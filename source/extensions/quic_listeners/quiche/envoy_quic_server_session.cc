@@ -89,7 +89,13 @@ void EnvoyQuicServerSession::Initialize() {
 }
 
 void EnvoyQuicServerSession::OnCanWrite() {
+  const uint64_t headers_to_send_old =
+      quic::VersionUsesHttp3(transport_version()) ? 0u : headers_stream()->BufferedDataBytes();
+
   quic::QuicServerSessionBase::OnCanWrite();
+  const uint64_t headers_to_send_new =
+      quic::VersionUsesHttp3(transport_version()) ? 0u : headers_stream()->BufferedDataBytes();
+  adjustBytesToSend(headers_to_send_new - headers_to_send_old);
   // Do not update delay close state according to connection level packet egress because that is
   // equivalent to TCP transport layer egress. But only do so if the session gets chance to write.
   maybeApplyDelayClosePolicy();
@@ -104,6 +110,11 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
 }
 
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
+
+void EnvoyQuicServerSession::OnOneRttKeysAvailable() {
+  quic::QuicServerSessionBase::OnOneRttKeysAvailable();
+  raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
 
 } // namespace Quic
 } // namespace Envoy

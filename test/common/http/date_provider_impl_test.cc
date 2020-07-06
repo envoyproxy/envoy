@@ -41,7 +41,7 @@ TEST(DateProviderImplTest, TlsResponseHeaders) {
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(500), _));
 
   TlsCachingDateProviderImpl provider(dispatcher, tls);
-  ResponseHeaderMapImpl headers;
+  TestResponseHeaderMapImpl headers;
   provider.setDateHeader(headers);
   EXPECT_NE(nullptr, headers.Date());
 

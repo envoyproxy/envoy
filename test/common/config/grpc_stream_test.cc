@@ -101,11 +101,10 @@ TEST_F(GrpcStreamTest, ReceiveMessage) {
   response_copy.set_type_url("faketypeURL");
   auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>(response_copy);
   envoy::service::discovery::v3::DiscoveryResponse received_message;
-  EXPECT_CALL(callbacks_, onDiscoveryResponse(_))
+  EXPECT_CALL(callbacks_, onDiscoveryResponse(_, _))
       .WillOnce([&received_message](
-                    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) {
-        received_message = *message;
-      });
+                    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+                    ControlPlaneStats&) { received_message = *message; });
   grpc_stream_.onReceiveMessage(std::move(response));
   EXPECT_TRUE(TestUtility::protoEqual(response_copy, received_message));
 }

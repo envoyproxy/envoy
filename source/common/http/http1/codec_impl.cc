@@ -11,6 +11,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
+#include "common/grpc/common.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -34,6 +35,9 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view ConnectionHeaderSanitization = "http1.connection_header_rejected";
   const absl::string_view InvalidUrl = "http1.invalid_url";
   const absl::string_view InvalidTransferEncoding = "http1.invalid_transfer_encoding";
+  const absl::string_view BodyDisallowed = "http1.body_disallowed";
+  const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
+  const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
 };
 
 struct Http1HeaderTypesValues {
@@ -67,8 +71,7 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
-      processing_100_continue_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), is_content_length_allowed_(true),
+      is_response_to_head_request_(false), is_response_to_connect_request_(false),
       header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
@@ -100,13 +103,11 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
 
 void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
-  processing_100_continue_ = true;
   encodeHeaders(headers, false);
-  processing_100_continue_ = false;
 }
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
-                                          bool end_stream) {
+                                          absl::optional<uint64_t> status, bool end_stream) {
   bool saw_content_length = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
@@ -150,7 +151,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   if (saw_content_length || disable_chunk_encoding_) {
     chunk_encoding_ = false;
   } else {
-    if (processing_100_continue_) {
+    if (status && *status == 100) {
       // Make sure we don't serialize chunk information with 100-Continue headers.
       chunk_encoding_ = false;
     } else if (end_stream && !is_response_to_head_request_) {
@@ -158,15 +159,26 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // response to a HEAD request.
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
-      if (is_content_length_allowed_) {
+      if (!status || (*status >= 200 && *status != 204)) {
         encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
       }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
+    } else if (status && (*status < 200 || *status == 204) &&
+               connection_.strict1xxAnd204Headers()) {
+      // TODO(zuercher): when the "envoy.reloadable_features.strict_1xx_and_204_response_headers"
+      // feature flag is removed, this block can be coalesced with the 100 Continue logic above.
+
+      // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
+      // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
+      chunk_encoding_ = false;
+
+      // Assert 1xx (may have content) OR 204 and end stream.
+      ASSERT(*status < 200 || end_stream);
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
-      // https://tools.ietf.org/html/rfc7231#section-4.3.6
+      // https://tools.ietf.org/html/rfc7231#section-4.3.6.
       if (!is_response_to_connect_request_) {
         encodeFormattedHeader(Headers::get().TransferEncoding.get(),
                               Headers::get().TransferEncodingValues.Chunked);
@@ -351,20 +363,12 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 
-  if (numeric_status == 204 || numeric_status < 200) {
-    // Per https://tools.ietf.org/html/rfc7230#section-3.3.2
-    setIsContentLengthAllowed(false);
-  } else {
-    // Make sure that if we encodeHeaders(100) then encodeHeaders(200) that we
-    // set is_content_length_allowed_ back to true.
-    setIsContentLengthAllowed(true);
-  }
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.
     is_response_to_connect_request_ = false;
   }
 
-  encodeHeadersBase(headers, end_stream);
+  encodeHeadersBase(headers, absl::make_optional<uint64_t>(numeric_status), end_stream);
 }
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
@@ -400,7 +404,7 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   }
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
-  encodeHeadersBase(headers, end_stream);
+  encodeHeadersBase(headers, absl::nullopt, end_stream);
 }
 
 http_parser_settings ConnectionImpl::settings_{
@@ -458,6 +462,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       enable_trailers_(enable_trailers),
       reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
+      strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
                      [&]() -> void { this->onAboveHighWatermark(); },
                      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
@@ -495,6 +501,22 @@ void ConnectionImpl::completeLastHeader() {
   header_parsing_state_ = HeaderParsingState::Field;
   ASSERT(current_header_field_.empty());
   ASSERT(current_header_value_.empty());
+}
+
+uint32_t ConnectionImpl::getHeadersSize() {
+  return current_header_field_.size() + current_header_value_.size() +
+         headersOrTrailers().byteSize();
+}
+
+void ConnectionImpl::checkMaxHeadersSize() {
+  const uint32_t total = getHeadersSize();
+  if (total > (max_headers_kb_ * 1024)) {
+    const absl::string_view header_type =
+        processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
+    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+    sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge);
+    throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
+  }
 }
 
 bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
@@ -575,12 +597,15 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
     }
     processing_trailers_ = true;
     header_parsing_state_ = HeaderParsingState::Field;
+    allocTrailers();
   }
   if (header_parsing_state_ == HeaderParsingState::Value) {
     completeLastHeader();
   }
 
   current_header_field_.append(data, length);
+
+  checkMaxHeadersSize();
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
@@ -589,12 +614,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
-  if (processing_trailers_) {
-    maybeAllocTrailers();
-  }
-
   absl::string_view header_value{data, length};
-
   if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
@@ -614,15 +634,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
   current_header_value_.append(header_value.data(), header_value.length());
 
-  const uint32_t total =
-      current_header_field_.size() + current_header_value_.size() + headersOrTrailers().byteSize();
-  if (total > (max_headers_kb_ * 1024)) {
-    const absl::string_view header_type =
-        processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
-    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
-    sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge);
-    throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
-  }
+  checkMaxHeadersSize();
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
@@ -660,16 +672,30 @@ int ConnectionImpl::onHeadersCompleteBase() {
     }
   }
   if (parser_.method == HTTP_CONNECT) {
+    if (request_or_response_headers.ContentLength()) {
+      if (request_or_response_headers.getContentLengthValue() == "0") {
+        request_or_response_headers.removeContentLength();
+      } else {
+        // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 a payload with a
+        // CONNECT request has no defined semantics, and may be rejected.
+        error_code_ = Http::Code::BadRequest;
+        sendProtocolError(Http1ResponseCodeDetails::get().BodyDisallowed);
+        throw CodecProtocolException("http/1.1 protocol error: unsupported content length");
+      }
+    }
     ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT request.", connection_);
     handling_upgrade_ = true;
   }
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
+  // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 a payload with a
+  // CONNECT request has no defined semantics, and may be rejected.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if (reject_unsupported_transfer_encodings_ &&
-        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
+    if ((reject_unsupported_transfer_encodings_ &&
+         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) ||
+        parser_.method == HTTP_CONNECT) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
       throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
@@ -765,6 +791,14 @@ ServerConnectionImpl::ServerConnectionImpl(
       flood_protection_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")),
       headers_with_underscores_action_(headers_with_underscores_action) {}
+
+uint32_t ServerConnectionImpl::getHeadersSize() {
+  // Add in the the size of the request URL if processing request headers.
+  const uint32_t url_size = (!processing_trailers_ && active_request_.has_value())
+                                ? active_request_.value().request_url_.size()
+                                : 0;
+  return url_size + ConnectionImpl::getHeadersSize();
+}
 
 void ServerConnectionImpl::onEncodeComplete() {
   if (active_request_.value().remote_complete_) {
@@ -898,6 +932,8 @@ void ServerConnectionImpl::onMessageBegin() {
 void ServerConnectionImpl::onUrl(const char* data, size_t length) {
   if (active_request_.has_value()) {
     active_request_.value().request_url_.append(data, length);
+
+    checkMaxHeadersSize();
   }
 }
 
@@ -945,7 +981,7 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   active_request_.reset();
 }
 
-void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
+void ServerConnectionImpl::sendProtocolErrorOld(absl::string_view details) {
   if (active_request_.has_value()) {
     active_request_.value().response_encoder_.setDetails(details);
   }
@@ -960,6 +996,35 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
                      "\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"));
 
     connection_.write(bad_request_response, false);
+  }
+}
+
+void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.early_errors_via_hcm")) {
+    sendProtocolErrorOld(details);
+    return;
+  }
+  // We do this here because we may get a protocol error before we have a logical stream.
+  if (!active_request_.has_value()) {
+    onMessageBeginBase();
+  }
+  ASSERT(active_request_.has_value());
+
+  active_request_.value().response_encoder_.setDetails(details);
+  if (!active_request_.value().response_encoder_.startedResponse()) {
+    // Note that the correctness of is_grpc_request and is_head_request is best-effort.
+    // If headers have not been fully parsed they may not be inferred correctly.
+    bool is_grpc_request = false;
+    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_) &&
+        absl::get<RequestHeaderMapPtr>(headers_or_trailers_) != nullptr) {
+      is_grpc_request =
+          Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+    }
+    const bool is_head_request = parser_.method == HTTP_HEAD;
+    active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
+                                                      CodeUtility::toString(error_code_), nullptr,
+                                                      is_head_request, absl::nullopt, details);
+    return;
   }
 }
 
@@ -1063,6 +1128,25 @@ int ClientConnectionImpl::onHeadersComplete() {
       }
     }
 
+    if (strict_1xx_and_204_headers_ && (parser_.status_code < 200 || parser_.status_code == 204)) {
+      if (headers->TransferEncoding()) {
+        sendProtocolError(Http1ResponseCodeDetails::get().TransferEncodingNotAllowed);
+        throw CodecProtocolException(
+            "http/1.1 protocol error: transfer encoding not allowed in 1xx or 204");
+      }
+
+      if (headers->ContentLength()) {
+        // Report a protocol error for non-zero Content-Length, but paper over zero Content-Length.
+        if (headers->ContentLength()->value().getStringView() != "0") {
+          sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
+          throw CodecProtocolException(
+              "http/1.1 protocol error: content length not allowed in 1xx or 204");
+        }
+
+        headers->removeContentLength();
+      }
+    }
+
     if (parser_.status_code == 100) {
       // http-parser treats 100 continue headers as their own complete response.
       // Swallow the spurious onMessageComplete and continue processing.
@@ -1086,7 +1170,7 @@ int ClientConnectionImpl::onHeadersComplete() {
 
 bool ClientConnectionImpl::upgradeAllowed() const {
   if (pending_response_.has_value()) {
-    return pending_response_->encoder_.upgrade_request_;
+    return pending_response_->encoder_.upgradeRequest();
   }
   return false;
 }

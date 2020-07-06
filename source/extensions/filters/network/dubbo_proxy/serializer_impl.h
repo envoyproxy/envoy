@@ -14,8 +14,6 @@ public:
   using ParameterValueMap = std::unordered_map<uint32_t, std::string>;
   using ParameterValueMapPtr = std::unique_ptr<ParameterValueMap>;
 
-  using HeaderMapPtr = std::unique_ptr<Http::HeaderMapImpl>;
-
   RpcInvocationImpl() = default;
   ~RpcInvocationImpl() override = default;
 
@@ -32,7 +30,7 @@ public:
 private:
   inline void assignHeaderIfNeed() {
     if (!headers_) {
-      headers_ = std::make_unique<Http::HeaderMapImpl>();
+      headers_ = Http::RequestHeaderMapImpl::create();
     }
   }
 
@@ -43,7 +41,7 @@ private:
   }
 
   ParameterValueMapPtr parameter_map_;
-  HeaderMapPtr headers_; // attachment
+  Http::HeaderMapPtr headers_; // attachment
 };
 
 class RpcResultImpl : public RpcResult {

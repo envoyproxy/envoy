@@ -15,8 +15,15 @@ of circuit breaking by setting the thresholds to a value of `1000000000`.
 
   circuit_breakers:
     thresholds:
-      priority: HIGH
-      max_connections: 1000000000
-      max_pending_requests: 1000000000
-      max_requests: 1000000000
-      max_retries: 1000000000
+      - priority: DEFAULT
+        max_connections: 1000000000
+        max_pending_requests: 1000000000
+        max_requests: 1000000000
+        max_retries: 1000000000
+      - priority: HIGH
+        max_connections: 1000000000
+        max_pending_requests: 1000000000
+        max_requests: 1000000000
+        max_retries: 1000000000
+
+Envoy supports priority routing at the route level. You may adjust the thresholds accordingly.

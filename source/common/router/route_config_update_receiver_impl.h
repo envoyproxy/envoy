@@ -17,19 +17,15 @@ namespace Router {
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(TimeSource& time_source,
-                                ProtobufMessage::ValidationVisitor& validation_visitor)
+  RouteConfigUpdateReceiverImpl(TimeSource& time_source)
       : time_source_(time_source), last_config_hash_(0ull), last_vhds_config_hash_(0ul),
-        validation_visitor_(validation_visitor), vhds_configuration_changed_(true) {}
+        vhds_configuration_changed_(true) {}
 
   void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
-  void collectResourceIdsInUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
-  bool updateVhosts(
-      std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources);
+  bool updateVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
+                    const VirtualHostRefVector& added_vhosts);
   void rebuildRouteConfig(
       const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
       const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
@@ -41,10 +37,10 @@ public:
   // Router::RouteConfigUpdateReceiver
   bool onRdsUpdate(const envoy::config::route::v3::RouteConfiguration& rc,
                    const std::string& version_info) override;
-  bool onVhdsUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& version_info) override;
+  bool onVhdsUpdate(const VirtualHostRefVector& added_vhosts,
+                    const std::set<std::string>& added_resource_ids,
+                    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                    const std::string& version_info) override;
   const std::string& routeConfigName() const override { return route_config_proto_.name(); }
   const std::string& configVersion() const override { return last_config_version_; }
   uint64_t configHash() const override { return last_config_hash_; }
@@ -70,7 +66,6 @@ private:
   std::map<std::string, envoy::config::route::v3::VirtualHost> rds_virtual_hosts_;
   std::map<std::string, envoy::config::route::v3::VirtualHost> vhds_virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   std::set<std::string> resource_ids_in_last_update_;
   bool vhds_configuration_changed_;
 };

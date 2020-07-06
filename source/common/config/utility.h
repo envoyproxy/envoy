@@ -185,6 +185,18 @@ public:
   parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
+   * Generate a ControlPlaneStats object from stats scope.
+   * @param scope for stats.
+   * @return ControlPlaneStats for scope.
+   */
+  static ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
+    const std::string control_plane_prefix = "control_plane.";
+    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
+                                    POOL_GAUGE_PREFIX(scope, control_plane_prefix),
+                                    POOL_TEXT_READOUT_PREFIX(scope, control_plane_prefix))};
+  }
+
+  /**
    * Generate a SubscriptionStats object from stats scope.
    * @param scope for stats.
    * @return SubscriptionStats for scope.

@@ -28,7 +28,7 @@ namespace Server {
 
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  std::shared_ptr<Network::DrainableFilterChain>
+  Network::DrainableFilterChainSharedPtr
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
@@ -89,10 +89,11 @@ public:
   // Dummy method
   void close() override {}
   bool isOpen() const override { return false; }
-  Network::Address::SocketType socketType() const override {
-    return Network::Address::SocketType::Stream;
-  }
+  Network::Socket::Type socketType() const override { return Network::Socket::Type::Stream; }
   Network::Address::Type addressType() const override { return local_address_->type(); }
+  absl::optional<Network::Address::IpVersion> ipVersion() const override {
+    return Network::Address::IpVersion::v4;
+  }
   void setLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void setRemoteAddress(const Network::Address::InstanceConstSharedPtr&) override {}
@@ -111,7 +112,9 @@ public:
   Api::SysCallIntResult setSocketOption(int, int, const void*, socklen_t) override {
     return {0, 0};
   }
-  Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) override { return {0, 0}; }
+  Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) const override {
+    return {0, 0};
+  }
   Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
 
 private:

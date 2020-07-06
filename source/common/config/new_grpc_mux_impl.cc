@@ -27,17 +27,39 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
 
 void NewGrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
 
+void NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
+  for (const auto& type_url : type_urls) {
+    pause(type_url);
+  }
+}
+
 void NewGrpcMuxImpl::resume(const std::string& type_url) {
   pausable_ack_queue_.resume(type_url);
   trySendDiscoveryRequests();
+}
+
+void NewGrpcMuxImpl::resume(const std::vector<std::string> type_urls) {
+  for (const auto& type_url : type_urls) {
+    resume(type_url);
+  }
 }
 
 bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
   return pausable_ack_queue_.paused(type_url);
 }
 
+bool NewGrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
+  for (const auto& type_url : type_urls) {
+    if (paused(type_url)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void NewGrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message) {
+    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+    ControlPlaneStats&) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
@@ -102,15 +124,16 @@ void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const std::set<std::string>& resources,
-                                         SubscriptionCallbacks& callbacks) {
+                                         SubscriptionCallbacks& callbacks,
+                                         OpaqueResourceDecoder& resource_decoder) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     addSubscription(type_url);
-    return addWatch(type_url, resources, callbacks);
+    return addWatch(type_url, resources, callbacks, resource_decoder);
   }
 
-  Watch* watch = entry->second->watch_map_.addWatch(callbacks);
+  Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
   updateWatch(type_url, watch, resources);
   return std::make_unique<WatchImpl>(type_url, watch, *this);

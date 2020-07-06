@@ -317,8 +317,8 @@ public:
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, get, (absl::string_view cluster));
   MOCK_METHOD(Http::ConnectionPool::Instance*, httpConnPoolForCluster,
-              (const std::string& cluster, ResourcePriority priority, Http::Protocol protocol,
-               LoadBalancerContext* context));
+              (const std::string& cluster, ResourcePriority priority,
+               absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, tcpConnPoolForCluster,
               (const std::string& cluster, ResourcePriority priority,
                LoadBalancerContext* context));
@@ -433,5 +433,19 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 };
+
+class MockBasicResourceLimit : public ResourceLimit {
+public:
+  MockBasicResourceLimit();
+  ~MockBasicResourceLimit() override;
+
+  MOCK_METHOD(bool, canCreate, ());
+  MOCK_METHOD(void, inc, ());
+  MOCK_METHOD(void, dec, ());
+  MOCK_METHOD(void, decBy, (uint64_t));
+  MOCK_METHOD(uint64_t, max, ());
+  MOCK_METHOD(uint64_t, count, (), (const));
+};
+
 } // namespace Upstream
 } // namespace Envoy

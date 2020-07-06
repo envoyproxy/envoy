@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/grpc_subscription_impl.h"
@@ -45,8 +46,8 @@ public:
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
         local_info_);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        xds_context_, callbacks_, stats_, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_,
-        init_fetch_timeout, false);
+        xds_context_, callbacks_, resource_decoder_, stats_,
+        Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
@@ -156,7 +157,7 @@ public:
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(response));
+        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -204,6 +205,8 @@ public:
   Event::MockTimer* init_timeout_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};

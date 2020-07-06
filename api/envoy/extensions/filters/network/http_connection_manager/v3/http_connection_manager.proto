@@ -18,7 +18,11 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -281,13 +285,15 @@ message HttpConnectionManager {
 
   // Additional settings for HTTP requests handled by the connection manager. These will be
   // applicable to both HTTP1 and HTTP2 requests.
-  config.core.v3.HttpProtocolOptions common_http_protocol_options = 35;
+  config.core.v3.HttpProtocolOptions common_http_protocol_options = 35
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
   config.core.v3.Http1ProtocolOptions http_protocol_options = 8;
 
   // Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
-  config.core.v3.Http2ProtocolOptions http2_protocol_options = 9;
+  config.core.v3.Http2ProtocolOptions http2_protocol_options = 9
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.
@@ -324,6 +330,16 @@ message HttpConnectionManager {
   // is terminated with a 408 Request Timeout error code if no upstream response
   // header has been received, otherwise a stream reset occurs.
   //
+  // This timeout also specifies the amount of time that Envoy will wait for the peer to open enough
+  // window to write any remaining stream data once the entirety of stream data (local end stream is
+  // true) has been buffered pending available window. In other words, this timeout defends against
+  // a peer that does not release enough window to completely write the stream, even though all
+  // data has been proxied within available flow control windows. If the timeout is hit in this
+  // case, the :ref:`tx_flush_timeout <config_http_conn_man_stats_per_codec>` counter will be
+  // incremented. Note that :ref:`max_stream_duration
+  // <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` does not apply to
+  // this corner case.
+  //
   // Note that it is possible to idle timeout even if the wire traffic for a stream is non-idle, due
   // to the granularity of events presented to the connection manager. For example, while receiving
   // very large request headers, it may be the case that there is traffic regularly arriving on the
@@ -332,13 +348,15 @@ message HttpConnectionManager {
   //
   // A value of 0 will completely disable the connection manager stream idle
   // timeout, although per-route idle timeout overrides will continue to apply.
-  google.protobuf.Duration stream_idle_timeout = 24;
+  google.protobuf.Duration stream_idle_timeout = 24
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // The amount of time that Envoy will wait for the entire request to be received.
   // The timer is activated when the request is initiated, and is disarmed when the last byte of the
   // request is sent upstream (i.e. all decoding filters have processed the request), OR when the
   // response is initiated. If not specified or set to 0, this timeout is disabled.
-  google.protobuf.Duration request_timeout = 28;
+  google.protobuf.Duration request_timeout = 28
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.
@@ -394,7 +412,8 @@ message HttpConnectionManager {
   // :ref:`config_http_conn_man_headers_x-forwarded-for`,
   // :ref:`config_http_conn_man_headers_x-envoy-internal`, and
   // :ref:`config_http_conn_man_headers_x-envoy-external-address` for more information.
-  google.protobuf.BoolValue use_remote_address = 14;
+  google.protobuf.BoolValue use_remote_address = 14
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // The number of additional ingress proxy hops from the right side of the
   // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
@@ -484,17 +503,17 @@ message HttpConnectionManager {
   // true in the future. When not specified, this value may be overridden by the
   // runtime variable
   // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
-  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`
+  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`_
   // for details of normalization.
   // Note that Envoy does not perform
-  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
+  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`_
   google.protobuf.BoolValue normalize_path = 30;
 
   // Determines if adjacent slashes in the path are merged into one before any processing of
   // requests by HTTP filters or routing. This affects the upstream *:path* header as well. Without
   // setting this option, incoming requests with path `//dir///file` will not match against route
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
-  // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  // `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool merge_slashes = 33;
 
   // The configuration of the request ID extension. This includes operations such as
@@ -519,7 +538,7 @@ message HttpConnectionManager {
   // local port and request method is not CONNECT. This affects the upstream host header as well.
   // Without setting this option, incoming requests with host `example:443` will not match against
   // route with :ref:`domains<envoy_api_field_config.route.v3.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
-  // of `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
+  // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool strip_matching_host_port = 39;
 }
 
@@ -596,7 +615,13 @@ message Rds {
   // API. This allows an Envoy configuration with multiple HTTP listeners (and
   // associated HTTP connection manager filters) to use different route
   // configurations.
-  string route_config_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  string route_config_name = 2
+      [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
+
+  // Resource locator for RDS. This is mutually exclusive to *route_config_name*.
+  // [#not-implemented-hide:]
+  udpa.core.v1.ResourceLocator rds_resource_locator = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.
@@ -744,22 +769,52 @@ message ScopedRds {
       [(validate.rules).message = {required: true}];
 }
 
+// [#next-free-field: 6]
 message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
+
+  // [#not-implemented-hide:] Configuration source specifier for the late-bound
+  // filter configuration. The HTTP Listener is warmed until all the initial
+  // filter configurations are received, unless the flag to apply the default
+  // configuration is set. Subsequent filter updates are atomic on a per-worker
+  // basis, and apply to new streams while the active streams continue using
+  // the older filter configurations. If the initial delivery of the filter
+  // configuration fails, due to a timeout for example, the optional default
+  // configuration is applied. Without a default configuration, the filter is
+  // disabled, and the HTTP listener responds with 500 immediately. After the
+  // failure, the listener continues subscribing to the subsequent filter
+  // configurations.
+  message HttpFilterConfigSource {
+    config.core.v3.ConfigSource config_source = 1;
+
+    // Optional default configuration to use as the initial configuration if
+    // there is a failure to receive the initial filter configuration or if
+    // `apply_default_config_without_warming` flag is set.
+    google.protobuf.Any default_config = 2;
+
+    // Use the default config as the initial configuration without warming and
+    // waiting for the first xDS response. Requires the default configuration
+    // to be supplied.
+    bool apply_default_config_without_warming = 3;
+  }
 
   reserved 3, 2;
 
   reserved "config";
 
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_http_filters>`.
+  // The name of the filter configuration. The name is used as a fallback to
+  // select an extension if the type of the configuration proto is not
+  // sufficient. It also serves as a resource name in FilterConfigDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
     google.protobuf.Any typed_config = 4;
+
+    // [#not-implemented-hide:] Configuration source specifier for FilterConfigDS.
+    HttpFilterConfigSource filter_config_ds = 5;
   }
 }
 

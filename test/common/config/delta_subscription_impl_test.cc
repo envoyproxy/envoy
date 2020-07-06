@@ -78,7 +78,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message));
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // The server gives us our first version of resource name2.
   // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
@@ -92,7 +92,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message));
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // The server gives us an updated version of resource name1.
   // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
@@ -106,7 +106,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message));
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
@@ -136,6 +136,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   NiceMock<Runtime::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
+  NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;
   auto* async_client = new Grpc::MockAsyncClient();
 
   const Protobuf::MethodDescriptor* method_descriptor =
@@ -147,8 +148,8 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
       local_info);
 
   std::unique_ptr<GrpcSubscriptionImpl> subscription = std::make_unique<GrpcSubscriptionImpl>(
-      xds_context, callbacks, stats, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher,
-      std::chrono::milliseconds(12345), false);
+      xds_context, callbacks, resource_decoder, stats, Config::TypeUrl::get().ClusterLoadAssignment,
+      dispatcher, std::chrono::milliseconds(12345), false);
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 

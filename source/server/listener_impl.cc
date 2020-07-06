@@ -3,6 +3,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/network/exception.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -53,7 +55,7 @@ bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
 
 ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& factory,
                                                  Network::Address::InstanceConstSharedPtr address,
-                                                 Network::Address::SocketType socket_type,
+                                                 Network::Socket::Type socket_type,
                                                  const Network::Socket::OptionsSharedPtr& options,
                                                  bool bind_to_port,
                                                  const std::string& listener_name, bool reuse_port)
@@ -62,7 +64,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
 
   bool create_socket = false;
   if (local_address_->type() == Network::Address::Type::Ip) {
-    if (socket_type_ == Network::Address::SocketType::Datagram) {
+    if (socket_type_ == Network::Socket::Type::Datagram) {
       ASSERT(reuse_port_ == true);
     }
 
@@ -106,7 +108,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
       ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
+      throw Network::CreateListenerException(message);
     } else {
       ENVOY_LOG(debug, "{}", message);
     }
@@ -244,6 +246,11 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
+      cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
+                            ".connection_limit"),
+      open_connections_(std::make_shared<BasicResourceLimitImpl>(
+          std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
+          cx_limit_runtime_key_)),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
         if (workers_started_) {
           parent_.onListenerWarmed(*this);
@@ -253,6 +260,16 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           listener_init_target_.ready();
         }
       }) {
+
+  const absl::optional<std::string> runtime_val =
+      listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
+  if (runtime_val && runtime_val->empty()) {
+    ENVOY_LOG(warn,
+              "Listener connection limit runtime key {} is empty. There are currently no "
+              "limitations on the number of accepted connections for listener {}.",
+              cx_limit_runtime_key_, config_.name());
+  }
+
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
@@ -260,7 +277,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
-  if (socket_type == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Socket::Type::Datagram) {
     return;
   }
   buildSocketOptions();
@@ -276,7 +293,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 }
 
-ListenerImpl::ListenerImpl(const ListenerImpl& origin,
+ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
@@ -320,6 +337,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
+  open_connections_ = origin.open_connections_;
 }
 
 void ListenerImpl::buildAccessLog() {
@@ -330,9 +348,15 @@ void ListenerImpl::buildAccessLog() {
   }
 }
 
-void ListenerImpl::buildUdpListenerFactory(Network::Address::SocketType socket_type,
+void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
                                            uint32_t concurrency) {
-  if (socket_type == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Socket::Type::Datagram) {
+    if (!config_.reuse_port() && concurrency > 1) {
+      throw EnvoyException("Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
+                           "socket option results in "
+                           "unstable packet proxying. Configure the reuse_port listener option or "
+                           "set concurrency = 1.");
+    }
     auto udp_config = config_.udp_listener_config();
     if (udp_config.udp_listener_name().empty()) {
       udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
@@ -343,14 +367,10 @@ void ListenerImpl::buildUdpListenerFactory(Network::Address::SocketType socket_t
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
-    if (!config_.reuse_port() && concurrency > 1) {
-      ENVOY_LOG(warn, "Listening on UDP without SO_REUSEPORT socket option may result to unstable "
-                      "packet proxying. Consider configuring the reuse_port listener option.");
-    }
   }
 }
 
-void ListenerImpl::buildListenSocketOptions(Network::Address::SocketType socket_type) {
+void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -364,7 +384,7 @@ void ListenerImpl::buildListenSocketOptions(Network::Address::SocketType socket_
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config_.socket_options()));
   }
-  if (socket_type == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Socket::Type::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
@@ -372,10 +392,10 @@ void ListenerImpl::buildListenSocketOptions(Network::Address::SocketType socket_
   }
 }
 
-void ListenerImpl::createListenerFilterFactories(Network::Address::SocketType socket_type) {
+void ListenerImpl::createListenerFilterFactories(Network::Socket::Type socket_type) {
   if (!config_.listener_filters().empty()) {
     switch (socket_type) {
-    case Network::Address::SocketType::Datagram:
+    case Network::Socket::Type::Datagram:
       if (config_.listener_filters().size() > 1) {
         // Currently supports only 1 UDP listener filter.
         throw EnvoyException(fmt::format(
@@ -385,7 +405,7 @@ void ListenerImpl::createListenerFilterFactories(Network::Address::SocketType so
       udp_listener_filter_factories_ = parent_.factory_.createUdpListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
       break;
-    case Network::Address::SocketType::Stream:
+    case Network::Socket::Type::Stream:
       listener_filter_factories_ = parent_.factory_.createListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
       break;
@@ -395,8 +415,8 @@ void ListenerImpl::createListenerFilterFactories(Network::Address::SocketType so
   }
 }
 
-void ListenerImpl::validateFilterChains(Network::Address::SocketType socket_type) {
-  if (config_.filter_chains().empty() && (socket_type == Network::Address::SocketType::Stream ||
+void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
+  if (config_.filter_chains().empty() && (socket_type == Network::Socket::Type::Stream ||
                                           !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
@@ -468,7 +488,7 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
   }
 }
@@ -637,9 +657,9 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
 
   // Currently we only support TCP filter chain update.
   if (Network::Utility::protobufAddressSocketType(config_.address()) !=
-          Network::Address::SocketType::Stream ||
+          Network::Socket::Type::Stream ||
       Network::Utility::protobufAddressSocketType(config.address()) !=
-          Network::Address::SocketType::Stream) {
+          Network::Socket::Type::Stream) {
     return false;
   }
 
