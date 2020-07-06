@@ -470,7 +470,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         memcpy(msg->msg_iov[0].iov_base, stacked_message.data(), stacked_message.length());
         msg->msg_iov[0].iov_len = stacked_message.length();
 
-        // Populate control headers
+        // Set control headers
         memset(msg->msg_control, 0, msg->msg_controllen);
         cmsghdr* cmsg = CMSG_FIRSTHDR(msg);
         if (send_to_addr_->ip()->version() == Address::IpVersion::v4) {
@@ -495,7 +495,7 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
               send_to_addr_->ip()->ipv6()->address();
         }
 
-        // Specify gso_size
+        // Set gso_size
         cmsg = CMSG_NXTHDR(msg, cmsg);
         cmsg->cmsg_level = SOL_UDP;
         cmsg->cmsg_type = UDP_GRO;
