@@ -76,15 +76,6 @@ protected:
                                      server_socket_->localAddress()->ip()->port());
   }
 
-  Address::Instance* getServerAnyAddress() {
-    if (version_ == Address::IpVersion::v4) {
-      return new Address::Ipv4Instance(Network::Test::getAnyAddressString(version_),
-                                       server_socket_->localAddress()->ip()->port());
-    }
-    return new Address::Ipv6Instance(Network::Test::getAnyAddressString(version_),
-                                     server_socket_->localAddress()->ip()->port());
-  }
-
   SocketSharedPtr createServerSocket(bool bind) {
     // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source address.
     return std::make_shared<UdpListenSocket>(Network::Test::getAnyAddress(version_),
