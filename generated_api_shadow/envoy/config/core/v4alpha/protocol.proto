@@ -281,7 +281,7 @@ message Http2ProtocolOptions {
   // when this option is enabled, only the offending stream is terminated.
   //
   // This is overridden by HCM :ref:`stream_error_on_invalid_http_messaging
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_messaging>`
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
   // iff present.
   //
   // This is deprecated in favor of :ref:`override_stream_error_on_invalid_http_message
@@ -295,7 +295,7 @@ message Http2ProtocolOptions {
   // when this option is enabled, only the offending stream is terminated.
   //
   // This overrides any HCM :ref:`stream_error_on_invalid_http_messaging
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_messaging>`
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
   //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 14;
