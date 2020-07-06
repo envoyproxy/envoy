@@ -12,6 +12,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
+#include "envoy/network/exception.h"
 
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
@@ -78,9 +79,16 @@ protected:
       : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_) {
-    SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
-  }
+        connection_handler_(*dispatcher_), quic_version_([]() {
+          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
+            return quic::CurrentSupportedVersionsWithQuicCrypto();
+          }
+          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
+          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
+          return quic::CurrentSupportedVersions();
+        }()[0]) {}
 
   template <typename A, typename B>
   std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
@@ -138,7 +146,7 @@ protected:
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
         }));
-    if (!quic::VersionUsesHttp3(quic::CurrentSupportedVersions()[0].transport_version)) {
+    if (!quic_version_.UsesTls()) {
       EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
           .Times(connection_count);
     }
@@ -174,9 +182,8 @@ protected:
   void sendCHLO(quic::QuicConnectionId connection_id) {
     client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
     Buffer::OwnedImpl payload = generateChloPacketToSend(
-        quic::CurrentSupportedVersions()[0], quic_config_,
-        ActiveQuicListenerPeer::cryptoConfig(*quic_listener_), connection_id, clock_,
-        envoyAddressInstanceToQuicSocketAddress(local_address_),
+        quic_version_, quic_config_, ActiveQuicListenerPeer::cryptoConfig(*quic_listener_),
+        connection_id, clock_, envoyAddressInstanceToQuicSocketAddress(local_address_),
         envoyAddressInstanceToQuicSocketAddress(local_address_), "test.example.org");
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
@@ -263,6 +270,7 @@ protected:
   // of elements are saved in expectations before new elements are added.
   std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
   std::list<Network::MockFilterChain> filter_chains_;
+  quic::ParsedQuicVersion quic_version_;
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
@@ -281,7 +289,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
           options,
           ActiveQuicListenerFactoryPeer::runtimeEnabled(
               static_cast<ActiveQuicListenerFactory*>(listener_factory_.get()))),
-      EnvoyException, "Failed to apply socket options.");
+      Network::CreateListenerException, "Failed to apply socket options.");
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {

@@ -75,8 +75,9 @@ envoy_extension_cc_test(
     extension_name = "envoy.transport_sockets.alts",
     external_deps = [
         "grpc_alts_fake_handshaker_server",
+        "grpc_alts_handshaker_proto",
+        "grpc_alts_transport_security_common_proto",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",

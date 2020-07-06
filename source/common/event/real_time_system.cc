@@ -22,7 +22,7 @@ private:
 
 } // namespace
 
-SchedulerPtr RealTimeSystem::createScheduler(Scheduler& base_scheduler) {
+SchedulerPtr RealTimeSystem::createScheduler(Scheduler& base_scheduler, CallbackScheduler&) {
   return std::make_unique<RealScheduler>(base_scheduler);
 }
 

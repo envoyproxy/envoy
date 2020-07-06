@@ -50,7 +50,13 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam().first,
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam().second);
+          if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
+            return quic::CurrentSupportedVersionsWithQuicCrypto();
+          }
+          bool use_http3 = GetParam().second == QuicVersionType::Iquic;
+          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
@@ -86,8 +92,11 @@ public:
   // TODO(#8479) Propagate INVALID_VERSION error to caller and let caller to use server advertised
   // version list to create a new connection with mutually supported version and make client codec
   // again.
-  IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn) override {
-    IntegrationCodecClientPtr codec = HttpIntegrationTest::makeRawHttpConnection(std::move(conn));
+  IntegrationCodecClientPtr makeRawHttpConnection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
+    IntegrationCodecClientPtr codec =
+        HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
     if (codec->disconnected()) {
       // Connection may get closed during version negotiation or handshake.
       ENVOY_LOG(error, "Fail to connect to server with error: {}",
@@ -418,7 +427,7 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                1);
-  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
   // Reduce load a little to allow the connection to be accepted connection.
@@ -446,7 +455,8 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   EXPECT_EQ("envoy overloaded", response2->body());
   codec_client_->close();
 
-  EXPECT_TRUE(makeRawHttpConnection(makeClientConnection((lookupPort("http"))))->disconnected());
+  EXPECT_TRUE(makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt)
+                  ->disconnected());
 }
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {

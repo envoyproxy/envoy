@@ -114,7 +114,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   EXPECT_TRUE(payload_entry != nullptr);
   EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_FALSE(upstream_request_->headers().Authorization());
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::CustomHeaders::get().Authorization));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -392,7 +392,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
   EXPECT_TRUE(payload_entry != nullptr);
   EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_FALSE(upstream_request_->headers().Authorization());
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::CustomHeaders::get().Authorization));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 

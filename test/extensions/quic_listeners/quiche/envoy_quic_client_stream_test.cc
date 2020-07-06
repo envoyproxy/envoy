@@ -25,7 +25,9 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
+          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
           SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -40,7 +42,8 @@ public:
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(quic::VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
-        request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}} {
+        request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
+        request_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setResponseDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(quic_stream_));
@@ -103,6 +106,7 @@ protected:
   Http::MockStreamCallbacks stream_callbacks_;
   std::string host_{"www.abc.com"};
   Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestRequestTrailerMapImpl request_trailers_;
   quic::QuicHeaderList response_headers_;
   quic::QuicHeaderList trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};
@@ -115,7 +119,8 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientStreamTests, EnvoyQuicClientStreamTest,
 TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   quic_stream_->encodeHeaders(request_headers_, false);
-  quic_stream_->encodeData(request_body_, true);
+  quic_stream_->encodeData(request_body_, false);
+  quic_stream_->encodeTrailers(request_trailers_);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
@@ -258,6 +263,82 @@ TEST_P(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
 
   EXPECT_TRUE(quic_stream_->local_end_stream_);
   EXPECT_TRUE(quic_stream_->write_side_closed());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
+// Tests that headers and trailers buffered in send buffer contribute towards buffer watermark
+// limits. Only IETF QUIC writes them on data stream, gQUIC writes them on dedicated headers stream
+// and only contributes to connection watermark buffer.
+TEST_P(EnvoyQuicClientStreamTest, HeadersContributeToWatermarkIquic) {
+  if (!quic::VersionUsesHttp3(quic_version_.transport_version)) {
+    EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+    return;
+  }
+
+  // Bump connection flow control window large enough not to cause connection level flow control
+  // blocked
+  quic::QuicWindowUpdateFrame window_update(
+      quic::kInvalidControlFrameId,
+      quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version), 1024 * 1024);
+  quic_session_.OnWindowUpdateFrame(window_update);
+
+  // Make the stream blocked by congestion control.
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .WillOnce(Invoke([](quic::QuicStreamId, size_t /*write_length*/, quic::QuicStreamOffset,
+                          quic::StreamSendingState state, bool,
+                          quiche::QuicheOptional<quic::EncryptionLevel>) {
+        return quic::QuicConsumedData{0u, state != quic::NO_FIN};
+      }));
+  quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/false);
+
+  // Encode 16kB -10 bytes request body. Because the high watermark is 16KB, with previously
+  // buffered headers, this call should make the send buffers reach their high watermark.
+  std::string request(16 * 1024 - 10, 'a');
+  Buffer::OwnedImpl buffer(request);
+  EXPECT_CALL(stream_callbacks_, onAboveWriteBufferHighWatermark());
+  quic_stream_->encodeData(buffer, false);
+  EXPECT_EQ(0u, buffer.length());
+
+  // Unblock writing now, and this will write out 16kB data and cause stream to
+  // be blocked by the flow control limit.
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .WillOnce(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
+                          quic::StreamSendingState state, bool,
+                          quiche::QuicheOptional<quic::EncryptionLevel>) {
+        return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
+      }));
+  EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark());
+  quic_session_.OnCanWrite();
+  EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
+
+  // Update flow control window to write all the buffered data.
+  quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, quic_stream_->id(),
+                                             32 * 1024);
+  quic_stream_->OnWindowUpdateFrame(window_update1);
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .WillOnce(Invoke([](quic::QuicStreamId, size_t write_length, quic::QuicStreamOffset,
+                          quic::StreamSendingState state, bool,
+                          quiche::QuicheOptional<quic::EncryptionLevel>) {
+        return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
+      }));
+  quic_session_.OnCanWrite();
+  // No data should be buffered at this point.
+
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .WillOnce(Invoke([](quic::QuicStreamId, size_t, quic::QuicStreamOffset,
+                          quic::StreamSendingState state, bool,
+                          quiche::QuicheOptional<quic::EncryptionLevel>) {
+        return quic::QuicConsumedData{0u, state != quic::NO_FIN};
+      }));
+  // Send more data. If watermark bytes counting were not cleared in previous
+  // OnCanWrite, this write would have caused the stream to exceed its high watermark.
+  std::string request1(16 * 1024 - 3, 'a');
+  Buffer::OwnedImpl buffer1(request1);
+  quic_stream_->encodeData(buffer1, false);
+  // Buffering more trailers will cause stream to reach high watermark, but
+  // because trailers closes the stream, no callback should be triggered.
+  quic_stream_->encodeTrailers(request_trailers_);
+
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 

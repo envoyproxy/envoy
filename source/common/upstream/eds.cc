@@ -4,13 +4,12 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
+#include "common/config/decoded_resource_impl.h"
 #include "common/config/version_converter.h"
 
 namespace Envoy {
@@ -23,12 +22,12 @@ EdsClusterImpl::EdsClusterImpl(
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          cluster.eds_cluster_config().eds_config().resource_api_version()),
+          cluster.eds_cluster_config().eds_config().resource_api_version(),
+          factory_context.messageValidationVisitor(), "cluster_name"),
       local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()),
-      validation_visitor_(factory_context.messageValidationVisitor()) {
+                        : cluster.eds_cluster_config().service_name()) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -41,7 +40,8 @@ EdsClusterImpl::EdsClusterImpl(
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this);
+          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
+          resource_decoder_);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -112,14 +112,14 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   parent_.onPreInitComplete();
 }
 
-void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                     const std::string&) {
   if (!validateUpdateSize(resources.size())) {
     return;
   }
-  auto cluster_load_assignment =
-      MessageUtil::anyConvertAndValidate<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          resources[0], validation_visitor_);
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
+      dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+          resources[0].get().resource());
   if (cluster_load_assignment.cluster_name() != cluster_name_) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
@@ -145,15 +145,13 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   priority_set_.batchHostUpdate(helper);
 }
 
-void EdsClusterImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
-    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  if (!validateUpdateSize(resources.size())) {
+void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                    const Protobuf::RepeatedPtrField<std::string>&,
+                                    const std::string&) {
+  if (!validateUpdateSize(added_resources.size())) {
     return;
   }
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
-  *unwrapped_resource.Add() = resources[0].resource();
-  onConfigUpdate(unwrapped_resource, resources[0].version());
+  onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {
@@ -175,11 +173,13 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // TODO(vishalpowar) This is not going to work for incremental updates, and we
   // need to instead change the health status to indicate the assignments are
   // stale.
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name(cluster_name_);
-  resources.Add()->PackFrom(resource);
-  onConfigUpdate(resources, "");
+  ProtobufWkt::Any any_resource;
+  any_resource.PackFrom(resource);
+  Config::DecodedResourceImpl decoded_resource(resource_decoder_, any_resource, "");
+  std::vector<Config::DecodedResourceRef> resource_refs = {decoded_resource};
+  onConfigUpdate(resource_refs, "");
   // Stat to track how often we end up with stale assignments.
   info_->stats().assignment_stale_.inc();
 }

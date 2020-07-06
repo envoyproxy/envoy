@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "envoy/config/core/v3/address.pb.h"
-#include "envoy/json/json_object.h"
 #include "envoy/network/address.h"
 
 #include "common/protobuf/protobuf.h"
@@ -126,9 +125,7 @@ private:
  */
 class IpList {
 public:
-  IpList(const std::vector<std::string>& subnets);
-  IpList(const Json::Object& config, const std::string& member_name);
-  IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
+  explicit IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
   IpList() = default;
 
   bool contains(const Instance& address) const;

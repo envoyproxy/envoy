@@ -46,7 +46,7 @@ public:
                                    ->mutable_transport_socket();
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
       auto* common_tls_context = tls_context.mutable_common_tls_context();
-      common_tls_context->add_alpn_protocols("http/1.1");
+      common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
 
       common_tls_context->mutable_validation_context_sds_secret_config()->set_name(
           "validation_context");
