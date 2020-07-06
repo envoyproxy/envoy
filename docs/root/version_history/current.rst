@@ -9,6 +9,7 @@ Incompatible Behavior Changes
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * client_ssl_auth: the `auth_ip_white_list` stat has been renamed to
   :ref:`auth_ip_allowlist <config_network_filters_client_ssl_auth_stats>`.
+* header to metadata: on_header_missing rules with empty values are now rejected (they were skipped before).
 * router: path_redirect now keeps query string by default. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.preserve_query_string_in_path_redirects` to false.
 
 Minor Behavior Changes
@@ -17,7 +18,6 @@ Minor Behavior Changes
 
 * access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
 * build: runs as non-root inside Docker containers. Existing behaviour can be restored by setting the environment variable `ENVOY_UID` to `0`. `ENVOY_UID` and `ENVOY_GID` can be used to set the envoy user's `uid` and `gid` respectively.
-* header to metadata: on_header_missing rules with empty values are now rejected (they were skipped before).
 * health check: in the health check filter the :ref:`percentage of healthy servers in upstream clusters <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>` is now interpreted as an integer.
 * hot restart: added the option :option:`--use-dynamic-base-id` to select an unused base ID at startup and the option :option:`--base-id-path` to write the base id to a file (for reuse with later hot restarts).
 * http: changed early error path for HTTP/1.1 so that responses consistently flow through the http connection manager, and the http filter chains. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.early_errors_via_hcm` to false.
