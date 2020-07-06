@@ -97,10 +97,8 @@ envoy_cc_fuzz_test(
     deps = [
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
-        "//source/server:proto_descriptors_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
-        "//test/test_common:environment_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
