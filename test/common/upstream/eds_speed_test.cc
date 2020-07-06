@@ -170,7 +170,7 @@ static void priorityAndLocalityWeighted(benchmark::State& state) {
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
     // if we've been instructed to skip tests, only run once no matter the argument:
-    uint32_t endpoints = SkipExpensiveBenchmarks() ? 1 : state.range(2);
+    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(2);
 
     speed_test.priorityAndLocalityWeightedHelper(state.range(1), endpoints, true);
   }
@@ -187,7 +187,7 @@ static void duplicateUpdate(benchmark::State& state) {
 
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, false);
-    uint32_t endpoints = SkipExpensiveBenchmarks() ? 1 : state.range(0);
+    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
@@ -202,7 +202,7 @@ static void healthOnlyUpdate(benchmark::State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
     Envoy::Upstream::EdsSpeedTest speed_test(state, false);
-    uint32_t endpoints = SkipExpensiveBenchmarks() ? 1 : state.range(0);
+    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, false);
