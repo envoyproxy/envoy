@@ -17,6 +17,8 @@ filegroup(
         "ext_authz/config/grpc-service/v2.yaml",
         "ext_authz/config/grpc-service/v3.yaml",
         "ext_authz/config/http-service.yaml",
+        "front-proxy/certs/front-proxy-crt.pem",
+        "front-proxy/certs/front-proxy-key.pem",
         "front-proxy/front-envoy.yaml",
         "front-proxy/service-envoy.yaml",
         "grpc-bridge/client/envoy-proxy.yaml",

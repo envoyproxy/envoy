@@ -3,12 +3,13 @@ FROM envoyproxy/envoy-dev:latest
 RUN apt-get update && apt-get -q install -y \
     curl
 
-RUN mkdir -p /etc/certs && \
+RUN mkdir -p /certs && \
+    touch ~/.rnd && \
     openssl req -x509 -newkey rsa:4096 \
-        -keyout /etc/certs/key.pem \
-        -out  /etc/certs/crt.pem \
+        -keyout /certs/front-proxy-key.pem \
+        -out  /certs/front-proxy-crt.pem \
         -days 365 -nodes -subj '/CN=front-envoy'
 
-RUN id -u envoy | xargs -I{} chown -R {}:{} /etc/certs
+RUN id -u envoy | xargs -I{} chown -R {}:{} /certs
 
 CMD /usr/local/bin/envoy -c /etc/front-envoy.yaml --service-cluster front-proxy

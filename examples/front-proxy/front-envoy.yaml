@@ -67,9 +67,9 @@ static_resources:
           common_tls_context:
             tls_certificates:
               certificate_chain:
-                filename: /etc/certs/crt.pem
+                filename: ./certs/front-proxy-crt.pem
               private_key:
-                filename: /etc/certs/key.pem
+                filename: ./certs/front-proxy-key.pem
 
   clusters:
   - name: service1
