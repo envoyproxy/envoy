@@ -27,8 +27,8 @@ public:
   EnvoyQuicProofSource(Network::Socket& listen_socket,
                        Network::FilterChainManager& filter_chain_manager,
                        Server::ListenerStats& listener_stats)
-      : EnvoyQuicFakeProofSource(), listen_socket_(listen_socket),
-        filter_chain_manager_(filter_chain_manager), listener_stats_(listener_stats) {}
+      : listen_socket_(listen_socket), filter_chain_manager_(filter_chain_manager),
+        listener_stats_(listener_stats) {}
 
   ~EnvoyQuicProofSource() override = default;
 

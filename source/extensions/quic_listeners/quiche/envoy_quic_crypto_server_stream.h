@@ -20,7 +20,7 @@ namespace Quic {
 
 class EnvoyCryptoServerStream : protected Logger::Loggable<Logger::Id::quic_stream> {
 public:
-  virtual ~EnvoyCryptoServerStream() {}
+  virtual ~EnvoyCryptoServerStream() = default;
   virtual const DetailsWithFilterChain* proofSourceDetails() const = 0;
 };
 
@@ -55,7 +55,7 @@ public:
                     std::move(proof_source_details));
     }
 
-    void Cancel() { parent_ = nullptr; }
+    void cancel() { parent_ = nullptr; }
 
   private:
     EnvoyQuicCryptoServerStream* parent_;
@@ -70,7 +70,7 @@ public:
 
   ~EnvoyQuicCryptoServerStream() override {
     if (done_cb_wrapper_ != nullptr) {
-      done_cb_wrapper_->Cancel();
+      done_cb_wrapper_->cancel();
     }
   }
 
@@ -82,6 +82,7 @@ public:
       std::unique_ptr<quic::ProcessClientHelloResultCallback> done_cb) override {
     auto done_cb_wrapper =
         std::make_unique<EnvoyProcessClientHelloResultCallback>(this, std::move(done_cb));
+    ASSERT(done_cb_wrapper_ == nullptr);
     done_cb_wrapper_ = done_cb_wrapper.get();
     auto details = static_cast<DetailsWithFilterChain*>(proof_source_details.get());
     if (details != nullptr) {
@@ -96,7 +97,7 @@ public:
   const DetailsWithFilterChain* proofSourceDetails() const override { return details_.get(); }
 
 private:
-  EnvoyProcessClientHelloResultCallback* done_cb_wrapper_;
+  EnvoyProcessClientHelloResultCallback* done_cb_wrapper_{nullptr};
   std::unique_ptr<DetailsWithFilterChain> details_;
 };
 

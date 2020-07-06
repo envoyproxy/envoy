@@ -85,7 +85,7 @@ public:
 
 class ProofSourceDetailsSetter {
 public:
-  virtual ~ProofSourceDetailsSetter(){};
+  virtual ~ProofSourceDetailsSetter() = default;
 
   virtual void setProofSourceDetails(std::unique_ptr<DetailsWithFilterChain> details) = 0;
 };
