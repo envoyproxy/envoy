@@ -263,7 +263,10 @@ public:
    */
   Thread::ThreadSynchronizer& sync() { return sync_; }
 
-  StatNameSet& wellKnownTags() { return *well_known_tags_; }
+  /**
+   * @return a set of well known tag names; used to reduce symbol table churn.
+   */
+  const StatNameSet& wellKnownTags() const { return *well_known_tags_; }
 
 private:
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
