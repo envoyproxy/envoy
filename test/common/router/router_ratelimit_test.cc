@@ -480,6 +480,7 @@ filter_metadata:
               testing::ContainerEq(descriptors_));
 }
 
+// Tests that the default_value is used in the descriptor when the metadata_key is empty.
 TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataNoMatchWithDefaultValue) {
   const std::string yaml = R"EOF(
 actions:
@@ -571,7 +572,7 @@ filter_metadata:
 
   EXPECT_TRUE(descriptors_.empty());
 }
-
+// Tests that no descriptor is generated when both the metadata_key and default_value are empty.
 TEST_F(RateLimitPolicyEntryTest, DynamicMetaDataAndDefaultValueEmpty) {
   const std::string yaml = R"EOF(
 actions:
