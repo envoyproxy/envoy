@@ -15,31 +15,57 @@ Overview
 --------
 
 The admission control filter probabilistically rejects requests based on the success rate of
-previous requests in a configurable sliding time window. Users may configure the definition of a
-successful request for the purposes of the rejection probability calculation.
+previous requests in a configurable sliding time window. It is based on `client-side
+throttling <https://landing.google.com/sre/sre-book/chapters/handling-overload/>`_ from the `Google SRE handbook <https://landing.google.com/sre/sre-book/toc/index.html>`_. The only notable difference between the admission control
+filter's load shedding and load shedding defined in client-side throttling is that users may
+configure how aggressively load shedding starts at a target request success-rate. Users may also
+configure the definition of a successful request for the purposes of the rejection probability
+calculation.
 
-The probability that the filter will a request is as follows:
+The probability that the filter will reject a request is as follows:
 
 .. math::
 
-   P(reject) = \frac{n_{total} - K * n_{success}}{n_{total} + 1}
+   P_{reject} = {(\frac{n_{total} - s}{n_{total} + 1})}^\frac{1}{aggression}
 
-Where *n* refers to a request count gathered in the sliding window and *K* is a configurable
-aggression coefficient that dictates the minimum request success rate at which the filter will **not
-reject** requests. See the :ref:`v3 API reference
-<envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>` for more
-details on this parameter.
+where,
 
-Request Success Criteria
-------------------------
+.. math::
 
-A successful request is a :ref:`configurable parameter
-<envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl.SuccessCriteria>`
-for both HTTP and gRPC requests.
+   s = \frac{n_{success}}{threshold}
+
+
+- *n* refers to a request count gathered in the sliding window.
+- *threshold* is a configurable value that dictates the lowest request success rate at which the
+  filter will **not reject** requests. The value is normalized to [0,1] for the calculation.
+- *aggression* controls the rejection probability curve such that 1.0 is a linear increase in
+  rejection probability as the success rate decreases. As the **aggression** increases, the
+  rejection probability will be higher for higher success rates. See `Aggression`_ for a more
+  detailed explanation.
 
 .. note::
   The success rate calculations are performed on a per-thread basis for decreased performance
-  overhead, so the rejection probability may vary between worker threads. 
+  overhead, so the rejection probability may vary between worker threads.
+
+See the :ref:`v3 API reference
+<envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>` for more
+details on this parameter.
+
+The definition of a successful request is a :ref:`configurable parameter
+<envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl.SuccessCriteria>`
+for both HTTP and gRPC requests.
+
+Aggression
+~~~~~~~~~~
+
+The aggression value affects the rejection probabilities as shown in the following figure:
+
+.. image:: images/aggression_graph.png
+
+Since the success rate threshold is set to 95%, the rejection probability remains 0 until then. As
+success rate drops to 0%, the rejection probability approaches a value just under 100%. The
+aggression values dictate how high the rejection probability will be at a given request success
+rate, so it will shed load more *aggressively*.
 
 Example Configuration
 ---------------------
@@ -55,8 +81,11 @@ fields can be overridden via runtime settings.
       default_value: true
       runtime_key: "admission_control.enabled"
     sampling_window: 120s
-    aggression_coefficient:
-      default_value: 1.1
+    sr_threshold:
+      default_value: 95.0
+      runtime_key: "admission_control.sr_threshold"
+    aggression:
+      default_value: 1.5
       runtime_key: "admission_control.aggression"
     success_criteria:
       http_criteria:
@@ -73,8 +102,8 @@ fields can be overridden via runtime settings.
 The above configuration can be understood as follows:
 
 * Calculate the request success-rate over a 120s sliding window.
-* Use an aggression coefficient of 1.1, which results in request rejections starting at a ~90%
-  success-rate.
+* Do not begin shedding any load until the request success-rate drops below 95% in the sliding
+  window.
 * HTTP requests are considered successful if they are 1xx, 2xx, 3xx, or a 404.
 * gRPC requests are considered successful if they are OK or CANCELLED.
 

@@ -102,8 +102,8 @@ public:
     // Success rate will be the same as the number of successful requests if the total request count
     // is 100.
     constexpr int total_request_count = 100;
-    EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(
-        Return(RequestData(total_request_count, success_rate)));
+    EXPECT_CALL(controller_, requestCounts())
+        .WillRepeatedly(Return(RequestData(total_request_count, success_rate)));
     EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
 
     Http::TestRequestHeaderMapImpl request_headers;
@@ -117,9 +117,8 @@ public:
       }
     }
 
-
-    EXPECT_NEAR(static_cast<double>(rejection_count) / accuracy,
-        expected_rejection_probability, 0.01);
+    EXPECT_NEAR(static_cast<double>(rejection_count) / accuracy, expected_rejection_probability,
+                0.01);
   }
 
 protected:
@@ -326,7 +325,6 @@ success_criteria:
 
   auto config = makeConfig(yaml);
   setupFilter(config);
-
 
   verifyProbabilities(100 /* success rate */, 0.0 /* expected rejection probability */);
   verifyProbabilities(95, 0.05);
