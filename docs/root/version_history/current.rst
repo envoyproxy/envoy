@@ -1,5 +1,5 @@
-1.15.0 (Pending)
-================
+1.15.0
+======
 
 
 Incompatible Behavior Changes
@@ -65,10 +65,10 @@ Removed Config or Runtime
 New Features
 ------------
 
-* access loggers: added GRPC_STATUS operator on logging format.
-* access loggers: extended specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
 * access loggers: added file access logger config :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
+* access loggers: added GRPC_STATUS operator on logging format.
 * access loggers: added gRPC access logger config added :ref:`API version <envoy_v3_api_field_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
+* access loggers: extended specifier for FilterStateFormatter to output :ref:`unstructured log string <config_access_log_format_filter_state>`.
 * admin: added support for dumping EDS config at :ref:`/config_dump?include_eds <operations_admin_interface_config_dump_include_eds>`.
 * aggregate cluster: made route :ref:`retry_priority <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` predicates work with :ref:`this cluster type <envoy_v3_api_msg_extensions.clusters.aggregate.v3.ClusterConfig>`.
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
@@ -128,12 +128,12 @@ New Features
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
+* router: added more fine grained internal redirect configs to the :ref:`internal_redirect_policy
+  <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field.
 * router: added regex substitution support for header based hashing.
 * router: added support for RESPONSE_FLAGS and RESPONSE_CODE_DETAILS :ref:`header formatters
   <config_http_conn_man_headers_custom_request_headers>`.
 * router: allow Rate Limiting Service to be called in case of missing request header for a descriptor if the :ref:`skip_if_absent <envoy_v3_api_field_config.route.v3.RateLimit.Action.RequestHeaders.skip_if_absent>` field is set to true.
-* router: added more fine grained internal redirect configs to the :ref:`internal_redirect_policy
-  <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_policy>` field.
 * runtime: added new gauge :ref:`deprecated_feature_seen_since_process_start <runtime_stats>` that gets reset across hot restarts.
 * server: added the option :option:`--drain-strategy` to enable different drain strategies for DrainManager::drainClose().
 * server: added :ref:`server.envoy_bug_failures <server_statistics>` statistic to count ENVOY_BUG failures.
