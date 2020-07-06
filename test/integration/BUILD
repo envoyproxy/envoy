@@ -747,7 +747,7 @@ envoy_cc_test(
     srcs = ["stats_integration_test.cc"],
     # The symbol table cluster memory tests take a while to run specially under tsan.
     # Shard it to avoid test timeout.
-    shard_count = 2,
+    # shard_count = 1,
     tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
