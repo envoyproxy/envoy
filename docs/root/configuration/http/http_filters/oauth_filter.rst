@@ -43,9 +43,6 @@ Example configuration
             address: { socket_address: { address: auth.example.com, port_value: 443 }}
     tls_context: { sni: auth.example.com }
 
-There is some duplicate configuration above - the oauth server hostname is defined twice, once in config and once in
-a cluster. This is due to some limitations to Envoy's internal Async HTTP client.
-
 Notes
 -----
 

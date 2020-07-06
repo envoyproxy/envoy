@@ -38,11 +38,12 @@ message OAuth2Credentials {
 //
 // [#next-free-field: 9]
 message OAuth2Config {
-  // The upstream cluster where the OAuth server is defined. This is required due limitations
-  // in Envoy's HTTP AsyncClient implementation.
+  // Name of the cluster to send OAuth requests to.
   string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The full domain of the OAuth server.
+  // The full domain of the OAuth server. This is used to construct
+  // the redirection URL, and so must be specified in addition to
+  // the cluster.
   string hostname = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // A struct with the credentials required for OAuth
@@ -54,7 +55,7 @@ message OAuth2Config {
   // The path to sign a user out, clearing their credential cookies.
   string signout_path = 5 [(validate.rules).string = {min_bytes: 1}];
 
-  // The duration for outgoing auth requests. Default is 3s.
+  // The timeout for outgoing auth requests. Default is 3s.
   google.protobuf.Duration timeout = 6;
 
   // Forward the OAuth token as a Bearer to upstream web service.
