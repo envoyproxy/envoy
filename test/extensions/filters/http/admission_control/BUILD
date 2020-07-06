@@ -55,3 +55,28 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "admission_control_integration_test",
+    srcs = ["admission_control_integration_test.cc"],
+    extension_name = "envoy.filters.http.admission_control",
+    tags = ["fails_on_windows"],
+    deps = [
+        "//source/extensions/filters/http/admission_control:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "admission_controller_test",
+    srcs = ["controller_test.cc"],
+    extension_name = "envoy.filters.http.admission_control",
+    deps = [
+        "//source/common/http:headers_lib",
+        "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
+    ],
+)

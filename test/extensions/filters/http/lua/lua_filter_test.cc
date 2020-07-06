@@ -8,6 +8,7 @@
 
 #include "extensions/filters/http/lua/lua_filter.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -54,6 +55,7 @@ public:
           decoder_callbacks_.buffer_->move(data);
         }));
 
+    EXPECT_CALL(decoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
 
@@ -65,14 +67,28 @@ public:
           }
           encoder_callbacks_.buffer_->move(data);
         }));
+    EXPECT_CALL(encoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
   }
 
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
+  // Quickly set up a global configuration. In order to avoid extensive modification of existing
+  // test cases, the existing configuration methods must be compatible.
   void setup(const std::string& lua_code) {
-    config_ = std::make_shared<FilterConfig>(lua_code, tls_, cluster_manager_);
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.set_inline_code(lua_code);
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+    setupConfig(proto_config, per_route_proto_config);
     setupFilter();
+  }
+
+  void setupConfig(envoy::extensions::filters::http::lua::v3::Lua& proto_config,
+                   envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
+    // Setup filter config for Lua filter.
+    config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_);
+    // Setup per route config for Lua filter.
+    per_route_config_ = std::make_shared<FilterConfigPerRoute>(per_route_proto_config, tls_, api_);
   }
 
   void setupFilter() {
@@ -94,8 +110,10 @@ public:
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Api::MockApi> api_;
   Upstream::MockClusterManager cluster_manager_;
   std::shared_ptr<FilterConfig> config_;
+  std::shared_ptr<FilterConfigPerRoute> per_route_config_;
   std::unique_ptr<TestFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
@@ -103,6 +121,7 @@ public:
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  Tracing::MockSpan child_span_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -180,6 +199,12 @@ public:
       end
     end
   )EOF"};
+
+  const std::string ADD_HEADERS_SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("hello", "world")
+    end
+  )EOF"};
 };
 
 // Bad code in initial config.
@@ -190,7 +215,12 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  EXPECT_THROW_WITH_MESSAGE(FilterConfig(SCRIPT, tls, cluster_manager),
+  NiceMock<Api::MockApi> api;
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.set_inline_code(SCRIPT);
+
+  EXPECT_THROW_WITH_MESSAGE(FilterConfig(proto_config, tls, cluster_manager, api),
                             Filters::Common::Lua::LuaException,
                             "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
@@ -797,6 +827,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
 }
 
@@ -997,6 +1028,7 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 403")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
 
   Buffer::OwnedImpl data("hello");
@@ -1410,8 +1442,9 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   setup(SCRIPT);
 
   // Perform a GC and snap bytes currently used by the runtime.
-  config_->runtimeGC();
-  const uint64_t mem_use_at_start = config_->runtimeBytesUsed();
+  auto script_config = config_->perLuaCodeSetup(GLOBAL_SCRIPT_NAME);
+  script_config->runtimeGC();
+  const uint64_t mem_use_at_start = script_config->runtimeBytesUsed();
 
   uint64_t num_loops = 2000;
 #if defined(__has_feature) && (__has_feature(thread_sanitizer))
@@ -1439,8 +1472,8 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   //       to do a soft comparison here. In my own testing, without a fix for #3570, the memory
   //       usage after is at least 20x higher after 2000 iterations so we just check to see if it's
   //       within 2x.
-  config_->runtimeGC();
-  EXPECT_TRUE(config_->runtimeBytesUsed() < mem_use_at_start * 2);
+  script_config->runtimeGC();
+  EXPECT_TRUE(script_config->runtimeBytesUsed() < mem_use_at_start * 2);
 }
 
 // Respond with bad status.
@@ -1916,6 +1949,99 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::trace, StrEq("Failed to verify digest. Error code: 0")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test whether the route configuration can properly disable the Lua filter.
+TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.set_disabled(true);
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+      .WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
+  EXPECT_EQ("world", request_headers_1.get_("hello"));
+
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_2, true));
+  EXPECT_EQ(nullptr, request_headers_2.get(Http::LowerCaseString("hello")));
+}
+
+// Test whether the route can directly reuse the Lua code in the global configuration.
+TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
+  const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("route_info", "This request is routed by ROUTE_ONE");
+    end
+  )EOF"};
+  const std::string SCRIPT_FOR_ROUTE_TWO{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("route_info", "This request is routed by ROUTE_TWO");
+    end
+  )EOF"};
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  envoy::config::core::v3::DataSource source1, source2;
+  source1.set_inline_string(SCRIPT_FOR_ROUTE_ONE);
+  source2.set_inline_string(SCRIPT_FOR_ROUTE_TWO);
+  proto_config.mutable_source_codes()->insert({"route_one.lua", source1});
+  proto_config.mutable_source_codes()->insert({"route_two.lua", source2});
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  per_route_proto_config.set_name("route_two.lua");
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ("This request is routed by ROUTE_TWO", request_headers.get_("route_info"));
+}
+
+// Lua filter do nothing when the referenced name does not exist.
+TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
+  const std::string SCRIPT_FOR_ROUTE_ONE{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("route_info", "This request is routed by ROUTE_ONE");
+    end
+  )EOF"};
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.set_inline_code(ADD_HEADERS_SCRIPT);
+  envoy::config::core::v3::DataSource source1;
+  source1.set_inline_string(SCRIPT_FOR_ROUTE_ONE);
+  proto_config.mutable_source_codes()->insert({"route_one.lua", source1});
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
+  // The global source codes do not contain a script named 'route_two.lua'.
+  per_route_proto_config.set_name("route_two.lua");
+
+  setupConfig(proto_config, per_route_proto_config);
+  setupFilter();
+
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+      .WillByDefault(Return(per_route_config_.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(nullptr, request_headers.get(Http::LowerCaseString("hello")));
 }
 
 } // namespace

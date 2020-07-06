@@ -343,6 +343,7 @@ envoy_cc_test(
         ":server_test_data",
         ":static_validation_test_data",
     ],
+    # Fails on windows with cr/lf yaml file checkouts
     tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:version_lib",

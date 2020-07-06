@@ -114,9 +114,11 @@ decompressor_library:
     // The filter removes the decompressor's content encoding from the Content-Encoding header.
     if (expected_content_encoding.has_value()) {
       EXPECT_EQ(expected_content_encoding.value(),
-                headers_after_filter->ContentEncoding()->value().getStringView());
+                headers_after_filter->get(Http::CustomHeaders::get().ContentEncoding)
+                    ->value()
+                    .getStringView());
     } else {
-      EXPECT_EQ(nullptr, headers_after_filter->ContentEncoding());
+      EXPECT_EQ(nullptr, headers_after_filter->get(Http::CustomHeaders::get().ContentEncoding));
     }
 
     // The filter adds the decompressor's content encoding to the Accept-Encoding header on the
@@ -342,7 +344,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingNotCurrent) {
 TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresent) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestRequestHeaderMapImpl headers_before_filter{
-      {"cache-control", Http::Headers::get().CacheControlValues.NoTransform},
+      {"cache-control", Http::CustomHeaders::get().CacheControlValues.NoTransform},
       {"content-encoding", "mock"},
       {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
@@ -355,8 +357,8 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresent) {
 TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) {
   EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
   Http::TestRequestHeaderMapImpl headers_before_filter{
-      {"cache-control", fmt::format("{}, {}", Http::Headers::get().CacheControlValues.NoCache,
-                                    Http::Headers::get().CacheControlValues.NoTransform)},
+      {"cache-control", fmt::format("{}, {}", Http::CustomHeaders::get().CacheControlValues.NoCache,
+                                    Http::CustomHeaders::get().CacheControlValues.NoTransform)},
       {"content-encoding", "mock"},
       {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
