@@ -165,7 +165,7 @@ public:
   // Called by derived classes any time a request is completed or destroyed for any reason.
   void onRequestClosed(Envoy::ConnectionPool::ActiveClient& client, bool delay_attaching_request);
 
-  const Upstream::HostConstSharedPtr& host() { return host_; }
+  const Upstream::HostConstSharedPtr& host() const { return host_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Upstream::ResourcePriority priority() const { return priority_; }
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() { return socket_options_; }
@@ -181,6 +181,7 @@ protected:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
+protected:
   std::list<Instance::DrainedCb> drained_callbacks_;
   std::list<PendingRequestPtr> pending_requests_;
 

@@ -10,8 +10,14 @@ envoy_package()
 
 envoy_cc_library(
     name = "conn_pool_lib",
-    srcs = ["original_conn_pool.cc"],
-    hdrs = ["original_conn_pool.h"],
+    srcs = [
+        "conn_pool.cc",
+        "original_conn_pool.cc",
+    ],
+    hdrs = [
+        "conn_pool.h",
+        "original_conn_pool.h",
+    ],
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/event:deferred_deletable",
@@ -24,6 +30,7 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:linked_object",
         "//source/common/common:utility_lib",
+        "//source/common/http:conn_pool_base_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:timespan_lib",
