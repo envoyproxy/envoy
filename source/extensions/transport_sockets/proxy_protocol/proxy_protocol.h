@@ -9,6 +9,7 @@
 
 #include "extensions/transport_sockets/common/passthrough.h"
 
+using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 
 namespace Envoy {
@@ -41,7 +42,7 @@ private:
 class UpstreamProxyProtocolSocketFactory : public Network::TransportSocketFactory {
 public:
   UpstreamProxyProtocolSocketFactory(Network::TransportSocketFactoryPtr transport_socket_factory,
-                                     ProxyProtocolConfig_Version version);
+                                     ProxyProtocolConfig config);
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
@@ -50,7 +51,7 @@ public:
 
 private:
   Network::TransportSocketFactoryPtr transport_socket_factory_;
-  ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
+  ProxyProtocolConfig config_;
 };
 
 } // namespace ProxyProtocol

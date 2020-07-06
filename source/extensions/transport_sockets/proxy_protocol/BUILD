@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_extension(
-    name = "config",
+    name = "upstream_config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",

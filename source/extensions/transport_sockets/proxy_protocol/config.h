@@ -17,7 +17,7 @@ class UpstreamProxyProtocolSocketConfigFactory
     : public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
   ~UpstreamProxyProtocolSocketConfigFactory() override = default;
-  std::string name() const override { return TransportSocketNames::get().ProxyProtocol; }
+  std::string name() const override { return TransportSocketNames::get().UpstreamProxyProtocol; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   Network::TransportSocketFactoryPtr createTransportSocketFactory(
       const Protobuf::Message& config,

@@ -113,14 +113,13 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
 }
 
 UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
-    Network::TransportSocketFactoryPtr transport_socket_factory,
-    ProxyProtocolConfig_Version version)
-    : transport_socket_factory_(std::move(transport_socket_factory)), version_(version) {}
+    Network::TransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config)
+    : transport_socket_factory_(std::move(transport_socket_factory)), config_(config) {}
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsSharedPtr options) const {
   return std::make_unique<UpstreamProxyProtocolSocket>(
-      transport_socket_factory_->createTransportSocket(options), options, version_);
+      transport_socket_factory_->createTransportSocket(options), options, config_.version());
 }
 
 bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
