@@ -104,7 +104,7 @@ public:
      * @param array the StatName encoded as a uint8_t array.
      * @param size the size of the array in bytes.
      * @param symbol_token_fn a function to be called whenever a symbol is encountered in the array.
-     * @param stringVIewTokeNFn a function to be called whenever a string literal is encountered.
+     * @param string_view_token_fn a function to be called whenever a string literal is encountered.
      */
     static void decodeTokens(const SymbolTable::Storage array, size_t size,
                              const std::function<void(Symbol)>& symbol_token_fn,
