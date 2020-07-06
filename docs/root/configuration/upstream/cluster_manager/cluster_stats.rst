@@ -329,4 +329,5 @@ statistics will be added to *cluster.<name>* and contain the following:
 
    upstream_rq_headers_size, Histogram, Request headers size in bytes per upstream
    upstream_rq_body_size, Histogram, Request body size in bytes per upstream
+   upstream_rs_headers_size, Histogram, Response headers size in bytes per upstream
    upstream_rs_body_size, Histogram, Response body size in bytes per upstream

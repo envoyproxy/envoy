@@ -628,6 +628,7 @@ public:
 #define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(HISTOGRAM)                                         \
   HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
   HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
+  HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
   HISTOGRAM(upstream_rs_body_size, Bytes)
 
 /**

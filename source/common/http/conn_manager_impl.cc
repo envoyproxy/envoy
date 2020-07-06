@@ -737,6 +737,15 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
+  auto host_ = connection_manager_.read_callbacks_->upstreamHost();
+
+  if (host_ != nullptr) {
+    if (host_->cluster().requestResponseSizeStats().has_value()) {
+      host_->cluster().requestResponseSizeStats()->get().upstream_rs_headers_size_.recordValue(
+          headers.byteSize());
+    }
+  }
+
   connection_manager_.stats_.named_.downstream_rq_completed_.inc();
   connection_manager_.listener_stats_.downstream_rq_completed_.inc();
   if (CodeUtility::is1xx(response_code)) {
