@@ -53,9 +53,10 @@ using ::Envoy::Network::UpstreamServerName;
 
 namespace {
 Config constructConfigFromYaml(const std::string& yaml,
-                               Server::Configuration::FactoryContext& context) {
+                               Server::Configuration::FactoryContext& context,
+                               bool avoid_boosting = true) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
   return Config(tcp_proxy, context);
 }
 
@@ -122,7 +123,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(BadConfig)) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructConfigFromYaml(yaml_string, factory_context), EnvoyException);
+  EXPECT_THROW(constructConfigFromYaml(yaml_string, factory_context, false), EnvoyException);
 }
 
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(EmptyRouteConfig)) {
@@ -134,7 +135,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(EmptyRouteConfig)) {
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  EXPECT_THROW(constructConfigFromYaml(yaml, factory_context_), EnvoyException);
+  EXPECT_THROW(constructConfigFromYaml(yaml, factory_context_, false), EnvoyException);
 }
 
 TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
@@ -185,7 +186,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(Routes)) {
     )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  Config config_obj(constructConfigFromYaml(yaml, factory_context_));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context_, false));
 
   {
     // hit route with destination_ip (10.10.10.10/32)
@@ -364,7 +365,7 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(RouteWithTopLevelMetadataMatchConfig)) 
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  Config config_obj(constructConfigFromYaml(yaml, factory_context_));
+  Config config_obj(constructConfigFromYaml(yaml, factory_context_, false));
 
   ProtobufWkt::Value v1, v2;
   v1.set_string_value("v1");
@@ -1742,7 +1743,7 @@ class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() = default;
 
-  void setup() {
+  void setup(bool avoid_boosting = true) {
     const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fallback_cluster
@@ -1752,7 +1753,8 @@ public:
         cluster: fake_cluster
     )EOF";
 
-    config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
+    config_ =
+        std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_, avoid_boosting));
   }
 
   void initializeFilter() {
@@ -1772,7 +1774,7 @@ public:
 };
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
-  setup();
+  setup(false);
 
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
   const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
@@ -1793,7 +1795,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
 }
 
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
-  setup();
+  setup(false);
 
   const uint32_t total_cx = config_->stats().downstream_cx_total_.value();
   const uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
@@ -1815,7 +1817,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
 
 // Test that the tcp proxy uses the cluster from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionCluster)) {
-  setup();
+  setup(false);
   initializeFilter();
 
   connection_.streamInfo().filterState()->setData(
@@ -1832,7 +1834,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
 
 // Test that the tcp proxy forwards the requested server name from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
-  setup();
+  setup(false);
   initializeFilter();
 
   connection_.streamInfo().filterState()->setData(
@@ -1862,7 +1864,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
 
 // Test that the tcp proxy override ALPN from FilterState if set
 TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
-  setup();
+  setup(false);
   initializeFilter();
 
   connection_.streamInfo().filterState()->setData(

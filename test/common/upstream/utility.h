@@ -124,6 +124,14 @@ makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
 }
 
 inline envoy::config::core::v3::HealthCheck
+parseHealthCheckFromV3Yaml(const std::string& yaml_string, bool avoid_boosting = true) {
+  envoy::config::core::v3::HealthCheck health_check;
+  TestUtility::loadFromYamlAndValidate(yaml_string, health_check, false, avoid_boosting);
+  return health_check;
+}
+
+// For DEPRECATED TEST CASES
+inline envoy::config::core::v3::HealthCheck
 parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   envoy::config::core::v3::HealthCheck health_check;
   TestUtility::loadFromYamlAndValidate(yaml_string, health_check);

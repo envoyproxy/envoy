@@ -9,6 +9,7 @@ Incompatible Behavior Changes
 * build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
 * client_ssl_auth: the `auth_ip_white_list` stat has been renamed to
   :ref:`auth_ip_allowlist <config_network_filters_client_ssl_auth_stats>`.
+* router: path_redirect now keeps query string by default. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.preserve_query_string_in_path_redirects` to false.
 
 Minor Behavior Changes
 ----------------------
@@ -38,10 +39,16 @@ Bug Fixes
 * adaptive concurrency: fixed a minRTT calculation bug where requests started before the concurrency
   limit was pinned to the minimum would skew the new minRTT value if the replies arrived after the
   start of the new minRTT window.
+* buffer: fixed CVE-2020-12603 by avoiding fragmentation, and tracking of HTTP/2 data and control frames in the output buffer.
 * grpc-json: fix a bug when in trailers only gRPC response (e.g. error) HTTP status code is not being re-written.
 * http: fixed a bug in the grpc_http1_reverse_bridge filter where header-only requests were forwarded with a non-zero content length.
 * http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
+* http: fixed CVE-2020-12604 by changing :ref:`stream_idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  to also defend against an HTTP/2 peer that does not open stream window once an entire response has been buffered to be sent to a downstream client.
+* http: fixed CVE-2020-12605 by including request URL in request header size computation, and rejecting partial headers that exceed configured limits.
 * http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
+* listener: fixed CVE-2020-8663 by adding runtime support for :ref:`per-listener limits <config_listeners_runtime>` on active/accepted connections.
+* overload management: fixed CVE-2020-8663 by adding runtime support for :ref:`global limits <config_overload_manager>` on active/accepted connections.
 * prometheus stats: fix the sort order of output lines to comply with the standard.
 * udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be
   specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a
@@ -72,6 +79,9 @@ New Features
 * config: added :ref:`version_text <config_cluster_manager_cds>` stat that reflects xDS version.
 * decompressor: generic :ref:`decompressor <config_http_filters_decompressor>` filter exposed to users.
 * dynamic forward proxy: added :ref:`SNI based dynamic forward proxy <config_network_filters_sni_dynamic_forward_proxy>` support.
+* dynamic forward proxy: added configurable :ref:`circuit breakers <dns_cache_circuit_breakers>` for resolver on DNS cache.
+  This behavior can be temporarily disabled by the runtime feature `envoy.reloadable_features.enable_dns_cache_circuit_breakers`.
+  If this runtime feature is disabled, the upstream circuit breakers for the cluster will be used even if the :ref:`DNS Cache circuit breakers <dns_cache_circuit_breakers>` are configured.
 * dynamic forward proxy: added :ref:`allow_insecure_cluster_options<envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_insecure_cluster_options>` to allow disabling of auto_san_validation and auto_sni.
 * ext_authz filter: added :ref:`v2 deny_at_disable <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.deny_at_disable>`, :ref:`v3 deny_at_disable <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.deny_at_disable>`. This allows to force deny for protected path while filter gets disabled, by setting this key to true.
 * ext_authz filter: added API version field for both :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.transport_api_version>`
@@ -103,6 +113,7 @@ New Features
   interested in; behavior is allowed based on new "envoy.lrs.supports_send_all_clusters" capability
   in :ref:`client_features<envoy_v3_api_field_config.core.v3.Node.client_features>` field.
 * lrs: updated to allow to explicitly set the API version of gRPC service endpoint and message to be used.
+* lua: added :ref:`per route config <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` for Lua filter.
 * lua: added tracing to the ``httpCall()`` API.
 * metrics service: added added :ref:`API version <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.transport_api_version>` to explicitly set the version of gRPC service endpoint and message to be used.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
@@ -117,6 +128,7 @@ New Features
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
+* router: add regex substitution support for header based hashing.
 * router: add support for RESPONSE_FLAGS and RESPONSE_CODE_DETAILS :ref:`header formatters
   <config_http_conn_man_headers_custom_request_headers>`.
 * router: allow Rate Limiting Service to be called in case of missing request header for a descriptor if the :ref:`skip_if_absent <envoy_v3_api_field_config.route.v3.RateLimit.Action.RequestHeaders.skip_if_absent>` field is set to true.
@@ -150,3 +162,4 @@ Deprecated
   in :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`.
 * File access logger fields :ref:`format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.format>`, :ref:`json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.json_format>` and :ref:`typed_json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.typed_json_format>` are deprecated in favor of :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
 * A warning is now logged when v2 xDS api is used. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_deprecated_v2_api_warning` to `false`.
+* Using cluster circuit breakers for DNS Cache is now deprecated in favor of :ref:`DNS cache circuit breakers <dns_cache_circuit_breakers>`. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_dns_cache_circuit_breakers` to `false`.
