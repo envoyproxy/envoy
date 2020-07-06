@@ -21,11 +21,12 @@ namespace {
 using ServiceName = std::string;
 
 struct ServiceVersionInfo {
-  // The version of a service. Possible values: envoy::config::core::v3::ApiVersion::V2,
-  // envoy::config::core::v3::ApiVersion::V3.
+  // The transport_api_version of a service. Possible values:
+  // envoy::config::core::v3::ApiVersion::V2, envoy::config::core::v3::ApiVersion::V3.
   envoy::config::core::v3::ApiVersion transport_api_version_;
 
-  // This hold a name for each version, for example for "envoy.api.v2.RouteDiscoveryService".
+  // This hold a name for each transport_api_version, for example for
+  // "envoy.api.v2.RouteDiscoveryService".
   //
   // {
   //    "V2": "envoy.api.v2.RouteDiscoveryService",
@@ -34,8 +35,8 @@ struct ServiceVersionInfo {
   std::unordered_map<envoy::config::core::v3::ApiVersion, ServiceName> names_;
 };
 
-// A ServiceVersionInfoMap holds a service's version and possible names for each available version.
-// For examples:
+// A ServiceVersionInfoMap holds a service's transport_api_version and possible names for each
+// available transport_api_version. For examples:
 //
 // Given "envoy.api.v2.RouteDiscoveryService" as the service name:
 // {
@@ -60,7 +61,7 @@ struct ServiceVersionInfo {
 // }
 using ServiceVersionInfoMap = std::unordered_map<ServiceName, ServiceVersionInfo>;
 
-// This creates a ServiceToServiceVersionInfoMap, with service name (e.g.
+// This creates a ServiceVersionInfoMap, with service name (For example:
 // "envoy.api.v2.RouteDiscoveryService") as the key.
 ServiceVersionInfoMap
 createServiceVersionInfoMap(absl::string_view service_name,
@@ -92,14 +93,14 @@ using TypeUrlVersionMap = std::unordered_map<TypeUrl, envoy::config::core::v3::A
 using VersionedMethodMap = std::unordered_map<envoy::config::core::v3::ApiVersion, MethodName>;
 
 struct VersionedDiscoveryType {
-  // This holds a map of type url to its corresponding version. For example:
+  // This holds a map of type url to its corresponding transport_api_version. For example:
   // {
   //   "type.googleapis.com/envoy.api.v2.RouteConfiguration": "V2",
   //   "type.googleapis.com/envoy.config.route.v3.RouteConfiguration": "V3"
   // }
   TypeUrlVersionMap type_url_versions_;
 
-  // Versioned discovery service RPC method fully qualified names. e.g.
+  // Versioned (by transport_api_version) discovery service RPC method fully qualified names. e.g.
   // {
   //   "V2": "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
   //   "V3": "envoy.service.route.v3.RouteDiscoveryService.StreamRoutes"
@@ -125,7 +126,8 @@ struct VersionedService {
 
 using TypeUrlToVersionedServiceMap = std::unordered_map<TypeUrl, VersionedService>;
 
-// buildTypeUrlToServiceMap() builds a reverse map from a resource type URLs to a versioned service.
+// buildTypeUrlToServiceMap() builds a reverse map from a resource type URLs to a versioned service
+// (by transport_api_version).
 //
 // The way we build it is by firstly constructing a list of ServiceVersionInfoMap:
 // [
@@ -188,9 +190,9 @@ TypeUrlToVersionedServiceMap* buildTypeUrlToServiceMap() {
   auto* type_url_to_versioned_service_map = new TypeUrlToVersionedServiceMap();
 
   // This happens once in the lifetime of Envoy. We build a reverse map from resource type URL to
-  // versioned service methods. We explicitly enumerate all services, since DescriptorPool doesn't
-  // support iterating over all descriptors, due its lazy load design, see
-  // https://www.mail-archive.com/protobuf@googlegroups.com/msg04540.html.
+  // service methods (versioned by transport_api_version). We explicitly enumerate all services,
+  // since DescriptorPool doesn't support iterating over all descriptors, due its lazy load design,
+  // see https://www.mail-archive.com/protobuf@googlegroups.com/msg04540.html.
   for (const ServiceVersionInfoMap& registered : {
            SERVICE_VERSION_INFO("envoy.api.v2.RouteDiscoveryService",
                                 "envoy.service.route.v3.RouteDiscoveryService"),
@@ -256,8 +258,8 @@ envoy::config::core::v3::ApiVersion
 effectiveTransportApiVersion(absl::string_view type_url,
                              envoy::config::core::v3::ApiVersion transport_api_version,
                              const TypeUrlVersionMap& version_map) {
-  // By default (when the transport_api_version is "AUTO"), the effective version is the same as the
-  // version inferred from type_url.
+  // By default (when the transport_api_version is "AUTO"), the effective transport_api_version is
+  // the same as the version inferred from type_url.
   if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO) {
     const auto it = version_map.find(static_cast<TypeUrl>(type_url));
     ASSERT(it != version_map.cend());
@@ -274,7 +276,8 @@ deltaGrpcMethod(absl::string_view type_url,
   const auto it = typeUrlToVersionedServiceMap().find(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToVersionedServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-      // The list of possible versions for a type_url is provided in .type_url_versions_.
+      // The list of possible transport_api_versions for a type_url is provided in
+      // .type_url_versions_.
       it->second.delta_grpc_.methods_[effectiveTransportApiVersion(
           type_url, transport_api_version, it->second.delta_grpc_.type_url_versions_)]);
 }
