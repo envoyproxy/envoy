@@ -539,11 +539,11 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                                      std::move(buffer), receive_time);
 }
 
-Api::IoCallUint64Result receiveMessage(uint64_t maxPacketSize, Buffer::InstancePtr& buffer,
+Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::InstancePtr& buffer,
                                        Buffer::RawSlice& slice, IoHandle::RecvMsgOutput& output,
                                        IoHandle& handle, const Address::Instance& local_address) {
 
-  const uint64_t num_slices = buffer->reserve(maxPacketSize, &slice, 1);
+  const uint64_t num_slices = buffer->reserve(max_packet_size, &slice, 1);
   ASSERT(num_slices == 1u);
 
   Api::IoCallUint64Result result =
@@ -572,10 +572,10 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
     // TODO(yugant): Avoid using 64k by getting memory from UdpPacketProcessor
-    const uint64_t maxPacketSizeWithGro = 65535;
+    const uint64_t max_packet_size_with_gro = 65535;
 
     Api::IoCallUint64Result result =
-        receiveMessage(maxPacketSizeWithGro, buffer, slice, output, handle, local_address);
+        receiveMessage(max_packet_size_with_gro, buffer, slice, output, handle, local_address);
 
     if (!result.ok()) {
       return result;
