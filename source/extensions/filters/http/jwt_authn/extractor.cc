@@ -153,7 +153,7 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
   }
   // If not specified, use default locations.
   if (provider.from_headers().empty() && provider.from_params().empty()) {
-    addHeaderConfig(provider.issuer(), Http::Headers::get().Authorization,
+    addHeaderConfig(provider.issuer(), Http::CustomHeaders::get().Authorization,
                     JwtConstValues::get().BearerPrefix);
     addQueryParamConfig(provider.issuer(), JwtConstValues::get().AccessTokenParam);
   }

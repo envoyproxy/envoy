@@ -76,6 +76,9 @@ public:
     ScopedRuntimeInjector scoped_runtime(server_.runtime());
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
         .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
+    ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
+      return snapshot_;
+    }));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
@@ -144,6 +147,7 @@ public:
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
                                                 false};
   Runtime::RandomGeneratorImpl random_;
+  Runtime::SnapshotConstSharedPtr snapshot_{std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
@@ -177,6 +181,33 @@ uint32_t run(const std::string& directory) {
     num_tested++;
   }
   return num_tested;
+}
+
+void loadVersionedBootstrapFile(const std::string& filename,
+                                envoy::config::bootstrap::v3::Bootstrap& bootstrap_message,
+                                absl::optional<uint32_t> bootstrap_version) {
+  Api::ApiPtr api = Api::createApiForTest();
+  OptionsImpl options(
+      Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
+  // Avoid contention issues with other tests over the hot restart domain socket.
+  options.setHotRestartDisabled(true);
+  if (bootstrap_version.has_value()) {
+    options.setBootstrapVersion(*bootstrap_version);
+  }
+  Server::InstanceUtil::loadBootstrapConfig(bootstrap_message, options,
+                                            ProtobufMessage::getStrictValidationVisitor(), *api);
+}
+
+void loadBootstrapConfigProto(const envoy::config::bootstrap::v3::Bootstrap& in_proto,
+                              envoy::config::bootstrap::v3::Bootstrap& bootstrap_message) {
+  Api::ApiPtr api = Api::createApiForTest();
+  OptionsImpl options(
+      Envoy::Server::createTestOptionsImpl("", "", Network::Address::IpVersion::v6));
+  options.setConfigProto(in_proto);
+  // Avoid contention issues with other tests over the hot restart domain socket.
+  options.setHotRestartDisabled(true);
+  Server::InstanceUtil::loadBootstrapConfig(bootstrap_message, options,
+                                            ProtobufMessage::getStrictValidationVisitor(), *api);
 }
 
 } // namespace ConfigTest

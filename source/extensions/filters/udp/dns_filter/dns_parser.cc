@@ -102,9 +102,10 @@ bool DnsAnswerRecord::serialize(Buffer::OwnedImpl& output) {
   return false;
 }
 
-DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& client_request) {
+DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& client_request,
+                                                        DnsParserCounters& counters) {
   DnsQueryContextPtr query_context = std::make_unique<DnsQueryContext>(
-      client_request.addresses_.local_, client_request.addresses_.peer_);
+      client_request.addresses_.local_, client_request.addresses_.peer_, counters, retry_count_);
 
   query_context->parse_status_ = parseDnsObject(query_context, client_request.buffer_);
   if (!query_context->parse_status_) {
@@ -127,6 +128,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   while (state != DnsQueryParseState::Finish) {
     // Ensure that we have enough data remaining in the buffer to parse the query
     if (available_bytes < field_size) {
+      context->counters_.underflow_counter.inc();
       ENVOY_LOG(debug,
                 "Exhausted available bytes in the buffer. Insufficient data to parse query field.");
       return false;
@@ -179,7 +181,16 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     }
   }
 
-  // TODO(abaptiste):  Verify that queries do not contain answer records
+  if (!header_.flags.qr && header_.answers) {
+    ENVOY_LOG(debug, "Answer records present in query");
+    return false;
+  }
+
+  if (header_.questions > 1) {
+    ENVOY_LOG(debug, "Multiple [{}] questions in DNS query", header_.questions);
+    return false;
+  }
+
   // Verify that we still have available data in the buffer to read answer and query records
   if (offset > buffer->length()) {
     ENVOY_LOG(debug, "Buffer read offset[{}] is larget than buffer length [{}].", offset,
@@ -204,6 +215,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     ENVOY_LOG(trace, "Parsing [{}/{}] questions", index, header_.questions);
     auto rec = parseDnsQueryRecord(buffer, &offset);
     if (rec == nullptr) {
+      context->counters_.query_parsing_failure.inc();
       ENVOY_LOG(debug, "Couldn't parse query record from buffer");
       return false;
     }
@@ -360,7 +372,7 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::Instance
   *offset = data_offset;
 
   return std::make_unique<DnsAnswerRecord>(record_name, record_type, record_class,
-                                           std::chrono::seconds{ttl}, std::move(ip_addr));
+                                           std::chrono::seconds(ttl), std::move(ip_addr));
 }
 
 DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePtr& buffer,
@@ -402,7 +414,11 @@ DnsQueryRecordPtr DnsMessageParser::parseDnsQueryRecord(const Buffer::InstancePt
     return nullptr;
   }
 
-  // stop reading he buffer here since we aren't parsing additional records
+  auto rec = std::make_unique<DnsQueryRecord>(record_name, record_type, record_class);
+  rec->query_time_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      query_latency_histogram_, timesource_);
+
+  // stop reading the buffer here since we aren't parsing additional records
   ENVOY_LOG(trace, "Extracted query record. Name: {} type: {} class: {}", record_name, record_type,
             record_class);
 
@@ -554,9 +570,8 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
       // names, we should not end up with a non-conforming name here.
       //
       // See Section 2.3.4 of https://tools.ietf.org/html/rfc1035
-
-      // TODO(abaptiste): add stats for record overflow
       if (query->name_.size() > MAX_DNS_NAME_SIZE) {
+        query_context->counters_.record_name_overflow.inc();
         ENVOY_LOG(
             debug,
             "Query name '{}' is longer than the maximum permitted length. Skipping serialization",

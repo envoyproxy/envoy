@@ -127,8 +127,8 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
             - endpoint:
                 address:
                   socket_address:
-                     address: 10.0.0.1
-                     port_value: 443
+                    address: 10.0.0.1
+                    port_value: 443
       cluster_type:
           name: envoy.clusters.custom_static
           typed_config:

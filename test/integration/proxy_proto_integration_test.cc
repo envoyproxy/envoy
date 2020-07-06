@@ -18,6 +18,27 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(ProxyProtoIntegrationTest, CaptureTlvToMetadata) {
+  useListenerAccessLog(
+      "%DYNAMIC_METADATA(envoy.filters.listener.proxy_protocol:PP2TypeAuthority)%");
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
+    constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                  0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,
+                                  0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 0x00, 0x00, 0x01, 0xff, 0x02,
+                                  0x00, 0x07, 0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+    Buffer::OwnedImpl buf(buffer, sizeof(buffer));
+    conn->write(buf, false);
+    return conn;
+  };
+
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  cleanupUpstreamAndDownstream();
+  const std::string log_line = waitForAccessLog(listener_access_log_name_);
+  EXPECT_EQ(log_line, "\"foo.com\"");
+}
+
 TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));

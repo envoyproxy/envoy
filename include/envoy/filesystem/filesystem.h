@@ -120,12 +120,12 @@ public:
 
   /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This
-   * is a basic sanity check for users, blacklisting some clearly bad paths. Paths
+   * is a basic sanity check for users, denying some clearly bad paths. Paths
    * may still be problematic (e.g. indirectly leading to /dev/mem) even if this
    * returns false, it is up to the user to validate that supplied paths are
    * valid.
    * @param path some filesystem path.
-   * @return is the path on the blacklist?
+   * @return is the path on the deny list?
    */
   virtual bool illegalPath(const std::string& path) PURE;
 };

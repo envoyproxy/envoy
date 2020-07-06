@@ -10,10 +10,10 @@ services:
     networks:
       - envoymesh
     expose:
-      - "80"
+      - "8000"
       - "8001"
     ports:
-      - "8000:80"
+      - "8000:8000"
       - "8001:8001"
 
   service:
@@ -27,7 +27,7 @@ services:
         aliases:
           - service
     expose:
-      - "80"
+      - "8000"
 
 networks:
   envoymesh: {}
