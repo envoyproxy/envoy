@@ -8,6 +8,7 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/path.proto";
 import "envoy/type/matcher/v3/string.proto";
 
+import "google/api/expr/v1alpha1/checked.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
 
 import "udpa/annotations/status.proto";
@@ -104,7 +105,13 @@ message Policy {
   // An optional symbolic expression specifying an access control
   // :ref:`condition <arch_overview_condition>`. The condition is combined
   // with the permissions and the principals as a clause with AND semantics.
-  google.api.expr.v1alpha1.Expr condition = 3;
+  oneof expression_specifier {
+    // Common expression which has not been type checked.
+    google.api.expr.v1alpha1.Expr condition = 3;
+
+    // Common expression which has been successfully type checked.
+    google.api.expr.v1alpha1.CheckedExpr checked_condition = 4;
+  }
 }
 
 // Permission defines an action (or actions) that a principal can take.
