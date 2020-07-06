@@ -5109,12 +5109,12 @@ virtual_hosts:
   EXPECT_THAT_THROWS_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       ::testing::AnyOf(
-        ::testing::ContainsRegex(
-          "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for "
-          "type oneof"),
-        ::testing::ContainsRegex(
-          "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for "
-          "type oneof")));
+          ::testing::ContainsRegex(
+              "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for "
+              "type oneof"),
+          ::testing::ContainsRegex(
+              "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for "
+              "type oneof")));
 #endif
 }
 
@@ -5157,12 +5157,12 @@ virtual_hosts:
   EXPECT_THAT_THROWS_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       ::testing::AnyOf(
-        ::testing::ContainsRegex(
-          "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for "
-          "type oneof"),
-        ::testing::ContainsRegex(
-          "invalid value oneof field 'path_specifier' is already set. Cannot set 'regex' for "
-          "type oneof")));
+          ::testing::ContainsRegex(
+              "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for "
+              "type oneof"),
+          ::testing::ContainsRegex(
+              "invalid value oneof field 'path_specifier' is already set. Cannot set 'regex' for "
+              "type oneof")));
 #endif
 }
 
@@ -5205,12 +5205,12 @@ virtual_hosts:
   EXPECT_THAT_THROWS_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       ::testing::AnyOf(
-        ::testing::ContainsRegex(
-          "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for "
-          "type oneof"),
-        ::testing::ContainsRegex(
-          "invalid value oneof field 'path_specifier' is already set. Cannot set 'regex' for "
-          "type oneof")));
+          ::testing::ContainsRegex(
+              "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for "
+              "type oneof"),
+          ::testing::ContainsRegex(
+              "invalid value oneof field 'path_specifier' is already set. Cannot set 'regex' for "
+              "type oneof")));
 #endif
 }
 
