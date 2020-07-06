@@ -1,0 +1,13 @@
+actions {
+  remove_route {
+    route_num: 1
+  }
+}
+actions {
+  remove_listener {
+    listener_num: 1
+  }
+}
+config {
+  sotw_or_delta: SOTW
+}
