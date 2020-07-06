@@ -42,10 +42,11 @@ class LogicalDnsClusterTest : public testing::Test {
 protected:
   LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
 
-  void setupFromV2Yaml(const std::string& yaml) {
+  void setupFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
-    envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+    envoy::config::cluster::v3::Cluster cluster_config =
+        parseClusterFromV3Yaml(yaml, avoid_boosting);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -74,7 +75,7 @@ protected:
   void testBasicSetup(const std::string& config, const std::string& expected_address,
                       uint32_t expected_port, uint32_t expected_hc_port) {
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
-    setupFromV2Yaml(config);
+    setupFromV3Yaml(config);
 
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
@@ -263,10 +264,14 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   lb_policy: round_robin
   )EOF" + std::get<0>(GetParam()) +
                            R"EOF(
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 443
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   EXPECT_CALL(membership_updated_, ready());
@@ -279,7 +284,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
-  setupFromV2Yaml(yaml);
+  setupFromV3Yaml(yaml);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo.bar.com",
@@ -301,14 +306,18 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
   # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
   dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 443
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  setupFromV2Yaml(yaml);
+  setupFromV3Yaml(yaml);
 
   // Failing response kicks the failure refresh backoff strategy.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
@@ -341,14 +350,18 @@ TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
   # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
   dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 443
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                     address: foo.bar.com
+                     port_value: 443
   )EOF";
 
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  setupFromV2Yaml(yaml);
+  setupFromV3Yaml(yaml);
 
   // TTL is recorded when the DNS response is successful and not empty
   EXPECT_CALL(membership_updated_, ready());
@@ -386,7 +399,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
       port_value: 443
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromV2Yaml(multiple_hosts_yaml), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(multiple_hosts_yaml, false), EnvoyException,
                             "LOGICAL_DNS clusters must have a single host");
 
   const std::string multiple_lb_endpoints_yaml = R"EOF(
@@ -417,7 +430,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      setupFromV2Yaml(multiple_lb_endpoints_yaml), EnvoyException,
+      setupFromV3Yaml(multiple_lb_endpoints_yaml, false), EnvoyException,
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_endpoints_yaml = R"EOF(
@@ -450,7 +463,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      setupFromV2Yaml(multiple_endpoints_yaml), EnvoyException,
+      setupFromV3Yaml(multiple_endpoints_yaml, false), EnvoyException,
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string custom_resolver_yaml = R"EOF(
@@ -474,7 +487,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
               port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromV2Yaml(custom_resolver_yaml), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(custom_resolver_yaml, false), EnvoyException,
                             "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 
@@ -491,10 +504,14 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
   # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
   dns_lookup_family: V4_ONLY
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 443
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   const std::string basic_yaml_load_assignment = R"EOF(
