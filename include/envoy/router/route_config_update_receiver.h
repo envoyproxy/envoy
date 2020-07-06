@@ -78,7 +78,7 @@ public:
   virtual absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const PURE;
 
   /**
-   * @return envoy::api::v2::RouteConfiguration& current RouteConfiguration.
+   * @return envoy::config::route::v3::RouteConfiguration& current RouteConfiguration.
    */
   virtual const envoy::config::route::v3::RouteConfiguration& routeConfiguration() PURE;
 
