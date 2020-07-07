@@ -424,7 +424,7 @@ public:
   }
 
 private:
-  absl::optional<uint32_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
+  absl::optional<int64_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
     const auto time = field_extractor_(stream_info);
     if (time) {
       return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();

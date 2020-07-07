@@ -41,7 +41,7 @@ public:
   double successRate(SuccessRateMonitorType) const override { return -1; }
 
 private:
-  const absl::optional<MonotonicTime> time_;
+  const absl::optional<MonotonicTime> time_{};
 };
 
 /**
