@@ -580,7 +580,8 @@ public:
   Stats::Scope& statsScope() const override { return *stats_scope_; }
 
   ClusterRequestResponseSizeOptRef requestResponseSizeStats() const override {
-    if (not optional_cluster_stats_ or not(optional_cluster_stats_->request_response_size_stats_)) {
+    if (optional_cluster_stats_ == nullptr or
+        optional_cluster_stats_->request_response_size_stats_ == nullptr) {
       return absl::nullopt;
     }
 
@@ -590,7 +591,8 @@ public:
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
 
   ClusterTimeoutBudgetOptRef timeoutBudgetStats() const override {
-    if (not optional_cluster_stats_ or not(optional_cluster_stats_->timeout_budget_stats_)) {
+    if (optional_cluster_stats_ == nullptr or
+        optional_cluster_stats_->timeout_budget_stats_ == nullptr) {
       return absl::nullopt;
     }
 

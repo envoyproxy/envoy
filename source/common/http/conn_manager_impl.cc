@@ -610,16 +610,17 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
-  auto host_ = connection_manager_.read_callbacks_->upstreamHost();
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
 
-  if (host_ != nullptr) {
-    if (host_->cluster().requestResponseSizeStats().has_value()) {
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
       // record request body size
-      host_->cluster().requestResponseSizeStats()->get().upstream_rq_body_size_.recordValue(
-          stream_info_.bytesReceived());
+      req_resp_stats->get().upstream_rq_body_size_.recordValue(stream_info_.bytesReceived());
       // record response body size
-      host_->cluster().requestResponseSizeStats()->get().upstream_rs_body_size_.recordValue(
-          stream_info_.bytesSent());
+      req_resp_stats->get().upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
     }
   }
 
@@ -737,12 +738,14 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
-  auto host_ = connection_manager_.read_callbacks_->upstreamHost();
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
 
-  if (host_ != nullptr) {
-    if (host_->cluster().requestResponseSizeStats().has_value()) {
-      host_->cluster().requestResponseSizeStats()->get().upstream_rs_headers_size_.recordValue(
-          headers.byteSize());
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
     }
   }
 
@@ -793,12 +796,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
-  auto host_ = connection_manager_.read_callbacks_->upstreamHost();
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
 
-  if (host_ != nullptr) {
-    if (host_->cluster().requestResponseSizeStats().has_value()) {
-      host_->cluster().requestResponseSizeStats()->get().upstream_rq_headers_size_.recordValue(
-          request_headers_->byteSize());
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
     }
   }
 
