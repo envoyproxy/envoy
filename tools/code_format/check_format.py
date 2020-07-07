@@ -576,13 +576,15 @@ def codecDiffHelper(file1, file2, diff):
     return error_message
 
 
-def checkCodecDiffs():
-  error_messages = []
-  for triple in CODEC_DIFFS:
-    codec_diff = codecDiffHelper(*triple)
-    if codec_diff != None:
-      error_messages.append(codecDiffHelper(*triple))
-  return error_messages
+def checkCodecDiffs(error_messages):
+  try:
+    for triple in CODEC_DIFFS:
+      codec_diff = codecDiffHelper(*triple)
+      if codec_diff != None:
+        error_messages.append(codecDiffHelper(*triple))
+    return error_messages
+  except IOError: # for check format tests
+    return error_messages
 
 
 # We want to look for a call to condvar.waitFor, but there's no strong pattern
@@ -1102,7 +1104,7 @@ if __name__ == "__main__":
   owned_directories = ownedDirectories(error_messages)
 
   # Check codec synchronization once per run.
-  error_messages += checkCodecDiffs()
+  checkCodecDiffs(error_messages)
 
   if os.path.isfile(target_path):
     error_messages += checkFormat("./" + target_path)
