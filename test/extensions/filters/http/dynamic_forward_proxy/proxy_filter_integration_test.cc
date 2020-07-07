@@ -141,7 +141,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
 
-TEST_P(ProxyFilterIntegrationTest, HeaderRequestWithClusterCircuitBreaker) {
+TEST_P(ProxyFilterIntegrationTest, RequestWithBodyWithClusterCircuitBreaker) {
   disableDnsCacheCircuitBreakers();
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
