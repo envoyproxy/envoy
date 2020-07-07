@@ -31,6 +31,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.outlier_detection_support_for_grpc_status",
     "envoy.reloadable_features.strict_header_validation",
     "envoy.reloadable_features.strict_authority_validation",
+    "envoy.reloadable_features.fix_wildcard_matching",
 };
 
 // This is a list of configuration fields which are disallowed by default in Envoy
