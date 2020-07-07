@@ -899,7 +899,7 @@ public:
   /**
    * @return eds cluster service_name of the cluster.
    */
-  virtual absl::optional<std::string> eds_service_name() const PURE;
+  virtual absl::optional<std::string> edsServiceName() const PURE;
 
   /**
    * Create network filters on a new upstream connection.
