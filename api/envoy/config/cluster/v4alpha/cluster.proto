@@ -343,7 +343,7 @@ message Cluster {
     //
     // .. note::
     //   This setting only takes effect if all host weights are not equal.
-    double active_request_bias = 2;
+    core.v4alpha.RuntimeDouble active_request_bias = 2;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
