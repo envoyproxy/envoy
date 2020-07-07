@@ -293,6 +293,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "overload_manager_interface",
     hdrs = ["overload_manager.h"],
+    external_deps = ["abseil_node_hash_map"],
     deps = [
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/singleton:const_singleton",
