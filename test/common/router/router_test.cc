@@ -6575,10 +6575,10 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestHeaders) {
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_EQ(nullptr, headers.Date());
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, true));
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _));
   router_.decodeHeaders(headers, true);
   EXPECT_NE(nullptr, headers.Date());
-  EXPECT_EQ(headers.get_("date"), "Thu, 01 Jan 1970 00:00:02 GMT");
+  EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:02 GMT");
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));

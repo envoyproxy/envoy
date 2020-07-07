@@ -47,7 +47,7 @@ TEST(SlowDateProviderImplTest, ResponseHeaders) {
 
   provider.setDateHeader(headers);
   EXPECT_NE(nullptr, headers.Date());
-  EXPECT_EQ(headers.get_("date"), "Thu, 01 Jan 1970 00:00:02 GMT");
+  EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:02 GMT");
 }
 
 TEST(TlsCachingDateProviderImplTest, TlsRequestHeaders) {
