@@ -62,6 +62,15 @@ HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
   return nullptr;
 }
 
+bool isChunked(absl::string_view header_value) {
+  for (auto single_encoding : absl::StrSplit(header_value, ",")) {
+    if (!absl::EqualsIgnoreCase(single_encoding, Headers::get().TransferEncodingValues.Chunked)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
@@ -693,8 +702,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   // CONNECT request has no defined semantics, and may be rejected.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if ((reject_unsupported_transfer_encodings_ &&
-         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) ||
+    if ((reject_unsupported_transfer_encodings_ && !isChunked(encoding)) ||
         parser_.method == HTTP_CONNECT) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);

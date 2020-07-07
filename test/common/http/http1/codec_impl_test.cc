@@ -2251,6 +2251,28 @@ TEST_F(Http1ClientConnectionImplTest, NoContentLengthResponse) {
   EXPECT_TRUE(status.ok());
 }
 
+TEST_F(Http1ClientConnectionImplTest, ResponseWithDuplicatedChunked) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n"
+                             // First chunked header.
+                             "transfer-encoding: chunked\r\n"
+                             // The duplicated chunked header.
+                             "transfer-encoding: chunked\r\n"
+                             // Another duplicated header, not lower case.
+                             "Transfer-Encoding: Chunked\r\n\r\n"
+                             // Regular response body.
+                             "b\r\nHello World\r\n0\r\n\r\n");
+  auto status = codec_->dispatch(response);
+  EXPECT_EQ(0UL, response.length());
+  EXPECT_TRUE(status.ok());
+}
+
 TEST_F(Http1ClientConnectionImplTest, ResponseWithTrailers) {
   initialize();
 
