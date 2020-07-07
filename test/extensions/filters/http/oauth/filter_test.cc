@@ -39,15 +39,12 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 class MockSecretReader : public SecretReader {
 public:
-  MockSecretReader() = default;
   std::string clientSecret() const override { return "asdf_client_secret_fdsa"; }
   std::string tokenSecret() const override { return "asdf_token_secret_fdsa"; }
 };
 
 class MockOAuth2CookieValidator : public CookieValidator {
 public:
-  MockOAuth2CookieValidator() = default;
-  ~MockOAuth2CookieValidator() override = default;
   MOCK_METHOD(std::string&, username, (), (const));
   MOCK_METHOD(std::string&, token, (), (const));
   MOCK_METHOD(bool, isValid, (), (const));
@@ -56,12 +53,9 @@ public:
 
 class MockOAuth2Client : public OAuth2Client {
 public:
-  MockOAuth2Client() = default;
-  ~MockOAuth2Client() override = default;
-
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
-  void setCallbacks(OAuth2FilterCallbacks&) override {}
+  void setCallbacks(FilterCallbacks&) override {}
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                     const Http::ResponseHeaderMap*) override {}
 

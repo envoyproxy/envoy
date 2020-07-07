@@ -37,13 +37,14 @@ START -> USER_UNAUTHORIZED -> PENDING_ACCESS_TOKEN -> USER_AUTHORIZED
  */
 class OAuth2Client : public Http::AsyncClient::Callbacks {
 public:
-  ~OAuth2Client() override = default;
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                                    const std::string& secret, const std::string& cb_url) PURE;
+  virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
+
+  // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override PURE;
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason f) override PURE;
-  virtual void setCallbacks(OAuth2FilterCallbacks& callbacks) PURE;
 };
 
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::upstream> {
@@ -58,13 +59,14 @@ public:
     }
   }
 
+  // OAuth2Client
   /**
    * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
    */
   void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
                            const std::string& secret, const std::string& cb_url) override;
 
-  void setCallbacks(OAuth2FilterCallbacks& callbacks) override { parent_ = &callbacks; }
+  void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 
   // AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override;
@@ -75,19 +77,18 @@ public:
 private:
   friend class OAuth2ClientTest;
 
-  OAuth2FilterCallbacks* parent_{nullptr};
+  FilterCallbacks* parent_{nullptr};
 
-  // the cluster manager is required to get the HTTP client
   Upstream::ClusterManager& cm_;
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_duration_;
 
-  // for simplicity we have one in-flight request at a time tracked via this pointer.
+  // Tracks any outstanding in-flight requests, allowing us to cancel the request
+  // if the filter ends before the request completes.
   Http::AsyncClient::Request* in_flight_request_{nullptr};
 
   // Due to the asynchronous nature of this functionality, it is helpful to have managed state which
-  // is tracked here. Logic within a single filter is thread-safe so we don't have to worry about
-  // locking the state in a mutex.
+  // is tracked here.
   OAuthState state_{OAuthState::Idle};
 
   /**
@@ -102,8 +103,6 @@ private:
     request->headers().setHost(cluster_name_);
     return request;
   }
-
-  Http::RequestMessagePtr createAuthGetRequest(const std::string& access_token);
 
   Http::RequestMessagePtr createPostRequest() {
     auto request = createBasicRequest();

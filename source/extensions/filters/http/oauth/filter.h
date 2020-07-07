@@ -43,22 +43,24 @@ public:
 
   std::string clientSecret() const override {
     if (!client_secret_provider_) {
-      return "";
+      return EMPTY_STRING;
     }
+
     const auto* secret = client_secret_provider_->secret();
     if (!secret) {
-      return "";
+      return EMPTY_STRING;
     }
+
     return Config::DataSource::read(secret->secret(), true, api_);
   }
 
   std::string tokenSecret() const override {
     if (!token_secret_provider_) {
-      return "";
+      return EMPTY_STRING;
     }
     const auto* secret = token_secret_provider_->secret();
     if (!secret) {
-      return "";
+      return EMPTY_STRING;
     }
     return Config::DataSource::read(secret->secret(), true, api_);
   }
@@ -165,12 +167,15 @@ private:
  * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
  * beyond that is broken into component classes.
  */
-class OAuth2Filter : public Http::PassThroughDecoderFilter, public OAuth2FilterCallbacks {
+class OAuth2Filter : public Http::PassThroughDecoderFilter, public FilterCallbacks {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
                TimeSource& time_source);
 
+  // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
+
+  // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code,
                                std::chrono::seconds expires_in) override;
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh

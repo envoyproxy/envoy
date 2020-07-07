@@ -54,23 +54,13 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
                                  Http::AsyncClient::RequestOptions().setTimeout(timeout_duration_));
 }
 
-Http::RequestMessagePtr OAuth2ClientImpl::createAuthGetRequest(const std::string& access_token) {
-  auto request = createBasicRequest();
-  request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  request->headers().setInline(authorization_handle.handle(),
-                               std::string("Bearer ") + access_token);
-  return request;
-}
-
-// successful request calls will end up here
 void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                  Http::ResponseMessagePtr&& message) {
   in_flight_request_ = nullptr;
 
-  /**
-   * Due to the asynchronous nature of this client, it's important to immediately update the state
-   * that we are not waiting on anything, otherwise a painful debugging session may ensue.
-   */
+  
+  // Due to the asynchronous nature of this client, it's important to immediately update the state
+  // that we are not waiting on anything, otherwise a painful debugging session may ensue.
   OAuthState prior_state = state_;
   state_ = OAuthState::Idle;
 
@@ -84,6 +74,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
   const std::string response_body = message->bodyAsString();
 
+// TODO(snowp): Make proto
   Json::ObjectSharedPtr json_object;
   try {
     json_object = Json::Factory::loadFromString(response_body);

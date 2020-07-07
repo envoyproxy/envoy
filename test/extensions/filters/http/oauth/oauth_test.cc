@@ -24,7 +24,7 @@ using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 
-class MockCallbacks : public OAuth2FilterCallbacks {
+class MockCallbacks : public FilterCallbacks {
 public:
   MOCK_METHOD(void, sendUnauthorizedResponse, ());
   MOCK_METHOD(void, onGetAccessTokenSuccess, (const std::string&, std::chrono::seconds));
