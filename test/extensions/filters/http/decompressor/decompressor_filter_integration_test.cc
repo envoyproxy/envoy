@@ -253,8 +253,8 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   test_server_->waitForCounterEq(
       "http.config_test.decompressor.testlib.gzip.response.total_compressed_bytes",
       compressed_response_length);
-  test_server_->waitForCounterEq(
-      "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 4);
+  test_server_->waitForCounterGe(
+      "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 3);
 }
 
 } // namespace Envoy
