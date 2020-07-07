@@ -13,6 +13,48 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
 
+class FakeConnectionSocket : public Network::MockConnectionSocket {
+  const Network::Address::InstanceConstSharedPtr& local_address_;
+public:
+  ~FakeConnectionSocket() override = default;
+
+  FakeConnectionSocket(const Network::Address::InstanceConstSharedPtr& local_address)
+      : local_address_(local_address)
+  { }
+
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+    return local_address_;
+  }
+
+  Network::Address::Type addressType() const override {
+    return local_address_->type();
+  }
+
+  absl::optional<Network::Address::IpVersion> ipVersion() const override {
+    if (local_address_->type() != Network::Address::Type::Ip) {
+      return absl::nullopt;
+    }
+
+    return local_address_->ip()->version();
+  }
+
+  Api::SysCallIntResult getSocketOption(int level, int, void* optval,
+                                        socklen_t*) const override {
+    switch (level) {
+      case SOL_IPV6:
+        static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET6;
+        break;
+      case SOL_IP:
+        static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET;
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+
+    return Api::SysCallIntResult{0, 0};
+  }
+};
+
 DEFINE_PROTO_FUZZER(
     const envoy::extensions::filters::listener::original_dst::v3::OriginalDstTestCase& input) {
 
@@ -24,45 +66,18 @@ DEFINE_PROTO_FUZZER(
   }
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
-  NiceMock<Network::MockConnectionSocket> socket_;
 
   try {
-    auto address_ = Network::Utility::resolveUrl(input.address());
-    ON_CALL(socket_, localAddress()).WillByDefault(testing::ReturnRef(address_));
-    ON_CALL(callbacks_, socket()).WillByDefault(testing::ReturnRef(socket_));
+    auto address = Network::Utility::resolveUrl(input.address());
+    FakeConnectionSocket socket(address);
+    ON_CALL(callbacks_, socket()).WillByDefault(testing::ReturnRef(socket));
 
-    if (address_ != nullptr) {
-      ON_CALL(socket_, addressType()).WillByDefault(testing::Return(address_->type()));
-      if (socket_.addressType() == Network::Address::Type::Ip) {
-        ON_CALL(socket_, ipVersion()).WillByDefault(testing::Return(address_->ip()->version()));
-      }
-    }
-
+    auto filter = std::make_unique<OriginalDstFilter>();
+    filter->onAccept(callbacks_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
-
-  auto filter = std::make_unique<OriginalDstFilter>();
-
-  // Set address family of mock socket so that it routes correctly thru addressFromSockAddr
-  ON_CALL(socket_, getSocketOption(_, _, _, _))
-      .WillByDefault(testing::WithArgs<0, 2>(Invoke([](int level, void* optval) {
-        switch (level) {
-        case SOL_IPV6:
-          static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET6;
-          break;
-        case SOL_IP:
-          static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET;
-          break;
-        default:
-          NOT_REACHED_GCOVR_EXCL_LINE;
-        }
-
-        return Api::SysCallIntResult{0, 0};
-      })));
-
-  filter->onAccept(callbacks_);
 }
 
 } // namespace OriginalDst
