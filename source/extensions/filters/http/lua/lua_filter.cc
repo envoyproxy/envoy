@@ -715,6 +715,9 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
     return;
   case spdlog::level::off:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return;
+  case spdlog::level::n_levels:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
