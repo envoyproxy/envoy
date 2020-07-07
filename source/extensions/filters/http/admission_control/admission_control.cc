@@ -60,11 +60,9 @@ AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigShare
       record_request_(true) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  ENVOY_LOG(trace, "decoding headers");
   // TODO(tonya11en): Ensure we document the fact that healthchecks are ignored.
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     // We must forego recording the success/failure of this request during encoding.
-    ENVOY_LOG(trace, "foregoing recording of request");
     record_request_ = false;
     return Http::FilterHeadersStatus::Continue;
   }

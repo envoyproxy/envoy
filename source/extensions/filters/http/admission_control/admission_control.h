@@ -106,13 +106,11 @@ private:
   bool shouldRejectRequest() const;
 
   void recordSuccess() {
-    ENVOY_LOG(trace, "recording success");
     stats_.rq_success_.inc();
     config_->getController().recordSuccess();
   }
 
   void recordFailure() {
-    ENVOY_LOG(trace, "recording failure");
     stats_.rq_failure_.inc();
     config_->getController().recordFailure();
   }
