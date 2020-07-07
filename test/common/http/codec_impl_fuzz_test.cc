@@ -216,8 +216,13 @@ public:
               fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.headers());
           if (headers.Status() == nullptr) {
             headers.setReferenceKey(Headers::get().Status, "200");
+          } else if (headers.Status()->value().getStringView() == "204") {
+            // According to https://tools.ietf.org/html/rfc7230#section-3.3.3 a
+            // 204 response must not contain a message body
+            state.response_encoder_->encodeHeaders(headers, true);
+          } else {
+            state.response_encoder_->encodeHeaders(headers, end_stream);
           }
-          state.response_encoder_->encodeHeaders(headers, end_stream);
         } else {
           state.request_encoder_->encodeHeaders(
               fromSanitizedHeaders<TestRequestHeaderMapImpl>(directional_action.headers()),
