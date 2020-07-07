@@ -76,7 +76,7 @@ message AdmissionControl {
   }
 
   // The sliding time window over which the success rate is calculated. The window is rounded to the
-  // nearest second. Defaults to 60s.
+  // nearest second. Defaults to 30s.
   google.protobuf.Duration sampling_window = 3;
 
   // Rejection probability is defined by the formula::
@@ -86,7 +86,7 @@ message AdmissionControl {
   // The aggression dictates how heavily the admission controller will throttle requests upon SR
   // dropping at or below the threshold. A value of 1 will result in a linear increase in
   // rejection probability as SR drops. Any values less than 1.0, will be set to 1.0. If the
-  // message is unspecified, the aggression is 2.0.
+  // message is unspecified, the aggression is 1.0.
   config.core.v3.RuntimeDouble aggression = 4;
 
   // Dictates the success rate at which the rejection probability is non-zero. As success rate drops

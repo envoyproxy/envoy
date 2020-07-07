@@ -84,7 +84,7 @@ success_criteria:
   auto config = makeConfig(yaml);
 
   EXPECT_TRUE(config->filterEnabled());
-  EXPECT_EQ(2.0, config->aggression());
+  EXPECT_EQ(1.0, config->aggression());
   EXPECT_EQ(0.95, config->successRateThreshold());
 }
 
