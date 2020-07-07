@@ -85,7 +85,7 @@ settings:
   )EOF";
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config, true, false);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
@@ -114,7 +114,7 @@ settings:
   )EOF";
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config, true, false);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);

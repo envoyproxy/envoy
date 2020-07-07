@@ -53,11 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "144290c4166bd67e76a54f96cd504ed86416ca3ca82030282760f0823c10be48",
-        strip_prefix = "bazel-toolchains-3.1.1",
+        sha256 = "db48eed61552e25d36fe051a65d2a329cc0fb08442627e8f13960c5ab087a44e",
+        strip_prefix = "bazel-toolchains-3.2.0",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.1.1/bazel-toolchains-3.1.1.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.1.1.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.2.0/bazel-toolchains-3.2.0.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.2.0.tar.gz",
         ],
         use_category = ["build"],
     ),
@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "b0efe70a1d122fffb89570771f4ec3b912aa0a8a0ce56218223918d7737d01e2",
-        strip_prefix = "envoy-build-tools-3cbc1d66b9e9ead42daf69e01597cacf4fb52151",
-        # 2020-05-15
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/3cbc1d66b9e9ead42daf69e01597cacf4fb52151.tar.gz"],
+        sha256 = "c4d27c0a5db918e861b7164d69cdffe920daafbe3f597ffdda5a1d10c1abc992",
+        strip_prefix = "envoy-build-tools-557ee9b44a3d08cf38d9ce6f08adb872c385d6a5",
+        # 2020-06-16
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/557ee9b44a3d08cf38d9ce6f08adb872c385d6a5.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -154,17 +154,17 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "afd18f62d1bc466c60bef088e6b637b0284be88c515cedc59ad4554150af6043",
-        strip_prefix = "spdlog-1.4.0",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.4.0.tar.gz"],
+        sha256 = "378a040d91f787aec96d269b0c39189f58a6b852e4cbf9150ccfacbe85ebbbfc",
+        strip_prefix = "spdlog-1.6.1",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.6.1.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "f6def6cdf63e29a367d46c0ad9e3e31eed89d031e22e0caac126f1e62d8b3fd0",
-        strip_prefix = "libprotobuf-mutator-3521f47a2828da9ace403e4ecc4aece1a84feb36",
-        # 2020-02-04
-        urls = ["https://github.com/google/libprotobuf-mutator/archive/3521f47a2828da9ace403e4ecc4aece1a84feb36.tar.gz"],
+        sha256 = "d51365191580c4bf5e9ff104eebcfe34f7ff5f471006d7a460c15dcb3657501c",
+        strip_prefix = "libprotobuf-mutator-7a2ed51a6b682a83e345ff49fc4cfd7ca47550db",
+        # 2020-06-25
+        urls = ["https://github.com/google/libprotobuf-mutator/archive/7a2ed51a6b682a83e345ff49fc4cfd7ca47550db.tar.gz"],
         use_category = ["test"],
     ),
     com_github_gperftools_gperftools = dict(
@@ -418,9 +418,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz
-        sha256 = "b40cd22cadba577b7281a76db66f6a66dd744edbad8cc2c861c2c976ef721e4d",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_dbf5ad147f60afc125e99db7549402af49a5eae8.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_6dafefa72cba2ab2ba4922d17a30618e9617c7cf.tar.gz
+        sha256 = "f1ab73ddd1a7db4e08a9e4db6c2e98e5a0a7bbaca08f5fee0d73adb02c24e44a",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_6dafefa72cba2ab2ba4922d17a30618e9617c7cf.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -433,9 +433,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_code_re2 = dict(
-        sha256 = "04ee2aaebaa5038554683329afc494e684c30f82f2a1e47eb62450e59338f84d",
-        strip_prefix = "re2-2020-03-03",
-        urls = ["https://github.com/google/re2/archive/2020-03-03.tar.gz"],
+        sha256 = "2e9489a31ae007c81e90e8ec8a15d62d58a9c18d4fd1603f6441ef248556b41f",
+        strip_prefix = "re2-2020-07-06",
+        # 2020-07-06
+        urls = ["https://github.com/google/re2/archive/2020-07-06.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),

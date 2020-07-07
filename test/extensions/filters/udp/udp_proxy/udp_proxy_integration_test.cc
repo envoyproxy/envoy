@@ -84,6 +84,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Make sure that we gracefully fail if the user does not configure reuse port and concurrency is
+// > 1.
+TEST_P(UdpProxyIntegrationTest, NoReusePort) {
+  concurrency_ = 2;
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+  setup(1);
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
 // Basic loopback test.
 TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   setup(1);

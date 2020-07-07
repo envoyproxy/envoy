@@ -758,6 +758,8 @@ private:
   const std::string host_redirect_;
   const std::string port_redirect_;
   const std::string path_redirect_;
+  const bool path_redirect_has_query_;
+  const bool enable_preserve_query_in_path_redirects_;
   const bool https_redirect_;
   const std::string prefix_rewrite_redirect_;
   const bool strip_query_;
