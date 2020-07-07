@@ -68,5 +68,7 @@ public:
   virtual ResourceLimit& connectionPools() PURE;
 };
 
+using ResourceManagerPtr = std::unique_ptr<ResourceManager>;
+
 } // namespace Upstream
 } // namespace Envoy

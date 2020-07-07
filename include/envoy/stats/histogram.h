@@ -65,6 +65,8 @@ public:
   virtual double sampleSum() const PURE;
 };
 
+using HistogramStatisticsSharedPtr = std::shared_ptr<HistogramStatistics>;
+
 /**
  * A histogram that records values one at a time.
  * Note: Histograms now incorporate what used to be timers because the only

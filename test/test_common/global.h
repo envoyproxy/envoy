@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 
@@ -63,6 +65,7 @@ private:
     void* ptrHelper() override { return ptr_.get(); }
 
   private:
+    using TypePtr = std::unique_ptr<Type>;
     TypePtr ptr_{std::make_unique<Type>()};
   };
 

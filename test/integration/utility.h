@@ -116,6 +116,8 @@ private:
     bool closed_{false};
   };
 
+  using ConnectionCallbacksPtr = std::unique_ptr<ConnectionCallbacks>;
+
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::Dispatcher& dispatcher_;

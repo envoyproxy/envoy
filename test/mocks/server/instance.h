@@ -98,7 +98,7 @@ public:
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  Secret::SecretManagerPtr secret_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;

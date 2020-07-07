@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -39,10 +40,14 @@ public:
   MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
 };
 
+template <class ResponseType> using ResponseTypePtr = std::unique_ptr<ResponseType>;
+
 template <class ResponseType>
 class MockAsyncRequestCallbacks : public AsyncRequestCallbacks<ResponseType> {
 public:
-  void onSuccess(ResponseTypePtr&& response, Tracing::Span& span) { onSuccess_(*response, span); }
+  void onSuccess(ResponseTypePtr<ResponseType>&& response, Tracing::Span& span) {
+    onSuccess_(*response, span);
+  }
 
   MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
   MOCK_METHOD(void, onSuccess_, (const ResponseType& response, Tracing::Span& span));
@@ -57,7 +62,7 @@ public:
     onReceiveInitialMetadata_(*metadata);
   }
 
-  void onReceiveMessage(ResponseTypePtr&& message) { onReceiveMessage_(*message); }
+  void onReceiveMessage(ResponseTypePtr<ResponseType>&& message) { onReceiveMessage_(*message); }
 
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
     onReceiveTrailingMetadata_(*metadata);

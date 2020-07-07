@@ -181,7 +181,7 @@ public:
                    Envoy::ConnectionPool::AttachContext& context) override {
     ActiveTcpClient* tcp_client = static_cast<ActiveTcpClient*>(&client);
     auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
-    std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
+    Envoy::Tcp::ConnectionPool::ConnectionDataPtr connection_data =
         std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);
     callbacks->onPoolReady(std::move(connection_data), tcp_client->real_host_description_);
   }

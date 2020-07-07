@@ -49,6 +49,8 @@ protected:
   virtual const Object* getData(const std::string& key) const PURE;
 };
 
+using TypedMetadataPtr = std::unique_ptr<TypedMetadata>;
+
 /**
  * Typed metadata should implement this factory and register via Registry::registerFactory or the
  * convenience class RegisterFactory.

@@ -37,7 +37,7 @@ public:
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockConfigTracker> config_tracker_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  Secret::SecretManagerPtr secret_manager_;
 };
 } // namespace Configuration
 } // namespace Server

@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <list>
+#include <memory>
 #include <random>
 #include <string>
 #include <vector>
@@ -958,6 +959,8 @@ public:
     header_map_->verifyByteSizeInternalForTest();
     return rc;
   }
+
+  using ImplPtr = std::unique_ptr<Impl>;
 
   ImplPtr header_map_{Impl::create()};
 };

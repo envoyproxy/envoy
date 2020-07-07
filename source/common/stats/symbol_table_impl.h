@@ -357,6 +357,8 @@ public:
   void free(SymbolTable& table);
 };
 
+using StatNameStoragePtr = std::unique_ptr<StatNameStorage>;
+
 /**
  * Efficiently represents a stat name using a variable-length array of uint8_t.
  * This class does not own the backing store for this array; the backing-store
@@ -505,6 +507,8 @@ public:
 private:
   SymbolTable& symbol_table_;
 };
+
+using StatNameManagedStoragePtr = std::unique_ptr<StatNameManagedStorage>;
 
 /**
  * Holds backing-store for a dynamic stat, where are no global locks needed

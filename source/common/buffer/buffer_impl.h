@@ -489,6 +489,8 @@ private:
   const std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
+using BufferFragmentImplPtr = std::unique_ptr<BufferFragmentImpl>;
+
 class LibEventInstance : public Instance {
 public:
   // Called after accessing the memory in buffer() directly to allow any post-processing.

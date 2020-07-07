@@ -1,4 +1,6 @@
 // NOLINT(namespace-envoy)
+#include <memory>
+
 #include "envoy/thread/thread.h"
 
 #include "test/test_common/environment.h"
@@ -8,6 +10,7 @@
 #include "tools/cpp/runfiles/runfiles.h"
 
 using bazel::tools::cpp::runfiles::Runfiles;
+using RunfilesPtr = std::unique_ptr<Runfiles>;
 // The main entry point (and the rest of this file) should have no logic in it,
 // this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
