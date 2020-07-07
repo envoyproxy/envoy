@@ -16,9 +16,6 @@ envoy_package()
 envoy_cc_library(
     name = "oauth_callback_interface",
     hdrs = ["oauth.h"],
-    deps = [
-        "//include/envoy/json:json_object_interface",
-    ],
 )
 
 envoy_proto_library(
@@ -33,7 +30,6 @@ envoy_cc_library(
     deps = [
         ":oauth_response_cc_proto",
         "//include/envoy/http:async_client_interface",
-        "//include/envoy/json:json_object_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/http:message_lib",
         "//source/common/protobuf:message_validator_lib",

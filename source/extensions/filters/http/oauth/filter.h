@@ -224,8 +224,7 @@ private:
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   const std::string& bearerPrefix() const;
-  std::string extractAccessToken(const Http::RequestHeaderMap& headers,
-                                 const std::string& parameter_name) const;
+  std::string extractAccessToken(const Http::RequestHeaderMap& headers) const;
 };
 
 } // namespace Oauth

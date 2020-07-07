@@ -60,5 +60,6 @@ The OAuth filter outputs statistics in the *<stat_prefix>.* namespace.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  failure, Counter, Total requests that were denied.
-  success, Counter, Total requests that were allowed.
+  oauth_failure, Counter, Total requests that were denied.
+  oauth_success, Counter, Total requests that were allowed.
+  oauth_unauthenticated_rq, Counter, Total unauthenticated requests that were redirected for authentication.

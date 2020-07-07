@@ -63,7 +63,7 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
 }
 
 /*
- * Static registration for the AWS Lambda filter. @see RegisterFactory.
+ * Static registration for the OAuth2 filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(OAuth2Config, Server::Configuration::NamedHttpFilterConfigFactory);
 

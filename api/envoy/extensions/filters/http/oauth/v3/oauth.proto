@@ -46,7 +46,7 @@ message OAuth2Config {
   // the cluster.
   string hostname = 2 [(validate.rules).string = {min_bytes: 1}];
 
-  // A struct with the credentials required for OAuth
+  // Credentials used for OAuth.
   OAuth2Credentials credentials = 3;
 
   // The callback path the OAuth server should use.
@@ -65,7 +65,7 @@ message OAuth2Config {
   bool pass_through_options_method = 8;
 }
 
-// Filter config
+// Filter config.
 message OAuth2 {
   // Leave this empty to disable OAuth2 for a specific route, using per filter config.
   OAuth2Config config = 1;

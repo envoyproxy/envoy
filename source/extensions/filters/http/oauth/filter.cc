@@ -33,9 +33,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth {
 
-// X-Forwarded Oauth headers
-const std::string Token{"token"};
-
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
@@ -143,8 +140,7 @@ const std::string& OAuth2Filter::bearerPrefix() const {
   CONSTRUCT_ON_FIRST_USE(std::string, "bearer ");
 }
 
-std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& headers,
-                                             const std::string& parameter_name) const {
+std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& headers) const {
   ASSERT(headers.Path() != nullptr);
 
   // Start by looking for a bearer token in the Authorization header.
@@ -161,7 +157,7 @@ std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& heade
   // Check for the named query string parameter.
   const auto path = headers.Path()->value().getStringView();
   const auto params = Http::Utility::parseQueryString(path);
-  const auto param = params.find(parameter_name);
+  const auto param = params.find("token");
   if (param != params.end()) {
     return param->second;
   }
@@ -228,7 +224,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // If a bearer token is supplied as a header or param, we ingest it here and kick off the
   // user resolution immediately. Note this comes after HMAC validation, so technically this
   // header is sanitized in a way, as the validation check forces the correct Bearer Cookie value.
-  access_token_ = extractAccessToken(headers, Token);
+  access_token_ = extractAccessToken(headers);
   if (!access_token_.empty()) {
     found_bearer_token_ = true;
     request_headers_ = &headers;
@@ -240,7 +236,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // If no access token and this isn't the callback URI, redirect to acquire credentials.
   //
   // The following conditional could be replaced with a regex pattern-match,
-  // if we're concerned about matching strictly `/_oauth`.
+  // if we're concerned about strict matching against the callback path.
   if (!absl::StartsWith(path_str, config_->callbackPath())) {
     Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
         {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
