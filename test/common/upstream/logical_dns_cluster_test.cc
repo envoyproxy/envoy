@@ -390,17 +390,24 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   dns_refresh_rate: 4s
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
-  hosts:
-  - socket_address:
-      address: foo.bar.com
-      port_value: 443
-  - socket_address:
-      address: foo2.bar.com
-      port_value: 443
+  load_assignment:
+        cluster_name: name
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443                     
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo2.bar.com
+                    port_value: 443
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(multiple_hosts_yaml, false), EnvoyException,
-                            "LOGICAL_DNS clusters must have a single host");
+  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(multiple_hosts_yaml), EnvoyException,
+                            "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_lb_endpoints_yaml = R"EOF(
   name: name
@@ -430,7 +437,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      setupFromV3Yaml(multiple_lb_endpoints_yaml, false), EnvoyException,
+      setupFromV3Yaml(multiple_lb_endpoints_yaml), EnvoyException,
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_endpoints_yaml = R"EOF(
@@ -463,7 +470,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      setupFromV3Yaml(multiple_endpoints_yaml, false), EnvoyException,
+      setupFromV3Yaml(multiple_endpoints_yaml), EnvoyException,
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string custom_resolver_yaml = R"EOF(
@@ -487,7 +494,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
               port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(custom_resolver_yaml, false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(custom_resolver_yaml), EnvoyException,
                             "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 

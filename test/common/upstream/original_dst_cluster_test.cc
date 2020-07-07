@@ -124,7 +124,7 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
     name: name
     connect_timeout: 0.25s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
     cleanup_interval: 1s
     load_assignment:
       cluster_name: name
@@ -138,7 +138,7 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      setupFromYaml(yaml, false), EnvoyException,
+      setupFromYaml(yaml), EnvoyException,
       "ORIGINAL_DST clusters must have no load assignment or hosts configured");
 }
 
