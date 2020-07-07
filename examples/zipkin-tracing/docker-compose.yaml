@@ -10,10 +10,10 @@ services:
     networks:
       - envoymesh
     expose:
-      - "80"
+      - "8000"
       - "8001"
     ports:
-      - "8000:80"
+      - "8000:8000"
       - "8001:8001"
 
   service1:
@@ -29,7 +29,7 @@ services:
     environment:
       - SERVICE_NAME=1
     expose:
-      - "80"
+      - "8000"
 
   service2:
     build:
@@ -44,7 +44,7 @@ services:
     environment:
       - SERVICE_NAME=2
     expose:
-      - "80"
+      - "8000"
 
   zipkin:
     image: openzipkin/zipkin

@@ -3,6 +3,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
+#include "common/runtime/runtime_features.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -53,16 +55,25 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   cluster_info_ = cluster->info();
 
-  auto& resource = cluster_info_->resourceManager(route_entry->priority()).pendingRequests();
-  if (!resource.canCreate()) {
-    ENVOY_STREAM_LOG(debug, "pending request overflow", *decoder_callbacks_);
-    cluster_info_->stats().upstream_rq_pending_overflow_.inc();
-    decoder_callbacks_->sendLocalReply(
+  const bool should_use_dns_cache_circuit_breakers =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_dns_cache_circuit_breakers");
+
+  circuit_breaker_ = config_->cache().canCreateDnsRequest(
+      !should_use_dns_cache_circuit_breakers
+          ? absl::make_optional(std::reference_wrapper<ResourceLimit>(
+                cluster_info_->resourceManager(route_entry->priority()).pendingRequests()))
+          : absl::nullopt);
+
+  if (circuit_breaker_ == nullptr) {
+    if (!should_use_dns_cache_circuit_breakers) {
+      cluster_info_->stats().upstream_rq_pending_overflow_.inc();
+    }
+    ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
+    this->decoder_callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
         absl::nullopt, ResponseStrings::get().PendingRequestOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(resource);
 
   uint16_t default_port = 80;
   if (cluster_info_->transportSocketMatcher()
