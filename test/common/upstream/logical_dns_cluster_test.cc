@@ -406,8 +406,9 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
                     port_value: 443
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(multiple_hosts_yaml), EnvoyException,
-                            "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromV3Yaml(multiple_hosts_yaml), EnvoyException,
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_lb_endpoints_yaml = R"EOF(
   name: name

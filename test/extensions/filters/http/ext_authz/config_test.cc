@@ -6,6 +6,7 @@
 #include "extensions/filters/http/ext_authz/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,18 +20,20 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
-TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
+void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   std::string yaml = R"EOF(
   grpc_service:
     google_grpc:
       target_uri: ext_authz_server
       stat_prefix: google
   failure_mode_allow: false
+  transport_api_version: {}
   )EOF";
 
   ExtAuthzFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(yaml, *proto_config);
+  TestUtility::loadFromYaml(
+      fmt::format(yaml, TestUtility::getVersionStringFromApiVersion(api_version)), *proto_config);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor()).Times(1);
@@ -46,6 +49,14 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
+}
+
+} // namespace
+
+TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
+  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO);
+  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V2);
+  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3);
 }
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
@@ -76,6 +87,10 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
         patterns:
         - exact: baz
         - prefix: x-fail
+      allowed_upstream_headers_to_append:
+        patterns:
+        - exact: baz-append
+        - prefix: x-append
 
     path_prefix: /extauth
 
@@ -93,7 +108,6 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   EXPECT_CALL(context, clusterManager()).Times(1);
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(1);
-  EXPECT_CALL(context, timeSource()).Times(1);
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
@@ -110,7 +124,6 @@ TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterNa
           deprecated_name));
 }
 
-} // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions

@@ -55,6 +55,26 @@ public:
   ClientType clientType() const override { return std::get<1>(GetParam()); }
 };
 
+class VersionedGrpcClientIntegrationParamTest
+    : public BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType,
+                                               envoy::config::core::v3::ApiVersion>> {
+public:
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType,
+                                                envoy::config::core::v3::ApiVersion>>& p) {
+    return fmt::format("{}_{}_{}",
+                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                       std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+                       std::get<2>(p.param) == envoy::config::core::v3::ApiVersion::V3
+                           ? "V3"
+                           : envoy::config::core::v3::ApiVersion::V2 ? "V2" : "AUTO");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  ClientType clientType() const override { return std::get<1>(GetParam()); }
+  envoy::config::core::v3::ApiVersion apiVersion() const { return std::get<2>(GetParam()); }
+};
+
 class DeltaSotwIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
       public testing::TestWithParam<
@@ -90,6 +110,12 @@ public:
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc))
+#define VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS                                                   \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
+                   testing::Values(envoy::config::core::v3::ApiVersion::V3,                        \
+                                   envoy::config::core::v3::ApiVersion::V2,                        \
+                                   envoy::config::core::v3::ApiVersion::AUTO))
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
@@ -98,6 +124,12 @@ public:
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc))
+#define VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS                                                   \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
+                   testing::Values(envoy::config::core::v3::ApiVersion::V3,                        \
+                                   envoy::config::core::v3::ApiVersion::V2,                        \
+                                   envoy::config::core::v3::ApiVersion::AUTO))
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
