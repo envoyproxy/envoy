@@ -20,7 +20,7 @@ namespace Envoy {
 class OptionsImpl : public Server::Options, protected Logger::Loggable<Logger::Id::config> {
 public:
   /**
-   * Parameters are max_stat_name_len, hot_restart_enabled
+   * Parameters are hot_restart_enabled
    */
   using HotRestartVersionCb = std::function<std::string(bool)>;
 
