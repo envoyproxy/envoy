@@ -178,7 +178,7 @@ def api_proto_package(
         importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
         proto = name,
         visibility = ["//visibility:public"],
-        deps = [_go_proto_mapping(dep) for dep in deps] + [
+        deps = depset([_go_proto_mapping(dep) for dep in deps] + [
             "@com_github_golang_protobuf//ptypes:go_default_library",
             "@com_github_golang_protobuf//ptypes/any:go_default_library",
             "@com_github_golang_protobuf//ptypes/duration:go_default_library",
@@ -188,5 +188,5 @@ def api_proto_package(
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@com_google_googleapis//google/api:annotations_go_proto",
             "@com_google_googleapis//google/rpc:status_go_proto",
-        ],
+        ]).to_list(),
     )
