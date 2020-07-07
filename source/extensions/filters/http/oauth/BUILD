@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
+    "envoy_proto_library",
     "envoy_package",
 )
 
@@ -20,6 +21,11 @@ envoy_cc_library(
     ],
 )
 
+envoy_proto_library(
+    name = "oauth_response",
+    srcs = ["oauth_response.proto"]
+)
+
 envoy_cc_library(
     name = "oauth_client",
     srcs = ["oauth_client.cc"],
@@ -29,8 +35,9 @@ envoy_cc_library(
         "//include/envoy/json:json_object_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/http:message_lib",
-        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:message_validator_lib",
         "//source/extensions/filters/http/oauth:oauth_callback_interface",
+        ":oauth_response_cc_proto",
     ],
 )
 

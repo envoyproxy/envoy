@@ -17,19 +17,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth {
 
-enum class OAuthState { Idle, PendingAccessToken };
-
-/*
-  OAuth states
-  - START
-  - USER_AUTHORIZED (continue)
-  - USER_UNAUTHORIZED
-  - PENDING_ACCESS_TOKEN
-
-example flow:
-START -> USER_UNAUTHORIZED -> PENDING_ACCESS_TOKEN -> USER_AUTHORIZED
-*/
-
 /**
  * An OAuth client abstracts away everything regarding how to communicate with
  * the OAuth server. The filter should only need to invoke the functions here,
@@ -86,6 +73,8 @@ private:
   // Tracks any outstanding in-flight requests, allowing us to cancel the request
   // if the filter ends before the request completes.
   Http::AsyncClient::Request* in_flight_request_{nullptr};
+
+  enum class OAuthState { Idle, PendingAccessToken };
 
   // Due to the asynchronous nature of this functionality, it is helpful to have managed state which
   // is tracked here.

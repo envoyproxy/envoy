@@ -9,7 +9,8 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
-#include "common/json/json_loader.h"
+#include "common/protobuf/message_validator_impl.h"
+#include "source/extensions/filters/http/oauth/oauth_response.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,11 +23,6 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 }
 
 constexpr absl::string_view authTokenEndpoint = "/oauth/token/";
-
-// JSON keys for the various responses
-const std::string& kAccessToken() { CONSTRUCT_ON_FIRST_USE(std::string, "access_token"); }
-
-const std::string& kExpiresIn() { CONSTRUCT_ON_FIRST_USE(std::string, "expires_in"); }
 
 const std::string& getAccessTokenBodyFormatString() {
   CONSTRUCT_ON_FIRST_USE(
@@ -45,6 +41,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
+  ASSERT(state_ == OAuthState::Idle);
   state_ = OAuthState::PendingAccessToken;
 }
 
@@ -58,10 +55,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                  Http::ResponseMessagePtr&& message) {
   in_flight_request_ = nullptr;
 
-  
-  // Due to the asynchronous nature of this client, it's important to immediately update the state
-  // that we are not waiting on anything, otherwise a painful debugging session may ensue.
-  OAuthState prior_state = state_;
+  ASSERT(state_ == OAuthState::PendingAccessToken);
   state_ = OAuthState::Idle;
 
   // Check that the auth cluster returned a happy response.
@@ -74,40 +68,28 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
   const std::string response_body = message->bodyAsString();
 
-// TODO(snowp): Make proto
-  Json::ObjectSharedPtr json_object;
+  envoy::extensions::http_filters::oauth2::OAuthResponse response;
   try {
-    json_object = Json::Factory::loadFromString(response_body);
-  } catch (const Json::Exception& e) {
-    ENVOY_LOG(debug, "Error parsing response body, received JSON Exception: {}", e.what());
+    MessageUtil::loadFromJson(response_body, response,
+                              ProtobufMessage::getNullValidationVisitor());
+  } catch (EnvoyException& e) {
+    ENVOY_LOG(debug, "Error parsing response body, received exception: {}", e.what());
     ENVOY_LOG(debug, "Response body: {}", response_body);
     parent_->sendUnauthorizedResponse();
     return;
   }
-  if (json_object == nullptr) {
-    ENVOY_LOG(debug, "No json body was loaded.");
+
+  // TODO(snowp): Should this be a pgv validation instead? A more readable log
+  // message might be good enough reason to do this manually?
+  if (!response.has_access_token() || !response.has_expires_in()) {
+    ENVOY_LOG(debug, "No access token or expiration after asyncGetAccessToken");
     parent_->sendUnauthorizedResponse();
     return;
   }
-  // The current state of the client dictates how we interpret the response.
-  if (prior_state == OAuthState::PendingAccessToken) {
-    if (!json_object->hasObject(kAccessToken()) || !json_object->hasObject(kExpiresIn())) {
-      ENVOY_LOG(debug, "No access token or expiration after asyncGetAccessToken");
-      parent_->sendUnauthorizedResponse();
-      return;
-    }
 
-    /**
-     * Even though we've validated the existence of the objects above, one possibility is that the
-     * `expires_in` object is not a valid integer, indicative of a problem on the OAuth server.
-     * In this case, we use a default value of "0" and carry on (rather than a try/catch construct),
-     * as this default value would cause authentication to fail when the user tries to validate
-     * their cookies.
-     */
-    const std::string access_token = json_object->getString(kAccessToken());
-    const std::chrono::seconds expires_in(json_object->getInteger(kExpiresIn(), 0));
-    parent_->onGetAccessTokenSuccess(access_token, expires_in);
-  }
+  const std::string access_token{PROTOBUF_GET_WRAPPED_REQUIRED(response, access_token)};
+  const std::chrono::seconds expires_in{PROTOBUF_GET_WRAPPED_REQUIRED(response, expires_in)};
+  parent_->onGetAccessTokenSuccess(access_token, expires_in);
 }
 
 // failed request calls will end up here
