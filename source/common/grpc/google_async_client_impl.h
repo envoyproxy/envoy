@@ -21,6 +21,8 @@
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/container/node_hash_set.h"
+
 #include "grpcpp/generic/generic_stub.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/support/proto_buffer_writer.h"

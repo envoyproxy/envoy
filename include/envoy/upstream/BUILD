@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
     external_deps = [
-        "abseil_node_hash_set",
         "abseil_node_hash_map",
     ],
     deps = [

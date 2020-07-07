@@ -54,6 +54,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
