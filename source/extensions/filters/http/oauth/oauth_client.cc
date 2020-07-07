@@ -10,6 +10,7 @@
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/message_validator_impl.h"
+
 #include "source/extensions/filters/http/oauth/oauth_response.pb.h"
 
 namespace Envoy {
@@ -71,8 +72,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
 
   envoy::extensions::http_filters::oauth2::OAuthResponse response;
   try {
-    MessageUtil::loadFromJson(response_body, response,
-                              ProtobufMessage::getNullValidationVisitor());
+    MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
   } catch (EnvoyException& e) {
     ENVOY_LOG(debug, "Error parsing response body, received exception: {}", e.what());
     ENVOY_LOG(debug, "Response body: {}", response_body);
