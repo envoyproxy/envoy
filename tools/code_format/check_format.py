@@ -556,8 +556,8 @@ def fixSourceLine(line, line_number):
 
 
 def codecDiffHelper(file1, file2, diff):
-  f1 = readLines("./" + file1)
-  f2 = readLines("./" + file2)
+  f1 = readLines(file1)
+  f2 = readLines(file2)
 
   # Create diff between two files
   code_diff = list(difflib.unified_diff(f1, f2, lineterm=""))
