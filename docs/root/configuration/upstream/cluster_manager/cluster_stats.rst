@@ -176,7 +176,7 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
 Timeout budget statistics
 -------------------------
 
-If :ref:`timeout budget statistic tracking <envoy_v3_api_field_config.cluster.v3.Cluster.track_optional_cluster_stats>` is
+If :ref:`timeout budget statistic tracking <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` is
 turned on, statistics will be added to *cluster.<name>* and contain the following:
 
 .. csv-table::
@@ -320,7 +320,7 @@ Statistics for monitoring effective host weights when using the
 Request Response Size statistics
 --------------------------------
 
-If :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_optional_cluster_stats>` are tracked,
+If :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked,
 statistics will be added to *cluster.<name>* and contain the following:
 
 .. csv-table::

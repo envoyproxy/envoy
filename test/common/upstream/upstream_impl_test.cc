@@ -2236,7 +2236,7 @@ TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
                             "extension_protocol_options can be specified");
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
+TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   const std::string yaml_disabled = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -2253,21 +2253,34 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    track_optional_cluster_stats: { timeout_budgets : true }
+    track_cluster_stats: { timeout_budgets : true }
   )EOF";
 
   cluster = makeCluster(yaml_disabled2);
   EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
 
+  const std::string yaml_disabled3 = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_cluster_stats: { request_response_sizes : false }
+  )EOF";
+
+  cluster = makeCluster(yaml_disabled3);
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+}
+
+TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    track_optional_cluster_stats: { request_response_sizes : true }
+    track_cluster_stats: { request_response_sizes : true }
   )EOF";
 
-  cluster = makeCluster(yaml);
+  auto cluster = makeCluster(yaml);
   // The stats should be created.
   EXPECT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
 
@@ -2363,7 +2376,7 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
+TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -2381,22 +2394,35 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    track_optional_cluster_stats: { request_response_sizes : true }
+    track_cluster_stats: { request_response_sizes : true }
   )EOF";
 
   cluster = makeCluster(yaml_disabled2);
   EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 
+  const std::string yaml_disabled3 = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_cluster_stats: { timeout_budgets : false }
+  )EOF";
+
+  cluster = makeCluster(yaml_disabled3);
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+}
+
+TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   // Check that with the flag, the histogram is created.
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    track_optional_cluster_stats: { timeout_budgets : true }
+    track_cluster_stats: { timeout_budgets : true }
   )EOF";
 
-  cluster = makeCluster(yaml);
+  auto cluster = makeCluster(yaml);
   // The stats should be created.
   EXPECT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
   EXPECT_EQ(

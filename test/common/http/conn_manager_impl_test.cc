@@ -6156,6 +6156,10 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseHeadersSize) {
       host_->cluster_.request_response_size_stats_store_,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 30));
 
+  // response headers are internally mutated and we record final response headers.
+  // for example in the below test case, response headers are modified as
+  // {':status', '200' 'date', 'Mon, 06 Jul 2020 06:08:55 GMT' 'server', ''}
+  // whose size is 49 instead of original response headers size 10({":status", "200"}).
   EXPECT_CALL(
       host_->cluster_.request_response_size_stats_store_,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 49));

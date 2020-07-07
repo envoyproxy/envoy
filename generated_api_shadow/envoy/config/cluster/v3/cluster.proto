@@ -825,7 +825,7 @@ message Cluster {
   core.v3.ConfigSource lrs_server = 42;
 
   // Configuration to track optional cluster stats.
-  TrackOptionalClusterStats track_optional_cluster_stats = 47;
+  TrackClusterStats track_cluster_stats = 47;
 
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
@@ -912,7 +912,7 @@ message UpstreamConnectionOptions {
   core.v3.TcpKeepalive tcp_keepalive = 1;
 }
 
-message TrackOptionalClusterStats {
+message TrackClusterStats {
   // If timeout_budgets is true, the :ref:`timeout budget histograms
   // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
   // request. These show what percentage of a request's per try and global timeout was used. A value

@@ -831,7 +831,7 @@ message Cluster {
   core.v4alpha.ConfigSource lrs_server = 42;
 
   // Configuration to track optional cluster stats.
-  TrackOptionalClusterStats track_optional_cluster_stats = 47;
+  TrackClusterStats track_cluster_stats = 47;
 
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
@@ -914,9 +914,9 @@ message UpstreamConnectionOptions {
   core.v4alpha.TcpKeepalive tcp_keepalive = 1;
 }
 
-message TrackOptionalClusterStats {
+message TrackClusterStats {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.cluster.v3.TrackOptionalClusterStats";
+      "envoy.config.cluster.v3.TrackClusterStats";
 
   // If timeout_budgets is true, the :ref:`timeout budget histograms
   // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each

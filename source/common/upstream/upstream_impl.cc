@@ -686,10 +686,10 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      optional_cluster_stats_(config.has_track_optional_cluster_stats()
-                                  ? std::make_unique<OptionalClusterStats>(
-                                        config.track_optional_cluster_stats(), *stats_scope_)
-                                  : nullptr),
+      optional_cluster_stats_(
+          config.has_track_cluster_stats()
+              ? std::make_unique<OptionalClusterStats>(config.track_cluster_stats(), *stats_scope_)
+              : nullptr),
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
@@ -1095,7 +1095,7 @@ void ClusterImplBase::validateEndpointsForZoneAwareRouting(
 }
 
 ClusterInfoImpl::OptionalClusterStats::OptionalClusterStats(
-    const envoy::config::cluster::v3::TrackOptionalClusterStats& optional_stats_config,
+    const envoy::config::cluster::v3::TrackClusterStats& optional_stats_config,
     Stats::Scope& stats_scope)
     : timeout_budget_stats_(
           optional_stats_config.timeout_budgets()
