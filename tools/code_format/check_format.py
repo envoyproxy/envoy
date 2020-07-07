@@ -583,7 +583,7 @@ def checkCodecDiffs(error_messages):
       if codec_diff != None:
         error_messages.append(codecDiffHelper(*triple))
     return error_messages
-  except IOError: # for check format tests
+  except IOError:  # for check format tests
     return error_messages
 
 
