@@ -112,6 +112,7 @@ def envoy_cc_fuzz_test(
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts() + select({
             "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
+            "//conditions:default": [],
         }),
         linkstatic = envoy_linkstatic(),
         args = select({
