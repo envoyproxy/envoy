@@ -32,6 +32,11 @@ static const std::string TEST_CLIENT_ID = "1";
 static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
 static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
 
+namespace {
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    authorization_handle(Http::CustomHeaders::get().Authorization);
+}
+
 class MockSecretReader : public SecretReader {
 public:
   MockSecretReader() = default;
@@ -57,6 +62,8 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
   void setCallbacks(OAuth2FilterCallbacks&) override {}
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                    const Http::ResponseHeaderMap*) override {}
 
   MOCK_METHOD(void, asyncGetAccessToken,
               (const std::string&, const std::string&, const std::string&, const std::string&));
@@ -84,7 +91,7 @@ public:
     config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
                                              scope_, "test.");
 
-    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr));
+    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
     filter_->validator_ = validator_;
@@ -112,6 +119,7 @@ public:
   Http::MockAsyncClientRequest request_;
   std::deque<Http::AsyncClient::Callbacks*> callbacks_;
   Stats::IsolatedStoreImpl scope_;
+  Event::SimulatedTimeSystem test_time_;
 };
 
 /**
@@ -155,7 +163,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().ForwardedProto.get(), "https"},
-      {Http::Headers::get().Authorization.get(), "Bearer injected_malice!"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer injected_malice!"},
   };
 
   Http::TestRequestHeaderMapImpl expected_headers{
@@ -163,7 +171,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().ForwardedProto.get(), "https"},
-      {Http::Headers::get().Authorization.get(), "Bearer legit_token"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
   // cookie-validation mocking
@@ -315,7 +323,7 @@ TEST_F(OAuth2Test, OAuthValidatedCookieAndContinue) {
        ";version=test"},
   };
 
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>();
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_EQ(cookie_validator->hmacIsValid(), true);
@@ -349,10 +357,10 @@ TEST_F(OAuth2Test, OAuthTestSetOAuthHeaders) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
-      {Http::Headers::get().Authorization.get(), "Bearer xyztoken"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer xyztoken"},
   };
 
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>();
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
   cookie_validator->setParams(request_headers, "mock-secret");
   filter_->setXForwardedOauthHeaders(request_headers, cookie_validator->token());
 
@@ -481,7 +489,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().ForwardedProto.get(), "https"},
-      {Http::Headers::get().Authorization.get(), "Bearer xyz-header-token"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"},
   };
   // Expected decoded headers after the callback & validation of the bearer token is complete.
   Http::TestRequestHeaderMapImpl request_headers_after{
@@ -489,7 +497,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().ForwardedProto.get(), "https"},
-      {Http::Headers::get().Authorization.get(), "Bearer xyz-header-token"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"},
   };
 
   // Fail the validation to trigger the OAuth flow.
@@ -515,7 +523,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().ForwardedProto.get(), "https"},
-      {Http::Headers::get().Authorization.get(), "Bearer xyz-queryparam-token"},
+      {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-queryparam-token"},
   };
 
   // Fail the validation to trigger the OAuth flow.

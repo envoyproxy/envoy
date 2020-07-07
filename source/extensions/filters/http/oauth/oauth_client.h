@@ -69,6 +69,8 @@ public:
   // AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason f) override;
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                    const Http::ResponseHeaderMap*) override {}
 
 private:
   friend class OAuth2ClientTest;
@@ -101,12 +103,7 @@ private:
     return request;
   }
 
-  Http::RequestMessagePtr createAuthGetRequest(const std::string& access_token) {
-    auto request = createBasicRequest();
-    request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-    request->headers().setAuthorization(std::string("Bearer ") + access_token);
-    return request;
-  }
+  Http::RequestMessagePtr createAuthGetRequest(const std::string& access_token);
 
   Http::RequestMessagePtr createPostRequest() {
     auto request = createBasicRequest();

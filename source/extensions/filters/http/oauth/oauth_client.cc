@@ -16,6 +16,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth {
 
+namespace {
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    authorization_handle(Http::CustomHeaders::get().Authorization);
+}
+
 constexpr absl::string_view authTokenEndpoint = "/oauth/token/";
 
 // JSON keys for the various responses
@@ -47,6 +52,13 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
   in_flight_request_ = cm_.httpAsyncClientForCluster(cluster_name_)
                            .send(std::move(msg), *this,
                                  Http::AsyncClient::RequestOptions().setTimeout(timeout_duration_));
+}
+
+Http::RequestMessagePtr OAuth2ClientImpl::createAuthGetRequest(const std::string& access_token) {
+  auto request = createBasicRequest();
+  request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
+  request->headers().setInline(authorization_handle.handle(), std::string("Bearer ") + access_token);
+  return request;
 }
 
 // successful request calls will end up here
@@ -101,8 +113,8 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
      * their cookies.
      */
     const std::string access_token = json_object->getString(kAccessToken());
-    const std::string new_expires = std::to_string(json_object->getInteger(kExpiresIn(), 0));
-    parent_->onGetAccessTokenSuccess(access_token, new_expires);
+    const std::chrono::seconds expires_in(json_object->getInteger(kExpiresIn(), 0));
+    parent_->onGetAccessTokenSuccess(access_token, expires_in);
   }
 }
 

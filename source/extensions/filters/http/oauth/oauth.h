@@ -19,7 +19,7 @@ public:
   virtual ~OAuth2FilterCallbacks() = default;
 
   virtual void onGetAccessTokenSuccess(const std::string& access_token,
-                                       const std::string& expires_in) PURE;
+                                       std::chrono::seconds expires_in) PURE;
 
   virtual void sendUnauthorizedResponse() PURE;
 };

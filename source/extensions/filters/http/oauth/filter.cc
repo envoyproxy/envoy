@@ -1,6 +1,7 @@
 #include "extensions/filters/http/oauth/filter.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <ctime>
 #include <memory>
@@ -34,6 +35,11 @@ namespace Oauth {
 
 // X-Forwarded Oauth headers
 const std::string Token{"token"};
+
+namespace {
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    authorization_handle(Http::CustomHeaders::get().Authorization);
+}
 
 const std::string& signoutCookieValue() {
   CONSTRUCT_ON_FIRST_USE(std::string,
@@ -112,23 +118,23 @@ bool OAuth2CookieValidator::hmacIsValid() const {
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
-  std::time_t epoch = std::time(nullptr);
-  int expires;
-  try {
-    expires = std::stoi(expires_);
-  } catch (const std::exception&) {
+  auto current_epoch = time_source_.systemTime().time_since_epoch();
+
+  uint64_t expires;
+  if (!absl::SimpleAtoi(expires_, &expires)) {
     return false;
   }
 
-  return expires > epoch;
+  return std::chrono::seconds(expires) > current_epoch;
 }
 
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client)
-    : validator_(std::make_shared<OAuth2CookieValidator>()), oauth_client_(std::move(oauth_client)),
-      config_(std::move(config)) {
+                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
+    : validator_(std::make_shared<OAuth2CookieValidator>(time_source)),
+      oauth_client_(std::move(oauth_client)), config_(std::move(config)),
+      time_source_(time_source) {
 
   oauth_client_->setCallbacks(*this);
 }
@@ -142,7 +148,7 @@ std::string OAuth2Filter::extractAccessToken(const Http::RequestHeaderMap& heade
   ASSERT(headers.Path() != nullptr);
 
   // Start by looking for a bearer token in the Authorization header.
-  const Http::HeaderEntry* authorization = headers.Authorization();
+  const Http::HeaderEntry* authorization = headers.getInline(authorization_handle.handle());
   if (authorization != nullptr) {
     const auto value = StringUtil::trim(authorization->value().getStringView());
     const auto& bearer_prefix = bearerPrefix();
@@ -305,7 +311,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 void OAuth2Filter::setXForwardedOauthHeaders(Http::RequestHeaderMap& headers,
                                              const std::string& token) {
   // Add the x-forwarded headers after inspecting the corresponding cookie values.
-  headers.setReferenceKey(Http::Headers::get().Authorization, absl::StrCat("Bearer ", token));
+  headers.setInline(authorization_handle.handle(), absl::StrCat("Bearer ", token));
 }
 
 // Defines a sequence of checks determining whether we should initiate a new OAuth flow or skip to
@@ -351,14 +357,12 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 }
 
 void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
-                                           const std::string& expires_in) {
-  std::istringstream iss(expires_in);
-  time_t expires_in_t;
-  iss >> expires_in_t;
-  time_t new_epoch = std::time(nullptr) + expires_in_t;
+                                           std::chrono::seconds expires_in) {
+  SystemTime new_epoch = time_source_.systemTime() + expires_in;
 
   access_token_ = access_code;
-  new_expires_ = std::to_string(new_epoch);
+  new_expires_ = std::to_string(
+      std::chrono::duration_cast<std::chrono::seconds>(new_epoch.time_since_epoch()).count());
 }
 
 void OAuth2Filter::finishFlow() {

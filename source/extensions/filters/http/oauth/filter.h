@@ -142,8 +142,8 @@ public:
 
 class OAuth2CookieValidator : public CookieValidator {
 public:
-  OAuth2CookieValidator() = default;
-  ~OAuth2CookieValidator() override = default;
+  explicit OAuth2CookieValidator(TimeSource& time_source) : time_source_(time_source) {}
+
   const std::string& token() const override { return token_; }
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
   bool isValid() const override;
@@ -156,6 +156,7 @@ private:
   std::string hmac_;
   std::vector<uint8_t> secret_;
   absl::string_view host_;
+  TimeSource& time_source_;
 };
 
 /**
@@ -165,12 +166,11 @@ private:
  */
 class OAuth2Filter : public Http::PassThroughDecoderFilter, public OAuth2FilterCallbacks {
 public:
-  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client);
-  ~OAuth2Filter() override = default;
+  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source);
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   void onGetAccessTokenSuccess(const std::string& access_code,
-                               const std::string& expires_in) override;
+                               std::chrono::seconds expires_in) override;
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
@@ -198,6 +198,7 @@ private:
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;
+  TimeSource& time_source_;
 
   const RequirementsMap& escapedReplacements() const {
     CONSTRUCT_ON_FIRST_USE(RequirementsMap,
