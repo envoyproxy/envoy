@@ -4,7 +4,6 @@
 #include "common/common/logger.h"
 
 #include "test/common/http/http2/http2_frame.h"
-#include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/integration/h2_capture_fuzz.pb.h"
 #include "test/integration/http_integration.h"

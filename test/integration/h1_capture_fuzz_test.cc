@@ -1,4 +1,5 @@
 #include "test/integration/h1_fuzz.h"
+#include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
 void H1FuzzIntegrationTest::initialize() { HttpIntegrationTest::initialize(); }
