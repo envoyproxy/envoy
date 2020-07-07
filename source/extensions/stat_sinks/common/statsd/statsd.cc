@@ -56,7 +56,7 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
 
 void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   Writer& writer = tls_->getTyped<Writer>();
-  auto buffer = Buffer::OwnedImpl();
+  Buffer::OwnedImpl buffer{};
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
