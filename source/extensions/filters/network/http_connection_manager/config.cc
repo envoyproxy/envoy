@@ -74,7 +74,7 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
-class EmptyConfigFilter : public Http::StreamDecoderFilter {
+class MissingConfigFilter : public Http::StreamDecoderFilter {
 public:
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -602,7 +602,7 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
     // If a filter config is missing after warming, inject a local reply with status 500.
     ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
     callbacks.addStreamDecoderFilter(
-        Http::StreamDecoderFilterSharedPtr{std::make_shared<EmptyConfigFilter>()});
+        Http::StreamDecoderFilterSharedPtr{std::make_shared<MissingConfigFilter>()});
   }
 }
 

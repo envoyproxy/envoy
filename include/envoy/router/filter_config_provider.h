@@ -24,13 +24,14 @@ public:
   /**
    * @return Http::FilterFactoryCb a filter config to be instantiated on the subsequent streams.
    * Note that if the provider has not yet performed an initial configuration load and no default is
-   * provided, no information will be returned.
+   * provided, an empty optional will be returned.
    */
   virtual absl::optional<Http::FilterFactoryCb> config() PURE;
 
   /**
-   * Validate if the route configuration can be applied in the context of the filter manager.
-   * @param Server::Configuration::NamedHttpFilterConfigFactory a filter factory to validate in the
+   * Validate if the filter configuration can be applied in the context of the filter manager, where
+   * it is used.
+   * @param factory a filter factory to validate in the
    * context of the filter manager filter chains.
    */
   virtual void validateConfig(Server::Configuration::NamedHttpFilterConfigFactory& factory) PURE;

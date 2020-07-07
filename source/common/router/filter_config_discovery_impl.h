@@ -75,7 +75,7 @@ public:
 
   ~FilterConfigSubscription() override;
 
-  const Init::SharedTargetImpl& initTarget() { return parent_init_target_; }
+  const Init::SharedTargetImpl& initTarget() { return init_target_; }
   const std::string& name() { return filter_config_name_; }
 
 private:
@@ -95,13 +95,7 @@ private:
   Server::Configuration::FactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
 
-  // Parent init target initializes local init manager, which in turn
-  // initializes local init target to start a subscription. The subscription
-  // signals the watcher to notify the parent init target readiness.
-  Init::SharedTargetImpl parent_init_target_;
-  Init::WatcherImpl local_init_watcher_;
-  Init::TargetImpl local_init_target_;
-  Init::ManagerImpl local_init_manager_;
+  Init::SharedTargetImpl init_target_;
   bool started_{false};
 
   Stats::ScopePtr scope_;

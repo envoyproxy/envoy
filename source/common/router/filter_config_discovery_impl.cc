@@ -66,16 +66,8 @@ FilterConfigSubscription::FilterConfigSubscription(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       filter_config_name_(filter_config_name), factory_context_(factory_context),
       validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
-      parent_init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
-                          [this]() { local_init_manager_.initialize(local_init_watcher_); }),
-      local_init_watcher_(
-          fmt::format("FilterConfigSubscription local-init-watcher {}", filter_config_name_),
-          [this]() { parent_init_target_.ready(); }),
-      local_init_target_(
-          fmt::format("FilterConfigSubscription local-init-target {}", filter_config_name_),
-          [this]() { start(); }),
-      local_init_manager_(
-          fmt::format("FilterConfigSubscription local-init-manager {}", filter_config_name_)),
+      init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
+                   [this]() { start(); }),
       scope_(factory_context.scope().createScope(stat_prefix + "filter_config_discovery." +
                                                  filter_config_name_ + ".")),
       stat_prefix_(stat_prefix), filter_config_provider_manager_(filter_config_provider_manager),
@@ -84,7 +76,6 @@ FilterConfigSubscription::FilterConfigSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
-  local_init_manager_.add(local_init_target_);
 }
 
 void FilterConfigSubscription::start() {
@@ -98,7 +89,7 @@ void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   // Make sure to make progress in case the control plane is temporarily inconsistent.
-  local_init_target_.ready();
+  init_target_.ready();
 
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format(
@@ -144,12 +135,12 @@ void FilterConfigSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateF
                                                     const EnvoyException*) {
   ENVOY_LOG(debug, "Updating filter config {} failed due to {}", filter_config_name_, reason);
   // Make sure to make progress in case the control plane is temporarily failing.
-  local_init_target_.ready();
+  init_target_.ready();
 }
 
 FilterConfigSubscription::~FilterConfigSubscription() {
   // If we get destroyed during initialization, make sure we signal that we "initialized".
-  local_init_target_.ready();
+  init_target_.ready();
   // Remove the subscription from the provider manager.
   filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
 }
@@ -181,6 +172,9 @@ FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConf
     bool apply_without_warming) {
   auto subscription =
       getSubscription(config_source, filter_config_name, factory_context, stat_prefix);
+  // For warming, wait until the subscription receives the first response to indicate readiness.
+  // Otherwise, mark ready immediately and start the subscription on initialization. A default
+  // config is expected in the latter case.
   if (!apply_without_warming) {
     factory_context.initManager().add(subscription->initTarget());
   }
