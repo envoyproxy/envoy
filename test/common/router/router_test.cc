@@ -6576,12 +6576,71 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestHeaders) {
   EXPECT_EQ(nullptr, headers.Date());
 
   EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _));
+  EXPECT_EQ(nullptr, headers.Date());
   router_.decodeHeaders(headers, true);
-  EXPECT_NE(nullptr, headers.Date());
   EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:02 GMT");
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
+  router_.onDestroy();
+}
+
+// Validate that the date header is updated on each retry (in addition to the original request).
+TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestRetryHeaders) {
+  test_time_.setSystemTime(std::chrono::milliseconds(2000));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder1 = &decoder;
+            EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+  expectPerTryTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_EQ(nullptr, headers.Date());
+  router_.decodeHeaders(headers, true);
+  EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:02 GMT");
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "500"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                        absl::optional<uint64_t>(absl::nullopt))).Times(1);
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
+  router_.retry_state_->expectHeadersRetry();
+  response_decoder1->decodeHeaders(std::move(response_headers1), true);
+
+  test_time_.setSystemTime(std::chrono::milliseconds(4000));
+
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder&,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+  EXPECT_EQ(2U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:04 GMT");
+
   router_.onDestroy();
 }
 

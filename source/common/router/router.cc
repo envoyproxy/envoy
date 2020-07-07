@@ -1529,6 +1529,10 @@ void Filter::doRetry() {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
+  if (config_.add_request_date_header_) {
+    config_.date_provider_.setDateHeader(*downstream_headers_);
+  }
+
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() &&
