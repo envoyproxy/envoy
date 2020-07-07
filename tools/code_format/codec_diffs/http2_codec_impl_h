@@ -1,14 +1,6 @@
 --- 
 +++ 
-@@ -19,6 +19,7 @@
- #include "common/common/thread.h"
- #include "common/http/codec_helper.h"
- #include "common/http/header_map_impl.h"
-+#include "common/http/http2/codec_impl.h"
- #include "common/http/http2/metadata_decoder.h"
- #include "common/http/http2/metadata_encoder.h"
- #include "common/http/status.h"
-@@ -29,45 +30,12 @@
+@@ -30,6 +30,7 @@
  
  namespace Envoy {
  namespace Http {
@@ -16,46 +8,7 @@
  namespace Http2 {
  
  // This is not the full client magic, but it's the smallest size that should be able to
- // differentiate between HTTP/1 and HTTP/2.
- const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
--
--/**
-- * All stats for the HTTP/2 codec. @see stats_macros.h
-- */
--#define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
--  COUNTER(dropped_headers_with_underscores)                                                        \
--  COUNTER(header_overflow)                                                                         \
--  COUNTER(headers_cb_no_stream)                                                                    \
--  COUNTER(inbound_empty_frames_flood)                                                              \
--  COUNTER(inbound_priority_frames_flood)                                                           \
--  COUNTER(inbound_window_update_frames_flood)                                                      \
--  COUNTER(outbound_control_flood)                                                                  \
--  COUNTER(outbound_flood)                                                                          \
--  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
--  COUNTER(rx_messaging_error)                                                                      \
--  COUNTER(rx_reset)                                                                                \
--  COUNTER(too_many_header_frames)                                                                  \
--  COUNTER(trailers)                                                                                \
--  COUNTER(tx_reset)
--
--/**
-- * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
-- */
--struct CodecStats {
--  using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
--
--  static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
--    return *ptr.get([&scope]() -> CodecStats* {
--      return new CodecStats{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."))};
--    });
--  }
--
--  ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
--};
- 
- class Utility {
- public:
-@@ -120,7 +88,7 @@
+@@ -87,7 +88,7 @@
   */
  class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
  public:
@@ -64,7 +17,7 @@
                   const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                   const uint32_t max_headers_kb, const uint32_t max_headers_count);
  
-@@ -266,9 +234,9 @@
+@@ -250,9 +251,9 @@
      virtual void decodeTrailers() PURE;
  
      // Get MetadataEncoder for this stream.
@@ -76,7 +29,7 @@
      // Callback function for MetadataDecoder.
      void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
  
-@@ -287,8 +255,8 @@
+@@ -271,8 +272,8 @@
          [this]() -> void { this->pendingSendBufferHighWatermark(); },
          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
      HeaderMapPtr pending_trailers_to_encode_;
@@ -87,7 +40,7 @@
      absl::optional<StreamResetReason> deferred_reset_;
      HeaderString cookies_;
      bool local_end_stream_sent_ : 1;
-@@ -420,7 +388,7 @@
+@@ -412,7 +413,7 @@
  
    std::list<StreamImplPtr> active_streams_;
    nghttp2_session* session_{};
@@ -96,7 +49,7 @@
    Network::Connection& connection_;
    const uint32_t max_headers_kb_;
    const uint32_t max_headers_count_;
-@@ -529,7 +497,7 @@
+@@ -518,7 +519,7 @@
  class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
  public:
    ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
@@ -105,7 +58,7 @@
                         const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                         const uint32_t max_response_headers_kb,
                         const uint32_t max_response_headers_count,
-@@ -564,7 +532,7 @@
+@@ -553,7 +554,7 @@
  class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
  public:
    ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
@@ -114,7 +67,7 @@
                         const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                         const uint32_t max_request_headers_kb,
                         const uint32_t max_request_headers_count,
-@@ -603,6 +571,7 @@
+@@ -592,6 +593,7 @@
  };
  
  } // namespace Http2

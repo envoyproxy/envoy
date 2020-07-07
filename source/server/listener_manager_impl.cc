@@ -593,14 +593,14 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
         server_.dispatcher().post([this, draining_it]() -> void {
           // TODO(lambdai): Resolve race condition below.
           // Consider the below events in global sequence order
-          // master thread: calling drainListener
+          // main thread: calling drainListener
           // work thread: deferred delete the active connection
-          // work thread: post to master that the drain is done
-          // master thread: erase the listener
+          // work thread: post to main that the drain is done
+          // main thread: erase the listener
           // worker thread: execute destroying connection when the shared listener config is
           // destroyed at step 4 (could be worse such as access the connection because connection is
           // not yet started to deleted). The race condition is introduced because 3 occurs too
-          // early. My solution is to defer schedule the callback posting to master thread, by
+          // early. My solution is to defer schedule the callback posting to main thread, by
           // introducing DeferTaskUtil. So that 5 should always happen before 3.
           if (--draining_it->workers_pending_removal_ == 0) {
             draining_it->listener_->debugLog("draining listener removal complete");
@@ -659,16 +659,19 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
         // The add listener completion runs on the worker thread. Post back to the main thread to
         // avoid locking.
         server_.dispatcher().post([this, success, &listener, completion_callback]() -> void {
-          // It is theoretically possible for a listener to get added on 1 worker but not the
-          // others. The below check with onListenerCreateFailure() is there to ensure we execute
-          // the removal/logging/stats at most once on failure. Note also that drain/removal can
-          // race with addition. It's guaranteed that workers process remove after add so this
-          // should be fine.
+          // It is possible for a listener to get added on 1 worker but not the others. The below
+          // check with onListenerCreateFailure() is there to ensure we execute the
+          // removal/logging/stats at most once on failure. Note also that drain/removal can race
+          // with addition. It's guaranteed that workers process remove after add so this should be
+          // fine.
+          //
+          // TODO(mattklein123): We should consider rewriting how listener sockets are added to
+          // workers, especially in the case of reuse port. If we were to create all needed
+          // listener sockets on the main thread (even in the case of reuse port) we could catch
+          // almost all socket errors here. This would both greatly simplify the logic and allow
+          // for xDS NACK in most cases.
           if (!success && !listener.onListenerCreateFailure()) {
-            // TODO(mattklein123): In addition to a critical log and a stat, we should consider
-            // adding a startup option here to cause the server to exit. I think we probably want
-            // this at Lyft but I will do it in a follow up.
-            ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
+            ENVOY_LOG(error, "listener '{}' failed to listen on address '{}' on worker",
                       listener.name(), listener.listenSocketFactory().localAddress()->asString());
             stats_.listener_create_failure_.inc();
             removeListenerInternal(listener.name(), false);

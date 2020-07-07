@@ -6,7 +6,7 @@
  
  #include <cstdint>
  #include <memory>
-@@ -23,6 +23,7 @@
+@@ -24,6 +24,7 @@
  
  namespace Envoy {
  namespace Http {
@@ -14,51 +14,18 @@
  namespace Http1 {
  namespace {
  
-@@ -46,6 +47,9 @@
+@@ -47,6 +48,10 @@
  
  using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
  using Http1HeaderTypes = ConstSingleton<Http1HeaderTypesValues>;
++using Http::Http1::CodecStats;
 +using Http::Http1::HeaderKeyFormatter;
 +using Http::Http1::HeaderKeyFormatterPtr;
 +using Http::Http1::ProperCaseHeaderKeyFormatter;
  
  const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
    CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
-@@ -452,7 +456,7 @@
-     nullptr // on_chunk_complete
- };
- 
--ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
-+ConnectionImpl::ConnectionImpl(Network::Connection& connection, Http::Http1::CodecStats& stats,
-                                http_parser_type type, uint32_t max_headers_kb,
-                                const uint32_t max_headers_count,
-                                HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
-@@ -769,9 +773,9 @@
- }
- 
- ServerConnectionImpl::ServerConnectionImpl(
--    Network::Connection& connection, CodecStats& stats, ServerConnectionCallbacks& callbacks,
--    const Http1Settings& settings, uint32_t max_request_headers_kb,
--    const uint32_t max_request_headers_count,
-+    Network::Connection& connection, Http::Http1::CodecStats& stats,
-+    ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
-+    uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
-     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-         headers_with_underscores_action)
-     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
-@@ -1026,8 +1030,9 @@
-   }
- }
- 
--ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
--                                           ConnectionCallbacks&, const Http1Settings& settings,
-+ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
-+                                           Http::Http1::CodecStats& stats, ConnectionCallbacks&,
-+                                           const Http1Settings& settings,
-                                            const uint32_t max_response_headers_count)
-     : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
-                      max_response_headers_count, formatter(settings), settings.enable_trailers_) {}
-@@ -1204,6 +1209,7 @@
+@@ -1245,6 +1250,7 @@
  }
  
  } // namespace Http1

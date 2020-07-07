@@ -19,7 +19,7 @@
 #include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
 #include "common/http/status.h"
@@ -169,6 +169,18 @@ protected:
                       public StreamCallbackHelper {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
+    ~StreamImpl() override;
+    // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
+    // deferred delete lifetime issues that need sorting out if the destructor of the stream is
+    // going to be able to refer to the parent connection.
+    void destroy();
+    void disarmStreamIdleTimer() {
+      if (stream_idle_timer_ != nullptr) {
+        // To ease testing and the destructor assertion.
+        stream_idle_timer_->disableTimer();
+        stream_idle_timer_.reset();
+      }
+    }
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
@@ -186,6 +198,8 @@ protected:
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
+    virtual void createPendingFlushTimer() PURE;
+    void onPendingFlushTimer();
 
     // Http::StreamEncoder
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -203,6 +217,9 @@ protected:
       return parent_.connection_.localAddress();
     }
     absl::string_view responseDetails() override { return details_; }
+    void setFlushTimeout(std::chrono::milliseconds timeout) override {
+      stream_idle_timeout_ = timeout;
+    }
 
     // This code assumes that details is a static string, so that we
     // can avoid copying it.
@@ -267,6 +284,9 @@ protected:
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
     absl::string_view details_;
+    // See HttpConnectionManager.stream_idle_timeout.
+    std::chrono::milliseconds stream_idle_timeout_{};
+    Event::TimerPtr stream_idle_timer_;
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -304,6 +324,10 @@ protected:
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<RequestTrailerMapImpl>(trailers);
+    }
+    void createPendingFlushTimer() override {
+      // Client streams do not create a flush timer because we currently assume that any failure
+      // to flush would be covered by a request/stream/etc. timeout.
     }
 
     // RequestEncoder
@@ -345,6 +369,7 @@ protected:
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<ResponseTrailerMapImpl>(trailers);
     }
+    void createPendingFlushTimer() override;
 
     // ResponseEncoder
     void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
@@ -407,7 +432,7 @@ protected:
   // Maximum number of outbound frames. Initialized from corresponding http2_protocol_options.
   // Default value is 10000.
   const uint32_t max_outbound_frames_;
-  const Buffer::OwnedBufferFragmentImpl::Releasor frame_buffer_releasor_;
+  const std::function<void()> frame_buffer_releasor_;
   // This counter keeps track of the number of outbound frames of types PING, SETTINGS and
   // RST_STREAM (these that were buffered in the underlying connection but not yet written into the
   // socket). If this counter exceeds the `max_outbound_control_frames_' value the connection is
@@ -416,7 +441,7 @@ protected:
   // Maximum number of outbound frames of types PING, SETTINGS and RST_STREAM. Initialized from
   // corresponding http2_protocol_options. Default value is 1000.
   const uint32_t max_outbound_control_frames_;
-  const Buffer::OwnedBufferFragmentImpl::Releasor control_frame_buffer_releasor_;
+  const std::function<void()> control_frame_buffer_releasor_;
   // This counter keeps track of the number of consecutive inbound frames of types HEADERS,
   // CONTINUATION and DATA with an empty payload and no end stream flag. If this counter exceeds
   // the `max_consecutive_inbound_frames_with_empty_payload_` value the connection is terminated.
@@ -469,12 +494,10 @@ private:
   int onFrameSend(const nghttp2_frame* frame);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
-
   int onStreamClose(int32_t stream_id, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
   ssize_t packMetadata(int32_t stream_id, uint8_t* buf, size_t len);
-
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   // Returns true on success or false if outbound queue limits were exceeded.
   bool addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
@@ -482,9 +505,8 @@ private:
   void incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
   virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
   virtual bool checkInboundFrameLimits() PURE;
-
-  void releaseOutboundFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
-  void releaseOutboundControlFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
+  void releaseOutboundFrame();
+  void releaseOutboundControlFrame();
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;

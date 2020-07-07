@@ -6,7 +6,7 @@
  
  #include <cstdint>
  #include <memory>
-@@ -24,6 +24,7 @@
+@@ -25,6 +25,7 @@
  
  namespace Envoy {
  namespace Http {
@@ -14,78 +14,17 @@
  namespace Http2 {
  
  class Http2ResponseCodeDetailValues {
-@@ -214,7 +215,7 @@
+@@ -52,6 +53,9 @@
+ };
  
- void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
-   ASSERT(parent_.allow_metadata_);
--  MetadataEncoder& metadata_encoder = getMetadataEncoder();
-+  Http::Http2::MetadataEncoder& metadata_encoder = getMetadataEncoder();
-   if (!metadata_encoder.createPayload(metadata_map_vector)) {
-     return;
-   }
-@@ -428,19 +429,19 @@
-   ASSERT(rc == 0);
- }
+ using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
++using Http::Http2::CodecStats;
++using Http::Http2::MetadataDecoder;
++using Http::Http2::MetadataEncoder;
  
--MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
-+Http::Http2::MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
-   if (metadata_encoder_ == nullptr) {
--    metadata_encoder_ = std::make_unique<MetadataEncoder>();
-+    metadata_encoder_ = std::make_unique<Http::Http2::MetadataEncoder>();
-   }
-   return *metadata_encoder_;
- }
- 
--MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
-+Http::Http2::MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
-   if (metadata_decoder_ == nullptr) {
-     auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
-       this->onMetadataDecoded(std::move(metadata_map_ptr));
-     };
--    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb);
-+    metadata_decoder_ = std::make_unique<Http::Http2::MetadataDecoder>(cb);
-   }
-   return *metadata_decoder_;
- }
-@@ -449,7 +450,7 @@
-   decoder().decodeMetadata(std::move(metadata_map_ptr));
- }
- 
--ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
-+ConnectionImpl::ConnectionImpl(Network::Connection& connection, Http::Http2::CodecStats& stats,
-                                const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                                const uint32_t max_headers_kb, const uint32_t max_headers_count)
-     : stats_(stats), connection_(connection), max_headers_kb_(max_headers_kb),
-@@ -873,7 +874,7 @@
-     return 0;
-   }
- 
--  MetadataEncoder& encoder = stream->getMetadataEncoder();
-+  Http::Http2::MetadataEncoder& encoder = stream->getMetadataEncoder();
-   return encoder.packNextFramePayload(buf, len);
- }
- 
-@@ -1170,7 +1171,8 @@
- }
- 
- ClientConnectionImpl::ClientConnectionImpl(
--    Network::Connection& connection, Http::ConnectionCallbacks& callbacks, CodecStats& stats,
-+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
-+    Http::Http2::CodecStats& stats,
-     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
-     Nghttp2SessionFactory& http2_session_factory)
-@@ -1220,7 +1222,8 @@
- }
- 
- ServerConnectionImpl::ServerConnectionImpl(
--    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
-+    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks,
-+    Http::Http2::CodecStats& stats,
-     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
-     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-@@ -1402,6 +1405,7 @@
+ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
+                                           HeaderString& cookies) {
+@@ -1454,6 +1458,7 @@
  }
  
  } // namespace Http2

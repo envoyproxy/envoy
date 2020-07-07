@@ -1,55 +1,24 @@
 --- 
 +++ 
-@@ -19,36 +19,14 @@
- #include "common/http/codec_helper.h"
- #include "common/http/codes.h"
- #include "common/http/header_map_impl.h"
-+#include "common/http/http1/codec_impl.h"
- #include "common/http/http1/header_formatter.h"
- #include "common/http/status.h"
+@@ -24,6 +24,7 @@
  
  namespace Envoy {
  namespace Http {
 +namespace Legacy {
  namespace Http1 {
--
--/**
-- * All stats for the HTTP/1 codec. @see stats_macros.h
-- */
--#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
--  COUNTER(dropped_headers_with_underscores)                                                        \
--  COUNTER(metadata_not_supported_error)                                                            \
--  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
--  COUNTER(response_flood)
--
--/**
-- * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
-- */
--struct CodecStats {
--  using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
--
--  static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
--    return *ptr.get([&scope]() -> CodecStats* {
--      return new CodecStats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))};
--    });
--  }
--
--  ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
--};
  
  class ConnectionImpl;
- 
-@@ -94,7 +72,8 @@
+@@ -75,7 +76,8 @@
    void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
  
  protected:
 -  StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
 +  StreamEncoderImpl(ConnectionImpl& connection,
 +                    Http::Http1::HeaderKeyFormatter* header_key_formatter);
-   void setIs1xx(bool value) { is_1xx_ = value; }
-   void setIs204(bool value) { is_204_ = value; }
-   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
-@@ -137,7 +116,7 @@
+   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
+                          bool end_stream);
+   void encodeTrailersBase(const HeaderMap& headers);
+@@ -114,7 +116,7 @@
  
    void encodeFormattedHeader(absl::string_view key, absl::string_view value);
  
@@ -58,7 +27,7 @@
    absl::string_view details_;
  };
  
-@@ -146,7 +125,8 @@
+@@ -123,7 +125,8 @@
   */
  class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
  public:
@@ -68,7 +37,7 @@
        : StreamEncoderImpl(connection, header_key_formatter) {}
  
    bool startedResponse() { return started_response_; }
-@@ -165,7 +145,8 @@
+@@ -142,7 +145,8 @@
   */
  class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
  public:
@@ -76,9 +45,9 @@
 +  RequestEncoderImpl(ConnectionImpl& connection,
 +                     Http::Http1::HeaderKeyFormatter* header_key_formatter)
        : StreamEncoderImpl(connection, header_key_formatter) {}
-   bool headRequest() { return head_request_; }
-   bool connectRequest() { return connect_request_; }
-@@ -226,7 +207,7 @@
+   bool upgradeRequest() const { return upgrade_request_; }
+   bool headRequest() const { return head_request_; }
+@@ -203,7 +207,7 @@
    virtual bool supportsHttp10() { return false; }
    bool maybeDirectDispatch(Buffer::Instance& data);
    virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
@@ -87,7 +56,7 @@
    bool enableTrailers() const { return enable_trailers_; }
  
    // Http::Connection
-@@ -241,17 +222,17 @@
+@@ -218,9 +222,9 @@
    bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
  
  protected:
@@ -99,6 +68,9 @@
 +                 Http::Http1::HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
  
    bool resetStreamCalled() { return reset_stream_called_; }
+   void onMessageBeginBase();
+@@ -240,10 +244,10 @@
+   void checkMaxHeadersSize();
  
    Network::Connection& connection_;
 -  CodecStats& stats_;
@@ -110,7 +82,7 @@
    HeaderString current_header_field_;
    HeaderString current_header_value_;
    bool processing_trailers_ : 1;
-@@ -431,7 +412,7 @@
+@@ -422,7 +426,7 @@
   */
  class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
  public:
@@ -119,7 +91,7 @@
                         ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                         uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-@@ -443,7 +424,7 @@
+@@ -434,7 +438,7 @@
     * An active HTTP/1.1 request.
     */
    struct ActiveRequest {
@@ -128,7 +100,7 @@
          : response_encoder_(connection, header_key_formatter) {}
  
      HeaderString request_url_;
-@@ -530,7 +511,7 @@
+@@ -526,7 +530,7 @@
   */
  class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
  public:
@@ -137,7 +109,7 @@
                         ConnectionCallbacks& callbacks, const Http1Settings& settings,
                         const uint32_t max_response_headers_count);
  
-@@ -539,8 +520,8 @@
+@@ -535,8 +539,8 @@
  
  private:
    struct PendingResponse {
@@ -148,7 +120,7 @@
          : encoder_(connection, header_key_formatter), decoder_(decoder) {}
  
      RequestEncoderImpl encoder_;
-@@ -603,6 +584,7 @@
+@@ -600,6 +604,7 @@
  };
  
  } // namespace Http1

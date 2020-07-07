@@ -18,7 +18,7 @@
  #include "gmock/gmock.h"
  #include "gtest/gtest.h"
  
-@@ -37,6 +37,7 @@
+@@ -37,10 +37,12 @@
  
  namespace Envoy {
  namespace Http {
@@ -26,16 +26,12 @@
  namespace Http2 {
  
  using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
-@@ -299,7 +300,7 @@
+ using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
++using Http::Http2::Http2Frame;
+ namespace CommonUtility = ::Envoy::Http2::Utility;
  
-     // HTTP/2 codec does not send empty DATA frames with no END_STREAM flag.
-     // To make this work, send raw bytes representing empty DATA frames bypassing client codec.
--    Http2Frame emptyDataFrame = Http2Frame::makeEmptyDataFrame(0);
-+    Http::Http2::Http2Frame emptyDataFrame = Http::Http2::Http2Frame::makeEmptyDataFrame(0);
-     constexpr uint32_t max_allowed =
-         CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
-     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
-@@ -1883,7 +1884,7 @@
+ class Http2CodecImplTestFixture {
+@@ -2058,7 +2060,7 @@
  protected:
    friend class TestNghttp2SessionFactory;
  
@@ -44,7 +40,7 @@
  };
  
  class TestNghttp2SessionFactory : public Nghttp2SessionFactory {
-@@ -1976,6 +1977,7 @@
+@@ -2151,6 +2153,7 @@
  }
  
  } // namespace Http2
