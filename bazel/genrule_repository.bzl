@@ -9,7 +9,7 @@ def _genrule_repository(ctx):
     for ii, patch in enumerate(ctx.attr.patches):
         patch_input = "patch-input-%d.patch" % (ii,)
         ctx.symlink(patch, patch_input)
-        patch_result = ctx.execute(["patch", "-p1", "--input", patch_input])
+        patch_result = ctx.execute(["patch", "-p0", "--input", patch_input])
         if patch_result.return_code != 0:
             fail("Failed to apply patch %r: %s" % (patch, patch_result.stderr))
 
