@@ -18,8 +18,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     const absl::string_view string_buffer(reinterpret_cast<const char*>(buf), len);
     Stats::Utility::sanitizeStatsName(string_buffer);
   }
-  if (len < 4)
+  if (len < 4) {
     return;
+  }
 
   // Create a greater scope vector to store the string to prevent the string memory from being free
   std::vector<std::string> string_vector;
@@ -36,10 +37,11 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // model common/stats/utility_test.cc, initialize those objects to create random elements as
     // input
     Stats::SymbolTablePtr symbol_table;
-    if (len % 2 == 1)
+    if (len % 2 == 1) {
       symbol_table = std::make_unique<Stats::FakeSymbolTableImpl>();
-    else
+    } else {
       symbol_table = std::make_unique<Stats::SymbolTableImpl>();
+    }
     std::unique_ptr<Stats::IsolatedStoreImpl> store =
         std::make_unique<Stats::IsolatedStoreImpl>(*symbol_table);
     Stats::StatNamePool pool(*symbol_table);
