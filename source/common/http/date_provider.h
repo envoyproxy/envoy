@@ -15,15 +15,9 @@ public:
 
   /**
    * Set the `Date` header (potentially using a cached value).
-   * @param headers the request headers to fill.
+   * @param headers the headers to populate.
    */
-  virtual void setDateHeader(RequestHeaderMap& headers) PURE;
-
-  /**
-   * Set the `Date` header (potentially using a cached value).
-   * @param headers the response headers to fill.
-   */
-  virtual void setDateHeader(ResponseHeaderMap& headers) PURE;
+  virtual void setDateHeader(RequestOrResponseHeaderMap& headers) PURE;
 };
 
 } // namespace Http

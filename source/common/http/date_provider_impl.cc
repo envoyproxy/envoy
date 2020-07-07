@@ -25,19 +25,11 @@ void TlsCachingDateProviderImpl::onRefreshDate() {
   refresh_timer_->enableTimer(std::chrono::milliseconds(500));
 }
 
-void TlsCachingDateProviderImpl::setDateHeader(RequestHeaderMap& headers) {
+void TlsCachingDateProviderImpl::setDateHeader(RequestOrResponseHeaderMap& headers) {
   headers.setDate(tls_->getTyped<ThreadLocalCachedDate>().date_string_);
 }
 
-void TlsCachingDateProviderImpl::setDateHeader(ResponseHeaderMap& headers) {
-  headers.setDate(tls_->getTyped<ThreadLocalCachedDate>().date_string_);
-}
-
-void SlowDateProviderImpl::setDateHeader(RequestHeaderMap& headers) {
-  headers.setDate(date_formatter_.now(time_source_));
-}
-
-void SlowDateProviderImpl::setDateHeader(ResponseHeaderMap& headers) {
+void SlowDateProviderImpl::setDateHeader(RequestOrResponseHeaderMap& headers) {
   headers.setDate(date_formatter_.now(time_source_));
 }
 
