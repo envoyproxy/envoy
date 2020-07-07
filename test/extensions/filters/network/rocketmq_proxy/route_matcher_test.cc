@@ -6,8 +6,6 @@
 #include "extensions/filters/network/rocketmq_proxy/metadata.h"
 #include "extensions/filters/network/rocketmq_proxy/router/route_matcher.h"
 
-#include "test/mocks/server/mocks.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

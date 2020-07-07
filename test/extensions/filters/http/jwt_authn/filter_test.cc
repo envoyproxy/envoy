@@ -4,7 +4,6 @@
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
