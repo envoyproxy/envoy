@@ -340,8 +340,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
       dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ("localhost",
-               SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+  EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -366,7 +365,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
       dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+  EXPECT_STREQ(nullptr, SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
