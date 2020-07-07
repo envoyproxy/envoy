@@ -569,8 +569,8 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
-    if (cluster_info->eds_service_name().has_value()) {
-      cluster_load_assignment.set_cluster_name(cluster_info->eds_service_name().value());
+    if (cluster_info->edsServiceName().has_value()) {
+      cluster_load_assignment.set_cluster_name(cluster_info->edsServiceName().value());
     } else {
       cluster_load_assignment.set_cluster_name(cluster_info->name());
     }
