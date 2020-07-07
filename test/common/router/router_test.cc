@@ -6576,7 +6576,6 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestHeaders) {
   EXPECT_EQ(nullptr, headers.Date());
 
   EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _));
-  EXPECT_EQ(nullptr, headers.Date());
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:02 GMT");
 
