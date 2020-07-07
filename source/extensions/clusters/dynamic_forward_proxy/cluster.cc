@@ -198,7 +198,7 @@ ClusterFactory::createClusterWithConfig(
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context.singletonManager(), context.dispatcher(), context.tls(), context.random(),
-      context.stats());
+      context.runtime(), context.stats());
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (cluster_config.has_upstream_http_protocol_options()) {
     if (!proto_config.allow_insecure_cluster_options() &&

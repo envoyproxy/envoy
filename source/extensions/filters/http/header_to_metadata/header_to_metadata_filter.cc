@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
 #include "common/common/base64.h"
+#include "common/common/regex.h"
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -16,6 +17,14 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
+
+Rule::Rule(const std::string& header, const ProtoRule& rule) : header_(header), rule_(rule) {
+  if (rule.on_header_present().has_regex_value_rewrite()) {
+    const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
+    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_substitution_ = rewrite_spec.substitution();
+  }
+}
 
 Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
                const bool per_route) {
@@ -40,8 +49,6 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
   }
 
   for (const auto& entry : proto_rules) {
-    std::pair<Http::LowerCaseString, Rule> rule = {Http::LowerCaseString(entry.header()), entry};
-
     // Rule must have at least one of the `on_header_*` fields set.
     if (!entry.has_on_header_present() && !entry.has_on_header_missing()) {
       const auto& error = fmt::format("header to metadata filter: rule for header '{}' has neither "
@@ -50,7 +57,18 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
       throw EnvoyException(error);
     }
 
-    vector.push_back(rule);
+    // Ensure value and regex_value_rewrite are not mixed.
+    // TODO(rgs1): remove this once we are on v4 and these fields are folded into a oneof.
+    if (!entry.on_header_present().value().empty() &&
+        entry.on_header_present().has_regex_value_rewrite()) {
+      throw EnvoyException("Cannot specify both value and regex_value_rewrite");
+    }
+
+    if (entry.has_on_header_missing() && entry.on_header_missing().value().empty()) {
+      throw EnvoyException("Cannot specify on_header_missing rule with an empty value");
+    }
+
+    vector.emplace_back(entry.header(), entry);
   }
 
   return true;
@@ -94,11 +112,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
                                          ValueType type, ValueEncode encode) const {
   ProtobufWkt::Value val;
 
-  if (value.empty()) {
-    // No value, skip. we could allow this though.
-    ENVOY_LOG(debug, "no metadata value provided");
-    return false;
-  }
+  ASSERT(!value.empty());
 
   if (value.size() >= MAX_HEADER_VALUE_LEN) {
     // Too long, go away.
@@ -138,8 +152,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     break;
   }
   default:
-    ENVOY_LOG(debug, "unknown value type");
-    return false;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   // Have we seen this namespace before?
@@ -164,15 +177,27 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
                                                    Http::StreamFilterCallbacks& callbacks) {
   StructMap structs_by_namespace;
 
-  for (const auto& rulePair : rules) {
-    const auto& header = rulePair.first;
-    const auto& rule = rulePair.second;
+  for (const auto& rule : rules) {
+    const auto& header = rule.header();
+    const auto& proto_rule = rule.rule();
     const Http::HeaderEntry* header_entry = headers.get(header);
 
-    if (header_entry != nullptr && rule.has_on_header_present()) {
-      const auto& keyval = rule.on_header_present();
-      absl::string_view value = keyval.value().empty() ? header_entry->value().getStringView()
-                                                       : absl::string_view(keyval.value());
+    if (header_entry != nullptr && proto_rule.has_on_header_present()) {
+      const auto& keyval = proto_rule.on_header_present();
+      absl::string_view value = header_entry->value().getStringView();
+      // This is used to hold the rewritten header value, so that it can
+      // be bound to value without going out of scope.
+      std::string rewritten_value;
+
+      if (!keyval.value().empty()) {
+        value = absl::string_view(keyval.value());
+      } else {
+        const auto& matcher = rule.regexRewrite();
+        if (matcher != nullptr) {
+          rewritten_value = matcher->replaceAll(value, rule.regexSubstitution());
+          value = rewritten_value;
+        }
+      }
 
       if (!value.empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());
@@ -182,20 +207,18 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
         ENVOY_LOG(debug, "value is empty, not adding metadata");
       }
 
-      if (rule.remove()) {
+      if (proto_rule.remove()) {
         headers.remove(header);
       }
-    } else if (rule.has_on_header_missing()) {
+    }
+    if (header_entry == nullptr && proto_rule.has_on_header_missing()) {
       // Add metadata for the header missing case.
-      const auto& keyval = rule.on_header_missing();
+      const auto& keyval = proto_rule.on_header_missing();
 
-      if (!keyval.value().empty()) {
-        const auto& nspace = decideNamespace(keyval.metadata_namespace());
-        addMetadata(structs_by_namespace, nspace, keyval.key(), keyval.value(), keyval.type(),
-                    keyval.encode());
-      } else {
-        ENVOY_LOG(debug, "value is empty, not adding metadata");
-      }
+      ASSERT(!keyval.value().empty());
+      const auto& nspace = decideNamespace(keyval.metadata_namespace());
+      addMetadata(structs_by_namespace, nspace, keyval.key(), keyval.value(), keyval.type(),
+                  keyval.encode());
     }
   }
 

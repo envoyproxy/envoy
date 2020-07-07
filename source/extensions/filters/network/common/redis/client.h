@@ -114,7 +114,7 @@ using ClientPtr = std::unique_ptr<Client>;
 /**
  * Read policy to use for Redis cluster.
  */
-enum class ReadPolicy { Master, PreferMaster, Replica, PreferReplica, Any };
+enum class ReadPolicy { Primary, PreferPrimary, Replica, PreferReplica, Any };
 
 /**
  * Configuration for a redis connection pool.
@@ -185,6 +185,8 @@ public:
    */
   virtual ReadPolicy readPolicy() const PURE;
 };
+
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * A factory for individual redis client connections.

@@ -7,7 +7,13 @@ namespace Filesystem {
 
 Api::IoError::IoErrorCode IoFileError::getErrorCode() const { return IoErrorCode::UnknownError; }
 
-std::string IoFileError::getErrorDetails() const { return ::strerror(errno_); }
+std::string IoFileError::getErrorDetails() const {
+  // TODO(sunjayBhatia, wrowe): Disable clang-format until win32 implementation no longer uses POSIX
+  // subsystem, see https://github.com/envoyproxy/envoy/issues/11655
+  // clang-format off
+  return ::strerror(errno_);
+  // clang-format on
+}
 
 Api::IoCallBoolResult FileSharedImpl::open(FlagSet in) {
   if (isOpen()) {
