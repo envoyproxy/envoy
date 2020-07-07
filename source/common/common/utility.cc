@@ -106,7 +106,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
         cached_time.formatted.erase(it);
         it = next_it;
       } else {
-        it++;
+        ++it;
       }
     }
 
