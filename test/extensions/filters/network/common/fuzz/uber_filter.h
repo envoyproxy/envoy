@@ -32,21 +32,23 @@ protected:
   void filterSetup(const envoy::config::listener::v3::Filter& proto_config);
 
 private:
-  static ::std::vector<absl::string_view> filter_names_;
+  // ::std::vector<absl::string_view> filter_names_;
   // NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Server::Configuration::MockFactoryContext factory_context_;
   Network::ReadFilterSharedPtr read_filter_;
   Network::FilterFactoryCb cb_;
   // NiceMock<Envoy::Network::MockConnection> connection_;
-  Envoy::Network::MockConnection connection_;
+  // Envoy::Network::MockConnection connection_;
   Network::Address::InstanceConstSharedPtr addr_;
   // NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Upstream::MockClusterManager cluster_manager_;
   Event::SimulatedTimeSystem time_source_;
-  Stats::IsolatedStoreImpl scope_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  // Stats::IsolatedStoreImpl scope_;
   // NiceMock<Runtime::MockLoader> runtime_;
   Runtime::MockLoader runtime_;
-  NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
+  std::shared_ptr<NiceMock<Network::MockReadFilterCallbacks>> read_filter_callbacks_;
 };
 
 } // namespace NetworkFilters

@@ -13,7 +13,6 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
       [](test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
@@ -33,7 +32,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          filter_name = "envoy.filters.network.redis_proxy";
+          // filter_name = "envoy.filters.network.redis_proxy";
           input->mutable_config()->set_name(std::string(filter_name));
         }
         // Set the corresponding type_url for Any.

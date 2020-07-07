@@ -23,3 +23,17 @@ actions {
   on_new_connection {
   }
 }
+actions {
+  advance_time {
+    milliseconds: 12035000
+  }
+}
+actions {
+  on_data {
+    data: "\000\000"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}

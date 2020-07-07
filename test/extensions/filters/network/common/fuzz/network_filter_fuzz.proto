@@ -29,7 +29,7 @@ message Action {
 }
 
 message FilterFuzzTestCase {
-  // envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter config = 1;
+  // This is actually a protobuf type for the config of network filters.
   envoy.config.listener.v3.Filter config = 1;
   repeated Action actions = 2;
 }
