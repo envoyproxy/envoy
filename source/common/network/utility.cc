@@ -571,8 +571,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     Buffer::RawSlice slice;
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
-    // TODO(yugant): Avoid using 64k by getting memory from UdpPacketProcessor
-    const uint64_t max_packet_size_with_gro = 65535;
+    // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
+    const uint64_t max_packet_size_with_gro = 16 * udp_packet_processor.maxPacketSize();
 
     Api::IoCallUint64Result result =
         receiveMessage(max_packet_size_with_gro, buffer, slice, output, handle, local_address);
