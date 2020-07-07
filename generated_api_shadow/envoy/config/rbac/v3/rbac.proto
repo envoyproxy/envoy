@@ -110,6 +110,7 @@ message Policy {
   google.api.expr.v1alpha1.Expr condition = 3
       [(udpa.annotations.field_migrate).oneof_promotion = "expression_specifier"];
 
+  // [#not-implemented-hide:]
   // An optional symbolic expression that has been successfully type checked.
   // Only be used when condition is not used.
   google.api.expr.v1alpha1.CheckedExpr checked_condition = 4
