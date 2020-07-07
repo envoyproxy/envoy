@@ -15,6 +15,7 @@ namespace OriginalDst {
 
 class FakeConnectionSocket : public Network::MockConnectionSocket {
   const Network::Address::InstanceConstSharedPtr& local_address_;
+
 public:
   ~FakeConnectionSocket() override = default;
 
