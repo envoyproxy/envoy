@@ -2144,7 +2144,7 @@ TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
         value: 0.3
   )EOF";
   auto cluster = makeCluster(yaml);
-  EXPECT_EQ(cluster->info()->eds_service_name(), "service_foo");
+  EXPECT_EQ(cluster->info()->edsServiceName(), "service_foo");
 
   const std::string unexpected_eds_config_yaml = R"EOF(
     name: name

@@ -27,5 +27,4 @@ public:
   absl::node_hash_map<std::string, Cb> config_tracker_callbacks_;
 };
 } // namespace Server
-
 } // namespace Envoy
