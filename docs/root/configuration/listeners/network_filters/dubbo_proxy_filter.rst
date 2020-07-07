@@ -17,7 +17,7 @@ and parameter value for routing.
 Statistics
 ----------
 
-Every configured dubbo proxy filter has statistics rooted at *redis.<stat_prefix>.* with the
+Every configured dubbo proxy filter has statistics rooted at *dubbo.<stat_prefix>.* with the
 following statistics:
 
 .. csv-table::
