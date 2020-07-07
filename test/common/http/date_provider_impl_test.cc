@@ -32,7 +32,6 @@ TEST(SlowDateProviderImplTest, RequestHeaders) {
   EXPECT_EQ(nullptr, headers.Date());
 
   provider.setDateHeader(headers);
-  EXPECT_NE(nullptr, headers.Date());
   EXPECT_EQ(headers.get_("date"), "Thu, 01 Jan 1970 00:00:02 GMT");
 }
 
@@ -46,7 +45,6 @@ TEST(SlowDateProviderImplTest, ResponseHeaders) {
   EXPECT_EQ(nullptr, headers.Date());
 
   provider.setDateHeader(headers);
-  EXPECT_NE(nullptr, headers.Date());
   EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:02 GMT");
 }
 

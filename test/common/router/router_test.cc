@@ -6617,7 +6617,8 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestRetryHeaders) {
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt))).Times(1);
+                        absl::optional<uint64_t>(absl::nullopt)))
+      .Times(1);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -6628,13 +6629,12 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestRetryHeaders) {
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder&,
-              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
-            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
-            return nullptr;
-          }));
+      .WillOnce(Invoke([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
   EXPECT_EQ(2U,
