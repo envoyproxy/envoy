@@ -63,7 +63,7 @@ HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
 }
 
 bool isChunked(absl::string_view header_value) {
-  for (auto single_encoding : absl::StrSplit(header_value, ",")) {
+  for (auto single_encoding : absl::StrSplit(header_value, ',')) {
     if (!absl::EqualsIgnoreCase(single_encoding, Headers::get().TransferEncodingValues.Chunked)) {
       return false;
     }
