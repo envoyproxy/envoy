@@ -461,6 +461,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(second_request_headers, false));
 
+  EXPECT_EQ(1, config_->stats().oauth_unauthenticated_rq_.value());
+
   // Expected response after the callback & validation is complete - verifying we kept the
   // state and method of the original request, including the query string parameters.
   Http::TestRequestHeaderMapImpl second_response_headers{

@@ -270,6 +270,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     response_headers->setReferenceKey(Http::Headers::get().Location, new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 
+    config_->stats().oauth_unauthenticated_rq_.inc();
+
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
 

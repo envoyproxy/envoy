@@ -73,6 +73,7 @@ private:
  * All stats for the OAuth filter. @see stats_macros.h
  */
 #define ALL_OAUTH_FILTER_STATS(COUNTER)                                                            \
+  COUNTER(oauth_unauthenticated_rq)                                                                \
   COUNTER(oauth_failure)                                                                           \
   COUNTER(oauth_success)
 
