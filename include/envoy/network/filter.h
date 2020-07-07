@@ -403,6 +403,11 @@ public:
    * @return the udp listener that owns this read filter.
    */
   virtual UdpListener& udpListener() PURE;
+
+  /**
+   * @return the udp listener is valid or not.
+   */
+  virtual bool isValidUdpListener() PURE;
 };
 
 /**

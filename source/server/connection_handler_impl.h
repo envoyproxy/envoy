@@ -368,6 +368,7 @@ public:
 
   // Network::UdpReadFilterCallbacks
   Network::UdpListener& udpListener() override;
+  bool isValidUdpListener() override;
 
 private:
   Network::UdpListenerPtr udp_listener_;

@@ -243,6 +243,18 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
   cluster_.cluster_stats_.sess_rx_datagrams_.inc();
   cluster_.cluster_.info()->stats().upstream_cx_rx_bytes_total_.add(buffer_length);
 
+  if (!cluster_.filter_.read_callbacks_->isValidUdpListener()) {
+    // In this case, the udp listener is removed or not added yet.
+    // So, we simply ignore datagram that incoming.
+    ENVOY_LOG(
+        debug,
+        "the udp listener is invalid. drop incoming datagram: downstream={} local={} upstream={}",
+        addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
+        host_->address()->asStringView());
+    cluster_.filter_.config_->stats().downstream_sess_tx_errors_.inc();
+    return;
+  }
+
   Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *buffer};
   const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener().send(data);
   if (!rc.ok()) {

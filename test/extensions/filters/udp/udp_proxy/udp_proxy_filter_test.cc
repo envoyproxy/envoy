@@ -14,6 +14,7 @@ using testing::ByMove;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnNew;
+using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -110,6 +111,32 @@ public:
       file_event_cb_(Event::FileReadyType::Read);
     }
 
+    void recvDataFromUpstreamWithoutDownstreamForwarding(const std::string& data) {
+      EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
+
+      EXPECT_CALL(*io_handle_, supportsMmsg());
+      // Return the datagram.
+      EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
+          .WillOnce(Invoke(
+              [this, data](Buffer::RawSlice* slices, const uint64_t, uint32_t,
+                           Network::IoHandle::RecvMsgOutput& output) -> Api::IoCallUint64Result {
+                ASSERT(data.size() <= slices[0].len_);
+                memcpy(slices[0].mem_, data.data(), data.size());
+                output.msg_[0].peer_address_ = upstream_address_;
+                return makeNoError(data.size());
+              }));
+
+      // Return an EAGAIN result.
+      EXPECT_CALL(*io_handle_, supportsMmsg());
+      EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
+          .WillOnce(Return(ByMove(Api::IoCallUint64Result(
+              0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                 Network::IoSocketError::deleteIoError)))));
+
+      // Kick off the receive.
+      file_event_cb_(Event::FileReadyType::Read);
+    }
+
     UdpProxyFilterTest& parent_;
     const Network::Address::InstanceConstSharedPtr upstream_address_;
     Event::MockTimer* idle_timer_{};
@@ -121,6 +148,7 @@ public:
       : upstream_address_(Network::Utility::parseInternetAddressAndPort("20.0.0.1:443")) {
     // Disable strict mock warnings.
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
+    EXPECT_CALL(callbacks_, isValidUdpListener()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
@@ -472,6 +500,28 @@ cluster: fake_cluster
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+// If the udp listener is not added yet, incoming datagram should be dropped.
+TEST_F(UdpProxyFilterTest, InvalidUdpListener) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+  )EOF");
+
+  testing::NiceMock<Network::MockUdpListener>* listener = nullptr;
+
+  ON_CALL(callbacks_, isValidUdpListener()).WillByDefault(Return(false));
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectUpstreamWrite("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  ON_CALL(callbacks_, udpListener()).WillByDefault(ReturnRef(*listener));
+  test_sessions_[0].recvDataFromUpstreamWithoutDownstreamForwarding("world");
+  EXPECT_EQ(1, config_->stats().downstream_sess_tx_errors_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_tx_bytes_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_tx_datagrams_.value());
 }
 
 } // namespace
