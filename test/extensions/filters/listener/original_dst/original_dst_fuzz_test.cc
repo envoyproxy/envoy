@@ -62,19 +62,21 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
-  NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Network::Address::InstanceConstSharedPtr address = nullptr;
 
   try {
-    auto address = Network::Utility::resolveUrl(input.address());
-    FakeConnectionSocket socket(address);
-    ON_CALL(callbacks_, socket()).WillByDefault(testing::ReturnRef(socket));
-
-    auto filter = std::make_unique<OriginalDstFilter>();
-    filter->onAccept(callbacks_);
+    address = Network::Utility::resolveUrl(input.address());
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
+
+  FakeConnectionSocket socket(address);
+  ON_CALL(callbacks, socket()).WillByDefault(testing::ReturnRef(socket));
+
+  auto filter = std::make_unique<OriginalDstFilter>();
+  filter->onAccept(callbacks);
 }
 
 } // namespace OriginalDst
