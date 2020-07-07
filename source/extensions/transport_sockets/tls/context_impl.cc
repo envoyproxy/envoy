@@ -19,6 +19,7 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stats/utility.h"
 
 #include "extensions/transport_sockets/tls/utility.h"
@@ -710,7 +711,12 @@ bool ContextImpl::dnsNameMatch(const std::string& dns_name, const char* pattern)
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
     if (dns_name.length() > pattern_len - 1) {
       const size_t off = dns_name.length() - pattern_len + 1;
-      return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_wildcard_matching")) {
+        return dns_name.substr(0, off).find('.') == std::string::npos &&
+               dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+      } else {
+        return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+      }
     }
   }
 
