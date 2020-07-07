@@ -34,4 +34,12 @@ Dynamic metadata that is set by multiple filters is placed in the common key nam
 The following Envoy filters emit shared dynamic metadata.
 
 * :ref:`Role Based Access Control (RBAC) Filter <config_http_filters_rbac_dynamic_metadata>`
+<<<<<<< HEAD
 * :ref:`Role Based Access Control (RBAC) Network Filter <config_network_filters_rbac_dynamic_metadata>`
+=======
+* :ref:`Role Based Access Control (RBAC) Network Filter <config_network_filters_rbac_dynamic_metadata>`
+
+The following filters consume shared dynamic metadata.
+
+* Log Key Access Log Filter
+>>>>>>> 2c3bc0a49... Added Log Key access log filter
