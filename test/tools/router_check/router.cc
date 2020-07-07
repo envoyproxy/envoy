@@ -84,7 +84,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
 
 void RouterCheckTool::assignUniqueRouteNames(
     envoy::config::route::v3::RouteConfiguration& route_config) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
       route.set_name(random.uuid());

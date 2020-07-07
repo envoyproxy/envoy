@@ -100,7 +100,7 @@ ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::S
 
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const Network::DrainDecision& drain_close,
-                                             Runtime::RandomGenerator& random_generator,
+                                             Random::RandomGenerator& random_generator,
                                              Http::Context& http_context, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,

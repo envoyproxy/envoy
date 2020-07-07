@@ -100,7 +100,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
     server = std::make_unique<InstanceImpl>(
         init_manager, options, test_time.timeSystem(),
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart, stats_store,
-        fakelock, component_factory, std::make_unique<Runtime::RandomGeneratorImpl>(),
+        fakelock, component_factory, std::make_unique<Random::RandomGeneratorImpl>(),
         thread_local_instance, Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         nullptr);
   } catch (const EnvoyException& ex) {

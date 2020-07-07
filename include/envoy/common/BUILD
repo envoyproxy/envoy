@@ -34,6 +34,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "random_generator_interface",
+    hdrs = ["random_generator.h"],
+)
+
+envoy_cc_library(
     name = "resource_interface",
     hdrs = ["resource.h"],
 )

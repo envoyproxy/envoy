@@ -24,6 +24,7 @@ envoy_cc_library(
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/singleton:manager_interface",

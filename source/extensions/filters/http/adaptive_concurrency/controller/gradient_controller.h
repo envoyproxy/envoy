@@ -7,6 +7,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
@@ -211,7 +212,7 @@ class GradientController : public ConcurrencyController {
 public:
   GradientController(GradientControllerConfig config, Event::Dispatcher& dispatcher,
                      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
-                     Runtime::RandomGenerator& random, TimeSource& time_source);
+                     Random::RandomGenerator& random, TimeSource& time_source);
 
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
@@ -238,7 +239,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
   GradientControllerStats stats_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   TimeSource& time_source_;
 
   // Protects data related to latency sampling and RTT values. In addition to protecting the latency

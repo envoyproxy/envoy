@@ -3,6 +3,7 @@
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -99,7 +100,7 @@ public:
   Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
          Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
+         const LocalInfo::LocalInfo& localinfo, Random::RandomGenerator& random_generator,
          TimeSource& time_source);
 
   /**

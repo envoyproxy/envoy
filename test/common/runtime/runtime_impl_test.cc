@@ -37,7 +37,7 @@ namespace Runtime {
 namespace {
 
 TEST(Random, DISABLED_benchmarkRandom) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
 
   for (size_t i = 0; i < 1000000000; ++i) {
     random.random();
@@ -45,7 +45,7 @@ TEST(Random, DISABLED_benchmarkRandom) {
 }
 
 TEST(Random, SanityCheckOfUniquenessRandom) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   std::set<uint64_t> results;
   const size_t num_of_results = 1000000;
 
@@ -57,7 +57,7 @@ TEST(Random, SanityCheckOfUniquenessRandom) {
 }
 
 TEST(Random, SanityCheckOfStdLibRandom) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
 
   static const auto num_of_items = 100;
   std::vector<uint64_t> v(num_of_items);

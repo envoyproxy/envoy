@@ -212,7 +212,7 @@ using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
 DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
                                          Event::Dispatcher& main_thread_dispatcher,
                                          ThreadLocal::SlotAllocator& tls,
-                                         Runtime::RandomGenerator& random, Runtime::Loader& loader,
+                                         Random::RandomGenerator& random, Runtime::Loader& loader,
                                          Stats::Scope& root_scope);
 
 /**

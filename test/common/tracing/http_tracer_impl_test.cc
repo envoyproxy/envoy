@@ -44,7 +44,7 @@ namespace {
 TEST(HttpTracerUtilityTest, IsTracing) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   NiceMock<Stats::MockStore> stats;
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   std::string not_traceable_guid = random.uuid();
 
   auto rid_extension = Http::RequestIDExtensionFactory::defaultInstance(random);

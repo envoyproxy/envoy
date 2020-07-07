@@ -152,7 +152,7 @@ public:
   // Application data passed to nghttp2.
   UserData user_data_;
 
-  Runtime::RandomGeneratorImpl random_generator_;
+  Random::RandomGeneratorImpl random_generator_;
 };
 
 TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
@@ -306,7 +306,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorLarge) {
 TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
   MetadataMapVector metadata_map_vector;
   for (int i = 0; i < 10; i++) {
-    Runtime::RandomGeneratorImpl random;
+    Random::RandomGeneratorImpl random;
     int value_size_1 = random.random() % (2 * Http::METADATA_MAX_PAYLOAD_SIZE) + 1;
     int value_size_2 = random.random() % (2 * Http::METADATA_MAX_PAYLOAD_SIZE) + 1;
     MetadataMap metadata_map = {
