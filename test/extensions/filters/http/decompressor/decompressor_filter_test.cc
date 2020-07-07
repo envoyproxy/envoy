@@ -238,7 +238,7 @@ response_direction_config:
                                                        {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 
   expectNoDecompression();
 }
@@ -262,7 +262,6 @@ request_direction_config:
     EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
     std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
         doHeaders(headers_before_filter, false /* end_stream */);
-    TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
     expectNoDecompression();
   } else {
     decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
@@ -294,7 +293,9 @@ response_direction_config:
     EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
     std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
         doHeaders(headers_before_filter, false /* end_stream */);
-    TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+    EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
+
     expectNoDecompression();
   }
 }
@@ -304,7 +305,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionHeadersOnly) {
   Http::TestRequestHeaderMapImpl headers_before_filter;
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, true /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 }
 
 TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingAbsent) {
@@ -312,7 +313,6 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingAbsent) {
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
 }
@@ -323,7 +323,6 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingDoesNotMatch) {
                                                        {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
 }
@@ -336,7 +335,6 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingNotCurrent) {
                                                        {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
 }
@@ -349,7 +347,6 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresent) {
       {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
 }
@@ -363,7 +360,6 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) 
       {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
 }

@@ -14,7 +14,6 @@ namespace Extensions {
 namespace Compression {
 namespace Gzip {
 namespace Decompressor {
-namespace {
 
 class ZlibDecompressorImplTest : public testing::Test {
 protected:
@@ -309,7 +308,31 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   EXPECT_EQ(original_text, decompressed_text);
 }
 
-} // namespace
+class ZlibDecompressorStatsTest : public testing::Test {
+protected:
+  void chargeErrorStats(const int result) { decompressor_.chargeErrorStats(result); }
+
+  Stats::IsolatedStoreImpl stats_store_{};
+  ZlibDecompressorImpl decompressor_{stats_store_, "test."};
+};
+
+TEST_F(ZlibDecompressorStatsTest, ChargeErrorStats) {
+  decompressor_.init(31);
+
+  chargeErrorStats(Z_ERRNO);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_errno").value(), 1);
+  chargeErrorStats(Z_STREAM_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_stream_error").value(), 1);
+  chargeErrorStats(Z_DATA_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_data_error").value(), 1);
+  chargeErrorStats(Z_MEM_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_mem_error").value(), 1);
+  chargeErrorStats(Z_BUF_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_buf_error").value(), 1);
+  chargeErrorStats(Z_VERSION_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_version_error").value(), 1);
+}
+
 } // namespace Decompressor
 } // namespace Gzip
 } // namespace Compression

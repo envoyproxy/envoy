@@ -93,11 +93,12 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   // Assert that the total bytes received upstream equal the sum of the uncompressed byte buffers
   // sent.
   EXPECT_TRUE(upstream_request_->complete());
-  TestUtility::headerMapEqualIgnoreOrder(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                        {":scheme", "http"},
-                                                                        {":path", "/test/long/url"},
-                                                                        {":authority", "host"}},
-                                         upstream_request_->headers());
+  EXPECT_EQ("chunked", upstream_request_->headers().TransferEncoding()->value().getStringView());
+  EXPECT_EQ("gzip", upstream_request_->headers()
+                        .get(Http::LowerCaseString("accept-encoding"))
+                        ->value()
+                        .getStringView());
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::LowerCaseString("content-encoding")));
   EXPECT_EQ(uncompressed_request_length, upstream_request_->bodyLength());
 
   // Verify stats
@@ -138,8 +139,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   // Assert that the total bytes received downstream equal the sum of the uncompressed byte buffers
   // sent.
   EXPECT_TRUE(response->complete());
-  TestUtility::headerMapEqualIgnoreOrder(Http::TestRequestHeaderMapImpl{{":status", "200"}},
-                                         response->headers());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(uncompressed_response_length, response->body().length());
 
   // Verify stats
@@ -156,7 +156,8 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
 }
 
 /**
- * Exercises gzip decompression bidirectionally with default configuration.
+ * Exercises gzip decompression bidirectionally with configuration using incompatible window bits
+ * resulting in an error.
  */
 TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   const std::string bad_config{R"EOF(
@@ -202,13 +203,12 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_TRUE(upstream_request_->complete());
-  TestUtility::headerMapEqualIgnoreOrder(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":scheme", "http"},
-                                     {":path", "/test/long/url"},
-                                     {":authority", "host"},
-                                     {"accept-encoding", "wroong"}},
-      upstream_request_->headers());
+  EXPECT_EQ("chunked", upstream_request_->headers().TransferEncoding()->value().getStringView());
+  EXPECT_EQ("gzip", upstream_request_->headers()
+                        .get(Http::LowerCaseString("accept-encoding"))
+                        ->value()
+                        .getStringView());
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::LowerCaseString("content-encoding")));
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.request.decompressed",
@@ -243,8 +243,7 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  TestUtility::headerMapEqualIgnoreOrder(Http::TestRequestHeaderMapImpl{{":status", "200"}},
-                                         response->headers());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.response.decompressed",

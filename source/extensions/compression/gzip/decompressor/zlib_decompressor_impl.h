@@ -69,11 +69,17 @@ public:
   int decompression_error_{0};
 
 private:
+  // TODO: clean up friend class. This is here to allow coverage of chargeErrorStats as it isn't
+  // completely straightforward
+  // to cause zlib's inflate function to return all the error codes necessary to hit all the cases
+  // in the switch statement.
+  friend class ZlibDecompressorStatsTest;
   static ZlibDecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return ZlibDecompressorStats{ALL_ZLIB_DECOMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
   bool inflateNext();
+  void chargeErrorStats(const int result);
 
   const ZlibDecompressorStats stats_;
 };
