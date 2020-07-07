@@ -667,6 +667,11 @@ def _com_googlesource_chromium_v8():
 
 def _com_googlesource_quiche():
     location = REPOSITORY_LOCATIONS["com_googlesource_quiche"]
+    _repository_impl(
+        name = "com_googlesource_quiche",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/external:quiche.patch"],
+    )
     genrule_repository(
         name = "com_googlesource_quiche",
         urls = location["urls"],
