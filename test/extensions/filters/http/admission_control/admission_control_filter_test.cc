@@ -313,7 +313,8 @@ enabled:
   runtime_key: "foo.enabled"
 sampling_window: 10s
 sr_threshold:
-  default_value: 100.0
+  default_value:
+    value: 100.0
   runtime_key: "foo.threshold"
 aggression:
   default_value: 1.0

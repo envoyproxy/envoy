@@ -92,5 +92,5 @@ message AdmissionControl {
   // Dictates the success rate at which the rejection probability is non-zero. As success rate drops
   // below this threshold, rejection probability will increase. Any success rate above the threshold
   // results in a rejection probability of 0. Defaults to 95%.
-  config.core.v3.RuntimeDouble sr_threshold = 5;
+  config.core.v3.RuntimePercent sr_threshold = 5;
 }

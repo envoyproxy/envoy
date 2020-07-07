@@ -54,7 +54,8 @@ enabled:
   runtime_key: "foo.enabled"
 sampling_window: 1337s
 sr_threshold:
-  default_value: 92
+  default_value:
+    value: 92
   runtime_key: "foo.sr_threshold"
 aggression:
   default_value: 4.2
@@ -96,7 +97,8 @@ enabled:
   runtime_key: "foo.enabled"
 sampling_window: 1337s
 sr_threshold:
-  default_value: 92
+  default_value:
+    value: 92
   runtime_key: "foo.sr_threshold"
 aggression:
   default_value: 4.2
@@ -115,11 +117,11 @@ success_criteria:
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.sr_threshold", 92)).WillOnce(Return(24.0));
   EXPECT_EQ(0.24, config->successRateThreshold());
 
-  // Verify threshold is clamped to [0,1].
+  // Verify bogus runtime thresholds revert to the default value.
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.sr_threshold", 92)).WillOnce(Return(250.0));
-  EXPECT_EQ(1.0, config->successRateThreshold());
+  EXPECT_EQ(0.92, config->successRateThreshold());
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.sr_threshold", 92)).WillOnce(Return(-1.0));
-  EXPECT_EQ(0.0, config->successRateThreshold());
+  EXPECT_EQ(0.92, config->successRateThreshold());
 }
 
 } // namespace

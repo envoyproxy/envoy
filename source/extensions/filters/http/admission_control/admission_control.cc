@@ -40,9 +40,9 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       aggression_(proto_config.has_aggression()
                       ? std::make_unique<Runtime::Double>(proto_config.aggression(), runtime)
                       : nullptr),
-      sr_threshold_(proto_config.has_sr_threshold()
-                        ? std::make_unique<Runtime::Double>(proto_config.sr_threshold(), runtime)
-                        : nullptr),
+      sr_threshold_(proto_config.has_sr_threshold() ? std::make_unique<Runtime::Percentage>(
+                                                          proto_config.sr_threshold(), runtime)
+                                                    : nullptr),
       response_evaluator_(std::move(response_evaluator)) {}
 
 double AdmissionControlFilterConfig::aggression() const {
@@ -50,8 +50,7 @@ double AdmissionControlFilterConfig::aggression() const {
 }
 
 double AdmissionControlFilterConfig::successRateThreshold() const {
-  const double pct =
-      std::max<double>(0.0, sr_threshold_ ? sr_threshold_->value() : defaultSuccessRateThreshold);
+  const double pct = sr_threshold_ ? sr_threshold_->value() : defaultSuccessRateThreshold;
   return std::min<double>(pct, 100.0) / 100.0;
 }
 

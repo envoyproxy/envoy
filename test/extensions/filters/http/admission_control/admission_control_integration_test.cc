@@ -21,7 +21,8 @@ typed_config:
     default_value: 2.0
     runtime_key: "foo.aggression"
   sr_threshold:
-    default_value: 100.0
+    default_value:
+      value: 100.0
     runtime_key: "foo.sr_threshold"
   enabled:
     default_value: true

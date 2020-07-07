@@ -75,7 +75,7 @@ private:
   const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;
   std::unique_ptr<Runtime::Double> aggression_;
-  std::unique_ptr<Runtime::Double> sr_threshold_;
+  std::unique_ptr<Runtime::Percentage> sr_threshold_;
   std::shared_ptr<ResponseEvaluator> response_evaluator_;
 };
 
