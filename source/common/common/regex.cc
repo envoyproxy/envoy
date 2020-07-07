@@ -43,8 +43,8 @@ private:
 
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
-  CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config)
-      : regex_(config.regex(), re2::RE2::Quiet) {
+  CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config, bool case_sensitive)
+      : regex_(case_sensitive ? config.regex() : "(?i:" + config.regex() + ")", re2::RE2::Quiet) {
     if (!regex_.ok()) {
       throw EnvoyException(regex_.error());
     }
@@ -121,14 +121,25 @@ private:
 
 } // namespace
 
-CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::v3::RegexMatcher& matcher) {
+CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::v3::RegexMatcher& matcher,
+                                       bool case_sensitive) {
   // Google Re is the only currently supported engine.
   ASSERT(matcher.has_google_re2());
-  return std::make_unique<CompiledGoogleReMatcher>(matcher);
+  return std::make_unique<CompiledGoogleReMatcher>(matcher, case_sensitive);
 }
 
 CompiledMatcherPtr Utility::parseStdRegexAsCompiledMatcher(const std::string& regex,
                                                            std::regex::flag_type flags) {
+  return std::make_unique<CompiledStdMatcher>(parseStdRegex(regex, flags));
+}
+
+CompiledMatcherPtr Utility::parseStdRegexAsCompiledMatcher(const std::string& regex,
+                                                           bool case_sensitive) {
+  std::regex::flag_type flags = std::regex::optimize;
+  if (!case_sensitive) {
+    flags |= std::regex_constants::icase;
+  }
+
   return std::make_unique<CompiledStdMatcher>(parseStdRegex(regex, flags));
 }
 

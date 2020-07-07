@@ -325,6 +325,11 @@ virtual_hosts:
     route:
       cluster: clock
   - match:
+      regex: "/t[io]c"
+      case_sensitive: false
+    route:
+      cluster: clock-ignore-case
+  - match:
       safe_regex:
         google_re2: {}
         regex: "/baa+"
@@ -389,6 +394,10 @@ virtual_hosts:
             config.route(genHeaders("bat.com", "/tic", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("clock",
             config.route(genHeaders("bat.com", "/toc", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("clock-ignore-case",
+            config.route(genHeaders("bat.com", "/TiC", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("clock-ignore-case",
+            config.route(genHeaders("bat.com", "/TOc", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("regex_default",
             config.route(genHeaders("bat.com", "/tac", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("regex_default",
@@ -685,6 +694,32 @@ virtual_hosts:
         regex: ".*"
     route:
       cluster: regex_default
+- name: ignore-case
+  domains:
+  - ignores.case
+  routes:
+  - match:
+      prefix: "/ignore/case/prefix"
+      case_sensitive: false
+    route:
+      cluster: ignore-case-prefix
+  - match:
+      path: "/ignore/case/path"
+      case_sensitive: false
+    route:
+      cluster: ignore-case-path
+  - match:
+      regex: "^/ignore/case/regex$"
+      case_sensitive: false
+    route:
+      cluster: ignore-case-regex
+  - match:
+      safe_regex:
+        google_re2: {}
+        regex: "/ignore/case/re2+"
+      case_sensitive: false
+    route:
+      cluster: ignore-case-re2
 - name: default
   domains:
   - "*"
@@ -1164,6 +1199,39 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers = genHeaders("api.lyft.com", "/something/else", "GET");
     EXPECT_EQ("other", virtualClusterName(config.route(headers, 0)->routeEntry(), headers));
   }
+
+  EXPECT_EQ("ignore-case-prefix",
+            config.route(genHeaders("ignores.case", "/ignore/case/prefix", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("ignore-case-prefix",
+            config.route(genHeaders("ignores.case", "/Ignore/Case/Prefix", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("ignore-case-path",
+            config.route(genHeaders("ignores.case", "/ignore/case/path", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("ignore-case-path",
+            config.route(genHeaders("ignores.case", "/Ignore/Case/Path", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("ignore-case-regex",
+            config.route(genHeaders("ignores.case", "/ignore/case/regex", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("ignore-case-regex",
+            config.route(genHeaders("ignores.case", "/Ignore/Case/Regex", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("ignore-case-re2",
+            config.route(genHeaders("ignores.case", "/ignore/case/re222", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("ignore-case-re2",
+            config.route(genHeaders("ignores.case", "/Ignore/Case/RE2", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
 }
 
 TEST_F(RouteMatcherTest, TestRoutesWithWildcardAndDefaultOnly) {
@@ -1783,6 +1851,52 @@ virtual_hosts:
 TEST_F(RouteMatcherTest, HeaderMatchedRouting) {
   const std::string yaml = R"EOF(
 virtual_hosts:
+- name: ignore-case
+  domains:
+  - ignores.case
+  routes:
+  - match:
+      path: "/ignore/case"
+      headers:
+      - name: test_header_exact
+        exact_match: exact
+        case_sensitive: false
+    route:
+      cluster: ignore-case-exact-header-match
+  - match:
+      path: "/ignore/case"
+      headers:
+      - name: test_header_prefix
+        prefix_match: prefix
+        case_sensitive: false
+    route:
+      cluster: ignore-case-prefix-header-match
+  - match:
+      path: "/ignore/case"
+      headers:
+      - name: test_header_suffix
+        suffix_match: suffix
+        case_sensitive: false
+    route:
+      cluster: ignore-case-suffix-header-match
+  - match:
+      path: "/ignore/case"
+      headers:
+      - name: test_header_regex
+        regex_match: ^regex\d+$
+        case_sensitive: false
+    route:
+      cluster: ignore-case-regex-header-match
+  - match:
+      path: "/ignore/case"
+      headers:
+      - name: test_header_re2
+        safe_regex_match:
+          google_re2: {}
+          regex: "^re2[[:alpha:]]+$"
+        case_sensitive: false
+    route:
+      cluster: ignore-case-re2-header-match
 - name: local_service
   domains:
   - "*"
@@ -1901,6 +2015,76 @@ virtual_hosts:
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_range", "19");
     EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_exact", "exact");
+    EXPECT_EQ("ignore-case-exact-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_exact", "ExAct");
+    EXPECT_EQ("ignore-case-exact-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_prefix", "prefix");
+    EXPECT_EQ("ignore-case-prefix-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_prefix", "PrefiX");
+    EXPECT_EQ("ignore-case-prefix-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_suffix", "suffix");
+    EXPECT_EQ("ignore-case-suffix-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_suffix", "SuFFix");
+    EXPECT_EQ("ignore-case-suffix-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_regex", "regex123");
+    EXPECT_EQ("ignore-case-regex-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_regex", "RegEx12345");
+    EXPECT_EQ("ignore-case-regex-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_re2", "re2abc");
+    EXPECT_EQ("ignore-case-re2-header-match",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("ignores.case", "/ignore/case", "GET");
+    headers.addCopy("test_header_re2", "RE2AbCdE");
+    EXPECT_EQ("ignore-case-re2-header-match",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
 }

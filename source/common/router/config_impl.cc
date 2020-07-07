@@ -983,12 +983,14 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
   if (route.match().path_specifier_case() ==
       envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
     regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        route.match().hidden_envoy_deprecated_regex());
+        route.match().hidden_envoy_deprecated_regex(),
+        route.match().has_case_sensitive() ? route.match().case_sensitive().value() : true);
     regex_str_ = route.match().hidden_envoy_deprecated_regex();
   } else {
     ASSERT(route.match().path_specifier_case() ==
            envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
-    regex_ = Regex::Utility::parseRegex(route.match().safe_regex());
+    regex_ = Regex::Utility::parseRegex(route.match().safe_regex(),
+                                        route.match().case_sensitive().value());
     regex_str_ = route.match().safe_regex().regex();
   }
 }

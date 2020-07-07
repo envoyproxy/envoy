@@ -35,7 +35,8 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
 HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config)
-    : name_(config.name()), invert_match_(config.invert_match()) {
+    : name_(config.name()), invert_match_(config.invert_match()),
+      case_sensitive_(config.has_case_sensitive() ? config.case_sensitive().value() : true) {
   switch (config.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
@@ -45,11 +46,11 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
       kHiddenEnvoyDeprecatedRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        config.hidden_envoy_deprecated_regex_match());
+        config.hidden_envoy_deprecated_regex_match(), case_sensitive_);
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
+    regex_ = Regex::Utility::parseRegex(config.safe_regex_match(), case_sensitive_);
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
@@ -117,7 +118,11 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   const absl::string_view header_view = header->value().getStringView();
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
-    match = header_data.value_.empty() || header_view == header_data.value_;
+    if (header_data.case_sensitive_) {
+      match = header_data.value_.empty() || header_view == header_data.value_;
+    } else {
+      match = header_data.value_.empty() || absl::EqualsIgnoreCase(header_view, header_data.value_);
+    }
     break;
   case HeaderMatchType::Regex:
     match = header_data.regex_->match(header_view);
@@ -132,10 +137,18 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
     match = true;
     break;
   case HeaderMatchType::Prefix:
-    match = absl::StartsWith(header_view, header_data.value_);
+    if (header_data.case_sensitive_) {
+      match = absl::StartsWith(header_view, header_data.value_);
+    } else {
+      match = absl::StartsWithIgnoreCase(header_view, header_data.value_);
+    }
     break;
   case HeaderMatchType::Suffix:
-    match = absl::EndsWith(header_view, header_data.value_);
+    if (header_data.case_sensitive_) {
+      match = absl::EndsWith(header_view, header_data.value_);
+    } else {
+      match = absl::EndsWithIgnoreCase(header_view, header_data.value_);
+    }
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

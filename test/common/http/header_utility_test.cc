@@ -187,6 +187,37 @@ invert_match: true
   EXPECT_EQ(true, header_data.invert_match_);
 }
 
+TEST(HeaderDataConstructorTest, CaseSensitiveSpecifier) {
+  const std::string yaml = R"EOF(
+name: test-header
+exact_match: value
+case_sensitive: false
+)EOF";
+
+  HeaderUtility::HeaderData header_data =
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+
+  EXPECT_EQ("test-header", header_data.name_.get());
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
+  EXPECT_EQ("value", header_data.value_);
+  EXPECT_EQ(false, header_data.case_sensitive_);
+}
+
+TEST(HeaderDataConstructorTest, DefaultCaseSensitiveSpecifier) {
+  const std::string yaml = R"EOF(
+name: test-header
+exact_match: value
+)EOF";
+
+  HeaderUtility::HeaderData header_data =
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+
+  EXPECT_EQ("test-header", header_data.name_.get());
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
+  EXPECT_EQ("value", header_data.value_);
+  EXPECT_EQ(true, header_data.case_sensitive_);
+}
+
 TEST(HeaderDataConstructorTest, GetAllOfHeader) {
   TestRequestHeaderMapImpl headers{
       {"foo", "val1"}, {"bar", "bar2"}, {"foo", "eep, bar"}, {"foo", ""}};
@@ -287,6 +318,23 @@ exact_match: match-value
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST(MatchHeadersTest, HeaderExactMatchIgnoreCase) {
+  TestRequestHeaderMapImpl matching_headers{{"match-header", "Match-Value"}};
+  TestRequestHeaderMapImpl unmatching_headers{{"match-header", "other-value"},
+                                              {"other-header", "match-value"}};
+  const std::string yaml = R"EOF(
+name: match-header
+exact_match: match-value
+case_sensitive: false
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
 TEST(MatchHeadersTest, HeaderExactMatchInverse) {
   TestRequestHeaderMapImpl matching_headers{{"match-header", "other-value"},
                                             {"other-header", "match-value"}};
@@ -321,6 +369,23 @@ regex_match: \d{3}
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST(MatchHeadersTest, HeaderRegexMatchIgnoreCase) {
+  TestRequestHeaderMapImpl matching_headers{{"match-header", "a123B"}};
+  TestRequestHeaderMapImpl unmatching_headers{{"match-header", "1234"},
+                                              {"match-header", "123.456"}};
+  const std::string yaml = R"EOF(
+name: match-header
+regex_match: A\d{3}B
+case_sensitive: false
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
 TEST(MatchHeadersTest, HeaderSafeRegexMatch) {
   TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "1234"},
@@ -330,6 +395,25 @@ name: match-header
 safe_regex_match:
   google_re2: {}
   regex: \d{3}
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(MatchHeadersTest, HeaderSafeRegexMatchIgnoreCase) {
+  TestRequestHeaderMapImpl matching_headers{{"match-header", "A123b"}};
+  TestRequestHeaderMapImpl unmatching_headers{{"match-header", "1234"},
+                                              {"match-header", "123.456"}};
+  const std::string yaml = R"EOF(
+name: match-header
+safe_regex_match:
+  google_re2: {}
+  regex: A\d{3}B
+case_sensitive: false
   )EOF";
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
@@ -449,6 +533,23 @@ prefix_match: value
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST(MatchHeadersTest, HeaderPrefixMatchIgnoreCase) {
+  TestRequestHeaderMapImpl matching_headers{{"match-header", "Value123"}};
+  TestRequestHeaderMapImpl unmatching_headers{{"match-header", "123value"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+prefix_match: value
+case_sensitive: false
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
 TEST(MatchHeadersTest, HeaderPrefixInverseMatch) {
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "value123"}};
   TestRequestHeaderMapImpl matching_headers{{"match-header", "123value"}};
@@ -473,6 +574,23 @@ TEST(MatchHeadersTest, HeaderSuffixMatch) {
   const std::string yaml = R"EOF(
 name: match-header
 suffix_match: value
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(MatchHeadersTest, HeaderSuffixMatchIgnoreCase) {
+  TestRequestHeaderMapImpl matching_headers{{"match-header", "123valuE"}};
+  TestRequestHeaderMapImpl unmatching_headers{{"match-header", "value123"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+suffix_match: value
+case_sensitive: false
   )EOF";
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;

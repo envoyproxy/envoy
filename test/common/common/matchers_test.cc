@@ -319,8 +319,7 @@ TEST(StringMatcher, RegexValueIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_ignore_case(true);
   matcher.set_hidden_envoy_deprecated_regex("foo");
-  EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
-                            "ignore_case has no effect for regex.");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("Foo"));
 }
 
 TEST(StringMatcher, SafeRegexValueIgnoreCase) {
@@ -328,8 +327,7 @@ TEST(StringMatcher, SafeRegexValueIgnoreCase) {
   matcher.set_ignore_case(true);
   matcher.mutable_safe_regex()->mutable_google_re2();
   matcher.mutable_safe_regex()->set_regex("foo");
-  EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
-                            "ignore_case has no effect for safe_regex.");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("Foo"));
 }
 
 TEST(PathMatcher, MatchExactPath) {
