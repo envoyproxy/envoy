@@ -92,12 +92,13 @@ public:
 
 class RouterTestBase : public testing::Test {
 public:
-  RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
+  RouterTestBase(bool start_child_span, bool suppress_envoy_headers, bool add_request_date_header,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
       : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-                false, std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_),
+                false, add_request_date_header, std::move(strict_headers_to_check),
+                test_time_.timeSystem(), http_context_),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
@@ -378,7 +379,7 @@ public:
 
 class RouterTest : public RouterTestBase {
 public:
-  RouterTest() : RouterTestBase(false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+  RouterTest() : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
 };
@@ -386,7 +387,7 @@ public:
 class RouterTestSuppressEnvoyHeaders : public RouterTestBase {
 public:
   RouterTestSuppressEnvoyHeaders()
-      : RouterTestBase(false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTest, UpdateServerNameFilterState) {
@@ -6172,7 +6173,8 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 
 class RouterTestChildSpan : public RouterTestBase {
 public:
-  RouterTestChildSpan() : RouterTestBase(true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+  RouterTestChildSpan()
+      : RouterTestBase(true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 // Make sure child spans start/inject/finish with a normal flow.
@@ -6403,7 +6405,8 @@ Protobuf::RepeatedPtrField<std::string> protobufStrList(const std::vector<std::s
 class RouterTestStrictCheckOneHeader : public RouterTestBase,
                                        public testing::WithParamInterface<std::string> {
 public:
-  RouterTestStrictCheckOneHeader() : RouterTestBase(false, false, protobufStrList({GetParam()})){};
+  RouterTestStrictCheckOneHeader()
+      : RouterTestBase(false, false, false, protobufStrList({GetParam()})){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckOneHeader,
@@ -6452,7 +6455,8 @@ class RouterTestStrictCheckSomeHeaders
     : public RouterTestBase,
       public testing::WithParamInterface<std::vector<std::string>> {
 public:
-  RouterTestStrictCheckSomeHeaders() : RouterTestBase(false, false, protobufStrList(GetParam())){};
+  RouterTestStrictCheckSomeHeaders()
+      : RouterTestBase(false, false, false, protobufStrList(GetParam())){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckSomeHeaders,
@@ -6485,7 +6489,7 @@ class RouterTestStrictCheckAllHeaders
       public testing::WithParamInterface<std::tuple<std::string, std::string>> {
 public:
   RouterTestStrictCheckAllHeaders()
-      : RouterTestBase(false, false, protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
+      : RouterTestBase(false, false, false, protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckAllHeaders,
@@ -6552,6 +6556,33 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
                      .valid_)
         << fmt::format("'{}' should have failed strict validation", target);
   }
+}
+
+class RouterTestRequestDateHeader : public RouterTestBase {
+public:
+  RouterTestRequestDateHeader()
+      : RouterTestBase(false, false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
+};
+
+TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestHeaders) {
+  test_time_.setSystemTime(std::chrono::milliseconds(2000));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_EQ(nullptr, headers.Date());
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, true));
+  router_.decodeHeaders(headers, true);
+  EXPECT_NE(nullptr, headers.Date());
+  EXPECT_EQ(headers.get_("date"), "Thu, 01 Jan 1970 00:00:02 GMT");
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel(_));
+  router_.onDestroy();
 }
 
 } // namespace Router
