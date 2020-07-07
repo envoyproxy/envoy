@@ -645,15 +645,18 @@ void ConnectionImpl::onWriteReady() {
   } else if ((inDelayedClose() && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-      ASSERT(delayed_close_timer_ != nullptr);
-      delayed_close_timer_->enableTimer(delayed_close_timeout_);
+      ASSERT(delayed_close_timer_ != nullptr && delayed_close_timer_->enabled());
+      if (result.bytes_processed_ > 0) {
+        delayed_close_timer_->enableTimer(delayed_close_timeout_);
+      }
     } else {
       ASSERT(bothSidesHalfClosed() || delayed_close_state_ == DelayedCloseState::CloseAfterFlush);
       closeConnectionImmediately();
     }
   } else {
     ASSERT(result.action_ == PostIoAction::KeepOpen);
-    if (delayed_close_timer_ != nullptr) {
+    ASSERT(!delayed_close_timer_ || delayed_close_timer_->enabled());
+    if (delayed_close_timer_ != nullptr && result.bytes_processed_ > 0) {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
