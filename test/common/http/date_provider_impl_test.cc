@@ -11,18 +11,53 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Http {
 
-TEST(DateProviderImplTest, TlsRequestHeaders) {
+class MockTimeSource : public TimeSource {
+public:
+  MOCK_METHOD(SystemTime, systemTime, ());
+  MOCK_METHOD(MonotonicTime, monotonicTime, ());
+};
+
+TEST(SlowDateProviderImplTest, RequestHeaders) {
+  MockTimeSource time_source;
+  SystemTime time_point{SystemTime::duration(2000000)};
+  EXPECT_CALL(time_source, systemTime()).WillOnce(Return(time_point));
+
+  SlowDateProviderImpl provider(time_source);
+  TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(nullptr, headers.Date());
+
+  provider.setDateHeader(headers);
+  EXPECT_NE(nullptr, headers.Date());
+  EXPECT_EQ(headers.get_("date"), "Thu, 01 Jan 1970 00:00:02 GMT");
+}
+
+TEST(SlowDateProviderImplTest, ResponseHeaders) {
+  MockTimeSource time_source;
+  SystemTime time_point{SystemTime::duration(2000000)};
+  EXPECT_CALL(time_source, systemTime()).WillOnce(Return(time_point));
+
+  SlowDateProviderImpl provider(time_source);
+  TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(nullptr, headers.Date());
+
+  provider.setDateHeader(headers);
+  EXPECT_NE(nullptr, headers.Date());
+  EXPECT_EQ(headers.get_("date"), "Thu, 01 Jan 1970 00:00:02 GMT");
+}
+
+TEST(TlsCachingDateProviderImplTest, TlsRequestHeaders) {
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
   Event::MockTimer* timer = new Event::MockTimer(&dispatcher);
   EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(500), _));
 
   TlsCachingDateProviderImpl provider(dispatcher, tls);
-  ResponseHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   provider.setDateHeader(headers);
   EXPECT_NE(nullptr, headers.Date());
 
@@ -34,7 +69,7 @@ TEST(DateProviderImplTest, TlsRequestHeaders) {
   EXPECT_NE(nullptr, headers.Date());
 }
 
-TEST(DateProviderImplTest, TlsResponseHeaders) {
+TEST(TlsCachingDateProviderImplTest, TlsResponseHeaders) {
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
   Event::MockTimer* timer = new Event::MockTimer(&dispatcher);
