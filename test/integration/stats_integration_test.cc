@@ -274,7 +274,9 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/05/20  11223    44491       44600   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    44491       44811   Make upstreams pluggable
   // 2020/04/23  10661    44425       46000   per-listener connection limits
-  // 2020/06/30  11252    44747       46000   Introduce Least Request LB active request bias config
+  // 2020/06/29  11751    44715       46000   Improve time complexity of removing callback handle
+  //                                          in callback manager.
+  // 2020/07/07  11252    44971       46000   Introduce Least Request LB active request bias config
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -288,7 +290,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44747);
+  EXPECT_MEMORY_EQ(m_per_cluster, 44971);
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
 
@@ -339,7 +341,9 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/05/20  11223    36603       36800   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    36603       36923   Make upstreams pluggable
   // 2020/04/23  10661    36537       37000   per-listener connection limits
-  // 2020/06/30  11252    36859       37500   Introduce Least Request LB active request bias config
+  // 2020/06/29  11751    36827       38000   Improve time complexity of removing callback handle.
+  //                                          in callback manager.
+  // 2020/07/07  11252    37083       38000   Introduce Least Request LB active request bias config
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -353,8 +357,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36859);
-  EXPECT_MEMORY_LE(m_per_cluster, 37500); // Round up to allow platform variations.
+  EXPECT_MEMORY_EQ(m_per_cluster, 37083);
+  EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {

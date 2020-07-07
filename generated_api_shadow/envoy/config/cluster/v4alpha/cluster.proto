@@ -19,6 +19,9 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/collection_entry.proto";
+import "udpa/core/v1/resource_locator.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -31,6 +34,15 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Cluster configuration]
+
+// Cluster list collections. Entries are *Cluster* resources or references.
+// [#not-implemented-hide:]
+message ClusterCollection {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.cluster.v3.ClusterCollection";
+
+  udpa.core.v1.CollectionEntry entries = 1;
+}
 
 // Configuration for a single upstream cluster.
 // [#next-free-field: 49]
@@ -175,10 +187,16 @@ message Cluster {
     // Configuration for the source of EDS updates for this Cluster.
     core.v4alpha.ConfigSource eds_config = 1;
 
-    // Optional alternative to cluster name to present to EDS. This does not
-    // have the same restrictions as cluster name, i.e. it may be arbitrary
-    // length.
-    string service_name = 2;
+    oneof name_specifier {
+      // Optional alternative to cluster name to present to EDS. This does not
+      // have the same restrictions as cluster name, i.e. it may be arbitrary
+      // length.
+      string service_name = 2;
+
+      // Resource locator for EDS. This is mutually exclusive to *service_name*.
+      // [#not-implemented-hide:]
+      udpa.core.v1.ResourceLocator eds_resource_locator = 3;
+    }
   }
 
   // Optionally divide the endpoints in this cluster into subsets defined by
