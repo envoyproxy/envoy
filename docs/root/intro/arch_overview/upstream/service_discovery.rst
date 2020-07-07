@@ -95,8 +95,8 @@ Connections to upstream hosts are pooled and unused hosts are flushed out when t
 5000ms. If the original destination address is not available, no upstream connection is opened.
 Envoy can also pickup the original destination from a :ref:`HTTP header
 <arch_overview_load_balancing_types_original_destination_request_header>`.
-Original destination service discovery must be used with the original destination :ref:`load
-balancer <arch_overview_load_balancing_types_original_destination>`.
+Original destination service discovery must be used with the cluster provided :ref:`load
+balancer <arch_overview_load_balancing_types_cluster_provided>`.
 
 .. _arch_overview_service_discovery_types_eds:
 
