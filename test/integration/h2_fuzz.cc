@@ -6,6 +6,7 @@
 #include "common/common/base64.h"
 #include "common/common/logger.h"
 
+#include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
 
 namespace Envoy {
