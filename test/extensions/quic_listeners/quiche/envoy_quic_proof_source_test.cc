@@ -37,7 +37,7 @@ public:
     EXPECT_EQ(2, chain->certs.size());
     EXPECT_EQ(expected_leaf_cert_, chain->certs[0]);
     EXPECT_EQ(&expected_filter_chain_,
-              &static_cast<DetailsWithFilterChain*>(details.get())->filterChain());
+              &static_cast<EnvoyQuicProofSourceDetails*>(details.get())->filterChain());
     called_ = true;
   }
 

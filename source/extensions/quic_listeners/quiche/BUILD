@@ -348,6 +348,7 @@ envoy_cc_extension(
 
 envoy_cc_library(
     name = "envoy_quic_crypto_server_stream_lib",
+    srcs = ["envoy_quic_crypto_server_stream.cc"],
     hdrs = ["envoy_quic_crypto_server_stream.h"],
     tags = ["nofips"],
     deps = [

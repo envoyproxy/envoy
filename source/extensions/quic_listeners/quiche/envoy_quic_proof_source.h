@@ -8,11 +8,12 @@
 namespace Envoy {
 namespace Quic {
 
-class DetailsWithFilterChain : public quic::ProofSource::Details {
+// A ProofSource::Detail implementation which retains filter chain.
+class EnvoyQuicProofSourceDetails : public quic::ProofSource::Details {
 public:
-  explicit DetailsWithFilterChain(const Network::FilterChain& filter_chain)
+  explicit EnvoyQuicProofSourceDetails(const Network::FilterChain& filter_chain)
       : filter_chain_(filter_chain) {}
-  DetailsWithFilterChain(const DetailsWithFilterChain& other)
+  EnvoyQuicProofSourceDetails(const EnvoyQuicProofSourceDetails& other)
       : filter_chain_(other.filter_chain_) {}
 
   const Network::FilterChain& filterChain() const { return filter_chain_; }
@@ -42,9 +43,10 @@ public:
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
-  using CertConfigWithFilterChain =
-      std::pair<absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>,
-                absl::optional<DetailsWithFilterChain>>;
+  struct CertConfigWithFilterChain {
+    absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_;
+    absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
+  };
 
   CertConfigWithFilterChain
   getTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,

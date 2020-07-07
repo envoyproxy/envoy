@@ -18,10 +18,10 @@ quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
 EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,
                                    const quic::QuicSocketAddress& client_address,
                                    const std::string& hostname) {
-  CertConfigWithFilterChain pair =
+  CertConfigWithFilterChain res =
       getTlsCertConfigAndFilterChain(server_address, client_address, hostname);
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
-      pair.first;
+      res.cert_config_;
   if (!cert_config_ref.has_value()) {
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     return nullptr;
@@ -44,10 +44,10 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
     const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
     const std::string& hostname, uint16_t signature_algorithm, quiche::QuicheStringPiece in,
     std::unique_ptr<quic::ProofSource::SignatureCallback> callback) {
-  CertConfigWithFilterChain pair =
+  CertConfigWithFilterChain res =
       getTlsCertConfigAndFilterChain(server_address, client_address, hostname);
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
-      pair.first;
+      res.cert_config_;
   if (!cert_config_ref.has_value()) {
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     callback->Run(false, "", nullptr);
@@ -64,8 +64,9 @@ void EnvoyQuicProofSource::ComputeTlsSignature(
   std::string sig = pem_key->Sign(in, signature_algorithm);
 
   bool success = !sig.empty();
-  ASSERT(pair.second.has_value());
-  callback->Run(success, sig, std::make_unique<DetailsWithFilterChain>(pair.second.value()));
+  ASSERT(res.filter_chain_.has_value());
+  callback->Run(success, sig,
+                std::make_unique<EnvoyQuicProofSourceDetails>(res.filter_chain_.value().get()));
 }
 
 EnvoyQuicProofSource::CertConfigWithFilterChain
@@ -98,7 +99,7 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   // Only return the first TLS cert config.
   // TODO(danzh) Choose based on supported cipher suites in TLS1.3 CHLO and prefer EC
   // certs if supported.
-  return {tls_cert_configs[0].get(), DetailsWithFilterChain(*filter_chain)};
+  return {tls_cert_configs[0].get(), *filter_chain};
 }
 
 } // namespace Quic

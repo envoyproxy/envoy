@@ -87,7 +87,7 @@ class ProofSourceDetailsSetter {
 public:
   virtual ~ProofSourceDetailsSetter() = default;
 
-  virtual void setProofSourceDetails(std::unique_ptr<DetailsWithFilterChain> details) = 0;
+  virtual void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) = 0;
 };
 
 class TestQuicCryptoServerStream : public EnvoyQuicCryptoServerStream,
@@ -103,14 +103,14 @@ public:
 
   bool encryption_established() const override { return true; }
 
-  const DetailsWithFilterChain* proofSourceDetails() const override { return details_.get(); }
+  const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
 
-  void setProofSourceDetails(std::unique_ptr<DetailsWithFilterChain> details) override {
+  void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
     details_ = std::move(details);
   }
 
 private:
-  std::unique_ptr<DetailsWithFilterChain> details_;
+  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
 };
 
 class TestEnvoyQuicTlsServerHandshaker : public EnvoyQuicTlsServerHandshaker,
@@ -126,8 +126,8 @@ public:
   }
 
   bool encryption_established() const override { return true; }
-  const DetailsWithFilterChain* proofSourceDetails() const override { return details_.get(); }
-  void setProofSourceDetails(std::unique_ptr<DetailsWithFilterChain> details) override {
+  const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
+  void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
     details_ = std::move(details);
   }
   const quic::QuicCryptoNegotiatedParameters& crypto_negotiated_params() const override {
@@ -135,7 +135,7 @@ public:
   }
 
 private:
-  std::unique_ptr<DetailsWithFilterChain> details_;
+  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
   quic::QuicReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
 };
 
@@ -766,7 +766,8 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
 
 TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   Network::MockFilterChain filter_chain;
-  crypto_stream_->setProofSourceDetails(std::make_unique<DetailsWithFilterChain>(filter_chain));
+  crypto_stream_->setProofSourceDetails(
+      std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain));
   std::vector<Network::FilterFactoryCb> filter_factory{[this](
                                                            Network::FilterManager& filter_manager) {
     filter_manager.addReadFilter(read_filter_);

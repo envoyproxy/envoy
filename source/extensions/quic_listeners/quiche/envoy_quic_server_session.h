@@ -76,7 +76,7 @@ protected:
 
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
-  void createNetworkFilters(const Network::FilterChain& filter_chain);
+  void maybeCreateNetworkFilters();
 
   std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   Network::ListenerConfig& listener_config_;
