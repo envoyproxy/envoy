@@ -112,8 +112,7 @@ Statistics
 The admission control filter outputs statistics in the
 *http.<stat_prefix>.admission_control.* namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
-comes from the owning HTTP connection manager. Statistics are specific to the concurrency
-controllers.
+comes from the owning HTTP connection manager.
 
 .. csv-table::
   :header: Name, Type, Description
