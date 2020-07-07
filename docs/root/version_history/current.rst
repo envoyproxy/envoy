@@ -31,6 +31,7 @@ Minor Behavior Changes
 * listener: fixed a bug where when a static listener fails to be added to a worker, the listener was not removed from the active listener list.
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
+* tls: fixed a bug where wilcard matching for "\*.foo.com" also matched domains of the form "a.b.foo.com". This behavior can be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_wildcard_matching` to false.
 
 Bug Fixes
 ---------

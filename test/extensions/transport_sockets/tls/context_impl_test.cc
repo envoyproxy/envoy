@@ -24,6 +24,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -48,6 +49,23 @@ protected:
 TEST_F(SslContextImplTest, TestDnsNameMatching) {
   EXPECT_TRUE(ContextImpl::dnsNameMatch("lyft.com", "lyft.com"));
   EXPECT_TRUE(ContextImpl::dnsNameMatch("a.lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dnsNameMatch("foo.test.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dnsNameMatch("alyft.com", "*.lyft.com"));
+  EXPECT_FALSE(ContextImpl::dnsNameMatch("alyft.com", "*lyft.com"));
+  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*lyft.com"));
+  EXPECT_FALSE(ContextImpl::dnsNameMatch("", "*lyft.com"));
+  EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", ""));
+}
+
+TEST_F(SslContextImplTest, TestDnsNameMatchingLegacy) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.fix_wildcard_matching", "false"}});
+  EXPECT_TRUE(ContextImpl::dnsNameMatch("lyft.com", "lyft.com"));
+  EXPECT_TRUE(ContextImpl::dnsNameMatch("a.lyft.com", "*.lyft.com"));
+  // Legacy behavior
   EXPECT_TRUE(ContextImpl::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
   EXPECT_FALSE(ContextImpl::dnsNameMatch("foo.test.com", "*.lyft.com"));
   EXPECT_FALSE(ContextImpl::dnsNameMatch("lyft.com", "*.lyft.com"));
