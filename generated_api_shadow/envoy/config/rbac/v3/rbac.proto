@@ -22,8 +22,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a
-// service. RBAC policies are additive. The policies are examined in order. A request is allowed
-// once a matching policy is found (suppose the `action` is ALLOW).
+// service. RBAC policies are additive. The policies are examined in order. Requests are allowed
+// or denied based on the `action` and whether a matching policy is found. For instance, if the
+// action is ALLOW and a matching policy is found the request should be allowed.
+//
+// RBAC can also be used to make access logging decisions by communicating with access loggers
+// through dynamic metadata. When the action is LOG, and at least one policy matches, the
+// `access_log_policy` value is set to `true` indicating the request should be logged.
 //
 // Here is an example of RBAC configuration. It has two policies:
 //
@@ -74,7 +79,7 @@ message RBAC {
     // access control.
     DENY = 1;
 
-    // The policies set the "envoy.log" dynamic metadata key based on if requests match
+    // The policies set the `access_log_policy` dynamic metadata key based on if requests match
     LOG = 2;
   }
 
@@ -85,9 +90,9 @@ message RBAC {
   //   * `action` is "DENY" and none of the policies match
   //   * `action` is "LOG"
   //
-  // If the action is "LOG" and at least one policy matches, or if the action is not "LOG",
-  // the dynamic metadata key `envoy.log` is set to the value "yes".
-  // Otherwise, it is set to "no".
+  // If the action is LOG and at least one policy matches the dynamic metadata key `access_log_policy`
+  // is set to the value `true`. If no policies match, it is set to `false`.
+  // Other actions do not modify this key.
   Action action = 1;
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
