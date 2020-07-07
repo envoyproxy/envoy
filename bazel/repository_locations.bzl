@@ -432,14 +432,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
-    # TODO(shikugawa): replace this with release tag after released package which includes
-    # disable pthread when build with emscripten. We use hash temporary to enable our changes to
-    # build envoy-wasm library with emscripten. https://github.com/google/re2/pull/263
     com_googlesource_code_re2 = dict(
-        sha256 = "455bcacd2b94fca8897decd81172c5a93e5303ea0e5816b410877c51d6179ffb",
-        strip_prefix = "re2-2b25567a8ee3b6e97c3cd05d616f296756c52759",
-        # 2020-06-08
-        urls = ["https://github.com/google/re2/archive/2b25567a8ee3b6e97c3cd05d616f296756c52759.tar.gz"],
+        sha256 = "2e9489a31ae007c81e90e8ec8a15d62d58a9c18d4fd1603f6441ef248556b41f",
+        strip_prefix = "re2-2020-07-06",
+        # 2020-07-06
+        urls = ["https://github.com/google/re2/archive/2020-07-06.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
