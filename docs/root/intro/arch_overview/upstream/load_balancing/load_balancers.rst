@@ -132,3 +132,9 @@ The random load balancer selects a random available host. The random load balanc
 better than round robin if no health checking policy is configured. Random selection avoids bias
 towards the host in the set that comes after a failed host.
 
+.. _arch_overview_load_balancing_types_cluster_provided:
+
+Cluster provided
+^^^^^^
+
+This load balancer type must be specified if the configured cluster provides a cluster specific load balancer.
