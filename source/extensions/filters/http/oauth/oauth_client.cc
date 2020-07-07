@@ -57,7 +57,8 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
 Http::RequestMessagePtr OAuth2ClientImpl::createAuthGetRequest(const std::string& access_token) {
   auto request = createBasicRequest();
   request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  request->headers().setInline(authorization_handle.handle(), std::string("Bearer ") + access_token);
+  request->headers().setInline(authorization_handle.handle(),
+                               std::string("Bearer ") + access_token);
   return request;
 }
 

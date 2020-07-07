@@ -166,7 +166,8 @@ private:
  */
 class OAuth2Filter : public Http::PassThroughDecoderFilter, public OAuth2FilterCallbacks {
 public:
-  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source);
+  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
+               TimeSource& time_source);
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   void onGetAccessTokenSuccess(const std::string& access_code,
