@@ -355,6 +355,7 @@ QUICHE_FLAG(
     "and the rest of the response bytes would still be delivered even though the response code "
     "said there should not be any body associated with the response code.")
 
+//*****taken*****
 QUICHE_FLAG(bool, quic_allow_chlo_buffering, true,
             "If true, allows packets to be buffered in anticipation of a "
             "future CHLO, and allow CHLO packets to be buffered until next "

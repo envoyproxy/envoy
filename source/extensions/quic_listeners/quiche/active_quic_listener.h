@@ -16,6 +16,8 @@
 namespace Envoy {
 namespace Quic {
 
+using QuicRuntimeFlagsMapPtr = std::map<std::string, envoy::config::core::v3::RuntimeFeatureFlag>;
+
 // QUIC specific UdpListenerCallbacks implementation which delegates incoming
 // packets, write signals and listener errors to QuicDispatcher.
 class ActiveQuicListener : public Network::UdpListenerCallbacks,
@@ -28,20 +30,23 @@ public:
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled, 
+                     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options,
                      std::unique_ptr<quic::ProofSource> proof_source,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
+                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags);
 
   ~ActiveQuicListener() override;
 
@@ -72,6 +77,8 @@ private:
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   Network::Socket& listen_socket_;
   Runtime::FeatureFlag enabled_;
+  QuicRuntimeFlagsMapPtr quic_runtime_flags_;
+  quiche::FlagRegistry& flag_registry_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
