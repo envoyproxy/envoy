@@ -96,7 +96,7 @@ def CreateIssues(access_token, runtime_and_pr):
     print(title)
     print(body)
     print('  >> Assigning to %s' % (login or email))
-    search_title='%s in:title' % title;
+    search_title = '%s in:title' % title
 
     # TODO(htuch): Figure out how to do this without legacy and faster.
     exists = repo.legacy_search_issues('open', search_title) or repo.legacy_search_issues(
