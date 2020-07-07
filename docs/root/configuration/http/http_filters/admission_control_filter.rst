@@ -120,3 +120,5 @@ controllers.
   :widths: auto
 
   rq_rejected, Counter, Total requests that were not admitted by the filter.
+  rq_success, Counter, Total requests that were considered a success.
+  rq_failure, Counter, Total requests that were considered a failure.
