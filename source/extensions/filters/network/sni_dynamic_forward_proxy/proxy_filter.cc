@@ -22,8 +22,6 @@ ProxyFilterConfig::ProxyFilterConfig(
 
 ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
-ProxyFilter::~ProxyFilter() { circuit_breaker_.reset(); }
-
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 Network::FilterStatus ProxyFilter::onNewConnection() {

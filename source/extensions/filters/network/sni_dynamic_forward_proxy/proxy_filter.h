@@ -40,7 +40,7 @@ class ProxyFilter
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   ProxyFilter(ProxyFilterConfigSharedPtr config);
-  ~ProxyFilter() override;
+
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override {
     return Network::FilterStatus::Continue;

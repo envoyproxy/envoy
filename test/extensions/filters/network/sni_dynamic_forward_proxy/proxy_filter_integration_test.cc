@@ -134,7 +134,7 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, UpstreamTls) {
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
-TEST_P(SniDynamicProxyFilterIntegrationTest, CircuitBraekerInvokedUpstreamTls) {
+TEST_P(SniDynamicProxyFilterIntegrationTest, CircuitBreakerInvokedUpstreamTls) {
   setup(1024, 0);
 
   codec_client_ = makeRawHttpConnection(
