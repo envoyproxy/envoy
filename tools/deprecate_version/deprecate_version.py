@@ -96,11 +96,14 @@ def CreateIssues(access_token, runtime_and_pr):
     print(title)
     print(body)
     print('  >> Assigning to %s' % (login or email))
+    search_title='%s in:title' % title;
 
     # TODO(htuch): Figure out how to do this without legacy and faster.
-    exists = repo.legacy_search_issues('open', '"%s"' % title) or repo.legacy_search_issues(
-        'closed', '"%s"' % title)
+    exists = repo.legacy_search_issues('open', search_title) or repo.legacy_search_issues(
+        'closed', search_title)
     if exists:
+      print("Issue with %s already exists" % search_title)
+      print(exists)
       print('  >> Issue already exists, not posting!')
     else:
       issues.append((title, body, login))
