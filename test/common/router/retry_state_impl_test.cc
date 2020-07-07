@@ -1167,7 +1167,7 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
     EXPECT_FALSE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
   }
 
-  // Repeat Policy is enabled case with runtime flag disabled.
+  // Repeat policy is enabled case with runtime flag disabled.
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
@@ -1194,7 +1194,7 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
     EXPECT_TRUE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
   }
 
-  // Repeat Policy is disabled case with runtime flag disabled.
+  // Repeat policy is disabled case with runtime flag disabled.
   {
     TestScopedRuntime scoped_runtime;
     Runtime::LoaderSingleton::getExisting()->mergeValues(
