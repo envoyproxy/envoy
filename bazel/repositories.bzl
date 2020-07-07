@@ -875,6 +875,21 @@ filegroup(
         patches = ["@envoy//bazel/external:kafka_int32.patch"],
     )
 
+    # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream
+    # Kafka clusters.
+    location = _get_location("edenhill_librdkafka")
+    http_archive(
+        name = "edenhill_librdkafka",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
+        build_file_content = BUILD_ALL_CONTENT,
+        **location
+    )
+    native.bind(
+        name = "librdkafka",
+        actual = "@envoy//bazel/foreign_cc:librdkafka",
+    )
+
     # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
     # tests.
     external_http_archive(

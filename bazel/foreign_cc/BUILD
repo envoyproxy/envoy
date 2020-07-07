@@ -6,6 +6,31 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+configure_make(
+    name = "librdkafka_build",
+    configure_in_place = True,
+    configure_options = ["--disable-gssapi && cp Makefile.config src/.. && cp config.h src/.."],
+    lib_source = "@edenhill_librdkafka//:all",
+    make_commands = [
+        "make",
+        "make install",
+    ],
+    static_libraries = [
+        "librdkafka.a",
+        "librdkafka++.a",
+    ],
+    tags = ["skip_on_windows"],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "librdkafka",
+    tags = ["skip_on_windows"],
+    deps = [
+        "librdkafka_build",
+    ],
+)
+
 # autotools packages are unusable on Windows as-is
 # TODO: Consider our own gperftools.BUILD file as we do with many other packages
 configure_make(

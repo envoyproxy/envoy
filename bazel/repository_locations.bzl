@@ -785,6 +785,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-03-03",
         cpe = "cpe:2.3:a:apache:kafka:*",
     ),
+    edenhill_librdkafka = dict(
+        project_name = "Kafka (C/C++ client)",
+        project_url = "https://github.com/edenhill/librdkafka",
+        version = "1.4.2",
+        sha256 = "3b99a36c082a67ef6295eabd4fb3e32ab0bff7c6b0d397d6352697335f4e57eb",
+        strip_prefix = "librdkafka-{version}",
+        urls = ["https://github.com/edenhill/librdkafka/archive/v{version}.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
     kafka_server_binary = dict(
         project_name = "Kafka (server binary)",
         project_desc = "Open-source distributed event streaming platform",
