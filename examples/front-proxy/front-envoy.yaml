@@ -66,10 +66,98 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
+              # The following self-signed certificate pair is generated using:
+              # $ openssl req -x509 -newkey rsa:4096 -keyout a/front-proxy-key.pem -out  a/front-proxy-crt.pem -days 3650 -nodes -subj '/CN=front-envoy'
+              #
+              # Instead of feeding it as an inline_string, certificate pair can be fed to Envoy via
+              # filename. Reference: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#config-core-v3-datasource.
+              #
+              # Or in a dynamic configuration scenario, certificate pair can be fetched remotely via
+              # Secret Discovery Service (SDS). Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/security/secret.
               certificate_chain:
-                filename: ./certs/front-proxy-crt.pem
+                inline_string: |
+                  -----BEGIN CERTIFICATE-----
+                  MIIEqDCCApACCQCE/fSH19bFiTANBgkqhkiG9w0BAQsFADAWMRQwEgYDVQQDDAtm
+                  cm9udC1lbnZveTAeFw0yMDA3MDcwMzUzNTBaFw0zMDA3MDUwMzUzNTBaMBYxFDAS
+                  BgNVBAMMC2Zyb250LWVudm95MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKC
+                  AgEAnM71M8VtVWCu78ftcqRlkg9Kf2NamcebJP8FPhS3tsWBTQ3UcA/Oc0BWyHl4
+                  JXyr2Wes5hHC02XkDT5dqaOE4etsDLiFON2RXzZUcMI1HY2xKhUksw4JktChS6TT
+                  iZskoN4MVJJ5PPqXPMBXmZGu4tDOG2rCUZh7nmlCyFFBYssi4HlPNpAcZyV94joD
+                  5JR+OofzMKePt9Trej3A2ADcR/vVpqDvV6brI4HGjRgWQi8lg/nOYfQUcZXA9kwX
+                  R4O4e5oLjuh9cm/tAaYvLzbaIC88ZAIk93iHdsIBs94CX5y3DAVzyZ7jFqRvdfX+
+                  E29gavLJ5XOhl9YjiWklOImGSiGsu5pEkCO1jjo2FZeiOUf0oDVn7NP7RZmOKJk3
+                  /qSR4vO1/XRtK+QzD5k49Wj/mxRgLJvzo261jWwLm1Gc1R5g+tP1NFu5LbJL/sBT
+                  6qlz/Jz4GQUdC7X9ZVoflve4bgAmQ8QHlnOR+inrhfSFbpP/47jMLIonozPWw62e
+                  rmme4pCHi6Dcn72P7fOiA22qZ26BkIwwTuj8zKYfVZ6nIZW11kPo0xgv5wZy0zZZ
+                  bfoHhj5NfmKzDSZcnW4aFXMYwDdf1ZD/or52R11vvrIvvWq7XPD/gLn8NwpK7JjN
+                  b2aASQ2DJzi09O2a94GGzv9BSOyuNWR3I+DHvXfRzPJMAwcCAwEAATANBgkqhkiG
+                  9w0BAQsFAAOCAgEAFs0viFgCRDpKQ7fBNBUKExzD2H8Z9PuyP4x46qOZNsCtXBvr
+                  eWXIWCo4DNRcsZvLhPuEvvbIFkjLcH1khrN1ss3w7jTvJ8I6ublPEbsm0K/FU79I
+                  FgzEUhb3na0WT7Kz4gOPbZ7kH8rRduoZK9NovDxxDRx+LaWyDAlBTEPQPkY47t2J
+                  pWjv/51UE2jY7wOilwBwmblb0tx0i2gmWHP5DrABIK4E/fsDD9vBfGlO4lM430Vj
+                  5yr2W+NcLuX9qxQmQcx+lio7onMmAvtEvbCDVmk4sf+HZCKHEDWBtNt0dNYCtrMI
+                  Dny0J7IcbqWq5KTNO4ue5GFaReSDDYKgVG3cnAUlKIw4l/Xze02ID8QOryz33j7g
+                  mOznjmOcIDbQXkaHPO0xr5/z4HaE71l15p38uDU1v4PyKEqwfR7PZCX1AxsG9wxY
+                  zAtrc3BgbaS8FeimnlRxcFi6T+oxLRIqdD6KRhKGo0GJ4/w6VIbqwEGqq5tJprC3
+                  XGK+Tb4pw/YJXYBrVzX4HwwtdkD6gwLfBikq0jT3dSbSMO8rSXjQJS5h01+o+pvN
+                  JMWxsU6lnGU2tNEvWBCbK1mEtw8eyVLMkmNbNXRwRXm+v1p1XjoQGGZduD21fyPO
+                  Q/Jm3XeVbJuzE9X/D5ipb6mg3RhsBEEzS9U6kPC6wol9oSvXrWkbgL8E6gc=
+                  -----END CERTIFICATE-----
               private_key:
-                filename: ./certs/front-proxy-key.pem
+                inline_string: |
+                  -----BEGIN PRIVATE KEY-----
+                  MIIJQwIBADANBgkqhkiG9w0BAQEFAASCCS0wggkpAgEAAoICAQCczvUzxW1VYK7v
+                  x+1ypGWSD0p/Y1qZx5sk/wU+FLe2xYFNDdRwD85zQFbIeXglfKvZZ6zmEcLTZeQN
+                  Pl2po4Th62wMuIU43ZFfNlRwwjUdjbEqFSSzDgmS0KFLpNOJmySg3gxUknk8+pc8
+                  wFeZka7i0M4basJRmHueaULIUUFiyyLgeU82kBxnJX3iOgPklH46h/Mwp4+31Ot6
+                  PcDYANxH+9WmoO9XpusjgcaNGBZCLyWD+c5h9BRxlcD2TBdHg7h7mguO6H1yb+0B
+                  pi8vNtogLzxkAiT3eId2wgGz3gJfnLcMBXPJnuMWpG919f4Tb2Bq8snlc6GX1iOJ
+                  aSU4iYZKIay7mkSQI7WOOjYVl6I5R/SgNWfs0/tFmY4omTf+pJHi87X9dG0r5DMP
+                  mTj1aP+bFGAsm/OjbrWNbAubUZzVHmD60/U0W7ktskv+wFPqqXP8nPgZBR0Ltf1l
+                  Wh+W97huACZDxAeWc5H6KeuF9IVuk//juMwsiiejM9bDrZ6uaZ7ikIeLoNyfvY/t
+                  86IDbapnboGQjDBO6PzMph9VnqchlbXWQ+jTGC/nBnLTNllt+geGPk1+YrMNJlyd
+                  bhoVcxjAN1/VkP+ivnZHXW++si+9artc8P+Aufw3CkrsmM1vZoBJDYMnOLT07Zr3
+                  gYbO/0FI7K41ZHcj4Me9d9HM8kwDBwIDAQABAoICAQCHguKsRuVhbxg+54vwEtok
+                  C0raI8ZcNv+ATVL+f3D0ZmKDcHwyC7biKqvUvAR0gPUSAGKOwLKZdehK+aZ/v2xK
+                  wOSzaZLXvcKvgYgfmfXFAHomX/dDNdJYKiv57wtQU96nlr0ZKSvU4spoGeCaOifk
+                  o4Y6c1xSn2/VSioIaxASjHIrgypNgOTKzr+nDXPnydv8QRiM54Fv4HVPQqaxBK1Z
+                  F+1e/p1YJkv2d2Ra8oHp2EyXbP5J8GDqd/w13TQQ/WgkiM+MRKaEiu1LC46jQsfm
+                  IGwUETZZFrQakTZfdnCeqBQYM24Iw2KEYr5gNqHHseylAAQyYmc3jDtRuKgN3+tI
+                  MsfAeANK5eFSKKNiqcdkoktPEf/mNp7Ecm+SoXghh6XNKv0tvFvJpFUM17AWTeTO
+                  bb6oIN8SkHeTob8kMyyfV32h3SLhZHO1DUpvmg3wLG/lpofaYGOm0e9AwlMpyjJt
+                  zboyBSMmdw+9Nw7xVEVJBLUfNuJq+Kw5kKUYckRSvmWj/d7N/AITIdG7LPGE31DR
+                  7WkrcfxFguBEinlYfonVgYoXQO18jBzCiSk0WeROZIHe4ovio80yUfX5uupR2bg2
+                  dDJkeM4sThCtgpYY9DR1RuxchliyCboWXrykIOQ/op3POt9kGDkslG6dS5YuxTWw
+                  KQOdAozH+FV9+vD/zB8/gQKCAQEAzOc4B0jT7OeeqwoFXOFF+3xkaeE2C/7vQjtL
+                  PLzOTOrRxSNLoQLkP9AN85duVZrHIo9qX1PQzxrzIHpgMJqF+TqKXuHHkmbz9gi0
+                  EVRUH1MLHfZLLCA9AZ1P72ob49zXBb/LTqg35R1l65qvQG0BwdAstDNxzCUaqK6B
+                  PaFnudRr7nf9cLvrkXMaMYWm+yqODPX/xBfz1eFBDjidZV+Ku6XdxPPqt2E2GOm2
+                  M8qZMmhaw0Dt4/XqxC+IqOcbu08wNAjsGf5o0kSyq5B2gA+P74XOHXOwl7xNwvSN
+                  T7FZp3KRF5kAfz7nIpUMC7IFpTR0Io2CUfw6gERchT5/0VfkMQKCAQEAw+lsy0Aj
+                  YBlZTXFnn/C1M/01Y38VRqJfoQTqVpe0w5hvuHrAwNb4Uq/8ww/F0uMZiuEFyYc8
+                  ae6DZkJti20nHVplanD2HB/UJ8Vk4TyeCD0s6lNJyZeK9+VqCz6xND0dg3MS3i3d
+                  +hiRGlXKfBaznWHMQypXJD1t2l+ZPoSaZ5N8/+KgWJdjIvXE4lOtyX6YkiY4oCOI
+                  HeAeI/YcVdYLWLL60IzP9mFiH/sjr4xH0k5ac5sDqyB581eSR707jGKYEzXSZd7n
+                  mgORdjVv49Au8tbyIS2BCg67cPHeWPboyRmI6ZJuEkQl/tO4iTc5N7/knaIJjxT7
+                  Ll6loggtszEktwKCAQEAjdtWEtT8w3rngoqBg/gCN0W7TwI4JL3ubvAV+orMWLwJ
+                  Vm5FIceatgMYZZhlLqblTqvzfOPOIFQMFmQizANu1UkOGvo87MKSC7ei0oyLYNRh
+                  UfD9wiLfmYqLmLjhbjOqObS60E3txJVBxodk5TmSidfR2z/yfN8DQdzuZPilkyXZ
+                  Q1OXBsFTKXOCot5g6Gphxd9ZnyzmByDXpTzU2yX2Kkt+6afky+hlR4ImPlz5Csjs
+                  bVk6WSQb0I8IEcdOj7MXMC8tJiHX+BrPh6+QGsCraaw9Mm6xx5r6Swp7+rxR0Xej
+                  s66dhXrLEkoV+NLazbEu5e0KWDBDYCHz29uVKh2rQQKCAQBzTS9dk/r99Q1M+eB+
+                  DmHnHjBMxZ+U+b2Ee+sbWZ/muhGOpphJJnvx1mfRube4/TWsOfF5AWG6CslE5vWn
+                  6G7r5KbpdWAzfzwSyCcuNMnhmXeU1b4Iqmr8qQW3ZodOcmWrVo+VObN6HPlRYYqR
+                  a578knFwWjv9NTYxHrCHTe295dzckNnEKh0Ll0/v0EXo39wVr+8FuMPEqYGzsoZM
+                  snPtGTFqimVe4UOqBNmk2M/wY3LytRn8nlmHsVODa0jfv6s3KycQE5eFWnJC+wJG
+                  NuFaxMyuYCSg8bi5qXAuNesdaCzfIvIrR/aAusTR5TGEsShw6cvsbPHEAapD6cJT
+                  wymTAoIBACWz/MD6KsatCbQWGBRj15KYNfTIu5+5ypyMdr0D1qJAqRVHy6cbkSYs
+                  v4BNfnxuSum4ZKF0BiZTrpDW1C575oHeytvq53N1vtyTXg3D7Z3qUDv/phl1CvCz
+                  wgJbZhTqduFHPzH25FGZvem+UY/gw6wQjLAe94nKMJrtu6kfm72p/xAjU/Bvypq6
+                  CWu5xpRJNCcySbIsVymDY61j7ZWnALWDl/792OXlSQToOFfDU3w1h4PkbifYQ0+V
+                  Tx1C+v6GQnuoYNdu40PDlG4fvtdFg3e6sqhutvO2pvhLApknhrFv+zsADvlkDS1s
+                  VFOiR929YD9wpZLEQtOWhM7k+bbXV8Q=
+                  -----END PRIVATE KEY-----
+
 
   clusters:
   - name: service1
