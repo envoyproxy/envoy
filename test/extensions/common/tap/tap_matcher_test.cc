@@ -461,6 +461,59 @@ INSTANTIATE_TEST_SUITE_P(
                             std::list<std::list<uint32_t>>{{0}, {7}, {8}, {6, 0}},
                             std::make_pair(true, false)))));
 
+// Test takes one long pattern existing on the boundary of two body chunks and generates random
+// number of substrings of various lengths. All substrings and original long pattern are added to
+// the matcher's config. Next the two body chunks are passed to the matcher. In all cases the
+// matcher should report that match was found.
+TEST_F(TapMatcherGenericBodyTest, RandomLengthOverlappingPatterns) {
+  std::string pattern = "envoyproxy";
+
+  // Loop through fairly large number of tests
+  for (size_t i = 0; i < 10 * pattern.length(); i++) {
+    std::string matcher_yaml = R"EOF(
+http_request_generic_body_match:
+  patterns:
+)EOF";
+    // generate number of substrings which will be derived from pattern
+    uint32_t num = std::rand() % 10;
+    for (size_t j = 0; j < num; j++) {
+      std::string yaml_line = "  - string_match: ";
+
+      // Generate random start index.
+      const uint32_t start = std::rand() % (pattern.length() - 1);
+      // Generate random length. Minimum 1 character.
+      const uint32_t len = 1 + std::rand() % (pattern.length() - start - 1);
+      yaml_line += "\"" + pattern.substr(start, len) + "\"\n";
+      matcher_yaml += yaml_line;
+    }
+    // Finally add the original pattern, but not in all cases
+    if (0 == (num % 2)) {
+      matcher_yaml += "  - string_match: " + pattern + "\n";
+    }
+
+    // Initialize matcher.
+    TestUtility::loadFromYaml(matcher_yaml, config_);
+    buildMatcher(config_, matchers_);
+    EXPECT_EQ(1, matchers_.size());
+    statuses_.resize(matchers_.size());
+    matchers_[0]->onNewStream(statuses_);
+
+    EXPECT_EQ((Matcher::MatchStatus{false, true}), matchers_[0]->matchStatus(statuses_));
+
+    // Use body chunks #0 and #1
+    data_.drain(data_.length());
+    data_.add(body_parts_[0].data(), body_parts_[0].length());
+    matchers_[0]->onRequestBody(data_, statuses_);
+    data_.drain(data_.length());
+    data_.add(body_parts_[1].data(), body_parts_[1].length());
+    matchers_[0]->onRequestBody(data_, statuses_);
+
+    // Check the result. All patterns should be found.
+    EXPECT_EQ((Matcher::MatchStatus{true, false}), matchers_[0]->matchStatus(statuses_));
+
+    matchers_.clear();
+  }
+}
 } // namespace
 } // namespace Tap
 } // namespace Common

@@ -413,6 +413,8 @@ protected:
     // Allocate a new context used for the new stream.
     statuses[my_index_].ctx_ =
         std::make_unique<HttpGenericBodyMatcherCtx>(patterns_, overlap_size_);
+    statuses[my_index_].matches_ = false;
+    statuses[my_index_].might_change_status_ = true;
   }
   bool locatePatternAcrossChunks(const std::string& pattern, const Buffer::Instance& data,
                                  const HttpGenericBodyMatcherCtx* ctx);

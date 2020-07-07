@@ -111,6 +111,12 @@ message HttpHeadersMatch {
 // List of text strings and hex strings to be located in HTTP body.
 // All specified strings must be found in the HTTP body for positive match.
 // The search may be limited to specified number of bytes from the body start.
+//
+// .. attention::
+//
+//   Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+//   If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
+//   to scan only part of the http body.
 message HttpGenericBodyMatch {
   message GenericTextMatch {
     oneof rule {
