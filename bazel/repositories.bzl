@@ -671,6 +671,7 @@ def _com_googlesource_quiche():
         name = "com_googlesource_quiche",
         urls = location["urls"],
         sha256 = location["sha256"],
+        patches = ["@envoy//bazel/external:quiche.patch"],
         genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
