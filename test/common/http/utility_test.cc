@@ -27,38 +27,43 @@ namespace Envoy {
 namespace Http {
 
 TEST(HttpUtility, parseQueryString) {
+  bool decode_param_value = true;
+
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString("/hello"));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
 
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString("/hello?"));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
             Utility::parseQueryString("/hello?hello=world"));
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
-            Utility::parseAndDecodeQueryString("/hello?hello=world"));
+            Utility::parseQueryString("/hello?hello=world"));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello="));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello="));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello="));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
-            Utility::parseAndDecodeQueryString("/hello?hello=&"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
             Utility::parseQueryString("/hello?hello=&hello2=world2"));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
-            Utility::parseAndDecodeQueryString("/hello?hello=&hello2=world2"));
+            Utility::parseQueryString("/hello?hello=&hello2=world2"));
 
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
             Utility::parseQueryString("/logging?name=admin&level=trace"));
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
-            Utility::parseAndDecodeQueryString("/logging?name=admin&level=trace"));
+            Utility::parseQueryString("/logging?name=admin&level=trace"));
+
+  EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a%26b"}}),
+            Utility::parseQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
+  EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a&b"}}),
+            Utility::parseQueryString("/hello?param_value_has_encoded_ampersand=a%26b",
+                                      decode_param_value));
 
   // A sample of an encoded query string of a request by prometheus:
   // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
@@ -74,9 +79,10 @@ TEST(HttpUtility, parseQueryString) {
       Utility::QueryParams(
           {{"filter", "(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|"
                       "rq_complete|rq_active|cx_active))|(server.version)"}}),
-      Utility::parseAndDecodeQueryString(
+      Utility::parseQueryString(
           "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
-          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
+          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29",
+          decode_param_value));
 }
 
 TEST(HttpUtility, getResponseStatus) {

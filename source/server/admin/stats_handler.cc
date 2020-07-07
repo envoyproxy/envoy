@@ -141,7 +141,7 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
                                                 Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params =
-      Http::Utility::parseAndDecodeQueryString(path_and_query);
+      Http::Utility::parseQueryString(path_and_query, /*decode_param_value=*/true);
   const bool used_only = params.find("usedonly") != params.end();
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {
