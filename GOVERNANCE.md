@@ -100,8 +100,8 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
 * Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
-* If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
-  Envoy account post).
+* Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
+  post.
 * Do a new PR to setup the next version
   * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". 
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
