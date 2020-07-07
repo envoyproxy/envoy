@@ -43,7 +43,6 @@ void UberFilterFuzzer::reset(const std::string) {
         [&](Network::ReadFilterSharedPtr read_filter) -> void { 
           read_filter_ = read_filter; 
           read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
-          std::cout<<"filter recorded"<<std::endl;
         }));
 }
 void UberFilterFuzzer::mockMethodsSetup() {
@@ -71,7 +70,6 @@ void UberFilterFuzzer::mockMethodsSetup() {
           [&](Network::ReadFilterSharedPtr read_filter) -> void { 
             read_filter_ = read_filter; 
             read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
-            // std::cout<<"filter recorded"<<std::endl;
           }));
   
 }
@@ -107,7 +105,6 @@ void UberFilterFuzzer::fuzz(
     switch (action.action_selector_case()) {
     case test::extensions::filters::network::Action::kOnData: {
       if (read_filter_ != nullptr) {
-        // std::cout<<"on data!"<<std::endl;
         Buffer::OwnedImpl buffer(action.on_data().data());
         read_filter_->onData(buffer, action.on_data().end_stream());
       }
@@ -115,7 +112,6 @@ void UberFilterFuzzer::fuzz(
     }
     case test::extensions::filters::network::Action::kOnNewConnection: {
       if (read_filter_ != nullptr) {
-        // std::cout<<"on new connection! "<<std::endl;
         read_filter_->onNewConnection();
       }
       break;
