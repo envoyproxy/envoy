@@ -110,6 +110,33 @@ TEST_F(FilterTest, CorsPreflight) {
   EXPECT_EQ(0U, mock_config_->stats().denied_.value());
 }
 
+TEST_F(FilterTest, CorsPreflightMssingOrigin) {
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "OPTIONS"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"access-control-request-method", "GET"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+  // Should not be bypassed by cors_preflight since missing origin.
+  EXPECT_EQ(0U, mock_config_->stats().cors_preflight_bypassed_.value());
+  EXPECT_EQ(0U, mock_config_->stats().denied_.value());
+}
+
+TEST_F(FilterTest, CorsPreflightMssingAccessControlRequestMethod) {
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {":method", "OPTIONS"},    {":path", "/"}, {":scheme", "http"}, {":authority", "host"},
+      {"origin", "test-origin"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+  // Should not be bypassed by cors_preflight since missing access-control-request-method.
+  EXPECT_EQ(0U, mock_config_->stats().cors_preflight_bypassed_.value());
+  EXPECT_EQ(0U, mock_config_->stats().denied_.value());
+}
+
 // This test verifies the setPayload call is handled correctly
 TEST_F(FilterTest, TestSetPayloadCall) {
   setupMockConfig();
