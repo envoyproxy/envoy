@@ -87,14 +87,9 @@ private:
    */
   void dispatchRequest(Http::RequestMessagePtr&& request);
 
-  Http::RequestMessagePtr createBasicRequest() {
+  Http::RequestMessagePtr createPostRequest() {
     Http::RequestMessagePtr request = std::make_unique<Http::RequestMessageImpl>();
     request->headers().setHost(cluster_name_);
-    return request;
-  }
-
-  Http::RequestMessagePtr createPostRequest() {
-    auto request = createBasicRequest();
     request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     request->headers().setContentType(Http::Headers::get().ContentTypeValues.FormUrlEncoded);
     return request;

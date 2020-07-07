@@ -2,8 +2,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_proto_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -23,7 +23,7 @@ envoy_cc_library(
 
 envoy_proto_library(
     name = "oauth_response",
-    srcs = ["oauth_response.proto"]
+    srcs = ["oauth_response.proto"],
 )
 
 envoy_cc_library(
@@ -31,13 +31,13 @@ envoy_cc_library(
     srcs = ["oauth_client.cc"],
     hdrs = ["oauth_client.h"],
     deps = [
+        ":oauth_response_cc_proto",
         "//include/envoy/http:async_client_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/http:message_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/filters/http/oauth:oauth_callback_interface",
-        ":oauth_response_cc_proto",
     ],
 )
 

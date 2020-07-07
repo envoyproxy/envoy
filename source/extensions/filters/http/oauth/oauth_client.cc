@@ -41,6 +41,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
+
   ASSERT(state_ == OAuthState::Idle);
   state_ = OAuthState::PendingAccessToken;
 }
