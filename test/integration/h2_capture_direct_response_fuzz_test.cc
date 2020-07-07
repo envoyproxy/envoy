@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "test/integration/h2_fuzz.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/integration/h2_fuzz.h"
 
 namespace Envoy {
 
