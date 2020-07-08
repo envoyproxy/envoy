@@ -80,7 +80,7 @@ def py_proto_library(name, deps = [], plugin = None):
     if name == "annotations_py_proto":
         proto_deps = proto_deps + [":http_py_proto"]
 
-    # checked.proto depends on syntax.proto, we have to add this dependency manually.
+    # checked.proto depends on syntax.proto, we have to add this dependency manually as well.
     if name == "checked_py_proto":
         proto_deps = proto_deps + [":syntax_py_proto"]
 
@@ -176,6 +176,9 @@ def api_proto_package(
     if has_services:
         compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
 
+    # Because RBAC proro depends on googleapis syntax.proto and checked.proto,
+    # which share the same go proto library, it causes duplicative dependencies.
+    # Thus, we use depset().to_list() to remove duplicated depenencies.
     go_proto_library(
         name = name + _GO_PROTO_SUFFIX,
         compilers = compilers,
