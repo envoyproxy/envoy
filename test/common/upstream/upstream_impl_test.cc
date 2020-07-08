@@ -2285,14 +2285,12 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
 
-  Upstream::ClusterRequestResponseSizeStats req_resp_stats = cluster->info()->requestResponseSizeStats()->get();
+  Upstream::ClusterRequestResponseSizeStats req_resp_stats =
+      cluster->info()->requestResponseSizeStats()->get();
 
-  EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            req_resp_stats.upstream_rq_headers_size_.unit());
-  EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            req_resp_stats.upstream_rq_body_size_.unit());
-  EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            req_resp_stats.upstream_rs_body_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_headers_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_body_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rs_body_size_.unit());
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
@@ -2430,10 +2428,10 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
   Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
-  EXPECT_EQ(
-      Stats::Histogram::Unit::Unspecified,
-      tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
-  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
 TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
@@ -2461,12 +2459,12 @@ TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld))
   cluster = makeCluster(yaml);
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
-  
+
   Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats();
-  EXPECT_EQ(
-      Stats::Histogram::Unit::Unspecified,
-      tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
-  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
 // Validates HTTP2 SETTINGS config.

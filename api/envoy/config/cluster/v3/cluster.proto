@@ -825,15 +825,15 @@ message Cluster {
   // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
   // from the LRS stream here.]
   core.v3.ConfigSource lrs_server = 42;
- 
+
   // If track_timeout_budgets is true, the :ref:`timeout budget histograms
   // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
   // request. These show what percentage of a request's per try and global timeout was used. A value
   // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
   // of 100 would indicate that the request took the entirety of the timeout given to it.
-  
+
   // .. attention::
-  //  This field has been deprecated in favor of `timeout_budgets`, part of 
+  //  This field has been deprecated in favor of `timeout_budgets`, part of
   // :ref:`track_cluster_stats <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
   bool track_timeout_budgets = 47 [deprecated = true];
 
@@ -855,7 +855,7 @@ message Cluster {
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
   core.v3.TypedExtensionConfig upstream_config = 48;
-  
+
   // Configuration to track optional cluster stats.
   TrackClusterStats track_cluster_stats = 49;
 }

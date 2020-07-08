@@ -848,7 +848,7 @@ message Cluster {
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
   core.v4alpha.TypedExtensionConfig upstream_config = 48;
-  
+
   // Configuration to track optional cluster stats.
   TrackClusterStats track_cluster_stats = 49;
 }
