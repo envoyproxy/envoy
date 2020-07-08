@@ -481,20 +481,22 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   case CodecType::HTTP1: {
     Http::Http1::CodecStats& stats =
         Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope());
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+    if (context_.runtime().snapshot().runtimeFeatureEnabled(
+            "envoy.reloadable_features.new_codec_behavior")) {
       return std::make_unique<Http::Http1::ServerConnectionImpl>(
           connection, stats, callbacks, http1_settings_, maxRequestHeadersKb(),
           maxRequestHeadersCount(), headersWithUnderscoresAction());
     } else {
       return std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
-          connection, context_.scope(), callbacks, http1_settings_, maxRequestHeadersKb(),
+          connection, stats, callbacks, http1_settings_, maxRequestHeadersKb(),
           maxRequestHeadersCount(), headersWithUnderscoresAction());
     }
   }
   case CodecType::HTTP2: {
     Http::Http2::CodecStats& stats =
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope());
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+    if (context_.runtime().snapshot().runtimeFeatureEnabled(
+            "envoy.reloadable_features.new_codec_behavior")) {
       return std::make_unique<Http::Http2::ServerConnectionImpl>(
           connection, callbacks, stats, http2_options_, maxRequestHeadersKb(),
           maxRequestHeadersCount(), headersWithUnderscoresAction());

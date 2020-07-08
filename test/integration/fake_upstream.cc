@@ -252,7 +252,7 @@ public:
 };
 
 namespace Legacy {
-class TestHttp1ServerConnectionImpl : public Http::Http1::ServerConnectionImpl {
+class TestHttp1ServerConnectionImpl : public Http::Legacy::Http1::ServerConnectionImpl {
 public:
   using Http::Legacy::Http1::ServerConnectionImpl::ServerConnectionImpl;
 
@@ -286,15 +286,15 @@ FakeHttpConnection::FakeHttpConnection(
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
-          shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-    } else {
-      codec_ = std::make_unique<Legacy::TestHttp1ServerConnectionImpl>(
-          shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-    }
+#ifdef ENVOY_USE_LEGACY_CODECS_IN_TEST
+    codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
+        shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
+#else
+    codec_ = std::make_unique<Legacy::TestHttp1ServerConnectionImpl>(
+        shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
+#endif
   } else {
     envoy::config::core::v3::Http2ProtocolOptions http2_options =
         ::Envoy::Http2::Utility::initializeAndValidateOptions(
@@ -302,18 +302,17 @@ FakeHttpConnection::FakeHttpConnection(
     http2_options.set_allow_connect(true);
     http2_options.set_allow_metadata(true);
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
-      codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-          shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-    } else {
-      codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
-          shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
-          max_request_headers_count, headers_with_underscores_action);
-    }
+#ifdef ENVOY_USE_LEGACY_CODECS_IN_TEST
+    codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
+        shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
+#else
+    codec_ = std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
+        shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
+        max_request_headers_count, headers_with_underscores_action);
+#endif
     ASSERT(type == Type::HTTP2);
   }
-
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});
 }
