@@ -275,7 +275,9 @@ message Route {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
-  repeated string response_headers_to_remove = 11;
+  repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Presence of the object defines whether the connection manager's tracing configuration
   // is overridden by this route specific instance.
