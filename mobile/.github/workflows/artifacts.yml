@@ -3,13 +3,13 @@ name: artifacts
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - VERSION
 
 jobs:
-  master_android_dist:
-    name: master_android_dist
+  main_android_dist:
+    name: main_android_dist
     runs-on: ubuntu-18.04
     timeout-minutes: 120
     steps:
@@ -28,14 +28,14 @@ jobs:
           bazel build \
               --config=release-android \
               --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a \
-              --define=pom_version=master-$current_short_commit \
+              --define=pom_version=main-$current_short_commit \
               //:android_dist
       - uses: actions/upload-artifact@v1
         with:
           name: envoy_android_aar_sources
           path: dist/envoy_aar_sources.zip
-  master_ios_dist:
-    name: master_ios_dist
+  main_ios_dist:
+    name: main_ios_dist
     runs-on: macOS-latest
     timeout-minutes: 90
     steps:
@@ -54,11 +54,11 @@ jobs:
         with:
           name: envoy_ios_framework
           path: dist/ios_artifact
-  master_ios_cocoapods:
-    name: master_ios_cocoapods
+  main_ios_cocoapods:
+    name: main_ios_cocoapods
     runs-on: macOS-latest
     timeout-minutes: 45
-    needs: [master_ios_dist]
+    needs: [main_ios_dist]
     steps:
       - uses: actions/checkout@v1
         with:
