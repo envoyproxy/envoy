@@ -17,6 +17,8 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* http: removed legacy header sanitization and the runtime guard `envoy.reloadable_features.strict_header_validation`.
+
 New Features
 ------------
 

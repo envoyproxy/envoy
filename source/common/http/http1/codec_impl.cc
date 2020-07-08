@@ -455,8 +455,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
     : connection_(connection), stats_(stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
-      strict_header_validation_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")),
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
@@ -615,13 +613,11 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 
   absl::string_view header_value{data, length};
-  if (strict_header_validation_) {
-    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
-      ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
-      error_code_ = Http::Code::BadRequest;
-      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
-      throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
-    }
+  if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
+    ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
+    error_code_ = Http::Code::BadRequest;
+    sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
+    throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
