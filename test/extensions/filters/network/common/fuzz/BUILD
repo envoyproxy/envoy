@@ -7,7 +7,8 @@ load(
 )
 load(
     "//source/extensions:all_extensions.bzl",
-    "envoy_all_extensions",
+    # "envoy_all_extensions",
+    "envoy_all_network_filters",
 )
 
 licenses(["notice"])  # Apache 2
@@ -57,5 +58,5 @@ envoy_cc_fuzz_test(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//test/config:utility_lib",
-    ] + envoy_all_extensions(),
+    ] + envoy_all_network_filters(),
 )

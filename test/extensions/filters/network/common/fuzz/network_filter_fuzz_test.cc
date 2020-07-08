@@ -1,5 +1,3 @@
-#include <vector>
-
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -23,16 +21,16 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         // target execution. Replaying a corpus through the fuzzer will not be affected by the
         // post-processor mutation.
 
-        // static const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
-        //     Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
-        static const std::vector<absl::string_view> filter_names = UberFilterFuzzer::filter_names();
+        // After extending to cover all the filters, we can use `Registry::FactoryRegistry<
+        // Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames()`
+        // to get all the filter names instead of calling `UberFilterFuzzer::filter_names()`
+        static const auto filter_names = UberFilterFuzzer::filter_names();
         static const auto factories = Registry::FactoryRegistry<
             Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
         // Choose a valid filter name.
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          // filter_name = "envoy.filters.network.redis_proxy";
           input->mutable_config()->set_name(std::string(filter_name));
         }
         // Set the corresponding type_url for Any.
