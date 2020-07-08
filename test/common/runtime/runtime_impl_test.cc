@@ -1129,8 +1129,8 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   rtds_layer->mutable_rtds_config();
 
   EXPECT_CALL(cm_, subscriptionFactory()).Times(1);
-  LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, 
-		  *api_);
+  LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
+                    *api_);
 
   EXPECT_THROW_WITH_MESSAGE(loader.initialize(cm_), EnvoyException, "bad config");
 }
