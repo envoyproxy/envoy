@@ -185,6 +185,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_filter_integration_test",
     srcs = ["cluster_filter_integration_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         "//include/envoy/network:filter_interface",
@@ -198,6 +199,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "custom_cluster_integration_test",
     srcs = ["custom_cluster_integration_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/upstream:load_balancer_lib",
@@ -373,6 +375,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
@@ -389,6 +392,7 @@ envoy_cc_test(
     srcs = [
         "header_casing_integration_test.cc",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -743,6 +747,7 @@ envoy_cc_test(
     # The symbol table cluster memory tests take a while to run specially under tsan.
     # Shard it to avoid test timeout.
     shard_count = 2,
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         "//source/common/memory:stats_lib",
@@ -942,6 +947,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     shard_count = 2,
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         "//source/common/config:api_version_lib",
@@ -988,6 +994,7 @@ envoy_cc_test(
     srcs = [
         "tcp_conn_pool_integration_test.cc",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         "//include/envoy/server:filter_config_interface",
@@ -1039,7 +1046,6 @@ envoy_cc_test(
     name = "dynamic_validation_integration_test",
     srcs = ["dynamic_validation_integration_test.cc"],
     data = ["//test/config/integration:server_xds_files"],
-    # Fails on windows with cr/lf yaml file checkouts
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -1082,6 +1088,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
