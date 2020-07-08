@@ -13,6 +13,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
 #include "common/network/utility.h"
@@ -2282,14 +2283,16 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
 
   auto cluster = makeCluster(yaml);
   // The stats should be created.
-  EXPECT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
+  ASSERT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
+
+  Upstream::ClusterRequestResponseSizeStats req_resp_stats = cluster->info()->requestResponseSizeStats()->get();
 
   EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            cluster->info()->requestResponseSizeStats()->get().upstream_rq_headers_size_.unit());
+            req_resp_stats.upstream_rq_headers_size_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            cluster->info()->requestResponseSizeStats()->get().upstream_rq_body_size_.unit());
+            req_resp_stats.upstream_rq_body_size_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Bytes,
-            cluster->info()->requestResponseSizeStats()->get().upstream_rs_body_size_.unit());
+            req_resp_stats.upstream_rs_body_size_.unit());
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
@@ -2424,15 +2427,13 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
 
   auto cluster = makeCluster(yaml);
   // The stats should be created.
-  EXPECT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+  ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+
+  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
   EXPECT_EQ(
       Stats::Histogram::Unit::Unspecified,
-      cluster->info()->timeoutBudgetStats()->get().upstream_rq_timeout_budget_percent_used_.unit());
-  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
-            cluster->info()
-                ->timeoutBudgetStats()
-                ->get()
-                .upstream_rq_timeout_budget_per_try_percent_used_.unit());
+      tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
 // Validates HTTP2 SETTINGS config.
