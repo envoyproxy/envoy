@@ -28,3 +28,10 @@ actions {
     }
   }
 }
+actions {
+  stream_action {
+    response {
+      data: 64
+    }
+  }
+}
