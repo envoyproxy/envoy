@@ -21,6 +21,8 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
+  ON_CALL(*this, getTransportSocketFactoryContext())
+      .WillByDefault(ReturnRef(transport_socket_factory_context_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
