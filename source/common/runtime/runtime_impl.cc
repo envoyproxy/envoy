@@ -10,8 +10,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/service/runtime/v3/rtds.pb.h"
-#include "envoy/service/runtime/v3/rtds.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/type/v3/percent.pb.validate.h"
@@ -515,7 +513,13 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
   loadNewSnapshot();
 }
 
-void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
+void LoaderImpl::initialize(Upstream::ClusterManager& cm) {
+  cm_ = &cm;
+
+  for (const auto& s : subscriptions_) {
+    s->createSubscription();
+  }
+}
 
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   on_rtds_initialized_ = on_done;
@@ -531,17 +535,22 @@ RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
-          rtds_layer.rtds_config().resource_api_version()),
+          rtds_layer.rtds_config().resource_api_version(), validation_visitor, "name"),
       parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
-      init_target_("RTDS " + resource_name_, [this]() { start(); }),
-      validation_visitor_(validation_visitor) {}
+      init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
 
-void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+void RtdsSubscription::createSubscription() {
+  const auto resource_name = getResourceName();
+  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
+      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this, resource_decoder_);
+}
+
+void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                       const std::string&) {
   validateUpdateSize(resources.size());
-  auto runtime = MessageUtil::anyConvertAndValidate<envoy::service::runtime::v3::Runtime>(
-      resources[0], validation_visitor_);
+  const auto& runtime =
+      dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
   if (runtime.name() != resource_name_) {
     throw EnvoyException(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
@@ -553,12 +562,10 @@ void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufW
 }
 
 void RtdsSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
+    const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(resources.size());
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
-  *unwrapped_resource.Add() = resources[0].resource();
-  onConfigUpdate(unwrapped_resource, resources[0].version());
+  validateUpdateSize(added_resources.size());
+  onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
 void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -569,15 +576,7 @@ void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
   init_target_.ready();
 }
 
-void RtdsSubscription::start() {
-  // We have to delay the subscription creation until init-time, since the
-  // cluster manager resources are not available in the constructor when
-  // instantiated in the server instance.
-  const auto resource_name = getResourceName();
-  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
-  subscription_->start({resource_name_});
-}
+void RtdsSubscription::start() { subscription_->start({resource_name_}); }
 
 void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
   if (num_resources != 1) {

@@ -50,7 +50,7 @@ TEST_P(HeaderCasingIntegrationTest, VerifyCasedHeaders) {
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
   auto request = "GET / HTTP/1.1\r\nhost: host\r\nmy-header: foo\r\n\r\n";
-  tcp_client->write(request, false);
+  ASSERT_TRUE(tcp_client->write(request, false));
 
   Envoy::FakeRawConnectionPtr upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));

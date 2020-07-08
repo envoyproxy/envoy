@@ -28,7 +28,9 @@ namespace Server {
 
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
   COUNTER(downstream_cx_destroy)                                                                   \
+  COUNTER(downstream_cx_overflow)                                                                  \
   COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_global_cx_overflow)                                                           \
   COUNTER(downstream_pre_cx_timeout)                                                               \
   COUNTER(no_filter_chain_match)                                                                   \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
@@ -113,15 +115,22 @@ private:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
     ~ActiveTcpListener() override;
+    bool listenerConnectionLimitReached() const {
+      // TODO(tonya11en): Delegate enforcement of per-listener connection limits to overload
+      // manager.
+      return !config_->openConnections().canCreate();
+    }
     void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections, bool rebalanced);
     void decNumConnections() {
       ASSERT(num_listener_connections_ > 0);
       --num_listener_connections_;
+      config_->openConnections().dec();
     }
 
     // Network::ListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
+    void onReject() override { stats_.downstream_global_cx_overflow_.inc(); }
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
@@ -131,7 +140,10 @@ private:
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
-    void incNumConnections() override { ++num_listener_connections_; }
+    void incNumConnections() override {
+      ++num_listener_connections_;
+      config_->openConnections().inc();
+    }
     void post(Network::ConnectionSocketPtr&& socket) override;
 
     /**
