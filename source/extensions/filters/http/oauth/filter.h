@@ -116,7 +116,7 @@ private:
   const std::string client_id_;
   const std::string oauth_server_hostname_;
   const std::string callback_path_;
-  const std::string oauth_token_path;
+  const std::string oauth_token_path_;
   const std::string signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;
