@@ -6,13 +6,13 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/service/health/v3/hds.pb.h"
+#include "envoy/service/health/v3/hds.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/version_converter.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -194,9 +194,13 @@ void HdsDelegate::onReceiveMessage(
 
   // Validate message fields
   try {
-    MessageUtil::validate<envoy::service::health::v3::HealthCheckSpecifier>(*message, ProtobufMessage::getStrictValidationVisitor());
-  } catch(ProtoValidationException e) {
-    //TODO(drewortega): handle bad received message exception
+    MessageUtil::validate(*message, ProtobufMessage::getStrictValidationVisitor());
+  } catch (const ProtoValidationException& ex) {
+    // Increment error count
+    stats_.errors_.inc();
+    ENVOY_LOG(warn, "unable to validate hds proto: {}", ex.what());
+
+    // Do not continue processing message
     return;
   }
   

@@ -152,36 +152,6 @@ public:
     return server_health_check_specifier_;
   }
 
-  // Creates a basic HealthCheckSpecifier message containing missing fields, for one endpoint and
-  // one HTTP health_check
-  envoy::service::health::v3::HealthCheckSpecifier makeBadHttpHealthCheckSpecifier() {
-    envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
-    server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
-
-    auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
-
-    health_check->set_cluster_name("anna");
-    Network::Utility::addressToProtobufAddress(
-        *host_upstream_->localAddress(),
-        *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
-    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("middle_earth");
-    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("shire");
-    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("hobbiton");
-
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
-    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
-    // removing the providing of the unhealthy threshold field should not result in std::terminate
-    //health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
-    health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-    health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check->mutable_health_checks(0)
-        ->mutable_http_health_check()
-        ->set_hidden_envoy_deprecated_use_http2(false);
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
-
-    return server_health_check_specifier_;
-  }
-
   // Creates a basic HealthCheckSpecifier message containing one endpoint and
   // one TCP health_check
   envoy::service::health::v3::HealthCheckSpecifier makeTcpHealthCheckSpecifier() {
@@ -394,7 +364,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
 // indeed unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointFieldMissingHttp) {
   initialize();
-  server_health_check_specifier_ = makeBadHttpHealthCheckSpecifier();
+  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+  server_health_check_specifier_.mutable_cluster_health_checks(0)->mutable_health_checks(0)->clear_unhealthy_threshold();
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -405,17 +376,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointFieldMissingHttp) {
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
-  // Envoy sends a health check message to an endpoint
-  healthcheckEndpoints();
-
-  // Endpoint responds to the health check
-  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, false);
-  host_stream_->encodeData(1024, true);
-
-  // Receive updates until the one we expect arrives
-  waitForEndpointHealthResponse(envoy::config::core::v3::UNHEALTHY);
-
-  checkCounters(1, 2, 0, 1);
+  // See that connection is closed
+  ASSERT_FALSE(host_upstream_->waitForHttpConnection(*dispatcher_, host_fake_connection_));
 
   // Clean up connections
   cleanupHostConnections();
