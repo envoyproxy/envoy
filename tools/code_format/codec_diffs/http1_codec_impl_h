@@ -82,7 +82,7 @@
    HeaderString current_header_field_;
    HeaderString current_header_value_;
    bool processing_trailers_ : 1;
-@@ -422,7 +426,7 @@
+@@ -421,7 +425,7 @@
   */
  class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
  public:
@@ -91,7 +91,7 @@
                         ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                         uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-@@ -434,7 +438,7 @@
+@@ -433,7 +437,7 @@
     * An active HTTP/1.1 request.
     */
    struct ActiveRequest {
@@ -100,7 +100,7 @@
          : response_encoder_(connection, header_key_formatter) {}
  
      HeaderString request_url_;
-@@ -526,7 +530,7 @@
+@@ -525,7 +529,7 @@
   */
  class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
  public:
@@ -109,7 +109,7 @@
                         ConnectionCallbacks& callbacks, const Http1Settings& settings,
                         const uint32_t max_response_headers_count);
  
-@@ -535,8 +539,8 @@
+@@ -534,8 +538,8 @@
  
  private:
    struct PendingResponse {
@@ -120,7 +120,7 @@
          : encoder_(connection, header_key_formatter), decoder_(decoder) {}
  
      RequestEncoderImpl encoder_;
-@@ -600,6 +604,7 @@
+@@ -599,6 +603,7 @@
  };
  
  } // namespace Http1
