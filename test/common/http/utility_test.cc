@@ -30,34 +30,37 @@ TEST(HttpUtility, parseQueryString) {
   bool decode_param_value = true;
 
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello", decode_param_value));
 
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?", decode_param_value));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseQueryString("/hello?hello", decode_param_value));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
             Utility::parseQueryString("/hello?hello=world"));
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
-            Utility::parseQueryString("/hello?hello=world"));
+            Utility::parseQueryString("/hello?hello=world", decode_param_value));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello="));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello="));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseQueryString("/hello?hello=", decode_param_value));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseQueryString("/hello?hello=&", decode_param_value));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
             Utility::parseQueryString("/hello?hello=&hello2=world2"));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
-            Utility::parseQueryString("/hello?hello=&hello2=world2"));
+            Utility::parseQueryString("/hello?hello=&hello2=world2", decode_param_value));
 
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
             Utility::parseQueryString("/logging?name=admin&level=trace"));
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
-            Utility::parseQueryString("/logging?name=admin&level=trace"));
+            Utility::parseQueryString("/logging?name=admin&level=trace", decode_param_value));
 
   EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a%26b"}}),
             Utility::parseQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
