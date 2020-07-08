@@ -39,12 +39,11 @@ class ValidatingCodeBlock(CodeBlock):
           'bazel-bin/tools/config_validation/validate_fragment',
           self.options.get('type-name'), '-s', '\n'.join(self.content)
       ]
-      process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      stdout, stderr = process.communicate()
-      if process.poll():
+      completed = subprocess.run(args, capture_output=True, encoding='utf-8')
+      if completed.returncode != 0:
         raise ExtensionError(
             "Failed config validation for type: '{0}' in: {1} line: {2}:\n {3}".format(
-                self.options.get('type-name'), source, line, stderr.decode(encoding='utf-8')))
+                self.options.get('type-name'), source, line, completed.stderr))
 
     self.options.pop('type-name', None)
     return list(CodeBlock.run(self))
