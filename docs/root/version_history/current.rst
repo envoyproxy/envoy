@@ -1,66 +1,21 @@
-1.15.0 (Pending)
+1.16.0 (Pending)
 ================
-
 
 Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* build: official released binary is now built on Ubuntu 18.04, requires glibc >= 2.27.
-* client_ssl_auth: the `auth_ip_white_list` stat has been renamed to
-  :ref:`auth_ip_allowlist <config_network_filters_client_ssl_auth_stats>`.
-* router: path_redirect now keeps query string by default. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.preserve_query_string_in_path_redirects` to false.
-
 Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
-
-* access loggers: applied existing buffer limits to access logs, as well as :ref:`stats <config_access_log_stats>` for logged / dropped logs. This can be reverted temporarily by setting runtime feature `envoy.reloadable_features.disallow_unbounded_access_logs` to false.
-* build: run as non-root inside Docker containers. Existing behaviour can be restored by setting the environment variable `ENVOY_UID` to `0`. `ENVOY_UID` and `ENVOY_GID` can be used to set the envoy user's `uid` and `gid` respectively.
-* header to metadata: on_header_missing rules with empty values are now rejected (they were skipped before).
-* health check: in the health check filter the :ref:`percentage of healthy servers in upstream clusters <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>` is now interpreted as an integer.
-* hot restart: added the option :option:`--use-dynamic-base-id` to select an unused base ID at startup and the option :option:`--base-id-path` to write the base id to a file (for reuse with later hot restarts).
-* http: changed early error path for HTTP/1.1 so that responses consistently flow through the http connection manager, and the http filter chains. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.early_errors_via_hcm` to false.
-* http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
-* http: fixed a bug where the upgrade header was not cleared on responses to non-upgrade requests.
-  Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
-* http: stopped overwriting `date` response headers. Responses without a `date` header will still have the header properly set. This behavior can be temporarily reverted by setting `envoy.reloadable_features.preserve_upstream_date` to false.
-* http: stopped adding a synthetic path to CONNECT requests, meaning unconfigured CONNECT requests will now return 404 instead of 403. This behavior can be temporarily reverted by setting `envoy.reloadable_features.stop_faking_paths` to false.
-* http: stopped allowing upstream 1xx or 204 responses with Transfer-Encoding or non-zero Content-Length headers. Content-Length of 0 is allowed, but stripped. This behavior can be temporarily reverted by setting `envoy.reloadable_features.strict_1xx_and_204_response_headers` to false.
-* http: upstream connections will now automatically set ALPN when this value is not explicitly set elsewhere (e.g. on the upstream TLS config). This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.http_default_alpn` to false.
-* listener: fixed a bug where when a static listener fails to be added to a worker, the listener was not removed from the active listener list.
-* router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
-* router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
 
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* adaptive concurrency: fixed a minRTT calculation bug where requests started before the concurrency
-  limit was pinned to the minimum would skew the new minRTT value if the replies arrived after the
-  start of the new minRTT window.
-* buffer: fixed CVE-2020-12603 by avoiding fragmentation, and tracking of HTTP/2 data and control frames in the output buffer.
-* grpc-json: fix a bug when in trailers only gRPC response (e.g. error) HTTP status code is not being re-written.
-* http: fixed a bug in the grpc_http1_reverse_bridge filter where header-only requests were forwarded with a non-zero content length.
-* http: fixed a bug where in some cases slash was moved from path to query string when :ref:`merging of adjacent slashes<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.merge_slashes>` is enabled.
-* http: fixed CVE-2020-12604 by changing :ref:`stream_idle_timeout <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
-  to also defend against an HTTP/2 peer that does not open stream window once an entire response has been buffered to be sent to a downstream client.
-* http: fixed CVE-2020-12605 by including request URL in request header size computation, and rejecting partial headers that exceed configured limits.
-* http: fixed several bugs with applying correct connection close behavior across the http connection manager, health checker, and connection pool. This behavior may be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_connection_close` to false.
-* listener: fixed CVE-2020-8663 by adding runtime support for :ref:`per-listener limits <config_listeners_runtime>` on active/accepted connections.
-* overload management: fixed CVE-2020-8663 by adding runtime support for :ref:`global limits <config_overload_manager>` on active/accepted connections.
-* prometheus stats: fix the sort order of output lines to comply with the standard.
-* udp: the :ref:`reuse_port <envoy_api_field_Listener.reuse_port>` listener option must now be
-  specified for UDP listeners if concurrency is > 1. This previously crashed so is considered a
-  bug fix.
-* upstream: fixed a bug where Envoy would panic when receiving a GRPC SERVICE_UNKNOWN status on the health check.
-
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-* http: remove legacy connection pool code and their runtime features: `envoy.reloadable_features.new_http1_connection_pool_behavior` and
-  `envoy.reloadable_features.new_http2_connection_pool_behavior`.
 
 New Features
 ------------
@@ -145,21 +100,3 @@ New Features
 Deprecated
 ----------
 
-* Tracing provider configuration as part of :ref:`bootstrap config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.tracing>`
-  has been deprecated in favor of configuration as part of :ref:`HTTP connection manager
-  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.provider>`.
-* The :ref:`HTTP Gzip filter <config_http_filters_gzip>` has been deprecated in favor of
-  :ref:`Compressor <config_http_filters_compressor>`.
-* The * :ref:`GoogleRE2.max_program_size<envoy_v3_api_field_type.matcher.v3.RegexMatcher.GoogleRE2.max_program_size>`
-  field is now deprecated. Management servers are expected to validate regexp program sizes
-  instead of expecting the client to do it. Alternatively, the max program size can be enforced by Envoy via runtime.
-* The :ref:`internal_redirect_action <envoy_v3_api_field_config.route.v3.RouteAction.internal_redirect_action>`
-  field and :ref:`max_internal_redirects <envoy_v3_api_field_config.route.v3.RouteAction.max_internal_redirects>` field
-  are now deprecated. This changes the implemented default cross scheme redirect behavior.
-  All cross scheme redirect are disallowed by default. To restore
-  the previous behavior, set allow_cross_scheme_redirect=true and use
-  :ref:`safe_cross_scheme<envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`,
-  in :ref:`predicates <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`.
-* File access logger fields :ref:`format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.format>`, :ref:`json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.json_format>` and :ref:`typed_json_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.typed_json_format>` are deprecated in favor of :ref:`log_format <envoy_v3_api_field_extensions.access_loggers.file.v3.FileAccessLog.log_format>`.
-* A warning is now logged when v2 xDS api is used. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_deprecated_v2_api_warning` to `false`.
-* Using cluster circuit breakers for DNS Cache is now deprecated in favor of :ref:`DNS cache circuit breakers <dns_cache_circuit_breakers>`. This behavior can be temporarily disabled by setting `envoy.reloadable_features.enable_dns_cache_circuit_breakers` to `false`.
