@@ -29,7 +29,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
@@ -2144,7 +2145,7 @@ TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
         value: 0.3
   )EOF";
   auto cluster = makeCluster(yaml);
-  EXPECT_EQ(cluster->info()->eds_service_name(), "service_foo");
+  EXPECT_EQ(cluster->info()->edsServiceName(), "service_foo");
 
   const std::string unexpected_eds_config_yaml = R"EOF(
     name: name
