@@ -327,6 +327,7 @@ message Cluster {
   }
 
   // Specific configuration for the LeastRequest load balancing policy.
+  // [#next-free-field: 7]
   message LeastRequestLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.LeastRequestLbConfig";
@@ -359,6 +360,15 @@ message Cluster {
     // .. note::
     //   This setting only takes effect if all host weights are not equal.
     core.v3.RuntimeDouble active_request_bias = 2;
+
+    // Add new fields to see whether the per-cluster memory footprint increases
+    core.v3.RuntimeDouble foo = 3;
+
+    bool foo1 = 4;
+
+    double foo2 = 5;
+
+    double foo3 = 6;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
