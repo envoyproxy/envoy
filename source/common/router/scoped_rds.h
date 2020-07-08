@@ -5,6 +5,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
+#include "envoy/config/route/v3/scoped_route.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -131,10 +132,9 @@ private:
   // Adds or updates scopes, create a new RDS provider for each resource, if an exception is thrown
   // during updating, the exception message is collected via the exception messages vector.
   // Returns true if any scope updated, false otherwise.
-  bool addOrUpdateScopes(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
-      Init::Manager& init_manager, const std::string& version_info,
-      std::vector<std::string>& exception_msgs);
+  bool addOrUpdateScopes(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
+                         Init::Manager& init_manager, const std::string& version_info,
+                         std::vector<std::string>& exception_msgs);
   // Removes given scopes from the managed set of scopes.
   // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
   // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.
@@ -151,20 +151,15 @@ private:
   // EnvoyException on any error and essentially reject an update. While the Delta form
   // onConfigUpdate(added_resources, removed_resources, version_info) by design will partially
   // accept correct RouteConfiguration from management server.
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& version_info) override;
+  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override {
     ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
     DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
-  }
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::config::route::v3::ScopedRouteConfiguration>(resource)
-        .name();
   }
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,
@@ -187,7 +182,6 @@ private:
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
 };
