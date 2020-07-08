@@ -545,8 +545,8 @@ RtdsSubscription::RtdsSubscription(
 
 void RtdsSubscription::createSubscription() {
   const auto resource_name = getResourceName();
-  subscription_ = parent.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
+  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
+      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this, resource_decoder_);
 }
 
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
