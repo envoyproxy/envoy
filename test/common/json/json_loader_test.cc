@@ -198,7 +198,7 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     ObjectSharedPtr json = Factory::loadFromString("{}");
-    EXPECT_THROW(json->getObjectArray("hello").empty(), Exception);
+    EXPECT_THROW((void)json->getObjectArray("hello").empty(), Exception);
   }
 
   {
