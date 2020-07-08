@@ -73,9 +73,7 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot,
-                     public ThreadLocal::ThreadLocalObject,
-                     Logger::Loggable<Logger::Id::runtime> {
+class SnapshotImpl : public Snapshot, Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
