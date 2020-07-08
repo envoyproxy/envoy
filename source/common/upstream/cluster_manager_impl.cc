@@ -32,6 +32,8 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
+#include "common/runtime/runtime_features.h"
+#include "common/tcp/conn_pool.h"
 #include "common/tcp/original_conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -1418,8 +1420,13 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) {
-  return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::OriginalConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
+    return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                               transport_socket_options);
+  } else {
+    return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
+        dispatcher, host, priority, options, transport_socket_options)};
+  }
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(

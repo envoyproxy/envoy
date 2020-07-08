@@ -2205,6 +2205,27 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   }
 }
 
+TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitution) {
+  // Apply a regex substitution before hashing.
+  auto* header = firstRouteHashPolicy()->mutable_header();
+  header->set_header_name(":path");
+  auto* regex_spec = header->mutable_regex_rewrite();
+  regex_spec->set_substitution("\\1");
+  auto* pattern = regex_spec->mutable_pattern();
+  pattern->mutable_google_re2();
+  pattern->set_regex("^/(\\w+)$");
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    const auto foo_hash_value = 3728699739546630719;
+    EXPECT_EQ(route->routeEntry()
+                  ->hashPolicy()
+                  ->generateHash(nullptr, headers, add_cookie_nop_, nullptr)
+                  .value(),
+              foo_hash_value);
+  }
+}
+
 class RouterMatcherCookieHashPolicyTest : public RouterMatcherHashPolicyTest {
 public:
   RouterMatcherCookieHashPolicyTest() {
