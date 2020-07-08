@@ -12,6 +12,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -760,9 +761,6 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
                                                  {"x-envoy-retry-grpc-on", "cancelled"},
                                                  {"x-envoy-max-retries", "3"}};
   setup(request_headers);
-  EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
-  EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
-  EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
@@ -936,9 +934,6 @@ TEST_F(RouterRetryStateImplTest, ZeroMaxRetriesHeader) {
                                                  {"x-envoy-retry-grpc-on", "cancelled"},
                                                  {"x-envoy-max-retries", "0"}};
   setup(request_headers);
-  EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
-  EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
-  EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
   EXPECT_TRUE(state_->enabled());
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
@@ -1125,6 +1120,104 @@ TEST_F(RouterRetryStateImplTest, ParseRetryGrpcOn) {
   result = RetryStateImpl::parseRetryGrpcOn(config);
   EXPECT_EQ(result.first, 96);
   EXPECT_FALSE(result.second);
+}
+
+TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
+  // Make sure retry related headers are removed when the policy is enabled.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {"x-envoy-retry-on", "5xx,retriable-header-names,retriable-status-codes"},
+        {"x-envoy-retry-grpc-on", "resource-exhausted"},
+        {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
+        {"x-envoy-retriable-status-codes", "418,420"},
+        {"x-envoy-max-retries", "7"},
+        {"x-envoy-hedge-on-per-try-timeout", "true"},
+        {"x-envoy-upstream-rq-per-try-timeout-ms", "2"},
+    };
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
+    EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
+    EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
+    EXPECT_FALSE(request_headers.has("x-envoy-retriable-header-names"));
+    EXPECT_FALSE(request_headers.has("x-envoy-retriable-status-codes"));
+    EXPECT_FALSE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
+    EXPECT_FALSE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+  }
+
+  // Make sure retry related headers are removed even if the policy is disabled.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
+        {"x-envoy-retriable-status-codes", "418,420"},
+        {"x-envoy-max-retries", "7"},
+        {"x-envoy-hedge-on-per-try-timeout", "true"},
+        {"x-envoy-upstream-rq-per-try-timeout-ms", "2"},
+    };
+    setup(request_headers);
+    EXPECT_EQ(nullptr, state_);
+
+    EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
+    EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
+    EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
+    EXPECT_FALSE(request_headers.has("x-envoy-retriable-header-names"));
+    EXPECT_FALSE(request_headers.has("x-envoy-retriable-status-codes"));
+    EXPECT_FALSE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
+    EXPECT_FALSE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+  }
+
+  // Repeat policy is enabled case with runtime flag disabled.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.consume_all_retry_headers", "false"}});
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {"x-envoy-retry-on", "5xx,retriable-header-names,retriable-status-codes"},
+        {"x-envoy-retry-grpc-on", "resource-exhausted"},
+        {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
+        {"x-envoy-retriable-status-codes", "418,420"},
+        {"x-envoy-max-retries", "7"},
+        {"x-envoy-hedge-on-per-try-timeout", "true"},
+        {"x-envoy-upstream-rq-per-try-timeout-ms", "2"},
+    };
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
+    EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
+    EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
+    EXPECT_TRUE(request_headers.has("x-envoy-retriable-header-names"));
+    EXPECT_TRUE(request_headers.has("x-envoy-retriable-status-codes"));
+    EXPECT_TRUE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
+    EXPECT_TRUE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+  }
+
+  // Repeat policy is disabled case with runtime flag disabled.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.consume_all_retry_headers", "false"}});
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
+        {"x-envoy-retriable-status-codes", "418,420"},
+        {"x-envoy-max-retries", "7"},
+        {"x-envoy-hedge-on-per-try-timeout", "true"},
+        {"x-envoy-upstream-rq-per-try-timeout-ms", "2"},
+    };
+    setup(request_headers);
+    EXPECT_EQ(nullptr, state_);
+
+    EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
+    EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
+    EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
+    EXPECT_TRUE(request_headers.has("x-envoy-retriable-header-names"));
+    EXPECT_TRUE(request_headers.has("x-envoy-retriable-status-codes"));
+    EXPECT_TRUE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
+    EXPECT_TRUE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+  }
 }
 
 } // namespace
