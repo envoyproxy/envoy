@@ -10,6 +10,9 @@
 
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
+#include "common/protobuf/message_validator_impl.h"
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -189,6 +192,14 @@ void HdsDelegate::onReceiveMessage(
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
 
+  // Validate message fields
+  try {
+    MessageUtil::validate<envoy::service::health::v3::HealthCheckSpecifier>(*message, ProtobufMessage::getStrictValidationVisitor());
+  } catch(ProtoValidationException e) {
+    //TODO(drewortega): handle bad received message exception
+    return;
+  }
+  
   // Reset
   hds_clusters_.clear();
 

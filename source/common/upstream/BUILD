@@ -226,6 +226,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/health_check/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
     ],
 )
