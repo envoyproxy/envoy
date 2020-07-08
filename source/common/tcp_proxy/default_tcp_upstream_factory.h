@@ -2,25 +2,20 @@
 #include "common/tcp_proxy/factory.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace Upstreams {
-namespace Tcp {
-
+namespace TcpProxy {
 /**
  * Config registration for the original dst filter. @see NamedNetworkFilterConfigFactory.
  */
-class DefaultTcpUpstreamFactory : public Envoy::Tcp::TcpUpstreamFactory {
+class DefaultTcpUpstreamFactory : public Envoy::TcpProxy::TcpUpstreamFactory {
 public:
   ~DefaultTcpUpstreamFactory() override = default;
-  Envoy::Tcp::ConnectionHandlePtr createTcpUpstreamHandle(
+  Envoy::TcpProxy::ConnectionHandlePtr createTcpUpstreamHandle(
       Envoy::Upstream::ClusterManager& cluster_manager,
       Envoy::Upstream::LoadBalancerContext* lb_context,
-      Envoy::Tcp::GenericUpstreamPoolCallbacks& generic_pool_callback,
+      Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callback,
       const std::shared_ptr<Envoy::Tcp::ConnectionPool::UpstreamCallbacks>& upstream_callback,
       absl::string_view hostname, const std::string& cluster_name) override;
 };
 
-} // namespace Tcp
-} // namespace Upstreams
-} // namespace Extensions
+} // namespace TcpProxy
 } // namespace Envoy

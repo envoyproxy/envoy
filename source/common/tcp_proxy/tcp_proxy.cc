@@ -25,9 +25,8 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
+#include "common/tcp_proxy/default_tcp_upstream_factory.h"
 #include "common/tcp_proxy/factory.h"
-
-#include "extensions/upstreams/tcp/factories/default_tcp_upstream_factory.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -433,7 +432,7 @@ void Filter::initializeUpstreamConnection() {
 }
 
 Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
-  Tcp::TcpUpstreamFactory&& factory = Extensions::Upstreams::Tcp::DefaultTcpUpstreamFactory();
+  TcpProxy::TcpUpstreamFactory&& factory = Envoy::TcpProxy::DefaultTcpUpstreamFactory();
   auto& tunnel_config = config_->tunnelingConfig();
   connecting_ = true;
   connect_attempts_++;
@@ -491,7 +490,7 @@ void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   }
 }
 
-void Filter::onPoolReady(const Tcp::GenericUpstreamSharedPtr& upstream,
+void Filter::onPoolReady(const TcpProxy::GenericUpstreamSharedPtr& upstream,
                          Upstream::HostDescriptionConstSharedPtr& host,
                          const Network::Address::InstanceConstSharedPtr& local_address,
                          StreamInfo::StreamInfo& info) {

@@ -4,7 +4,7 @@
 #include "envoy/tcp/conn_pool.h"
 
 namespace Envoy {
-namespace Tcp {
+namespace TcpProxy {
 
 // Interface for a generic Upstream, which can communicate with a TCP or HTTP
 // upstream.
@@ -62,5 +62,5 @@ public:
 };
 using ConnectionHandlePtr = std::unique_ptr<ConnectionHandle>;
 
-} // namespace Tcp
+} // namespace TcpProxy
 } // namespace Envoy

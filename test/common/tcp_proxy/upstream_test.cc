@@ -1,8 +1,7 @@
 #include <memory>
 
-#include "envoy/tcp/upstream.h"
-
-#include "extensions/upstreams/tcp/http/upstream_request.h"
+#include "common/tcp_proxy/upstream.h"
+#include "common/tcp_proxy/upstream_interface.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
@@ -15,10 +14,7 @@ using testing::_;
 using testing::AnyNumber;
 
 namespace Envoy {
-namespace Extensions {
-namespace Upstreams {
-namespace Tcp {
-namespace Http {
+namespace TcpProxy {
 
 class HttpUpstreamTest : public testing::Test {
 public:
@@ -108,8 +104,6 @@ TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
   EXPECT_CALL(callbacks_, onBelowWriteBufferLowWatermark());
   upstream_->onBelowWriteBufferLowWatermark();
 }
-} // namespace Http
-} // namespace Tcp
-} // namespace Upstreams
-} // namespace Extensions
+
+} // namespace TcpProxy
 } // namespace Envoy

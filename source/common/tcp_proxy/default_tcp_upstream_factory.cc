@@ -1,23 +1,20 @@
-#include "extensions/upstreams/tcp/factories/default_tcp_upstream_factory.h"
+#include "common/tcp_proxy/default_tcp_upstream_factory.h"
 
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/upstreams/tcp/http/upstream_request.h"
-#include "extensions/upstreams/tcp/tcp/upstream_request.h"
+#include "common/tcp_proxy/upstream.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace Upstreams {
-namespace Tcp {
+namespace TcpProxy {
 
 /**
  * Config registration for the original dst filter. @see NamedNetworkFilterConfigFactory.
  */
-Envoy::Tcp::ConnectionHandlePtr DefaultTcpUpstreamFactory::createTcpUpstreamHandle(
+Envoy::TcpProxy::ConnectionHandlePtr DefaultTcpUpstreamFactory::createTcpUpstreamHandle(
     Envoy::Upstream::ClusterManager& cluster_manager,
     Envoy::Upstream::LoadBalancerContext* lb_context,
-    Envoy::Tcp::GenericUpstreamPoolCallbacks& generic_pool_callbacks,
+    Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks,
     const std::shared_ptr<Envoy::Tcp::ConnectionPool::UpstreamCallbacks>& upstream_callbacks,
     absl::string_view hostname, const std::string& cluster_name) {
 
@@ -25,9 +22,8 @@ Envoy::Tcp::ConnectionHandlePtr DefaultTcpUpstreamFactory::createTcpUpstreamHand
     Envoy::Tcp::ConnectionPool::Instance* conn_pool = cluster_manager.tcpConnPoolForCluster(
         cluster_name, Envoy::Upstream::ResourcePriority::Default, lb_context);
     if (conn_pool) {
-      auto tcp_handle =
-          std::make_unique<Envoy::Extensions::Upstreams::Tcp::Tcp::TcpConnectionHandle>(
-              nullptr, *upstream_callbacks, generic_pool_callbacks);
+      auto tcp_handle = std::make_unique<Envoy::TcpProxy::TcpConnectionHandle>(
+          nullptr, *upstream_callbacks, generic_pool_callbacks);
       Envoy::Tcp::ConnectionPool::Cancellable* cancellable = conn_pool->newConnection(*tcp_handle);
       tcp_handle->setUpstreamHandle(cancellable);
       return tcp_handle;
@@ -52,10 +48,9 @@ Envoy::Tcp::ConnectionHandlePtr DefaultTcpUpstreamFactory::createTcpUpstreamHand
         cluster_name, Envoy::Upstream::ResourcePriority::Default, absl::nullopt, lb_context);
     if (conn_pool) {
       auto http_handle =
-          std::make_unique<Envoy::Extensions::Upstreams::Tcp::Http::HttpConnectionHandle>(
-              nullptr, generic_pool_callbacks);
-      auto http_upstream = std::make_shared<Envoy::Extensions::Upstreams::Tcp::Http::HttpUpstream>(
-          *upstream_callbacks, std::string(hostname));
+          std::make_unique<Envoy::TcpProxy::HttpConnectionHandle>(nullptr, generic_pool_callbacks);
+      auto http_upstream = std::make_shared<Envoy::TcpProxy::HttpUpstream>(*upstream_callbacks,
+                                                                           std::string(hostname));
       // Always create new handle so that handle and http_upstream is 1:1 mapping.
       http_handle->setUpstream(http_upstream);
       Envoy::Http::ConnectionPool::Cancellable* cancellable =
@@ -66,7 +61,5 @@ Envoy::Tcp::ConnectionHandlePtr DefaultTcpUpstreamFactory::createTcpUpstreamHand
   }
   return nullptr;
 }
-} // namespace Tcp
-} // namespace Upstreams
-} // namespace Extensions
+} // namespace TcpProxy
 } // namespace Envoy

@@ -14,7 +14,7 @@ envoy_cc_library(
         "factory.h",
     ],
     deps = [
-        "//include/envoy/tcp:upstream_interface",
+        ":upstream_interface",
     ],
 )
 
@@ -27,6 +27,8 @@ envoy_cc_library(
         "tcp_proxy.h",
     ],
     deps = [
+        ":default_tcp_upstream_factory",
+        ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
@@ -40,7 +42,6 @@ envoy_cc_library(
         "//include/envoy/stats:timespan_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//include/envoy/tcp:conn_pool_interface",
-        "//include/envoy/tcp:upstream_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_lib",
@@ -59,8 +60,77 @@ envoy_cc_library(
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/upstreams/tcp/factories:default_tcp_upstream_factory",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_interface",
+    hdrs = [
+        "upstream_interface.h",
+    ],
+    deps = [
+        "//include/envoy/tcp:conn_pool_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "tcp_proxy_upstreams",
+    srcs = [
+        "upstream.cc",
+    ],
+    hdrs = [
+        "upstream.h",
+    ],
+    deps = [
+        ":upstream_interface",
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/router:router_interface",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/stats:timespan_interface",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//include/envoy/tcp:conn_pool_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/access_log:access_log_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:macros",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/network:application_protocol_lib",
+        "//source/common/network:cidr_range_lib",
+        "//source/common/network:filter_lib",
+        "//source/common/network:hash_policy_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/network:upstream_server_name_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/router:metadatamatchcriteria_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/common/upstream:load_balancer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "default_tcp_upstream_factory",
+    srcs = [
+        "default_tcp_upstream_factory.cc",
+    ],
+    hdrs = [
+        "default_tcp_upstream_factory.h",
+    ],
+    deps = [
+        ":upstream_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/tcp_proxy:tcp_proxy_upstreams",
+        "//source/common/tcp_proxy:tcp_upstream_factory",
     ],
 )
