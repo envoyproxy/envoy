@@ -249,9 +249,8 @@ void XdsFuzzTest::replay() {
       break;
     }
     case test::server::config_validation::Action::kRemoveRoute: {
-      // it seems like routes cannot be removed
-      // leaving a route out of an SOTW request does not remove it and sending a
-      // remove message in a delta request is ignored
+      // it seems like routes cannot be removed - leaving a route out of an SOTW request does not
+      // remove it and sending a remove message in a delta request is ignored
       ENVOY_LOG_MISC(info, "Ignoring request to remove route_{}",
                      action.remove_route().route_num());
       break;
