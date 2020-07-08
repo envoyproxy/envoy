@@ -276,7 +276,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/04/23  10661    44425       46000   per-listener connection limits
   // 2020/06/29  11751    44715       46000   Improve time complexity of removing callback handle
   //                                          in callback manager.
-  // 2020/07/01  11748    45003       44811   Stream error on invalid messaging
+  // 2020/07/01  11748    45003       46000   Stream error on invalid messaging
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
