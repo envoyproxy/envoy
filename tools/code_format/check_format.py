@@ -218,7 +218,7 @@ def readFile(path):
 # lookPath searches for the given executable in all directories in PATH
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
-    return shutil.which(executable) or ''
+  return shutil.which(executable) or ''
 
 
 # pathExists checks whether the given path exists. This function assumes that
