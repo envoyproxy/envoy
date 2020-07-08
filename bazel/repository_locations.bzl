@@ -825,6 +825,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "MIT",
         license_url = "https://github.com/ncopa/su-exec/blob/{version}/LICENSE",
     ),
+    com_github_leethomason_tinyxml2 = dict(
+        project_name = "TinyXML-2",
+        project_desc = "Simple, small, efficient, C++ XML parser that can be easily integrated into other programs.",
+        project_url = "https://github.com/leethomason/tinyxml2",
+        version = "9.0.0",
+        sha256 = "cc2f1417c308b1f6acc54f88eb70771a0bf65f76282ce5c40e54cfe52952702c",
+        strip_prefix = "tinyxml2-9.0.0",
+        urls = ["https://github.com/leethomason/tinyxml2/archive/9.0.0.tar.gz"],
+        use_category = ["dataplane_ext"],
+        # TODO: Verify & update the extensions
+        extensions = ["envoy.grpc_credentials.aws_iam"],
+        release_date = "2021-06-06",
+        cpe = "cpe:2.3:a:tinyxml2_project:tinyxml2:*",
+    ),
     com_google_googletest = dict(
         project_name = "Google Test",
         project_desc = "Google's C++ test framework",

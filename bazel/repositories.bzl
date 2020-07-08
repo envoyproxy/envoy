@@ -197,6 +197,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
+    _com_github_leethomason_tinyxml2()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
@@ -611,6 +612,16 @@ def _com_github_nlohmann_json():
     native.bind(
         name = "json",
         actual = "@com_github_nlohmann_json//:json",
+    )
+
+def _com_github_leethomason_tinyxml2():
+    external_http_archive(
+        name = "com_github_leethomason_tinyxml2",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "tinyxml2",
+        actual = "@envoy//bazel/foreign_cc:tinyxml2",
     )
 
 def _com_github_nodejs_http_parser():
