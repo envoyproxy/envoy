@@ -3,7 +3,7 @@ name: perf
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
 
 jobs:
@@ -27,8 +27,8 @@ jobs:
         with:
           name: sizecurrent
           path: bazel-bin/test/performance/test_binary_size
-  sizemaster:
-    name: size_master
+  sizemain:
+    name: size_main
     runs-on: ubuntu-18.04
     timeout-minutes: 60
     steps:
@@ -39,18 +39,18 @@ jobs:
         run: ./ci/linux_ci_setup.sh
       - name: 'Build test binary'
         run: |
-          git checkout master && git pull origin master && git submodule update
+          git checkout main && git pull origin main && git submodule update
           export PATH=/usr/lib/llvm-8/bin:$PATH
           export CC=clang
           export CXX=clang++
           bazel build //test/performance:test_binary_size --config=sizeopt
       - uses: actions/upload-artifact@v1
         with:
-          name: sizemaster
+          name: sizemain
           path: bazel-bin/test/performance/test_binary_size
   sizecompare:
     name: size_compare
-    needs: [sizecurrent, sizemaster]
+    needs: [sizecurrent, sizemain]
     runs-on: ubuntu-18.04
     timeout-minutes: 30
     steps:
@@ -63,14 +63,14 @@ jobs:
           path: dist/sizecurrent
       - uses: actions/download-artifact@v1
         with:
-          name: sizemaster
-          path: dist/sizemaster
+          name: sizemain
+          path: dist/sizemain
       - name: 'Strip and Zip binary'
         run: |
           ls -lh dist/
-          strip -s -o dist/master.stripped dist/sizemaster/test_binary_size
+          strip -s -o dist/main.stripped dist/sizemain/test_binary_size
           strip -s -o dist/current.stripped dist/sizecurrent/test_binary_size
-          zip -9 dist/master.zip dist/master.stripped
+          zip -9 dist/main.zip dist/main.stripped
           zip -9 dist/current.zip dist/current.stripped
       - name: 'Test size regression'
-        run: ./ci/test_size_regression.sh dist/master.zip dist/current.zip
+        run: ./ci/test_size_regression.sh dist/main.zip dist/current.zip
