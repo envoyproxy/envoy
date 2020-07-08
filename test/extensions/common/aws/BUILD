@@ -76,7 +76,6 @@ envoy_cc_test(
     srcs = [
         "aws_metadata_fetcher_integration_test.cc",
     ],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:fmt_lib",
         "//source/extensions/common/aws:utility_lib",
