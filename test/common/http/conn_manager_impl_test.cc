@@ -2921,6 +2921,14 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackResetStream) {
   conn_manager_->onData(fake_input, false); // kick off request
 
   EXPECT_CALL(*duration_timer, disableTimer());
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("408", headers.getStatusValue());
+      }));
+  EXPECT_CALL(response_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([](const Buffer::Instance& data, bool) {
+        EXPECT_EQ(data.toString(), "downstream max stream duration reached");
+      }));
   duration_timer->invokeCallback();
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_max_duration_reached_.value());

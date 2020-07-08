@@ -16,6 +16,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -679,7 +680,10 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  connection_manager_.doEndStream(*this);
+  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamMaxStreamDurationReached);
+  sendLocalReply(false, Http::Code::RequestTimeout, "downstream max stream duration reached",
+                 nullptr, state_.is_head_request_, absl::nullopt,
+                 StreamInfo::ResponseCodeDetails::get().DownstreamMaxStreamDurationReached);
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(

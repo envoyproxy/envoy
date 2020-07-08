@@ -1911,7 +1911,8 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
 
   test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
   response->waitForReset();
-  EXPECT_FALSE(response->complete());
+  EXPECT_EQ("408", response->headers().getStatusValue());
+  EXPECT_TRUE(response->complete());
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.

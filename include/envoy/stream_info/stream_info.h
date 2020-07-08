@@ -76,8 +76,10 @@ enum ResponseFlag {
   UpstreamMaxStreamDurationReached = 0x80000,
   // True if the response was served from an Envoy cache filter.
   ResponseFromCacheFilter = 0x100000,
+  // Downstream request reached to user defined max stream duration.
+  DownstreamMaxStreamDurationReached = 0x200000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = ResponseFromCacheFilter
+  LastFlag = DownstreamMaxStreamDurationReached
 };
 
 /**
@@ -144,7 +146,7 @@ struct ResponseCodeDetailValues {
   const std::string UpstreamTimeout = "upstream_response_timeout";
   // The final upstream try timed out
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
-  // The request was destroyed because of user defined max stream duration.
+  // The upstream request was destroyed because of user defined max stream duration.
   const std::string UpstreamMaxStreamDurationReached = "upstream_max_stream_duration_reached";
   // The upstream connection was reset before a response was started. This
   // will generally be accompanied by details about why the reset occurred.
@@ -156,6 +158,8 @@ struct ResponseCodeDetailValues {
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
   // The connection is rejected due to no matching filter chain.
   const std::string FilterChainNotFound = "filter_chain_not_found";
+  // The downstream request was destroyed because of user defined max stream duration.
+  const std::string DownstreamMaxStreamDurationReached = "downstream_max_stream_duration_reached";
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
