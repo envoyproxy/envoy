@@ -579,7 +579,7 @@ public:
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
 
-  ClusterRequestResponseSizeOptRef requestResponseSizeStats() const override {
+  ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const override {
     if (optional_cluster_stats_ == nullptr or
         optional_cluster_stats_->request_response_size_stats_ == nullptr) {
       return absl::nullopt;
@@ -590,7 +590,7 @@ public:
 
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
 
-  ClusterTimeoutBudgetOptRef timeoutBudgetStats() const override {
+  ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const override {
     if (optional_cluster_stats_ == nullptr or
         optional_cluster_stats_->timeout_budget_stats_ == nullptr) {
       return absl::nullopt;
@@ -643,8 +643,8 @@ private:
   struct OptionalClusterStats {
     OptionalClusterStats(const envoy::config::cluster::v3::TrackClusterStats& optional_stats_config,
                          Stats::Scope& stats_scope);
-    const ClusterTimeoutBudgetPtr timeout_budget_stats_;
-    const ClusterRequestResponseSizePtr request_response_size_stats_;
+    const ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
+    const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
   };
 
   Runtime::Loader& runtime_;

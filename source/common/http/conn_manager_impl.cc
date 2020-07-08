@@ -614,7 +614,7 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
       connection_manager_.read_callbacks_->upstreamHost();
 
   if (upstream_host != nullptr) {
-    Upstream::ClusterRequestResponseSizeOptRef req_resp_stats =
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
         upstream_host->cluster().requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
       // record request body size
@@ -742,7 +742,7 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
       connection_manager_.read_callbacks_->upstreamHost();
 
   if (upstream_host != nullptr) {
-    Upstream::ClusterRequestResponseSizeOptRef req_resp_stats =
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
         upstream_host->cluster().requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
       req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
@@ -800,7 +800,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       connection_manager_.read_callbacks_->upstreamHost();
 
   if (upstream_host != nullptr) {
-    Upstream::ClusterRequestResponseSizeOptRef req_resp_stats =
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
         upstream_host->cluster().requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
       req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());

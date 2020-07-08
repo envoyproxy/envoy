@@ -666,8 +666,8 @@ struct ClusterRequestResponseSizeStats {
   ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
-using ClusterRequestResponseSizePtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
-using ClusterRequestResponseSizeOptRef =
+using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
+using ClusterRequestResponseSizeStatsOptRef =
     absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
 
 /**
@@ -677,8 +677,8 @@ struct ClusterTimeoutBudgetStats {
   ALL_CLUSTER_TIMEOUT_BUDGET_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
-using ClusterTimeoutBudgetPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
-using ClusterTimeoutBudgetOptRef =
+using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
+using ClusterTimeoutBudgetStatsOptRef =
     absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>;
 
 /**
@@ -878,13 +878,13 @@ public:
    * @return absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
    * headers/body sizes of request/response for this cluster.
    */
-  virtual ClusterRequestResponseSizeOptRef requestResponseSizeStats() const PURE;
+  virtual ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const PURE;
 
   /**
    * @return absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
    * budgets for this cluster.
    */
-  virtual ClusterTimeoutBudgetOptRef timeoutBudgetStats() const PURE;
+  virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
   /**
    * Returns an optional source address for upstream connections to bind to.
