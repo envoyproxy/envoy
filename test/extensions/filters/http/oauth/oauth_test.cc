@@ -34,18 +34,18 @@ class OAuth2ClientTest : public testing::Test {
 public:
   OAuth2ClientTest()
       : mock_callbacks_(std::make_shared<MockCallbacks>()), request_(&cm_.async_client_) {
-    client_ = std::make_shared<OAuth2ClientImpl>(cm_, "auth", std::chrono::milliseconds(3000));
+    client_ = std::make_shared<OAuth2ClientImpl>(cm_, "auth", "/oauth/token", std::chrono::milliseconds(3000));
   }
 
-  Http::AsyncClient::Callbacks* popPendingCallback() {
+  ABSL_MUST_USE_RESULT
+  AssertionResult popPendingCallback(std::function<Http::AsyncClient::Callbacks*> func) {
     if (callbacks_.empty()) {
-      // Can't use ASSERT_* as this is not a test function
-      throw std::underflow_error("empty deque");
+      return AssertionFailure() << "tried to pop callback from empty deque";
     }
 
-    auto callbacks = callbacks_.front();
+    func(callbacks_.front());
     callbacks_.pop_front();
-    return callbacks;
+    return AssertionSuccess();
   }
 
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -83,7 +83,8 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _));
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-  popPendingCallback()->onSuccess(request, std::move(mock_response));
+  ASSERT_TRUE(popPendingCallback(
+      [](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
@@ -113,7 +114,8 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-  popPendingCallback()->onSuccess(request, std::move(mock_response));
+  ASSERT_TRUE(popPendingCallback(
+      [](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
 TEST_F(OAuth2ClientTest, NetworkError) {
@@ -131,7 +133,8 @@ TEST_F(OAuth2ClientTest, NetworkError) {
 
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-  popPendingCallback()->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+  ASSERT_TRUE(popPendingCallback(
+      [](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
 } // namespace Oauth

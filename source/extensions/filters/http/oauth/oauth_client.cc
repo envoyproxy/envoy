@@ -23,8 +23,6 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     authorization_handle(Http::CustomHeaders::get().Authorization);
 }
 
-constexpr absl::string_view authTokenEndpoint = "/oauth/token/";
-
 const std::string& getAccessTokenBodyFormatString() {
   CONSTRUCT_ON_FIRST_USE(
       std::string,
@@ -35,7 +33,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
                                            const std::string& cb_url) {
   Http::RequestMessagePtr request = createPostRequest();
-  request->headers().setPath(authTokenEndpoint);
+  request->headers().setPath(oauth_token_path_);
   const std::string body =
       fmt::format(getAccessTokenBodyFormatString(), auth_code, client_id, secret, cb_url);
   request->body() = std::make_unique<Buffer::OwnedImpl>(body);
@@ -93,7 +91,6 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   parent_->onGetAccessTokenSuccess(access_token, expires_in);
 }
 
-// failed request calls will end up here
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
                                  Http::AsyncClient::FailureReason) {
   ENVOY_LOG(debug, "OAuth request failed.");

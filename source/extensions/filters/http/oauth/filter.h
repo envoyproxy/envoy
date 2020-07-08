@@ -102,6 +102,7 @@ public:
   bool passThroughOptionsMethod() const { return pass_through_options_method_; }
   const std::string& oauthServerHostname() const { return oauth_server_hostname_; }
   const std::string& oauthCallbackPath() const { return oauth_server_hostname_; }
+  const std::string& oauthTokenPath() const { return oauth_token_path_; }
   const std::string& callbackPath() const { return callback_path_; }
   const std::string& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
@@ -115,6 +116,7 @@ private:
   const std::string client_id_;
   const std::string oauth_server_hostname_;
   const std::string callback_path_;
+  const std::string oauth_token_path_;
   const std::string signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;

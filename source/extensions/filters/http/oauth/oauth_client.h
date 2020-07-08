@@ -37,8 +37,9 @@ public:
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::upstream> {
 public:
   OAuth2ClientImpl(Upstream::ClusterManager& cm, std::string cluster_name,
-                   const std::chrono::milliseconds timeout_duration)
-      : cm_(cm), cluster_name_(std::move(cluster_name)), timeout_duration_(timeout_duration) {}
+                   std::string oauth_token_path, const std::chrono::milliseconds timeout_duration)
+      : cm_(cm), cluster_name_(std::move(cluster_name)),
+        oauth_token_path_(std::move(oauth_token_path)), timeout_duration_(timeout_duration) {}
 
   ~OAuth2ClientImpl() override {
     if (in_flight_request_ != nullptr) {
@@ -68,6 +69,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   const std::string cluster_name_;
+  const std::string oauth_token_path_;
   const std::chrono::milliseconds timeout_duration_;
 
   // Tracks any outstanding in-flight requests, allowing us to cancel the request

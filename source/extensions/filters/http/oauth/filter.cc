@@ -77,8 +77,8 @@ FilterConfig::FilterConfig(
     Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
       oauth_server_hostname_(proto_config.hostname()), callback_path_(proto_config.callback_path()),
-      signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
-      stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      oauth_token_path(proto_config.token_path()), signout_path_(proto_config.signout_path()),
+      secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_options_method_(proto_config.pass_through_options_method()) {
   if (!cluster_manager.get(cluster_name_)) {

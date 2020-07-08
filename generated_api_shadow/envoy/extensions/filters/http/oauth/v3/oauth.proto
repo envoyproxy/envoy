@@ -36,16 +36,17 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message OAuth2Config {
-  // The upstream cluster where the OAuth server is defined. This is required due limitations
-  // in Envoy's HTTP AsyncClient implementation.
+  // Name of the cluster to send OAuth requests to.
   string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The full domain of the OAuth server.
+  // The full domain of the OAuth server. This is used to construct
+  // the redirection URL, and so must be specified in addition to
+  // the cluster.
   string hostname = 2 [(validate.rules).string = {min_bytes: 1}];
 
-  // A struct with the credentials required for OAuth
+  // Credentials used for OAuth.
   OAuth2Credentials credentials = 3;
 
   // The callback path the OAuth server should use.
@@ -54,17 +55,20 @@ message OAuth2Config {
   // The path to sign a user out, clearing their credential cookies.
   string signout_path = 5 [(validate.rules).string = {min_bytes: 1}];
 
-  // The duration for outgoing auth requests. Default is 3s.
-  google.protobuf.Duration timeout = 6;
+  // The path to send requests for the token against the OAuth cluster.
+  string token_path = 6 [(validate.rules).string = {min_bytes: 1}];
+
+  // The timeout for outgoing auth requests.
+  google.protobuf.Duration timeout = 7 [(validate.rules).duration = {required: true}];
 
   // Forward the OAuth token as a Bearer to upstream web service.
-  bool forward_bearer_token = 7;
+  bool forward_bearer_token = 8;
 
   // Allow HTTP OPTIONS requests to pass-through (CORS preflight workaround).
-  bool pass_through_options_method = 8;
+  bool pass_through_options_method = 9;
 }
 
-// Filter config
+// Filter config.
 message OAuth2 {
   // Leave this empty to disable OAuth2 for a specific route, using per filter config.
   OAuth2Config config = 1;

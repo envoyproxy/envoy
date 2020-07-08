@@ -36,7 +36,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message OAuth2Config {
   // Name of the cluster to send OAuth requests to.
   string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -55,14 +55,17 @@ message OAuth2Config {
   // The path to sign a user out, clearing their credential cookies.
   string signout_path = 5 [(validate.rules).string = {min_bytes: 1}];
 
+  // The path to send requests for the token against the OAuth cluster.
+  string token_path = 6 [(validate.rules).string = {min_bytes: 1}];
+
   // The timeout for outgoing auth requests.
-  google.protobuf.Duration timeout = 6 [(validate.rules).duration = {required: true}];
+  google.protobuf.Duration timeout = 7 [(validate.rules).duration = {required: true}];
 
   // Forward the OAuth token as a Bearer to upstream web service.
-  bool forward_bearer_token = 7;
+  bool forward_bearer_token = 8;
 
   // Allow HTTP OPTIONS requests to pass-through (CORS preflight workaround).
-  bool pass_through_options_method = 8;
+  bool pass_through_options_method = 9;
 }
 
 // Filter config.
