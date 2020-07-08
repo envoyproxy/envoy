@@ -365,7 +365,9 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
 TEST_P(HdsIntegrationTest, SingleEndpointFieldMissingHttp) {
   initialize();
   server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
-  server_health_check_specifier_.mutable_cluster_health_checks(0)->mutable_health_checks(0)->clear_unhealthy_threshold();
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->clear_unhealthy_threshold();
 
   // Server <--> Envoy
   waitForHdsStream();

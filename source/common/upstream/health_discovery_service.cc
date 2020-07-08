@@ -203,7 +203,7 @@ void HdsDelegate::onReceiveMessage(
     // Do not continue processing message
     return;
   }
-  
+
   // Reset
   hds_clusters_.clear();
 
