@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/match.h"
@@ -127,7 +128,7 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // _before_ canonicalizing the path is that different unix flavors implement
   // /dev/fd/* differently, for example on linux they are symlinks to /dev/pts/*
   // which are symlinks to /proc/self/fds/. On BSD (and darwin) they are not
-  // symlinks at all. To avoid lots of platform, specifics, we whitelist
+  // symlinks at all. To avoid lots of platform, specifics, we allowlist
   // /dev/fd/* _before_ resolving the canonical path.
   if (absl::StartsWith(path, "/dev/fd/")) {
     return false;
@@ -136,7 +137,7 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   const Api::SysCallStringResult canonical_path = canonicalPath(path);
   if (canonical_path.rc_.empty()) {
     ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,
-                   ::strerror(canonical_path.errno_));
+                   errorDetails(canonical_path.errno_));
     return true;
   }
 
