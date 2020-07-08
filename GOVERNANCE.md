@@ -88,18 +88,20 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
     "1.6.0".
   * Get a review and merge.
+* Wait for tests to pass on [master](https://dev.azure.com/cncf/envoy/_build).
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
-* Create a branch from the tagged release, e.g. "release/v1.6". It will be used for the
+* From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
+  from the tagged release, e.g. "release/v1.6". It will be used for the
   [stable releases](RELEASES.md#stable-releases).
 * Monitor the AZP tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
 * Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
-* If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
-  Envoy account post).
+* Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
+  post.
 * Do a new PR to setup the next version
   * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". 
   * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
@@ -112,8 +114,24 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 1.7.0 (Pending)
 ===============
 
-Changes
--------
+Incompatible Behavior Changes
+-----------------------------
+*Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+Minor Behavior Changes
+----------------------
+*Changes that may cause incompatibilities for some users, but should not for most*
+
+Bug Fixes
+---------
+*Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+Removed Config or Runtime
+-------------------------
+*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+New Features
+------------
 
 Deprecated
 ----------
