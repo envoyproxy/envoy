@@ -56,12 +56,12 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       // add random length string in each loop
       while (provider.remaining_bytes() > 3) {
         if (provider.ConsumeBool()) {
-          absl::string_view str = provider.ConsumeRandomLengthString(max_len);
-          ele_vec.push_back(Stats::DynamicName(make_string(str)));
+          absl::string_view str = make_string(provider.ConsumeRandomLengthString(max_len));
+          ele_vec.push_back(Stats::DynamicName(str));
           sn_vec.push_back(pool.add(str));
         } else {
-          key = pool.add(provider.ConsumeRandomLengthString(provider.remaining_bytes() / 2));
-          val = pool.add(provider.ConsumeRandomLengthString(provider.remaining_bytes()));
+          key = pool.add(provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes() / 2)));
+          val = pool.add(provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes())));
           tags.push_back({key, val});
         }
         Stats::Utility::counterFromStatNames(*scope, sn_vec, tags);
