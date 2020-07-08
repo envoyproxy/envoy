@@ -199,7 +199,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
       const auto state =
-          absl::StrReplaceAll(query_parameters.at(queryParamsState()), unescapedReplacements());
+          Http::Utility::PercentEncoding::decode(query_parameters.at(queryParamsState()));
       Http::Utility::Url state_url;
       if (!state_url.initialize(state, false)) {
         sendUnauthorizedResponse();
@@ -257,8 +257,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string state_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
 
     const std::string escaped_redirect_uri =
-        absl::StrReplaceAll(callback_path, escapedReplacements());
-    const std::string escaped_state = absl::StrReplaceAll(state_path, escapedReplacements());
+        Http::Utility::PercentEncoding::encode(callback_path, ":/=&?");
+    const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
     const std::string new_url =
         fmt::format(authClusterUriParameters(), config_->oauthServerHostname(), config_->clientId(),
@@ -288,7 +288,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
 
   auth_code_ = query_parameters.at(queryParamsCode());
-  state_ = absl::StrReplaceAll(query_parameters.at(queryParamsState()), unescapedReplacements());
+  state_ = Http::Utility::PercentEncoding::decode(query_parameters.at(queryParamsState()));
 
   Http::Utility::Url state_url;
   if (!state_url.initialize(state_, false)) {

@@ -207,16 +207,6 @@ private:
   FilterConfigSharedPtr config_;
   TimeSource& time_source_;
 
-  const RequirementsMap& escapedReplacements() const {
-    CONSTRUCT_ON_FIRST_USE(RequirementsMap,
-                           {{"/", "%2F"}, {":", "%3A"}, {"?", "%3F"}, {"&", "%26"}, {"=", "%3D"}});
-  }
-
-  const RequirementsMap& unescapedReplacements() const {
-    CONSTRUCT_ON_FIRST_USE(RequirementsMap,
-                           {{"%2F", "/"}, {"%3A", ":"}, {"%3F", "?"}, {"%26", "&"}, {"%3D", "="}});
-  }
-
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
