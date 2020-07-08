@@ -78,7 +78,7 @@ message Config {
         [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
 
     // The value's type — defaults to string.
-    ValueType type = 4;
+    ValueType type = 4 [(validate.rules).enum = {defined_only: true}];
 
     // How is the value encoded, default is NONE (not encoded).
     // The value will be decoded accordingly before storing to metadata.
