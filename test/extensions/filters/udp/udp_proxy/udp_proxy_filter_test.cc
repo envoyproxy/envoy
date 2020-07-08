@@ -14,7 +14,6 @@ using testing::ByMove;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnNew;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -511,13 +510,10 @@ stat_prefix: foo
 cluster: fake_cluster
   )EOF");
 
-  testing::NiceMock<Network::MockUdpListener>* listener = nullptr;
-
   ON_CALL(callbacks_, isValidUdpListener()).WillByDefault(Return(false));
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectUpstreamWrite("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-  ON_CALL(callbacks_, udpListener()).WillByDefault(ReturnRef(*listener));
   test_sessions_[0].recvDataFromUpstreamWithoutDownstreamForwarding("world");
   EXPECT_EQ(1, config_->stats().downstream_sess_tx_errors_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_tx_bytes_.value());
