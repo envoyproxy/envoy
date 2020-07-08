@@ -5,6 +5,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "test/test_common/only_one_thread.h"
 #include "test/test_common/test_time_system.h"
@@ -64,10 +65,24 @@ private:
   class SimulatedScheduler;
   class Alarm;
   friend class Alarm; // Needed to reference mutex for thread annotations.
-  struct CompareAlarms {
-    bool operator()(const Alarm* a, const Alarm* b) const;
+  struct AlarmRegistration {
+    MonotonicTime time;
+    // Random tie-breaker for alarms scheduled for the same monotonic time used to mimic
+    // non-deterministic execution of real alarms scheduled for the same wall time.
+    uint64_t randomness;
+    Alarm* alarm;
+
+    friend bool operator<(const AlarmRegistration& lhs, const AlarmRegistration& rhs) {
+      if (lhs.time != rhs.time) {
+        return lhs.time < rhs.time;
+      }
+      if (lhs.randomness != rhs.randomness) {
+        return lhs.randomness < rhs.randomness;
+      }
+      return lhs.alarm < rhs.alarm;
+    }
   };
-  using AlarmSet = std::set<Alarm*, CompareAlarms>;
+  using AlarmSet = std::set<AlarmRegistration>;
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves
@@ -80,12 +95,7 @@ private:
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  MonotonicTime alarmTimeLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void alarmActivateLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
-  // The simulation keeps a unique ID for each alarm to act as a deterministic
-  // tie-breaker for alarm-ordering.
-  int64_t nextIndex();
 
   // Adds/removes an alarm.
   void addAlarmLockHeld(Alarm*, const std::chrono::microseconds& duration)
@@ -105,8 +115,9 @@ private:
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
+  Runtime::RandomGeneratorImpl random_source_ ABSL_GUARDED_BY(mutex_);
   AlarmSet alarms_ ABSL_GUARDED_BY(mutex_);
-  uint64_t index_ ABSL_GUARDED_BY(mutex_);
+  std::map<Alarm*, AlarmSet::const_iterator> alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
   Thread::OnlyOneThread only_one_thread_;

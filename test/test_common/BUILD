@@ -271,6 +271,7 @@ envoy_cc_test_library(
         "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
         "//source/common/event:timer_lib",
+        "//source/common/runtime:runtime_lib",
     ],
 )
 
