@@ -197,7 +197,7 @@ public:
   // Some stream action applied in either the request or response direction.
   void directionalAction(DirectionalState& state,
                          const test::common::http::DirectionalAction& directional_action) {
-    bool end_stream = directional_action.end_stream();
+    const bool end_stream = directional_action.end_stream();
     const bool response = &state == &response_;
     switch (directional_action.directional_action_selector_case()) {
     case test::common::http::DirectionalAction::kContinueHeaders: {
@@ -216,10 +216,6 @@ public:
               fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.headers());
           if (headers.Status() == nullptr) {
             headers.setReferenceKey(Headers::get().Status, "200");
-          } else if (headers.Status()->value().getStringView() == "204") {
-            // According to https://tools.ietf.org/html/rfc7230#section-3.3.3 a
-            // 204 response must not contain a message body
-            end_stream = true;
           }
           state.response_encoder_->encodeHeaders(headers, end_stream);
         } else {
