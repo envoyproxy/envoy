@@ -154,6 +154,7 @@ std::shared_ptr<HttpFilterConfigSubscription> HttpFilterConfigProviderManagerImp
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
   // HttpFilterConfigSubscriptions are unique based on their config source and filter config name
   // combination.
+  // TODO(https://github.com/envoyproxy/envoy/issues/11967) Hash collision can cause subscription aliasing.
   const std::string subscription_id = absl::StrCat(MessageUtil::hash(config_source), ".", name);
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {

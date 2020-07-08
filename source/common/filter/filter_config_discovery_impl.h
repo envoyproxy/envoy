@@ -78,7 +78,7 @@ struct FilterConfigDiscoveryStats {
  */
 class HttpFilterConfigSubscription
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>,
-      Logger::Loggable<Logger::Id::router> {
+      Logger::Loggable<Logger::Id::filter> {
 public:
   HttpFilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                                const std::string& filter_config_name,
