@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 49]
+// [#next-free-field: 50]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -520,9 +520,9 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  reserved 12, 15, 7, 11, 35;
+  reserved 12, 15, 7, 11, 35, 47;
 
-  reserved "hosts", "tls_context", "extension_protocol_options";
+  reserved "hosts", "tls_context", "extension_protocol_options", "track_timeout_budgets";
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket_match* in the
@@ -830,9 +830,6 @@ message Cluster {
   // from the LRS stream here.]
   core.v4alpha.ConfigSource lrs_server = 42;
 
-  // Configuration to track optional cluster stats.
-  TrackClusterStats track_cluster_stats = 47;
-
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
   // Currently this field only applies for HTTP traffic but is designed for eventual use for custom
@@ -851,6 +848,9 @@ message Cluster {
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
   core.v4alpha.TypedExtensionConfig upstream_config = 48;
+  
+  // Configuration to track optional cluster stats.
+  TrackClusterStats track_cluster_stats = 49;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

@@ -2436,6 +2436,39 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified, tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
+TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
+  // Check that without the flag specified, the histogram is null.
+  const std::string yaml_disabled = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+  )EOF";
+
+  auto cluster = makeCluster(yaml_disabled);
+  // The stats will be null if they have not been explicitly turned on.
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+
+  // Check that with the flag, the histogram is created.
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_timeout_budgets: true
+  )EOF";
+
+  cluster = makeCluster(yaml);
+  // The stats should be created.
+  ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+  
+  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats();
+  EXPECT_EQ(
+      Stats::Histogram::Unit::Unspecified,
+      tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified, tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
+}
+
 // Validates HTTP2 SETTINGS config.
 TEST_F(ClusterInfoImplTest, Http2ProtocolOptions) {
   const std::string yaml = R"EOF(

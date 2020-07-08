@@ -19,10 +19,10 @@ Removed Config or Runtime
 
 New Features
 ------------
-* stats: added optional histograms to :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>` that 
-   track headers and body sizes of requests and responses.
+* stats: added optional histograms to :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>` 
+  that track headers and body sizes of requests and responses.
 
 Deprecated
 ----------
-* The :ref:`track_timeout_budgets <config_cluster_manager_cluster_stats_request_response_sizes>` has been deprecated in favor of
-  :ref:`Optional Configuration <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
+* The :ref:`track_timeout_budgets <envoy_api_field_config.cluster.v3.Cluster.track_timeout_budgets>` 
+  field has been deprecated in favor of `timeout_budgets` part of an :ref:`Optional Configuration <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
