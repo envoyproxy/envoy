@@ -774,7 +774,7 @@ message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
 
-  // [#not-implemented-hide:] Configuration source specifier for the late-bound
+  // Configuration source specifier for the late-bound
   // filter configuration. The HTTP Listener is warmed until all the initial
   // filter configurations are received, unless the flag to apply the default
   // configuration is set. Subsequent filter updates are atomic on a per-worker
@@ -813,7 +813,7 @@ message HttpFilter {
   oneof config_type {
     google.protobuf.Any typed_config = 4;
 
-    // [#not-implemented-hide:] Configuration source specifier for ExtensionConfigDS.
+    // Configuration source specifier for ExtensionConfigDS.
     HttpFilterConfigSource config_discovery = 5;
   }
 }
