@@ -62,22 +62,12 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
             Utility::parseQueryString("/logging?name=admin&level=trace", decode_param_value));
 
-  EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a%26b"}}),
-            Utility::parseQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
   EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a&b"}}),
             Utility::parseQueryString("/hello?param_value_has_encoded_ampersand=a%26b",
                                       decode_param_value));
 
   // A sample of an encoded query string of a request by prometheus:
   // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
-  EXPECT_EQ(
-      Utility::QueryParams(
-          {{"filter",
-            "%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
-            "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"}}),
-      Utility::parseQueryString(
-          "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
-          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
   EXPECT_EQ(
       Utility::QueryParams(
           {{"filter", "(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|"
