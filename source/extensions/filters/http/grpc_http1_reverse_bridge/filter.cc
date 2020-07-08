@@ -16,6 +16,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    accept_handle(Http::CustomHeaders::get().Accept);
+
 struct RcDetailsValues {
   // The gRPC HTTP/1 reverse bridge failed because the body payload was too
   // small to be a gRPC frame.
@@ -93,7 +96,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // gRPC content type variations such as application/grpc+proto.
     content_type_ = std::string(headers.getContentTypeValue());
     headers.setContentType(upstream_content_type_);
-    headers.setAccept(upstream_content_type_);
+    headers.setInline(accept_handle.handle(), upstream_content_type_);
 
     if (withhold_grpc_frames_) {
       // Adjust the content-length header to account for us removing the gRPC frame header.
