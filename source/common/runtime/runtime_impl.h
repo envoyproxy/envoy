@@ -258,7 +258,7 @@ private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual SnapshotImplPtr createNewSnapshot();
+  SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
