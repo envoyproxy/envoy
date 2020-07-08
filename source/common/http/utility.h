@@ -193,7 +193,7 @@ std::string createSslRedirectPath(const RequestHeaderMap& headers);
  *        Defaults to false.
  * @return QueryParams the parsed parameters, if any.
  */
-QueryParams parseQueryString(absl::string_view url, bool decode_param_value = false);
+QueryParams parseQueryString(absl::string_view url, bool decode_param_value = true);
 
 /**
  * Parse a a request body into query parameters.
@@ -210,7 +210,7 @@ QueryParams parseFromBody(absl::string_view body);
  *        Defaults to false.
  * @return QueryParams the parsed parameters, if any.
  */
-QueryParams parseParameters(absl::string_view data, size_t start, bool decode_param_value = false);
+QueryParams parseParameters(absl::string_view data, size_t start, bool decode_param_value = true);
 
 /**
  * Finds the start of the query string in a path

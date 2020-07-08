@@ -1237,6 +1237,7 @@ TEST(PercentEncoding, EncodeDecode) {
 }
 
 TEST(PercentEncoding, Decoding) {
+  EXPECT_EQ(Utility::PercentEncoding::decode("a%26b"), "a&b");
   EXPECT_EQ(Utility::PercentEncoding::decode("hello%20world"), "hello world");
   EXPECT_EQ(Utility::PercentEncoding::decode("upstream%7Cdownstream"), "upstream|downstream");
   EXPECT_EQ(
