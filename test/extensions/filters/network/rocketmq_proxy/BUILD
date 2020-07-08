@@ -131,7 +131,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.rocketmq_proxy",
     deps = [
         "//source/extensions/filters/network/rocketmq_proxy/router:route_matcher",
-        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/rocketmq_proxy/v3:pkg_cc_proto",
     ],
 )

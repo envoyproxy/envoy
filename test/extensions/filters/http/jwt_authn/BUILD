@@ -47,7 +47,6 @@ envoy_extension_cc_test(
     deps = [
         ":mock_lib",
         "//source/extensions/filters/http/jwt_authn:filter_lib",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],

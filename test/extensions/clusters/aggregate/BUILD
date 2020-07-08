@@ -64,7 +64,6 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
