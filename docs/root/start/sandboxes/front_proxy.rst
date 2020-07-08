@@ -4,7 +4,7 @@ Front Proxy
 ===========
 
 To get a flavor of what Envoy has to offer as a front proxy, we are releasing a `docker compose <https://docs.docker.com/compose/>`_
-sandbox that deploys a front Envoy and a couple of services (simple flask apps) colocated with a
+sandbox that deploys a front Envoy and a couple of services (simple Flask apps) colocated with a
 running service Envoy. The three containers will be deployed inside a virtual network called
 ``envoymesh``.
 
@@ -18,8 +18,8 @@ the edge of the ``envoymesh`` network. Port ``8080``, ``8443``, and ``8001`` are
 compose (see :repo:`/examples/front-proxy/docker-compose.yaml`) to handle ``HTTP``, ``HTTPS`` calls
 to the services and requests to ``/admin`` respectively. Moreover, notice that all traffic routed
 by the front Envoy to the service containers is actually routed to the service Envoys
-(routes setup in :repo:`/examples/front-proxy/front-envoy.yaml`). In turn the service envoys route
-the request to the flask app via the loopback address (routes setup in :repo:`/examples/front-proxy/service-envoy.yaml`).
+(routes setup in :repo:`/examples/front-proxy/front-envoy.yaml`). In turn the service Envoys route
+the request to the Flask app via the loopback address (routes setup in :repo:`/examples/front-proxy/service-envoy.yaml`).
 This setup illustrates the advantage of running service Envoys collocated with your services: all
 requests are handled by the service Envoy, and efficiently routed to your services.
 
