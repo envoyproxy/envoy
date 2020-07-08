@@ -96,8 +96,11 @@ public:
 
   MOCK_METHOD(void, start, ());
   MOCK_METHOD(void, pause, (const std::string& type_url));
+  MOCK_METHOD(void, pause, (const std::vector<std::string> type_urls));
   MOCK_METHOD(void, resume, (const std::string& type_url));
+  MOCK_METHOD(void, resume, (const std::vector<std::string> type_urls));
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
+  MOCK_METHOD(bool, paused, (const std::vector<std::string> type_urls), (const));
 
   MOCK_METHOD(void, addSubscription,
               (const std::set<std::string>& resources, const std::string& type_url,
