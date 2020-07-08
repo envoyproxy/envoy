@@ -540,9 +540,10 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 }
 
 Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::InstancePtr& buffer,
-                                       Buffer::RawSlice& slice, IoHandle::RecvMsgOutput& output,
-                                       IoHandle& handle, const Address::Instance& local_address) {
+                                       IoHandle::RecvMsgOutput& output, IoHandle& handle,
+                                       const Address::Instance& local_address) {
 
+  Buffer::RawSlice slice;
   const uint64_t num_slices = buffer->reserve(max_packet_size, &slice, 1);
   ASSERT(num_slices == 1u);
 
@@ -568,14 +569,13 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 
   if (handle.supportsUdpGro()) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
-    Buffer::RawSlice slice;
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
     // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
     const uint64_t max_packet_size_with_gro = 16 * udp_packet_processor.maxPacketSize();
 
     Api::IoCallUint64Result result =
-        receiveMessage(max_packet_size_with_gro, buffer, slice, output, handle, local_address);
+        receiveMessage(max_packet_size_with_gro, buffer, output, handle, local_address);
 
     if (!result.ok()) {
       return result;
@@ -593,8 +593,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     }
 
     // Segment the buffer read by the recvmsg syscall into gso_sized sub buffers.
-    for (uint64_t bytes_to_skip = 0; bytes_to_skip < slice.len_; bytes_to_skip += gso_size) {
-      const uint64_t bytes_to_copy = std::min(slice.len_ - bytes_to_skip, gso_size);
+    while (buffer->length() > 0) {
+      const uint64_t bytes_to_copy = std::min(buffer->length(), gso_size);
       Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
       sub_buffer->move(*buffer, bytes_to_copy);
       passPayloadToProcessor(bytes_to_copy, std::move(sub_buffer), output.msg_[0].peer_address_,
@@ -643,11 +643,10 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   }
 
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
-  Buffer::RawSlice slice;
   IoHandle::RecvMsgOutput output(1, packets_dropped);
 
-  Api::IoCallUint64Result result = receiveMessage(udp_packet_processor.maxPacketSize(), buffer,
-                                                  slice, output, handle, local_address);
+  Api::IoCallUint64Result result =
+      receiveMessage(udp_packet_processor.maxPacketSize(), buffer, output, handle, local_address);
 
   if (!result.ok()) {
     return result;
