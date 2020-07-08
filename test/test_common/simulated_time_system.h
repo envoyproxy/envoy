@@ -5,10 +5,10 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "test/test_common/only_one_thread.h"
 #include "test/test_common/test_time_system.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Event {
@@ -115,7 +115,7 @@ private:
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
-  Runtime::RandomGeneratorImpl random_source_ ABSL_GUARDED_BY(mutex_);
+  TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
   AlarmSet alarms_ ABSL_GUARDED_BY(mutex_);
   std::map<Alarm*, AlarmSet::const_iterator> alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
