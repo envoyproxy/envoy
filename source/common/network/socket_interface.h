@@ -44,7 +44,9 @@ class SocketInterfaceBase : public SocketInterface,
  * @return Pointer to @ref SocketInterface instance that registered using the name of nullptr
  */
 static inline const SocketInterface* socketInterface(std::string name) {
-  return Registry::FactoryRegistry<SocketInterface>::getFactory(name);
+  auto factory =
+      Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::getFactory(name);
+  return dynamic_cast<SocketInterface*>(factory);
 }
 
 using SocketInterfaceSingleton = InjectableSingleton<SocketInterface>;
