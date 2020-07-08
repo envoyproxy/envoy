@@ -4,6 +4,7 @@ package envoy.config.accesslog.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
+import "envoy/type/matcher/v4alpha/metadata.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -94,8 +95,8 @@ message AccessLogFilter {
     // Extension filter.
     ExtensionFilter extension_filter = 11;
 
-    // Log key filter
-    LogKeyFilter log_key_filter = 12;
+    // Metadata Filter
+    MetadataFilter metadata_filter = 12;
   }
 }
 
@@ -283,11 +284,14 @@ message GrpcStatusFilter {
   bool exclude = 2;
 }
 
-// Filters based on dynamic metadata 'access_log_policy' key. The filter will not log if the key is set to `false`.
-// If the key is set to `true` or unset, the request will be logged.
-message LogKeyFilter {
+// Filters based on matching dynamic metadata.
+message MetadataFilter {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.accesslog.v3.LogKeyFilter";
+      "envoy.config.accesslog.v3.MetadataFilter";
+
+  // Matcher to check metadata for specified value. For example, to match on the access_log_hint metadata
+  // set the filter to "envoy.common" and the path to "access_log_hint".
+  type.matcher.v4alpha.MetadataMatcher matcher = 1;
 }
 
 // Extension filter is statically registered at runtime.

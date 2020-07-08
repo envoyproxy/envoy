@@ -29,17 +29,13 @@ Dynamic metadata that is set by multiple filters is placed in the common key nam
   :header: Name, Type, Description, Rules
   :widths: 1, 1, 3, 3
 
-  access_log_policy, boolean, Whether access loggers should log the request., "When this metadata is already set: A `true` value should not be overwritten by a `false` value, while a `false` value can be overwritten by a `true` value."
+  access_log_hint, boolean, Whether access loggers should log the request., "When this metadata is already set: A `true` value should not be overwritten by a `false` value, while a `false` value can be overwritten by a `true` value."
 
 The following Envoy filters emit shared dynamic metadata.
 
 * :ref:`Role Based Access Control (RBAC) Filter <config_http_filters_rbac_dynamic_metadata>`
-<<<<<<< HEAD
-* :ref:`Role Based Access Control (RBAC) Network Filter <config_network_filters_rbac_dynamic_metadata>`
-=======
 * :ref:`Role Based Access Control (RBAC) Network Filter <config_network_filters_rbac_dynamic_metadata>`
 
 The following filters consume shared dynamic metadata.
 
-* Log Key Access Log Filter
->>>>>>> 2c3bc0a49... Added Log Key access log filter
+* Metadata Access Log Filter
