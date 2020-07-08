@@ -21,13 +21,11 @@ namespace Oauth {
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
-}
 
-const std::string& getAccessTokenBodyFormatString() {
-  CONSTRUCT_ON_FIRST_USE(
-      std::string,
-      "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}");
-}
+constexpr const char* GetAccessTokenBodyFormatString =
+    "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}";
+
+} // namespace
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
@@ -35,7 +33,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   Http::RequestMessagePtr request = createPostRequest();
   request->headers().setPath(oauth_token_path_);
   const std::string body =
-      fmt::format(getAccessTokenBodyFormatString(), auth_code, client_id, secret, cb_url);
+      fmt::format(GetAccessTokenBodyFormatString, auth_code, client_id, secret, cb_url);
   request->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
