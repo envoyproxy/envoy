@@ -28,12 +28,15 @@
 
 #include "benchmark/benchmark.h"
 
+using ::benchmark::State;
+using Envoy::benchmark::skipExpensiveBenchmarks;
+
 namespace Envoy {
 namespace Upstream {
 
 class EdsSpeedTest {
 public:
-  EdsSpeedTest(benchmark::State& state, bool v2_config)
+  EdsSpeedTest(State& state, bool v2_config)
       : state_(state), v2_config_(v2_config),
         type_url_(v2_config_
                       ? "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment"
@@ -134,7 +137,7 @@ public:
            num_hosts);
   }
 
-  benchmark::State& state_;
+  State& state_;
   const bool v2_config_;
   const std::string type_url_;
   bool initialized_{};
@@ -165,7 +168,7 @@ public:
 } // namespace Upstream
 } // namespace Envoy
 
-static void priorityAndLocalityWeighted(benchmark::State& state) {
+static void priorityAndLocalityWeighted(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
@@ -182,7 +185,7 @@ BENCHMARK(priorityAndLocalityWeighted)
     ->Ranges({{false, true}, {false, true}, {1, 100000}})
     ->Unit(benchmark::kMillisecond);
 
-static void duplicateUpdate(benchmark::State& state) {
+static void duplicateUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
@@ -198,7 +201,7 @@ static void duplicateUpdate(benchmark::State& state) {
 
 BENCHMARK(duplicateUpdate)->Range(1, 100000)->Unit(benchmark::kMillisecond);
 
-static void healthOnlyUpdate(benchmark::State& state) {
+static void healthOnlyUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);

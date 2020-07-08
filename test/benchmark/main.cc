@@ -37,4 +37,4 @@ int main(int argc, char** argv) {
   benchmark::RunSpecifiedBenchmarks();
 }
 
-bool skipExpensiveBenchmarks() { return skip_expensive_benchmarks; }
+bool Envoy::benchmark::skipExpensiveBenchmarks() { return skip_expensive_benchmarks; }
