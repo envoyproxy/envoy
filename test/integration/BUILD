@@ -331,6 +331,7 @@ envoy_cc_test(
         "http2_integration_test.cc",
         "http2_integration_test.h",
     ],
+    shard_count = 4,
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
