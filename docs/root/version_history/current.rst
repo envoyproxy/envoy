@@ -24,5 +24,5 @@ New Features
 
 Deprecated
 ----------
-* The :ref:`track_timeout_budgets <envoy_api_field_config.cluster.v3.Cluster.track_timeout_budgets>` 
-  field has been deprecated in favor of `timeout_budgets` part of an :ref:`Optional Configuration <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
+* The :ref:`track_timeout_budgets <envoy_v3_api_field_config.cluster.v3.Cluster.track_timeout_budgets>` 
+  field has been deprecated in favor of `timeout_budgets` part of an :ref:`Optional Configuration <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
