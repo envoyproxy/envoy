@@ -60,8 +60,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
           ele_vec.push_back(Stats::DynamicName(str));
           sn_vec.push_back(pool.add(str));
         } else {
-          key = pool.add(provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes() / 2)));
-          val = pool.add(provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes())));
+          key = pool.add(provider.ConsumeRandomLengthString(
+              std::min(max_len, provider.remaining_bytes() / 2)));
+          val = pool.add(
+              provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes())));
           tags.push_back({key, val});
         }
         Stats::Utility::counterFromStatNames(*scope, sn_vec, tags);
