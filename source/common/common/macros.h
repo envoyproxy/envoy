@@ -54,5 +54,7 @@ namespace Envoy {
 #define FALLTHRU
 #endif
 
-#define GCC_COMPILER (defined(__GNUC__) && !defined(__clang__))
+#if (defined(__GNUC__) && !defined(__clang__))
+#define GCC_COMPILER 
+#endif
 } // namespace Envoy
