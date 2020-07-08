@@ -466,7 +466,14 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
 
 void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                            Upstream::HostDescriptionConstSharedPtr host) {
+  if (!upstream_handle_) {
+    // Failure occurs before creating the cancellable request.
+    // The failure will be handled by handle owner.
+    return;
+  }
+
   upstream_handle_->cancel();
+  upstream_handle_ = nullptr;
 
   read_callbacks_->upstreamHost(host);
   getStreamInfo().onUpstreamHostSelected(host);

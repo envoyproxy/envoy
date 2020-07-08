@@ -63,14 +63,12 @@ void TcpConnectionHandle::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionData
 
 void TcpConnectionHandle::onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason reason,
                                         Upstream::HostDescriptionConstSharedPtr host) {
-  // An immediate callback from conn pool. tcp_upstream_handle_ could indicate successful pool
-  // ready. However, it's impossible in the context of onPoolFailure.
   if (tcp_upstream_handle_ == nullptr) {
+    // An immediate failure before creating the connection.
     has_failure_ = true;
-  } else {
-    // The onPoolFailure is invoked outside the scope of handle creation. Trigger onPoolFailure.
-    generic_pool_callbacks_.onPoolFailure(reason, host);
   }
+  // The onPoolFailure is invoked outside the scope of handle creation. Trigger onPoolFailure.
+  generic_pool_callbacks_.onPoolFailure(reason, host);
 }
 
 HttpUpstream::HttpUpstream(Envoy::Tcp::ConnectionPool::UpstreamCallbacks& callbacks,

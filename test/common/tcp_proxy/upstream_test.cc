@@ -3,10 +3,10 @@
 #include "common/tcp_proxy/upstream.h"
 #include "common/tcp_proxy/upstream_interface.h"
 
+#include "test/common/tcp_proxy/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/tcp/mocks.h"
-#include "test/common/tcp_proxy/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
