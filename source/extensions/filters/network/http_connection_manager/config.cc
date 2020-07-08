@@ -477,6 +477,7 @@ Http::ServerConnectionPtr
 HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
+  ENVOY_LOG_MISC(info, "CREATING CODEC");
   switch (codec_type_) {
   case CodecType::HTTP1: {
     Http::Http1::CodecStats& stats =

@@ -256,7 +256,7 @@ protected:
     // Callback function for MetadataDecoder.
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
-    bool buffers_overrun() const { return read_disable_count_ > 0; }
+    bool buffersOverrun() const { return read_disable_count_ > 0; }
 
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
