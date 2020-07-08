@@ -5,8 +5,8 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/utility.h"
 #include "common/common/random_generator.h"
+#include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
 

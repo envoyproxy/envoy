@@ -4,8 +4,8 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
-#include "common/http/request_id_extension_impl.h"
 #include "common/common/random_generator.h"
+#include "common/http/request_id_extension_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/simulated_time_system.h"

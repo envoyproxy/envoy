@@ -1,8 +1,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "common/common/random_generator.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "test/test_common/logging.h"
 

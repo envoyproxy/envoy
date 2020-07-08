@@ -3,6 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 
+#include "common/common/random_generator.h"
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 

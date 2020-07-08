@@ -1,6 +1,6 @@
 #include "dns_filter_test_utils.h"
 
-#include "common/runtime/runtime_impl.h"
+#include "common/common/random_generator.h"
 
 #include "test/test_common/utility.h"
 

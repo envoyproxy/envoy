@@ -230,8 +230,8 @@ public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const envoy::config::bootstrap::v3::LayeredRuntime& config,
              const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-             Random::RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
-             Api::Api& api);
+             Random::RandomGenerator& generator,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;

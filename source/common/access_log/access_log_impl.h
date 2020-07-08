@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/common/random_generator.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/type/v3/percent.pb.h"
 

@@ -10,9 +10,9 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
+#include "common/common/random_generator.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/common/random_generator.h"
 
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 

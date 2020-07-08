@@ -2,12 +2,12 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "envoy/common/random_generator.h"
 #include "common/stats/timespan_impl.h"
 
 namespace Envoy {

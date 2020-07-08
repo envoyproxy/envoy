@@ -245,7 +245,7 @@ envoy_cc_library(
     ],
     external_deps = ["ssl"],
     deps = [
-      ":assert_lib",
+        ":assert_lib",
         "//include/envoy/common:random_generator_interface",
     ],
 )

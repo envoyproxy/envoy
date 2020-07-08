@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -26,7 +27,6 @@
 #include "envoy/http/codec.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
-#include "envoy/common/random_generator.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"

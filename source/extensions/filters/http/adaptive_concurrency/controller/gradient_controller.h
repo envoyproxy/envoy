@@ -3,11 +3,11 @@
 #include <chrono>
 #include <vector>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/common/random_generator.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "extensions/filters/http/adaptive_concurrency/controller/controller.h"

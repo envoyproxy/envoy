@@ -2,8 +2,9 @@
 
 #include <random>
 
-#include "openssl/rand.h"
 #include "common/common/assert.h"
+
+#include "openssl/rand.h"
 
 namespace Envoy {
 namespace Random {

@@ -14,7 +14,7 @@ MockRandomGenerator::MockRandomGenerator() { ON_CALL(*this, uuid()).WillByDefaul
 
 MockRandomGenerator::~MockRandomGenerator() = default;
 
-}  // namespace Random
+} // namespace Random
 
 ReadyWatcher::ReadyWatcher() = default;
 ReadyWatcher::~ReadyWatcher() = default;

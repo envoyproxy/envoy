@@ -2,6 +2,7 @@
 
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
+#include "common/common/random_generator.h"
 #include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -9,7 +10,7 @@
 
 #include "server/options_impl.h"
 
-#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/common.h"
 #include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

@@ -257,8 +257,8 @@ protected:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
-  Runtime::MockRandomGenerator generator_;
-  Runtime::MockRandomGenerator rand_;
+  Random::MockRandomGenerator generator_;
+  Random::MockRandomGenerator rand_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;

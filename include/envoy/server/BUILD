@@ -257,6 +257,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

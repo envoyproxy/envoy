@@ -8,8 +8,8 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
 #include "common/common/fmt.h"
+#include "common/common/random_generator.h"
 #include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
 

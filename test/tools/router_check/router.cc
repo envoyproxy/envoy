@@ -9,10 +9,10 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/common/random_generator.h"
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
