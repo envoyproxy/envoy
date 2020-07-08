@@ -6,12 +6,15 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+
 #include "extensions/filters/network/well_known_names.h"
 
 #include "test/test_common/utility.h"
 #include <memory>
 
+// #include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "test/extensions/filters/common/ext_authz/test_common.h"
+// #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -29,63 +32,104 @@ std::vector<absl::string_view> UberFilterFuzzer::filter_names() {
 
 void UberFilterFuzzer::reset(const std::string) {
 
-  read_filter_callbacks_->connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+  // read_filter_callbacks_->connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   // release the filter memory
-  read_filter_.reset();
+  // read_filter_.reset();
   // reset the read_filter_callbacks_ because the filter has been destructed.
+  // read_filter_callbacks_=std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
+  // ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
+  //     .WillByDefault(testing::ReturnRef(addr_));
+  // ON_CALL(read_filter_callbacks_->connection_, localAddress())
+  //     .WillByDefault(testing::ReturnRef(addr_));
+  // ON_CALL(read_filter_callbacks_->connection_, addReadFilter(_))
+  //   .WillByDefault(Invoke(
+  //       [&](Network::ReadFilterSharedPtr read_filter) -> void { 
+  //         read_filter_ = read_filter; 
+  //         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
+  //       }));
+}
+void UberFilterFuzzer::perFilterSetup(const std::string filter_name){
+  std::cout<<"setup for filter:"<<filter_name<<std::endl;
+
+  // Prepare common setup for all kinds of filters
   read_filter_callbacks_=std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
-  ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
-      .WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(read_filter_callbacks_->connection_, localAddress())
-      .WillByDefault(testing::ReturnRef(addr_));
   ON_CALL(read_filter_callbacks_->connection_, addReadFilter(_))
-    .WillByDefault(Invoke(
-        [&](Network::ReadFilterSharedPtr read_filter) -> void { 
-          read_filter_ = read_filter; 
-          read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
+  .WillByDefault(Invoke(
+      [&](Network::ReadFilterSharedPtr read_filter) -> void { 
+        read_filter_ = read_filter; 
+        read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
+      }));
+
+
+  // setup response for ext_authz filter
+  if(filter_name=="envoy.filters.network.ext_authz"){
+      addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+
+    ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
+        .WillByDefault(testing::ReturnRef(addr_));
+    ON_CALL(read_filter_callbacks_->connection_, localAddress())
+        .WillByDefault(testing::ReturnRef(addr_));
+
+    async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
+      async_client_ = std::make_unique<Grpc::MockAsyncClient>();
+      async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
+
+              ON_CALL(*async_client_, sendRaw(_,_,_,_,_,_)).WillByDefault(testing::WithArgs<3>(Invoke([&](Grpc::RawAsyncRequestCallbacks& callbacks){
+
+              Filters::Common::ExtAuthz::GrpcClientImpl* grpc_client_impl=dynamic_cast<Filters::Common::ExtAuthz::GrpcClientImpl*>(&callbacks);
+    
+                const std::string empty_body{};
+                const auto expected_headers = Filters::Common::ExtAuthz::TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
+                auto check_response = Filters::Common::ExtAuthz::TestCommon::makeCheckResponse(
+                  Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body, expected_headers);
+                grpc_client_impl->onSuccess(std::move(check_response), span_);
+              // grpc_client_impl->cancel();
+
+              return async_request_.get();
+            })));
+                ON_CALL(*async_client_factory_, create()).WillByDefault(Invoke([&] {
+                return std::move(async_client_);
+              }));
+
+      ON_CALL(cluster_manager_.async_client_manager_,
+                factoryForGrpcService(_, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          return std::move(async_client_factory_);
         }));
+  }
+  
+
 }
 void UberFilterFuzzer::mockMethodsSetup() {
   // setup process when fuzzer object is constructed. For a static fuzzer, this will only be executed once.
-  read_filter_callbacks_=std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
+  
+   // Prepare expectations for the ext_authz filter.
+  
   // Prepare expectations for the local_ratelimit filter
   api_ = Api::createApiForTest(time_source_);
   dispatcher_ = api_->allocateDispatcher("test_thread");
-  ON_CALL(factory_context_, dispatcher()).WillByDefault(testing::ReturnRef(*dispatcher_));
-  // Prepare expectations for the ext_authz filter.
-  addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
-  ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
 
-  ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
-      .WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(read_filter_callbacks_->connection_, localAddress())
-      .WillByDefault(testing::ReturnRef(addr_));
+  ON_CALL(factory_context_, dispatcher()).WillByDefault(testing::ReturnRef(*dispatcher_));
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
   // Prepare expectations for the local_ratelimit filter.
   ON_CALL(factory_context_, runtime()).WillByDefault(testing::ReturnRef(runtime_));
   // ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(scope_));
+
   // Prepare general expectations for all the filters.
   ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source_));
-  ON_CALL(read_filter_callbacks_->connection_, addReadFilter(_))
-      .WillByDefault(Invoke(
-          [&](Network::ReadFilterSharedPtr read_filter) -> void { 
-            read_filter_ = read_filter; 
-            read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
-          }));
+  
   
 }
 
 void UberFilterFuzzer::filterSetup(const envoy::config::listener::v3::Filter& proto_config) {
   const std::string filter_name = proto_config.name();
   ENVOY_LOG_MISC(info, "filter name {}", filter_name);
-
   auto& factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::NamedNetworkFilterConfigFactory>(filter_name);
-
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       proto_config, factory_context_.messageValidationVisitor(), factory);
   ENVOY_LOG_MISC(info, "Config content: {}", message->DebugString());
   cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
-  cb_(read_filter_callbacks_->connection_);
 }
 UberFilterFuzzer::UberFilterFuzzer() { mockMethodsSetup(); }
 
@@ -99,7 +143,9 @@ void UberFilterFuzzer::fuzz(
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup{}", e.what());
     return;
   }
-  
+  perFilterSetup(proto_config.name());
+  //add filter to connection_
+  cb_(read_filter_callbacks_->connection_);
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {

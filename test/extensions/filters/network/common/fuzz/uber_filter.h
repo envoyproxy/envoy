@@ -8,6 +8,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include <__mutex_base>
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +25,7 @@ public:
   static std::vector<absl::string_view> filter_names();
   // Avoid issues in destructors.
   void reset(const std::string filter_name);
-
+  void perFilterSetup(const std::string filter_name);
 protected:
   // Set-up filter specific mock expectations in constructor.
   void mockMethodsSetup();
@@ -49,6 +50,10 @@ private:
   // NiceMock<Runtime::MockLoader> runtime_;
   Runtime::MockLoader runtime_;
   std::shared_ptr<NiceMock<Network::MockReadFilterCallbacks>> read_filter_callbacks_;
+  std::unique_ptr<Grpc::MockAsyncRequest>async_request_;
+  std::unique_ptr<Grpc::MockAsyncClient> async_client_;
+  std::unique_ptr<Grpc::MockAsyncClientFactory> async_client_factory_;
+  Tracing::MockSpan span_;
 };
 
 } // namespace NetworkFilters
