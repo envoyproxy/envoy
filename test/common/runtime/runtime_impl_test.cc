@@ -18,6 +18,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -1110,6 +1111,28 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(RtdsLoaderImplTest, BadConfigSource) {
+  Upstream::MockClusterManager cm_;
+  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+      .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
+        throw EnvoyException("bad config");
+        return nullptr;
+      }));
+
+  envoy::config::bootstrap::v3::LayeredRuntime config;
+  auto* layer = config.add_layers();
+  layer->set_name("some_other_resource");
+  auto* rtds_layer = layer->mutable_rtds_layer();
+  rtds_layer->set_name("some_resource");
+  rtds_layer->mutable_rtds_config();
+
+  EXPECT_CALL(cm_, subscriptionFactory()).Times(1);
+  LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
+                    *api_);
+
+  EXPECT_THROW_WITH_MESSAGE(loader.initialize(cm_), EnvoyException, "bad config");
 }
 
 } // namespace
