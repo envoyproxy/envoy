@@ -180,7 +180,7 @@ public:
   }
 
   void setupExistsHealthcheckDeprecated(bool avoid_boosting = true) {
-    const std::string yaml = R"EOF(
+  interval_jitter: 1s
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -301,9 +301,6 @@ TEST_F(RedisHealthCheckerTest, PingWithAuth) {
   auth_password_ = "test password";
 
   setupWithAuth();
-
-  // Exercise stubbed out interfaces for coverage.
-  exerciseStubs();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
