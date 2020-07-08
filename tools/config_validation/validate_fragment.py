@@ -56,7 +56,8 @@ def ParseArgs():
   parser = argparse.ArgumentParser(
       description='Validate a YAML fragment against an Envoy API proto3 type.')
   parser.add_argument(
-      'message_type', help='a string providing the type name, e.g. envoy.config.bootstrap.v3.Bootstrap.')
+      'message_type',
+      help='a string providing the type name, e.g. envoy.config.bootstrap.v3.Bootstrap.')
   parser.add_argument('fragment_path', nargs='?', help='Path to a YAML configuration fragment.')
   parser.add_argument('-s', required=False, help='YAML configuration fragment.')
 
