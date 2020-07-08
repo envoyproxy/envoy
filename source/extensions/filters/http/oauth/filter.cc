@@ -36,40 +36,28 @@ namespace Oauth {
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
-}
 
-const std::string& signoutCookieValue() {
-  CONSTRUCT_ON_FIRST_USE(std::string,
-                         "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT");
-}
+constexpr absl::string_view SignoutCookieValue =
+    "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
-const std::string& signoutBearerTokenValue() {
-  CONSTRUCT_ON_FIRST_USE(std::string,
-                         "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT");
-}
+constexpr absl::string_view SignoutBearerTokenValue =
+    "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
-const std::string& cookieTailFormatString() {
-  CONSTRUCT_ON_FIRST_USE(std::string, ";version=1;path=/;Max-Age={};secure");
-}
+constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};secure";
 
-const std::string& cookieTailHttpOnlyFormatString() {
-  CONSTRUCT_ON_FIRST_USE(std::string, ";version=1;path=/;Max-Age={};secure;HttpOnly");
-}
+constexpr const char* CookieTailHttpOnlyFormatString =
+    ";version=1;path=/;Max-Age={};secure;HttpOnly";
 
-const std::string& authClusterUriParameters() {
-  CONSTRUCT_ON_FIRST_USE(
-      std::string,
-      "https://{}/oauth/"
-      "authorize/?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}");
-}
+const char* AuthClusterUriParameters =
+    "https://{}/oauth/authorize/"
+    "?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}";
 
-const std::string& unauthorizedBodyMessage() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "OAuth flow failed.");
-}
+constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
 const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
+} // namespace
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::oauth::v3::OAuth2Config& proto_config,
@@ -77,7 +65,7 @@ FilterConfig::FilterConfig(
     Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
       oauth_server_hostname_(proto_config.hostname()), callback_path_(proto_config.callback_path()),
-      oauth_token_path(proto_config.token_path()), signout_path_(proto_config.signout_path()),
+      oauth_token_path_(proto_config.token_path()), signout_path_(proto_config.signout_path()),
       secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_options_method_(proto_config.pass_through_options_method()) {
@@ -261,9 +249,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
     const std::string new_url =
-        fmt::format(authClusterUriParameters(), config_->oauthServerHostname(), config_->clientId(),
+        fmt::format(AuthClusterUriParameters, config_->oauthServerHostname(), config_->clientId(),
                     escaped_redirect_uri, escaped_state);
-    response_headers->setReferenceKey(Http::Headers::get().Location, new_url);
+    response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 
     config_->stats().oauth_unauthenticated_rq_.inc();
@@ -346,9 +334,9 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
   const std::string new_path =
       absl::StrCat(headers.ForwardedProto()->value().getStringView(), "://", host_, "/");
-  response_headers->addReference(Http::Headers::get().SetCookie, signoutCookieValue());
-  response_headers->addReference(Http::Headers::get().SetCookie, signoutBearerTokenValue());
-  response_headers->setReferenceKey(Http::Headers::get().Location, new_path);
+  response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
+  response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
+  response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
@@ -391,9 +379,9 @@ void OAuth2Filter::finishFlow() {
   absl::Base64Escape(pre_encoded_token, &encoded_token);
 
   // We use HTTP Only cookies for the HMAC and Expiry.
-  const std::string cookie_tail = fmt::format(cookieTailFormatString(), new_expires_);
+  const std::string cookie_tail = fmt::format(CookieTailFormatString, new_expires_);
   const std::string cookie_tail_http_only =
-      fmt::format(cookieTailHttpOnlyFormatString(), new_expires_);
+      fmt::format(CookieTailHttpOnlyFormatString, new_expires_);
 
   /**
    * At this point we have all of the pieces needed to authenticate a user that did not originally
@@ -418,7 +406,7 @@ void OAuth2Filter::finishFlow() {
                                       absl::StrCat("BearerToken=", access_token_, cookie_tail));
   }
 
-  response_headers->setReferenceKey(Http::Headers::get().Location, state_);
+  response_headers->setLocation(state_);
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
   config_->stats().oauth_success_.inc();
@@ -427,7 +415,7 @@ void OAuth2Filter::finishFlow() {
 
 void OAuth2Filter::sendUnauthorizedResponse() {
   config_->stats().oauth_failure_.inc();
-  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, unauthorizedBodyMessage(), nullptr,
+  decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
                                      absl::nullopt, EMPTY_STRING);
 }
 

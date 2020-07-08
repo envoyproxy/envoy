@@ -34,11 +34,12 @@ class OAuth2ClientTest : public testing::Test {
 public:
   OAuth2ClientTest()
       : mock_callbacks_(std::make_shared<MockCallbacks>()), request_(&cm_.async_client_) {
-    client_ = std::make_shared<OAuth2ClientImpl>(cm_, "auth", "/oauth/token", std::chrono::milliseconds(3000));
+    client_ = std::make_shared<OAuth2ClientImpl>(cm_, "auth", "/oauth/token",
+                                                 std::chrono::milliseconds(3000));
   }
 
   ABSL_MUST_USE_RESULT
-  AssertionResult popPendingCallback(std::function<Http::AsyncClient::Callbacks*> func) {
+  AssertionResult popPendingCallback(std::function<void(Http::AsyncClient::Callbacks*)> func) {
     if (callbacks_.empty()) {
       return AssertionFailure() << "tried to pop callback from empty deque";
     }
@@ -84,7 +85,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _));
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   ASSERT_TRUE(popPendingCallback(
-      [](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
@@ -115,7 +116,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenIncompleteResponse) {
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   ASSERT_TRUE(popPendingCallback(
-      [](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+      [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
 TEST_F(OAuth2ClientTest, NetworkError) {
@@ -133,8 +134,9 @@ TEST_F(OAuth2ClientTest, NetworkError) {
 
   EXPECT_CALL(*mock_callbacks_, sendUnauthorizedResponse());
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-  ASSERT_TRUE(popPendingCallback(
-      [](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
+  ASSERT_TRUE(popPendingCallback([&](auto* callback) {
+    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+  }));
 }
 
 } // namespace Oauth
