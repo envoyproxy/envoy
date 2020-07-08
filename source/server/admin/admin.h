@@ -23,14 +23,15 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/common/basic_resource_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/network/connection_balancer_impl.h"
@@ -259,7 +260,7 @@ private:
    * Helper methods for the /config_dump url handler.
    */
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                          const absl::optional<std::string>& mask) const;
+                          const absl::optional<std::string>& mask, bool include_eds) const;
   /**
    * Add the config matching the passed resource to the passed config dump.
    * @return absl::nullopt on success, else the Http::Code and an error message that should be added
@@ -267,10 +268,17 @@ private:
    */
   absl::optional<std::pair<Http::Code, std::string>>
   addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
-                    const std::string& resource) const;
+                    const std::string& resource, bool include_eds) const;
 
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
+
+  /**
+   * Helper methods for the /config_dump url handler to add endpoints config
+   */
+  void addLbEndpoint(const Upstream::HostSharedPtr& host,
+                     envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
+  ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
   /**
    * URL handlers.
    */
@@ -339,6 +347,7 @@ private:
       return envoy::config::core::v3::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    ResourceLimit& openConnections() override { return open_connections_; }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
@@ -348,6 +357,7 @@ private:
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
+    BasicResourceLimitImpl open_connections_;
 
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;

@@ -9,6 +9,8 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/store.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
@@ -69,10 +71,8 @@ using RandomGeneratorPtr = std::unique_ptr<RandomGenerator>;
 /**
  * A snapshot of runtime data.
  */
-class Snapshot {
+class Snapshot : public ThreadLocal::ThreadLocalObject {
 public:
-  virtual ~Snapshot() = default;
-
   struct Entry {
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
@@ -301,6 +301,11 @@ public:
    * have either received and applied their responses or timed out.
    */
   virtual void startRtdsSubscriptions(ReadyCallback on_done) PURE;
+
+  /**
+   * @return Stats::Scope& the root scope.
+   */
+  virtual Stats::Scope& getRootScope() PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;
