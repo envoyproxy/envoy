@@ -71,7 +71,15 @@ message OkHttpResponse {
   // one if there is a match.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
-  // Optional response metadata that will be emitted as dynamic metadata.
+  // Optional response metadata that will be emitted as dynamic metadata. This metadata lives in a
+  // namespace defined by the canonical name of extension filter that requires it.
+  //
+  // .. csv-table::
+  //    :header: Namespaces, Enable flags
+  //    :widths: 1, 1
+  //
+  //    envoy.filters.http.ext_authz, :ref:`envoy.extensions.filters.http.ext_authz.v3.ExtAuthz.emit_dynamic_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_dynamic_metadata>`
+  //    envoy.filters.network.ext_authz, :ref:`envoy.extensions.filters.network.ext_authz.v3.ExtAuthz.emit_dynamic_metadata <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.emit_dynamic_metadata>`
   google.protobuf.Struct dynamic_metadata = 3;
 }
 
