@@ -6,6 +6,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/tcp/mocks.h"
+#include "test/common/tcp_proxy/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -16,6 +17,7 @@ using testing::AnyNumber;
 namespace Envoy {
 namespace TcpProxy {
 
+namespace {
 class HttpUpstreamTest : public testing::Test {
 public:
   HttpUpstreamTest() {
@@ -105,5 +107,28 @@ TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
   upstream_->onBelowWriteBufferLowWatermark();
 }
 
+class HttpConnectionHandleTest : public testing::Test {
+public:
+  HttpConnectionHandleTest() {
+    http_conn_handle_ =
+        std::make_unique<HttpConnectionHandle>(&cancellable_, generic_pool_callbacks_);
+  }
+  std::unique_ptr<HttpConnectionHandle> http_conn_handle_;
+  Envoy::ConnectionPool::MockCancellable cancellable_;
+  Envoy::TcpProxy::MockGenericUpstreamPoolCallbacks generic_pool_callbacks_;
+};
+
+TEST_F(HttpConnectionHandleTest, DestroyOnAvailableCanncellable) {
+  EXPECT_CALL(cancellable_, cancel(ConnectionPool::CancelPolicy::Default)).Times(1);
+  http_conn_handle_.reset();
+}
+
+TEST_F(HttpConnectionHandleTest, DestroyAfterComplete) {
+  EXPECT_CALL(cancellable_, cancel(_)).Times(0);
+  http_conn_handle_->complete();
+  http_conn_handle_.reset();
+}
+
+} // namespace
 } // namespace TcpProxy
 } // namespace Envoy

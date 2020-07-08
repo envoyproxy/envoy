@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_mock",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -42,6 +43,19 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
+    deps = [
+        ":tcp_upstream_mocks",
+        "//source/common/tcp_proxy:tcp_proxy_upstreams",
+        "//source/common/tcp_proxy:upstream_interface",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/tcp:tcp_mocks",
+    ],
+)
+
+envoy_cc_mock(
+    name = "tcp_upstream_mocks",
+    srcs = ["mocks.cc"],
+    hdrs = ["mocks.h"],
     deps = [
         "//source/common/tcp_proxy:tcp_proxy_upstreams",
         "//source/common/tcp_proxy:upstream_interface",
