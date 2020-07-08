@@ -30,8 +30,8 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
   const auto& proto_config = proto.config();
   const auto& credentials = proto_config.credentials();
 
-  const auto client_secret_config_name = credentials.client_secret_config_name();
-  const auto token_secret_config_name = credentials.token_secret_config_name();
+  const auto& client_secret_config_name = credentials.client_secret_config_name();
+  const auto& token_secret_config_name = credentials.token_secret_config_name();
 
   envoy::config::core::v3::ConfigSource config_source;
   auto* const api_config_source = config_source.mutable_api_config_source();
