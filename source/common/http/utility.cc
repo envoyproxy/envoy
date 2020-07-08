@@ -276,7 +276,7 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url, bool decod
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
-  return parseParameters(body, 0);
+  return parseParameters(body, 0, /*decode_param_value=*/true);
 }
 
 Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start,

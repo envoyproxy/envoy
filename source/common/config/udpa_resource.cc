@@ -131,7 +131,7 @@ void decodePath(absl::string_view path, std::string* resource_type,
 void decodeQueryParams(absl::string_view query_params,
                        udpa::core::v1::ContextParams& context_params) {
   Http::Utility::QueryParams query_params_components =
-      Http::Utility::parseQueryString(query_params);
+      Http::Utility::parseQueryString(query_params, /*decode_param_value=*/false);
   for (const auto& it : query_params_components) {
     (*context_params.mutable_params())[PercentEncoding::decode(it.first)] =
         PercentEncoding::decode(it.second);
