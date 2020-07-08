@@ -217,9 +217,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
-  if (ip_version_ != Network::Address::IpVersion::v4) {
-    return;
-  }
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(true);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -283,7 +280,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/05/13  10531    44425       44600   Refactor resource manager
   // 2020/05/20  11223    44491       44600   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    44491       44811   Make upstreams pluggable
-  // 2020/07/02  11794    44671       46000   Builtin set for common tag names
+  // 2020/06/29  11751    44715       46000   Improve time complexity of removing callback handle
+  // 2020/07/07  11794    44895       46000   Builtin set for common tag names
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -297,15 +295,13 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44671);
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    EXPECT_MEMORY_EQ(m_per_cluster, 44895);
+  }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
-  if (ip_version_ != Network::Address::IpVersion::v4) {
-    return;
-  }
-
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -352,6 +348,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/05/13  10531    36537       36800   Refactor resource manager
   // 2020/05/20  11223    36603       36800   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    36603       36923   Make upstreams pluggable
+  // 2020/06/29  11751    36827       38000   Improve time complexity of removing callback handle.
+  //                                          in callback manager.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -365,15 +363,13 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36603);
-  EXPECT_MEMORY_LE(m_per_cluster, 37000);
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    EXPECT_MEMORY_EQ(m_per_cluster, 36827);
+  }
+  EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
-  if (ip_version_ != Network::Address::IpVersion::v4) {
-    return;
-  }
-
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -411,7 +407,9 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1380);
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    EXPECT_MEMORY_EQ(m_per_host, 1380);
+  }
   EXPECT_MEMORY_LE(m_per_host, 1800); // Round up to allow platform variations.
 }
 
