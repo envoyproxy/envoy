@@ -2701,7 +2701,6 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForFilterWithoutOptions
 }
 
 // Cluster retrieval of typed extension protocol options.
-// This test case can't be converted for V3 API as it is specific for extension_protocol_options
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
 
@@ -2719,9 +2718,19 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
-    extension_protocol_options:
-      envoy.test.filter: { option: "value" }
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.test.filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          option: "value"
   )EOF";
 
   const std::string typed_yaml = R"EOF(
@@ -2729,7 +2738,14 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     typed_extension_protocol_options:
       envoy.test.filter:
         "@type": type.googleapis.com/google.protobuf.Struct
@@ -2746,26 +2762,26 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
     TestNetworkFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
         factory);
-    clusters.push_back(makeCluster(yaml, false));
+    clusters.push_back(makeCluster(yaml));
   }
   {
     // Get the cluster with extension_protocol_options for an http filter factory.
     TestHttpFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
-    clusters.push_back(makeCluster(yaml, false));
+    clusters.push_back(makeCluster(yaml));
   }
   {
     // Get the cluster with extension_protocol_options for a network filter factory.
     TestNetworkFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
         factory);
-    clusters.push_back(makeCluster(typed_yaml, false));
+    clusters.push_back(makeCluster(typed_yaml));
   }
   {
     // Get the cluster with extension_protocol_options for an http filter factory.
     TestHttpFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
-    clusters.push_back(makeCluster(typed_yaml, false));
+    clusters.push_back(makeCluster(typed_yaml));
   }
 
   // Make sure that the clusters created from both factories are as expected.

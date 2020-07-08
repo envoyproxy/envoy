@@ -512,14 +512,14 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
     original_dst_lb_config:
       use_http_header: true
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  setupFromYaml(yaml, false);
+  setupFromYaml(yaml);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
