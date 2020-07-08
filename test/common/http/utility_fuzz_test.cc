@@ -57,7 +57,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kParseParameters: {
     const auto& parse_parameters = input.parse_parameters();
-    Http::Utility::parseParameters(parse_parameters.data(), parse_parameters.start());
+    Http::Utility::parseParameters(parse_parameters.data(), parse_parameters.start(),
+                                   /*decode_param_value*/ true);
     break;
   }
   case test::common::http::UtilityTestCase::kFindQueryString: {
