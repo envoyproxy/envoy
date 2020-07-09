@@ -366,6 +366,7 @@ JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : confi
 
 void JsonTranscoderFilter::initPerRouteConfig() {
   if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
+    per_route_config_ = &config_;
     return;
   }
 
