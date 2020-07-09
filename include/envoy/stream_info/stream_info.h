@@ -510,6 +510,7 @@ public:
   virtual const FilterStateConstSharedPtr& upstreamFilterState() const PURE;
   virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
   virtual void setConstUpstreamFilterState(const FilterStateConstSharedPtr& filter_state) PURE;
+
   /**
    * @param SNI value requested.
    */

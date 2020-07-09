@@ -475,7 +475,6 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
     }
   }
 
-  // Put connecting_ and connect_attempts_ here?
   if (upstream_handle_ == nullptr ||
       // Error during creating the conn pool.
       (upstream_handle_->failedOnPool() && !upstream_handle_->failedOnConnection())) {
