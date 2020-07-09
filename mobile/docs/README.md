@@ -17,4 +17,4 @@ The output can be then be found in `generated/docs`.
 ## Updating the Envoy Mobile website and docs
 
 The docs website is automatically updated with the latest docs when a commit is
-merged to master. This is done via the [publish script](./publish.sh).
+merged to main. This is done via the [publish script](./publish.sh).

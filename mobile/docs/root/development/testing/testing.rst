@@ -7,7 +7,7 @@ Envoy Mobile strives to have a high standard of code quality and test coverage f
 project.
 
 All unit tests are in the various ``library/<language>`` directories of the repository,
-and are run on CI for all PRs and merges to master.
+and are run on CI for all PRs and merges to main.
 
 Tests may be run locally as outlined below.
 
