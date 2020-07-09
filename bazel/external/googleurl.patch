@@ -1,3 +1,6 @@
+# TODO(dio): Consider to remove this patch when we have the ability to compile the project using
+# clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
+
 diff --git a/base/compiler_specific.h b/base/compiler_specific.h
 index 2962537..6193b56 100644
 --- a/base/compiler_specific.h
