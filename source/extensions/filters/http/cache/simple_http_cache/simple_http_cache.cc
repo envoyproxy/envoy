@@ -94,7 +94,8 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
 
 void SimpleHttpCache::updateHeaders(const LookupContext&, const Http::ResponseHeaderMap&) {
   // TODO(toddmgreer): Support updating headers.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  // Not implemented yet, however this is called during tests
+  // NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
