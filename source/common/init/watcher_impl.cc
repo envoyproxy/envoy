@@ -12,7 +12,8 @@ bool WatcherHandleImpl::ready() const {
   if (locked_fn) {
     // If we can "lock" a shared pointer to the watcher's callback function, call it.
     ENVOY_LOG(debug, "{} initialized, notifying {}", handle_name_, name_);
-    (*locked_fn)();
+    // (ASOPVII: Pass target_name to watcher's callback)
+    (*locked_fn)(handle_name_);
     return true;
   } else {
     // If not, the watcher was already destroyed.

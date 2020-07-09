@@ -262,7 +262,8 @@ private:
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
-  void onRdtsReady();
+  // (ASOPVII: Pass target_name to watcher's callback)
+  void onRdtsReady(const std::string);
 
   RandomGenerator& generator_;
   RuntimeStats stats_;

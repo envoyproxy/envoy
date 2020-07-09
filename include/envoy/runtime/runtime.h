@@ -265,8 +265,8 @@ using SnapshotConstSharedPtr = std::shared_ptr<const Snapshot>;
 class Loader {
 public:
   virtual ~Loader() = default;
-
-  using ReadyCallback = std::function<void()>;
+  // (ASOPVII: Pass target_name to watcher's callback)
+  using ReadyCallback = std::function<void(const std::string)>;
 
   /**
    * Post-construction initialization. Runtime will be generally available after

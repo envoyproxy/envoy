@@ -22,9 +22,11 @@ TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
 
   ExpectableTargetImpl t1("t1");
   m.add(t1);
+  m.checkUnreadyTargets(); // (ASOPVII)
 
   ExpectableTargetImpl t2("t2");
   m.add(t2);
+  m.checkUnreadyTargets(); // (ASOPVII)
 
   ExpectableWatcherImpl w;
 
@@ -33,6 +35,7 @@ TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   t2.expectInitializeWillCallReady();
   w.expectReady();
   m.initialize(w);
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitialized(m);
 }
 
@@ -44,9 +47,11 @@ TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
 
   ExpectableTargetImpl t1("t1");
   m.add(t1);
+  m.checkUnreadyTargets(); // (ASOPVII)
 
   ExpectableTargetImpl t2("t2");
   m.add(t2);
+  m.checkUnreadyTargets(); // (ASOPVII)
 
   ExpectableWatcherImpl w;
 
@@ -54,15 +59,18 @@ TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   t1.expectInitialize();
   t2.expectInitialize();
   m.initialize(w);
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitializing(m);
 
   // should still be initializing after first target initializes
   t1.ready();
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitializing(m);
 
   // initialization should finish after second target initializes
   w.expectReady();
   t2.ready();
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitialized(m);
 }
 
@@ -77,18 +85,20 @@ TEST(InitManagerImplTest, AddMixedTargetsWhenUninitialized) {
 
   ExpectableTargetImpl t2("t2");
   m.add(t2);
-
+  m.checkUnreadyTargets(); // (ASOPVII)
   ExpectableWatcherImpl w;
 
   // initialization should begin, and first target will initialize immediately
   t1.expectInitializeWillCallReady();
   t2.expectInitialize();
   m.initialize(w);
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitializing(m);
 
   // initialization should finish after second target initializes
   w.expectReady();
   t2.ready();
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitialized(m);
 }
 
@@ -100,23 +110,27 @@ TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
 
   ExpectableTargetImpl t1("t1");
   m.add(t1);
-
+  m.checkUnreadyTargets(); // (ASOPVII)
+  
   ExpectableWatcherImpl w;
 
   // initialization should begin
   t1.expectInitialize();
   m.initialize(w);
   expectInitializing(m);
+  m.checkUnreadyTargets(); // (ASOPVII)
 
   // adding an immediate target shouldn't finish initialization
   ExpectableTargetImpl t2("t2");
   t2.expectInitializeWillCallReady();
   m.add(t2);
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitializing(m);
 
   // initialization should finish after original target initializes
   w.expectReady();
   t1.ready();
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitialized(m);
 }
 
@@ -130,6 +144,7 @@ TEST(InitManagerImplTest, UnavailableTarget) {
   {
     ExpectableTargetImpl t("t");
     m.add(t);
+    m.checkUnreadyTargets(); // (ASOPVII)
     t.expectInitialize().Times(0);
   }
 
@@ -138,6 +153,7 @@ TEST(InitManagerImplTest, UnavailableTarget) {
   // initialization should complete despite the destroyed target
   w.expectReady();
   m.initialize(w);
+  m.checkUnreadyTargets(); // (ASOPVII)
   expectInitialized(m);
 }
 
@@ -152,10 +168,12 @@ TEST(InitManagerImplTest, UnavailableManager) {
     expectUninitialized(m);
 
     m.add(t);
+    m.checkUnreadyTargets(); // (ASOPVII)
 
     // initialization should begin before destroying the manager
     t.expectInitialize();
     m.initialize(w);
+    m.checkUnreadyTargets(); // (ASOPVII)
     expectInitializing(m);
   }
 
@@ -172,6 +190,7 @@ TEST(InitManagerImplTest, UnavailableWatcher) {
 
   ExpectableTargetImpl t("t");
   m.add(t);
+  m.checkUnreadyTargets(); // (ASOPVII)
 
   {
     ExpectableWatcherImpl w;
@@ -179,13 +198,16 @@ TEST(InitManagerImplTest, UnavailableWatcher) {
     // initialization should begin before destroying the watcher
     t.expectInitialize();
     m.initialize(w);
+    m.checkUnreadyTargets(); // (ASOPVII)
     expectInitializing(m);
 
     w.expectReady().Times(0);
+    m.checkUnreadyTargets(); // (ASOPVII)
   }
 
   // initialization should finish without notifying the watcher
   t.ready();
+  m.checkUnreadyTargets(); // (ASOPVII)
 }
 
 } // namespace
