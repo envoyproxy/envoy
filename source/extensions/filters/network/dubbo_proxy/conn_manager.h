@@ -67,8 +67,8 @@ public:
 
   DubboFilterStats& stats() const { return stats_; }
   Network::Connection& connection() const { return read_callbacks_->connection(); }
-  TimeSource& time_system() const { return time_system_; }
-  Random::RandomGenerator& random_generator() const { return random_generator_; }
+  TimeSource& timeSystem() const { return time_system_; }
+  Random::RandomGenerator& randomGenerator() const { return random_generator_; }
   Config& config() const { return config_; }
   SerializationType downstreamSerializationType() const { return protocol_->serializer()->type(); }
   ProtocolType downstreamProtocolType() const { return protocol_->type(); }
