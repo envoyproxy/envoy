@@ -144,7 +144,8 @@ public:
   virtual void encodeTrailers(const ResponseTrailerMap& trailers) PURE;
 
   /**
-   * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection error. 
+   * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection
+   * error.
    */
   virtual absl::optional<bool> streamErrorOnInvalidHttpMessage() PURE;
 };

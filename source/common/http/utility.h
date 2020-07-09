@@ -265,9 +265,9 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
  */
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
-bool streamErrorOnInvalidHttpMessageForHttp1( 
-            const bool hcm_stream_error_on_invalid_http_message, 
-            const absl::optional<bool>& override_stream_error_on_invalid_http_message);
+bool streamErrorOnInvalidHttpMessageForHttp1(
+    const bool hcm_stream_error_on_invalid_http_message,
+    const absl::optional<bool>& override_stream_error_on_invalid_http_message);
 
 struct EncodeFunctions {
   // Function to rewrite locally generated response.
