@@ -122,16 +122,16 @@ TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
 TEST_F(PrometheusStatsFormatterTest, MetricNameOptOut) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "vulture_eats_liver";
-  auto actual = PrometheusStatsFormatter::metricName(raw);
 
   EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace(".vulture"));
 
   EXPECT_FALSE(PrometheusStatsFormatter::unregisterPrometheusNamespace("vulture"));
   EXPECT_TRUE(PrometheusStatsFormatter::registerPrometheusNamespace("vulture"));
   EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace("vulture"));
-  EXPECT_EQ("envoy_" + expected, actual);
+  EXPECT_EQ(expected, PrometheusStatsFormatter::metricName(raw));
   EXPECT_TRUE(PrometheusStatsFormatter::unregisterPrometheusNamespace("vulture"));
-  EXPECT_EQ("envoy_" + expected, actual);
+
+  EXPECT_EQ("envoy_" + expected, PrometheusStatsFormatter::metricName(raw));
 }
 
 TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
