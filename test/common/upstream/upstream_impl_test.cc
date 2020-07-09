@@ -2341,16 +2341,25 @@ TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.
-// This test case can't be converted for V3 API as it is specific for extension_protocol_options
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
-    extension_protocol_options:
-      no_such_filter: { option: value }
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      no_such_filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          option: "value"
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
@@ -2630,7 +2639,6 @@ struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig 
 
 // Cluster extension protocol options fails validation when configured for filter that does not
 // support options.
-// This test case can't be converted for V3 API as it is specific for extension_protocol_options
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
   TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return nullptr; },
@@ -2642,9 +2650,19 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
-    extension_protocol_options:
-      envoy.test.filter: { option: value }
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.test.filter:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          option: "value"
   )EOF";
 
   {
