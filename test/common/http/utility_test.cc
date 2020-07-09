@@ -355,6 +355,26 @@ initial_connection_window_size: 65535
   }
 }
 
+TEST(HttpUtility, ValidateStreamErrorsWithHcmForHttp1) {
+  // If the override value is present, it will take precedence over the HCM value.
+  bool hcm_stream_error = false;
+  absl::optional<bool> override_stream_error = true;
+  EXPECT_TRUE(Http::Utility::streamErrorOnInvalidHttpMessageForHttp1(hcm_stream_error, override_stream_error));
+
+  hcm_stream_error = true;
+  override_stream_error = false;
+  EXPECT_FALSE(Http::Utility::streamErrorOnInvalidHttpMessageForHttp1(hcm_stream_error, override_stream_error));
+
+  // If the override value is not set, the HCM value will be used.
+  hcm_stream_error = false;
+  override_stream_error.reset();
+  EXPECT_FALSE(Http::Utility::streamErrorOnInvalidHttpMessageForHttp1(hcm_stream_error, override_stream_error));
+
+  hcm_stream_error = true;
+  override_stream_error.reset();
+  EXPECT_TRUE(Http::Utility::streamErrorOnInvalidHttpMessageForHttp1(hcm_stream_error, override_stream_error));
+}
+
 TEST(HttpUtility, getLastAddressFromXFF) {
   {
     const std::string first_address = "192.0.2.10";

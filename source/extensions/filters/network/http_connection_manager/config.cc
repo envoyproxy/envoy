@@ -202,6 +202,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
+      stream_error_on_invalid_http_messaging_(false),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
 #ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
