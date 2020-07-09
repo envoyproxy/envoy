@@ -39,7 +39,8 @@ public:
 
   /**
    * Register a prometheus namespace, stats starting with the namespace will not be
-   * automatically namespaced. This method must be called from the main thread.
+   * automatically prefixed with envoy namespace.
+   * This method must be called from the main thread.
    * @returns bool if a new namespace is registered, false if the namespace is already
    *          registered or the namespace is invalid.
    */

@@ -119,10 +119,11 @@ TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST_F(PrometheusStatsFormatterTest, MetricNameOptOut) {
+TEST_F(PrometheusStatsFormatterTest, NamespaceRegistry) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "vulture_eats_liver";
 
+  EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace("3vulture"));
   EXPECT_FALSE(PrometheusStatsFormatter::registerPrometheusNamespace(".vulture"));
 
   EXPECT_FALSE(PrometheusStatsFormatter::unregisterPrometheusNamespace("vulture"));

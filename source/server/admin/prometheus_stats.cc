@@ -12,7 +12,9 @@ namespace Server {
 namespace {
 
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
-const std::regex& namespaceRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-Z0-9]*$"); }
+const std::regex& namespaceRegex() {
+  CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-Z_][a-zA-Z0-9]*$");
+}
 
 /**
  * Take a string and sanitize it according to Prometheus conventions.
@@ -20,6 +22,7 @@ const std::regex& namespaceRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-
 std::string sanitizeName(const std::string& name) {
   // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
+  // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
   return std::regex_replace(name, promRegex(), "_");
 }
 
