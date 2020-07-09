@@ -468,7 +468,7 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client->write("hello", false));
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
 
   std::string access_log =
       absl::StrCat("NR ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
