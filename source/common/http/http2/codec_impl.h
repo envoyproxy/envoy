@@ -383,7 +383,7 @@ protected:
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
     absl::optional<bool> stream_error_on_invalid_http_message_;
 
-    absl::optional<bool> streamErrorOnInvalidHTTPMessage() override {
+    absl::optional<bool> streamErrorOnInvalidHttpMessage() override {
       return stream_error_on_invalid_http_message_;
     }
   };

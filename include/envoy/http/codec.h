@@ -142,6 +142,11 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(const ResponseTrailerMap& trailers) PURE;
+
+  /**
+   * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection error. 
+   */
+  virtual absl::optional<bool> streamErrorOnInvalidHttpMessage() PURE;
 };
 
 /**
@@ -388,6 +393,8 @@ struct Http1Settings {
 
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
+
+  absl::optional<bool> stream_error_on_invalid_http_message_{};
 };
 
 /**

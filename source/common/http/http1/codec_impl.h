@@ -136,7 +136,7 @@ public:
   void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
-  absl::optional<bool> streamErrorOnInvalidHTTPMessage() override {
+  absl::optional<bool> streamErrorOnInvalidHttpMessage() override {
     return stream_error_on_invalid_http_message_;
   }
 
