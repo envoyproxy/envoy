@@ -5,11 +5,13 @@
 #include "envoy/config/subscription.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/cleanup.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {
 
+using ScopedResume = std::unique_ptr<Cleanup>;
 /**
  * All control plane related stats. @see stats_macros.h
  */
@@ -62,8 +64,11 @@ public:
    * requests may later be resumed with resume().
    * @param type_url type URL corresponding to xDS API, e.g.
    * type.googleapis.com/envoy.api.v2.Cluster.
+   *
+   * @return a ScopedResume object, which when destructed, resumes the paused discovery requests.
+   * A discovery request will be sent if one would have been sent during the pause.
    */
-  virtual void pause(const std::string& type_url) PURE;
+  ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::string& type_url) PURE;
 
   /**
    * Pause discovery requests for given API types. This is useful when we're processing an update
@@ -71,23 +76,11 @@ public:
    * requests may later be resumed with resume().
    * @param type_urls type URLs corresponding to xDS API, e.g.
    * type.googleapis.com/envoy.api.v2.Cluster.
+   *
+   * @return a ScopedResume object, which when destructed, resumes the paused discovery requests.
+   * A discovery request will be sent if one would have been sent during the pause.
    */
-  virtual void pause(const std::vector<std::string> type_urls) PURE;
-
-  /**
-   * Resume discovery requests for a given API type. This will send a discovery request if one would
-   * have been sent during the pause.
-   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
-   */
-  virtual void resume(const std::string& type_url) PURE;
-
-  /**
-   * Resume discovery requests for given API types. This will send a discovery request if one would
-   * have been sent during the pause.
-   * @param type_urls type URLs corresponding to xDS API e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster
-   */
-  virtual void resume(const std::vector<std::string> type_urls) PURE;
+  ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::vector<std::string> type_urls) PURE;
 
   /**
    * Retrieves the current pause state as set by pause()/resume().

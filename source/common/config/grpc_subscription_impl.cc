@@ -105,9 +105,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
   stats_.update_attempt_.inc();
 }
 
-void GrpcSubscriptionImpl::pause() { grpc_mux_->pause(type_url_); }
-
-void GrpcSubscriptionImpl::resume() { grpc_mux_->resume(type_url_); }
+ScopedResume GrpcSubscriptionImpl::pause() { return grpc_mux_->pause(type_url_); }
 
 void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
   if (init_fetch_timeout_timer_) {

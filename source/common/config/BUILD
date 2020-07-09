@@ -139,6 +139,7 @@ envoy_cc_library(
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/memory:utils_lib",

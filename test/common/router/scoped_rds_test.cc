@@ -241,7 +241,7 @@ key:
     - string_key: x-bar-key
 )EOF";
   const auto resource_2 = parseScopedRouteConfigurationFromYaml(config_yaml2);
-  init_watcher_.expectReady().Times(1); // Only the SRDS parent_init_target_.
+  init_watcher_.expectReady(); // Only the SRDS parent_init_target_.
   context_init_manager_.initialize(init_watcher_);
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
@@ -298,7 +298,7 @@ key:
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
 TEST_F(ScopedRdsTest, MultipleResourcesDelta) {
   setup();
-  init_watcher_.expectReady().Times(1);
+  init_watcher_.expectReady();
   const std::string config_yaml = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
@@ -318,8 +318,8 @@ key:
 
   // Delta API.
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
   context_init_manager_.initialize(init_watcher_);
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
@@ -433,7 +433,7 @@ key:
     - string_key: x-foo-key
 )EOF";
   const auto resource_2 = parseScopedRouteConfigurationFromYaml(config_yaml2);
-  init_watcher_.expectReady().Times(1); // Partial success gets the subscription ready.
+  init_watcher_.expectReady(); // Partial success gets the subscription ready.
   context_init_manager_.initialize(init_watcher_);
 
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
@@ -479,6 +479,8 @@ key:
   const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml1);
   const auto resource_2 = parseScopedRouteConfigurationFromYaml(config_yaml2);
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
@@ -492,8 +494,6 @@ key:
                   ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                   ->name(),
               "");
-  init_watcher_.expectReady().Times(1);
-  context_init_manager_.initialize(init_watcher_);
   pushRdsConfig({"foo_routes", "bar_routes"}, "111");
   EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
             1UL);
@@ -646,7 +646,7 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
 // config.
 TEST_F(ScopedRdsTest, ConfigDump) {
   setup();
-  init_watcher_.expectReady().Times(1);
+  init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
   auto message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
