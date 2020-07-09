@@ -34,6 +34,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
