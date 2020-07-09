@@ -35,6 +35,7 @@ envoy_cc_library(
     deps = [
         ":subscription_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/common:cleanup_lib",
         "//source/common/protobuf",
     ],
 )
