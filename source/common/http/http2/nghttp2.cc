@@ -14,6 +14,8 @@ namespace Http {
 namespace Http2 {
 
 void initializeNghttp2Logging() {
+  // Event when ENVOY_NGHTTP2_TRACE is not set, we install a debug logger, to prevent nghttp2
+  // logging directly to stdout at -l trace.
   nghttp2_set_debug_vprintf_callback([](const char* format, va_list args) {
     if (std::getenv("ENVOY_NGHTTP2_TRACE") != nullptr) {
       char buf[2048];
