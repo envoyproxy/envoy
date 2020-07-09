@@ -348,6 +348,7 @@ protected:
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
         : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {
+      // TODO(rulex123) pull from value that overrides HCM configuration
       stream_error_on_invalid_http_message_ = parent.stream_error_on_invalid_http_messaging_;
     }
 
