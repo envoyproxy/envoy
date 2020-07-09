@@ -27,7 +27,7 @@ public:
     maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
-  using LazyCreateAncestor = std::pair<FilterStateSharedPtr&, FilterState::LifeSpan>;
+  using LazyCreateAncestor = std::pair<FilterStateSharedPtr, FilterState::LifeSpan>;
   /**
    * @param ancestor a std::pair storing an ancestor, that can be passed in as a way to lazy
    * initialize a FilterState that's owned by an object with bigger scope than this. This is to
