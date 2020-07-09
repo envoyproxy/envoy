@@ -45,6 +45,7 @@ envoy_cc_test(
     name = "codec_impl_legacy_test",
     srcs = ["codec_impl_legacy_test.cc"],
     shard_count = 5,
+    tags = ["fails_on_windows"],
     deps = [
         ":codec_impl_legacy_test_util",
         "//source/common/event:dispatcher_lib",
