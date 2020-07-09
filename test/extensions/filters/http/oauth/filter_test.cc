@@ -65,7 +65,9 @@ public:
 
 class OAuth2Test : public testing::Test {
 public:
-  OAuth2Test() : request_(&cm_.async_client_) {
+  OAuth2Test() : request_(&cm_.async_client_) { init(); }
+
+  void init() {
     // Set up the OAuth client
     oauth_client_ = new MockOAuth2Client();
     std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
@@ -115,6 +117,14 @@ public:
   Stats::IsolatedStoreImpl scope_;
   Event::SimulatedTimeSystem test_time_;
 };
+
+TEST_F(OAuth2Test, InvalidCluster) {
+  ON_CALL(factory_context_.cluster_manager_, get(_)).WillByDefault(Return(nullptr));
+
+  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
+                            "OAuth2 filter: unknown cluster 'auth.example.com' in config. Please "
+                            "specify which cluster to direct OAuth requests to.");
+}
 
 /**
  * Scenario: The OAuth filter receives a sign out request.
@@ -296,31 +306,63 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
-/**
- * Scenario: The OAuth filter has successfully set the cookie parameters in the headers and
- * we should expect to continue to the next filter in the chain after validating HMAC/expiration.
- * This infers forward_bearer_token = true because we provide a BearerToken cookie to the validator.
- * Otherwise, this cookie should be void and will not contribute to the HMAC validation.
- *
- * Expected behavior: the OAuth2CookieValidator should return true after parsing the cookie values.
- */
-TEST_F(OAuth2Test, OAuthValidatedCookieAndContinue) {
+// Validates the behavior of the cookie validator.
+TEST_F(OAuth2Test, CookieValidator) {
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+
+  const auto expires_at_s =
+      std::chrono::duration_cast<std::chrono::seconds>(
+          test_time_.timeSystem().systemTime().time_since_epoch() + std::chrono::seconds(10))
+          .count();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
+      {Http::Headers::get().Cookie.get(),
+       fmt::format("OauthExpires={};version=test", expires_at_s)},
       {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
-       "NmU4ZjFjMWNkYzQwOTA5YzUwMmYwN2U1MDcxZjA2Y2VlNmZlODczNmRhYjA5ZjZiZGQ0ODVkNjAzODljYmM0NA=="
+       "NGQ3MzVjZGExNGM5NTFiZGJjODBkMjBmYjAyYjNiOTFjMmNjYjIxMTUzNmNiNWU0NjQzMmMxMWUzZmE2ZWJjYg=="
        ";version=test"},
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
   cookie_validator->setParams(request_headers, "mock-secret");
 
-  EXPECT_EQ(cookie_validator->hmacIsValid(), true);
+  EXPECT_TRUE(cookie_validator->hmacIsValid());
+  EXPECT_TRUE(cookie_validator->timestampIsValid());
+  EXPECT_TRUE(cookie_validator->isValid());
+
+  // If we advance time beyond 10s the timestamp should no longer be valid.
+  test_time_.advanceTimeWait(std::chrono::seconds(11));
+
+  EXPECT_FALSE(cookie_validator->timestampIsValid());
+  EXPECT_FALSE(cookie_validator->isValid());
+}
+
+// Validates the behavior of the cookie validator when the expires_at value is not a valid integer.
+TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber;version=test"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "M2NjZmIxYWE0NzQzOGZlZTJjMjQwMzBiZTU5OTdkN2Y0NDRhZjE5MjZiOWNhY2YzNjM0MWRmMTNkMDVmZWFlOQ=="
+       ";version=test"},
+  };
+
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
+  cookie_validator->setParams(request_headers, "mock-secret");
+
+  EXPECT_TRUE(cookie_validator->hmacIsValid());
+  EXPECT_FALSE(cookie_validator->timestampIsValid());
+  EXPECT_FALSE(cookie_validator->isValid());
 }
 
 /**
