@@ -31,7 +31,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/direct_response:89.3"
 "source/extensions/filters/network/dubbo_proxy:96.1"
 "source/extensions/filters/network/dubbo_proxy/router:95.1"
-"source/extensions/filters/network/http_connection_manager:95.9"
 "source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/sni_cluster:90.3"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:89.4"
