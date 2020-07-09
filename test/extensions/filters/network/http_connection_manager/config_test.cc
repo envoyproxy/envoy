@@ -440,7 +440,7 @@ tracing:
   EXPECT_NE(foo, nullptr);
   EXPECT_EQ(foo->tag(), "foo");
 }
-// FIXME
+
 TEST_F(HttpConnectionManagerConfigTest,
        DEPRECATED_FEATURE_TEST(ListenerDirectionOutboundOverride)) {
   const std::string yaml_string = R"EOF(
