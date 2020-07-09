@@ -108,7 +108,9 @@ public:
   std::string name() const override { return ""; }
 };
 
-TEST(RegistryTest, DEPRECATED_FEATURE_TEST(AssertsIfNoDeprecatedNamePassed)) {
+TEST(RegistryTest, DEPRECATED_FEATURE_TEST(AssertsIfNoDeprecatedNameGiven)) {
+  // Expects an assert to raise if we register a factory that has an empty name
+  // and no associated deprecated names.
   EXPECT_DEATH((Registry::RegisterFactory<TestWithDeprecatedPublishedFactoryNoDeprecatedNames,
                                           PublishedFactory>({})),
                ".*assert failure:.*");
@@ -205,7 +207,7 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactoryAn
   TestVersionedWithDeprecatedNamesFactoryAndAdditionalCategory test;
 
   // Check the category is not registered
-  EXPECT_FALSE(Registry::FactoryCategoryRegistry::isRegistered(test.category()));
+  ASSERT_FALSE(Registry::FactoryCategoryRegistry::isRegistered(test.category()));
 
   auto factory =
       Registry::RegisterFactory<TestVersionedWithDeprecatedNamesFactoryAndAdditionalCategory,
@@ -214,14 +216,15 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactoryAn
           {"testing.published.versioned.deprecated_name_and_category"});
 
   // Check the category now registered
-  EXPECT_TRUE(Registry::FactoryCategoryRegistry::isRegistered(test.category()));
+  ASSERT_TRUE(Registry::FactoryCategoryRegistry::isRegistered(test.category()));
 
   const auto& factories = Envoy::Registry::FactoryCategoryRegistry::registeredFactories();
 
   auto version =
       factories.find("testing.published.additional.category")
           ->second->getFactoryVersion("testing.published.versioned.instead_name_and_category");
-  EXPECT_TRUE(version.has_value());
+
+  ASSERT_TRUE(version.has_value());
   EXPECT_EQ(0, version.value().version().major_number());
   EXPECT_EQ(0, version.value().version().minor_number());
   EXPECT_EQ(1, version.value().version().patch());
@@ -233,8 +236,7 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactoryAn
   auto deprecated_version =
       factories.find("testing.published.additional.category")
           ->second->getFactoryVersion("testing.published.versioned.deprecated_name_and_category");
-  EXPECT_TRUE(deprecated_version.has_value());
-  EXPECT_THAT(deprecated_version.value(), ProtoEq(version.value()));
+  EXPECT_THAT(deprecated_version, testing::Optional(ProtoEq(version.value())));
 }
 
 } // namespace
