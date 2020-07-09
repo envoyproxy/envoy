@@ -617,6 +617,7 @@ getaddrinfo
 getaffinity
 gethostname
 getifaddrs
+getname
 getpeername
 getsockname
 getsockopt
