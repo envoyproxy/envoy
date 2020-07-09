@@ -6,7 +6,7 @@ import java.lang.IllegalArgumentException
  * Specifies how a request may be retried, containing one or more rules.
  *
  * @param maxRetryCount Maximum number of retries that a request may be performed.
- * @param retryOn Whitelist of rules used for retrying.
+ * @param retryOn Rules checked for retrying.
  * @param retryStatusCodes Additional list of status codes that should be retried.
  * @param perRetryTimeoutMS Timeout (in milliseconds) to apply to each retry.
  * Must be <= `totalUpstreamTimeoutMS` if it's a positive number.

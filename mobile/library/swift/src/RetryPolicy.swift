@@ -74,7 +74,7 @@ public final class RetryPolicy: NSObject {
   /// Designated initializer.
   ///
   /// - parameter maxRetryCount:          Maximum number of retries that a request may be performed.
-  /// - parameter retryOn:                Whitelist of rules used for retrying.
+  /// - parameter retryOn:                Rules checked for retrying.
   /// - parameter retryStatusCodes:       Additional list of status codes that should be retried.
   /// - parameter perRetryTimeoutMS:      Timeout (in milliseconds) to apply to each retry. Must be
   ///                                     <= `totalUpstreamTimeoutMS` if it's a positive number.
