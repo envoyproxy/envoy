@@ -49,12 +49,7 @@ public:
   }
 
   void setState(const std::string& action, OverloadActionState state) {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      actions_[action] = state;
-    } else {
-      it->second = state;
-    }
+    actions_[action] = state;
   }
 
 private:
