@@ -127,7 +127,6 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
@@ -225,7 +224,6 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
@@ -331,6 +329,7 @@ envoy_cc_test(
         "http2_integration_test.cc",
         "http2_integration_test.h",
     ],
+    shard_count = 4,
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -947,6 +946,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 2,
     tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",

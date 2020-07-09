@@ -73,9 +73,7 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot,
-                     public ThreadLocal::ThreadLocalObject,
-                     Logger::Loggable<Logger::Id::runtime> {
+class SnapshotImpl : public Snapshot, Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
@@ -221,6 +219,7 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
+  void createSubscription();
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;
@@ -259,7 +258,7 @@ private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual SnapshotImplPtr createNewSnapshot();
+  SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
