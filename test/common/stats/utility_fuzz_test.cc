@@ -39,9 +39,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   } else {
     symbol_table = std::make_unique<Stats::SymbolTableImpl>();
   }
-  Stats::IsolatedStoreImpl store;
+  std::unique_ptr<Stats::IsolatedStoreImpl> store =
+      std::make_unique<Stats::IsolatedStoreImpl>(*symbol_table);
   Stats::StatNamePool pool(*symbol_table);
-  Stats::ScopePtr scope = store.createScope(provider.ConsumeRandomLengthString(max_len));
+  Stats::ScopePtr scope = store->createScope(provider.ConsumeRandomLengthString(max_len));
   Stats::ElementVec ele_vec;
   Stats::StatNameVec sn_vec;
   Stats::StatNameTagVector tags;
@@ -55,7 +56,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     while (provider.remaining_bytes() > 3) {
       if (provider.ConsumeBool()) {
         absl::string_view str = make_string(
-            provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes() / 3)));
+            provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes())));
         ele_vec.push_back(Stats::DynamicName(str));
         sn_vec.push_back(pool.add(str));
       } else {
