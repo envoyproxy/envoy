@@ -88,7 +88,7 @@ public:
 
   void initialize(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml_config);
+        Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::aggregate::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
