@@ -8,8 +8,10 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/path.proto";
 import "envoy/type/matcher/v3/string.proto";
 
+import "google/api/expr/v1alpha1/checked.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -104,7 +106,15 @@ message Policy {
   // An optional symbolic expression specifying an access control
   // :ref:`condition <arch_overview_condition>`. The condition is combined
   // with the permissions and the principals as a clause with AND semantics.
-  google.api.expr.v1alpha1.Expr condition = 3;
+  // Only be used when checked_condition is not used.
+  google.api.expr.v1alpha1.Expr condition = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "expression_specifier"];
+
+  // [#not-implemented-hide:]
+  // An optional symbolic expression that has been successfully type checked.
+  // Only be used when condition is not used.
+  google.api.expr.v1alpha1.CheckedExpr checked_condition = 4
+      [(udpa.annotations.field_migrate).oneof_promotion = "expression_specifier"];
 }
 
 // Permission defines an action (or actions) that a principal can take.

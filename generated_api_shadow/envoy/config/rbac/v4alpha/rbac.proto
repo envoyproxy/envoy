@@ -8,6 +8,7 @@ import "envoy/type/matcher/v4alpha/metadata.proto";
 import "envoy/type/matcher/v4alpha/path.proto";
 import "envoy/type/matcher/v4alpha/string.proto";
 
+import "google/api/expr/v1alpha1/checked.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
 
 import "udpa/annotations/status.proto";
@@ -101,10 +102,18 @@ message Policy {
   // Principal with the `any` field set to true should be used.
   repeated Principal principals = 2 [(validate.rules).repeated = {min_items: 1}];
 
-  // An optional symbolic expression specifying an access control
-  // :ref:`condition <arch_overview_condition>`. The condition is combined
-  // with the permissions and the principals as a clause with AND semantics.
-  google.api.expr.v1alpha1.Expr condition = 3;
+  oneof expression_specifier {
+    // An optional symbolic expression specifying an access control
+    // :ref:`condition <arch_overview_condition>`. The condition is combined
+    // with the permissions and the principals as a clause with AND semantics.
+    // Only be used when checked_condition is not used.
+    google.api.expr.v1alpha1.Expr condition = 3;
+
+    // [#not-implemented-hide:]
+    // An optional symbolic expression that has been successfully type checked.
+    // Only be used when condition is not used.
+    google.api.expr.v1alpha1.CheckedExpr checked_condition = 4;
+  }
 }
 
 // Permission defines an action (or actions) that a principal can take.
