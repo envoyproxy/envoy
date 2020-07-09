@@ -60,7 +60,6 @@ envoy_cc_fuzz_test(
     deps = [
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//test/fuzz:utility_lib",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
     ],
 )
