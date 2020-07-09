@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/compression/decompressor/config.h"
 #include "envoy/compression/decompressor/decompressor.h"
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
@@ -10,7 +12,6 @@
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
