@@ -18,7 +18,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth {
 
-using testing::_;
 using testing::NiceMock;
 
 TEST(ConfigTest, CreateFilter) {
