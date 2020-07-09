@@ -106,7 +106,7 @@ in order to take advantage of the
 (and subsequently Envoy Mobile).
 
 Note that only stats specified in the configuration's
-:tree:`whitelist <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L146-L167>`
+:tree:`inclusion list <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L146-L167>`
 will be emitted.
 
 **Example**::
