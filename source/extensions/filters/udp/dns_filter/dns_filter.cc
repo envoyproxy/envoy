@@ -120,7 +120,7 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
 
 DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
                      const DnsFilterEnvoyConfigSharedPtr& config)
-    : UdpListenerReadFilter(callbacks), config_(config), listener_(callbacks.udpListener()),
+    : UdpListenerReadFilter(callbacks), config_(config), listener_(*callbacks.udpListener()),
       cluster_manager_(config_->clusterManager()),
       message_parser_(config->forwardQueries(), listener_.dispatcher().timeSource(),
                       config->retryCount(), config->random(),

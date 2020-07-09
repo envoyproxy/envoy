@@ -153,12 +153,12 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                              Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                              const Upstream::HostConstSharedPtr& host)
     : cluster_(cluster), addresses_(std::move(addresses)), host_(host),
-      idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
+      idle_timer_(cluster.filter_.read_callbacks_->udpListener()->dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
       io_handle_(cluster.filter_.createIoHandle(host)),
-      socket_event_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createFileEvent(
+      socket_event_(cluster.filter_.read_callbacks_->udpListener()->dispatcher().createFileEvent(
           io_handle_->fd(), [this](uint32_t) { onReadReady(); }, Event::FileTriggerType::Edge,
           Event::FileReadyType::Read)) {
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
@@ -243,7 +243,8 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
   cluster_.cluster_stats_.sess_rx_datagrams_.inc();
   cluster_.cluster_.info()->stats().upstream_cx_rx_bytes_total_.add(buffer_length);
 
-  if (!cluster_.filter_.read_callbacks_->isValidUdpListener()) {
+  Network::UdpListener* const udpListener = cluster_.filter_.read_callbacks_->udpListener();
+  if (udpListener == nullptr) {
     // In this case, the udp listener is removed or not added yet.
     // So, we simply ignore datagram that incoming.
     ENVOY_LOG(
@@ -256,7 +257,7 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
   }
 
   Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *buffer};
-  const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener().send(data);
+  const Api::IoCallUint64Result rc = udpListener->send(data);
   if (!rc.ok()) {
     cluster_.filter_.config_->stats().downstream_sess_tx_errors_.inc();
   } else {

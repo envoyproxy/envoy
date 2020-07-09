@@ -585,9 +585,7 @@ void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& fil
   read_filter_ = std::move(filter);
 }
 
-Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }
-
-bool ActiveRawUdpListener::isValidUdpListener() { return udp_listener_ != nullptr; }
+Network::UdpListener* ActiveRawUdpListener::udpListener() { return udp_listener_.get(); }
 
 } // namespace Server
 } // namespace Envoy

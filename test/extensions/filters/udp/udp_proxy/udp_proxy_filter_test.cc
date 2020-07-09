@@ -147,7 +147,6 @@ public:
       : upstream_address_(Network::Utility::parseInternetAddressAndPort("20.0.0.1:443")) {
     // Disable strict mock warnings.
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
-    EXPECT_CALL(callbacks_, isValidUdpListener()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
@@ -510,10 +509,10 @@ stat_prefix: foo
 cluster: fake_cluster
   )EOF");
 
-  ON_CALL(callbacks_, isValidUdpListener()).WillByDefault(Return(false));
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectUpstreamWrite("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  ON_CALL(callbacks_, udpListener()).WillByDefault(Return(nullptr));
   test_sessions_[0].recvDataFromUpstreamWithoutDownstreamForwarding("world");
   EXPECT_EQ(1, config_->stats().downstream_sess_tx_errors_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_tx_bytes_.value());

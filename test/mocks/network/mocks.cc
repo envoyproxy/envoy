@@ -182,8 +182,7 @@ MockUdpListener::MockUdpListener() {
 MockUdpListener::~MockUdpListener() { onDestroy(); }
 
 MockUdpReadFilterCallbacks::MockUdpReadFilterCallbacks() {
-  ON_CALL(*this, udpListener()).WillByDefault(ReturnRef(udp_listener_));
-  ON_CALL(*this, isValidUdpListener()).WillByDefault(Return(true));
+  ON_CALL(*this, udpListener()).WillByDefault(Return(&udp_listener_));
 }
 
 MockUdpReadFilterCallbacks::~MockUdpReadFilterCallbacks() = default;

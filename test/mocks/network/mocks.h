@@ -473,8 +473,7 @@ public:
   MockUdpReadFilterCallbacks();
   ~MockUdpReadFilterCallbacks() override;
 
-  MOCK_METHOD(UdpListener&, udpListener, ());
-  MOCK_METHOD(bool, isValidUdpListener, ());
+  MOCK_METHOD(UdpListener*, udpListener, ());
 
   testing::NiceMock<MockUdpListener> udp_listener_;
 };
