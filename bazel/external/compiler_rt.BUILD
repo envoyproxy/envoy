@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 cc_library(
     name = "fuzzed_data_provider",
     hdrs = ["include/fuzzer/FuzzedDataProvider.h"],
+    strip_include_prefix = "include",
     visibility = ["//visibility:public"],
 )
 

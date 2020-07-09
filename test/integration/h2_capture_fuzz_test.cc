@@ -1,4 +1,3 @@
-#include "test/fuzz/fuzz_runner.h"
 #include "test/integration/h2_fuzz.h"
 
 namespace Envoy {

@@ -116,8 +116,8 @@ def envoy_cc_fuzz_test(
         }),
         linkstatic = envoy_linkstatic(),
         args = select({
-            "@envoy//bazel:coverage_build": ["$(locations %s)" % corpus_name],
-            "@envoy//bazel:libfuzzer_no_coverage": [],
+            "@envoy//bazel:libfuzzer_coverage": ["$(locations %s)" % corpus_name],
+            "@envoy//bazel:libfuzzer": [],
             "//conditions:default": ["$(locations %s)" % corpus_name],
         }),
         data = [corpus_name],

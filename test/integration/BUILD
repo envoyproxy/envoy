@@ -1098,9 +1098,9 @@ envoy_cc_test(
 H1_FUZZ_LIB_DEPS = [
     ":capture_fuzz_proto_cc_proto",
     ":http_integration_lib",
-    "//test/fuzz:fuzz_runner_lib",
     "//source/common/common:assert_lib",
     "//source/common/common:logger_lib",
+    "//test/fuzz:fuzz_runner_lib",
     "//test/integration:integration_lib",
     "//test/test_common:environment_lib",
 ]
@@ -1161,8 +1161,8 @@ H2_FUZZ_LIB_DEPS = [
     ":http_integration_lib",
     "//source/common/common:assert_lib",
     "//source/common/common:logger_lib",
-    "//test/fuzz:fuzz_runner_lib",
     "//test/common/http/http2:http2_frame",
+    "//test/fuzz:fuzz_runner_lib",
     "//test/fuzz:utility_lib",
     "//test/integration:integration_lib",
     "//test/test_common:environment_lib",
