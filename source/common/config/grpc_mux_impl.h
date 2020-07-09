@@ -20,7 +20,6 @@
 
 namespace Envoy {
 namespace Config {
-
 /**
  * ADS API implementation that fetches via gRPC.
  */
@@ -38,10 +37,8 @@ public:
   void start() override;
 
   // GrpcMux
-  void pause(const std::string& type_url) override;
-  void pause(const std::vector<std::string> type_urls) override;
-  void resume(const std::string& type_url) override;
-  void resume(const std::vector<std::string> type_urls) override;
+  ScopedResume pause(const std::string& type_url) override;
+  ScopedResume pause(const std::vector<std::string> type_urls) override;
   bool paused(const std::string& type_url) const override;
   bool paused(const std::vector<std::string> type_urls) const override;
 
@@ -147,10 +144,12 @@ class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   void start() override {}
-  void pause(const std::string&) override {}
-  void pause(const std::vector<std::string>) override {}
-  void resume(const std::string&) override {}
-  void resume(const std::vector<std::string>) override {}
+  ScopedResume pause(const std::string&) override {
+    return std::make_unique<Cleanup>([] {});
+  }
+  ScopedResume pause(const std::vector<std::string>) override {
+    return std::make_unique<Cleanup>([] {});
+  }
   bool paused(const std::string&) const override { return false; }
   bool paused(const std::vector<std::string>) const override { return false; }
 

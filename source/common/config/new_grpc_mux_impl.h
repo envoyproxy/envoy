@@ -38,10 +38,8 @@ public:
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoder& resource_decoder) override;
 
-  void pause(const std::string& type_url) override;
-  void pause(const std::vector<std::string> type_urls) override;
-  void resume(const std::string& type_url) override;
-  void resume(const std::vector<std::string> type_urls) override;
+  ScopedResume pause(const std::string& type_url) override;
+  ScopedResume pause(const std::vector<std::string> type_urls) override;
   bool paused(const std::string& type_url) const override;
   bool paused(const std::vector<std::string> type_urls) const override;
 
