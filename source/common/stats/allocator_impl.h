@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "envoy/stats/allocator.h"
@@ -95,6 +96,8 @@ private:
 
   Thread::ThreadSynchronizer sync_;
 };
+
+using AllocatorImplPtr = std::unique_ptr<AllocatorImpl>;
 
 } // namespace Stats
 } // namespace Envoy

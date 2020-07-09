@@ -70,6 +70,8 @@ private:
   std::string string_;
 };
 
+using LowerCaseStringPtr = std::unique_ptr<LowerCaseString>;
+
 /**
  * Convenient type for a vector of lower case string and string pair.
  */
@@ -717,6 +719,8 @@ public:
   INLINE_REQ_RESP_HEADERS(DEFINE_INLINE_HEADER)
 };
 
+using RequestOrResponseHeaderMapPtr = std::unique_ptr<RequestOrResponseHeaderMap>;
+
 // Request headers.
 class RequestHeaderMap
     : public RequestOrResponseHeaderMap,
@@ -748,14 +752,18 @@ class ResponseHeaderMap
 public:
   INLINE_RESP_HEADERS(DEFINE_INLINE_HEADER)
 };
+
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
+using ResponseHeaderMapSharedPtr = std::shared_ptr<ResponseHeaderMap>;
 
 // Response trailers.
 class ResponseTrailerMap
     : public ResponseHeaderOrTrailerMap,
       public HeaderMap,
       public CustomInlineHeaderBase<CustomInlineHeaderRegistry::Type::ResponseTrailers> {};
+
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
+using ResponseTrailerMapSharedPtr = std::shared_ptr<ResponseTrailerMap>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.

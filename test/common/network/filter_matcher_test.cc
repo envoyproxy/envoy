@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/network/address_impl.h"
 #include "common/network/filter_matcher.h"
 
@@ -16,6 +18,8 @@ struct CallbackHandle {
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   Address::InstanceConstSharedPtr address_;
 };
+
+using CallbackHandlePtr = std::unique_ptr<CallbackHandle>;
 } // namespace
 class ListenerFilterMatcherTest : public testing::Test {
 public:

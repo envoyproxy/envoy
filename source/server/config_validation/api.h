@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
@@ -25,6 +27,8 @@ public:
 private:
   Event::TimeSystem& time_system_;
 };
+
+using ValidationImplPtr = std::unique_ptr<ValidationImpl>;
 
 } // namespace Api
 } // namespace Envoy

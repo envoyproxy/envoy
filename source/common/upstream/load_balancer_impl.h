@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <queue>
 #include <set>
 #include <vector>
@@ -420,6 +421,8 @@ private:
   std::unordered_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
+using RoundRobinLoadBalancerPtr = std::unique_ptr<RoundRobinLoadBalancer>;
+
 /**
  * Weighted Least Request load balancer.
  *
@@ -471,6 +474,8 @@ private:
                                         const HostsSource& source) override;
   const uint32_t choice_count_;
 };
+
+using LeastRequestLoadBalancerPtr = std::unique_ptr<LeastRequestLoadBalancer>;
 
 /**
  * Random load balancer that picks a random host out of all hosts.

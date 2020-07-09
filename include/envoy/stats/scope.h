@@ -21,6 +21,7 @@ class NullGaugeImpl;
 class Scope;
 class TextReadout;
 
+using CounterPtr = std::unique_ptr<Counter>;
 using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>;
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;

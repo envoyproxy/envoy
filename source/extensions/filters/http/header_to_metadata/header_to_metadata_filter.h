@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -147,6 +148,8 @@ private:
   const std::string& decideNamespace(const std::string& nspace) const;
   const Config* getConfig() const;
 };
+
+using HeaderToMetadataFilterSharedPtr = std::shared_ptr<HeaderToMetadataFilter>;
 
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters

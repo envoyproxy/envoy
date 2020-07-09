@@ -125,6 +125,8 @@ private:
   Network::ClientConnectionPtr client_;
 };
 
+using RawConnectionDriverPtr = std::unique_ptr<RawConnectionDriver>;
+
 /**
  * Utility routines for integration tests.
  */
@@ -217,5 +219,7 @@ private:
   size_t length_to_wait_for_{0};
   bool wait_for_length_{false};
 };
+
+using WaitForPayloadReaderSharedPtr = std::shared_ptr<WaitForPayloadReader>;
 
 } // namespace Envoy

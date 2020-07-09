@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -91,6 +92,8 @@ private:
   const HashFunction hash_function_;
   const bool use_hostname_for_hashing_;
 };
+
+using RingHashLoadBalancerPtr = std::unique_ptr<RingHashLoadBalancer>;
 
 } // namespace Upstream
 } // namespace Envoy

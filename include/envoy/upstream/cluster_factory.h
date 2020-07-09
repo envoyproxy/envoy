@@ -142,5 +142,7 @@ public:
   std::string category() const override { return "envoy.clusters"; }
 };
 
+using ClusterFactoryPtr = std::unique_ptr<ClusterFactory>;
+
 } // namespace Upstream
 } // namespace Envoy

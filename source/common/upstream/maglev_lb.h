@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -92,6 +94,8 @@ private:
   const uint64_t table_size_;
   const bool use_hostname_for_hashing_;
 };
+
+using MaglevLoadBalancerPtr = std::unique_ptr<MaglevLoadBalancer>;
 
 } // namespace Upstream
 } // namespace Envoy

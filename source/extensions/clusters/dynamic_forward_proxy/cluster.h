@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
@@ -114,6 +116,8 @@ private:
   friend class ClusterFactory;
   friend class ClusterTest;
 };
+
+using ClusterSharedPtr = std::shared_ptr<Cluster>;
 
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                            envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig> {

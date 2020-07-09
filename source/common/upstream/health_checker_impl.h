@@ -284,6 +284,8 @@ private:
   const TcpHealthCheckMatcher::MatchSegments receive_bytes_;
 };
 
+using TcpHealthCheckerImplSharedPtr = std::shared_ptr<TcpHealthCheckerImpl>;
+
 /**
  * gRPC health checker implementation.
  */

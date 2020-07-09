@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 
@@ -27,6 +29,8 @@ public:
 private:
   Config config_;
 };
+
+using OriginalSrcFilterPtr = std::unique_ptr<OriginalSrcFilter>;
 
 } // namespace OriginalSrc
 } // namespace ListenerFilters

@@ -584,6 +584,8 @@ private:
   std::vector<StatNameStorage> storage_vector_;
 };
 
+using StatNamePoolPtr = std::unique_ptr<StatNamePool>;
+
 /**
  * Maintains storage for a collection of StatName objects constructed from
  * dynamically discovered strings. Like StatNameDynamicStorage, this has an RAII

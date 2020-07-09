@@ -279,6 +279,8 @@ private:
   TimeSource& time_source_;
 };
 
+using ConnectionManagerPtr = std::unique_ptr<ConnectionManager>;
+
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions

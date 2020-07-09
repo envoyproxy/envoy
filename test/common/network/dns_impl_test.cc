@@ -341,6 +341,8 @@ private:
   DnsResolverImpl* resolver_;
 };
 
+using DnsResolverImplPeerPtr = std::unique_ptr<DnsResolverImplPeer>;
+
 class DnsImplConstructor : public testing::Test {
 protected:
   DnsImplConstructor()

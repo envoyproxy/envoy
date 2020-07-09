@@ -53,6 +53,8 @@ public:
 };
 
 using TlsCertificateConfigPtr = std::unique_ptr<TlsCertificateConfig>;
+using TlsCertificateConfigOptConstRef =
+    absl::optional<std::reference_wrapper<const TlsCertificateConfig>>;
 
 } // namespace Ssl
 } // namespace Envoy

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "common/common/assert.h"
@@ -61,6 +62,8 @@ private:
     // triggered in Run().
     FakeSignatureCallback(bool& success, std::string& signature)
         : success_(success), signature_(signature) {}
+
+    using DetailsPtr = std::unique_ptr<Details>;
 
     // quic::ProofSource::SignatureCallback
     void Run(bool ok, std::string signature, DetailsPtr /*details*/) override {

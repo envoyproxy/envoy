@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/http/filter.h"
@@ -135,6 +136,8 @@ private:
   bool payload_passthrough_ = false;
   bool skip_ = false;
 };
+
+using FilterPtr = std::unique_ptr<Filter>;
 
 } // namespace AwsLambdaFilter
 } // namespace HttpFilters

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -69,6 +70,9 @@ public:
     return FactoryRegistry::isFactoryDisabled(name);
   }
 };
+
+template <class Base>
+using FactoryRegistryProxyImplPtr = std::unique_ptr<FactoryRegistryProxyImpl<Base>>;
 
 /**
  * BaseFactoryCategoryRegistry holds the static factory map for

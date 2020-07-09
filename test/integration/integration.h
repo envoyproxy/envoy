@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -127,6 +128,8 @@ private:
 
     IntegrationTcpClient& parent_;
   };
+
+  using ConnectionCallbacksSharedPtr = std::shared_ptr<ConnectionCallbacks>;
 
   Event::TestTimeSystem& time_system_;
   WaitForPayloadReaderSharedPtr payload_reader_;

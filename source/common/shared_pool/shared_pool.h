@@ -106,6 +106,10 @@ private:
   Thread::ThreadSynchronizer sync_;
 };
 
+template <typename T, typename HashFunc = std::hash<T>,
+          class V = typename std::enable_if<std::is_copy_constructible<T>::value>::type>
+using ObjectSharedPoolSharedPtr = std::shared_ptr<ObjectSharedPool<T, HashFunc, V>>;
+
 template <typename T, typename HashFunc, class V>
 const char ObjectSharedPool<T, HashFunc, V>::DeleteObjectOnMainThread[] = "delete-object-on-main";
 

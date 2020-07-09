@@ -66,6 +66,7 @@ protected:
 
 using TcpListenSocket = NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
 using TcpListenSocketPtr = std::unique_ptr<TcpListenSocket>;
+using TcpListenSocketSharedPtr = std::shared_ptr<TcpListenSocket>;
 
 using UdpListenSocket = NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>;
 using UdpListenSocketPtr = std::unique_ptr<UdpListenSocket>;

@@ -10,6 +10,7 @@
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -201,6 +202,8 @@ private:
   Compression::Decompressor::DecompressorPtr request_decompressor_{};
   Compression::Decompressor::DecompressorPtr response_decompressor_{};
 };
+
+using DecompressorFilterPtr = std::unique_ptr<DecompressorFilter>;
 
 } // namespace Decompressor
 } // namespace HttpFilters

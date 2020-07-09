@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/singleton/manager.h"
@@ -69,6 +71,8 @@ public:
    */
   virtual DnsCacheCircuitBreakersStats& stats() PURE;
 };
+
+using DnsCacheResourceManagerPtr = std::unique_ptr<DnsCacheResourceManager>;
 
 /**
  * A cache of DNS hosts. Hosts will re-resolve their addresses or be automatically purged
@@ -186,6 +190,7 @@ public:
   canCreateDnsRequest(ResourceLimitOptRef pending_request) PURE;
 };
 
+using DnsCachePtr = std::unique_ptr<DnsCache>;
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
 
 /**

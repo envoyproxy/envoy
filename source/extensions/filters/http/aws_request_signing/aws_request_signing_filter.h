@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
@@ -87,6 +89,8 @@ public:
 private:
   FilterConfigSharedPtr config_;
 };
+
+using FilterPtr = std::unique_ptr<Filter>;
 
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters
