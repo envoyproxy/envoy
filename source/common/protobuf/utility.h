@@ -262,8 +262,9 @@ public:
 
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-    loadFromYaml(yaml, message, validation_visitor);
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      bool avoid_boosting = false) {
+    loadFromYaml(yaml, message, validation_visitor, !avoid_boosting);
     validate(message, validation_visitor);
   }
 
@@ -302,9 +303,14 @@ public:
    * @return MessageType the typed message inside the Any.
    */
   template <class MessageType>
+  static inline void anyConvert(const ProtobufWkt::Any& message, MessageType& typed_message) {
+    unpackTo(message, typed_message);
+  };
+
+  template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     MessageType typed_message;
-    unpackTo(message, typed_message);
+    anyConvert(message, typed_message);
     return typed_message;
   };
 
@@ -316,13 +322,37 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType>
+  static inline void anyConvertAndValidate(const ProtobufWkt::Any& message,
+                                           MessageType& typed_message,
+                                           ProtobufMessage::ValidationVisitor& validation_visitor) {
+    anyConvert<MessageType>(message, typed_message);
+    validate(typed_message, validation_visitor);
+  };
+
+  template <class MessageType>
   static inline MessageType
   anyConvertAndValidate(const ProtobufWkt::Any& message,
                         ProtobufMessage::ValidationVisitor& validation_visitor) {
-    MessageType typed_message = anyConvert<MessageType>(message);
-    validate(typed_message, validation_visitor);
+    MessageType typed_message;
+    anyConvertAndValidate<MessageType>(message, typed_message, validation_visitor);
     return typed_message;
   };
+
+  /**
+   * Obtain a string field from a protobuf message dynamically.
+   *
+   * @param message message to extract from.
+   * @param field_name field name.
+   *
+   * @return std::string with field value.
+   */
+  static inline std::string getStringField(const Protobuf::Message& message,
+                                           const std::string& field_name) {
+    const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+    const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
+    const Protobuf::Reflection* reflection = message.GetReflection();
+    return reflection->GetString(message, name_field);
+  }
 
   /**
    * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
