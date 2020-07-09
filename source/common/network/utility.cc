@@ -190,18 +190,6 @@ void Utility::throwWithMalformedIp(absl::string_view ip_address) {
   throw EnvoyException(absl::StrCat("malformed IP address: ", ip_address));
 }
 
-#define SUPPORTS_GETIFADDRS
-#ifdef WIN32
-#undef SUPPORTS_GETIFADDRS
-#endif
-
-// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
-#ifdef __ANDROID_API__
-#if __ANDROID_API__ < 24
-#undef SUPPORTS_GETIFADDRS
-#endif // __ANDROID_API__ < 24
-#endif // ifdef __ANDROID_API__
-
 // TODO(hennna): Currently getLocalAddress does not support choosing between
 // multiple interfaces and addresses not returned by getifaddrs. In addition,
 // the default is to return a loopback address of type version. This function may
