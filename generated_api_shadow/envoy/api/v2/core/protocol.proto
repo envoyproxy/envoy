@@ -144,7 +144,9 @@ message Http1ProtocolOptions {
   bool enable_trailers = 5;
 
   // [#not-implemented-hide:]
-  // Overrides envoy's behavior on invalid HTTP messaging configured in the hcm
+  // Allows invalid HTTP messaging. When this option is disabled (default), then Envoy will terminate
+  // HTTP/1.1 connections upon receiving an invalid HTTP message. This overrides any HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 6;
 }
 
