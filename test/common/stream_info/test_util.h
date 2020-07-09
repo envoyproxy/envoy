@@ -188,8 +188,8 @@ public:
   const Envoy::StreamInfo::FilterStateConstSharedPtr& upstreamFilterState() const override {
     return upstream_filter_state_;
   }
-  void
-  setConstUpstreamFilterState(const Envoy::StreamInfo::FilterStateConstSharedPtr& filter_state) override {
+  void setConstUpstreamFilterState(
+      const Envoy::StreamInfo::FilterStateConstSharedPtr& filter_state) override {
     upstream_filter_state_ = filter_state;
   }
   void

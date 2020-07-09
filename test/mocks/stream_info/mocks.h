@@ -83,7 +83,7 @@ public:
   MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(FilterStateConstSharedPtr, sharedFilterState, (), (const));
-  
+
   MOCK_METHOD(const FilterStateConstSharedPtr&, upstreamFilterState, (), (const));
   MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
   MOCK_METHOD(void, setConstUpstreamFilterState, (const FilterStateConstSharedPtr&));
