@@ -26,6 +26,7 @@ Minor Behavior Changes
 * listener: fixed a bug where when a static listener fails to be added to a worker, the listener was not removed from the active listener list.
 * router: allow retries of streaming or incomplete requests. This removes stat `rq_retry_skipped_request_not_complete`.
 * router: allow retries by default when upstream responds with :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>`.
+* router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
 
 Bug Fixes
 ---------
@@ -34,6 +35,8 @@ Bug Fixes
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+* http: removed legacy header sanitization and the runtime guard `envoy.reloadable_features.strict_header_validation`.
 
 New Features
 ------------
