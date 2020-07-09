@@ -490,7 +490,7 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
   if (!config_query_parameters_.empty()) {
     Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
+        Http::Utility::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
 

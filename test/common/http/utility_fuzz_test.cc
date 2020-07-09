@@ -18,7 +18,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   switch (input.utility_selector_case()) {
   case test::common::http::UtilityTestCase::kParseQueryString: {
-    Http::Utility::parseAndDecodeQueryString(input.parse_query_string());
+    // TODO(dio): Add the case when using parseAndDecodeQueryString().
+    Http::Utility::parseQueryString(input.parse_query_string());
     break;
   }
   case test::common::http::UtilityTestCase::kParseCookieValue: {
@@ -57,8 +58,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kParseParameters: {
     const auto& parse_parameters = input.parse_parameters();
+    // TODO(dio): Add a case when doing parse_parameters with decode_params flag true.
     Http::Utility::parseParameters(parse_parameters.data(), parse_parameters.start(),
-                                   /*decode_param_value*/ true);
+                                   /*decode_params*/ false);
     break;
   }
   case test::common::http::UtilityTestCase::kFindQueryString: {
