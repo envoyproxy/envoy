@@ -56,9 +56,10 @@ inline envoy::config::cluster::v3::Cluster parseClusterFromV2Json(const std::str
   return cluster;
 }
 
-inline envoy::config::cluster::v3::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
+inline envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::string& yaml,
+                                                                  bool avoid_boosting = true) {
   envoy::config::cluster::v3::Cluster cluster;
-  TestUtility::loadFromYaml(yaml, cluster, true);
+  TestUtility::loadFromYaml(yaml, cluster, true, avoid_boosting);
   return cluster;
 }
 
