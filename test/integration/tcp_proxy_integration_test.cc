@@ -70,13 +70,13 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   tcp_client->waitForData("ello", false);
 
   // Make sure length based wait works for the data already received
-  tcp_client->waitForData(5);
-  tcp_client->waitForData(4);
+  ASSERT_TRUE(tcp_client->waitForData(5));
+  ASSERT_TRUE(tcp_client->waitForData(4));
 
   // Drain part of the received message
   tcp_client->clearData(2);
   tcp_client->waitForData("llo");
-  tcp_client->waitForData(3);
+  ASSERT_TRUE(tcp_client->waitForData(3));
 
   ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));

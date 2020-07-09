@@ -18,6 +18,8 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 
+#include "gtest/gtest.h"
+
 namespace Envoy {
 /**
  * A buffering response decoder used for testing.
@@ -197,11 +199,29 @@ public:
     data_to_wait_for_ = data;
     exact_match_ = exact_match;
   }
-  void setLengthToWaitFor(size_t length) {
+
+  ABSL_MUST_USE_RESULT testing::AssertionResult waitForLength(size_t length,
+                                                              std::chrono::milliseconds timeout) {
     ASSERT(!wait_for_length_);
     length_to_wait_for_ = length;
     wait_for_length_ = true;
+
+    Event::TimerPtr timeout_timer =
+        dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); });
+    timeout_timer->enableTimer(timeout);
+
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+
+    if (timeout_timer->enabled()) {
+      timeout_timer->disableTimer();
+      return testing::AssertionSuccess();
+    }
+
+    length_to_wait_for_ = 0;
+    wait_for_length_ = false;
+    return testing::AssertionFailure() << "Timed out waiting for " << length << " bytes of data\n";
   }
+
   const std::string& data() { return data_; }
   bool readLastByte() { return read_end_stream_; }
   void clearData(size_t count = std::string::npos) { data_.erase(0, count); }
