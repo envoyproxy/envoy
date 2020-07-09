@@ -9,6 +9,8 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* http: the per-stream FilterState maintained by the HTTP connection manager will now provide read/write access to the downstream connection FilterState. As such, code that relies on interacting with this might
+  see a change in behavior.
 * router: now consumes all retry related headers to prevent them from being propagated to the upstream. This behavior may be reverted by setting runtime feature `envoy.reloadable_features.consume_all_retry_headers` to false.
 
 Bug Fixes
@@ -20,9 +22,11 @@ Removed Config or Runtime
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 * http: removed legacy header sanitization and the runtime guard `envoy.reloadable_features.strict_header_validation`.
+* http: removed legacy transfer-encoding enforcement and runtime guard `envoy.reloadable_features.reject_unsupported_transfer_encodings`.
 
 New Features
 ------------
+* tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
 
 * http: introduced new HTTP/1 and HTTP/2 codec implementations that will remove the use of exceptions for control flow due to high risk factors and instead use error statuses. The old behavior is deprecated, but can be used during the removal period by disabling the runtime feature `envoy.reloadable_features.new_codec_behavior`. The removal period will be one month.
 

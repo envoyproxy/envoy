@@ -104,7 +104,8 @@ public:
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
   // wait for at least `length` bytes to be received
-  void waitForData(size_t length);
+  ABSL_MUST_USE_RESULT AssertionResult
+  waitForData(size_t length, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
