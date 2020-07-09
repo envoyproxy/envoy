@@ -2914,22 +2914,64 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackResetStream) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(1);
     conn_manager_->newStream(response_encoder_);
+
+    EXPECT_CALL(*duration_timer, disableTimer());
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+        .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+          EXPECT_EQ("408", headers.getStatusValue());
+        }));
+    EXPECT_CALL(response_encoder_, encodeData(_, true))
+        .WillOnce(Invoke([](const Buffer::Instance& data, bool) {
+          EXPECT_EQ(data.toString(), "downstream max stream duration reached");
+        }));
+    duration_timer->invokeCallback();
+
     return Http::okStatus();
   }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false); // kick off request
 
-  EXPECT_CALL(*duration_timer, disableTimer());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_max_duration_reached_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackResetStreamWithResponseHeader) {
+  max_stream_duration_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  Event::MockTimer* duration_timer = setUpTimer();
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(1);
+    RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+    filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+
+    EXPECT_CALL(*duration_timer, disableTimer());
+
+    duration_timer->invokeCallback();
+    return Http::okStatus();
+  }));
+
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-        EXPECT_EQ("408", headers.getStatusValue());
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) {
+        EXPECT_EQ("200", headers.getStatusValue());
       }));
-  EXPECT_CALL(response_encoder_, encodeData(_, true))
-      .WillOnce(Invoke([](const Buffer::Instance& data, bool) {
-        EXPECT_EQ(data.toString(), "downstream max stream duration reached");
-      }));
-  duration_timer->invokeCallback();
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false); // kick off request
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_max_duration_reached_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());

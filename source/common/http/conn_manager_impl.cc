@@ -681,9 +681,15 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamMaxStreamDurationReached);
-  sendLocalReply(false, Http::Code::RequestTimeout, "downstream max stream duration reached",
-                 nullptr, state_.is_head_request_, absl::nullopt,
-                 StreamInfo::ResponseCodeDetails::get().DownstreamMaxStreamDurationReached);
+
+  // If downstream response had started, envoy don't return 408.
+  if (response_headers_ != nullptr) {
+    connection_manager_.doEndStream(*this);
+  } else {
+    sendLocalReply(false, Http::Code::RequestTimeout, "downstream max stream duration reached",
+                   nullptr, state_.is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().DownstreamMaxStreamDurationReached);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
