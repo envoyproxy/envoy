@@ -26,23 +26,23 @@ private:
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 };
 
-// An implementation of ConnectionHandle which works with the Tcp::ConnectionPool.
-class TcpConnectionHandle : public Envoy::TcpProxy::ConnectionHandle,
-                            public Envoy::Tcp::ConnectionPool::Callbacks {
+// An implementation of GenericConnPool which works with the Tcp::ConnectionPool.
+class TcpConnPool : public Envoy::TcpProxy::GenericConnPool,
+                    public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnectionHandle(Envoy::Tcp::ConnectionPool::Cancellable* handle,
-                      Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                      Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks)
+  TcpConnPool(Envoy::Tcp::ConnectionPool::Cancellable* handle,
+              Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+              Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks)
       : tcp_upstream_handle_(handle), tcp_upstream_callbacks_(upstream_callbacks),
         generic_pool_callbacks_(generic_pool_callbacks) {}
 
-  ~TcpConnectionHandle() override {
+  ~TcpConnPool() override {
     if (tcp_upstream_handle_ != nullptr) {
       tcp_upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::CloseExcess);
     }
   }
 
-  void cancel() override {
+  void cancelAnyPendingRequest() override {
     if (tcp_upstream_handle_ != nullptr) {
       tcp_upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::CloseExcess);
       tcp_upstream_handle_ = nullptr;
@@ -229,21 +229,21 @@ private:
   bool write_half_closed_{};
 };
 
-class HttpConnectionHandle : public Envoy::TcpProxy::ConnectionHandle,
-                             public Envoy::Http::ConnectionPool::Callbacks {
+class HttpGenericConnPool : public Envoy::TcpProxy::GenericConnPool,
+                            public Envoy::Http::ConnectionPool::Callbacks {
 public:
-  HttpConnectionHandle(Envoy::Http::ConnectionPool::Cancellable* handle,
-                       Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks)
+  HttpGenericConnPool(Envoy::Http::ConnectionPool::Cancellable* handle,
+                      Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks)
       : upstream_http_handle_(handle), generic_pool_callbacks_(generic_pool_callbacks) {}
 
-  ~HttpConnectionHandle() override {
+  ~HttpGenericConnPool() override {
     if (upstream_http_handle_ != nullptr) {
       upstream_http_handle_->cancel(ConnectionPool::CancelPolicy::Default);
     }
   }
 
-  // Envoy::TcpProxy::ConnectionHandle
-  void cancel() override {
+  // Envoy::TcpProxy::GenericConnPool
+  void cancelAnyPendingRequest() override {
     if (upstream_http_handle_ != nullptr) {
       upstream_http_handle_->cancel(ConnectionPool::CancelPolicy::Default);
       upstream_http_handle_ = nullptr;

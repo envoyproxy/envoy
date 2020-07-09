@@ -6,7 +6,7 @@ MockGenericUpstream::MockGenericUpstream() = default;
 MockGenericUpstream::~MockGenericUpstream() = default;
 MockGenericUpstreamPoolCallbacks::MockGenericUpstreamPoolCallbacks() = default;
 MockGenericUpstreamPoolCallbacks::~MockGenericUpstreamPoolCallbacks() = default;
-MockConnectionHandle::MockConnectionHandle() = default;
-MockConnectionHandle::~MockConnectionHandle() = default;
+MockGenericConnPool::MockGenericConnPool() = default;
+MockGenericConnPool::~MockGenericConnPool() = default;
 } // namespace TcpProxy
 } // namespace Envoy

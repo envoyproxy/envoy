@@ -440,8 +440,8 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
     Envoy::Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
         cluster_name, Envoy::Upstream::ResourcePriority::Default, this);
     if (conn_pool) {
-      auto tcp_handle = std::make_unique<Envoy::TcpProxy::TcpConnectionHandle>(
-          nullptr, *upstream_callbacks_, *this);
+      auto tcp_handle =
+          std::make_unique<Envoy::TcpProxy::TcpConnPool>(nullptr, *upstream_callbacks_, *this);
       Envoy::Tcp::ConnectionPool::Cancellable* cancellable = conn_pool->newConnection(*tcp_handle);
       tcp_handle->setUpstreamHandle(cancellable);
       upstream_handle_ = std::move(tcp_handle);
@@ -462,7 +462,7 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
       Envoy::Http::ConnectionPool::Instance* conn_pool = cluster_manager_.httpConnPoolForCluster(
           cluster_name, Envoy::Upstream::ResourcePriority::Default, absl::nullopt, this);
       if (conn_pool) {
-        auto http_handle = std::make_unique<Envoy::TcpProxy::HttpConnectionHandle>(nullptr, *this);
+        auto http_handle = std::make_unique<Envoy::TcpProxy::HttpGenericConnPool>(nullptr, *this);
         auto http_upstream = std::make_shared<Envoy::TcpProxy::HttpUpstream>(*upstream_callbacks_,
                                                                              std::string(hostname));
         // Always create new handle so that handle and http_upstream is 1:1 mapping.
@@ -505,7 +505,7 @@ void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     return;
   }
 
-  upstream_handle_->cancel();
+  upstream_handle_->cancelAnyPendingRequest();
   upstream_handle_ = nullptr;
 
   read_callbacks_->upstreamHost(host);
@@ -587,7 +587,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
       // Cancel the conn pool request and close any excess pending requests.
-      upstream_handle_->cancel();
+      upstream_handle_->cancelAnyPendingRequest();
     }
   }
 }

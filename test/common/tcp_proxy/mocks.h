@@ -36,11 +36,11 @@ public:
                const StreamInfo::StreamInfo& info));
 };
 
-class MockConnectionHandle : public ConnectionHandle {
+class MockGenericConnPool : public GenericConnPool {
 public:
-  MockConnectionHandle();
-  ~MockConnectionHandle() override;
-  MOCK_METHOD(void, cancel, ());
+  MockGenericConnPool();
+  ~MockGenericConnPool() override;
+  MOCK_METHOD(void, cancelAnyPendingRequest, ());
   MOCK_METHOD(void, complete, ());
   MOCK_METHOD(GenericUpstreamSharedPtr, upstream, ());
   MOCK_METHOD(bool, failedOnPool, ());

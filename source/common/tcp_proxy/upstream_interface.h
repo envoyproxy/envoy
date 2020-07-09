@@ -38,16 +38,16 @@ public:
                            const StreamInfo::StreamInfo& info) PURE;
 };
 
-// Interface for a generic ConnectionHandle, which can wrap a TcpConnectionHandle
-// or an HttpConnectionHandle.
-class ConnectionHandle {
+// Interface for a generic GenericConnPool, which can wrap a TcpConnPool
+// or an HttpGenericConnPool.
+class GenericConnPool {
 public:
-  virtual ~ConnectionHandle() = default;
+  virtual ~GenericConnPool() = default;
   // Cancel the conn pool request and close any excess pending requests.
-  virtual void cancel() PURE;
+  virtual void cancelAnyPendingRequest() PURE;
   virtual void complete() PURE;
 
-  // Return the GenericUpstream associated with ConnectionHandle.
+  // Return the GenericUpstream associated with GenericConnPool.
   virtual GenericUpstreamSharedPtr upstream() PURE;
 
   // Return true if the conn pool is not valid. This can be called when this handle is
@@ -60,7 +60,7 @@ public:
   // handle is created.
   virtual bool isConnecting() PURE;
 };
-using ConnectionHandlePtr = std::unique_ptr<ConnectionHandle>;
+using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
 
 } // namespace TcpProxy
 } // namespace Envoy

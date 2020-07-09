@@ -12,20 +12,18 @@ class ClusterManager;
 namespace TcpProxy {
 
 // TODO(lambdai): move to include path.
-class TcpUpstreamFactory {
+class GenericConnPoolFactory {
 public:
-  virtual ~TcpUpstreamFactory() = default;
-  virtual ConnectionHandlePtr createTcpUpstreamHandle(
+  virtual ~GenericConnPoolFactory() = default;
+  virtual GenericConnPoolPtr createTcpUpstreamHandle(
       Envoy::Upstream::ClusterManager& cluster_manager,
       Envoy::Upstream::LoadBalancerContext* lb_context,
       Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callback,
       const std::shared_ptr<Envoy::Tcp::ConnectionPool::UpstreamCallbacks>& upstream_callback,
-      absl::string_view hostname,
-      // TODO(lambdai): Move to factory impl since cluster is the owner of this factory.
-      const std::string& cluster_name) PURE;
+      absl::string_view hostname, const std::string& cluster_name) PURE;
 };
 
-using TcpUpstreamFactorySharedPtr = std::shared_ptr<TcpUpstreamFactory>;
+using GenericConnPoolFactorySharedPtr = std::shared_ptr<GenericConnPoolFactory>;
 
 } // namespace TcpProxy
 } // namespace Envoy

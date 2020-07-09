@@ -107,23 +107,23 @@ TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
   upstream_->onBelowWriteBufferLowWatermark();
 }
 
-class HttpConnectionHandleTest : public testing::Test {
+class HttpGenericConnPoolTest : public testing::Test {
 public:
-  HttpConnectionHandleTest() {
+  HttpGenericConnPoolTest() {
     http_conn_handle_ =
-        std::make_unique<HttpConnectionHandle>(&cancellable_, generic_pool_callbacks_);
+        std::make_unique<HttpGenericConnPool>(&cancellable_, generic_pool_callbacks_);
   }
-  std::unique_ptr<HttpConnectionHandle> http_conn_handle_;
+  std::unique_ptr<HttpGenericConnPool> http_conn_handle_;
   Envoy::ConnectionPool::MockCancellable cancellable_;
   Envoy::TcpProxy::MockGenericUpstreamPoolCallbacks generic_pool_callbacks_;
 };
 
-TEST_F(HttpConnectionHandleTest, DestroyOnAvailableCanncellable) {
+TEST_F(HttpGenericConnPoolTest, DestroyOnAvailableCanncellable) {
   EXPECT_CALL(cancellable_, cancel(ConnectionPool::CancelPolicy::Default)).Times(1);
   http_conn_handle_.reset();
 }
 
-TEST_F(HttpConnectionHandleTest, DestroyAfterComplete) {
+TEST_F(HttpGenericConnPoolTest, DestroyAfterComplete) {
   EXPECT_CALL(cancellable_, cancel(_)).Times(0);
   http_conn_handle_->complete();
   http_conn_handle_.reset();
