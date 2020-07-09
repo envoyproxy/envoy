@@ -1444,7 +1444,12 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
 // time-consuming byte size validations that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
   // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
-  testManyRequestHeaders(std::chrono::milliseconds(5000));
+  auto time = std::chrono::milliseconds(5000);
+#ifdef ENVOY_CONFIG_COVERAGE
+  // Scale up for coverage, due to flakes.
+  time = std::chrono::milliseconds(10000);
+#endif
+  testManyRequestHeaders(time);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
