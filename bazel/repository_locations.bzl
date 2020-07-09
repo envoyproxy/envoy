@@ -53,11 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "db48eed61552e25d36fe051a65d2a329cc0fb08442627e8f13960c5ab087a44e",
-        strip_prefix = "bazel-toolchains-3.2.0",
+        sha256 = "2431088b38fd8e2878db17e3c5babb431de9e5c52b6d8b509d3070fa279a5be2",
+        strip_prefix = "bazel-toolchains-3.3.1",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.2.0/bazel-toolchains-3.2.0.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.2.0.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.3.1/bazel-toolchains-3.3.1.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.3.1.tar.gz",
         ],
         use_category = ["build"],
     ),
@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "c4d27c0a5db918e861b7164d69cdffe920daafbe3f597ffdda5a1d10c1abc992",
-        strip_prefix = "envoy-build-tools-557ee9b44a3d08cf38d9ce6f08adb872c385d6a5",
+        sha256 = "ff890c70d60e51c7ee80874f85c3905718b7f6929a6c367c850cdd0b9c01d44d",
+        strip_prefix = "envoy-build-tools-efaecf11d76b86551cf42e2354274ac2acd7042f",
         # 2020-06-16
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/557ee9b44a3d08cf38d9ce6f08adb872c385d6a5.tar.gz"],
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/efaecf11d76b86551cf42e2354274ac2acd7042f.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -154,9 +154,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "afd18f62d1bc466c60bef088e6b637b0284be88c515cedc59ad4554150af6043",
-        strip_prefix = "spdlog-1.4.0",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.4.0.tar.gz"],
+        sha256 = "378a040d91f787aec96d269b0c39189f58a6b852e4cbf9150ccfacbe85ebbbfc",
+        strip_prefix = "spdlog-1.6.1",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.6.1.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
@@ -432,14 +432,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
-    # TODO(shikugawa): replace this with release tag after released package which includes
-    # disable pthread when build with emscripten. We use hash temporary to enable our changes to
-    # build envoy-wasm library with emscripten. https://github.com/google/re2/pull/263
     com_googlesource_code_re2 = dict(
-        sha256 = "455bcacd2b94fca8897decd81172c5a93e5303ea0e5816b410877c51d6179ffb",
-        strip_prefix = "re2-2b25567a8ee3b6e97c3cd05d616f296756c52759",
-        # 2020-06-08
-        urls = ["https://github.com/google/re2/archive/2b25567a8ee3b6e97c3cd05d616f296756c52759.tar.gz"],
+        sha256 = "2e9489a31ae007c81e90e8ec8a15d62d58a9c18d4fd1603f6441ef248556b41f",
+        strip_prefix = "re2-2020-07-06",
+        # 2020-07-06
+        urls = ["https://github.com/google/re2/archive/2020-07-06.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -479,5 +476,12 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "kafka-python-2.0.0",
         urls = ["https://github.com/dpkp/kafka-python/archive/2.0.0.tar.gz"],
         use_category = ["test"],
+    ),
+    org_unicode_icuuc = dict(
+        strip_prefix = "icu-release-64-2",
+        sha256 = "524960ac99d086cdb6988d2a92fc163436fd3c6ec0a84c475c6382fbf989be05",
+        urls = ["https://github.com/unicode-org/icu/archive/release-64-2.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:icu-project:international_components_for_unicode",
     ),
 )
