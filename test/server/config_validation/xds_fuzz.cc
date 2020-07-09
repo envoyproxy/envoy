@@ -196,7 +196,9 @@ void XdsFuzzTest::replay() {
   for (const auto& action : actions_) {
     switch (action.action_selector_case()) {
     case test::server::config_validation::Action::kAddListener: {
-      sent_listener = true;
+      ENVOY_LOG_MISC(info, "Adding listener_{} with reference to route_{}",
+                     action.add_listener().listener_num() % ListenersMax,
+                     action.add_listener().route_num() % RoutesMax);
       uint32_t listener_num = action.add_listener().listener_num();
       auto removed_name = removeListener(listener_num);
       auto listener = buildListener(listener_num, action.add_listener().route_num());
@@ -209,20 +211,45 @@ void XdsFuzzTest::replay() {
       EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
       if (removed_name) {
         modified++;
+        verifier_.listenerUpdated(listener);
         test_server_->waitForCounterGe("listener_manager.listener_modified", modified);
       } else {
         added++;
+        verifier_.listenerAdded(listener);
         test_server_->waitForCounterGe("listener_manager.listener_added", added);
       }
+
+      if (!sent_listener) {
+        ENVOY_LOG_MISC(info, "Adding route_{}", action.add_listener().route_num() % RoutesMax);
+        uint32_t route_num = action.add_listener().route_num();
+        auto removed_name = removeRoute(route_num);
+        auto route = buildRouteConfig(route_num);
+        routes_.push_back(route);
+
+        if (removed_name) {
+          // if the route was already in routes_, don't send a duplicate add in delta request
+          updateRoute(routes_, {}, {});
+          verifier_.routeUpdated(route);
+        } else {
+          updateRoute(routes_, {route}, {});
+          verifier_.routeAdded(route);
+        }
+
+        EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
+      }
+      sent_listener = true;
       break;
     }
     case test::server::config_validation::Action::kRemoveListener: {
+      ENVOY_LOG_MISC(info, "Removing listener_{}",
+                     action.remove_listener().listener_num() % ListenersMax);
       auto removed_name = removeListener(action.remove_listener().listener_num());
 
       if (removed_name) {
         removed++;
         updateListener(listeners_, {}, {*removed_name});
         EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
+        verifier_.listenerRemoved(*removed_name);
         test_server_->waitForCounterGe("listener_manager.listener_removed", removed);
       }
 
@@ -233,6 +260,7 @@ void XdsFuzzTest::replay() {
         ENVOY_LOG_MISC(info, "Ignoring request to add route_{}", action.add_route().route_num());
         break;
       }
+      ENVOY_LOG_MISC(info, "Adding route_{}", action.add_route().route_num() % RoutesMax);
       uint32_t route_num = action.add_route().route_num();
       auto removed_name = removeRoute(route_num);
       auto route = buildRouteConfig(route_num);
@@ -241,8 +269,10 @@ void XdsFuzzTest::replay() {
       if (removed_name) {
         // if the route was already in routes_, don't send a duplicate add in delta request
         updateRoute(routes_, {}, {});
+        verifier_.routeUpdated(route);
       } else {
         updateRoute(routes_, {route}, {});
+        verifier_.routeAdded(route);
       }
 
       EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
@@ -259,6 +289,7 @@ void XdsFuzzTest::replay() {
       auto removed_name = removeRoute(action.remove_route().route_num());
       if (removed) {
         updateRoute(routes_, {}, {*removed_name});
+        verifier_.routeRemoved(*removed_name);
         EXPECT_TRUE(
             waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
       }
@@ -269,7 +300,77 @@ void XdsFuzzTest::replay() {
     }
   }
 
+  verifyState();
   close();
+}
+
+/**
+ * verify that each listener in the verifier has a matching listener in the config dump
+ */
+void XdsFuzzTest::verifyListeners() {
+  ENVOY_LOG_MISC(info, "Verifying listeners");
+  const auto& listeners = verifier_.listeners();
+  envoy::admin::v3::ListenersConfigDump listener_dump = getListenersConfigDump();
+  ENVOY_LOG_MISC(info, "{}", listener_dump.DebugString());
+  for (auto& listener_rep : listeners) {
+    ENVOY_LOG_MISC(info, "Verifying {} with state {}", listener_rep.listener.name(),
+                   listener_rep.state);
+    bool found = false;
+    for (auto& dump_listener : listener_dump.dynamic_listeners()) {
+      if (dump_listener.name() == listener_rep.listener.name()) {
+        ENVOY_LOG_MISC(info, "Found a matching listener in config dump");
+        ENVOY_LOG_MISC(info, "drain: {}, warm {}, active {}", dump_listener.has_draining_state(),
+                       dump_listener.has_warming_state(), dump_listener.has_active_state());
+        switch (listener_rep.state) {
+        case XdsVerifier::DRAINING:
+          if (dump_listener.has_draining_state()) {
+            ENVOY_LOG_MISC(info, "{} is draining", listener_rep.listener.name());
+            found = true;
+          }
+          break;
+        case XdsVerifier::WARMING:
+          if (dump_listener.has_warming_state()) {
+            ENVOY_LOG_MISC(info, "{} is warming", listener_rep.listener.name());
+            found = true;
+          }
+          break;
+        case XdsVerifier::ACTIVE:
+          if (dump_listener.has_active_state()) {
+            ENVOY_LOG_MISC(info, "{} is active", listener_rep.listener.name());
+            found = true;
+          }
+          break;
+        default:
+          NOT_REACHED_GCOVR_EXCL_LINE;
+        }
+      }
+    }
+    if (!found) {
+      ENVOY_LOG_MISC(info, "Expected to find listener {} in config dump",
+                     listener_rep.listener.name());
+      throw EnvoyException(fmt::format("Expected to find listener {} in config dump",
+                                        listener_rep.listener.name()));
+    }
+  }
+}
+
+void XdsFuzzTest::verifyState() {
+  verifyListeners();
+  ENVOY_LOG_MISC(info, "Verified listeners");
+
+  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_draining")->value(),
+            verifier_.numDraining());
+  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_warming")->value(),
+            verifier_.numWarming());
+  EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_active")->value(),
+            verifier_.numActive());
+  ENVOY_LOG_MISC(info, "Verified stats");
+}
+
+envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {
+  auto message_ptr =
+      test_server_->server().admin().getConfigTracker().getCallbacksMap().at("listeners")();
+  return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 }
 
 } // namespace Envoy

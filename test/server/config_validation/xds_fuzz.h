@@ -13,6 +13,7 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/server/config_validation/xds_fuzz.pb.h"
+#include "test/server/config_validation/xds_verifier.h"
 
 #include "absl/types/optional.h"
 
@@ -49,6 +50,16 @@ public:
   const size_t RoutesMax = 5;
 
 private:
+  void parseConfig(const test::server::config_validation::XdsTestCase& input);
+  void verifyState();
+  void verifyListeners();
+
+  envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
+  envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
+  envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
+
+  XdsVerifier verifier_;
+
   absl::optional<std::string> removeListener(uint32_t listener_num);
   absl::optional<std::string> removeRoute(uint32_t route_num);
   AssertionResult waitForAck(const std::string& expected_type_url,
