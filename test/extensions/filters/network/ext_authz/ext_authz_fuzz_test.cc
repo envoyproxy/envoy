@@ -72,8 +72,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config = input.config();
 
   ConfigSharedPtr config = std::make_shared<Config>(proto_config, stats_store);
-  std::unique_ptr<Filter> filter =
-      std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
+  FilterPtr filter = std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   filter->initializeReadFilterCallbacks(filter_callbacks);
