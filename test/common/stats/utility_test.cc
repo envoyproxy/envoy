@@ -35,6 +35,42 @@ protected:
   StatNameTagVector tags_;
 };
 
+TEST_F(StatsUtilityTest, Counters_tmp) {
+  // Create a greater scope vector to store the string to prevent the string memory from being free
+  std::vector<std::string> string_vector;
+  auto make_string = [&string_vector](absl::string_view str) -> absl::string_view {
+    string_vector.push_back(std::string(str));
+    return string_vector.back();
+  };
+  Stats::SymbolTablePtr symbol_table;
+  symbol_table = std::make_unique<Stats::FakeSymbolTableImpl>();
+  std::unique_ptr<Stats::IsolatedStoreImpl> store =
+      std::make_unique<Stats::IsolatedStoreImpl>(*symbol_table);
+  Stats::StatNamePool pool(*symbol_table);
+  Stats::ScopePtr scope = store->createScope("abc");
+  Stats::ElementVec ele_vec;
+  Stats::StatNameVec sn_vec;
+  Stats::StatNameTagVector tags;
+  Stats::StatName key, val;
+
+  Stats::Utility::counterFromStatNames(*scope, {});
+  Stats::Utility::counterFromElements(*scope, {});
+
+  // must have 2 strings to trigger the crash, whether or not using make_string doesn't make
+  // difference here
+  absl::string_view str1 = make_string(std::string("abc"));
+  absl::string_view str2 = make_string(std::string("abc"));
+  ele_vec.push_back(Stats::DynamicName(str1));
+  ele_vec.push_back(Stats::DynamicName(str2));
+  sn_vec.push_back(pool.add(str1));
+  sn_vec.push_back(pool.add(str2));
+  key = pool.add("abc");
+  val = pool.add("abc");
+  tags.push_back({key, val});
+  Stats::Utility::counterFromStatNames(*scope, sn_vec, tags);
+  Stats::Utility::counterFromElements(*scope, ele_vec, tags);
+}
+
 TEST_F(StatsUtilityTest, Counters) {
   ScopePtr scope = store_->createScope("scope.");
   Counter& c1 = Utility::counterFromElements(*scope, {DynamicName("a"), DynamicName("b")});
