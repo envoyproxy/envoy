@@ -7,6 +7,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 using testing::_;
+using testing::ByMove;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
@@ -52,7 +53,7 @@ public:
     ON_CALL(connection_, id()).WillByDefault(Return(1));
     EXPECT_CALL(*config_, createPerTapSinkHandleManager_(1)).WillOnce(Return(sink_manager_));
     EXPECT_CALL(*config_, createMatchStatusVector())
-        .WillOnce(Return(TapCommon::Matcher::MatchStatusVector(1)));
+        .WillOnce(Return(ByMove(TapCommon::Matcher::MatchStatusVector(1))));
     EXPECT_CALL(*config_, rootMatcher()).WillRepeatedly(ReturnRef(matcher_));
     EXPECT_CALL(matcher_, onNewStream(_))
         .WillOnce(Invoke([this](TapCommon::Matcher::MatchStatusVector& statuses) {

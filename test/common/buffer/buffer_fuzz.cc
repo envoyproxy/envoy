@@ -159,7 +159,8 @@ public:
     return 1;
   }
 
-  ssize_t search(const void* data, uint64_t size, size_t start) const override {
+  ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {
+    UNREFERENCED_PARAMETER(length);
     return asStringView().find({static_cast<const char*>(data), size}, start);
   }
 

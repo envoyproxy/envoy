@@ -538,5 +538,52 @@ typed_config:
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
 }
 
+// Verify that body matching works.
+TEST_P(TapIntegrationTest, AdminBodyMatching) {
+  initializeFilter(admin_filter_config_);
+
+  const std::string admin_request_yaml =
+      R"EOF(
+config_id: test_config_id
+tap_config:
+  match_config:
+    and_match:
+      rules:
+        - http_request_generic_body_match:
+            patterns:
+              - string_match: request
+        - http_response_generic_body_match:
+            patterns:
+              - string_match: response
+  output_config:
+    sinks:
+      - format: JSON_BODY_AS_STRING
+        streaming_admin: {}
+)EOF";
+
+  startAdminRequest(admin_request_yaml);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  // Should not tap, request and response body do not match.
+  makeRequest(request_headers_no_tap_, {{"This is test payload"}}, nullptr,
+              response_headers_no_tap_, {{"This is test payload"}}, nullptr);
+  // Should not tap, request matches but response body does not match.
+  makeRequest(request_headers_no_tap_, {{"This is request payload"}}, nullptr,
+              response_headers_no_tap_, {{"This is test payload"}}, nullptr);
+  // Should tap, request and response body match.
+  makeRequest(request_headers_no_tap_, {{"This is request payload"}}, nullptr,
+              response_headers_no_tap_, {{"This is resp"}, {"onse payload"}}, nullptr);
+
+  envoy::data::tap::v3::TraceWrapper trace;
+  admin_response_->waitForBodyData(1);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
+  EXPECT_NE(std::string::npos,
+            trace.http_buffered_trace().request().body().as_string().find("request"));
+  EXPECT_NE(std::string::npos,
+            trace.http_buffered_trace().response().body().as_string().find("response"));
+
+  admin_client_->close();
+}
+
 } // namespace
 } // namespace Envoy

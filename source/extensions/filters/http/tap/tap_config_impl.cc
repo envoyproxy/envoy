@@ -61,7 +61,7 @@ void HttpPerRequestTapperImpl::streamBufferedRequestBody() {
 void HttpPerRequestTapperImpl::onRequestBody(const Buffer::Instance& data) {
   onBody(data, buffered_streamed_request_body_, config_->maxBufferedRxBytes(),
          &envoy::data::tap::v3::HttpStreamedTraceSegment::mutable_request_body_chunk,
-         &envoy::data::tap::v3::HttpBufferedTrace::mutable_request);
+         &envoy::data::tap::v3::HttpBufferedTrace::mutable_request, true);
 }
 
 void HttpPerRequestTapperImpl::streamRequestTrailers() {
@@ -123,7 +123,7 @@ void HttpPerRequestTapperImpl::streamBufferedResponseBody() {
 void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
   onBody(data, buffered_streamed_response_body_, config_->maxBufferedTxBytes(),
          &envoy::data::tap::v3::HttpStreamedTraceSegment::mutable_response_body_chunk,
-         &envoy::data::tap::v3::HttpBufferedTrace::mutable_response);
+         &envoy::data::tap::v3::HttpBufferedTrace::mutable_response, false);
 }
 
 void HttpPerRequestTapperImpl::onResponseTrailers(const Http::ResponseTrailerMap& trailers) {
@@ -177,10 +177,12 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
 void HttpPerRequestTapperImpl::onBody(
     const Buffer::Instance& data, Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
     uint32_t max_buffered_bytes, MutableBodyChunk mutable_body_chunk,
-    MutableMessage mutable_message) {
-  // TODO(mattklein123): Body matching.
+    MutableMessage mutable_message, bool request) {
+  // Invoke body matcher.
+  request ? config_->rootMatcher().onRequestBody(data, statuses_)
+          : config_->rootMatcher().onResponseBody(data, statuses_);
   if (config_->streaming()) {
-    const auto match_status = config_->rootMatcher().matchStatus(statuses_);
+    const auto& match_status = config_->rootMatcher().matchStatus(statuses_);
     // Without body matching, we must have already started tracing or have not yet matched.
     ASSERT(started_streaming_trace_ || !match_status.matches_);
 

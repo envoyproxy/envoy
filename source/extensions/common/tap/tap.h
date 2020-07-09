@@ -139,6 +139,13 @@ public:
   virtual const Matcher& rootMatcher() const PURE;
 
   /**
+   * Non-const version of rootMatcher method.
+   */
+  Matcher& rootMatcher() {
+    return const_cast<Matcher&>(static_cast<const TapConfig&>(*this).rootMatcher());
+  }
+
+  /**
    * Return whether the tap session should run in streaming or buffering mode.
    */
   virtual bool streaming() const PURE;

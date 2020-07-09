@@ -132,9 +132,9 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const Http::HeaderString& content_type = header_map.ContentType()->value();
   EXPECT_THAT(std::string(content_type.getStringView()), testing::HasSubstr("text/html"));
-  EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0));
+  EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0, 0));
   const std::string escaped_planets = "jupiter&gt;saturn&gt;mars";
-  EXPECT_NE(-1, response.search(escaped_planets.data(), escaped_planets.size(), 0));
+  EXPECT_NE(-1, response.search(escaped_planets.data(), escaped_planets.size(), 0, 0));
 }
 
 TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
@@ -143,8 +143,8 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const std::string logging_action = "<form action='logging' method='post'";
   const std::string stats_href = "<a href='stats'";
-  EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
-  EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
+  EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0, 0));
+  EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0, 0));
 }
 
 TEST_P(AdminInstanceTest, ConfigDump) {

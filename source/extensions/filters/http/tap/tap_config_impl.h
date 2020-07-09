@@ -53,7 +53,7 @@ private:
   void onBody(const Buffer::Instance& data,
               Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
               uint32_t max_buffered_bytes, MutableBodyChunk mutable_body_chunk,
-              MutableMessage mutable_message);
+              MutableMessage mutable_message, bool request);
 
   void makeBufferedFullTraceIfNeeded() {
     if (buffered_full_trace_ == nullptr) {

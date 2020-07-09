@@ -122,6 +122,43 @@ Another example POST body:
 The preceding configuration instructs the tap filter to match any HTTP requests. All requests will
 be tapped and streamed out the admin endpoint.
 
+Another example POST body:
+
+.. code-block:: yaml
+
+  config_id: test_config_id
+  tap_config:
+    match_config:
+      and_match:
+        rules:
+          - http_request_headers_match:
+              headers:
+                - name: foo
+                  exact_match: bar
+          - http_request_generic_body_match:
+              patterns:
+                - string_match: test
+                - binary_match: 3q2+7w==
+              bytes_limit: 128
+          - http_response_generic_body_match:
+              patterns:
+                - binary_match: vu8=
+              bytes_limit: 64
+    output_config:
+      sinks:
+        - streaming_admin: {}
+
+The preceding configuration instructs the tap filter to match any HTTP requests in which a request
+header ``foo: bar`` is present AND request body contains string ``test`` and hex bytes ``deadbeef`` (``3q2+7w==`` in base64 format)
+in the first 128 bytes AND response body contains hex bytes ``beef`` (``vu8=`` in base64 format) in the first 64 bytes. If all of these
+conditions are met, the request will be tapped and streamed out to the admin endpoint.
+
+.. attention::
+
+  Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+  If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
+  to scan only part of the http body.
+
 Output format
 -------------
 
