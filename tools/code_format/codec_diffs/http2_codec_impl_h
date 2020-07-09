@@ -49,7 +49,7 @@
    Network::Connection& connection_;
    const uint32_t max_headers_kb_;
    const uint32_t max_headers_count_;
-@@ -518,7 +519,7 @@
+@@ -519,7 +520,7 @@
  class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
  public:
    ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
@@ -58,7 +58,7 @@
                         const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                         const uint32_t max_response_headers_kb,
                         const uint32_t max_response_headers_count,
-@@ -553,7 +554,7 @@
+@@ -554,7 +555,7 @@
  class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
  public:
    ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
@@ -67,7 +67,7 @@
                         const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                         const uint32_t max_request_headers_kb,
                         const uint32_t max_request_headers_count,
-@@ -592,6 +593,7 @@
+@@ -593,6 +594,7 @@
  };
  
  } // namespace Http2
