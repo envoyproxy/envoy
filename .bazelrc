@@ -129,22 +129,23 @@ build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
 build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
-coverage:test-coverage --test_arg="--log-path /dev/null"
 coverage:test-coverage --test_arg="-l trace"
 coverage:fuzz-coverage --config=asan-fuzzer
 coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
-build:rbe-toolchain --host_platform=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
-build:rbe-toolchain --platforms=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 build:rbe-toolchain-clang --config=rbe-toolchain
+build:rbe-toolchain-clang --platforms=@rbe_ubuntu_clang//config:platform
+build:rbe-toolchain-clang --host_platform=@rbe_ubuntu_clang//config:platform
 build:rbe-toolchain-clang --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
 build:rbe-toolchain-clang --extra_toolchains=@rbe_ubuntu_clang//config:cc-toolchain
 build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
 
 build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
+build:rbe-toolchain-clang-libc++ --platforms=@rbe_ubuntu_clang_libcxx//config:platform
+build:rbe-toolchain-clang-libc++ --host_platform=@rbe_ubuntu_clang_libcxx//config:platform
 build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
@@ -157,8 +158,15 @@ build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --config=clang-msan
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
+build:rbe-toolchain-gcc --platforms=@rbe_ubuntu_gcc//config:platform
+build:rbe-toolchain-gcc --host_platform=@rbe_ubuntu_gcc//config:platform
 build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
 build:rbe-toolchain-gcc --extra_toolchains=@rbe_ubuntu_gcc//config:cc-toolchain
+
+build:rbe-toolchain-msvc-cl --host_platform=@rbe_windows_msvc_cl//config:platform
+build:rbe-toolchain-msvc-cl --platforms=@rbe_windows_msvc_cl//config:platform
+build:rbe-toolchain-msvc-cl --crosstool_top=@rbe_windows_msvc_cl//cc:toolchain
+build:rbe-toolchain-msvc-cl --extra_toolchains=@rbe_windows_msvc_cl//config:cc-toolchain
 
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
@@ -167,6 +175,15 @@ build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=7200
 build:remote --auth_enabled=true
 build:remote --remote_download_toplevel
+
+# Windows bazel does not allow sandboxed as a spawn strategy
+build:remote-windows --spawn_strategy=remote,local
+build:remote-windows --strategy=Javac=remote,local
+build:remote-windows --strategy=Closure=remote,local
+build:remote-windows --strategy=Genrule=remote,local
+build:remote-windows --remote_timeout=7200
+build:remote-windows --auth_enabled=true
+build:remote-windows --remote_download_toplevel
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
@@ -181,9 +198,12 @@ build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
+build:remote-msvc-cl --config=remote-windows
+build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
+
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:12b3d2c2ffa582507e5d6dd34632b2b990f1b195
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:f21773ab398a879f976936f72c78c9dd3718ca1e
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

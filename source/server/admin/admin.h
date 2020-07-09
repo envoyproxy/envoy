@@ -23,14 +23,15 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/common/basic_resource_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/network/connection_balancer_impl.h"
@@ -346,6 +347,7 @@ private:
       return envoy::config::core::v3::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    ResourceLimit& openConnections() override { return open_connections_; }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
@@ -355,6 +357,7 @@ private:
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
+    BasicResourceLimitImpl open_connections_;
 
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;

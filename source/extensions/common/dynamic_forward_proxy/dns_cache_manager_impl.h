@@ -14,9 +14,10 @@ namespace DynamicForwardProxy {
 class DnsCacheManagerImpl : public DnsCacheManager, public Singleton::Instance {
 public:
   DnsCacheManagerImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-                      Runtime::RandomGenerator& random, Stats::Scope& root_scope)
+                      Runtime::RandomGenerator& random, Runtime::Loader& loader,
+                      Stats::Scope& root_scope)
       : main_thread_dispatcher_(main_thread_dispatcher), tls_(tls), random_(random),
-        root_scope_(root_scope) {}
+        loader_(loader), root_scope_(root_scope) {}
 
   // DnsCacheManager
   DnsCacheSharedPtr getCache(
@@ -35,6 +36,7 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::SlotAllocator& tls_;
   Runtime::RandomGenerator& random_;
+  Runtime::Loader& loader_;
   Stats::Scope& root_scope_;
   absl::flat_hash_map<std::string, ActiveCache> caches_;
 };
@@ -43,12 +45,12 @@ class DnsCacheManagerFactoryImpl : public DnsCacheManagerFactory {
 public:
   DnsCacheManagerFactoryImpl(Singleton::Manager& singleton_manager, Event::Dispatcher& dispatcher,
                              ThreadLocal::SlotAllocator& tls, Runtime::RandomGenerator& random,
-                             Stats::Scope& root_scope)
+                             Runtime::Loader& loader, Stats::Scope& root_scope)
       : singleton_manager_(singleton_manager), dispatcher_(dispatcher), tls_(tls), random_(random),
-        root_scope_(root_scope) {}
+        loader_(loader), root_scope_(root_scope) {}
 
   DnsCacheManagerSharedPtr get() override {
-    return getCacheManager(singleton_manager_, dispatcher_, tls_, random_, root_scope_);
+    return getCacheManager(singleton_manager_, dispatcher_, tls_, random_, loader_, root_scope_);
   }
 
 private:
@@ -56,6 +58,7 @@ private:
   Event::Dispatcher& dispatcher_;
   ThreadLocal::SlotAllocator& tls_;
   Runtime::RandomGenerator& random_;
+  Runtime::Loader& loader_;
   Stats::Scope& root_scope_;
 };
 

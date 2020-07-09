@@ -41,8 +41,8 @@
 #include "common/common/thread.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/shared_pool/shared_pool.h"
@@ -599,7 +599,7 @@ public:
     return upstream_http_protocol_options_;
   }
 
-  absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
+  absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
   Http::Protocol
@@ -787,7 +787,6 @@ private:
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
-  Stats::SymbolTable& symbol_table_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
 };
 

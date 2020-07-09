@@ -20,7 +20,8 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -59,7 +60,7 @@ public:
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
-        grpc_mux_, *eds_callbacks_, subscription_stats_, type_url_, dispatcher_,
+        grpc_mux_, *eds_callbacks_, resource_decoder_, subscription_stats_, type_url_, dispatcher_,
         std::chrono::milliseconds(), false);
   }
 
@@ -142,6 +143,8 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<EdsClusterImpl> cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
+  Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{validation_visitor_, "cluster_name"};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

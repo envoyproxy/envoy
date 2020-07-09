@@ -15,5 +15,6 @@ api_proto_package(
         "//envoy/config/overload/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/v4alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/core/v1:pkg",
     ],
 )

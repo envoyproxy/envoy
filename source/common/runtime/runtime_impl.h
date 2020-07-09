@@ -14,6 +14,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.validate.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
@@ -72,9 +73,7 @@ struct RuntimeStats {
 /**
  * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
-class SnapshotImpl : public Snapshot,
-                     public ThreadLocal::ThreadLocalObject,
-                     Logger::Loggable<Logger::Id::runtime> {
+class SnapshotImpl : public Snapshot, Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
@@ -209,21 +208,18 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string&) override;
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
-  }
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
+  void createSubscription();
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;
@@ -232,7 +228,6 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
   std::string resource_name_;
   Init::TargetImpl init_target_;
   ProtobufWkt::Struct proto_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
 using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
@@ -263,7 +258,7 @@ private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual SnapshotImplPtr createNewSnapshot();
+  SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);

@@ -5,7 +5,6 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
