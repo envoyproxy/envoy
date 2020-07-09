@@ -15,7 +15,7 @@ ListenersHandler::ListenersHandler(Server::Instance& server) : HandlerContextBas
 
 Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
                                                    Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
 
   ListenerManager::StopListenersType stop_listeners_type =
       params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
@@ -41,7 +41,7 @@ Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::
 Http::Code ListenersHandler::handlerListenerInfo(absl::string_view url,
                                                  Http::ResponseHeaderMap& response_headers,
                                                  Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  const Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
   const auto format_value = Utility::formatParam(query_params);
 
   if (format_value.has_value() && format_value.value() == "json") {

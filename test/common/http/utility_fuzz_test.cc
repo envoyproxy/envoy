@@ -18,7 +18,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   switch (input.utility_selector_case()) {
   case test::common::http::UtilityTestCase::kParseQueryString: {
-    Http::Utility::parseQueryString(input.parse_query_string());
+    Http::Utility::parseAndDecodeQueryString(input.parse_query_string());
     break;
   }
   case test::common::http::UtilityTestCase::kParseCookieValue: {

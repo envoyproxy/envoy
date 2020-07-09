@@ -442,7 +442,7 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
 Http::Code AdminImpl::handlerClusters(absl::string_view url,
                                       Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
   const auto format_value = Utility::formatParam(query_params);
 
   if (format_value.has_value() && format_value.value() == "json") {
@@ -622,7 +622,7 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
                                         Http::ResponseHeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) const {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);

@@ -264,7 +264,7 @@ std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   return fmt::format("https://{}{}", headers.getHostValue(), headers.getPathValue());
 }
 
-Utility::QueryParams Utility::parseQueryString(absl::string_view url, bool decode_param_value) {
+Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   size_t start = url.find('?');
   if (start == std::string::npos) {
     QueryParams params;
@@ -272,15 +272,26 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url, bool decod
   }
 
   start++;
-  return parseParameters(url, start, decode_param_value);
+  return parseParameters(url, start, /*decode_params=*/false);
+}
+
+Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
+  size_t start = url.find('?');
+  if (start == std::string::npos) {
+    QueryParams params;
+    return params;
+  }
+
+  start++;
+  return parseParameters(url, start, /*decode_params=*/true);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
-  return parseParameters(body, 0, /*decode_param_value=*/true);
+  return parseParameters(body, 0, /*decode_params=*/true);
 }
 
 Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start,
-                                              bool decode_param_value) {
+                                              bool decode_params) {
   QueryParams params;
 
   while (start < data.size()) {
@@ -292,9 +303,10 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
 
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
+      const auto param_name = StringUtil::subspan(data, start, start + equal);
       const auto param_value = StringUtil::subspan(data, start + equal + 1, end);
-      params.emplace(StringUtil::subspan(data, start, start + equal),
-                     decode_param_value ? PercentEncoding::decode(param_value) : param_value);
+      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
+                     decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
       params.emplace(StringUtil::subspan(data, start, end), "");
     }

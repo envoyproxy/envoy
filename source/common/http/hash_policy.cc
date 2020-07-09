@@ -121,7 +121,7 @@ public:
     const HeaderEntry* header = headers.Path();
     if (header) {
       Http::Utility::QueryParams query_parameters =
-          Http::Utility::parseQueryString(header->value().getStringView());
+          Http::Utility::parseAndDecodeQueryString(header->value().getStringView());
       const auto& iter = query_parameters.find(parameter_name_);
       if (iter != query_parameters.end()) {
         hash = HashUtil::xxHash64(iter->second);
