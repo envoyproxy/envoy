@@ -52,7 +52,7 @@ public:
         this);
     RELEASE_ASSERT(rc == 0, "");
 
-#ifdef __linux__
+#ifdef SUPPORTS_PTHREAD_GETNAME_NP
     // If the name was not specified, get it from the OS. If the name was
     // specified, write it into the thread, and assert that the OS sees it the
     // same way.
