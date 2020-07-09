@@ -15,6 +15,8 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+using ::testing::Optional;
+
 class InternalFactory : public Config::UntypedFactory {
 public:
   ~InternalFactory() override = default;
@@ -233,7 +235,7 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactoryAn
   auto deprecated_version =
       factories.find("testing.published.additional.category")
           ->second->getFactoryVersion("testing.published.versioned.deprecated_name_and_category");
-  EXPECT_THAT(deprecated_version, testing::Optional(ProtoEq(version.value())));
+  EXPECT_THAT(deprecated_version, Optional(ProtoEq(version.value())));
 }
 
 } // namespace
