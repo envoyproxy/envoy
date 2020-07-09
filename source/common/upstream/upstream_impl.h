@@ -641,7 +641,7 @@ private:
   };
 
   struct OptionalClusterStats {
-    OptionalClusterStats(const envoy::config::cluster::v3::TrackClusterStats& optional_stats_config,
+    OptionalClusterStats(const envoy::config::cluster::v3::Cluster& config,
                          Stats::Scope& stats_scope);
     const ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
     const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;

@@ -831,8 +831,9 @@ message Cluster {
   // of 100 would indicate that the request took the entirety of the timeout given to it.
   //
   // .. attention::
-  //  This field has been deprecated in favor of `timeout_budgets`, part of
-  // :ref:`track_cluster_stats <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
+  //
+  //   This field has been deprecated in favor of `timeout_budgets`, part of
+  //   :ref:`track_cluster_stats <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
   bool track_timeout_budgets = 47 [deprecated = true];
 
   // Optional customization and configuration of upstream connection pool, and upstream type.
