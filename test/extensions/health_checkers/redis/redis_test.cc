@@ -180,7 +180,7 @@ public:
   }
 
   void setupExistsHealthcheckDeprecated(bool avoid_boosting = true) {
-  interval_jitter: 1s
+    const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
