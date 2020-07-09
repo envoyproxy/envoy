@@ -302,7 +302,7 @@ TEST_P(TcpTunnelingIntegrationTest, Basic) {
 
   // Send data from upstream to downstream.
   upstream_request_->encodeData(12, false);
-  tcp_client->waitForData(12);
+  ASSERT_TRUE(tcp_client->waitForData(12));
 
   // Now send more data and close the TCP client. This should be treated as half close, so the data
   // should go through.
@@ -370,7 +370,7 @@ TEST_P(TcpTunnelingIntegrationTest, CloseUpstreamFirst) {
   // Send data from upstream to downstream with an end stream and make sure the data is received
   // before the connection is half-closed.
   upstream_request_->encodeData(12, true);
-  tcp_client->waitForData(12);
+  ASSERT_TRUE(tcp_client->waitForData(12));
   tcp_client->waitForHalfClose();
 
   // Attempt to send data upstream.
