@@ -235,3 +235,17 @@ struct mmsghdr {
   unsigned int msg_len;
 };
 #endif
+
+
+#define SUPPORTS_PTHREAD_GETNAME_NP
+#ifdef __linux__
+#undef SUPPORTS_PTHREAD_GETNAME_NP
+#endif
+
+// https://android.googlesource.com/platform/bionic/+/master/docs/status.md
+// pthread_getname_np is introduced in API 26
+#ifdef __ANDROID_API__
+#if __ANDROID_API__ < 26
+#undef SUPPORTS_PTHREAD_GETNAME_NP
+#endif // __ANDROID_API__ < 26
+#endif // ifdef __ANDROID_API__

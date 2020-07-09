@@ -93,7 +93,7 @@ public:
   }
 
 private:
-#ifdef __linux__
+#ifdef SUPPORTS_PTHREAD_GETNAME_NP
   // Attempts to get the name from the operating system, returning true and
   // updating 'name' if successful. Note that during normal operation this
   // may fail, if the thread exits prior to the system call.
