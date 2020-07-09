@@ -48,9 +48,7 @@ public:
     return it->second;
   }
 
-  void setState(const std::string& action, OverloadActionState state) {
-    actions_[action] = state;
-  }
+  void setState(const std::string& action, OverloadActionState state) { actions_[action] = state; }
 
 private:
   std::unordered_map<std::string, OverloadActionState> actions_;
