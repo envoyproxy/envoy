@@ -67,7 +67,13 @@ blob_sha = os.environ['ENVOY_BLOB_SHA']
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
+
+sys.path.append(os.path.abspath("./_ext"))
+
+extensions = [
+    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
+    'validating_code_block'
+]
 extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
     'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
