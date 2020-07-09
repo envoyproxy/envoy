@@ -118,6 +118,10 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
         upstream_filter_state_ = filter_state;
       }));
+  ON_CALL(*this, setConstUpstreamFilterState(_))
+      .WillByDefault(Invoke([this](const FilterStateConstSharedPtr& filter_state) {
+        upstream_filter_state_ = filter_state;
+      }));
   ON_CALL(*this, setRequestedServerName(_))
       .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {
         requested_server_name_ = std::string(requested_server_name);

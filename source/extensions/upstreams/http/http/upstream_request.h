@@ -36,7 +36,7 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host,
-                   StreamInfo::StreamInfo& info) override;
+                   const StreamInfo::StreamInfo& info) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
 
   bool valid() { return conn_pool_ != nullptr; }

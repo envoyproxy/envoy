@@ -182,7 +182,7 @@ void HttpConnectionHandle::onPoolFailure(ConnectionPool::PoolFailureReason reaso
 
 void HttpConnectionHandle::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                                        Upstream::HostDescriptionConstSharedPtr host,
-                                       StreamInfo::StreamInfo& info) {
+                                       const StreamInfo::StreamInfo& info) {
   http_upstream_->setRequestEncoder(request_encoder,
                                     host->transportSocketFactory().implementsSecureTransport());
   // Disable cancel.

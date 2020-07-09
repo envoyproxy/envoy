@@ -27,7 +27,7 @@ envoy_cc_library(
         "tcp_proxy.h",
     ],
     deps = [
-        ":default_tcp_upstream_factory",
+        ":tcp_proxy_upstreams",
         ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
@@ -116,21 +116,5 @@ envoy_cc_library(
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:load_balancer_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "default_tcp_upstream_factory",
-    srcs = [
-        "default_tcp_upstream_factory.cc",
-    ],
-    hdrs = [
-        "default_tcp_upstream_factory.h",
-    ],
-    deps = [
-        ":upstream_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/tcp_proxy:tcp_proxy_upstreams",
-        "//source/common/tcp_proxy:tcp_upstream_factory",
     ],
 )

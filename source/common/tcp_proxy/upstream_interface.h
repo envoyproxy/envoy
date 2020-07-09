@@ -35,7 +35,7 @@ public:
   virtual void onPoolReady(const GenericUpstreamSharedPtr& upstream,
                            Upstream::HostDescriptionConstSharedPtr& host,
                            const Network::Address::InstanceConstSharedPtr& local_address,
-                           StreamInfo::StreamInfo& info) PURE;
+                           const StreamInfo::StreamInfo& info) PURE;
 };
 
 // Interface for a generic ConnectionHandle, which can wrap a TcpConnectionHandle

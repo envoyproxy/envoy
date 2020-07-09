@@ -39,7 +39,7 @@ public:
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   void onPoolReady(Http::RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                   StreamInfo::StreamInfo&) override {
+                   const StreamInfo::StreamInfo&) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();

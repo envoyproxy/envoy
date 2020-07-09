@@ -25,8 +25,7 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
-#include "common/tcp_proxy/default_tcp_upstream_factory.h"
-#include "common/tcp_proxy/factory.h"
+#include "common/tcp_proxy/upstream.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -221,7 +220,6 @@ Filter::~Filter() {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
 
-  // ASSERT(upstream_handle_ == nullptr);
   ASSERT(upstream_ == nullptr);
 }
 
@@ -432,14 +430,50 @@ void Filter::initializeUpstreamConnection() {
 }
 
 Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
-  TcpProxy::TcpUpstreamFactory&& factory = Envoy::TcpProxy::DefaultTcpUpstreamFactory();
   auto& tunnel_config = config_->tunnelingConfig();
   connecting_ = true;
   connect_attempts_++;
+  upstream_handle_ = nullptr;
+  absl::string_view hostname = tunnel_config ? tunnel_config->hostname() : "";
 
-  upstream_handle_ =
-      factory.createTcpUpstreamHandle(cluster_manager_, this, *this, upstream_callbacks_,
-                                      tunnel_config ? tunnel_config->hostname() : "", cluster_name);
+  if (hostname.empty()) {
+    Envoy::Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
+        cluster_name, Envoy::Upstream::ResourcePriority::Default, this);
+    if (conn_pool) {
+      auto tcp_handle = std::make_unique<Envoy::TcpProxy::TcpConnectionHandle>(
+          nullptr, *upstream_callbacks_, *this);
+      Envoy::Tcp::ConnectionPool::Cancellable* cancellable = conn_pool->newConnection(*tcp_handle);
+      tcp_handle->setUpstreamHandle(cancellable);
+      upstream_handle_ = std::move(tcp_handle);
+    }
+  } else {
+    auto* cluster = cluster_manager_.get(cluster_name);
+    if (!cluster) {
+      upstream_handle_ = nullptr;
+    } else if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) == 0) {
+      // TODO(snowp): Ideally we should prevent this from being configured, but that's tricky to
+      // get right since whether a cluster is invalid depends on both the tcp_proxy config +
+      // cluster config.
+      ENVOY_LOG(error,
+                "Attempted to tunnel over HTTP/1.1 from cluster {}, this is not supported. Set "
+                "http2_protocol_options on the cluster.",
+                cluster_name);
+    } else {
+      Envoy::Http::ConnectionPool::Instance* conn_pool = cluster_manager_.httpConnPoolForCluster(
+          cluster_name, Envoy::Upstream::ResourcePriority::Default, absl::nullopt, this);
+      if (conn_pool) {
+        auto http_handle = std::make_unique<Envoy::TcpProxy::HttpConnectionHandle>(nullptr, *this);
+        auto http_upstream = std::make_shared<Envoy::TcpProxy::HttpUpstream>(*upstream_callbacks_,
+                                                                             std::string(hostname));
+        // Always create new handle so that handle and http_upstream is 1:1 mapping.
+        http_handle->setUpstream(http_upstream);
+        Envoy::Http::ConnectionPool::Cancellable* cancellable =
+            conn_pool->newStream(http_upstream->responseDecoder(), *http_handle);
+        http_handle->setUpstreamHandle(cancellable);
+        upstream_handle_ = std::move(http_handle);
+      }
+    }
+  }
 
   // Put connecting_ and connect_attempts_ here?
   if (upstream_handle_ == nullptr ||
@@ -500,8 +534,8 @@ void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void Filter::onPoolReady(const TcpProxy::GenericUpstreamSharedPtr& upstream,
                          Upstream::HostDescriptionConstSharedPtr& host,
                          const Network::Address::InstanceConstSharedPtr& local_address,
-                         StreamInfo::StreamInfo& info) {
-  read_callbacks_->connection().streamInfo().setUpstreamFilterState(info.filterState());
+                         const StreamInfo::StreamInfo& info) {
+  read_callbacks_->connection().streamInfo().setConstUpstreamFilterState(info.sharedFilterState());
   upstream_ = upstream;
   read_callbacks_->upstreamHost(host);
   getStreamInfo().onUpstreamHostSelected(host);

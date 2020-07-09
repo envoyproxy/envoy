@@ -33,7 +33,7 @@ public:
               (const GenericUpstreamSharedPtr& upstream,
                Upstream::HostDescriptionConstSharedPtr& host,
                const Network::Address::InstanceConstSharedPtr& local_address,
-               StreamInfo::StreamInfo& info));
+               const StreamInfo::StreamInfo& info));
 };
 
 class MockConnectionHandle : public ConnectionHandle {

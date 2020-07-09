@@ -118,7 +118,7 @@ public:
 
   Type type() const { return type_; }
 
-  StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
+  const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
 protected:
   /**

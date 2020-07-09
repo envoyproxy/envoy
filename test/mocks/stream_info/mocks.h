@@ -82,8 +82,12 @@ public:
               (const std::string&, const std::string&, const std::string&));
   MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
-  MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
+  MOCK_METHOD(FilterStateConstSharedPtr, sharedFilterState, (), (const));
+  
+  MOCK_METHOD(const FilterStateConstSharedPtr&, upstreamFilterState, (), (const));
   MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
+  MOCK_METHOD(void, setConstUpstreamFilterState, (const FilterStateConstSharedPtr&));
+
   MOCK_METHOD(void, setRequestedServerName, (const absl::string_view));
   MOCK_METHOD(const std::string&, requestedServerName, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view));
@@ -114,7 +118,7 @@ public:
   absl::optional<std::string> response_code_details_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
-  FilterStateSharedPtr upstream_filter_state_;
+  FilterStateConstSharedPtr upstream_filter_state_;
   FilterStateSharedPtr filter_state_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};

@@ -217,11 +217,17 @@ struct StreamInfoImpl : public StreamInfo {
 
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
+  FilterStateConstSharedPtr sharedFilterState() const override {
+    return std::const_pointer_cast<const FilterState>(filter_state_);
+  }
 
-  const FilterStateSharedPtr& upstreamFilterState() const override {
+  const FilterStateConstSharedPtr& upstreamFilterState() const override {
     return upstream_filter_state_;
   }
   void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) override {
+    upstream_filter_state_ = filter_state;
+  }
+  void setConstUpstreamFilterState(const FilterStateConstSharedPtr& filter_state) override {
     upstream_filter_state_ = filter_state;
   }
 
@@ -286,7 +292,7 @@ struct StreamInfoImpl : public StreamInfo {
   const Router::RouteEntry* route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
-  FilterStateSharedPtr upstream_filter_state_;
+  FilterStateConstSharedPtr upstream_filter_state_;
   std::string route_name_;
 
 private:

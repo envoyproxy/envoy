@@ -246,13 +246,13 @@ public:
   }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
-  // Tcp::GenericPoolCallbacks
+  // TcpProxy::GenericUpstreamPoolCallbacks
   void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(const TcpProxy::GenericUpstreamSharedPtr& upstream,
                    Upstream::HostDescriptionConstSharedPtr& host,
                    const Network::Address::InstanceConstSharedPtr& local_address,
-                   StreamInfo::StreamInfo& info) override;
+                   const StreamInfo::StreamInfo& info) override;
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {

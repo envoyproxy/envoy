@@ -500,15 +500,16 @@ public:
    */
   virtual const FilterStateSharedPtr& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
+  virtual FilterStateConstSharedPtr sharedFilterState() const PURE;
 
   /**
    * Filter State object to be shared between upstream and downstream filters.
    * @param pointer to upstream connections filter state.
    * @return pointer to filter state to be used by upstream connections.
    */
-  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
+  virtual const FilterStateConstSharedPtr& upstreamFilterState() const PURE;
   virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
-
+  virtual void setConstUpstreamFilterState(const FilterStateConstSharedPtr& filter_state) PURE;
   /**
    * @param SNI value requested.
    */

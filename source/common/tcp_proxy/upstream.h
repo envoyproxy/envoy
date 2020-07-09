@@ -269,7 +269,7 @@ public:
 
   void onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                    Envoy::Upstream::HostDescriptionConstSharedPtr host,
-                   StreamInfo::StreamInfo& info) override;
+                   const StreamInfo::StreamInfo& info) override;
 
   void setUpstreamHandle(Envoy::Http::ConnectionPool::Cancellable* upstream_handle) {
     ASSERT(upstream_http_handle_ == nullptr);

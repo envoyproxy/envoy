@@ -18,6 +18,8 @@ namespace StreamInfo {
 class FilterState;
 
 using FilterStateSharedPtr = std::shared_ptr<FilterState>;
+using FilterStateConstSharedPtr = std::shared_ptr<const FilterState>;
+
 
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
