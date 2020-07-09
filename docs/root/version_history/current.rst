@@ -20,6 +20,8 @@ Removed Config or Runtime
 New Features
 ------------
 
+* postgres network filter: :ref:`metadata <config_network_filters_postgres_proxy_dynamic_metadata>` is produced based on SQL query.
+
 Deprecated
 ----------
 
