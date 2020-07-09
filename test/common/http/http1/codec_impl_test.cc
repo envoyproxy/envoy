@@ -1002,34 +1002,11 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// Ensures that requests with invalid HTTP header values are not rejected
-// when the runtime guard is not enabled for the feature.
-TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRuntimeGuard) {
-  TestScopedRuntime scoped_runtime;
-  // When the runtime-guarded feature is NOT enabled, invalid header values
-  // should be accepted by the codec.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.strict_header_validation", "false"}});
-
-  initialize();
-
-  MockRequestDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  Buffer::OwnedImpl buffer(
-      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
-}
-
 // Ensures that requests with invalid HTTP header values are properly rejected
-// when the runtime guard is enabled for the feature.
 TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   TestScopedRuntime scoped_runtime;
   // When the runtime-guarded feature is enabled, invalid header values
   // should result in a rejection.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.strict_header_validation", "true"}});
 
   initialize();
 
@@ -1138,27 +1115,6 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
   EXPECT_EQ(status.message(),
             "http/1.1 protocol error: request headers failed spec compliance checks");
   EXPECT_EQ("http.invalid_authority", response_encoder->getStream().responseDetails());
-}
-
-// Regression test for http-parser allowing embedded NULs in header values,
-// verify we reject them.
-TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.strict_header_validation", "false"}});
-  initialize();
-
-  InSequence sequence;
-
-  MockRequestDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  Buffer::OwnedImpl buffer(
-      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: bar", std::string(1, '\0'), "baz\r\n"));
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
 // Mutate an HTTP GET with embedded NULs, this should always be rejected in some
