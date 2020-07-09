@@ -25,7 +25,7 @@
  
  const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
    CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
-@@ -1241,6 +1246,7 @@
+@@ -1238,6 +1243,7 @@
  }
  
  } // namespace Http1
