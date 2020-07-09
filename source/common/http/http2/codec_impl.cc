@@ -759,6 +759,11 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   return 0;
 }
 
+int ConnectionImpl::onError(absl::string_view error) {
+  ENVOY_CONN_LOG(debug, "invalid http2: {}", connection_, error);
+  return 0;
+}
+
 int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, nghttp2_strerror(error_code),
                  stream_id);
@@ -1170,6 +1175,11 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
          void* user_data) -> ssize_t {
         ASSERT(frame->hd.length <= len);
         return static_cast<ConnectionImpl*>(user_data)->packMetadata(frame->hd.stream_id, buf, len);
+      });
+
+  nghttp2_session_callbacks_set_error_callback2(
+      callbacks_, [](nghttp2_session*, int, const char* msg, size_t len, void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onError(absl::string_view(msg, len));
       });
 }
 
