@@ -1529,6 +1529,8 @@ void Filter::doRetry() {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
+  // TODO: Move this to an extension once support for upstream router/retry filters exists.
+  // https://github.com/envoyproxy/envoy/issues/10455
   if (config_.add_request_date_header_) {
     config_.date_provider_.setDateHeader(*downstream_headers_);
   }
