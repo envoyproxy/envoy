@@ -368,6 +368,14 @@ TEST_P(HdsIntegrationTest, SingleEndpointFieldMissingHttp) {
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->clear_unhealthy_threshold();
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_seconds(0);
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_nanos(100000000); // 0.1 seconds
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -385,6 +393,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointFieldMissingHttp) {
   cleanupHostConnections();
   cleanupHdsConnection();
 }
+
 // Tests Envoy TCP health checking an endpoint that doesn't respond and reporting that it is
 // unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
