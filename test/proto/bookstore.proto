@@ -114,6 +114,12 @@ service Bookstore {
       body: "nested.content"
     };
   }
+  rpc EchoResponseBodyPath(google.protobuf.Empty) returns (EchoBodyRequest) {
+    option (google.api.http) = {
+      get: "/echoResponseBodyPath"
+      response_body: "nested.content"
+    };
+  }
   rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
     option (google.api.http) = {
       post: "/echoStruct"
@@ -135,6 +141,24 @@ service ServiceWithResponseBody {
     option (google.api.http) = {
       get: "/echoStruct"
       response_body: "content"
+    };
+  }
+}
+
+service ServiceWithInvalidRequestBodyPath {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      body: "unknown.field"
+    };
+  }
+}
+
+service ServiceWithInvalidResponseBodyPath {
+  rpc EchoStruct(EchoStructReqResp) returns (EchoStructReqResp) {
+    option (google.api.http) = {
+      get: "/echoStruct"
+      response_body: "unknown.field"
     };
   }
 }

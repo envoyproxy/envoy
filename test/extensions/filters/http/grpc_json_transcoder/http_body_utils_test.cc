@@ -67,6 +67,15 @@ public:
     }
   }
 
+  void testInvalidMessage(const std::string& content, const std::vector<int>& body_field_path) {
+    setBodyFieldPath(body_field_path);
+    Buffer::InstancePtr message_buffer = std::make_unique<Buffer::OwnedImpl>();
+    message_buffer->add(content);
+    google::api::HttpBody http_body;
+    Buffer::ZeroCopyInputStreamImpl stream(std::move(message_buffer));
+    EXPECT_FALSE(HttpBodyUtils::parseMessageByFieldPath(&stream, body_field_path_, &http_body));
+  }
+
   std::vector<Protobuf::Field> raw_body_field_path_;
   std::vector<const Protobuf::Field*> body_field_path_;
 };
@@ -117,6 +126,39 @@ TEST_F(HttpBodyUtilsTest, SkipUnknownFields) {
   EXPECT_TRUE(HttpBodyUtils::parseMessageByFieldPath(&stream, body_field_path_, &http_body));
   EXPECT_EQ(http_body.content_type(), "text/nested");
   EXPECT_EQ(http_body.data(), "abcd");
+}
+
+TEST_F(HttpBodyUtilsTest, FailInvalidLength) {
+  std::string message;
+  // First field tag.
+  message += static_cast<char>((1 << 3) | 2);
+  // Invalid length.
+  message += '\x02';
+  // Second field tag.
+  message += static_cast<char>((2 << 3) | 2);
+  // Invalid length.
+  message += '\x80';
+  testInvalidMessage(message, {1, 2});
+}
+
+TEST_F(HttpBodyUtilsTest, FailSkipField) {
+  std::string message;
+  // Field tag.
+  message += static_cast<char>((2 << 3) | 2);
+  // Invalid length.
+  message += '\x80';
+  testInvalidMessage(message, {1});
+}
+
+TEST_F(HttpBodyUtilsTest, FailShortMessage) {
+  std::string message;
+  // Field tag.
+  message += static_cast<char>((1 << 3) | 2);
+  // Length less then remaining message size.
+  message += '\x02';
+  // Invalid tag.
+  message += '\x00';
+  testInvalidMessage(message, {1, 2});
 }
 
 } // namespace
