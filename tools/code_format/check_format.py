@@ -218,11 +218,7 @@ def readFile(path):
 # lookPath searches for the given executable in all directories in PATH
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
-  for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
-    if os.path.exists(executable_path):
-      return executable_path
-  return ""
+  return shutil.which(executable) or ''
 
 
 # pathExists checks whether the given path exists. This function assumes that
@@ -565,6 +561,22 @@ def isInSubdir(filename, *subdirs):
   return False
 
 
+# Determines if given token exists in line without leading or trailing token characters
+# e.g. will return True for a line containing foo() but not foo_bar() or baz_foo
+def tokenInLine(token, line):
+  index = 0
+  while True:
+    index = line.find(token, index)
+    if index < 1:
+      break
+    if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
+      if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
+                                                 line[index + len(token)] == '_'):
+        return True
+    index = index + 1
+  return False
+
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
@@ -616,23 +628,25 @@ def checkSourceLine(line, file_path, reportError):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   # Check that we use the absl::Time library
-  if "std::get_time" in line:
+  if tokenInLine("std::get_time", line):
     if "test/" in file_path:
       reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
     else:
       reportError("Don't use std::get_time; use the injectable time system")
-  if "std::put_time" in line:
+  if tokenInLine("std::put_time", line):
     reportError("Don't use std::put_time; use absl::Time equivalent instead")
-  if "gmtime" in line:
+  if tokenInLine("gmtime", line):
     reportError("Don't use gmtime; use absl::Time equivalent instead")
-  if "mktime" in line:
+  if tokenInLine("mktime", line):
     reportError("Don't use mktime; use absl::Time equivalent instead")
-  if "localtime" in line:
+  if tokenInLine("localtime", line):
     reportError("Don't use localtime; use absl::Time equivalent instead")
-  if "strftime" in line:
+  if tokenInLine("strftime", line):
     reportError("Don't use strftime; use absl::FormatTime instead")
-  if "strptime" in line:
+  if tokenInLine("strptime", line):
     reportError("Don't use strptime; use absl::FormatTime instead")
+  if tokenInLine("strerror", line):
+    reportError("Don't use strerror; use Envoy::errorDetails instead")
   if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.

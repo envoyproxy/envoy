@@ -17,6 +17,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    accept_handle(Http::CustomHeaders::get().Accept);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    grpc_accept_encoding_handle(Http::CustomHeaders::get().GrpcAcceptEncoding);
+
 struct RcDetailsValues {
   // The grpc web filter couldn't decode the data as the size wasn't a multiple of 4.
   const std::string GrpcDecodeFailedDueToSize = "grpc_base_64_decode_failed_bad_size";
@@ -71,7 +76,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
   }
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 
-  const absl::string_view accept = headers.getAcceptValue();
+  const absl::string_view accept = headers.getInlineValue(accept_handle.handle());
   if (accept == Http::Headers::get().ContentTypeValues.GrpcWebText ||
       accept == Http::Headers::get().ContentTypeValues.GrpcWebTextProto) {
     // Checks whether gRPC-Web client is asking for base64 encoded response.
@@ -81,7 +86,8 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
   // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
   // Adds grpc-accept-encoding:identity,deflate,gzip. It's required for gRPC.
-  headers.setReferenceGrpcAcceptEncoding(Http::Headers::get().GrpcAcceptEncodingValues.Default);
+  headers.setReferenceInline(grpc_accept_encoding_handle.handle(),
+                             Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
   return Http::FilterHeadersStatus::Continue;
 }
 

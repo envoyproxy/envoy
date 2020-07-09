@@ -173,11 +173,11 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
     switch (event.event_selector_case()) {
     case test::integration::Event::kDownstreamSendEvent: {
       auto downstream_write_func = [&](const Http2Frame& h2_frame) -> void {
-        tcp_client->write(std::string(h2_frame), false, false);
+        ASSERT_TRUE(tcp_client->write(std::string(h2_frame), false, false));
       };
       if (!preamble_sent) {
         // Start H2 session - send hello string
-        tcp_client->write(Http2Frame::Preamble, false, false);
+        ASSERT_TRUE(tcp_client->write(Http2Frame::Preamble, false, false));
         preamble_sent = true;
       }
       for (auto& frame : event.downstream_send_event().h2_frames()) {
