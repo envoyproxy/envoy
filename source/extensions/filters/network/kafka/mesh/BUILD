@@ -15,18 +15,26 @@ envoy_package()
 
 envoy_cc_extension(
     name = "config_lib",
-    srcs = ["config.cc"],
+    srcs = select({
+        "//bazel:windows": ["config_windows.cc"],
+        "//conditions:default": ["config.cc"],
+    }),
     hdrs = ["config.h"],
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "wip",
     deps = [
-        ":clustering_lib",
-        ":filter_lib",
-        ":upstream_kafka_facade_lib",
+        "//include/envoy/registry",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:windows": [],
+        "//conditions:default": [
+            ":clustering_lib",
+            ":filter_lib",
+            ":upstream_kafka_facade_lib",
+        ],
+    }),
 )
 
 envoy_cc_library(
@@ -35,6 +43,7 @@ envoy_cc_library(
     hdrs = [
         "filter.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         ":abstract_command_lib",
         ":clustering_lib",
@@ -58,6 +67,7 @@ envoy_cc_library(
     hdrs = [
         "splitter.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         ":abstract_command_lib",
         "//source/common/common:minimal_logger_lib",
@@ -76,6 +86,7 @@ envoy_cc_library(
     hdrs = [
         "abstract_command.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         ":clustering_lib",
         ":upstream_kafka_facade_lib",
@@ -93,6 +104,7 @@ envoy_cc_library(
     hdrs = [
         "upstream_kafka_facade.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         ":clustering_lib",
         ":upstream_kafka_client_lib",
@@ -110,6 +122,7 @@ envoy_cc_library(
     hdrs = [
         "upstream_kafka_client.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
@@ -125,6 +138,7 @@ envoy_cc_library(
     hdrs = [
         "clustering.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
