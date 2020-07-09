@@ -1,0 +1,60 @@
+actions {
+  add_route {
+  }
+}
+actions {
+  remove_route {
+    route_num: 13107200
+  }
+}
+actions {
+  add_listener {
+    listener_num: 1073741824
+    route_num: 10752
+  }
+}
+actions {
+  add_listener {
+    listener_num: 1073741824
+    route_num: 1
+  }
+}
+actions {
+  remove_route {
+    route_num: 8
+  }
+}
+actions {
+  add_listener {
+    listener_num: 1073741824
+    route_num: 10752
+  }
+}
+actions {
+  remove_listener {
+    listener_num: 4
+  }
+}
+actions {
+  remove_listener {
+    listener_num: 8
+  }
+}
+actions {
+  remove_route {
+    route_num: 8
+  }
+}
+actions {
+  remove_route {
+    route_num: 13107200
+  }
+}
+actions {
+  add_listener {
+    listener_num: 8
+  }
+}
+config {
+  sotw_or_delta: DELTA
+}
