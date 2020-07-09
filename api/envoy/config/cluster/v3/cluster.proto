@@ -831,7 +831,7 @@ message Cluster {
   // request. These show what percentage of a request's per try and global timeout was used. A value
   // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
   // of 100 would indicate that the request took the entirety of the timeout given to it.
-
+  //
   // .. attention::
   //  This field has been deprecated in favor of `timeout_budgets`, part of
   // :ref:`track_cluster_stats <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.

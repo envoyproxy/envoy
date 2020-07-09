@@ -2460,7 +2460,7 @@ TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld))
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats();
+  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
             tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
