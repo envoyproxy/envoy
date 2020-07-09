@@ -49,7 +49,7 @@ public:
   /**
    * Unregister a prometheus namespace registered by `registerPrometheusNamespace`
    * This method must be called from the main thread.
-   * @returns bool if the prometherus namespace is unregistered. false if the namspace
+   * @returns bool if the Prometheus namespace is unregistered. false if the namespace
    *          wasn't registered.
    */
   static bool unregisterPrometheusNamespace(absl::string_view prometheus_namespace);
