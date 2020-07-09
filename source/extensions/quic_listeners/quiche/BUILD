@@ -265,6 +265,7 @@ envoy_cc_library(
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_session_lib",
         "//include/envoy/network:listener_interface",
+        "//source/common/http:utility_lib",
         "//source/server:connection_handler_lib",
         "@com_googlesource_quiche//:quic_core_server_lib",
         "@com_googlesource_quiche//:quic_core_utils_lib",

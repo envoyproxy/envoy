@@ -1,0 +1,119 @@
+# TODO(dio): Consider to remove this patch when we have the ability to compile the project using
+# clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
+
+diff --git a/base/compiler_specific.h b/base/compiler_specific.h
+index 2962537..6193b56 100644
+--- a/base/compiler_specific.h
++++ b/base/compiler_specific.h
+@@ -7,10 +7,6 @@
+
+ #include "build/build_config.h"
+
+-#if defined(COMPILER_MSVC) && !defined(__clang__)
+-#error "Only clang-cl is supported on Windows, see https://crbug.com/988071"
+-#endif
+-
+ // Annotate a variable indicating it's ok if the variable is not used.
+ // (Typically used to silence a compiler warning when the assignment
+ // is important for some other reason.)
+@@ -212,7 +208,9 @@
+ #endif
+ #endif
+
+-#if defined(__clang__) && __has_attribute(uninitialized)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(uninitialized)
+ // Attribute "uninitialized" disables -ftrivial-auto-var-init=pattern for
+ // the specified variable.
+ // Library-wide alternative is
+@@ -243,6 +241,8 @@
+ // E.g. platform, bot, benchmark or test name in patch description or next to
+ // the attribute.
+ #define STACK_UNINITIALIZED __attribute__((uninitialized))
++#endif
++#endif
+ #else
+ #define STACK_UNINITIALIZED
+ #endif
+diff --git a/base/strings/BUILD b/base/strings/BUILD
+index 7a06170..7c86a5f 100644
+--- a/base/strings/BUILD
++++ b/base/strings/BUILD
+@@ -6,23 +6,21 @@ load("//:build_config.bzl", "build_config")
+ cc_library(
+     name = "strings",
+     srcs = [
+-        "string16.cc",
+         "string_piece.cc",
+         "string_util.cc",
+         "string_util_constants.cc",
+         "utf_string_conversion_utils.cc",
+         "utf_string_conversions.cc",
+-    ],
++    ] + build_config.strings_srcs,
+     hdrs = [
+         "char_traits.h",
+         "string16.h",
+         "string_piece.h",
+         "string_piece_forward.h",
+         "string_util.h",
+-        "string_util_posix.h",
+         "utf_string_conversion_utils.h",
+         "utf_string_conversions.h",
+-    ],
++    ] + build_config.strings_hdrs,
+     copts = build_config.default_copts,
+     visibility = ["//visibility:public"],
+     deps = [
+diff --git a/build_config.bzl b/build_config.bzl
+index d5fca65..fc0d7e5 100644
+--- a/build_config/build_config.bzl
++++ b/build_config/build_config.bzl
+@@ -1,8 +1,25 @@
+-_default_copts = [
+-    "-std=c++14",
+-    "-fno-strict-aliasing",
+-]
++_default_copts = select({
++    "@envoy//bazel:windows_x86_64": [
++        "/std:c++14",
++    ],
++    "//conditions:default": [
++        "-std=c++14",
++        "-fno-strict-aliasing",
++    ],
++})
++
++_strings_srcs = select({
++    "@envoy//bazel:windows_x86_64": [],
++    "//conditions:default": ["string16.cc"],
++})
++
++_strings_hdrs = select({
++    "@envoy//bazel:windows_x86_64": ["string_util_win.h"],
++    "//conditions:default": ["string_util_posix.h"],
++})
+
+ build_config = struct(
+     default_copts = _default_copts,
++    strings_srcs = _strings_srcs,
++    strings_hdrs = _strings_hdrs,
+ )
+diff --git a/url/BUILD b/url/BUILD
+index 0126bdc..5d1a171 100644
+--- a/url/BUILD
++++ b/url/BUILD
+@@ -43,11 +43,11 @@ cc_library(
+         "url_util.h",
+     ],
+     copts = build_config.default_copts,
+-    linkopts = ["-licuuc"],
+     visibility = ["//visibility:public"],
+     deps = [
+         "//base",
+         "//base/strings",
+         "//polyfills",
++         "@org_unicode_icuuc//:common",
+     ],
+ )

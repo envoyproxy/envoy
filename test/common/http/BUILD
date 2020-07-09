@@ -363,6 +363,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:url_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",
