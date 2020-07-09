@@ -219,6 +219,7 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
+  void createSubscription();
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;
@@ -257,7 +258,7 @@ private:
   friend RtdsSubscription;
 
   // Create a new Snapshot
-  virtual SnapshotImplPtr createNewSnapshot();
+  SnapshotImplPtr createNewSnapshot();
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
