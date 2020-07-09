@@ -165,7 +165,7 @@ public:
       : api_(Api::createApiForTest()), main_dispatcher_(api_->allocateDispatcher("main")),
         worker_dispatcher_(api_->allocateDispatcher("worker")) {}
 
-  // Use a real dispatcher to verify that callback can be executed correctly.
+  // Use real dispatchers to verify that callback functions can be executed correctly.
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   Event::DispatcherPtr worker_dispatcher_;
@@ -196,7 +196,7 @@ TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
   // Destroy state_.
   state_.reset(nullptr);
 
-  // Start a new worker thread to execute the callback function in the worker dispatcher.
+  // Start a new worker thread to execute the callback functions in the worker dispatcher.
   Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([this]() {
     worker_dispatcher_->run(Event::Dispatcher::RunType::Block);
     // Verify we have the expected dispatcher for the new thread thread.
