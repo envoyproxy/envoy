@@ -35,6 +35,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":original_dst_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_dst:original_dst_lib",
+        "//test/mocks/network:network_fakes",
         "//test/mocks/network:network_mocks",
     ],
 )
