@@ -103,7 +103,7 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(WithDeprecatedFactoryPublished)) {
                           ->name());
 }
 
-class TestWithDeprecatedPublishedFactoryNoDeprecatedNames : public PublishedFactory {
+class NoNamePublishedFactory : public PublishedFactory {
 public:
   std::string name() const override { return ""; }
 };
@@ -111,9 +111,8 @@ public:
 TEST(RegistryTest, DEPRECATED_FEATURE_TEST(AssertsIfNoDeprecatedNameGiven)) {
   // Expects an assert to raise if we register a factory that has an empty name
   // and no associated deprecated names.
-  EXPECT_DEATH((Registry::RegisterFactory<TestWithDeprecatedPublishedFactoryNoDeprecatedNames,
-                                          PublishedFactory>({})),
-               ".*assert failure:.*");
+  EXPECT_DEBUG_DEATH((Registry::RegisterFactory<NoNamePublishedFactory, PublishedFactory>({})),
+                     "Attempted to register factory without a name or deprecated name");
 }
 
 class TestVersionedFactory : public PublishedFactory {
@@ -195,7 +194,7 @@ TEST(RegistryTest, TestDoubleRegistrationByName) {
                             "Double registration for name: 'testing.published.test'");
 }
 
-class TestVersionedWithDeprecatedNamesFactoryAndAdditionalCategory : public PublishedFactory {
+class PublishedFactoryWithNameAndCategory : public PublishedFactory {
 public:
   std::string category() const override { return "testing.published.additional.category"; }
   std::string name() const override {
@@ -204,16 +203,14 @@ public:
 };
 
 TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactoryAndNewCategory)) {
-  TestVersionedWithDeprecatedNamesFactoryAndAdditionalCategory test;
+  PublishedFactoryWithNameAndCategory test;
 
   // Check the category is not registered
   ASSERT_FALSE(Registry::FactoryCategoryRegistry::isRegistered(test.category()));
 
-  auto factory =
-      Registry::RegisterFactory<TestVersionedWithDeprecatedNamesFactoryAndAdditionalCategory,
-                                PublishedFactory>(
-          FACTORY_VERSION(0, 0, 1, {{"build.kind", "private"}}),
-          {"testing.published.versioned.deprecated_name_and_category"});
+  auto factory = Registry::RegisterFactory<PublishedFactoryWithNameAndCategory, PublishedFactory>(
+      FACTORY_VERSION(0, 0, 1, {{"build.kind", "private"}}),
+      {"testing.published.versioned.deprecated_name_and_category"});
 
   // Check the category now registered
   ASSERT_TRUE(Registry::FactoryCategoryRegistry::isRegistered(test.category()));
