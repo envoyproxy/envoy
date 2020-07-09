@@ -26,9 +26,8 @@ Removed Config or Runtime
 
 New Features
 ------------
-* tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
-
 * grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
+* tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
 
 Deprecated
 ----------
