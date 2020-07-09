@@ -34,6 +34,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "histogram_impl_test",
+    srcs = ["histogram_impl_test.cc"],
+    deps = [
+        "//source/common/stats:histogram_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "metric_impl_test",
     srcs = ["metric_impl_test.cc"],
     deps = [

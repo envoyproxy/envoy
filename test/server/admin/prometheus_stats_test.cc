@@ -6,6 +6,7 @@
 #include "test/test_common/utility.h"
 
 using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
@@ -178,8 +179,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
   auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics())
-      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   addHistogram(histogram);
 
@@ -217,6 +217,34 @@ envoy_histogram1_count{} 0
   EXPECT_EQ(expected_output, response.toString());
 }
 
+TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
+  Stats::SupportedBuckets buckets{10, 20};
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram(), buckets);
+
+  auto histogram = makeHistogram("histogram1", {});
+  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
+
+  addHistogram(histogram);
+
+  Buffer::OwnedImpl response;
+  auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
+                                                          false, absl::nullopt);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+envoy_histogram1_bucket{le="10"} 0
+envoy_histogram1_bucket{le="20"} 0
+envoy_histogram1_bucket{le="+Inf"} 0
+envoy_histogram1_sum{} 0
+envoy_histogram1_count{} 0
+
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
 TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   HistogramWrapper h1_cumulative;
 
@@ -230,8 +258,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
 
   auto histogram = makeHistogram("histogram1", {});
-  ON_CALL(*histogram, cumulativeStatistics())
-      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
 
   addHistogram(histogram);
 
@@ -289,8 +316,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
                                                         {makeStat("key2"), makeStat("value2")}});
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics())
-      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+  EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
@@ -363,7 +389,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
       histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
       addHistogram(histogram1);
       EXPECT_CALL(*histogram1, cumulativeStatistics())
-          .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+          .WillOnce(ReturnRef(h1_cumulative_statistics));
     }
   }
 
@@ -553,8 +579,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
                                                         {makeStat("key2"), makeStat("value2")}});
   histogram1->unit_ = Stats::Histogram::Unit::Milliseconds;
   addHistogram(histogram1);
-  EXPECT_CALL(*histogram1, cumulativeStatistics())
-      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+  EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
   auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response,
@@ -615,8 +640,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
   {
     const bool used_only = false;
-    EXPECT_CALL(*histogram1, cumulativeStatistics())
-        .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+    EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
     Buffer::OwnedImpl response;
     auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
