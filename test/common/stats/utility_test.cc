@@ -49,12 +49,8 @@ TEST_F(StatsUtilityTest, Counters_tmp) {
   Stats::StatNamePool pool(*symbol_table);
   Stats::ScopePtr scope = store->createScope("abc");
   Stats::ElementVec ele_vec;
-  Stats::StatNameVec sn_vec;
   Stats::StatNameTagVector tags;
   Stats::StatName key, val;
-
-  Stats::Utility::counterFromStatNames(*scope, {});
-  Stats::Utility::counterFromElements(*scope, {});
 
   // must have 2 strings to trigger the crash, whether or not using make_string doesn't make
   // difference here
@@ -62,12 +58,9 @@ TEST_F(StatsUtilityTest, Counters_tmp) {
   absl::string_view str2 = make_string(std::string("abc"));
   ele_vec.push_back(Stats::DynamicName(str1));
   ele_vec.push_back(Stats::DynamicName(str2));
-  sn_vec.push_back(pool.add(str1));
-  sn_vec.push_back(pool.add(str2));
   key = pool.add("abc");
   val = pool.add("abc");
   tags.push_back({key, val});
-  Stats::Utility::counterFromStatNames(*scope, sn_vec, tags);
   Stats::Utility::counterFromElements(*scope, ele_vec, tags);
 }
 
