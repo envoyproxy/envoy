@@ -53,11 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "db48eed61552e25d36fe051a65d2a329cc0fb08442627e8f13960c5ab087a44e",
-        strip_prefix = "bazel-toolchains-3.2.0",
+        sha256 = "2431088b38fd8e2878db17e3c5babb431de9e5c52b6d8b509d3070fa279a5be2",
+        strip_prefix = "bazel-toolchains-3.3.1",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.2.0/bazel-toolchains-3.2.0.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.2.0.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.3.1/bazel-toolchains-3.3.1.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.3.1.tar.gz",
         ],
         use_category = ["build"],
     ),
@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "c4d27c0a5db918e861b7164d69cdffe920daafbe3f597ffdda5a1d10c1abc992",
-        strip_prefix = "envoy-build-tools-557ee9b44a3d08cf38d9ce6f08adb872c385d6a5",
+        sha256 = "ff890c70d60e51c7ee80874f85c3905718b7f6929a6c367c850cdd0b9c01d44d",
+        strip_prefix = "envoy-build-tools-efaecf11d76b86551cf42e2354274ac2acd7042f",
         # 2020-06-16
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/557ee9b44a3d08cf38d9ce6f08adb872c385d6a5.tar.gz"],
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/efaecf11d76b86551cf42e2354274ac2acd7042f.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -476,5 +476,12 @@ DEPENDENCY_REPOSITORIES = dict(
         strip_prefix = "kafka-python-2.0.0",
         urls = ["https://github.com/dpkp/kafka-python/archive/2.0.0.tar.gz"],
         use_category = ["test"],
+    ),
+    org_unicode_icuuc = dict(
+        strip_prefix = "icu-release-64-2",
+        sha256 = "524960ac99d086cdb6988d2a92fc163436fd3c6ec0a84c475c6382fbf989be05",
+        urls = ["https://github.com/unicode-org/icu/archive/release-64-2.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "cpe:2.3:a:icu-project:international_components_for_unicode",
     ),
 )
