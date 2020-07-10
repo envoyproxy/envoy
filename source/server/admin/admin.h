@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "common/common/assert.h"
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -25,6 +24,7 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/common/assert.h"
 #include "common/common/basic_resource_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
