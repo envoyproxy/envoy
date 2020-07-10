@@ -1533,12 +1533,12 @@ void Http2FloodMitigationTest::beginSession() {
 
 Http2Frame Http2FloodMitigationTest::readFrame() {
   Http2Frame frame;
-  tcp_client_->waitForData(frame.HeaderSize);
+  EXPECT_TRUE(tcp_client_->waitForData(frame.HeaderSize));
   frame.setHeader(tcp_client_->data());
   tcp_client_->clearData(frame.HeaderSize);
   auto len = frame.payloadSize();
   if (len) {
-    tcp_client_->waitForData(len);
+    EXPECT_TRUE(tcp_client_->waitForData(len));
     frame.setPayload(tcp_client_->data());
     tcp_client_->clearData(len);
   }
