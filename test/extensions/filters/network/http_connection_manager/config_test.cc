@@ -150,7 +150,9 @@ http_filters:
                             "chain.");
 }
 
-TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
+// When deprecating v2, remove the old style "operation_name: egress" config
+// but retain the rest of the test.
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(MiscConfig)) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 server_name: foo
