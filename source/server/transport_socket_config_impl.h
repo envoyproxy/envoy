@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
@@ -67,6 +69,8 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
 };
+
+using TransportSocketFactoryContextImplPtr = std::unique_ptr<TransportSocketFactoryContextImpl>;
 
 } // namespace Configuration
 } // namespace Server

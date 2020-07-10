@@ -56,5 +56,7 @@ public:
   virtual EntryOwnerPtr add(const std::string& key, Cb cb) PURE;
 };
 
+using ConfigTrackerSharedPtr = std::shared_ptr<ConfigTracker>;
+
 } // namespace Server
 } // namespace Envoy

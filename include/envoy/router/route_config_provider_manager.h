@@ -56,6 +56,7 @@ public:
                                   ProtobufMessage::ValidationVisitor& validator) PURE;
 };
 
+using RouteConfigProviderManagerPtr = std::unique_ptr<RouteConfigProviderManager>;
 using RouteConfigProviderManagerSharedPtr = std::shared_ptr<RouteConfigProviderManager>;
 
 } // namespace Router

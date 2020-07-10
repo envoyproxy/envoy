@@ -104,6 +104,7 @@ public:
 };
 
 using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;
+using LoadBalancerSharedPtr = std::shared_ptr<LoadBalancer>;
 
 /**
  * Factory for load balancers.

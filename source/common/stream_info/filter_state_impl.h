@@ -71,5 +71,7 @@ private:
   absl::flat_hash_map<std::string, FilterObjectPtr> data_storage_;
 };
 
+using FilterStateImplPtr = std::unique_ptr<FilterStateImpl>;
+
 } // namespace StreamInfo
 } // namespace Envoy

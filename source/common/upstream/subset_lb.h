@@ -261,5 +261,7 @@ private:
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };
 
+using SubsetLoadBalancerSharedPtr = std::shared_ptr<SubsetLoadBalancer>;
+
 } // namespace Upstream
 } // namespace Envoy

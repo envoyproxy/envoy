@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -456,6 +457,8 @@ private:
   const std::string name_;
   const uint64_t weight_;
 };
+
+using WeightedClusterEntryPtr = std::unique_ptr<WeightedClusterEntry>;
 using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
 TEST(WeightedClusterUtil, pickCluster) {

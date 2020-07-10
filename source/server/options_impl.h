@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -202,6 +203,8 @@ private:
   std::vector<std::string> disabled_extensions_;
   uint32_t count_;
 };
+
+using OptionsImplPtr = std::unique_ptr<OptionsImpl>;
 
 /**
  * Thrown when an OptionsImpl was not constructed because all of Envoy's work is done (for example,

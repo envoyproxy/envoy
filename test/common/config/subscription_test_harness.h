@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -113,6 +115,8 @@ public:
   SubscriptionStats stats_;
   ControlPlaneStats control_plane_stats_;
 };
+
+using SubscriptionTestHarnessPtr = std::unique_ptr<SubscriptionTestHarness>;
 
 ACTION_P(ThrowOnRejectedConfig, accept) {
   if (!accept) {

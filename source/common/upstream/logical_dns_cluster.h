@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -77,6 +78,8 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
 };
+
+using LogicalDnsClusterSharedPtr = std::shared_ptr<LogicalDnsCluster>;
 
 class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
 public:

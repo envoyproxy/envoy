@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/http/async_client.h"
 
 namespace Envoy {
@@ -38,6 +40,8 @@ private:
   // Track active async HTTP requests to be able to cancel them on destruction.
   absl::flat_hash_set<AsyncClient::Request*> active_requests_;
 };
+
+using AsyncClientRequestTrackerPtr = std::unique_ptr<AsyncClientRequestTracker>;
 
 } // namespace Http
 } // namespace Envoy

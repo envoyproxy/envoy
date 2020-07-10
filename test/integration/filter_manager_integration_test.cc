@@ -1,3 +1,4 @@
+#include <memory>
 #include <regex>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -56,6 +57,8 @@ private:
   const uint64_t max_chunk_length_;
   const std::function<void(Buffer::Instance&, bool)> next_chunk_cb_;
 };
+
+using ThrottlerPtr = std::unique_ptr<Throttler>;
 
 void Throttler::throttle(Buffer::Instance& data, bool end_stream) {
   buffer_.move(data);

@@ -284,5 +284,7 @@ private:
   SnapshotConstSharedPtr thread_safe_snapshot_ ABSL_GUARDED_BY(snapshot_mutex_);
 };
 
+using LoaderImplPtr = std::unique_ptr<LoaderImpl>;
+
 } // namespace Runtime
 } // namespace Envoy

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
@@ -29,6 +30,8 @@ private:
   std::vector<std::function<bool(uint64_t)>> http_success_fns_;
   std::vector<uint32_t> grpc_success_codes_;
 };
+
+using SuccessCriteriaEvaluatorPtr = std::unique_ptr<SuccessCriteriaEvaluator>;
 
 } // namespace AdmissionControl
 } // namespace HttpFilters

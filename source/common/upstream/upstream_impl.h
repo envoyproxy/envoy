@@ -512,6 +512,8 @@ private:
   };
 };
 
+using PrioritySetImplSharedPtr = std::shared_ptr<PrioritySetImpl>;
+
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */

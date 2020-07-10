@@ -140,5 +140,7 @@ private:
   bool write_half_closed_{};
 };
 
+using HttpUpstreamPtr = std::unique_ptr<HttpUpstream>;
+
 } // namespace TcpProxy
 } // namespace Envoy

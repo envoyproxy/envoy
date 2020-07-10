@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -50,6 +51,8 @@ private:
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
 };
+
+using LdsApiImplPtr = std::unique_ptr<LdsApiImpl>;
 
 } // namespace Server
 } // namespace Envoy

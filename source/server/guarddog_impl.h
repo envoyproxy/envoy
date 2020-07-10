@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -131,6 +132,8 @@ private:
   Thread::MutexBasicLockable mutex_;
   bool run_thread_ ABSL_GUARDED_BY(mutex_);
 };
+
+using GuardDogImplPtr = std::unique_ptr<GuardDogImpl>;
 
 } // namespace Server
 } // namespace Envoy

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "envoy/http/conn_pool.h"
 
@@ -33,6 +34,8 @@ public:
 
   DestroyCb destroy_cb_;
 };
+
+using CodecClientForTestPtr = std::unique_ptr<CodecClientForTest>;
 
 /**
  * Mock callbacks used for conn pool testing.

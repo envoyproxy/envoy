@@ -129,6 +129,8 @@ public:
   std::vector<TestCodecClient> test_clients_;
 };
 
+using ConnPoolImplForTestPtr = std::unique_ptr<ConnPoolImplForTest>;
+
 /**
  * Test fixture for all connection pool tests.
  */

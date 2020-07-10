@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -82,6 +84,8 @@ private:
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;
 };
+
+using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;
 
 class EdsClusterFactory : public ClusterFactoryImplBase {
 public:

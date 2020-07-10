@@ -604,6 +604,8 @@ private:
   OverflowDetectingUInt64 length_;
 };
 
+using OwnedImplPtr = std::unique_ptr<OwnedImpl>;
+
 using BufferFragmentPtr = std::unique_ptr<BufferFragment>;
 
 /**

@@ -150,6 +150,7 @@ private:
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
+using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;
 
 } // namespace Config

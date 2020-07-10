@@ -46,6 +46,8 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
+using ListenerHandleSharedPtr = std::shared_ptr<ListenerHandle>;
+
 class ListenerManagerImplTest : public testing::Test {
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest()) {}

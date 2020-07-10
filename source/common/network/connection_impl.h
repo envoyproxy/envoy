@@ -197,6 +197,8 @@ private:
   bool dispatch_buffered_data_ : 1;
 };
 
+using ConnectionImplPtr = std::unique_ptr<ConnectionImpl>;
+
 /**
  * libevent implementation of Network::ClientConnection.
  */

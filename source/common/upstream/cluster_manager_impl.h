@@ -92,6 +92,8 @@ protected:
   Singleton::Manager& singleton_manager_;
 };
 
+using ProdClusterManagerFactoryPtr = std::unique_ptr<ProdClusterManagerFactory>;
+
 // For friend declaration in ClusterManagerInitHelper.
 class ClusterManagerImpl;
 

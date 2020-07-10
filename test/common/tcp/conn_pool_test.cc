@@ -65,6 +65,8 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   Upstream::HostDescriptionConstSharedPtr host_;
 };
 
+using ConnPoolCallbacksPtr = std::unique_ptr<ConnPoolCallbacks>;
+
 /**
  * A wrapper around a ConnectionPoolImpl which tracks when the bridge between
  * the pool and the consumer of the connection is released and destroyed.
@@ -269,7 +271,7 @@ public:
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Network::MockClientConnection>* connection_;
-  OriginalConnPoolImplPtr conn_pool_;
+  Tcp::ConnectionPool::InstancePtr conn_pool_;
   ConnPoolCallbacksPtr callbacks_;
 };
 

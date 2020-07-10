@@ -205,6 +205,8 @@ public:
   }
 };
 
+using DummyConfigProviderManagerPtr = std::unique_ptr<DummyConfigProviderManager>;
+
 DummyConfigSubscription::DummyConfigSubscription(
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
     DummyConfigProviderManager& config_provider_manager)
@@ -646,6 +648,8 @@ public:
     return std::make_unique<DeltaDummyDynamicConfigProvider>(std::move(subscription));
   }
 };
+
+using DeltaDummyConfigProviderManagerPtr = std::unique_ptr<DeltaDummyConfigProviderManager>;
 
 DeltaDummyConfigSubscription::DeltaDummyConfigSubscription(
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,

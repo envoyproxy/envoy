@@ -171,6 +171,8 @@ private:
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
 };
 
+using RateLimitPolicyEntryImplPtr = std::unique_ptr<RateLimitPolicyEntryImpl>;
+
 /**
  * Implementation of RateLimitPolicy that reads from the JSON route config.
  */

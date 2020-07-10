@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -199,6 +201,8 @@ public:
   const TestMetadata empty_metadata_;
 };
 
+using HelloworldStreamPtr = std::unique_ptr<HelloworldStream>;
+
 // Request related test utilities.
 class HelloworldRequest : public MockAsyncRequestCallbacks<helloworld::HelloReply> {
 public:
@@ -221,6 +225,8 @@ public:
   AsyncRequest* grpc_request_{};
   Tracing::MockSpan* child_span_{new Tracing::MockSpan()};
 };
+
+using HelloworldRequestPtr = std::unique_ptr<HelloworldRequest>;
 
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:

@@ -26,6 +26,8 @@ protected:
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 };
 
+using ListenSocketImplPtr = ::std::unique_ptr<ListenSocketImpl>;
+
 /**
  * Wraps a unix socket.
  */

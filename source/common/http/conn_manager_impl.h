@@ -808,5 +808,7 @@ private:
   StreamInfo::FilterStateSharedPtr filter_state_;
 };
 
+using ConnectionManagerImplPtr = std::unique_ptr<ConnectionManagerImpl>;
+
 } // namespace Http
 } // namespace Envoy

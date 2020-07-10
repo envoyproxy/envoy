@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "envoy/stats/stats.h"
@@ -200,6 +201,8 @@ private:
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
 };
+
+using IsolatedStoreImplPtr = std::unique_ptr<IsolatedStoreImpl>;
 
 } // namespace Stats
 } // namespace Envoy

@@ -112,6 +112,8 @@ private:
   std::unordered_set<GoogleAsyncStreamImpl*> streams_;
 };
 
+using GoogleAsyncClientThreadLocalPtr = std::unique_ptr<GoogleAsyncClientThreadLocal>;
+
 // Google gRPC client stats. TODO(htuch): consider how a wider set of stats collected by the
 // library, such as the census related ones, can be externalized as needed.
 struct GoogleAsyncClientStats {

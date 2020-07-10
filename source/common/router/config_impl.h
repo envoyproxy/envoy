@@ -998,6 +998,8 @@ private:
   const bool most_specific_header_mutations_wins_;
 };
 
+using ConfigImplPtr = std::unique_ptr<ConfigImpl>;
+
 /**
  * Implementation of Config that is empty.
  */

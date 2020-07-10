@@ -148,6 +148,8 @@ private:
   Event::SignalEventPtr sig_hup_;
 };
 
+using RunHelperPtr = std::unique_ptr<RunHelper>;
+
 // ServerFactoryContextImpl implements both ServerFactoryContext and
 // TransportSocketFactoryContext for convenience as these two contexts
 // share common member functions and member variables.

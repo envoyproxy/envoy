@@ -6,6 +6,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/common/platform.h"
@@ -130,6 +131,8 @@ private:
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
 };
+
+using HotRestartImplPtr = std::unique_ptr<HotRestartImpl>;
 
 } // namespace Server
 } // namespace Envoy

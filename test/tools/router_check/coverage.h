@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/router/router.h"
 
@@ -38,6 +40,8 @@ private:
   bool redirect_path_covered_{false};
   std::vector<bool> coverageFields();
 };
+
+using RouteCoveragePtr = std::unique_ptr<RouteCoverage>;
 
 class Coverage : Logger::Loggable<Logger::Id::testing> {
 public:

@@ -598,6 +598,8 @@ private:
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 };
 
+using ClientConnectionImplPtr = std::unique_ptr<ClientConnectionImpl>;
+
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

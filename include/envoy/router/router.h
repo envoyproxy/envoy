@@ -574,6 +574,7 @@ using MetadataMatchCriterionConstSharedPtr = std::shared_ptr<const MetadataMatch
 
 class MetadataMatchCriteria;
 using MetadataMatchCriteriaConstPtr = std::unique_ptr<const MetadataMatchCriteria>;
+using MetadataMatchCriteriaSharedPtr = std::shared_ptr<MetadataMatchCriteria>;
 
 class MetadataMatchCriteria {
 public:

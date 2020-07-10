@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
@@ -35,6 +36,8 @@ private:
 
   std::vector<Matchers::StringMatcherImpl> matchers_;
 };
+
+using StatsMatcherImplPtr = std::unique_ptr<StatsMatcherImpl>;
 
 } // namespace Stats
 } // namespace Envoy

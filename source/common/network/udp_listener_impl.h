@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 
 #include "envoy/common/time.h"
 
@@ -58,6 +59,8 @@ private:
   TimeSource& time_source_;
   Event::FileEventPtr file_event_;
 };
+
+using UdpListenerImplPtr = std::unique_ptr<UdpListenerImpl>;
 
 } // namespace Network
 } // namespace Envoy

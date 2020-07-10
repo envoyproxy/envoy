@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/server/process_context.h"
 
 namespace Envoy {
@@ -13,5 +15,7 @@ public:
 private:
   ProcessObject& process_object_;
 };
+
+using ProcessContextImplPtr = std::unique_ptr<ProcessContextImpl>;
 
 } // namespace Envoy

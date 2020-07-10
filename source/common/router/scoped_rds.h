@@ -242,6 +242,7 @@ private:
   RouteConfigProviderManager& route_config_provider_manager_;
 };
 
+using ScopedRoutesConfigProviderManagerPtr = std::unique_ptr<ScopedRoutesConfigProviderManager>;
 using ScopedRoutesConfigProviderManagerSharedPtr =
     std::shared_ptr<ScopedRoutesConfigProviderManager>;
 

@@ -145,6 +145,7 @@ private:
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;
+using GrpcMuxImplSharedPtr = std::shared_ptr<GrpcMuxImpl>;
 
 class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {

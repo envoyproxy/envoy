@@ -169,6 +169,9 @@ private:
   ScopeKey scope_key_;
   ConfigConstSharedPtr route_config_;
 };
+
+using ScopedRouteInfoPtr = std::unique_ptr<ScopedRouteInfo>;
+using ScopedRouteInfoSharedPtr = std::shared_ptr<ScopedRouteInfo>;
 using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;
 // Ordered map for consistent config dumping.
 using ScopedRouteMap = std::map<std::string, ScopedRouteInfoConstSharedPtr>;
@@ -198,6 +201,8 @@ private:
   // Hash by ScopeKey hash to lookup in constant time.
   absl::flat_hash_map<uint64_t, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_key_;
 };
+
+using ScopedConfigImplPtr = std::unique_ptr<ScopedConfigImpl>;
 
 /**
  * A NULL implementation of the scoped routing configuration.

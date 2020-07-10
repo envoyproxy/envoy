@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
@@ -60,6 +62,8 @@ private:
   Network::DnsLookupFamily dns_lookup_family_;
   uint32_t overprovisioning_factor_;
 };
+
+using StrictDnsClusterImplPtr = std::unique_ptr<StrictDnsClusterImpl>;
 
 /**
  * Factory for StrictDnsClusterImpl

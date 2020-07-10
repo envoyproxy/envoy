@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -70,6 +72,8 @@ private:
   Event::Dispatcher& dispatcher_;
   Network::Socket& listen_socket_;
 };
+
+using EnvoyQuicDispatcherPtr = std::unique_ptr<EnvoyQuicDispatcher>;
 
 } // namespace Quic
 } // namespace Envoy

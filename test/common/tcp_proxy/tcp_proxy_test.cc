@@ -821,6 +821,8 @@ TEST(ConfigTest, AccessLogConfig) {
   EXPECT_EQ(2, config_obj.accessLogs().size());
 }
 
+using FilterPtr = std::unique_ptr<Filter>;
+
 class TcpProxyTest : public testing::Test {
 public:
   TcpProxyTest() {

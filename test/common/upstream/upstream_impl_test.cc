@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -76,8 +77,10 @@ std::list<std::string> hostListToAddresses(const HostVector& hosts) {
   return addresses;
 }
 
+template <class HostsT = HostVector> using HostsTConstSharedPtr = std::shared_ptr<const HostsT>;
+
 template <class HostsT = HostVector>
-HostsTConstSharedPtr
+HostsTConstSharedPtr<HostsT>
 makeHostsFromHostsPerLocality(HostsPerLocalityConstSharedPtr hosts_per_locality) {
   HostVector hosts;
 

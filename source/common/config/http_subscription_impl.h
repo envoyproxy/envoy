@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
@@ -58,6 +60,8 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
+
+using HttpSubscriptionImplPtr = std::unique_ptr<HttpSubscriptionImpl>;
 
 } // namespace Config
 } // namespace Envoy

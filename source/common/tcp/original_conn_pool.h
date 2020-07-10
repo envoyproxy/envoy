@@ -164,5 +164,7 @@ protected:
   bool upstream_ready_enabled_{false};
 };
 
+using OriginalConnPoolImplPtr = std::unique_ptr<OriginalConnPoolImpl>;
+
 } // namespace Tcp
 } // namespace Envoy

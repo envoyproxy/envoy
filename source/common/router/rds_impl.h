@@ -260,5 +260,7 @@ private:
   friend class StaticRouteConfigProviderImpl;
 };
 
+using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;
+
 } // namespace Router
 } // namespace Envoy
