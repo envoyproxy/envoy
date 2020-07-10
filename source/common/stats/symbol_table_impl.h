@@ -815,7 +815,7 @@ public:
    *
    * @return the StatName or fallback.
    */
-  StatName getBuiltin(absl::string_view token, StatName fallback);
+  StatName getBuiltin(absl::string_view token, StatName fallback) const;
 
   /**
    * Adds a StatName using the pool, but without remembering it in any maps.
