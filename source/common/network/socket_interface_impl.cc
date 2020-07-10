@@ -1,7 +1,7 @@
 #include "common/network/socket_interface_impl.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/config/core/v3/default_socket_interface.pb.h"
+#include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
 #include "envoy/network/socket.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -89,7 +89,8 @@ SocketInterfaceImpl::createBootstrapExtension(const Protobuf::Message&,
 }
 
 ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::core::v3::DefaultSocketInterface>();
+  return std::make_unique<
+      envoy::extensions::network::socket_interface::v3::DefaultSocketInterface>();
 }
 
 REGISTER_FACTORY(SocketInterfaceImpl, Server::Configuration::BootstrapExtensionFactory);

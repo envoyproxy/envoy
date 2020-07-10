@@ -22,7 +22,9 @@ public:
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return "envoy.config.core.default_socket_interface"; };
+  std::string name() const override {
+    return "envoy.extensions.network.socket_interface.default_socket_interface";
+  };
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);

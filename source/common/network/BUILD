@@ -199,7 +199,7 @@ envoy_cc_library(
         "//include/envoy/network:socket_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )
 
