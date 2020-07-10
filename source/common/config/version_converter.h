@@ -92,6 +92,15 @@ public:
                                         envoy::config::core::v3::ApiVersion api_version);
 
   /**
+   * Annotate an upgraded message with original message type information.
+   *
+   * @param prev_descriptor descriptor for original type.
+   * @param upgraded_message upgraded message.
+   */
+  static void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
+                                       Protobuf::Message& upgraded_message);
+
+  /**
    * For a message that may have been upgraded, recover the original message.
    * This is useful for config dump, debug output etc.
    *
