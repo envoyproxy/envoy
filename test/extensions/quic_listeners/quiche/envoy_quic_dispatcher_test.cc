@@ -63,9 +63,9 @@ public:
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
-          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_29, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),

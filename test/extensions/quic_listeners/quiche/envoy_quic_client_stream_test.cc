@@ -25,9 +25,9 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
-          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_29, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),

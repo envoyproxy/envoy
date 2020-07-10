@@ -1,5 +1,14 @@
 #include <string>
 
+#pragma GCC diagnostic push
+// QUICHE allows unused parameters.
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+// QUICHE uses offsetof().
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+
+#include "quiche/quic/test_tools/quic_connection_peer.h"
+#pragma GCC diagnostic pop
+
 #include "common/event/libevent_scheduler.h"
 #include "common/http/headers.h"
 
@@ -30,9 +39,9 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
-          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_29, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -51,6 +60,7 @@ public:
         response_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
+    quic::test::QuicConnectionPeer::SetAddressValidated(&quic_connection_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
     EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(testing::Return(false));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
