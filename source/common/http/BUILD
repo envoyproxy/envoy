@@ -71,6 +71,7 @@ envoy_cc_library(
         "//source/common/http/http3:well_known_names",
         "//source/common/network:filter_lib",
         "//source/common/runtime:runtime_features_lib",
+        "//source/common/runtime:runtime_lib",
     ],
 )
 
