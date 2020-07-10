@@ -360,8 +360,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
   cleanupHdsConnection();
 }
 
-// Tests Envoy TCP health checking with missing required fields to ensure that
-// that HDS does not continue with invalid configuration.
+// Tests Envoy TCP health checking an endpoint that doesn't respond and reporting that it is
+// unhealthy to the server.
 TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   initialize();
 
