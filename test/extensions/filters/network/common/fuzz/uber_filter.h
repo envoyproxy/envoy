@@ -21,7 +21,7 @@ public:
   fuzz(const envoy::config::listener::v3::Filter& proto_config,
        const Protobuf::RepeatedPtrField<::test::extensions::filters::network::Action>& actions);
   // Get the name of filters which has been covered by this fuzzer.
-  static std::vector<absl::string_view> filter_names();
+  static std::vector<absl::string_view> filterNames();
   // Avoid issues in destructors.
   void reset(const std::string filter_name);
   void perFilterSetup(const std::string filter_name);
@@ -47,6 +47,16 @@ private:
   std::unique_ptr<Grpc::MockAsyncClient> async_client_;
   std::unique_ptr<Grpc::MockAsyncClientFactory> async_client_factory_;
   Tracing::MockSpan span_;
+  // mock tcp upstream
+  std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
+    upstream_connection_data_{};
+  std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
+  std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_{};
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr upstream_remote_address_;
+  std::vector<Tcp::ConnectionPool::Callbacks*> conn_pool_callbacks_;
+  std::vector<std::unique_ptr<NiceMock<Envoy::ConnectionPool::MockCancellable>>> conn_pool_handles_;
+  NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
 };
 
 } // namespace NetworkFilters

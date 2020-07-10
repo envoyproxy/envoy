@@ -13,14 +13,15 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-std::vector<absl::string_view> UberFilterFuzzer::filter_names() {
+std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // This filters that have already been covered by this fuzzer.
   // Will extend to cover other network filters one by one.
   static ::std::vector<absl::string_view> filter_names_;
-  if (filter_names_.size() == 0) {
+  if (filter_names_.empty()) {
     filter_names_ = {"envoy.filters.network.ext_authz", "envoy.filters.network.local_ratelimit",
-                     "envoy.filters.network.redis_proxy", "envoy.filters.network.tcp_proxy",
-                     "envoy.filters.network.client_ssl_auth"};
+                     "envoy.filters.network.redis_proxy", 
+                     "envoy.filters.network.client_ssl_auth","envoy.filters.network.echo",
+                     "envoy.filters.network.direct_response","envoy.filters.network.sni_cluster"};
   }
   return filter_names_;
 }
@@ -32,6 +33,16 @@ void UberFilterFuzzer::reset(const std::string) {
   read_filter_callbacks_->connection_.callbacks_.clear();
   read_filter_callbacks_->connection_.bytes_sent_callbacks_.clear();
   read_filter_callbacks_->connection_.state_ = Network::Connection::State::Open;
+
+  // read_filter_callbacks_ = std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
+  // ON_CALL(read_filter_callbacks_->connection_, addReadFilter(_))
+  //     .WillByDefault(Invoke([&](Network::ReadFilterSharedPtr read_filter) -> void {
+  //       read_filter_ = read_filter;
+  //       read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
+  //     }));
+  // // Prepare sni for sni_cluster filter
+  // ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
+  //   .WillByDefault(testing::Return("filter_state_cluster"));
 }
 void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
   std::cout << "setup for filter:" << filter_name << std::endl;
@@ -70,6 +81,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return std::move(async_client_factory_); }));
   }
+  
 }
 void UberFilterFuzzer::fuzzerSetup() {
   // Setup process when this fuzzer object is constructed.
@@ -82,7 +94,9 @@ void UberFilterFuzzer::fuzzerSetup() {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
       }));
-
+  // Prepare sni for sni_cluster filter
+  ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
+    .WillByDefault(testing::Return("filter_state_cluster"));
   // Prepare time source for filters such as local_ratelimit filter
   api_ = Api::createApiForTest(time_source_);
   dispatcher_ = api_->allocateDispatcher("test_thread");
@@ -94,7 +108,7 @@ void UberFilterFuzzer::fuzzerSetup() {
 }
 
 void UberFilterFuzzer::filterSetup(const envoy::config::listener::v3::Filter& proto_config) {
-  const std::string filter_name = proto_config.name();
+  const std::string& filter_name = proto_config.name();
   ENVOY_LOG_MISC(info, "filter name {}", filter_name);
   auto& factory = Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::NamedNetworkFilterConfigFactory>(filter_name);
@@ -119,6 +133,9 @@ void UberFilterFuzzer::fuzz(
   perFilterSetup(proto_config.name());
   // Add filter to connection_
   cb_(read_filter_callbacks_->connection_);
+  // if (actions.size() > 5) {
+  //   PANIC("A case is found!");
+  // }
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {

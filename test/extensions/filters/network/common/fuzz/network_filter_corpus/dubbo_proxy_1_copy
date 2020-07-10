@@ -1,0 +1,39 @@
+config {
+  name: "envoy.filters.network.dubbo_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.dubbo_proxy.v3.DubboProxy"
+    value: "\n!envoy.filters.network.dubbo_proxy"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+    data: "\000\013"
+  }
+}
+actions {
+  on_data {
+    data: "\000\013"
+  }
+}
+actions {
+  on_data {
+    data: "\000\013"
+  }
+}
+actions {
+  on_data {
+    data: "\000\013"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
