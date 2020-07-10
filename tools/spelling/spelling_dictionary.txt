@@ -617,7 +617,6 @@ getaddrinfo
 getaffinity
 gethostname
 getifaddrs
-getname
 getpeername
 getsockname
 getsockopt
@@ -792,7 +791,6 @@ noncopyable
 nonresponsive
 noop
 nop
-np
 nthreads
 ntohl
 ntop

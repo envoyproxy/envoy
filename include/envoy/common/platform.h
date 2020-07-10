@@ -241,7 +241,7 @@ struct mmsghdr {
 #endif
 
 // https://android.googlesource.com/platform/bionic/+/master/docs/status.md
-// pthread_getname_np is introduced in API 26
+// `pthread_getname_np` is introduced in API 26
 #ifdef __ANDROID_API__
 #if __ANDROID_API__ > 26
 #define SUPPORTS_PTHREAD_GETNAME_NP 1
