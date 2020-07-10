@@ -49,6 +49,8 @@ stable releases and sending announcements about them. This role is rotating on a
 | Quarter |       Release manager        |
 |:-------:|:----------------------------:|
 | 2020 Q1 | Piotr Sikora ([PiotrSikora]) |
+| 2020 Q2 | Piotr Sikora ([PiotrSikora]) |
+| 2020 Q3 | Yuchen Dai ([lambdai])       |
 
 ## Release schedule
 
@@ -61,7 +63,7 @@ deadline of 3 weeks.
 | 1.12.0  | 2019/09/30 | 2019/10/31 |  +31 days  | 2020/10/31  |
 | 1.13.0  | 2019/12/31 | 2020/01/20 |  +20 days  | 2021/01/20  |
 | 1.14.0  | 2020/03/31 | 2020/04/08 |   +8 days  | 2021/04/08  |
-| 1.15.0  | 2020/06/30 |            |            |             |
+| 1.15.0  | 2020/06/30 | 2020/07/07 |   +7 days  | 2021/07/07  |
 | 1.16.0  | 2020/09/30 |            |            |             |
 | 1.17.0  | 2020/12/31 |            |            |             |
 
