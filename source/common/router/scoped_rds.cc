@@ -28,6 +28,7 @@ using Envoy::Config::ConfigProvider;
 using Envoy::Config::ConfigProviderInstanceType;
 using Envoy::Config::ConfigProviderManager;
 using Envoy::Config::ConfigProviderPtr;
+using Envoy::Config::ScopedResume;
 
 namespace Envoy {
 namespace Router {
@@ -225,40 +226,41 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // NOTE: deletes are done before adds/updates.
 
   absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> to_be_removed_scopes;
+  // Destruction of resume_rds will lift the floodgate for new RDS subscriptions.
+  // Note in the case of partial acceptance, accepted RDS subscriptions should be started
+  // despite of any error.
+  ScopedResume resume_rds;
   // If new route config sources come after the local init manager's initialize() been
   // called, the init manager can't accept new targets. Instead we use a local override which will
   // start new subscriptions but not wait on them to be ready.
-  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
-  // NOTE: This should be defined after noop_init_manager as it depends on the
-  // noop_init_manager.
-  std::unique_ptr<Cleanup> resume_rds;
+  std::unique_ptr<Init::ManagerImpl> srds_init_mgr;
+  // NOTE: This should be defined after srds_init_mgr and resume_rds, as it depends on the
+  // srds_init_mgr, and we want a single RDS discovery request to be sent to management
+  // server.
+  std::unique_ptr<Cleanup> srds_initialization_continuation;
+  ASSERT(localInitManager().state() > Init::Manager::State::Uninitialized);
+  const auto type_urls =
+      Envoy::Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+  // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
+  // In the case that localInitManager is uninitialized, RDS is already paused
+  // either by Server init or LDS init.
+  if (factory_context_.clusterManager().adsMux()) {
+    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_urls);
+  }
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
-    const auto type_urls =
-        Envoy::Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
-    noop_init_manager =
+    srds_init_mgr =
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
-    // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
-    // In the case if factory_context_.init_manager() is uninitialized, RDS is already paused
-    // either by Server init or LDS init.
-    if (factory_context_.clusterManager().adsMux()) {
-      factory_context_.clusterManager().adsMux()->pause(type_urls);
-    }
-    resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info, type_urls] {
-      // For new RDS subscriptions created after listener warming up, we don't wait for them to
-      // warm up.
-      Init::WatcherImpl noop_watcher(
-          // Note: we just throw it away.
-          fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
-          []() { /*Do nothing.*/ });
-      noop_init_manager->initialize(noop_watcher);
-      // New RDS subscriptions should have been created, now lift the floodgate.
-      // Note in the case of partial acceptance, accepted RDS subscriptions should be started
-      // despite of any error.
-      if (factory_context_.clusterManager().adsMux()) {
-        factory_context_.clusterManager().adsMux()->resume(type_urls);
-      }
-    });
+    srds_initialization_continuation =
+        std::make_unique<Cleanup>([this, &srds_init_mgr, version_info] {
+          // For new RDS subscriptions created after listener warming up, we don't wait for them to
+          // warm up.
+          Init::WatcherImpl noop_watcher(
+              // Note: we just throw it away.
+              fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
+              []() { /*Do nothing.*/ });
+          srds_init_mgr->initialize(noop_watcher);
+        });
   }
 
   std::vector<std::string> exception_msgs;
@@ -268,7 +270,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       to_be_removed_rds_providers = removeScopes(removed_resources, version_info);
   bool any_applied =
       addOrUpdateScopes(added_resources,
-                        (noop_init_manager == nullptr ? localInitManager() : *noop_init_manager),
+                        (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
                         version_info, exception_msgs) ||
       !to_be_removed_rds_providers.empty();
   ConfigSubscriptionCommonBase::onConfigUpdate();
