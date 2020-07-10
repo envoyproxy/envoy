@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/api_listener.h"
@@ -54,7 +55,7 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public Http::ApiListener {
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
-                        Runtime::RandomGenerator& random_generator, Http::Context& http_context,
+                        Random::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager* overload_manager, TimeSource& time_system);
@@ -788,7 +789,7 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
-  Runtime::RandomGenerator& random_generator_;
+  Random::RandomGenerator& random_generator_;
   Http::Context& http_context_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
