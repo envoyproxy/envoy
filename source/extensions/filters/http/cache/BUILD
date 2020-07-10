@@ -56,6 +56,8 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:header_map_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
