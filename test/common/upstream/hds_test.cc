@@ -248,6 +248,46 @@ TEST_F(HdsTest, TestProcessMessageMissingFields) {
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 1);
 }
 
+// Test if processMessage exits gracefully upon receiving a malformed message
+// There was a previous valid config, so we go back to that.
+TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Send Response
+  auto msg = hds_delegate_->sendResponse();
+
+  // Create a invalid message
+  message.reset(createSimpleMessage());
+
+  // remove healthy threshold field to create an error
+  message->mutable_cluster_health_checks(0)->mutable_health_checks(0)->clear_healthy_threshold();
+
+  // call onReceiveMessage function for testing. Should increment stat_ errors upon
+  // getting a bad message
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Check Correctness by verifying one request and one error has been generated in stat_
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
+}
+
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
 TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));

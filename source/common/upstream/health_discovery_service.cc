@@ -200,6 +200,12 @@ void HdsDelegate::onReceiveMessage(
     stats_.errors_.inc();
     ENVOY_LOG(warn, "Unable to validate health check specifier: {}", ex.what());
 
+    // if there was a previous valid config, continue using it.
+    if (!hds_clusters_.empty()) {
+      ENVOY_LOG(debug, "Using previous health check specifier");
+      setHdsStreamResponseTimer();
+    }
+
     // Do not continue processing message
     return;
   }
