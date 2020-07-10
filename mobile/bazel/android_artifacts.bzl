@@ -26,7 +26,7 @@ load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-def aar_with_jni(name, android_library, manifest, archive_name, native_deps = [], proguard_rules = "", visibility = []):
+def android_artifacts(name, android_library, manifest, archive_name, native_deps = [], proguard_rules = "", visibility = []):
     """
     NOTE: The bazel android_library's implicit aar output doesn't flatten its transitive
     dependencies. Additionally, when using the kotlin rules, the kt_android_library rule
@@ -56,7 +56,7 @@ def aar_with_jni(name, android_library, manifest, archive_name, native_deps = []
     _sources_name, _javadocs_name = _create_sources_javadocs(name, android_library)
     _pom_name = _create_pom_xml(name, android_library)
     native.genrule(
-        name = name,
+        name = name + "_with_artifacts",
         srcs = [
             _aar_output,
             _pom_name,
@@ -127,7 +127,7 @@ def _create_aar(name, archive_name, classes_jar, jni_archive, proguard_rules, vi
     )
 
     native.genrule(
-        name = name + "_only_aar",
+        name = name,
         outs = [_aar_output],
         srcs = [
             classes_jar,

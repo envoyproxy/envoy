@@ -21,17 +21,23 @@ touch $@
 
 alias(
     name = "android_aar",
-    actual = "//library/kotlin/src/io/envoyproxy/envoymobile:android_aar_only_aar",
+    actual = "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_aar",
     visibility = ["//visibility:public"],
 )
 
 genrule(
-    name = "android_zip",
+    name = "android_dist_ci",
     srcs = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:android_aar",
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_aar_with_artifacts",
     ],
     outs = ["envoy_mobile.zip"],
-    cmd = "$(location //bazel:zipper) fc $@ $(SRCS)",
+    cmd = """
+    for artifact in $(SRCS); do
+        chmod 755 $$artifact
+        cp $$artifact dist/
+    done
+    touch $@
+    """,
     stamp = True,
     tools = ["//bazel:zipper"],
     visibility = ["//visibility:public"],
@@ -40,14 +46,12 @@ genrule(
 genrule(
     name = "android_dist",
     srcs = [
-        "//library/kotlin/src/io/envoyproxy/envoymobile:android_aar",
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_aar",
     ],
     outs = ["output_in_dist_directory"],
     cmd = """
-    for artifact in $(SRCS); do
-        chmod 755 $$artifact
-        cp $$artifact dist/
-    done
+    chmod 755 $<
+    cp $< dist/
     touch $@
     """,
     stamp = True,
