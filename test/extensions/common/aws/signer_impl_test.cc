@@ -224,7 +224,7 @@ TEST_F(SignerImplTest, SignHeadersES) {
                     time_system_);
   signer.sign(headers);
 
-  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/s3/aws4_request, "
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/es/aws4_request, "
             "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
             "Signature=d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
             headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
@@ -241,11 +241,11 @@ TEST_F(SignerImplTest, SignHeadersGracier) {
   headers.setPath("/");
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
-  SignerImpl signer("es", "region", CredentialsProviderSharedPtr{credentials_provider},
+  SignerImpl signer("gracier", "region", CredentialsProviderSharedPtr{credentials_provider},
                     time_system_);
   signer.sign(headers);
 
-  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/s3/aws4_request, "
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/gracier/aws4_request, "
             "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
             "Signature=d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
             headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
