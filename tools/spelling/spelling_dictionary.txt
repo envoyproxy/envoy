@@ -792,6 +792,7 @@ noncopyable
 nonresponsive
 noop
 nop
+np
 nthreads
 ntohl
 ntop
