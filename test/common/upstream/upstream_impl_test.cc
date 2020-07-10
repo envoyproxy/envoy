@@ -59,7 +59,7 @@ protected:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore stats_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -2199,7 +2199,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
