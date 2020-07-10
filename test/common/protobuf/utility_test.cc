@@ -1459,9 +1459,9 @@ protected:
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
-  Runtime::MockRandomGenerator generator_;
+  Random::MockRandomGenerator generator_;
   Api::ApiPtr api_;
-  Runtime::MockRandomGenerator rand_;
+  Random::MockRandomGenerator rand_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;

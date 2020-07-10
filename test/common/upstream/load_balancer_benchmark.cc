@@ -4,8 +4,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
+#include "common/common/random_generator.h"
 #include "common/memory/stats.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/upstream_impl.h"
@@ -51,7 +51,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
   NiceMock<Runtime::MockLoader> runtime_;
-  Runtime::RandomGeneratorImpl random_;
+  Random::RandomGeneratorImpl random_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };

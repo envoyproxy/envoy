@@ -43,7 +43,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl scope_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
 };
 
 // Verify the configuration when all fields are set.

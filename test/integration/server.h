@@ -465,7 +465,7 @@ protected:
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                        Server::ComponentFactory& component_factory,
-                                       Runtime::RandomGeneratorPtr&& random_generator,
+                                       Random::RandomGeneratorPtr&& random_generator,
                                        ProcessObjectOptRef process_object) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
@@ -528,7 +528,7 @@ private:
                                Network::Address::InstanceConstSharedPtr local_address,
                                ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                Server::ComponentFactory& component_factory,
-                               Runtime::RandomGeneratorPtr&& random_generator,
+                               Random::RandomGeneratorPtr&& random_generator,
                                ProcessObjectOptRef process_object) override;
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done

@@ -634,7 +634,7 @@ public:
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
-  Envoy::Runtime::RandomGenerator& random() override { return random_; }
+  Envoy::Random::RandomGenerator& random() override { return random_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
@@ -653,7 +653,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
-  Envoy::Runtime::RandomGenerator& random_;
+  Envoy::Random::RandomGenerator& random_;
   Envoy::Runtime::Loader& runtime_;
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;

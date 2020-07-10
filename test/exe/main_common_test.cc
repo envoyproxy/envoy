@@ -2,6 +2,7 @@
 
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
+#include "common/common/random_generator.h"
 #include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -9,7 +10,7 @@
 
 #include "server/options_impl.h"
 
-#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/common.h"
 #include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -113,14 +114,14 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
                                                     config_file_, "--base-id-path", base_id_path});
   OptionsImpl first_options(first_args, &MainCommon::hotRestartVersion, spdlog::level::info);
   MainCommonBase first(first_options, real_time_system, default_listener_hooks,
-                       prod_component_factory, std::make_unique<Runtime::RandomGeneratorImpl>(),
+                       prod_component_factory, std::make_unique<Random::RandomGeneratorImpl>(),
                        platform.threadFactory(), platform.fileSystem(), nullptr);
 
   const std::string base_id_str = TestEnvironment::readFileToStringForTest(base_id_path);
   uint32_t base_id;
   ASSERT_TRUE(absl::SimpleAtoi(base_id_str, &base_id));
 
-  auto* mock_rng = new NiceMock<Runtime::MockRandomGenerator>();
+  auto* mock_rng = new NiceMock<Random::MockRandomGenerator>();
   EXPECT_CALL(*mock_rng, random()).WillRepeatedly(Return(base_id));
 
   const auto second_args =
@@ -129,7 +130,7 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
 
   EXPECT_THROW_WITH_MESSAGE(
       MainCommonBase(second_options, real_time_system, default_listener_hooks,
-                     prod_component_factory, std::unique_ptr<Runtime::RandomGenerator>{mock_rng},
+                     prod_component_factory, std::unique_ptr<Random::RandomGenerator>{mock_rng},
                      platform.threadFactory(), platform.fileSystem(), nullptr),
       EnvoyException, "unable to select a dynamic base id");
 #endif

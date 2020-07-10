@@ -39,7 +39,7 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
@@ -51,7 +51,7 @@ protected:
 class TestLb : public LoadBalancerBase {
 public:
   TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-         Runtime::RandomGenerator& random,
+         Random::RandomGenerator& random,
          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;

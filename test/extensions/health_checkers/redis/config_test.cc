@@ -157,7 +157,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
+  Random::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<Api::MockApi> api;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -394,7 +395,7 @@ public:
    */
   template <typename T>
   static BackOffStrategyPtr prepareDnsRefreshStrategy(const T& config, uint64_t dns_refresh_rate_ms,
-                                                      Runtime::RandomGenerator& random) {
+                                                      Random::RandomGenerator& random) {
     if (config.has_dns_failure_refresh_rate()) {
       uint64_t base_interval_ms =
           PROTOBUF_GET_MS_REQUIRED(config.dns_failure_refresh_rate(), base_interval);

@@ -57,7 +57,7 @@ InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-    ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
+    ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),

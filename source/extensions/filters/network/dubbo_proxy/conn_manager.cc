@@ -18,7 +18,7 @@ namespace DubboProxy {
 
 constexpr uint32_t BufferLimit = UINT32_MAX;
 
-ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                                      TimeSource& time_system)
     : config_(config), time_system_(time_system), stats_(config_.stats()),
       random_generator_(random_generator), protocol_(config.createProtocol()),

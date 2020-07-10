@@ -198,7 +198,7 @@ public:
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
@@ -534,7 +534,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   FuzzConfig config(input.forward_client_cert());
   NiceMock<Network::MockDrainDecision> drain_close;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::SymbolTablePtr symbol_table(Stats::SymbolTableCreator::makeSymbolTable());
   Http::ContextImpl http_context(*symbol_table);
   NiceMock<Runtime::MockLoader> runtime;

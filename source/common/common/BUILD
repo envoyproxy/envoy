@@ -38,7 +38,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//include/envoy/common:backoff_strategy_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/common:random_generator_interface",
     ],
 )
 
@@ -232,6 +232,21 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "random_generator_lib",
+    srcs = [
+        "random_generator.cc",
+    ],
+    hdrs = [
+        "random_generator.h",
+    ],
+    external_deps = ["ssl"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:random_generator_interface",
     ],
 )
 

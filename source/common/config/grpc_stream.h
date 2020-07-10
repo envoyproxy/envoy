@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client.h"
 
@@ -21,7 +22,7 @@ class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
-             const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
+             const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
              Event::Dispatcher& dispatcher, Stats::Scope& scope,
              const RateLimitSettings& rate_limit_settings)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
@@ -135,7 +136,7 @@ private:
 
   // Reestablishes the gRPC channel when necessary, with some backoff politeness.
   Event::TimerPtr retry_timer_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;
 

@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/random_generator.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/socket_option_impl.h"
 
@@ -262,7 +263,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
   const int size = 4;
   std::vector<Http::MetadataMapVector> multiple_vecs(size);
   for (int i = 0; i < size; i++) {
-    Runtime::RandomGeneratorImpl random;
+    Random::RandomGeneratorImpl random;
     int value_size = random.random() % Http::METADATA_MAX_PAYLOAD_SIZE + 1;
     Http::MetadataMap metadata_map = {{std::string(i, 'a'), std::string(value_size, 'b')}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);

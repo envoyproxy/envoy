@@ -2,12 +2,12 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
 
 namespace Envoy {
@@ -163,7 +163,7 @@ public:
   });
 
   DnsMessageParser(bool recurse, TimeSource& timesource, uint64_t retry_count,
-                   Runtime::RandomGenerator& random, Stats::Histogram& latency_histogram)
+                   Random::RandomGenerator& random, Stats::Histogram& latency_histogram)
       : recursion_available_(recurse), timesource_(timesource), retry_count_(retry_count),
         query_latency_histogram_(latency_histogram), rng_(random) {}
 
@@ -270,7 +270,7 @@ private:
   Stats::Histogram& query_latency_histogram_;
   DnsHeader header_;
   DnsHeader response_header_;
-  Runtime::RandomGenerator& rng_;
+  Random::RandomGenerator& rng_;
 };
 
 } // namespace DnsFilter

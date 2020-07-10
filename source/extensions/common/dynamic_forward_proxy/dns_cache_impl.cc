@@ -16,7 +16,7 @@ namespace DynamicForwardProxy {
 
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-    Runtime::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
+    Random::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),

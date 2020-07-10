@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/common/conn_pool.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
@@ -108,5 +109,18 @@ public:
   MOCK_METHOD(void, cancel, (CancelPolicy cancel_policy));
 };
 } // namespace ConnectionPool
+
+namespace Random {
+class MockRandomGenerator : public RandomGenerator {
+public:
+  MockRandomGenerator();
+  ~MockRandomGenerator() override;
+
+  MOCK_METHOD(uint64_t, random, ());
+  MOCK_METHOD(std::string, uuid, ());
+
+  const std::string uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
+};
+} // namespace Random
 
 } // namespace Envoy

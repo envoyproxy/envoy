@@ -170,7 +170,7 @@ public:
     });
 
     on_server_ready_function_ = [this](Envoy::IntegrationTestServer& test_server) {
-      mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&(test_server.server().random()));
+      mock_rng_ = dynamic_cast<Random::MockRandomGenerator*>(&(test_server.server().random()));
       // Abort now if we cannot downcast the server's random number generator pointer.
       ASSERT_TRUE(mock_rng_ != nullptr);
       // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
@@ -356,7 +356,7 @@ protected:
     return result.str();
   }
 
-  Runtime::MockRandomGenerator* mock_rng_{};
+  Random::MockRandomGenerator* mock_rng_{};
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
   int random_index_;

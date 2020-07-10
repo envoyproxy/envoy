@@ -100,7 +100,7 @@ Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create() {
 
 namespace {
 Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_set,
-                                              Runtime::RandomGenerator& random) {
+                                              Random::RandomGenerator& random) {
   auto hosts = host_set.healthyHosts();
   if (hosts.empty()) {
     hosts = host_set.degradedHosts();

@@ -278,7 +278,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   // Value is taken from random generator.
@@ -321,7 +321,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   // Value is taken from random generator.
@@ -439,7 +439,7 @@ typed_config:
 }
 
 TEST_F(AccessLogImplTest, RequestTracing) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -1269,7 +1269,7 @@ public:
   ~TestHeaderFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Runtime::Loader&, Runtime::RandomGenerator&) override {
+                         Runtime::Loader&, Random::RandomGenerator&) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
     const auto& header_config =
@@ -1345,7 +1345,7 @@ public:
   ~SampleExtensionFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Runtime::Loader&, Runtime::RandomGenerator&) override {
+                         Runtime::Loader&, Random::RandomGenerator&) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
 

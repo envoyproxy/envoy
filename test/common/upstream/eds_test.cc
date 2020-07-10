@@ -122,7 +122,7 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<EdsClusterImpl> cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;

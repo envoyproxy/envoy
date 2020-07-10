@@ -101,7 +101,7 @@ uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
 
 MaglevLoadBalancer::MaglevLoadBalancer(
     const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config, uint64_t table_size)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
       scope_(scope.createScope("maglev_lb.")), stats_(generateStats(*scope_)),

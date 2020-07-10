@@ -10,9 +10,9 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
+#include "common/common/random_generator.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
@@ -39,7 +39,7 @@ constexpr auto XRaySerializationVersion = "1";
 std::string generateTraceId(SystemTime point_in_time) {
   using std::chrono::seconds;
   using std::chrono::time_point_cast;
-  Runtime::RandomGeneratorImpl rng;
+  Random::RandomGeneratorImpl rng;
   const auto epoch = time_point_cast<seconds>(point_in_time).time_since_epoch().count();
   std::string out;
   out.reserve(35);

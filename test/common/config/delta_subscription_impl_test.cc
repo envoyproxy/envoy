@@ -130,7 +130,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   EXPECT_CALL(local_info, node()).WillRepeatedly(testing::ReturnRef(node));
 
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
   NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;

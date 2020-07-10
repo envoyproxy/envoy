@@ -33,7 +33,7 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Grpc::MockAsyncStream async_stream_;
   Stats::TestUtil::TestStore stats_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   NiceMock<MockGrpcStreamCallbacks> callbacks_;
   std::unique_ptr<Grpc::MockAsyncClient> async_client_owner_;

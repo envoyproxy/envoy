@@ -38,7 +38,7 @@ public:
   // destructed.
   MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
-                 std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
+                 std::unique_ptr<Random::RandomGenerator>&& random_generator,
                  Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                  std::unique_ptr<ProcessContext> process_context);
 
@@ -87,7 +87,7 @@ protected:
 
 private:
   void configureComponentLogLevels();
-  void configureHotRestarter(Runtime::RandomGenerator& random_generator);
+  void configureHotRestarter(Random::RandomGenerator& random_generator);
 };
 
 // TODO(jmarantz): consider removing this class; I think it'd be more useful to

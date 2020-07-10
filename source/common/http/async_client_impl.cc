@@ -39,7 +39,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random,
+                                 Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context)
     : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,

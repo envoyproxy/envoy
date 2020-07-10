@@ -14,7 +14,7 @@ namespace DynamicForwardProxy {
 class DnsCacheManagerImpl : public DnsCacheManager, public Singleton::Instance {
 public:
   DnsCacheManagerImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-                      Runtime::RandomGenerator& random, Runtime::Loader& loader,
+                      Random::RandomGenerator& random, Runtime::Loader& loader,
                       Stats::Scope& root_scope)
       : main_thread_dispatcher_(main_thread_dispatcher), tls_(tls), random_(random),
         loader_(loader), root_scope_(root_scope) {}
@@ -35,7 +35,7 @@ private:
 
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::SlotAllocator& tls_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   Runtime::Loader& loader_;
   Stats::Scope& root_scope_;
   absl::flat_hash_map<std::string, ActiveCache> caches_;
@@ -44,7 +44,7 @@ private:
 class DnsCacheManagerFactoryImpl : public DnsCacheManagerFactory {
 public:
   DnsCacheManagerFactoryImpl(Singleton::Manager& singleton_manager, Event::Dispatcher& dispatcher,
-                             ThreadLocal::SlotAllocator& tls, Runtime::RandomGenerator& random,
+                             ThreadLocal::SlotAllocator& tls, Random::RandomGenerator& random,
                              Runtime::Loader& loader, Stats::Scope& root_scope)
       : singleton_manager_(singleton_manager), dispatcher_(dispatcher), tls_(tls), random_(random),
         loader_(loader), root_scope_(root_scope) {}
@@ -57,7 +57,7 @@ private:
   Singleton::Manager& singleton_manager_;
   Event::Dispatcher& dispatcher_;
   ThreadLocal::SlotAllocator& tls_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   Runtime::Loader& loader_;
   Stats::Scope& root_scope_;
 };

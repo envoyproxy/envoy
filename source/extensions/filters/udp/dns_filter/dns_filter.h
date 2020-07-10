@@ -87,7 +87,7 @@ public:
   const std::chrono::milliseconds resolverTimeout() const { return resolver_timeout_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   uint64_t retryCount() const { return retry_count_; }
-  Runtime::RandomGenerator& random() const { return random_; }
+  Random::RandomGenerator& random() const { return random_; }
   uint64_t maxPendingLookups() const { return max_pending_lookups_; }
 
 private:
@@ -114,7 +114,7 @@ private:
   uint64_t retry_count_;
   AddressConstPtrVec resolvers_;
   std::chrono::milliseconds resolver_timeout_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   uint64_t max_pending_lookups_;
 };
 

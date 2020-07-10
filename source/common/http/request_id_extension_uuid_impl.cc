@@ -5,8 +5,8 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/common/random_generator.h"
 #include "common/common/utility.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -55,7 +55,7 @@ TraceStatus UUIDRequestIDExtension::getTraceStatus(const RequestHeaderMap& reque
     return TraceStatus::NoTrace;
   }
   absl::string_view uuid = request_headers.getRequestIdValue();
-  if (uuid.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
+  if (uuid.length() != Random::RandomGeneratorImpl::UUID_LENGTH) {
     return TraceStatus::NoTrace;
   }
 
@@ -76,7 +76,7 @@ void UUIDRequestIDExtension::setTraceStatus(RequestHeaderMap& request_headers, T
     return;
   }
   absl::string_view uuid_view = request_headers.getRequestIdValue();
-  if (uuid_view.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
+  if (uuid_view.length() != Random::RandomGeneratorImpl::UUID_LENGTH) {
     return;
   }
   std::string uuid(uuid_view);

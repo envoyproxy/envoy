@@ -1,10 +1,10 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -60,7 +60,7 @@ class ConnectionManager : public Network::ReadFilter,
                           public DecoderCallbacks,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
-  ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+  ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system);
   ~ConnectionManager() override;
 
@@ -267,7 +267,7 @@ private:
   DecoderPtr decoder_;
   std::list<ActiveRpcPtr> rpcs_;
   Buffer::OwnedImpl request_buffer_;
-  Runtime::RandomGenerator& random_generator_;
+  Random::RandomGenerator& random_generator_;
   bool stopped_{false};
   bool half_closed_{false};
   TimeSource& time_source_;

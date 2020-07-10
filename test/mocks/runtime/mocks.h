@@ -15,17 +15,6 @@
 namespace Envoy {
 namespace Runtime {
 
-class MockRandomGenerator : public RandomGenerator {
-public:
-  MockRandomGenerator();
-  ~MockRandomGenerator() override;
-
-  MOCK_METHOD(uint64_t, random, ());
-  MOCK_METHOD(std::string, uuid, ());
-
-  const std::string uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
-};
-
 class MockSnapshot : public Snapshot {
 public:
   MockSnapshot();

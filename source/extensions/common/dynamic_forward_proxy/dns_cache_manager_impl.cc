@@ -36,7 +36,7 @@ DnsCacheSharedPtr DnsCacheManagerImpl::getCache(
 DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& singleton_manager,
                                          Event::Dispatcher& main_thread_dispatcher,
                                          ThreadLocal::SlotAllocator& tls,
-                                         Runtime::RandomGenerator& random, Runtime::Loader& loader,
+                                         Random::RandomGenerator& random, Runtime::Loader& loader,
                                          Stats::Scope& root_scope) {
   return singleton_manager.getTyped<DnsCacheManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(dns_cache_manager),

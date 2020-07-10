@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
@@ -180,7 +181,7 @@ class FilterConfig {
 public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-               Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
+               Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
                bool respect_expected_rq_timeout,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
@@ -225,7 +226,7 @@ public:
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
@@ -474,7 +475,7 @@ private:
   virtual RetryStatePtr
   createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                    const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                    Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) PURE;
 
   std::unique_ptr<GenericConnPool> createConnPool();
@@ -563,7 +564,7 @@ private:
   RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster,
                                  const VirtualCluster* vcluster, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                 Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;
 };
 

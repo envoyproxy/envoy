@@ -40,7 +40,7 @@ RequestIDExtensionSharedPtr RequestIDExtensionFactory::fromProto(
 }
 
 RequestIDExtensionSharedPtr
-RequestIDExtensionFactory::defaultInstance(Envoy::Runtime::RandomGenerator& random) {
+RequestIDExtensionFactory::defaultInstance(Envoy::Random::RandomGenerator& random) {
   return std::make_shared<UUIDRequestIDExtension>(random);
 }
 

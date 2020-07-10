@@ -463,7 +463,7 @@ public:
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   PrioritySetImpl local_priority_set_;

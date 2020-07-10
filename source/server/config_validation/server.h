@@ -13,6 +13,7 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/assert.h"
+#include "common/common/random_generator.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/router/rds_impl.h"
@@ -84,7 +85,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
-  Runtime::RandomGenerator& random() override { return random_generator_; }
+  Random::RandomGenerator& random() override { return random_generator_; }
   Runtime::Loader& runtime() override { return Runtime::LoaderSingleton::get(); }
   void shutdown() override;
   bool isShutdown() override { return false; }
@@ -193,7 +194,7 @@ private:
   Server::ValidationAdmin admin_;
   Singleton::ManagerPtr singleton_manager_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
-  Runtime::RandomGeneratorImpl random_generator_;
+  Random::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   Configuration::MainImpl config_;
   LocalInfo::LocalInfoPtr local_info_;

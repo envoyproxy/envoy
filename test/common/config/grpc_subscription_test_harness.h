@@ -178,7 +178,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  Random::MockRandomGenerator random_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::config::core::v3::Node node_;

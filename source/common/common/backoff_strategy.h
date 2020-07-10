@@ -4,7 +4,7 @@
 #include <memory>
 
 #include "envoy/common/backoff_strategy.h"
-#include "envoy/runtime/runtime.h"
+#include "envoy/common/random_generator.h"
 
 #include "common/common/assert.h"
 
@@ -24,7 +24,7 @@ public:
    * @param random the random generator.
    */
   JitteredBackOffStrategy(uint64_t base_interval, uint64_t max_interval,
-                          Runtime::RandomGenerator& random);
+                          Random::RandomGenerator& random);
 
   // BackOffStrategy methods
   uint64_t nextBackOffMs() override;
@@ -34,7 +34,7 @@ private:
   const uint64_t base_interval_;
   const uint64_t max_interval_{};
   uint64_t next_interval_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
 };
 
 /**
