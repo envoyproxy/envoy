@@ -41,6 +41,27 @@ public:
     message_->body() = std::make_unique<Buffer::OwnedImpl>(body);
   }
 
+  void expectSignHeaders(absl::string_view service_name, absl::string_view signature,
+                         absl::string_view payload) {
+    auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
+    EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
+    Http::TestRequestHeaderMapImpl headers{};
+    headers.setMethod("GET");
+    headers.setPath("/");
+    headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+
+    SignerImpl signer(service_name, "region", CredentialsProviderSharedPtr{credentials_provider},
+                      time_system_);
+    signer.sign(headers);
+
+    EXPECT_EQ(fmt::format("AWS4-HMAC-SHA256 Credential=akid/20180102/region/{}/aws4_request, "
+                          "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
+                          "Signature={}",
+                          service_name, signature),
+              headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
+    EXPECT_EQ(payload, headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
+  }
+
   NiceMock<MockCredentialsProvider>* credentials_provider_;
   Event::SimulatedTimeSystem time_system_;
   Http::RequestMessagePtr message_;
@@ -169,88 +190,16 @@ TEST_F(SignerImplTest, SignHostHeader) {
       message_->headers().get(Http::CustomHeaders::get().Authorization)->value().getStringView());
 }
 
-// Verify signing headers for S3
-TEST_F(SignerImplTest, SignHeadersS3) {
-  auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
-  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
-  Http::TestRequestHeaderMapImpl headers{};
-  headers.setMethod("GET");
-  headers.setPath("/");
-  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
-
-  SignerImpl signer("s3", "region", CredentialsProviderSharedPtr{credentials_provider},
-                    time_system_);
-  signer.sign(headers);
-
-  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/s3/aws4_request, "
-            "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
-            "Signature=d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
-            headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
-  EXPECT_EQ(SignatureConstants::get().UnsignedPayload,
-            headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
-}
-
-// Verify signing headers for non S3
-TEST_F(SignerImplTest, SignHeadersNonS3) {
-  auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
-  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
-  Http::TestRequestHeaderMapImpl headers{};
-  headers.setMethod("GET");
-  headers.setPath("/");
-  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
-
-  SignerImpl signer("service", "region", CredentialsProviderSharedPtr{credentials_provider},
-                    time_system_);
-  signer.sign(headers);
-
-  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-            "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
-            "Signature=d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
-            headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
-  EXPECT_EQ(SignatureConstants::get().HashedEmptyString,
-            headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
-}
-
-// Verify signing headers for es
-TEST_F(SignerImplTest, SignHeadersES) {
-  auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
-  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
-  Http::TestRequestHeaderMapImpl headers{};
-  headers.setMethod("GET");
-  headers.setPath("/");
-  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
-
-  SignerImpl signer("es", "region", CredentialsProviderSharedPtr{credentials_provider},
-                    time_system_);
-  signer.sign(headers);
-
-  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/es/aws4_request, "
-            "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
-            "Signature=0fd9c974bb2ad16c8d8a314dca4f6db151d32cbd04748d9c018afee2a685a02e",
-            headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
-  EXPECT_EQ(SignatureConstants::get().UnsignedPayload,
-            headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
-}
-
-// Verify signing headers for Gracier
-TEST_F(SignerImplTest, SignHeadersGracier) {
-  auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
-  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
-  Http::TestRequestHeaderMapImpl headers{};
-  headers.setMethod("GET");
-  headers.setPath("/");
-  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
-
-  SignerImpl signer("gracier", "region", CredentialsProviderSharedPtr{credentials_provider},
-                    time_system_);
-  signer.sign(headers);
-
-  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/gracier/aws4_request, "
-            "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
-            "Signature=06a594b2fa4cf2bfe43e8535dc4bd0a6d3b8ae3080f4fbdbc3c6d8b16b038941",
-            headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
-  EXPECT_EQ(SignatureConstants::get().UnsignedPayload,
-            headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
+// Verify signing headers for services
+TEST_F(SignerImplTest, SignHeadersByService) {
+  expectSignHeaders("s3", "d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
+                    SignatureConstants::get().UnsignedPayload);
+  expectSignHeaders("service", "d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
+                    SignatureConstants::get().HashedEmptyString);
+  expectSignHeaders("es", "0fd9c974bb2ad16c8d8a314dca4f6db151d32cbd04748d9c018afee2a685a02e",
+                    SignatureConstants::get().UnsignedPayload);
+  expectSignHeaders("gracier", "06a594b2fa4cf2bfe43e8535dc4bd0a6d3b8ae3080f4fbdbc3c6d8b16b038941",
+                    SignatureConstants::get().UnsignedPayload);
 }
 
 } // namespace
