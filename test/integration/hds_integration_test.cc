@@ -360,33 +360,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
   cleanupHdsConnection();
 }
 
-// Tests Envoy HTTP health checking a single unhealthy endpoint and reporting that it is
-// indeed unhealthy to the server.
-TEST_P(HdsIntegrationTest, SingleEndpointFieldMissingHttp) {
-  initialize();
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
-  server_health_check_specifier_.mutable_cluster_health_checks(0)
-      ->mutable_health_checks(0)
-      ->clear_unhealthy_threshold();
-
-  // Server <--> Envoy
-  waitForHdsStream();
-  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
-
-  // Server asks for health checking
-  hds_stream_->startGrpcStream();
-  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
-  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
-
-  // See that connection is closed
-  ASSERT_FALSE(host_upstream_->waitForHttpConnection(*dispatcher_, host_fake_connection_,
-                                                     std::chrono::milliseconds(1000)));
-
-  // Clean up connections
-  cleanupHostConnections();
-  cleanupHdsConnection();
-}
-
 // Tests Envoy TCP health checking with missing required fields to ensure that
 // that HDS does not continue with invalid configuration.
 TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {

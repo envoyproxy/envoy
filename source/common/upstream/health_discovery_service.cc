@@ -198,7 +198,7 @@ void HdsDelegate::onReceiveMessage(
   } catch (const ProtoValidationException& ex) {
     // Increment error count
     stats_.errors_.inc();
-    ENVOY_LOG(warn, "unable to validate hds proto: {}", ex.what());
+    ENVOY_LOG(warn, "Unable to validate health check specifier: {}", ex.what());
 
     // Do not continue processing message
     return;
