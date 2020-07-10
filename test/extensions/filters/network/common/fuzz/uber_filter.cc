@@ -18,10 +18,10 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // Will extend to cover other network filters one by one.
   static ::std::vector<absl::string_view> filter_names_;
   if (filter_names_.empty()) {
-    filter_names_ = {"envoy.filters.network.ext_authz", "envoy.filters.network.local_ratelimit",
-                     "envoy.filters.network.redis_proxy", 
-                     "envoy.filters.network.client_ssl_auth","envoy.filters.network.echo",
-                     "envoy.filters.network.direct_response","envoy.filters.network.sni_cluster"};
+    filter_names_ = {"envoy.filters.network.ext_authz",   "envoy.filters.network.local_ratelimit",
+                     "envoy.filters.network.redis_proxy", "envoy.filters.network.client_ssl_auth",
+                     "envoy.filters.network.echo",        "envoy.filters.network.direct_response",
+                     "envoy.filters.network.sni_cluster"};
   }
   return filter_names_;
 }
@@ -81,7 +81,6 @@ void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return std::move(async_client_factory_); }));
   }
-  
 }
 void UberFilterFuzzer::fuzzerSetup() {
   // Setup process when this fuzzer object is constructed.
@@ -96,7 +95,7 @@ void UberFilterFuzzer::fuzzerSetup() {
       }));
   // Prepare sni for sni_cluster filter
   ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
-    .WillByDefault(testing::Return("filter_state_cluster"));
+      .WillByDefault(testing::Return("filter_state_cluster"));
   // Prepare time source for filters such as local_ratelimit filter
   api_ = Api::createApiForTest(time_source_);
   dispatcher_ = api_->allocateDispatcher("test_thread");

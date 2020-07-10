@@ -49,7 +49,7 @@ private:
   Tracing::MockSpan span_;
   // mock tcp upstream
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
-    upstream_connection_data_{};
+      upstream_connection_data_{};
   std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
   std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;

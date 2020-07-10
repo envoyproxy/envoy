@@ -46,7 +46,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
     // Fuzz filter.
     static const auto filter_names = UberFilterFuzzer::filterNames();
     if (std::find(filter_names.begin(), filter_names.end(), input.config().name()) ==
-            std::end(filter_names)) {
+        std::end(filter_names)) {
       ENVOY_LOG_MISC(debug, "Test case with unsupported filter type: {}", input.config().name());
       return;
     }
