@@ -2,8 +2,10 @@
 
 #include <csignal>
 
+#include "common/signal/fatal_error_handler.h"
 #include "common/signal/signal_action.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -35,13 +37,15 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
       "backtrace.*Segmentation fault");
 }
 
-class TestFatalErrorHandler : public FatalErrorHandlerInterface {
-  void onFatalError() const override { std::cerr << "HERE!"; }
+class MockFatalErrorHandler : public FatalErrorHandlerInterface {
+public:
+  MOCK_METHOD(void, onFatalError, (std::ostream & os), (const override));
 };
 
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
-  TestFatalErrorHandler handler;
-  SignalAction::registerFatalErrorHandler(handler);
+  MockFatalErrorHandler handler;
+  ON_CALL(handler, onFatalError(_)).WillByDefault([](std::ostream& os) { os << "HERE!"; });
+  FatalErrorHandler::registerFatalErrorHandler(handler);
   SignalAction actions;
   // Make sure the fatal error log "HERE" registered above is logged on fatal error.
   EXPECT_DEATH_LOG_TO_STDERR(
@@ -51,7 +55,7 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
         *(nasty_ptr) = 0;
       }(),
       "HERE");
-  SignalAction::removeFatalErrorHandler(handler);
+  FatalErrorHandler::removeFatalErrorHandler(handler);
 }
 
 TEST(SignalsDeathTest, BusDeathTest) {
@@ -143,6 +147,49 @@ TEST(Signals, HandlerTest) {
   siginfo_t fake_si;
   fake_si.si_addr = nullptr;
   SignalAction::sigHandler(SIGURG, &fake_si, nullptr);
+}
+
+TEST(FatalErrorHandler, CallHandler) {
+  // Reserve space in advance so that the handler doesn't allocate memory.
+  std::string s;
+  s.reserve(1024);
+  std::ostringstream os(std::move(s));
+
+  MockFatalErrorHandler handler;
+  EXPECT_CALL(handler, onFatalError(_)).WillOnce([](std::ostream& os) { os << "HERE!"; });
+  FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  FatalErrorHandler::callFatalErrorHandlers(os);
+  EXPECT_EQ(os.str(), "HERE!");
+
+  // callFatalErrorHandlers() will unregister the handler, so this isn't
+  // necessary for cleanup. Call it anyway, to simulate the case when one thread
+  // tries to remove the handler while another thread crashes.
+  FatalErrorHandler::removeFatalErrorHandler(handler);
+}
+
+// FatalErrorHandler::callFatalErrorHandlers shouldn't allocate any heap memory,
+// so that it's safe to call from a signal handler. Test by comparing the
+// allocated memory before a call with the allocated memory during a handler.
+TEST(FatalErrorHandler, DontAllocateMemory) {
+  // Reserve space in advance so that the handler doesn't allocate memory.
+  std::string s;
+  s.reserve(1024);
+  std::ostringstream os(std::move(s));
+
+  Stats::TestUtil::MemoryTest memory_test;
+
+  MockFatalErrorHandler handler;
+  uint64_t allocated_after_call;
+  EXPECT_CALL(handler, onFatalError(_)).WillOnce(testing::InvokeWithoutArgs([&]() {
+    allocated_after_call = memory_test.consumedBytes();
+  }));
+  FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  uint64_t allocated_before_call = memory_test.consumedBytes();
+  FatalErrorHandler::callFatalErrorHandlers(os);
+
+  EXPECT_MEMORY_EQ(allocated_after_call, allocated_before_call);
 }
 
 } // namespace Envoy
