@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/empty_string.h"
@@ -55,11 +56,13 @@ public:
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::unique_ptr<NewGrpcMuxImpl> grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::TestUtil::TestStore stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
@@ -77,7 +80,7 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_);
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -98,17 +101,13 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
     load_assignment.set_cluster_name("x");
     response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(load_assignment));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-        .WillOnce(
-            Invoke([&load_assignment](
-                       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&
-                           added_resources,
-                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-              EXPECT_EQ(1, added_resources.size());
-              envoy::config::endpoint::v3::ClusterLoadAssignment expected_assignment =
-                  MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-                      added_resources[0].resource());
-              EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
-            }));
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        }));
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
 }
@@ -119,7 +118,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
-  auto watch = grpc_mux_->addWatch(type_url, {"domain1.test"}, callbacks_);
+  auto watch = grpc_mux_->addWatch(type_url, {"domain1.test"}, callbacks_, resource_decoder_);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -154,7 +153,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
-  auto watch = grpc_mux_->addWatch(type_url, {"domain1.test"}, callbacks_);
+  auto watch = grpc_mux_->addWatch(type_url, {"domain1.test"}, callbacks_, resource_decoder_);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();

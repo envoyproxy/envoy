@@ -86,7 +86,7 @@ using CommandSplitterPtr = std::unique_ptr<Instance>;
 /**
  * A command splitter factory that allows creation of the command splitter when
  * we have access to the dispatcher parameter. This supports fault injection,
- * specifically defay faults, which rely on the dispatcher for creating delay timers.
+ * specifically delay faults, which rely on the dispatcher for creating delay timers.
  */
 class CommandSplitterFactory {
 public:

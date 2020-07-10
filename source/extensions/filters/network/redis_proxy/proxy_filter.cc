@@ -34,11 +34,11 @@ ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Sc
 }
 
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
-                         Common::Redis::EncoderPtr&& encoder, 
+                         Common::Redis::EncoderPtr&& encoder,
                          CommandSplitter::CommandSplitterFactory& splitter_factory,
                          ProxyFilterConfigSharedPtr config)
-    : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_factory_(splitter_factory),
-      config_(config) {
+    : decoder_(factory.create(*this)), encoder_(std::move(encoder)),
+      splitter_factory_(splitter_factory), config_(config) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ =

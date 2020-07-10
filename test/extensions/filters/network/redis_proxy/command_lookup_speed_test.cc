@@ -73,10 +73,8 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<MockFaultManager> fault_manager_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  CommandSplitter::InstanceImpl splitter_{
-      *router_, store_, "redis.foo.",
-      time_system_,false, fault_manager_,
-      dispatcher_};
+  CommandSplitter::InstanceImpl splitter_{*router_, store_,         "redis.foo.", time_system_,
+                                          false,    fault_manager_, dispatcher_};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

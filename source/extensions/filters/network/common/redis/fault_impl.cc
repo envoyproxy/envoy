@@ -103,8 +103,9 @@ const Fault* FaultManagerImpl::getFaultForCommandInternal(std::string command) c
     int amortized_fault = 0;
 
     for (const FaultSharedPtr& fault_ptr : it_outer->second) {
-      uint64_t fault_injection_percentage = runtime_.snapshot().getIntegerNumeratorOfFractionalPercent(
-          fault_ptr->runtimeKey().value(), fault_ptr->defaultValue());
+      uint64_t fault_injection_percentage =
+          runtime_.snapshot().getIntegerNumeratorOfFractionalPercent(
+              fault_ptr->runtimeKey().value(), fault_ptr->defaultValue());
       if (random_number < (fault_injection_percentage + amortized_fault)) {
         return fault_ptr.get();
       } else {

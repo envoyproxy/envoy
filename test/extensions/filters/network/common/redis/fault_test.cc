@@ -126,8 +126,8 @@ TEST_F(FaultTest, SingleCommandFault) {
 
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
-  EXPECT_CALL(snapshot_,
-              getIntegerNumeratorOfFractionalPercent(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot_, getIntegerNumeratorOfFractionalPercent(
+                             _, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(10));
 
   const Fault* fault_ptr = fault_manager.getFaultForCommand("ttl");
@@ -168,8 +168,8 @@ TEST_F(FaultTest, MultipleFaults) {
   // with 0s delay.
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
-  EXPECT_CALL(snapshot_,
-              getIntegerNumeratorOfFractionalPercent(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot_, getIntegerNumeratorOfFractionalPercent(
+                             _, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(10));
   fault_ptr = fault_manager.getFaultForCommand("get");
   ASSERT_TRUE(fault_ptr != nullptr);
@@ -178,8 +178,8 @@ TEST_F(FaultTest, MultipleFaults) {
   // Another Get; we mock the random percentage to be 25%, giving us the ALL_KEY fault
   EXPECT_CALL(random_, random()).WillOnce(Return(25));
   EXPECT_CALL(runtime_, snapshot()).Times(2).WillRepeatedly(ReturnRef(snapshot_));
-  EXPECT_CALL(snapshot_,
-              getIntegerNumeratorOfFractionalPercent(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot_, getIntegerNumeratorOfFractionalPercent(
+                             _, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(2)
       .WillOnce(Return(10))
       .WillOnce(Return(50));
@@ -196,8 +196,8 @@ TEST_F(FaultTest, MultipleFaults) {
   // Any other command; we mock the random percentage to be 1%, giving us the ALL_KEY fault
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
-  EXPECT_CALL(snapshot_,
-              getIntegerNumeratorOfFractionalPercent(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot_, getIntegerNumeratorOfFractionalPercent(
+                             _, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(10));
 
   fault_ptr = fault_manager.getFaultForCommand("ttl");

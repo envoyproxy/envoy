@@ -132,11 +132,12 @@ public:
         parseProtoFromYaml(yaml_string);
     config_ =
         std::make_shared<ProxyFilterConfig>(proto_config, store_, drain_decision_, runtime_, api_);
-    
-    std::unique_ptr<CommandSplitter::MockInstance> splitter_ptr = std::make_unique<CommandSplitter::MockInstance>();
+
+    std::unique_ptr<CommandSplitter::MockInstance> splitter_ptr =
+        std::make_unique<CommandSplitter::MockInstance>();
     EXPECT_CALL(splitter_factory_, create_(_)).WillOnce(Return(ByMove(std::move(splitter_ptr))));
-    filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_factory_,
-                                            config_);
+    filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_},
+                                            splitter_factory_, config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     EXPECT_EQ(1UL, config_->stats_.downstream_cx_total_.value());

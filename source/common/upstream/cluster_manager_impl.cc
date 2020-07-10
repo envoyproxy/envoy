@@ -32,6 +32,8 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
+#include "common/runtime/runtime_features.h"
+#include "common/tcp/conn_pool.h"
 #include "common/tcp/original_conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -153,14 +155,12 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      std::unique_ptr<Cleanup> maybe_eds_resume;
+      Config::ScopedResume maybe_resume_eds;
       if (cm_.adsMux()) {
         const auto type_urls =
             Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
         if (!cm_.adsMux()->paused(type_urls)) {
-          cm_.adsMux()->pause(type_urls);
-          maybe_eds_resume =
-              std::make_unique<Cleanup>([this, type_urls] { cm_.adsMux()->resume(type_urls); });
+          maybe_resume_eds = cm_.adsMux()->pause(type_urls);
         }
       }
       initializeSecondaryClusters();
@@ -236,7 +236,7 @@ void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
 ClusterManagerImpl::ClusterManagerImpl(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+    Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context)
@@ -803,9 +803,10 @@ void ClusterManagerImpl::updateClusterCounts() {
     const auto type_urls = Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      ads_mux_->pause(type_urls);
+      resume_cds_ = ads_mux_->pause(type_urls);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      ads_mux_->resume(type_urls);
+      ASSERT(resume_cds_ != nullptr);
+      resume_cds_.reset();
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());
@@ -1418,8 +1419,13 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) {
-  return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::OriginalConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
+    return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                               transport_socket_options);
+  } else {
+    return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
+        dispatcher, host, priority, options, transport_socket_options)};
+  }
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(

@@ -62,23 +62,15 @@ public:
   ConnPool::InstanceSharedPtr conn_pool_shared_ptr_{conn_pool_};
   ConnPool::MockInstance* mirror_conn_pool_{new ConnPool::MockInstance()};
   ConnPool::InstanceSharedPtr mirror_conn_pool_shared_ptr_{mirror_conn_pool_};
-  std::shared_ptr<NiceMock<MockRoute>> route_{
-      new NiceMock<MockRoute>(conn_pool_shared_ptr_)};
+  std::shared_ptr<NiceMock<MockRoute>> route_{new NiceMock<MockRoute>(conn_pool_shared_ptr_)};
   std::shared_ptr<NiceMock<MockRouter>> router_{new NiceMock<MockRouter>(route_)};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockFaultManager> fault_manager_;
 
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{
-      *router_,
-      store_,
-      "redis.foo.",
-      time_system_,
-      latency_in_micros_,
-      fault_manager_,
-      dispatcher_
-  };
+  InstanceImpl splitter_{*router_,           store_,         "redis.foo.", time_system_,
+                         latency_in_micros_, fault_manager_, dispatcher_};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };

@@ -47,7 +47,7 @@ public:
   using ConfigSerializationType =
       envoy::extensions::filters::network::dubbo_proxy::v3::SerializationType;
 
-  ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+  ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system);
   ~ConnectionManager() override = default;
 
@@ -67,8 +67,8 @@ public:
 
   DubboFilterStats& stats() const { return stats_; }
   Network::Connection& connection() const { return read_callbacks_->connection(); }
-  TimeSource& time_system() const { return time_system_; }
-  Runtime::RandomGenerator& random_generator() const { return random_generator_; }
+  TimeSource& timeSystem() const { return time_system_; }
+  Random::RandomGenerator& randomGenerator() const { return random_generator_; }
   Config& config() const { return config_; }
   SerializationType downstreamSerializationType() const { return protocol_->serializer()->type(); }
   ProtocolType downstreamProtocolType() const { return protocol_->type(); }
@@ -94,7 +94,7 @@ private:
   Config& config_;
   TimeSource& time_system_;
   DubboFilterStats& stats_;
-  Runtime::RandomGenerator& random_generator_;
+  Random::RandomGenerator& random_generator_;
 
   SerializerPtr serializer_;
   ProtocolPtr protocol_;

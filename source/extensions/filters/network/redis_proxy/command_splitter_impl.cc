@@ -432,12 +432,11 @@ InstanceImpl::InstanceImpl(Router& router, Stats::Scope& scope, const std::strin
                            TimeSource& time_source, bool latency_in_micros,
                            Common::Redis::FaultManager& fault_manager,
                            Event::Dispatcher& dispatcher)
-    : simple_command_handler_(router),
-      eval_command_handler_(router), mget_handler_(router), mset_handler_(router),
-      split_keys_sum_result_handler_(router),
-      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source), fault_manager_(fault_manager),
-      dispatcher_(dispatcher) {
+    : simple_command_handler_(router), eval_command_handler_(router), mget_handler_(router),
+      mset_handler_(router),
+      split_keys_sum_result_handler_(router), stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(
+                                                  scope, stat_prefix + "splitter."))},
+      time_source_(time_source), fault_manager_(fault_manager), dispatcher_(dispatcher) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
@@ -582,9 +581,9 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
 }
 
 CommandSplitterPtr CommandSplitterFactoryImpl::create(Event::Dispatcher& dispatcher) {
-  return std::make_unique<CommandSplitter::InstanceImpl>(
-          *router_, scope_, stat_prefix_, time_source_,
-          latency_in_micros_, *fault_manager_, dispatcher);
+  return std::make_unique<CommandSplitter::InstanceImpl>(*router_, scope_, stat_prefix_,
+                                                         time_source_, latency_in_micros_,
+                                                         *fault_manager_, dispatcher);
 }
 
 } // namespace CommandSplitter

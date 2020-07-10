@@ -134,11 +134,9 @@ public:
   MockCommandSplitterFactory();
   ~MockCommandSplitterFactory() override;
 
-  CommandSplitterPtr create(Event::Dispatcher& dispatcher) override {
-    return create_(dispatcher);
-  };
+  CommandSplitterPtr create(Event::Dispatcher& dispatcher) override { return create_(dispatcher); };
 
-  MOCK_METHOD(CommandSplitterPtr, create_, (Event::Dispatcher& dispatcher));
+  MOCK_METHOD(CommandSplitterPtr, create_, (Event::Dispatcher & dispatcher));
 };
 
 } // namespace CommandSplitter

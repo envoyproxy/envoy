@@ -2,11 +2,14 @@
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/config/decoded_resource_impl.h"
+
 namespace Envoy {
 namespace Config {
 
-Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks) {
-  auto watch = std::make_unique<Watch>(callbacks);
+Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
+                          OpaqueResourceDecoder& resource_decoder) {
+  auto watch = std::make_unique<Watch>(callbacks, resource_decoder);
   Watch* watch_ptr = watch.get();
   wildcard_watches_.insert(watch_ptr);
   watches_.insert(std::move(watch));
@@ -58,17 +61,19 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   if (watches_.empty()) {
     return;
   }
-  SubscriptionCallbacks& name_getter = (*watches_.begin())->callbacks_;
 
   // Build a map from watches, to the set of updated resources that each watch cares about. Each
   // entry in the map is then a nice little bundle that can be fed directly into the individual
   // onConfigUpdate()s.
-  absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<ProtobufWkt::Any>> per_watch_updates;
+  std::vector<DecodedResourceImplPtr> decoded_resources;
+  absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_updates;
   for (const auto& r : resources) {
+    decoded_resources.emplace_back(
+        new DecodedResourceImpl((*watches_.begin())->resource_decoder_, r, version_info));
     const absl::flat_hash_set<Watch*>& interested_in_r =
-        watchesInterestedIn(name_getter.resourceName(r));
+        watchesInterestedIn(decoded_resources.back()->name());
     for (const auto& interested_watch : interested_in_r) {
-      per_watch_updates[interested_watch].Add()->CopyFrom(r);
+      per_watch_updates[interested_watch].emplace_back(*decoded_resources.back());
     }
   }
 
@@ -128,12 +133,19 @@ void WatchMap::onConfigUpdate(
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
-  absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>>
-      per_watch_added;
+  std::vector<DecodedResourceImplPtr> decoded_resources;
+  absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
+    // If there are no watches, then we don't need to decode. If there are watches, they should all
+    // be for the same resource type, so we can just use the callbacks of the first watch to decode.
+    if (interested_in_r.empty()) {
+      continue;
+    }
+    decoded_resources.emplace_back(
+        new DecodedResourceImpl((*interested_in_r.begin())->resource_decoder_, r));
     for (const auto& interested_watch : interested_in_r) {
-      per_watch_added[interested_watch].Add()->CopyFrom(r);
+      per_watch_added[interested_watch].emplace_back(*decoded_resources.back());
     }
   }
   absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<std::string>> per_watch_removed;

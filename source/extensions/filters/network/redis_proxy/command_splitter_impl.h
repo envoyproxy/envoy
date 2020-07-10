@@ -337,8 +337,7 @@ class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(Router& router, Stats::Scope& scope, const std::string& stat_prefix,
                TimeSource& time_source, bool latency_in_micros,
-               Common::Redis::FaultManager& fault_manager,
-               Event::Dispatcher& dispatcher);
+               Common::Redis::FaultManager& fault_manager, Event::Dispatcher& dispatcher);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
@@ -372,16 +371,12 @@ private:
 
 class CommandSplitterFactoryImpl : public CommandSplitterFactory {
 public:
-  CommandSplitterFactoryImpl(
-      RouterPtr&& router,
-      Common::Redis::FaultManagerPtr fault_manager,
-      Stats::Scope& scope,
-      const std::string& stat_prefix,
-      TimeSource& time_source,
-      bool latency_in_micros) : 
-        router_(std::move(router)),
-        fault_manager_(std::move(fault_manager)), scope_(scope), stat_prefix_(stat_prefix), time_source_(time_source), 
-        latency_in_micros_(latency_in_micros) {};
+  CommandSplitterFactoryImpl(RouterPtr&& router, Common::Redis::FaultManagerPtr fault_manager,
+                             Stats::Scope& scope, const std::string& stat_prefix,
+                             TimeSource& time_source, bool latency_in_micros)
+      : router_(std::move(router)), fault_manager_(std::move(fault_manager)), scope_(scope),
+        stat_prefix_(stat_prefix), time_source_(time_source),
+        latency_in_micros_(latency_in_micros){};
   CommandSplitterPtr create(Event::Dispatcher& dispatcher);
 
 private:

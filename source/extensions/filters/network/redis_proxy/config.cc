@@ -90,17 +90,12 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(
       context.random(), context.runtime(), proto_config.faults());
 
-  auto splitter_factory =
-    std::make_shared<CommandSplitter::CommandSplitterFactoryImpl>(
-        std::move(router),
-        std::move(fault_manager), 
-        context.scope(), 
-        filter_config->stat_prefix_, 
-        context.timeSource(),
-        proto_config.latency_in_micros()
-    );
+  auto splitter_factory = std::make_shared<CommandSplitter::CommandSplitterFactoryImpl>(
+      std::move(router), std::move(fault_manager), context.scope(), filter_config->stat_prefix_,
+      context.timeSource(), proto_config.latency_in_micros());
 
-  return [splitter_factory, refresh_manager, filter_config](Network::FilterManager& filter_manager) -> void {
+  return [splitter_factory, refresh_manager,
+          filter_config](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
         factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter_factory,
