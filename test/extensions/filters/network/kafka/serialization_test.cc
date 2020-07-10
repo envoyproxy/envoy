@@ -323,7 +323,7 @@ TEST(NullableBytesDeserializer, ShouldDeserialize) {
 }
 
 TEST(NullableBytesDeserializer, ShouldDeserializeEmptyBytes) {
-  const NullableBytes value{{}};
+  const NullableBytes value{};
   serializeThenDeserializeAndCheckEquality<NullableBytesDeserializer>(value);
 }
 
