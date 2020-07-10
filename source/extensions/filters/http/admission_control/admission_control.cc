@@ -50,7 +50,7 @@ double AdmissionControlFilterConfig::aggression() const {
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
-      record_request_(true) {}
+      expect_grpc_status_in_trailer_(false), record_request_(true) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // TODO(tonya11en): Ensure we document the fact that healthchecks are ignored.
