@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.oauth.v4alpha;
+
+import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.oauth.v4alpha";
+option java_outer_classname = "OauthProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+
+// [#protodoc-title: OAuth]
+// OAuth :ref:`configuration overview <config_http_filters_oauth>`.
+// [#extension: envoy.filters.http.oauth]
+//
+
+message OAuth2Credentials {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.oauth.v3.OAuth2Credentials";
+
+  // The client_id to be used in the authorize calls.
+  string client_id = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // The secret used to retrieve the access token.
+  transport_sockets.tls.v4alpha.SdsSecretConfig token_secret = 2
+      [(validate.rules).message = {required: true}];
+
+  // The secret used to perform the HMAC validation.
+  transport_sockets.tls.v4alpha.SdsSecretConfig hmac_secret = 3
+      [(validate.rules).message = {required: true}];
+}
+
+// OAuth config
+//
+// [#next-free-field: 10]
+message OAuth2Config {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.oauth.v3.OAuth2Config";
+
+  // Name of the cluster to send OAuth requests to.
+  string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // The full domain of the OAuth server. This is used to construct
+  // the redirection URL, and so must be specified in addition to
+  // the cluster.
+  string hostname = 2 [(validate.rules).string = {min_bytes: 1}];
+
+  // Credentials used for OAuth.
+  OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
+
+  // The callback path the OAuth server should use.
+  string callback_path = 4 [(validate.rules).string = {min_bytes: 1}];
+
+  // The path to sign a user out, clearing their credential cookies.
+  string signout_path = 5 [(validate.rules).string = {min_bytes: 1}];
+
+  // The path to send requests for the token against the OAuth cluster.
+  string token_path = 6 [(validate.rules).string = {min_bytes: 1}];
+
+  // The timeout for outgoing auth requests.
+  google.protobuf.Duration timeout = 7 [(validate.rules).duration = {required: true}];
+
+  // Forward the OAuth token as a Bearer to upstream web service.
+  bool forward_bearer_token = 8;
+
+  // Allow HTTP OPTIONS requests to pass-through (CORS preflight workaround).
+  bool pass_through_options_method = 9;
+}
+
+// Filter config.
+message OAuth2 {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.oauth.v3.OAuth2";
+
+  // Leave this empty to disable OAuth2 for a specific route, using per filter config.
+  OAuth2Config config = 1;
+}
