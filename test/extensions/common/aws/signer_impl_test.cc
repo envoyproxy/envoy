@@ -232,7 +232,7 @@ TEST_F(SignerImplTest, SignHeadersES) {
             headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
 }
 
-// Verify signing headers for gracier
+// Verify signing headers for Gracier
 TEST_F(SignerImplTest, SignHeadersGracier) {
   auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
   EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));

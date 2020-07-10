@@ -24,12 +24,12 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers) {
-  // S3, gracier, es payloads require special treatment.
-  // s3:
+  // S3, Gracier, ES payloads require special treatment.
+  // S3:
   // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
-  // es:
+  // ES:
   // https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-request-signing.html
-  // gracier:
+  // Gracier:
   // https://docs.aws.amazon.com/amazonglacier/latest/dev/amazon-glacier-signing-requests.html
   if (service_name_ == "s3" || service_name_ == "gracier" || service_name_ == "es") {
     headers.setReference(SignatureHeaders::get().ContentSha256,
