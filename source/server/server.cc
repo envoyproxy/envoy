@@ -506,7 +506,8 @@ void InstanceImpl::initialize(const Options& options,
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
   // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
-  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this] (const std::string) { onRuntimeReady(); });
+  Runtime::LoaderSingleton::get().startRtdsSubscriptions(
+      [this](const std::string) { onRuntimeReady(); });
 }
 
 void InstanceImpl::onRuntimeReady() {

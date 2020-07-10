@@ -67,7 +67,7 @@ void ManagerImpl::initialize(const Watcher& watcher) {
 // For init manager to query unready targets
 void ManagerImpl::checkUnreadyTargets() {
   ENVOY_LOG(debug, "QUERY: List of unready targets..................");
-  for(const auto &unready_target : target_names_count_) {
+  for (const auto& unready_target : target_names_count_) {
     ENVOY_LOG(debug, "{} x {}", unready_target.first, unready_target.second);
   }
   ENVOY_LOG(debug, "QUERY ENDS......................................");
@@ -78,7 +78,7 @@ void ManagerImpl::onTargetReady(const std::string target_name) {
   ASSERT(count_ != 0, fmt::format("{} called back by target after initialization complete"));
 
   // Decrease count of a target_name by 1
-  if(--target_names_count_[target_name] == 0) {
+  if (--target_names_count_[target_name] == 0) {
     target_names_count_.erase(target_name);
   }
 

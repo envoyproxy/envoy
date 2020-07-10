@@ -475,7 +475,8 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
-      init_watcher_("RDTS", [this](const std::string target_name) { onRdtsReady(target_name); }), store_(store) {
+      init_watcher_("RDTS", [this](const std::string target_name) { onRdtsReady(target_name); }),
+      store_(store) {
   std::unordered_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());

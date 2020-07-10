@@ -1,8 +1,8 @@
 #pragma once
 
 #include <list>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "envoy/init/manager.h"
 
@@ -61,7 +61,7 @@ private:
 
   // All registered targets
   std::list<TargetHandlePtr> target_handles_;
-  
+
   // Corresponding name of registered targets
   std::vector<std::string> target_names_;
 
