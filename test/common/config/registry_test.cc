@@ -114,7 +114,7 @@ TEST(RegistryTest, DEPRECATED_FEATURE_TEST(AssertsIfNoDeprecatedNameGiven)) {
   // Expects an assert to raise if we register a factory that has an empty name
   // and no associated deprecated names.
   EXPECT_DEBUG_DEATH((Registry::RegisterFactory<NoNamePublishedFactory, PublishedFactory>({})),
-                     "Attempted to register factory without a name or deprecated name");
+                     "Attempted to register a factory without a name or deprecated name");
 }
 
 class TestVersionedFactory : public PublishedFactory {
