@@ -226,7 +226,7 @@ TEST_F(SignerImplTest, SignHeadersES) {
 
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/es/aws4_request, "
             "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
-            "Signature=d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
+            "Signature=0fd9c974bb2ad16c8d8a314dca4f6db151d32cbd04748d9c018afee2a685a02e",
             headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
   EXPECT_EQ(SignatureConstants::get().UnsignedPayload,
             headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
@@ -247,7 +247,7 @@ TEST_F(SignerImplTest, SignHeadersGracier) {
 
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/gracier/aws4_request, "
             "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
-            "Signature=d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
+            "Signature=06a594b2fa4cf2bfe43e8535dc4bd0a6d3b8ae3080f4fbdbc3c6d8b16b038941",
             headers.get(Http::CustomHeaders::get().Authorization)->value().getStringView());
   EXPECT_EQ(SignatureConstants::get().UnsignedPayload,
             headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
