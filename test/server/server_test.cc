@@ -187,7 +187,7 @@ protected:
         *init_manager_, options_, time_system_,
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
         stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
     EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
@@ -206,7 +206,7 @@ protected:
         *init_manager_, options_, time_system_,
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
         stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
@@ -474,7 +474,22 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 
-// This stat only works in this configuration.
+// The ENVOY_BUG stat works in release mode.
+#if defined(NDEBUG)
+  // Test exponential back-off on a fixed line ENVOY_BUG.
+  for (int i = 0; i < 16; i++) {
+    ENVOY_BUG(false, "");
+  }
+  EXPECT_EQ(5L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
+  // Another ENVOY_BUG increments the counter.
+  ENVOY_BUG(false, "Testing envoy bug assertion failure detection in release build.");
+  EXPECT_EQ(6L, TestUtility::findCounter(stats_store_, "server.envoy_bug_failures")->value());
+#else
+  // The ENVOY_BUG macro aborts in debug mode.
+  EXPECT_DEATH(ENVOY_BUG(false, ""), "");
+#endif
+
+// The ASSERT stat only works in this configuration.
 #if defined(NDEBUG) && defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
   ASSERT(false, "Testing debug assertion failure detection in release build.");
   EXPECT_EQ(1L, TestUtility::findCounter(stats_store_, "server.debug_assertion_failures")->value());
@@ -877,7 +892,8 @@ void bindAndListenTcpSocket(const Network::Address::InstanceConstSharedPtr& addr
   // with some other socket already listening on it, see #7636.
   if (SOCKET_FAILURE(os_sys_calls.listen(socket->ioHandle().fd(), 1).rc_)) {
     // Mimic bind exception for the test simplicity.
-    throw Network::SocketBindException(fmt::format("cannot listen: {}", strerror(errno)), errno);
+    throw Network::SocketBindException(fmt::format("cannot listen: {}", errorDetails(errno)),
+                                       errno);
   }
 }
 } // namespace
@@ -892,7 +908,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.
   EXPECT_THAT_THROWS_MESSAGE(bindAndListenTcpSocket(address, nullptr), EnvoyException,
-                             HasSubstr(strerror(EADDRINUSE)));
+                             HasSubstr(errorDetails(SOCKET_ERROR_ADDR_IN_USE)));
 
   // Second attempt should succeed as kernel allows multiple sockets to listen the same address iff
   // both of them use SO_REUSEPORT socket option.
@@ -974,7 +990,7 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
       server_.reset(new InstanceImpl(*init_manager_, options_, time_system_,
                                      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                                      hooks_, restart_, stats_store_, fakelock_, component_factory_,
-                                     std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(),
+                                     std::make_unique<NiceMock<Random::MockRandomGenerator>>(),
                                      *thread_local_, Thread::threadFactoryForTest(),
                                      Filesystem::fileSystemForTest(), nullptr)),
       EnvoyException,

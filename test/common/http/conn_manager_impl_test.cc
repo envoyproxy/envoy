@@ -195,6 +195,7 @@ public:
     EXPECT_CALL(stream_, addCallbacks(_))
         .WillOnce(Invoke(
             [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
+    EXPECT_CALL(stream_, setFlushTimeout(_));
     EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
   }
 
@@ -392,7 +393,7 @@ public:
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
   absl::optional<std::chrono::milliseconds> max_stream_duration_{};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_connection_;
@@ -6110,6 +6111,10 @@ private:
 } // namespace
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      "connection_provided_data", std::make_shared<SimpleType>(555),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
   setup(false, "envoy-custom-server", false);
 
   setupFilterChain(1, 0, /* num_requests = */ 3);
@@ -6152,6 +6157,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           EXPECT_TRUE(
               decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
+                  "connection_provided_data"));
           return FilterHeadersStatus::StopIteration;
         }));
     EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
@@ -6165,6 +6173,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           EXPECT_TRUE(
               decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
+                  "connection_provided_data"));
           return FilterHeadersStatus::StopIteration;
         }));
   }
@@ -6178,6 +6189,10 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   conn_manager_->onData(fake_input, false);
   decoder_filters_[0]->callbacks_->recreateStream();
   conn_manager_->onData(fake_input, false);
+
+  // The connection life time data should have been written to the connection filter state.
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.filter_state_->hasData<SimpleType>(
+      "per_downstream_connection"));
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {

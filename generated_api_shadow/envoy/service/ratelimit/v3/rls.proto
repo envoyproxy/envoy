@@ -69,6 +69,8 @@ message RateLimitResponse {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.ratelimit.v2.RateLimitResponse.RateLimit";
 
+    // Identifies the unit of of time for rate limit.
+    // [#comment: replace by envoy/type/v3/ratelimit_unit.proto in v4]
     enum Unit {
       // The time unit is not known.
       UNKNOWN = 0;

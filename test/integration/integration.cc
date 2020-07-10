@@ -148,11 +148,11 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, abs
   }
 }
 
-IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
-                                           MockBufferFactory& factory, uint32_t port,
-                                           Network::Address::IpVersion version,
-                                           bool enable_half_close)
-    : payload_reader_(new WaitForPayloadReader(dispatcher)),
+IntegrationTcpClient::IntegrationTcpClient(
+    Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system, MockBufferFactory& factory,
+    uint32_t port, Network::Address::IpVersion version, bool enable_half_close,
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    : time_system_(time_system), payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _, _))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
@@ -165,7 +165,7 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options);
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
@@ -189,24 +189,28 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
-void IntegrationTcpClient::waitForData(size_t length) {
+AssertionResult IntegrationTcpClient::waitForData(size_t length,
+                                                  std::chrono::milliseconds timeout) {
   if (payload_reader_->data().size() >= length) {
-    return;
+    return AssertionSuccess();
   }
 
-  payload_reader_->setLengthToWaitFor(length);
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  return payload_reader_->waitForLength(length, timeout);
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
   if (ignore_spurious_events) {
-    while (!disconnected_) {
+    while (!disconnected_ && timeout_timer->enabled()) {
       connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
     }
   } else {
     connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-    EXPECT_TRUE(disconnected_);
   }
+  EXPECT_TRUE(disconnected_);
 }
 
 void IntegrationTcpClient::waitForHalfClose() {
@@ -219,7 +223,9 @@ void IntegrationTcpClient::waitForHalfClose() {
 
 void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable(disabled); }
 
-void IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify) {
+AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify,
+                                            std::chrono::milliseconds timeout) {
+  auto end_time = time_system_.monotonicTime() + timeout;
   Buffer::OwnedImpl buffer(data);
   if (verify) {
     EXPECT_CALL(*client_write_buffer_, move(_));
@@ -233,12 +239,21 @@ void IntegrationTcpClient::write(const std::string& data, bool end_stream, bool 
   connection_->write(buffer, end_stream);
   do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  } while (client_write_buffer_->bytes_written() != bytes_expected && !disconnected_);
-  if (verify) {
-    // If we disconnect part way through the write, then we should fail, since write() is always
-    // expected to succeed.
-    EXPECT_TRUE(!disconnected_ || client_write_buffer_->bytes_written() == bytes_expected);
+    if (client_write_buffer_->bytes_written() == bytes_expected || disconnected_) {
+      break;
+    }
+  } while (time_system_.monotonicTime() < end_time);
+
+  if (time_system_.monotonicTime() >= end_time) {
+    return AssertionFailure() << "Timed out completing write";
+  } else if (verify && (disconnected_ || client_write_buffer_->bytes_written() != bytes_expected)) {
+    return AssertionFailure()
+           << "Failed to complete write or unexpected disconnect. disconnected_: " << disconnected_
+           << " bytes_written: " << client_write_buffer_->bytes_written()
+           << " bytes_expected: " << bytes_expected;
   }
+
+  return AssertionSuccess();
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -389,9 +404,11 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   }
 }
 
-IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_);
+IntegrationTcpClientPtr
+BaseIntegrationTest::makeTcpConnection(uint32_t port,
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  return std::make_unique<IntegrationTcpClient>(*dispatcher_, time_system_, *mock_buffer_factory_,
+                                                port, version_, enable_half_close_, options);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -466,16 +483,17 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     auto end_time = time_system_.monotonicTime() + TestUtility::DefaultTimeout;
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
-    while ((test_server_->counter(success) == nullptr ||
-            test_server_->counter(success)->value() < concurrency_) &&
-           (!allow_lds_rejection || test_server_->counter(rejected) == nullptr ||
-            test_server_->counter(rejected)->value() == 0)) {
+    for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
+                                 rejected_counter = test_server_->counter(rejected);
+         (success_counter == nullptr || success_counter->value() < concurrency_) &&
+         (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
+         success_counter = test_server_->counter(success),
+                                 rejected_counter = test_server_->counter(rejected)) {
       if (time_system_.monotonicTime() >= end_time) {
         RELEASE_ASSERT(0, "Timed out waiting for listeners.");
       }
       if (!allow_lds_rejection) {
-        RELEASE_ASSERT(test_server_->counter(rejected) == nullptr ||
-                           test_server_->counter(rejected)->value() == 0,
+        RELEASE_ASSERT(rejected_counter == nullptr || rejected_counter->value() == 0,
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }

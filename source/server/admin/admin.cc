@@ -14,11 +14,13 @@
 #include "envoy/admin/v3/metrics.pb.h"
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -128,6 +130,11 @@ absl::optional<std::string> resourceParam(const Http::Utility::QueryParams& para
 // Helper method to get the mask parameter.
 absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "mask");
+}
+
+// Helper method to get the eds parameter.
+bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
+  return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
@@ -449,8 +456,16 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url,
 }
 
 void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                                   const absl::optional<std::string>& mask) const {
-  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
+                                   const absl::optional<std::string>& mask,
+                                   bool include_eds) const {
+  Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
+  if (include_eds) {
+    if (!server_.clusterManager().clusters().empty()) {
+      callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+    }
+  }
+
+  for (const auto& key_callback_pair : callbacks_map) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     ASSERT(message);
 
@@ -469,9 +484,16 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
 
 absl::optional<std::pair<Http::Code, std::string>>
 AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
-                             const absl::optional<std::string>& mask,
-                             const std::string& resource) const {
-  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
+                             const absl::optional<std::string>& mask, const std::string& resource,
+                             bool include_eds) const {
+  Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
+  if (include_eds) {
+    if (!server_.clusterManager().clusters().empty()) {
+      callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+    }
+  }
+
+  for (const auto& key_callback_pair : callbacks_map) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     ASSERT(message);
 
@@ -506,23 +528,115 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
+void AdminImpl::addLbEndpoint(
+    const Upstream::HostSharedPtr& host,
+    envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const {
+  auto& lb_endpoint = *locality_lb_endpoint.mutable_lb_endpoints()->Add();
+  if (host->metadata() != nullptr) {
+    lb_endpoint.mutable_metadata()->MergeFrom(*host->metadata());
+  }
+  lb_endpoint.mutable_load_balancing_weight()->set_value(host->weight());
+
+  switch (host->health()) {
+  case Upstream::Host::Health::Healthy:
+    lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::HEALTHY);
+    break;
+  case Upstream::Host::Health::Unhealthy:
+    lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::UNHEALTHY);
+    break;
+  case Upstream::Host::Health::Degraded:
+    lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::DEGRADED);
+    break;
+  default:
+    lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::UNKNOWN);
+  }
+
+  auto& endpoint = *lb_endpoint.mutable_endpoint();
+  endpoint.set_hostname(host->hostname());
+  Network::Utility::addressToProtobufAddress(*host->address(), *endpoint.mutable_address());
+  auto& health_check_config = *endpoint.mutable_health_check_config();
+  health_check_config.set_hostname(host->hostnameForHealthChecks());
+  if (host->healthCheckAddress()->asString() != host->address()->asString()) {
+    health_check_config.set_port_value(host->healthCheckAddress()->ip()->port());
+  }
+}
+
+ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
+  auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
+
+  for (auto& cluster_pair : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_pair.second.get();
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
+    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+
+    if (cluster_info->edsServiceName().has_value()) {
+      cluster_load_assignment.set_cluster_name(cluster_info->edsServiceName().value());
+    } else {
+      cluster_load_assignment.set_cluster_name(cluster_info->name());
+    }
+    auto& policy = *cluster_load_assignment.mutable_policy();
+
+    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+      policy.mutable_overprovisioning_factor()->set_value(host_set->overprovisioningFactor());
+
+      if (!host_set->hostsPerLocality().get().empty()) {
+        for (int index = 0; index < static_cast<int>(host_set->hostsPerLocality().get().size());
+             index++) {
+          auto locality_host_set = host_set->hostsPerLocality().get()[index];
+
+          if (!locality_host_set.empty()) {
+            auto& locality_lb_endpoint = *cluster_load_assignment.mutable_endpoints()->Add();
+            locality_lb_endpoint.mutable_locality()->MergeFrom(locality_host_set[0]->locality());
+            locality_lb_endpoint.set_priority(locality_host_set[0]->priority());
+            if (host_set->localityWeights() != nullptr && !host_set->localityWeights()->empty()) {
+              locality_lb_endpoint.mutable_load_balancing_weight()->set_value(
+                  (*host_set->localityWeights())[index]);
+            }
+
+            for (auto& host : locality_host_set) {
+              addLbEndpoint(host, locality_lb_endpoint);
+            }
+          }
+        }
+      } else {
+        for (auto& host : host_set->hosts()) {
+          auto& locality_lb_endpoint = *cluster_load_assignment.mutable_endpoints()->Add();
+          locality_lb_endpoint.mutable_locality()->MergeFrom(host->locality());
+          locality_lb_endpoint.set_priority(host->priority());
+          addLbEndpoint(host, locality_lb_endpoint);
+        }
+      }
+    }
+
+    if (cluster_info->addedViaApi()) {
+      auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
+      dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
+    } else {
+      auto& static_endpoint = *endpoint_config_dump->mutable_static_endpoint_configs()->Add();
+      static_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);
+    }
+  }
+  return endpoint_config_dump;
+}
+
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
                                         Http::ResponseHeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) const {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
+  const bool include_eds = shouldIncludeEdsInDump(query_params);
 
   envoy::admin::v3::ConfigDump dump;
 
   if (resource.has_value()) {
-    auto err = addResourceToDump(dump, mask, resource.value());
+    auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
     if (err.has_value()) {
       response.add(err.value().second);
       return err.value().first;
     }
   } else {
-    addAllConfigToDump(dump, mask);
+    addAllConfigToDump(dump, mask, include_eds);
   }
   MessageUtil::redact(dump);
 

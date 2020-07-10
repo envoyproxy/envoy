@@ -98,6 +98,11 @@ INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
 X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
+DESIGNATED_INITIALIZER_REGEX = re.compile(r"\{\s*\.\w+\s*\=")
+MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}")
+HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
+TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
+EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -213,11 +218,7 @@ def readFile(path):
 # lookPath searches for the given executable in all directories in PATH
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
-  for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
-    if os.path.exists(executable_path):
-      return executable_path
-  return ""
+  return shutil.which(executable) or ''
 
 
 # pathExists checks whether the given path exists. This function assumes that
@@ -560,6 +561,22 @@ def isInSubdir(filename, *subdirs):
   return False
 
 
+# Determines if given token exists in line without leading or trailing token characters
+# e.g. will return True for a line containing foo() but not foo_bar() or baz_foo
+def tokenInLine(token, line):
+  index = 0
+  while True:
+    index = line.find(token, index)
+    if index < 1:
+      break
+    if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
+      if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
+                                                 line[index + len(token)] == '_'):
+        return True
+    index = index + 1
+  return False
+
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
@@ -611,23 +628,25 @@ def checkSourceLine(line, file_path, reportError):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   # Check that we use the absl::Time library
-  if "std::get_time" in line:
+  if tokenInLine("std::get_time", line):
     if "test/" in file_path:
       reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
     else:
       reportError("Don't use std::get_time; use the injectable time system")
-  if "std::put_time" in line:
+  if tokenInLine("std::put_time", line):
     reportError("Don't use std::put_time; use absl::Time equivalent instead")
-  if "gmtime" in line:
+  if tokenInLine("gmtime", line):
     reportError("Don't use gmtime; use absl::Time equivalent instead")
-  if "mktime" in line:
+  if tokenInLine("mktime", line):
     reportError("Don't use mktime; use absl::Time equivalent instead")
-  if "localtime" in line:
+  if tokenInLine("localtime", line):
     reportError("Don't use localtime; use absl::Time equivalent instead")
-  if "strftime" in line:
+  if tokenInLine("strftime", line):
     reportError("Don't use strftime; use absl::FormatTime instead")
-  if "strptime" in line:
+  if tokenInLine("strptime", line):
     reportError("Don't use strptime; use absl::FormatTime instead")
+  if tokenInLine("strerror", line):
+    reportError("Don't use strerror; use Envoy::errorDetails instead")
   if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
@@ -637,7 +656,7 @@ def checkSourceLine(line, file_path, reportError):
     # can be used instead
     reportError("Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in include/envoy/common/platform.h instead")
-  if re.search("\{\s*\.\w+\s*\=", line):
+  if DESIGNATED_INITIALIZER_REGEX.search(line):
     # Designated initializers are not part of the C++14 standard and are not supported
     # by MSVC
     reportError("Don't use designated initializers in struct initialization, "
@@ -649,7 +668,7 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
   if line.startswith("using testing::TestWithParams;"):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if re.search("TEST(_.\(.*,\s|\()[a-z].*\)\s\{", line):
+  if TEST_NAME_STARTING_LOWER_CASE_REGEX.search(line):
     # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
     # with a lowercase letter.
     reportError("Test names should be CamelCase, starting with a capital letter")
@@ -671,10 +690,10 @@ def checkSourceLine(line, file_path, reportError):
       '->histogramFromString(' in line or '->textReadoutFromString(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
-  if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
+  if MANGLED_PROTOBUF_NAME_REGEX.search(line):
     reportError("Don't use mangled Protobuf names for enum constants")
 
-  hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
+  hist_m = HISTOGRAM_SI_SUFFIX_REGEX.search(line)
   if hist_m and not allowlistedForHistogramSiSuffix(hist_m.group(0)):
     reportError(
         "Don't suffix histogram names with the unit symbol, "
@@ -1009,7 +1028,7 @@ if __name__ == "__main__":
         for line in f:
           # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
           # name and store it in the list of directories with documented owners.
-          m = re.search(r'.*(extensions[^@]*\s+)(@.*)', line)
+          m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
           if m is not None and not line.startswith('#'):
             owned.append(m.group(1).strip())
             owners = re.findall('@\S+', m.group(2).strip())

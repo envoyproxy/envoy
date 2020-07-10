@@ -28,7 +28,7 @@ public:
   RedisHealthChecker(
       const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
       const envoy::config::health_checker::redis::v2::Redis& redis_config,
-      Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
       Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
@@ -75,7 +75,7 @@ private:
       return true;
     } // Redirection errors are treated as check successes.
     NetworkFilters::Common::Redis::Client::ReadPolicy readPolicy() const override {
-      return NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
+      return NetworkFilters::Common::Redis::Client::ReadPolicy::Primary;
     }
 
     // Batching

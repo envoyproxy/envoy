@@ -1,7 +1,6 @@
 #include "common/runtime/runtime_impl.h"
 
 #include <cstdint>
-#include <random>
 #include <string>
 #include <unordered_map>
 
@@ -10,8 +9,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/service/runtime/v3/rtds.pb.h"
-#include "envoy/service/runtime/v3/rtds.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/type/v3/percent.pb.validate.h"
@@ -28,134 +25,9 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
-#include "openssl/rand.h"
 
 namespace Envoy {
 namespace Runtime {
-
-const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
-
-uint64_t RandomGeneratorImpl::random() {
-  // Prefetch 256 * sizeof(uint64_t) bytes of randomness. buffered_idx is initialized to 256,
-  // i.e. out-of-range value, so the buffer will be filled with randomness on the first call
-  // to this function.
-  //
-  // There is a diminishing return when increasing the prefetch size, as illustrated below in
-  // a test that generates 1,000,000,000 uint64_t numbers (results on Intel Xeon E5-1650v3).
-  //
-  // //test/common/runtime:runtime_impl_test - Random.DISABLED_benchmarkRandom
-  //
-  //  prefetch  |  time  | improvement
-  // (uint64_t) |  (ms)  | (% vs prev)
-  // ---------------------------------
-  //         32 | 25,931 |
-  //         64 | 15,124 | 42% faster
-  //        128 |  9,653 | 36% faster
-  //        256 |  6,930 | 28% faster  <-- used right now
-  //        512 |  5,571 | 20% faster
-  //       1024 |  4,888 | 12% faster
-  //       2048 |  4,594 |  6% faster
-  //       4096 |  4,424 |  4% faster
-  //       8192 |  4,386 |  1% faster
-
-  const size_t prefetch = 256;
-  static thread_local uint64_t buffered[prefetch];
-  static thread_local size_t buffered_idx = prefetch;
-
-  if (buffered_idx >= prefetch) {
-    int rc = RAND_bytes(reinterpret_cast<uint8_t*>(buffered), sizeof(buffered));
-    ASSERT(rc == 1);
-    buffered_idx = 0;
-  }
-
-  // Consume uint64_t from the buffer.
-  return buffered[buffered_idx++];
-}
-
-std::string RandomGeneratorImpl::uuid() {
-  // Prefetch 2048 bytes of randomness. buffered_idx is initialized to sizeof(buffered),
-  // i.e. out-of-range value, so the buffer will be filled with randomness on the first
-  // call to this function.
-  //
-  // There is a diminishing return when increasing the prefetch size, as illustrated below
-  // in a test that generates 100,000,000 UUIDs (results on Intel Xeon E5-1650v3).
-  //
-  // //test/common/runtime:uuid_util_test - UUIDUtilsTest.DISABLED_benchmark
-  //
-  //   prefetch |  time  | improvement
-  //   (bytes)  |  (ms)  | (% vs prev)
-  // ---------------------------------
-  //        128 | 16,353 |
-  //        256 | 11,827 | 28% faster
-  //        512 |  9,676 | 18% faster
-  //       1024 |  8,594 | 11% faster
-  //       2048 |  8,097 |  6% faster  <-- used right now
-  //       4096 |  7,790 |  4% faster
-  //       8192 |  7,737 |  1% faster
-
-  static thread_local uint8_t buffered[2048];
-  static thread_local size_t buffered_idx = sizeof(buffered);
-
-  if (buffered_idx + 16 > sizeof(buffered)) {
-    int rc = RAND_bytes(buffered, sizeof(buffered));
-    ASSERT(rc == 1);
-    buffered_idx = 0;
-  }
-
-  // Consume 16 bytes from the buffer.
-  ASSERT(buffered_idx + 16 <= sizeof(buffered));
-  uint8_t* rand = &buffered[buffered_idx];
-  buffered_idx += 16;
-
-  // Create UUID from Truly Random or Pseudo-Random Numbers.
-  // See: https://tools.ietf.org/html/rfc4122#section-4.4
-  rand[6] = (rand[6] & 0x0f) | 0x40; // UUID version 4 (random)
-  rand[8] = (rand[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
-
-  // Convert UUID to a string representation, e.g. a121e9e1-feae-4136-9e0e-6fac343d56c9.
-  static const char* const hex = "0123456789abcdef";
-  char uuid[UUID_LENGTH];
-
-  for (uint8_t i = 0; i < 4; i++) {
-    const uint8_t d = rand[i];
-    uuid[2 * i] = hex[d >> 4];
-    uuid[2 * i + 1] = hex[d & 0x0f];
-  }
-
-  uuid[8] = '-';
-
-  for (uint8_t i = 4; i < 6; i++) {
-    const uint8_t d = rand[i];
-    uuid[2 * i + 1] = hex[d >> 4];
-    uuid[2 * i + 2] = hex[d & 0x0f];
-  }
-
-  uuid[13] = '-';
-
-  for (uint8_t i = 6; i < 8; i++) {
-    const uint8_t d = rand[i];
-    uuid[2 * i + 2] = hex[d >> 4];
-    uuid[2 * i + 3] = hex[d & 0x0f];
-  }
-
-  uuid[18] = '-';
-
-  for (uint8_t i = 8; i < 10; i++) {
-    const uint8_t d = rand[i];
-    uuid[2 * i + 3] = hex[d >> 4];
-    uuid[2 * i + 4] = hex[d & 0x0f];
-  }
-
-  uuid[23] = '-';
-
-  for (uint8_t i = 10; i < 16; i++) {
-    const uint8_t d = rand[i];
-    uuid[2 * i + 4] = hex[d >> 4];
-    uuid[2 * i + 5] = hex[d & 0x0f];
-  }
-
-  return std::string(uuid, UUID_LENGTH);
-}
 
 void SnapshotImpl::countDeprecatedFeatureUse() const {
   stats_.deprecated_feature_use_.inc();
@@ -285,7 +157,7 @@ const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() co
   return layers_;
 }
 
-SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
+SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
                            std::vector<OverrideLayerConstPtr>&& layers)
     : layers_{std::move(layers)}, generator_{generator}, stats_{stats} {
   for (const auto& layer : layers_) {
@@ -473,11 +345,11 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
 LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const envoy::config::bootstrap::v3::LayeredRuntime& config,
                        const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-                       RandomGenerator& generator,
+                       Random::RandomGenerator& generator,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
-      init_watcher_("RDTS", [this]() { onRdtsReady(); }) {
+      init_watcher_("RDTS", [this]() { onRdtsReady(); }), store_(store) {
   std::unordered_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
@@ -515,7 +387,13 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
   loadNewSnapshot();
 }
 
-void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
+void LoaderImpl::initialize(Upstream::ClusterManager& cm) {
+  cm_ = &cm;
+
+  for (const auto& s : subscriptions_) {
+    s->createSubscription();
+  }
+}
 
 void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   on_rtds_initialized_ = on_done;
@@ -531,17 +409,22 @@ RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
-          rtds_layer.rtds_config().resource_api_version()),
+          rtds_layer.rtds_config().resource_api_version(), validation_visitor, "name"),
       parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
-      init_target_("RTDS " + resource_name_, [this]() { start(); }),
-      validation_visitor_(validation_visitor) {}
+      init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
 
-void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+void RtdsSubscription::createSubscription() {
+  const auto resource_name = getResourceName();
+  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
+      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this, resource_decoder_);
+}
+
+void RtdsSubscription::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                       const std::string&) {
   validateUpdateSize(resources.size());
-  auto runtime = MessageUtil::anyConvertAndValidate<envoy::service::runtime::v3::Runtime>(
-      resources[0], validation_visitor_);
+  const auto& runtime =
+      dynamic_cast<const envoy::service::runtime::v3::Runtime&>(resources[0].get().resource());
   if (runtime.name() != resource_name_) {
     throw EnvoyException(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
@@ -553,12 +436,10 @@ void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufW
 }
 
 void RtdsSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
+    const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(resources.size());
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
-  *unwrapped_resource.Add() = resources[0].resource();
-  onConfigUpdate(unwrapped_resource, resources[0].version());
+  validateUpdateSize(added_resources.size());
+  onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
 void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -569,15 +450,7 @@ void RtdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
   init_target_.ready();
 }
 
-void RtdsSubscription::start() {
-  // We have to delay the subscription creation until init-time, since the
-  // cluster manager resources are not available in the constructor when
-  // instantiated in the server instance.
-  const auto resource_name = getResourceName();
-  subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
-  subscription_->start({resource_name_});
-}
+void RtdsSubscription::start() { subscription_->start({resource_name_}); }
 
 void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
   if (num_resources != 1) {
@@ -622,6 +495,8 @@ void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>&
   admin_layer_->mergeValues(values);
   loadNewSnapshot();
 }
+
+Stats::Scope& LoaderImpl::getRootScope() { return store_; }
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";

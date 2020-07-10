@@ -15,40 +15,16 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
 #include "common/common/statusor.h"
-#include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http1/codec_stats.h"
 #include "common/http/http1/header_formatter.h"
 #include "common/http/status.h"
 
 namespace Envoy {
 namespace Http {
 namespace Http1 {
-
-/**
- * All stats for the HTTP/1 codec. @see stats_macros.h
- */
-#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
-  COUNTER(dropped_headers_with_underscores)                                                        \
-  COUNTER(metadata_not_supported_error)                                                            \
-  COUNTER(requests_rejected_with_underscores_in_headers)                                           \
-  COUNTER(response_flood)
-
-/**
- * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
- */
-struct CodecStats {
-  using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
-
-  static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
-    return *ptr.get([&scope]() -> CodecStats* {
-      return new CodecStats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))};
-    });
-  }
-
-  ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 class ConnectionImpl;
 
@@ -86,6 +62,11 @@ public:
   uint32_t bufferLimit() override;
   absl::string_view responseDetails() override { return details_; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
+  void setFlushTimeout(std::chrono::milliseconds) override {
+    // HTTP/1 has one stream per connection, thus any data encoded is immediately written to the
+    // connection, invoking any watermarks as necessary. There is no internal buffering that would
+    // require a flush timeout not already covered by other timeouts.
+  }
 
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
@@ -244,6 +225,20 @@ protected:
   bool resetStreamCalled() { return reset_stream_called_; }
   void onMessageBeginBase();
 
+  /**
+   * Get memory used to represent HTTP headers or trailers currently being parsed.
+   * Computed by adding the partial header field and value that is currently being parsed and the
+   * estimated header size for previous header lines provided by HeaderMap::byteSize().
+   */
+  virtual uint32_t getHeadersSize();
+
+  /**
+   * Called from onUrl, onHeaderField and onHeaderValue to verify that the headers do not exceed the
+   * configured max header size limit. Throws a  CodecProtocolException if headers exceed the size
+   * limit.
+   */
+  void checkMaxHeadersSize();
+
   Network::Connection& connection_;
   CodecStats& stats_;
   http_parser parser_;
@@ -258,10 +253,8 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
   const bool enable_trailers_ : 1;
-  const bool reject_unsupported_transfer_encodings_ : 1;
   const bool strict_1xx_and_204_headers_ : 1;
 
 private:
@@ -270,7 +263,7 @@ private:
   virtual HeaderMap& headersOrTrailers() PURE;
   virtual RequestOrResponseHeaderMap& requestOrResponseHeaders() PURE;
   virtual void allocHeaders() PURE;
-  virtual void maybeAllocTrailers() PURE;
+  virtual void allocTrailers() PURE;
 
   /**
    * Called in order to complete an in progress header decode.
@@ -450,6 +443,8 @@ protected:
   absl::optional<ActiveRequest>& activeRequest() { return active_request_; }
   // ConnectionImpl
   void onMessageComplete() override;
+  // Add the size of the request_url to the reported header size when processing request headers.
+  uint32_t getHeadersSize() override;
 
 private:
   /**
@@ -486,9 +481,10 @@ private:
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+    ASSERT(!processing_trailers_);
     headers_or_trailers_.emplace<RequestHeaderMapPtr>(RequestHeaderMapImpl::create());
   }
-  void maybeAllocTrailers() override {
+  void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
       headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
@@ -571,9 +567,10 @@ private:
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
+    ASSERT(!processing_trailers_);
     headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
   }
-  void maybeAllocTrailers() override {
+  void allocTrailers() override {
     ASSERT(processing_trailers_);
     if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
       headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
@@ -591,9 +588,9 @@ private:
   bool ignore_message_complete_for_100_continue_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
-  // populated on message begin. Trailers are populated on the first parsed trailer field (if
-  // trailers are enabled). The variant is reset to null headers on message complete for assertion
-  // purposes.
+  // populated on message begin. Trailers are populated when the switch to trailer processing is
+  // detected while parsing the first trailer field (if trailers are enabled). The variant is reset
+  // to null headers on message complete for assertion purposes.
   absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.

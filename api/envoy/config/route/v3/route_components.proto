@@ -7,6 +7,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/range.proto";
@@ -274,7 +275,9 @@ message Route {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
-  repeated string response_headers_to_remove = 11;
+  repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Presence of the object defines whether the connection manager's tracing configuration
   // is overridden by this route specific instance.
@@ -614,6 +617,10 @@ message RouteAction {
       string header_name = 1 [
         (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
       ];
+
+      // If specified, the request header value will be rewritten and used
+      // to produce the hash key.
+      type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 2;
     }
 
     // Envoy supports two types of cookie affinity:
@@ -1207,6 +1214,21 @@ message RedirectAction {
 
   oneof path_rewrite_specifier {
     // The path portion of the URL will be swapped with this value.
+    // Please note that query string in path_redirect will override the
+    // request's query string and will not be stripped.
+    //
+    // For example, let's say we have the following routes:
+    //
+    // - match: { path: "/old-path-1" }
+    //   redirect: { path_redirect: "/new-path-1" }
+    // - match: { path: "/old-path-2" }
+    //   redirect: { path_redirect: "/new-path-2", strip-query: "true" }
+    // - match: { path: "/old-path-3" }
+    //   redirect: { path_redirect: "/new-path-3?foo=1", strip_query: "true" }
+    //
+    // 1. if request uri is "/old-path-1?bar=1", users will be redirected to "/new-path-1?bar=1"
+    // 2. if request uri is "/old-path-2?bar=1", users will be redirected to "/new-path-2"
+    // 3. if request uri is "/old-path-3?bar=1", users will be redirected to "/new-path-3?foo=1"
     string path_redirect = 2
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
@@ -1342,7 +1364,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1456,6 +1478,20 @@ message RateLimit {
       repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
     }
 
+    // The following descriptor entry is appended when the dynamic metadata contains a key value:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    message DynamicMetaData {
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the dynamic metadata is of type string.
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+    }
+
     oneof action_specifier {
       option (validate.required) = true;
 
@@ -1476,6 +1512,27 @@ message RateLimit {
 
       // Rate limit on the existence of request headers.
       HeaderValueMatch header_value_match = 6;
+
+      // Rate limit on dynamic metadata.
+      DynamicMetaData dynamic_metadata = 7;
+    }
+  }
+
+  message Override {
+    // Fetches the override from the dynamic metadata.
+    message DynamicMetadata {
+      // Metadata struct that defines the key and path to retrieve the struct value.
+      // The value must be a struct containing an integer "requests_per_unit" property
+      // and a "unit" property with a value parseable to :ref:`RateLimitUnit
+      // enum <envoy_api_enum_type.v3.RateLimitUnit>`
+      type.metadata.v3.MetadataKey metadata_key = 1 [(validate.rules).message = {required: true}];
+    }
+
+    oneof override_specifier {
+      option (validate.required) = true;
+
+      // Limit override from dynamic metadata.
+      DynamicMetadata dynamic_metadata = 1;
     }
   }
 
@@ -1498,6 +1555,12 @@ message RateLimit {
   // configuration. See :ref:`composing actions
   // <config_http_filters_rate_limit_composing_actions>` for additional documentation.
   repeated Action actions = 3 [(validate.rules).repeated = {min_items: 1}];
+
+  // An optional limit override to be appended to the descriptor produced by this
+  // rate limit configuration. If the override value is invalid or cannot be resolved
+  // from metadata, no override is provided. See :ref:`rate limit override
+  // <config_http_filters_rate_limit_rate_limit_override>` for more information.
+  Override limit = 4;
 }
 
 // .. attention::

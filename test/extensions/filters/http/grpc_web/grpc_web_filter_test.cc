@@ -95,13 +95,13 @@ public:
             [=](Buffer::Instance& data, bool) { EXPECT_EQ(expected_message, data.toString()); }));
   }
 
-  void expectRequiredGrpcUpstreamHeaders(const Http::RequestHeaderMap& request_headers) {
+  void expectRequiredGrpcUpstreamHeaders(const Http::TestRequestHeaderMapImpl& request_headers) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
     // Ensure we never send content-length upstream
     EXPECT_EQ(nullptr, request_headers.ContentLength());
     EXPECT_EQ(Http::Headers::get().TEValues.Trailers, request_headers.getTEValue());
-    EXPECT_EQ(Http::Headers::get().GrpcAcceptEncodingValues.Default,
-              request_headers.getGrpcAcceptEncodingValue());
+    EXPECT_EQ(Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default,
+              request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
   }
 
   Stats::TestSymbolTable symbol_table_;
@@ -261,7 +261,7 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
 TEST_P(GrpcWebFilterTest, Unary) {
   // Tests request headers.
   request_headers_.addCopy(Http::Headers::get().ContentType, request_content_type());
-  request_headers_.addCopy(Http::Headers::get().Accept, request_accept());
+  request_headers_.addCopy(Http::CustomHeaders::get().Accept, request_accept());
   request_headers_.addCopy(Http::Headers::get().ContentLength, uint64_t(8));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));

@@ -201,9 +201,15 @@ private:
     return memory_test.consumedBytes();
   }
 };
+
 class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
+  ClusterMemoryTestRunner()
+      : ip_version_(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
+
   Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
+
+  Network::Address::IpVersion ip_version_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
@@ -269,10 +275,13 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/04/02  10624    43356       44000   Use 100 clusters rather than 1000 to avoid timeouts
   // 2020/04/07  10661    43349       44000   fix clang tidy on master
   // 2020/04/23  10531    44169       44600   http: max stream duration upstream support.
+  // 2020/04/23  10661    44425       46000   per-listener connection limits
   // 2020/05/05  10908    44233       44600   router: add InternalRedirectPolicy and predicate
   // 2020/05/13  10531    44425       44600   Refactor resource manager
   // 2020/05/20  11223    44491       44600   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    44491       44811   Make upstreams pluggable
+  // 2020/06/29  11751    44715       46000   Improve time complexity of removing callback handle
+  //                                          in callback manager.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -286,8 +295,13 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44491);
-  EXPECT_MEMORY_LE(m_per_cluster, 44811);
+  //
+  // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
+  // different number of bytes. We still run the approximate test.
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    EXPECT_MEMORY_EQ(m_per_cluster, 44715);
+  }
+  EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
@@ -332,10 +346,13 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/04/02  10624    35564       36000   Use 100 clusters rather than 1000 to avoid timeouts
   // 2020/04/07  10661    35557       36000   fix clang tidy on master
   // 2020/04/23  10531    36281       36800   http: max stream duration upstream support.
+  // 2020/04/23  10661    36537       37000   per-listener connection limits
   // 2020/05/05  10908    36345       36800   router: add InternalRedirectPolicy and predicate
   // 2020/05/13  10531    36537       36800   Refactor resource manager
   // 2020/05/20  11223    36603       36800   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    36603       36923   Make upstreams pluggable
+  // 2020/06/29  11751    36827       38000   Improve time complexity of removing callback handle.
+  //                                          in callback manager.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -349,8 +366,13 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36603);
-  EXPECT_MEMORY_LE(m_per_cluster, 36923);
+  //
+  // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
+  // different number of bytes. We still run the approximate test.
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    EXPECT_MEMORY_EQ(m_per_cluster, 36827);
+  }
+  EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
@@ -391,8 +413,13 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1380);
-  EXPECT_MEMORY_LE(m_per_host, 1655);
+  //
+  // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
+  // different number of bytes. We still run the approximate test.
+  if (ip_version_ != Network::Address::IpVersion::v6) {
+    EXPECT_MEMORY_EQ(m_per_host, 1380);
+  }
+  EXPECT_MEMORY_LE(m_per_host, 1800); // Round up to allow platform variations.
 }
 
 } // namespace

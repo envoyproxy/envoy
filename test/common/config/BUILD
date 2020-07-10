@@ -27,6 +27,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "decoded_resource_impl_test",
+    srcs = ["decoded_resource_impl_test.cc"],
+    deps = [
+        "//source/common/config:decoded_resource_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "delta_subscription_impl_test",
     srcs = ["delta_subscription_impl_test.cc"],
     deps = [
@@ -249,6 +259,17 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "opaque_resource_decoder_impl_test",
+    srcs = ["opaque_resource_decoder_impl_test.cc"],
+    deps = [
+        "//source/common/config:opaque_resource_decoder_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "subscription_factory_impl_test",
     srcs = ["subscription_factory_impl_test.cc"],
     deps = [
@@ -409,10 +430,20 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/common/crypto:utility_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "udpa_resource_test",
+    srcs = ["udpa_resource_test.cc"],
+    deps = [
+        "//source/common/config:udpa_resource_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

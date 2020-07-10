@@ -18,6 +18,10 @@ envoy_cc_library(
     name = "assert_lib",
     srcs = ["assert.cc"],
     hdrs = ["assert.h"],
+    external_deps = [
+        "abseil_base",
+        "abseil_synchronization",
+    ],
     deps = [":minimal_logger_lib"],
 )
 
@@ -34,7 +38,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//include/envoy/common:backoff_strategy_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/common:random_generator_interface",
     ],
 )
 
@@ -232,6 +236,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "random_generator_lib",
+    srcs = [
+        "random_generator.cc",
+    ],
+    hdrs = [
+        "random_generator.h",
+    ],
+    external_deps = ["ssl"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:random_generator_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "regex_lib",
     srcs = ["regex.cc"],
     hdrs = ["regex.h"],
@@ -239,6 +258,7 @@ envoy_cc_library(
         ":assert_lib",
         "//include/envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "@com_googlesource_code_re2//:re2",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

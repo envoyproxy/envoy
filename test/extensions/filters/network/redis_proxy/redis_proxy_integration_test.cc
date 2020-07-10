@@ -480,7 +480,7 @@ void RedisProxyIntegrationTest::roundtripToUpstreamStep(
     IntegrationTcpClientPtr& redis_client, FakeRawConnectionPtr& fake_upstream_connection,
     const std::string& auth_username, const std::string& auth_password) {
   redis_client->clearData();
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   expectUpstreamRequestResponse(upstream, request, response, fake_upstream_connection,
                                 auth_username, auth_password);
@@ -539,7 +539,7 @@ void RedisProxyIntegrationTest::proxyResponseStep(const std::string& request,
                                                   const std::string& proxy_response,
                                                   IntegrationTcpClientPtr& redis_client) {
   redis_client->clearData();
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
   redis_client->waitForData(proxy_response);
   // After sending the request to the proxy, the fake redis client should receive proxy_response.
   EXPECT_EQ(proxy_response, redis_client->data());
@@ -560,7 +560,7 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
   bool asking = (redirection_response.find("-ASK") != std::string::npos);
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
 
@@ -623,7 +623,7 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
   // Make MGET request from downstream
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   redis_client->clearData();
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   // Make GET request to upstream (MGET is turned into GETs for upstream)
   FakeUpstreamPtr& upstream = fake_upstreams_[0];
@@ -788,7 +788,7 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingRe
 
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
 
@@ -851,8 +851,8 @@ TEST_P(RedisProxyWithBatchingIntegrationTest, SimpleBatching) {
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client_1 = makeTcpConnection(lookupPort("redis_proxy"));
   IntegrationTcpClientPtr redis_client_2 = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client_1->write(request);
-  redis_client_2->write(request);
+  ASSERT_TRUE(redis_client_1->write(request));
+  ASSERT_TRUE(redis_client_2->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection;
   EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -961,7 +961,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
   const std::string& response = "$3\r\nbar\r\n";
   // roundtrip to cluster_0 (catch_all route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
 
@@ -991,7 +991,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
 
   // roundtrip to cluster_0 (write_only route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(set_request);
+  ASSERT_TRUE(redis_client->write(set_request));
 
   expectUpstreamRequestResponse(fake_upstreams_[0], set_request, set_response,
                                 fake_upstream_connection[0]);
@@ -1018,7 +1018,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
 
   // roundtrip to cluster_0 (write_only route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(get_request);
+  ASSERT_TRUE(redis_client->write(get_request));
 
   expectUpstreamRequestResponse(fake_upstreams_[0], get_request, get_response,
                                 cluster_0_connection);
@@ -1044,7 +1044,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   const std::string& response = "$3\r\nbar\r\n";
   // roundtrip to cluster_0 (catch_all route)
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
 

@@ -11,6 +11,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using testing::InSequence;
@@ -30,7 +31,8 @@ public:
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
 
     EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
-    dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, store_, config_);
+    dns_cache_ =
+        std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, loader_, store_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
 
@@ -58,7 +60,8 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Runtime::MockLoader> loader_;
   Stats::IsolatedStoreImpl store_;
   std::unique_ptr<DnsCache> dns_cache_;
   MockUpdateCallbacks update_callbacks_;
@@ -642,13 +645,40 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
   EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.host_overflow")->value());
 }
 
+TEST_F(DnsCacheImplTest, CircuitBreakersNotInvoked) {
+  initialize();
+
+  auto raii_ptr = dns_cache_->canCreateDnsRequest(absl::nullopt);
+  EXPECT_NE(raii_ptr.get(), nullptr);
+}
+
+TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
+  config_.mutable_dns_cache_circuit_breaker()->mutable_max_pending_requests()->set_value(0);
+  initialize();
+
+  auto raii_ptr = dns_cache_->canCreateDnsRequest(absl::nullopt);
+  EXPECT_EQ(raii_ptr.get(), nullptr);
+  EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
+}
+
+TEST_F(DnsCacheImplTest, ClustersCircuitBreakersOverflow) {
+  initialize();
+  NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
+
+  EXPECT_CALL(pending_requests_, canCreate()).WillOnce(Return(false));
+  auto raii_ptr = dns_cache_->canCreateDnsRequest(pending_requests_);
+  EXPECT_EQ(raii_ptr.get(), nullptr);
+  EXPECT_EQ(0, TestUtility::findCounter(store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
+}
+
 // DNS cache manager config tests.
 TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Runtime::MockLoader> loader;
   Stats::IsolatedStoreImpl store;
-  DnsCacheManagerImpl cache_manager(dispatcher, tls, random, store);
+  DnsCacheManagerImpl cache_manager(dispatcher, tls, random, loader, store);
 
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
   config1.set_name("foo");
@@ -680,7 +710,7 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
 // I spent too much time trying to figure this out. So for the moment I have copied this test body
 // here. I will spend some more time fixing this, but wanted to land unblocking functionality first.
 TEST(UtilityTest, PrepareDnsRefreshStrategy) {
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
 
   {
     // dns_failure_refresh_rate not set.

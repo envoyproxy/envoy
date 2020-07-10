@@ -146,7 +146,7 @@ public:
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
                                                 false};
-  Runtime::RandomGeneratorImpl random_;
+  Random::RandomGeneratorImpl random_;
   Runtime::SnapshotConstSharedPtr snapshot_{std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};

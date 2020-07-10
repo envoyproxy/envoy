@@ -21,7 +21,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -69,7 +70,9 @@ public:
       : cleanup_timer_(new Event::MockTimer(&dispatcher_)),
         api_(Api::createApiForTest(stats_store_)) {}
 
-  void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }
+  void setupFromYaml(const std::string& yaml, bool avoid_boosting = true) {
+    setup(parseClusterFromV3Yaml(yaml, avoid_boosting));
+  }
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
     NiceMock<MockClusterManager> cm;
@@ -96,7 +99,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* cleanup_timer_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
@@ -114,7 +117,7 @@ TEST(OriginalDstClusterConfigTest, GoodConfig) {
     cleanup_interval: 1s
   )EOF"; // Help Emacs balance quotation marks: "
 
-  EXPECT_TRUE(parseClusterFromV2Yaml(yaml).has_cleanup_interval());
+  EXPECT_TRUE(parseClusterFromV3Yaml(yaml).has_cleanup_interval());
 }
 
 TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
@@ -122,7 +125,7 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
     name: name
     connect_timeout: 0.25s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
     cleanup_interval: 1s
     load_assignment:
       cluster_name: name
@@ -154,7 +157,7 @@ TEST_F(OriginalDstClusterTest, BadConfigWithDeprecatedHosts) {
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      setupFromYaml(yaml), EnvoyException,
+      setupFromYaml(yaml, false), EnvoyException,
       "ORIGINAL_DST clusters must have no load assignment or hosts configured");
 }
 
@@ -163,7 +166,7 @@ TEST_F(OriginalDstClusterTest, CleanupInterval) {
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
     cleanup_interval: 1s
   )EOF"; // Help Emacs balance quotation marks: "
 
@@ -181,7 +184,7 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     name: name,
     connect_timeout: 0.125s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -239,7 +242,7 @@ TEST_F(OriginalDstClusterTest, Membership) {
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -330,7 +333,7 @@ TEST_F(OriginalDstClusterTest, Membership2) {
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -418,7 +421,7 @@ TEST_F(OriginalDstClusterTest, Connection) {
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -458,7 +461,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
@@ -510,7 +513,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
     original_dst_lb_config:
       use_http_header: true
   )EOF";
@@ -583,7 +586,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
     name: name
     connect_timeout: 1.250s
     type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+    lb_policy: CLUSTER_PROVIDED
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
