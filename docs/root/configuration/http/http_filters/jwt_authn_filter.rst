@@ -7,8 +7,7 @@ This HTTP filter can be used to verify JSON Web Token (JWT). It will verify its 
 
 JWKS is needed to verify JWT signatures. They can be specified in the filter config or can be fetched remotely from a JWKS server.
 
-.. attention::
-Supported JWT alg:
+Following are supported JWT alg:
 
 .. code-block::
 
@@ -18,7 +17,6 @@ Supported JWT alg:
    PS256, PS384, PS512,
    EdDSA
 
-   
 Configuration
 -------------
 
