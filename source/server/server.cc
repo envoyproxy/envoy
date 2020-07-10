@@ -506,7 +506,7 @@ void InstanceImpl::initialize(const Options& options,
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
   // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
-  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
+  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this] (const std::string) { onRuntimeReady(); });
 }
 
 void InstanceImpl::onRuntimeReady() {
@@ -575,7 +575,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
                      Init::Manager& init_manager, OverloadManager& overload_manager,
                      std::function<void()> post_init_cb)
-    : init_watcher_("RunHelper", [&instance, post_init_cb]() {
+    : init_watcher_("RunHelper", [&instance, post_init_cb](const std::string) {
         if (!instance.isShutdown()) {
           post_init_cb();
         }
