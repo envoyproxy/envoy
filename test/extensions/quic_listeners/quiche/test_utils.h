@@ -191,6 +191,7 @@ std::string testParamsToString(
   case QuicVersionType::Iquic:
     return absl::StrCat(ip_version, "_UseHttp3");
   }
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Quic

@@ -124,14 +124,14 @@ MemoryTest::Mode MemoryTest::mode() {
                    "$ENVOY_MEMORY_TEST_EXACT is set for canonical memory measurements, "
                    "but memory measurement looks broken");
     return Mode::Canonical;
-  } else {
-    // Different versions of STL and other compiler/architecture differences may
-    // also impact memory usage, so when not compiling with MEMORY_TEST_EXACT,
-    // memory comparisons must be given some slack. There have recently emerged
-    // some memory-allocation differences between development and Envoy CI and
-    // Bazel CI (which compiles Envoy as a test of Bazel).
-    return can_measure_memory ? Mode::Approximate : Mode::Disabled;
   }
+
+  // Different versions of STL and other compiler/architecture differences may
+  // also impact memory usage, so when not compiling with MEMORY_TEST_EXACT,
+  // memory comparisons must be given some slack. There have recently emerged
+  // some memory-allocation differences between development and Envoy CI and
+  // Bazel CI (which compiles Envoy as a test of Bazel).
+  return can_measure_memory ? Mode::Approximate : Mode::Disabled;
 #endif
 }
 

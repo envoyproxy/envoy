@@ -240,9 +240,10 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
-#ifndef ENVOY_CONFIG_COVERAGE
+#if !defined(ENVOY_CONFIG_COVERAGE) && !defined(GCC_COMPILER)
   // This doesn't work in coverage build because part of the stacktrace will be overwritten by
   // __llvm_coverage_mapping
+  // Stack trace under gcc with optimizations on (-c opt) doesn't include the test name
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 #endif
 }
