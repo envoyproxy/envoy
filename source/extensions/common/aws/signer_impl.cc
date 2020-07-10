@@ -24,8 +24,8 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers) {
-  // S3 payloads require special treatment.
-  if (service_name_ == "s3") {
+  // S3, gracier, es payloads require special treatment.
+  if (service_name_ == "s3" || service_name_ == "gracier" || service_name_ == "es") {
     headers.setReference(SignatureHeaders::get().ContentSha256,
                          SignatureConstants::get().UnsignedPayload);
     sign(headers, SignatureConstants::get().UnsignedPayload);
