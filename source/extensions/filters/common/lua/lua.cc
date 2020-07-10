@@ -71,9 +71,8 @@ int ThreadLocalState::getGlobalRef(uint64_t slot) {
 }
 
 uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
-  tls_slot_->runOnAllThreads([global](ThreadLocal::ThreadLocalObjectSharedPtr ptr) -> auto {
-    ASSERT(std::dynamic_pointer_cast<LuaThreadLocal>(ptr));
-    LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(ptr);
+  tls_slot_->runOnAllThreads([global](ThreadLocal::ThreadLocalObjectSharedPtr previous) {
+    LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(previous);
     lua_getglobal(tls.state_.get(), global.c_str());
     if (lua_isfunction(tls.state_.get(), -1)) {
       tls.global_slots_.push_back(luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX));
@@ -82,7 +81,7 @@ uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
       lua_pop(tls.state_.get(), 1);
       tls.global_slots_.push_back(LUA_REFNIL);
     }
-    return ptr;
+    return previous;
   });
 
   return current_global_slot_++;

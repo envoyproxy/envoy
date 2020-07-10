@@ -386,11 +386,10 @@ public:
    * all threaded workers.
    */
   template <class T> void registerType() {
-    tls_slot_->runOnAllThreads([](ThreadLocal::ThreadLocalObjectSharedPtr ptr) -> auto {
-      ASSERT(std::dynamic_pointer_cast<LuaThreadLocal>(ptr));
-      LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(ptr);
+    tls_slot_->runOnAllThreads([](ThreadLocal::ThreadLocalObjectSharedPtr previous) {
+      LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(previous);
       T::registerType(tls.state_.get());
-      return ptr;
+      return previous;
     });
   }
 

@@ -199,7 +199,7 @@ TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
   // Start a new worker thread to execute the callback functions in the worker dispatcher.
   Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([this]() {
     worker_dispatcher_->run(Event::Dispatcher::RunType::Block);
-    // Verify we have the expected dispatcher for the new thread thread.
+    // Verify we have the expected dispatcher for the new worker thread.
     EXPECT_EQ(worker_dispatcher_.get(), &tls_.dispatcher());
   });
   thread->join();
