@@ -523,6 +523,14 @@ bazel test -c dbg --config=macos-asan //test/...
 
 Log verbosity is controlled at runtime in all builds.
 
+To obtain `nghttp2` traces, you can set `ENVOY_NGHTTP2_TRACE` in the environment for enhanced
+logging at `-l trace`. For example, in tests:
+
+```
+bazel test //test/integration:protocol_integration_test --test_output=streamed \
+  --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
+```
+
 ## Disabling optional features
 
 The following optional features can be disabled on the Bazel build command-line:

@@ -6,6 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -39,7 +40,7 @@ bool isModifyMethod(const Http::RequestHeaderMap& headers) {
 absl::string_view hostAndPort(const absl::string_view header) {
   Http::Utility::Url absolute_url;
   if (!header.empty()) {
-    if (absolute_url.initialize(header, false)) {
+    if (absolute_url.initialize(header, /*is_connect=*/false)) {
       return absolute_url.hostAndPort();
     }
     return header;

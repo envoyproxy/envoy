@@ -128,7 +128,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
+build:coverage --instrumentation_filter="//source(?!/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
 coverage:test-coverage --test_arg="-l trace"
 coverage:fuzz-coverage --config=asan-fuzzer
 coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh

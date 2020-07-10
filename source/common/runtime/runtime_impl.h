@@ -7,6 +7,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
@@ -37,19 +38,6 @@ namespace Runtime {
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
 /**
- * Implementation of RandomGenerator that uses per-thread RANLUX generators seeded with current
- * time.
- */
-class RandomGeneratorImpl : public RandomGenerator {
-public:
-  // Runtime::RandomGenerator
-  uint64_t random() override;
-  std::string uuid() override;
-
-  static const size_t UUID_LENGTH;
-};
-
-/**
  * All runtime stats. @see stats_macros.h
  */
 #define ALL_RUNTIME_STATS(COUNTER, GAUGE)                                                          \
@@ -75,7 +63,7 @@ struct RuntimeStats {
  */
 class SnapshotImpl : public Snapshot, Logger::Loggable<Logger::Id::runtime> {
 public:
-  SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
+  SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
@@ -125,7 +113,7 @@ private:
 
   const std::vector<OverrideLayerConstPtr> layers_;
   EntryMap values_;
-  RandomGenerator& generator_;
+  Random::RandomGenerator& generator_;
   RuntimeStats& stats_;
 };
 
@@ -243,8 +231,8 @@ public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const envoy::config::bootstrap::v3::LayeredRuntime& config,
              const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-             RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
-             Api::Api& api);
+             Random::RandomGenerator& generator,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
@@ -264,7 +252,7 @@ private:
   RuntimeStats generateStats(Stats::Store& store);
   void onRdtsReady();
 
-  RandomGenerator& generator_;
+  Random::RandomGenerator& generator_;
   RuntimeStats stats_;
   AdminLayerPtr admin_layer_;
   ThreadLocal::SlotPtr tls_;
