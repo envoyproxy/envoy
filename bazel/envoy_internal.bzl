@@ -14,7 +14,6 @@ def envoy_copts(repository, test = False):
         "-Wformat",
         "-Wformat-security",
         "-Wvla",
-        "-std=c++17",
     ]
 
     # Windows options for cleanest service compilation;
@@ -36,7 +35,6 @@ def envoy_copts(repository, test = False):
         # this is to silence the incorrect MSVC compiler warning when trying to convert between
         # std::optional data types while conversions between primitive types are producing no error
         "-wd4244",
-        "/std:c++17",
     ]
 
     return select({
