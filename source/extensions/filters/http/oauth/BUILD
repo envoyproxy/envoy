@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "//source/common/http:rest_api_fetcher_lib",
+        "//source/common/http:url_utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
