@@ -61,7 +61,7 @@ TEST_F(HistogramSettingsImplTest, Matching) {
   EXPECT_EQ(settings_->buckets("bcde"), SupportedBuckets({3, 4}));
 }
 
-// Test that earlier configs take precendence over later configs when both match.
+// Test that earlier configs take precedence over later configs when both match.
 TEST_F(HistogramSettingsImplTest, Priority) {
   {
     envoy::config::metrics::v3::HistogramBucketSettings setting;
