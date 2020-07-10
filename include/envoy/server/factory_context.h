@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/grpc/context.h"
@@ -65,7 +66,7 @@ public:
   /**
    * @return RandomGenerator& the random generator for the server.
    */
-  virtual Envoy::Runtime::RandomGenerator& random() PURE;
+  virtual Envoy::Random::RandomGenerator& random() PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
