@@ -349,6 +349,8 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
   access_token_ = access_code;
   new_expires_ = std::to_string(
       std::chrono::duration_cast<std::chrono::seconds>(new_epoch.time_since_epoch()).count());
+
+  finishFlow();
 }
 
 void OAuth2Filter::finishFlow() {

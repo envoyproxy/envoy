@@ -4,9 +4,13 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/auth/secret.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.validate.h"
 #include "envoy/registry/registry.h"
+#include "envoy/secret/secret_manager.h"
+#include "envoy/secret/secret_provider.h"
+#include "envoy/ssl/private_key/private_key.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -20,6 +24,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth {
 
+namespace {
+Secret::GenericSecretConfigProviderSharedPtr
+secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
+                Secret::SecretManager& secret_manager,
+                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory) {
+  if (config.has_sds_config()) {
+    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
+                                                            transport_socket_factory);
+  } else {
+    return secret_manager.findStaticGenericSecretProvider(config.name());
+  }
+}
+} // namespace
+
 Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::oauth::v3::OAuth2& proto,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
@@ -30,24 +48,18 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
   const auto& proto_config = proto.config();
   const auto& credentials = proto_config.credentials();
 
-  const auto& client_secret_config_name = credentials.client_secret_config_name();
-  const auto& token_secret_config_name = credentials.token_secret_config_name();
-
-  envoy::config::core::v3::ConfigSource config_source;
-  auto* const api_config_source = config_source.mutable_api_config_source();
-  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-  auto* const grpc_service = api_config_source->add_grpc_services();
-  grpc_service->mutable_envoy_grpc()->set_cluster_name(credentials.secrets_cluster());
+  const auto& token_secret = credentials.token_secret();
+  const auto& hmac_secret = credentials.hmac_secret();
 
   auto& secret_manager = context.clusterManager().clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
-  auto secret_provider_client_secret = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, client_secret_config_name, transport_socket_factory);
-  auto secret_provider_token_secret = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, token_secret_config_name, transport_socket_factory);
+  auto secret_provider_token_secret =
+      secretsProvider(token_secret, secret_manager, transport_socket_factory);
+  auto secret_provider_hmac_secret =
+      secretsProvider(hmac_secret, secret_manager, transport_socket_factory);
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
-      secret_provider_client_secret, secret_provider_token_secret, context.api());
+      secret_provider_token_secret, secret_provider_hmac_secret, context.api());
   auto config = std::make_shared<FilterConfig>(proto_config, context.clusterManager(),
                                                secret_reader, context.scope(), stats_prefix);
 

@@ -118,6 +118,7 @@ public:
   Event::SimulatedTimeSystem test_time_;
 };
 
+// Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
   ON_CALL(factory_context_.cluster_manager_, get(_)).WillByDefault(Return(nullptr));
 
@@ -401,6 +402,73 @@ TEST_F(OAuth2Test, OAuthTestSetOAuthHeaders) {
   filter_->setXForwardedOauthHeaders(request_headers, cookie_validator->token());
 
   EXPECT_EQ(request_headers, expected_headers);
+}
+
+// Verify that we 401 the request if the state query param doesn't contain a valid URL.
+TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
+                                        "state=blah"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+  };
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "401"},
+      {Http::Headers::get().ContentLength.get(), "18"},
+      {Http::Headers::get().ContentType.get(), "text/plain"},
+      // Invalid URL: we inject a few : in the middle of the URL.
+  };
+
+  // Succeed the HMAC validation.
+  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+// Verify that we 401 the request if the state query param contains the callback URL.
+TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Path.get(), "/_oauth?code=abcdefxyz123&scope=user&"
+                                        "state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=legit_token;version=test"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
+  };
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "401"},
+      {Http::Headers::get().ContentLength.get(), "18"},
+      {Http::Headers::get().ContentType.get(), "text/plain"},
+  };
+
+  // Succeed the HMAC validation.
+  EXPECT_CALL(*validator_, setParams(_, _)).Times(1);
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillOnce(ReturnRef(legit_token));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
 }
 
 /**

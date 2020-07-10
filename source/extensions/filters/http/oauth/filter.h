@@ -101,7 +101,6 @@ public:
   bool forwardBearerToken() const { return forward_bearer_token_; }
   bool passThroughOptionsMethod() const { return pass_through_options_method_; }
   const std::string& oauthServerHostname() const { return oauth_server_hostname_; }
-  const std::string& oauthCallbackPath() const { return oauth_server_hostname_; }
   const std::string& oauthTokenPath() const { return oauth_token_path_; }
   const std::string& callbackPath() const { return callback_path_; }
   const std::string& signoutPath() const { return signout_path_; }

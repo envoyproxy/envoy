@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.oauth.v3;
 
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
@@ -20,18 +22,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message OAuth2Credentials {
   // The client_id to be used in the authorize calls.
-  string client_id = 1;
+  string client_id = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The config name in SDS that contains the client secret that will be used
-  // to get an access token.
-  string client_secret_config_name = 2;
+  // The secret used to retrieve the access token.
+  transport_sockets.tls.v3.SdsSecretConfig token_secret = 2
+      [(validate.rules).message = {required: true}];
 
-  // The config name in SDS that contains the token secret that will be used
-  // to perform the HMAC validation.
-  string token_secret_config_name = 3;
-
-  // The cluster that has the SDS generic secrets.
-  string secrets_cluster = 4 [(validate.rules).string = {min_bytes: 1}];
+  // The secret used to perform the HMAC validation.
+  transport_sockets.tls.v3.SdsSecretConfig hmac_secret = 3
+      [(validate.rules).message = {required: true}];
 }
 
 // OAuth config
@@ -47,7 +46,7 @@ message OAuth2Config {
   string hostname = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // Credentials used for OAuth.
-  OAuth2Credentials credentials = 3;
+  OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
 
   // The callback path the OAuth server should use.
   string callback_path = 4 [(validate.rules).string = {min_bytes: 1}];
