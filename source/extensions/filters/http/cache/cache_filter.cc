@@ -44,7 +44,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ASSERT(decoder_callbacks_);
 
-  auto lookup_request = LookupRequest(headers, time_source_.systemTime());
+  LookupRequest lookup_request(headers, time_source_.systemTime());
   request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
   lookup_ = cache_.makeLookupContext(std::move(lookup_request));
 
