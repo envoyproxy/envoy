@@ -6,7 +6,7 @@
  
  #include <cstdint>
  #include <memory>
-@@ -24,6 +24,7 @@
+@@ -25,6 +25,7 @@
  
  namespace Envoy {
  namespace Http {
@@ -14,7 +14,7 @@
  namespace Http1 {
  namespace {
  
-@@ -47,6 +48,10 @@
+@@ -48,6 +49,10 @@
  
  using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
  using Http1HeaderTypes = ConstSingleton<Http1HeaderTypesValues>;
@@ -25,7 +25,7 @@
  
  const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
    CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
-@@ -1238,6 +1243,7 @@
+@@ -1239,6 +1244,7 @@
  }
  
  } // namespace Http1
