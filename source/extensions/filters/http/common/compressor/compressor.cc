@@ -111,13 +111,15 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
 
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
-  if (!end_stream && config_->enabled() && isMinimumContentLength(headers) &&
-      isAcceptEncodingAllowed(headers) && isContentTypeAllowed(headers) &&
-      !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
-      isTransferEncodingAllowed(headers) && !headers.getInline(content_encoding_handle.handle())) {
+  const bool isEnabledAndContentLengthBigEnough =
+      config_->enabled() && isMinimumContentLength(headers);
+  const bool isCompressible = isEnabledAndContentLengthBigEnough && isContentTypeAllowed(headers) &&
+                              !hasCacheControlNoTransform(headers) && isEtagAllowed(headers) &&
+                              !headers.getInline(content_encoding_handle.handle());
+  if (!end_stream && isEnabledAndContentLengthBigEnough && isAcceptEncodingAllowed(headers) &&
+      isCompressible && isTransferEncodingAllowed(headers)) {
     skip_compression_ = false;
     sanitizeEtagHeader(headers);
-    insertVaryHeader(headers);
     headers.removeContentLength();
     headers.setInline(content_encoding_handle.handle(), config_->contentEncoding());
     config_->stats().compressed_.inc();
@@ -126,6 +128,14 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   } else {
     config_->stats().not_compressed_.inc();
   }
+
+  // Even if we decided not to compress due to incompatible Accept-Encoding value,
+  // the Vary header would need to be inserted to let a caching proxy in front of Envoy
+  // know that the requested resource still can be served with compression applied.
+  if (isCompressible) {
+    insertVaryHeader(headers);
+  }
+
   return Http::FilterHeadersStatus::Continue;
 }
 
