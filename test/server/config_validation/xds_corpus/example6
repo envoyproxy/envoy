@@ -1,0 +1,34 @@
+actions {
+  remove_route {
+    route_num: 1024
+  }
+}
+actions {
+  add_listener {
+    listener_num: 1
+    route_num: 1
+  }
+}
+actions {
+  add_route {
+    route_num: 1
+  }
+}
+actions {
+  remove_route {
+    route_num: 1
+  }
+}
+actions {
+  add_route {
+    route_num: 1
+  }
+}
+actions {
+  remove_listener {
+    listener_num: 1
+  }
+}
+config {
+  sotw_or_delta: DELTA
+}

@@ -273,7 +273,7 @@ void XdsFuzzTest::replay() {
           absl::StrCat("route_config_", action.add_listener().route_num() % RoutesMax);
       addListener(listener_name, route_name);
       if (!sent_listener) {
-        addRoute(listener_name);
+        addRoute(route_name);
       }
       sent_listener = true;
       break;
@@ -324,8 +324,7 @@ void XdsFuzzTest::verifyListeners() {
     bool found = false;
     for (auto& dump_listener : listener_dump.dynamic_listeners()) {
       if (dump_listener.name() == listener_rep.listener.name()) {
-        ENVOY_LOG_MISC(info, "drain: {}, warm {}, active {}", dump_listener.has_draining_state(),
-                       dump_listener.has_warming_state(), dump_listener.has_active_state());
+        ENVOY_LOG_MISC(info, "warm {}, active {}, drain: {}", dump_listener.has_warming_state(), dump_listener.has_active_state(), dump_listener.has_draining_state());
         switch (listener_rep.state) {
         case XdsVerifier::DRAINING:
           if (dump_listener.has_draining_state()) {
