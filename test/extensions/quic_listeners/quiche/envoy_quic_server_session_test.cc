@@ -145,9 +145,9 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
-          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_29, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         quic_connection_(new TestEnvoyQuicServerConnection(
@@ -183,6 +183,7 @@ public:
     setQuicConfigWithDefaultValues(envoy_quic_session_.config());
     envoy_quic_session_.OnConfigNegotiated();
     quic::test::QuicConfigPeer::SetNegotiated(envoy_quic_session_.config(), true);
+    quic::test::QuicConnectionPeer::SetAddressValidated(quic_connection_);
     // Switch to a encryption forward secure crypto stream.
     quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
     quic::QuicCryptoServerStreamBase* crypto_stream = nullptr;

@@ -19,6 +19,8 @@ from google.protobuf import text_format
 
 from bazel_tools.tools.python.runfiles import runfiles
 
+import argparse
+
 
 def ValidateFragment(type_name, fragment):
   """Validate a dictionary representing a JSON/YAML fragment against an Envoy API proto3 type.
@@ -50,7 +52,21 @@ def ValidateFragment(type_name, fragment):
   json_format.Parse(json_fragment, msg, descriptor_pool=pool)
 
 
+def ParseArgs():
+  parser = argparse.ArgumentParser(
+      description='Validate a YAML fragment against an Envoy API proto3 type.')
+  parser.add_argument(
+      'message_type',
+      help='a string providing the type name, e.g. envoy.config.bootstrap.v3.Bootstrap.')
+  parser.add_argument('fragment_path', nargs='?', help='Path to a YAML configuration fragment.')
+  parser.add_argument('-s', required=False, help='YAML configuration fragment.')
+
+  return parser.parse_args()
+
+
 if __name__ == '__main__':
-  type_name, yaml_path = sys.argv[1:]
-  ValidateFragment(type_name, yaml.load(pathlib.Path(yaml_path).read_text(),
-                                        Loader=yaml.FullLoader))
+  parsed_args = ParseArgs()
+  message_type = parsed_args.message_type
+  content = parsed_args.s if (parsed_args.fragment_path is None) else pathlib.Path(
+      parsed_args.fragment_path).read_text()
+  ValidateFragment(message_type, yaml.load(content, Loader=yaml.FullLoader))
