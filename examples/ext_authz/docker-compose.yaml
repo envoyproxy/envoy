@@ -40,6 +40,23 @@ services:
         aliases:
           - ext_authz-grpc-service
 
+  ext_authz-opa-service:
+    image: openpolicyagent/opa:0.21.0-istio
+    volumes:
+      - ./config/opa-service/policy.rego:/etc/policy.rego
+    command:
+      - run
+      - --log-level=debug
+      - --server
+      - --log-format=json-pretty
+      - --set=plugins.envoy_ext_authz_grpc.addr=:9002
+      - --set=decision_logs.console=true
+      - /etc/policy.rego
+    networks:
+      envoymesh:
+        aliases:
+          - ext_authz-opa-service
+
   upstream-service:
     build:
       context: ./upstream
