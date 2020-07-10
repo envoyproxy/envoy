@@ -130,6 +130,13 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
     return;
   }
 
+  // For a valid provider without allow_failed, multiple tokens exist, reject it.
+  if (tokens_.size() > 1 && provider_ && !is_allow_failed_) {
+    tokens_.clear();
+    doneWithStatus(Status::JwtMissed);
+    return;
+  }
+
   startVerify();
 }
 
