@@ -1,6 +1,7 @@
 load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@envoy_build_tools//toolchains:rbe_toolchains_config.bzl", "rbe_toolchains_config")
+load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@upb//bazel:repository_defs.bzl", upb_bazel_version_repository = "bazel_version_repository")
@@ -18,6 +19,13 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     gazelle_dependencies()
     apple_rules_dependencies()
     upb_bazel_version_repository(name = "upb_bazel_version")
+
+    custom_exec_properties(
+        name = "envoy_large_machine_exec_property",
+        constants = {
+            "LARGE_MACHINE": create_rbe_exec_properties_dict(labels = dict(size = "large")),
+        },
+    )
 
     go_repository(
         name = "org_golang_google_grpc",
