@@ -248,7 +248,7 @@ struct mmsghdr {
 #endif // __ANDROID_API__ > 26
 #endif // ifdef __ANDROID_API__
 
-// Ensure we set SUPPORTS_PTHREAD_GETNAME_NP
+// Ensure SUPPORTS_PTHREAD_GETNAME_NP is set
 #ifndef SUPPORTS_PTHREAD_GETNAME_NP
 #define SUPPORTS_PTHREAD_GETNAME_NP 0
 #endif
