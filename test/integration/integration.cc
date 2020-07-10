@@ -189,24 +189,28 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
-void IntegrationTcpClient::waitForData(size_t length) {
+AssertionResult IntegrationTcpClient::waitForData(size_t length,
+                                                  std::chrono::milliseconds timeout) {
   if (payload_reader_->data().size() >= length) {
-    return;
+    return AssertionSuccess();
   }
 
-  payload_reader_->setLengthToWaitFor(length);
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  return payload_reader_->waitForLength(length, timeout);
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
   if (ignore_spurious_events) {
-    while (!disconnected_) {
+    while (!disconnected_ && timeout_timer->enabled()) {
       connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
     }
   } else {
     connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-    EXPECT_TRUE(disconnected_);
   }
+  EXPECT_TRUE(disconnected_);
 }
 
 void IntegrationTcpClient::waitForHalfClose() {
