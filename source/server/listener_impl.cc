@@ -371,6 +371,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 }
 
 void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
+  addListenSocketOptions(Network::SocketOptionFactory::buildSocketSigpipeOptions());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
