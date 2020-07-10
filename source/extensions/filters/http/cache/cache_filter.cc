@@ -82,8 +82,8 @@ void CacheFilter::onHeaders(LookupResult&& result) {
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::RequiresValidation:
   case CacheEntryStatus::FoundNotModified:
-  case CacheEntryStatus::UnsatisfiableRange:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
+  case CacheEntryStatus::NotSatisfiableRange: // TODO(#10132): create 416 response.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;          // We don't yet return or support these codes.
   case CacheEntryStatus::Unusable:
     if (state_ == GetHeadersState::FinishedGetHeadersCall) {
       // decodeHeader returned Http::FilterHeadersStatus::StopAllIterationAndWatermark--restart it
@@ -93,6 +93,8 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       state_ = GetHeadersState::GetHeadersResultUnusable;
     }
     return;
+  case CacheEntryStatus::SatisfiableRange: // TODO(#10132): break response content to the ranges
+                                           // requested.
   case CacheEntryStatus::Ok:
     response_has_trailers_ = result.has_trailers_;
     const bool end_stream = (result.content_length_ == 0 && !response_has_trailers_);

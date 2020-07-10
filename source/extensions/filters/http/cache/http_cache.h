@@ -11,6 +11,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 
 #include "source/extensions/filters/http/cache/key.pb.h"
 
@@ -32,8 +33,10 @@ enum class CacheEntryStatus {
   // This entry is fresh, and an appropriate basis for a 304 Not Modified
   // response.
   FoundNotModified,
-  // This entry is fresh, but can't satisfy the requested range(s).
-  UnsatisfiableRange,
+  // This entry is fresh, but cannot satisfy the requested range(s).
+  NotSatisfiableRange,
+  // This entry is fresh, and can satisfy the requested range(s).
+  SatisfiableRange,
 };
 
 std::ostream& operator<<(std::ostream& os, CacheEntryStatus status);
@@ -67,6 +70,13 @@ public:
 private:
   const uint64_t first_byte_pos_;
   const uint64_t last_byte_pos_;
+};
+
+class RangeRequests : Logger::Loggable<Logger::Id::cache_filter> {
+public:
+  // Parses the ranges from the request headers into a vector<RawByteRange>.
+  static std::vector<RawByteRange> parseRanges(const Http::RequestHeaderMap& request_headers,
+                                               int byte_range_parse_limit);
 };
 
 // Byte range from an HTTP request, adjusted for a known response body size, and converted from an
