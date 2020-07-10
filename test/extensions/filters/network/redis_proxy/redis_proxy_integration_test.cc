@@ -1098,7 +1098,6 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
 
 // This test injects an error fault. The server responds with an error.
 TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
-  // std::stringstream fault_response;
   std::string fault_response = fmt::format("-{}\r\n", Extensions::NetworkFilters::Common::Redis::FaultMessages::get().Error);
   initialize();
   simpleProxyResponse(makeBulkStringArray({"get", "foo"}), fault_response);

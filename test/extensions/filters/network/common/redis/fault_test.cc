@@ -127,7 +127,7 @@ TEST_F(FaultTest, SingleCommandFault) {
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
   EXPECT_CALL(snapshot_,
-              getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+              getIntegerNumeratorOfFractionalPercent(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(10));
 
   const Fault* fault_ptr = fault_manager.getFaultForCommand("ttl");
@@ -169,7 +169,7 @@ TEST_F(FaultTest, MultipleFaults) {
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
   EXPECT_CALL(snapshot_,
-              getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+              getIntegerNumeratorOfFractionalPercent(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(10));
   fault_ptr = fault_manager.getFaultForCommand("get");
   ASSERT_TRUE(fault_ptr != nullptr);
@@ -179,7 +179,7 @@ TEST_F(FaultTest, MultipleFaults) {
   EXPECT_CALL(random_, random()).WillOnce(Return(25));
   EXPECT_CALL(runtime_, snapshot()).Times(2).WillRepeatedly(ReturnRef(snapshot_));
   EXPECT_CALL(snapshot_,
-              getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+              getIntegerNumeratorOfFractionalPercent(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .Times(2)
       .WillOnce(Return(10))
       .WillOnce(Return(50));
@@ -197,7 +197,7 @@ TEST_F(FaultTest, MultipleFaults) {
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_, snapshot()).WillOnce(ReturnRef(snapshot_));
   EXPECT_CALL(snapshot_,
-              getInteger(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+              getIntegerNumeratorOfFractionalPercent(_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
       .WillOnce(Return(10));
 
   fault_ptr = fault_manager.getFaultForCommand("ttl");

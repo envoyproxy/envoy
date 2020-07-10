@@ -335,15 +335,14 @@ struct InstanceStats {
 
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
-  InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
+  InstanceImpl(Router& router, Stats::Scope& scope, const std::string& stat_prefix,
                TimeSource& time_source, bool latency_in_micros,
-               Common::Redis::FaultManagerPtr&& fault_manager);
+               Common::Redis::FaultManager& fault_manager,
+               Event::Dispatcher& dispatcher);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                               SplitCallbacks& callbacks) override;
-
-  void setDispatcher(Event::Dispatcher& dispatcher) override { dispatcher_ = &dispatcher; };
 
 private:
   struct HandlerData {
@@ -357,7 +356,6 @@ private:
                   bool latency_in_micros, CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
 
-  RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
@@ -366,11 +364,33 @@ private:
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
-  Event::Dispatcher* dispatcher_;
-
-  Common::Redis::FaultManagerPtr fault_manager_;
+  Common::Redis::FaultManager& fault_manager_;
+  Event::Dispatcher& dispatcher_;
 
   const std::string error_fault_ = "error_fault";
+};
+
+class CommandSplitterFactoryImpl : public CommandSplitterFactory {
+public:
+  CommandSplitterFactoryImpl(
+      RouterPtr&& router,
+      Common::Redis::FaultManagerPtr fault_manager,
+      Stats::Scope& scope,
+      const std::string& stat_prefix,
+      TimeSource& time_source,
+      bool latency_in_micros) : 
+        router_(std::move(router)),
+        fault_manager_(std::move(fault_manager)), scope_(scope), stat_prefix_(stat_prefix), time_source_(time_source), 
+        latency_in_micros_(latency_in_micros) {};
+  CommandSplitterPtr create(Event::Dispatcher& dispatcher);
+
+private:
+  RouterPtr router_;
+  Common::Redis::FaultManagerPtr fault_manager_;
+  Stats::Scope& scope_;
+  const std::string& stat_prefix_;
+  TimeSource& time_source_;
+  bool latency_in_micros_;
 };
 
 } // namespace CommandSplitter

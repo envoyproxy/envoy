@@ -51,6 +51,9 @@ MockSplitCallbacks::~MockSplitCallbacks() = default;
 MockInstance::MockInstance() = default;
 MockInstance::~MockInstance() = default;
 
+MockCommandSplitterFactory::MockCommandSplitterFactory() = default;
+MockCommandSplitterFactory::~MockCommandSplitterFactory() = default;
+
 } // namespace CommandSplitter
 } // namespace RedisProxy
 } // namespace NetworkFilters

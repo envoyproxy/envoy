@@ -35,9 +35,7 @@ class RedisCommandSplitterImplTest : public testing::Test {
 public:
   RedisCommandSplitterImplTest() : RedisCommandSplitterImplTest(false) {}
   RedisCommandSplitterImplTest(bool latency_in_macro)
-      : RedisCommandSplitterImplTest(latency_in_macro, nullptr) {
-    splitter_.setDispatcher(dispatcher_);
-  }
+      : RedisCommandSplitterImplTest(latency_in_macro, nullptr) {}
   RedisCommandSplitterImplTest(bool latency_in_macro, Common::Redis::FaultSharedPtr fault_ptr)
       : latency_in_micros_(latency_in_macro) {
     ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
@@ -61,22 +59,25 @@ public:
 
   const bool latency_in_micros_;
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
+  ConnPool::InstanceSharedPtr conn_pool_shared_ptr_{conn_pool_};
   ConnPool::MockInstance* mirror_conn_pool_{new ConnPool::MockInstance()};
   ConnPool::InstanceSharedPtr mirror_conn_pool_shared_ptr_{mirror_conn_pool_};
   std::shared_ptr<NiceMock<MockRoute>> route_{
-      new NiceMock<MockRoute>(ConnPool::InstanceSharedPtr{conn_pool_})};
+      new NiceMock<MockRoute>(conn_pool_shared_ptr_)};
+  std::shared_ptr<NiceMock<MockRouter>> router_{new NiceMock<MockRouter>(route_)};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockFaultManager> fault_manager_;
 
   Event::SimulatedTimeSystem time_system_;
   InstanceImpl splitter_{
-      std::make_unique<NiceMock<MockRouter>>(route_),
+      *router_,
       store_,
       "redis.foo.",
       time_system_,
       latency_in_micros_,
-      std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
+      fault_manager_,
+      dispatcher_
   };
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
