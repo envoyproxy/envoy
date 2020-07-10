@@ -13,7 +13,7 @@ namespace Init {
  * A watcher is just a glorified callback function, called by a target or a manager when
  * initialization completes.
  */
-using ReadyFn = std::function<void(const std::string)>;
+using ReadyFn = std::function<void(absl::string_view)>;
 
 /**
  * A WatcherHandleImpl functions as a weak reference to a Watcher. It is how a TargetImpl safely
@@ -33,13 +33,13 @@ public:
 
 private:
   // Name of the handle (either the name of the target calling the manager, or the name of the
-  // manager calling the client)
+  // manager calling the client).
   const std::string handle_name_;
 
-  // Name of the watcher (either the name of the manager, or the name of the client)
+  // Name of the watcher (either the name of the manager, or the name of the client).
   const std::string name_;
 
-  // The watcher's callback function, only called if the weak pointer can be "locked"
+  // The watcher's callback function, only called if the weak pointer can be "locked".
   const std::weak_ptr<ReadyFn> fn_;
 };
 
@@ -51,8 +51,8 @@ private:
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::init> {
 public:
   /**
-   * @param name a human-readable watcher name, for logging / debugging
-   * @param fn a callback function to invoke when `ready` is called on the handle
+   * @param name a human-readable watcher name, for logging / debugging.
+   * @param fn a callback function to invoke when `ready` is called on the handle.
    */
   WatcherImpl(absl::string_view name, ReadyFn fn);
   ~WatcherImpl() override;
@@ -62,10 +62,10 @@ public:
   WatcherHandlePtr createHandle(absl::string_view handle_name) const override;
 
 private:
-  // Human-readable name for logging
+  // Human-readable name for logging.
   const std::string name_;
 
-  // The callback function, called via WatcherHandleImpl by either the target or the manager
+  // The callback function, called via WatcherHandleImpl by either the target or the manager.
   const std::shared_ptr<ReadyFn> fn_;
 };
 

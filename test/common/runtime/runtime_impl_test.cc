@@ -915,7 +915,7 @@ public:
   std::vector<std::string> layers_{"some_resource"};
   std::vector<Config::SubscriptionCallbacks*> rtds_callbacks_;
   std::vector<Config::MockSubscription*> rtds_subscriptions_;
-  MockFunction<void(const std::string)> rtds_init_callback_;
+  MockFunction<void(absl::string_view)> rtds_init_callback_;
 };
 
 // Empty resource lists are rejected.

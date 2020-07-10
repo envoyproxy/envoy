@@ -252,7 +252,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
           cx_limit_runtime_key_)),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this](const std::string) {
+                          [this](absl::string_view) {
                             if (workers_started_) {
                               parent_.onListenerWarmed(*this);
                             } else {
@@ -323,7 +323,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this](const std::string) {
+                          [this](absl::string_view) {
                             ASSERT(workers_started_);
                             parent_.inPlaceFilterChainUpdate(*this);
                           }) {

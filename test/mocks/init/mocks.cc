@@ -6,7 +6,7 @@ namespace Init {
 using ::testing::Invoke;
 
 ExpectableWatcherImpl::ExpectableWatcherImpl(absl::string_view name)
-    : WatcherImpl(name, {[this](const std::string) { ready(); }}) {}
+    : WatcherImpl(name, {[this](absl::string_view) { ready(); }}) {}
 ::testing::internal::TypedExpectation<void()>& ExpectableWatcherImpl::expectReady() const {
   return EXPECT_CALL(*this, ready());
 }

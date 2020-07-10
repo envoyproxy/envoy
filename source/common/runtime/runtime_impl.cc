@@ -475,7 +475,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
-      init_watcher_("RDTS", [this](const std::string target_name) { onRdtsReady(target_name); }),
+      init_watcher_("RDTS", [this](absl::string_view target_name) { onRdtsReady(target_name); }),
       store_(store) {
   std::unordered_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
@@ -527,7 +527,7 @@ void LoaderImpl::startRtdsSubscriptions(ReadyCallback on_done) {
   init_manager_.initialize(init_watcher_);
 }
 
-void LoaderImpl::onRdtsReady(const std::string target_name) {
+void LoaderImpl::onRdtsReady(absl::string_view target_name) {
   ENVOY_LOG(info, "RTDS has finished initialization");
   on_rtds_initialized_(target_name);
 }

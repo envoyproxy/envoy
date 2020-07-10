@@ -551,7 +551,7 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> mock_factory_context2;
 
-  Init::WatcherImpl real_watcher("real", [](const std::string) {});
+  Init::WatcherImpl real_watcher("real", [](absl::string_view) {});
   Init::ManagerImpl real_init_manager("real");
 
   RouteConfigProviderSharedPtr provider2 =

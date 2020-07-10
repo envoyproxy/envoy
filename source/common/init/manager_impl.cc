@@ -7,7 +7,7 @@ namespace Init {
 
 ManagerImpl::ManagerImpl(absl::string_view name)
     : name_(fmt::format("init manager {}", name)), state_(State::Uninitialized), count_(0),
-      watcher_(name_, [this](const std::string target_name) { onTargetReady(target_name); }) {}
+      watcher_(name_, [this](absl::string_view target_name) { onTargetReady(target_name); }) {}
 
 Manager::State ManagerImpl::state() const { return state_; }
 
@@ -18,8 +18,7 @@ void ManagerImpl::add(const Target& target) {
   case State::Uninitialized:
     // If the manager isn't initialized yet, save the target handle to be initialized later.
     ENVOY_LOG(debug, "added {} to {}", target.name(), name_);
-    target_names_.push_back(std::string(target.name()));
-    ++target_names_count_[std::string(target.name())];
+    ++target_names_count_[target.name()];
     target_handles_.push_back(std::move(target_handle));
     return;
   case State::Initializing:
@@ -27,7 +26,7 @@ void ManagerImpl::add(const Target& target) {
     // it's important in this case that count_ was incremented above before calling the target,
     // because if the target calls the init manager back immediately, count_ will be decremented
     // here (see the definition of watcher_ above).
-    ++target_names_count_[std::string(target.name())];
+    ++target_names_count_[target.name()];
     target_handle->initialize(watcher_);
     return;
   case State::Initialized:
@@ -54,17 +53,15 @@ void ManagerImpl::initialize(const Watcher& watcher) {
 
     // Attempt to initialize each target. If a target is unavailable, treat it as though it
     // completed immediately.
-    uint32_t target_index = 0;
     for (const auto& target_handle : target_handles_) {
       if (!target_handle->initialize(watcher_)) {
-        onTargetReady(target_names_[target_index]);
+        onTargetReady(target_handle->name());
       }
-      target_index++;
     }
   }
 }
 
-// For init manager to query unready targets
+// For init manager to query unready targets.
 void ManagerImpl::checkUnreadyTargets() {
   ENVOY_LOG(debug, "QUERY: List of unready targets..................");
   for (const auto& unready_target : target_names_count_) {
@@ -73,11 +70,11 @@ void ManagerImpl::checkUnreadyTargets() {
   ENVOY_LOG(debug, "QUERY ENDS......................................");
 }
 
-void ManagerImpl::onTargetReady(const std::string target_name) {
+void ManagerImpl::onTargetReady(absl::string_view target_name) {
   // If there are no remaining targets and one mysteriously calls us back, this manager is haunted.
   ASSERT(count_ != 0, fmt::format("{} called back by target after initialization complete"));
 
-  // Decrease count of a target_name by 1
+  // Decrease count of a target_name by 1.
   if (--target_names_count_[target_name] == 0) {
     target_names_count_.erase(target_name);
   }

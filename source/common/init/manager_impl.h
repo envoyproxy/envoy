@@ -1,13 +1,13 @@
 #pragma once
 
 #include <list>
-#include <unordered_map>
-#include <vector>
 
 #include "envoy/init/manager.h"
 
 #include "common/common/logger.h"
 #include "common/init/watcher_impl.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Init {
@@ -37,11 +37,11 @@ public:
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
 
-  // For init manager to query unready targets
+  // For init manager to query unready targets.
   void checkUnreadyTargets();
 
 private:
-  void onTargetReady(const std::string target_name);
+  void onTargetReady(absl::string_view target_name);
   void ready();
 
   // Human-readable name for logging
@@ -62,11 +62,8 @@ private:
   // All registered targets
   std::list<TargetHandlePtr> target_handles_;
 
-  // Corresponding name of registered targets
-  std::vector<std::string> target_names_;
-
-  // Count of target_name
-  std::unordered_map<std::string, uint32_t> target_names_count_;
+  // Count of target_name of unready targets.
+  absl::flat_hash_map<std::string, uint32_t> target_names_count_;
 };
 
 } // namespace Init
