@@ -46,9 +46,9 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
       stream_info_(parent_.callbacks()->dispatcher().timeSource()),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
-      encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
-      outlier_detection_timeout_recorded_(false),
+      calling_encode_headers_(false), upstream_canary_(false), decoded_100_continue_headers_(false),
+      decode_complete_(false), encode_complete_(false), encode_trailers_(false), retried_(false),
+      awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()) {
   if (parent_.config().start_child_span_) {
@@ -114,11 +114,24 @@ void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& head
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
-  parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
+  // We coalesce 100-continue headers here, to prevent HCM from having to worry about this.
+  if (!decoded_100_continue_headers_) {
+    decoded_100_continue_headers_ = true;
+    parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
+  }
 }
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+
+  // We drop 1xx other than 101 on the floor. 100-continue headers are handled in
+  // decode100ContinueHeaders. We could in principle handler other headers here, but this might
+  // result in the double invocation of decodeHeaders() (once for informational, again for
+  // non-informational), which is likely an easy to miss corner case in the filter and HCM contract.
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  if (Http::CodeUtility::is1xx(response_code) && response_code != 101) {
+    return;
+  }
 
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
   // byte.
@@ -129,7 +142,6 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
-  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
 
   if (paused_for_connect_ && response_code == 200) {

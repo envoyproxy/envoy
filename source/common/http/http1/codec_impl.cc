@@ -1139,9 +1139,9 @@ int ClientConnectionImpl::onHeadersComplete() {
     }
 
     if (parser_.status_code == 100) {
-      // http-parser treats 100 continue headers as their own complete response.
-      // Swallow the spurious onMessageComplete and continue processing.
-      ignore_message_complete_for_100_continue_ = true;
+      // http-parser treats 1xx headers as their own complete response. Swallow the spurious
+      // onMessageComplete and continue processing.
+      ignore_message_complete_for_1xx_continue_ = true;
       pending_response_.value().decoder_->decode100ContinueHeaders(std::move(headers));
 
       // Reset to ensure no information from the continue headers is used for the response headers
@@ -1176,8 +1176,8 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
 
 void ClientConnectionImpl::onMessageComplete() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
-  if (ignore_message_complete_for_100_continue_) {
-    ignore_message_complete_for_100_continue_ = false;
+  if (ignore_message_complete_for_1xx_continue_) {
+    ignore_message_complete_for_1xx_continue_ = false;
     return;
   }
   if (pending_response_.has_value()) {

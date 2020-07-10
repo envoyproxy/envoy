@@ -349,6 +349,7 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   response_encoder_->encodeHeaders(response_headers, true);
 }
 
+// 100 response followed by 200 results in a [decode100ContinueHeaders, decodeHeaders] sequence.
 TEST_P(Http2CodecImplTest, ContinueHeaders) {
   initialize();
 
@@ -364,6 +365,41 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
+};
+
+// Multiple 100 responses are passed to the response encoder (who is responsible for coalescing).
+TEST_P(Http2CodecImplTest, MultipleContinueHeaders) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
+  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
+  response_encoder_->encode100ContinueHeaders(continue_headers);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  response_encoder_->encodeHeaders(response_headers, true);
+};
+
+// 101/102 headers etc. are passed to the response encoder (who is responsibly for deciding to
+// upgrade, ignore, etc.).
+TEST_P(Http2CodecImplTest, 1xxNonContinueHeaders) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestResponseHeaderMapImpl other_headers{{":status", "102"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(other_headers, false);
 };
 
 TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
@@ -457,27 +493,6 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
   expectDetailsRequest("http2.violation.of.messaging.rule");
 };
-
-TEST_P(Http2CodecImplTest, Invalid103) {
-  initialize();
-
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  request_encoder_->encodeHeaders(request_headers, true);
-
-  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
-
-  TestResponseHeaderMapImpl early_hint_headers{{":status", "103"}};
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
-  response_encoder_->encodeHeaders(early_hint_headers, false);
-
-  EXPECT_THROW_WITH_MESSAGE(response_encoder_->encodeHeaders(early_hint_headers, false),
-                            ClientCodecError, "Unexpected 'trailers' with no end stream.");
-  EXPECT_EQ(1, client_stats_store_.counter("http2.too_many_header_frames").value());
-}
 
 TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
   initialize();

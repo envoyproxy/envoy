@@ -148,6 +148,7 @@ private:
   uint32_t downstream_data_disabled_{};
   bool calling_encode_headers_ : 1;
   bool upstream_canary_ : 1;
+  bool decoded_100_continue_headers_ : 1;
   bool decode_complete_ : 1;
   bool encode_complete_ : 1;
   bool encode_trailers_ : 1;

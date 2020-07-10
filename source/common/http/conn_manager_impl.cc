@@ -1559,6 +1559,8 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers) {
   resetIdleTimer();
   ASSERT(connection_manager_.config_.proxy100Continue());
+  // The caller must guarantee that encode100ContinueHeaders() is invoked at most once.
+  ASSERT(!state_.has_continue_headers_ || filter != nullptr);
   // Make sure commonContinue continues encode100ContinueHeaders.
   state_.has_continue_headers_ = true;
 
@@ -1611,6 +1613,8 @@ void ConnectionManagerImpl::ActiveStream::maybeContinueEncoding(
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         ResponseHeaderMap& headers,
                                                         bool end_stream) {
+  ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
+         Utility::getResponseStatus(headers) == 101);
   resetIdleTimer();
   disarmRequestTimeout();
 

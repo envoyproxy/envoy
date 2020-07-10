@@ -867,8 +867,16 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarly100Continue) {
   testEnvoyProxying100Continue(true);
 }
 
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarlyMultiple1xxContinue) {
+  testEnvoyProxying100Continue(true, false, true);
+}
+
 TEST_P(ProtocolIntegrationTest, EnvoyProxyingLate100Continue) {
   testEnvoyProxying100Continue(false);
+}
+
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xxContinue) {
+  testEnvoyProxying100Continue(false, false, true);
 }
 
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
