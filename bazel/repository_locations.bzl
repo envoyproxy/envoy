@@ -446,7 +446,7 @@ DEPENDENCY_REPOSITORIES = dict(
     org_llvm_releases_compiler_rt = dict(
         sha256 = "6a7da64d3a0a7320577b68b9ca4933bdcab676e898b759850e827333c3282c75",
         # Only allow peeking at fuzzer related files for now.
-        strip_prefix = "compiler-rt-10.0.0.src/include",
+        strip_prefix = "compiler-rt-10.0.0.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/compiler-rt-10.0.0.src.tar.xz"],
         use_category = ["test"],
     ),

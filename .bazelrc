@@ -130,7 +130,7 @@ build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
 build:coverage --instrumentation_filter="//source(?!/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
 coverage:test-coverage --test_arg="-l trace"
-coverage:fuzz-coverage --config=asan-fuzzer
+coverage:fuzz-coverage --config=plain-fuzzer
 coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html

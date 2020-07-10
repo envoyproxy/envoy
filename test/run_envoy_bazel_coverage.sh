@@ -21,7 +21,7 @@ elif [[ -n "${COVERAGE_TARGET}" ]]; then
 else
   # For fuzz builds, this overrides to just fuzz targets.
   COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} == "true" ]] &&
-    COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzzer", //test/...)')"
+    COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
 fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then

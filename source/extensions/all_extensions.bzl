@@ -31,3 +31,10 @@ def envoy_all_core_extensions():
 
     # These extensions can be removed on a site specific basis.
     return [v for k, v in all_extensions.items() if k in _core_extensions]
+
+_http_filter_prefix = "envoy.filters.http"
+
+def envoy_all_http_filters():
+    all_extensions = dicts.add(_required_extensions, EXTENSIONS)
+
+    return [v for k, v in all_extensions.items() if k.startswith(_http_filter_prefix)]

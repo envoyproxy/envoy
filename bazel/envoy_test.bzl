@@ -110,14 +110,24 @@ def envoy_cc_fuzz_test(
     cc_test(
         name = name,
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
-        linkopts = _envoy_test_linkopts(),
-        linkstatic = 1,
-        args = ["$(locations %s)" % corpus_name],
+        linkopts = _envoy_test_linkopts() + select({
+            "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
+            "//conditions:default": [],
+        }),
+        linkstatic = envoy_linkstatic(),
+        args = select({
+            "@envoy//bazel:libfuzzer_coverage": ["$(locations %s)" % corpus_name],
+            "@envoy//bazel:libfuzzer": [],
+            "//conditions:default": ["$(locations %s)" % corpus_name],
+        }),
         data = [corpus_name],
         # No fuzzing on macOS or Windows
         deps = select({
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],
             "@envoy//bazel:windows_x86_64": [repository + "//test:dummy_main"],
+            "@envoy//bazel:libfuzzer": [
+                ":" + test_lib_name,
+            ],
             "//conditions:default": [
                 ":" + test_lib_name,
                 repository + "//test/fuzz:main",
@@ -139,19 +149,6 @@ def envoy_cc_fuzz_test(
         testonly = 1,
         deps = [":" + test_lib_name],
         tags = ["manual"] + tags,
-    )
-    cc_test(
-        name = name + "_with_libfuzzer",
-        copts = fuzz_copts + envoy_copts("@envoy", test = True),
-        linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
-        linkstatic = 1,
-        args = select({
-            "@envoy//bazel:coverage_build": ["$(locations %s)" % corpus_name],
-            "//conditions:default": [],
-        }),
-        data = [corpus_name],
-        deps = [":" + test_lib_name],
-        tags = ["manual", "fuzzer"] + tags,
     )
 
 # Envoy C++ test targets should be specified with this function.
