@@ -12,9 +12,10 @@ namespace Filter {
 
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
     HttpFilterConfigSubscriptionSharedPtr&& subscription, bool require_terminal,
+    absl::optional<std::string> require_type_url,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)), require_terminal_(require_terminal),
-      tls_(factory_context.threadLocal().allocateSlot()),
+      require_type_url_(require_type_url), tls_(factory_context.threadLocal().allocateSlot()),
       init_target_("DynamicFilterConfigProviderImpl", [this]() {
         subscription_->start();
         init_target_.ready();
@@ -36,6 +37,7 @@ absl::optional<Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() 
 }
 
 void DynamicFilterConfigProviderImpl::validateConfig(
+    const ProtobufWkt::Any& proto_config,
     Server::Configuration::NamedHttpFilterConfigFactory& factory) {
   if (factory.isTerminalFilter() && !require_terminal_) {
     throw EnvoyException(
@@ -43,6 +45,13 @@ void DynamicFilterConfigProviderImpl::validateConfig(
   } else if (!factory.isTerminalFilter() && require_terminal_) {
     throw EnvoyException(
         fmt::format("Error: filter config {} must be the last in the filter chain", name()));
+  }
+  if (require_type_url_.has_value()) {
+    auto type_url = Config::Utility::getFactoryType(proto_config);
+    if (type_url != require_type_url_.value()) {
+      throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}",
+                                       type_url, require_type_url_.value()));
+    }
   }
 }
 
@@ -107,7 +116,7 @@ void HttpFilterConfigSubscription::onConfigUpdate(
           filter_config);
   // Ensure that the filter config is valid in the filter chain context once the proto is processed.
   for (auto* provider : filter_config_providers_) {
-    provider->validateConfig(factory);
+    provider->validateConfig(filter_config.typed_config(), factory);
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       filter_config.typed_config(), validator_, factory);
@@ -154,7 +163,8 @@ std::shared_ptr<HttpFilterConfigSubscription> HttpFilterConfigProviderManagerImp
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
   // HttpFilterConfigSubscriptions are unique based on their config source and filter config name
   // combination.
-  // TODO(https://github.com/envoyproxy/envoy/issues/11967) Hash collision can cause subscription aliasing.
+  // TODO(https://github.com/envoyproxy/envoy/issues/11967) Hash collision can cause subscription
+  // aliasing.
   const std::string subscription_id = absl::StrCat(MessageUtil::hash(config_source), ".", name);
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {
@@ -174,6 +184,7 @@ std::shared_ptr<HttpFilterConfigSubscription> HttpFilterConfigProviderManagerImp
 HttpFilterConfigProviderPtr HttpFilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name, bool require_terminal,
+    absl::optional<std::string> require_type_url,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     bool apply_without_warming) {
   auto subscription =
@@ -185,7 +196,7 @@ HttpFilterConfigProviderPtr HttpFilterConfigProviderManagerImpl::createDynamicFi
     factory_context.initManager().add(subscription->initTarget());
   }
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      std::move(subscription), require_terminal, factory_context);
+      std::move(subscription), require_terminal, require_type_url, factory_context);
   // Ensure the subscription starts if it has not already.
   if (apply_without_warming) {
     factory_context.initManager().add(provider->init_target_);

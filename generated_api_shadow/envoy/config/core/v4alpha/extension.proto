@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.core.v4alpha;
 
+import "envoy/config/core/v4alpha/config_source.proto";
+
 import "google/protobuf/any.proto";
 
 import "udpa/annotations/status.proto";
@@ -31,4 +33,34 @@ message TypedExtensionConfig {
   // :ref:`extension configuration overview
   // <config_overview_extension_configuration>` for further details.
   google.protobuf.Any typed_config = 2 [(validate.rules).any = {required: true}];
+}
+
+// Configuration source specifier for a late-bound
+// extension configuration. The parent resource is warmed until all the initial
+// extension configurations are received, unless the flag to apply the default
+// configuration is set. Subsequent extension updates are atomic on a per-worker
+// basis, and apply to new streams while the active streams continue using
+// the older extension configurations. If the initial delivery of the extension
+// configuration fails, due to a timeout for example, the optional default
+// configuration is applied. Without a default configuration, the extension is
+// disabled, until an extension configuration is received.
+message ExtensionConfigSource {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.ExtensionConfigSource";
+
+  ConfigSource config_source = 1;
+
+  // Optional default configuration to use as the initial configuration if
+  // there is a failure to receive the initial extension configuration or if
+  // `apply_default_config_without_warming` flag is set.
+  google.protobuf.Any default_config = 2;
+
+  // Use the default config as the initial configuration without warming and
+  // waiting for the first discovery response. Requires the default configuration
+  // to be supplied.
+  bool apply_default_config_without_warming = 3;
+
+  // Optional constraint on the type URL. Extension configuration updates are rejected
+  // if they do not match the set type URL.
+  string type_url = 4;
 }

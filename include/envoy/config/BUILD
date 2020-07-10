@@ -32,9 +32,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "extension_config_provider_interface",
     hdrs = ["extension_config_provider.h"],
-    deps = [
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    deps = ["//source/common/protobuf"],
 )
 
 envoy_cc_library(

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/config/core/v3/extension.pb.h"
+
+#include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 
@@ -33,9 +34,10 @@ public:
    * Validate that the configuration is applicable in the context of the provider. If an exception
    * is thrown by any of the config providers for an update, the extension configuration update is
    * rejected.
+   * @param proto_config is the candidate configuration update.
    * @param factory used to instantiate an extension config.
    */
-  virtual void validateConfig(Factory& factory) PURE;
+  virtual void validateConfig(const ProtobufWkt::Any& proto_config, Factory& factory) PURE;
 
   /**
    * Update the provider with a new configuraion.

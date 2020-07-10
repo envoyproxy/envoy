@@ -8,6 +8,7 @@
 #include <string>
 
 #include "envoy/config/config_provider_manager.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/filter_config_provider.h"
@@ -179,8 +180,7 @@ private:
                 const char* filter_chain_type, bool last_filter_in_current_config);
   void
   processDynamicFilterConfig(const std::string& name,
-                             const envoy::extensions::filters::network::http_connection_manager::
-                                 v3::HttpFilter_HttpFilterConfigSource& config_discovery,
+                             const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
                              bool last_filter_in_current_config,
                              FilterFactoriesList& filter_factories);
   void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,

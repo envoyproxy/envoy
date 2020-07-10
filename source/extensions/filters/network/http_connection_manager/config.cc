@@ -517,9 +517,7 @@ void HttpConnectionManagerConfig::processFilter(
 }
 
 void HttpConnectionManagerConfig::processDynamicFilterConfig(
-    const std::string& name,
-    const envoy::extensions::filters::network::http_connection_manager::v3::
-        HttpFilter_HttpFilterConfigSource& config_discovery,
+    const std::string& name, const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
     bool last_filter_in_current_config, FilterFactoriesList& filter_factories) {
   ENVOY_LOG(debug, "      discovery: {}", MessageUtil::getJsonStringFromMessage(config_discovery));
   if (config_discovery.apply_default_config_without_warming() &&
@@ -527,9 +525,12 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
     throw EnvoyException(fmt::format(
         "Error: filter config {} applied without warming but has no default config", name));
   }
+  auto require_type_url = config_discovery.type_url().empty()
+                              ? absl::nullopt
+                              : absl::optional<std::string>(config_discovery.type_url());
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-      config_discovery.config_source(), name, last_filter_in_current_config, context_,
-      stats_prefix_, config_discovery.apply_default_config_without_warming());
+      config_discovery.config_source(), name, last_filter_in_current_config, require_type_url,
+      context_, stats_prefix_, config_discovery.apply_default_config_without_warming());
   if (config_discovery.has_default_config()) {
     auto* default_factory =
         Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
@@ -539,7 +540,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
                                        "configuration with type URL {}.",
                                        name, config_discovery.default_config().type_url()));
     }
-    filter_config_provider->validateConfig(*default_factory);
+    filter_config_provider->validateConfig(config_discovery.default_config(), *default_factory);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         config_discovery.default_config(), context_.messageValidationVisitor(), *default_factory);
     Http::FilterFactoryCb default_config =

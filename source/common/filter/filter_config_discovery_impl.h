@@ -31,13 +31,15 @@ class DynamicFilterConfigProviderImpl : public HttpFilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(HttpFilterConfigSubscriptionSharedPtr&& subscription,
                                   bool require_terminal,
+                                  absl::optional<std::string> require_type_url,
                                   Server::Configuration::FactoryContext& factory_context);
   ~DynamicFilterConfigProviderImpl() override;
 
   // Config::ExtensionConfigProvider
   const std::string& name() override;
   absl::optional<Http::FilterFactoryCb> config() override;
-  void validateConfig(Server::Configuration::NamedHttpFilterConfigFactory&) override;
+  void validateConfig(const ProtobufWkt::Any& proto_config,
+                      Server::Configuration::NamedHttpFilterConfigFactory&) override;
   void onConfigUpdate(Http::FilterFactoryCb config, const std::string&) override;
 
 private:
@@ -48,6 +50,7 @@ private:
 
   HttpFilterConfigSubscriptionSharedPtr subscription_;
   const bool require_terminal_;
+  const absl::optional<std::string> require_type_url_;
   ThreadLocal::SlotPtr tls_;
 
   // Local initialization target to ensure that the subscription starts in
@@ -135,7 +138,8 @@ public:
   // Config::ExtensionConfigProvider
   const std::string& name() override { return filter_config_name_; }
   absl::optional<Http::FilterFactoryCb> config() override { return config_; }
-  void validateConfig(Server::Configuration::NamedHttpFilterConfigFactory&) override {
+  void validateConfig(const ProtobufWkt::Any&,
+                      Server::Configuration::NamedHttpFilterConfigFactory&) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void onConfigUpdate(Http::FilterFactoryCb, const std::string&) override {
@@ -160,6 +164,7 @@ public:
   HttpFilterConfigProviderPtr
   createDynamicFilterConfigProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                     const std::string& filter_config_name, bool require_terminal,
+                                    absl::optional<std::string> require_type_url,
                                     Server::Configuration::FactoryContext& factory_context,
                                     const std::string& stat_prefix,
                                     bool apply_without_warming) override;
