@@ -23,7 +23,7 @@ jobs:
           export CC=clang
           export CXX=clang++
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          bazel build --fat_apk_cpu=x86 //:android_dist
+          bazel build --fat_apk_cpu=x86 //:android_dist_ci
     # TODO: parallelize these two jobs
       - name: 'Build Java app'
         run: |
@@ -49,7 +49,7 @@ jobs:
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
-        run: bazel build --fat_apk_cpu=x86 //:android_dist
+        run: bazel build --fat_apk_cpu=x86 //:android_dist_ci
       - uses: actions/upload-artifact@v1
         with:
           name: envoy.aar
