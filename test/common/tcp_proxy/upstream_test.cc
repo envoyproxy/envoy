@@ -5,6 +5,7 @@
 
 #include "test/common/tcp_proxy/mocks.h"
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/http/conn_pool.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/tcp/mocks.h"
 
@@ -13,6 +14,7 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::Return;
 
 namespace Envoy {
 namespace TcpProxy {
@@ -109,26 +111,29 @@ TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
 
 class HttpGenericConnPoolTest : public testing::Test {
 public:
-  HttpGenericConnPoolTest() {
-    http_conn_handle_ =
-        std::make_unique<HttpGenericConnPool>(&cancellable_, generic_pool_callbacks_);
-  }
-  std::unique_ptr<HttpGenericConnPool> http_conn_handle_;
-  Envoy::ConnectionPool::MockCancellable cancellable_;
+  std::string hostname_{"default.com"};
   Envoy::TcpProxy::MockGenericUpstreamPoolCallbacks generic_pool_callbacks_;
+  std::unique_ptr<HttpGenericConnPool> http_generic_pool_;
+
+  Envoy::Http::ConnectionPool::MockInstance http_conn_pool_instance_;
+  Envoy::Tcp::ConnectionPool::MockUpstreamCallbacks tcp_upstream_calbacks_;
+  Envoy::ConnectionPool::MockCancellable cancellable_;
 };
 
-TEST_F(HttpGenericConnPoolTest, DestroyOnAvailableCanncellable) {
-  EXPECT_CALL(cancellable_, cancel(ConnectionPool::CancelPolicy::Default)).Times(1);
-  http_conn_handle_.reset();
+TEST_F(HttpGenericConnPoolTest, HandleIsCancelledOnDestroy) {
+  EXPECT_CALL(http_conn_pool_instance_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  http_generic_pool_ = std::make_unique<HttpGenericConnPool>(
+      http_conn_pool_instance_, generic_pool_callbacks_, tcp_upstream_calbacks_, hostname_);
+  EXPECT_CALL(cancellable_, cancel(_)).Times(1);
+  http_generic_pool_.reset();
 }
 
-TEST_F(HttpGenericConnPoolTest, DestroyAfterComplete) {
-  EXPECT_CALL(cancellable_, cancel(_)).Times(0);
-  http_conn_handle_->complete();
-  http_conn_handle_.reset();
+TEST_F(HttpGenericConnPoolTest, NullHandleIsUntouchedOnDestroy) {
+  EXPECT_CALL(http_conn_pool_instance_, newStream(_, _)).WillOnce(Return(nullptr));
+  http_generic_pool_ = std::make_unique<HttpGenericConnPool>(
+      http_conn_pool_instance_, generic_pool_callbacks_, tcp_upstream_calbacks_, hostname_);
+  http_generic_pool_.reset();
 }
-
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy

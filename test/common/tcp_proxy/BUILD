@@ -47,6 +47,7 @@ envoy_cc_test(
         ":tcp_upstream_mocks",
         "//source/common/tcp_proxy:tcp_proxy_upstreams",
         "//source/common/tcp_proxy:upstream_interface",
+        "//test/mocks/http:conn_pool_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/tcp:tcp_mocks",
     ],

@@ -433,23 +433,20 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
   auto& tunnel_config = config_->tunnelingConfig();
   connecting_ = true;
   connect_attempts_++;
-  upstream_handle_ = nullptr;
+  generic_pool_ = nullptr;
   absl::string_view hostname = tunnel_config ? tunnel_config->hostname() : "";
 
   if (hostname.empty()) {
     Envoy::Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
         cluster_name, Envoy::Upstream::ResourcePriority::Default, this);
     if (conn_pool) {
-      auto tcp_handle =
-          std::make_unique<Envoy::TcpProxy::TcpConnPool>(nullptr, *upstream_callbacks_, *this);
-      Envoy::Tcp::ConnectionPool::Cancellable* cancellable = conn_pool->newConnection(*tcp_handle);
-      tcp_handle->setUpstreamHandle(cancellable);
-      upstream_handle_ = std::move(tcp_handle);
+      generic_pool_ =
+          std::make_unique<Envoy::TcpProxy::TcpConnPool>(*conn_pool, *upstream_callbacks_, *this);
     }
   } else {
     auto* cluster = cluster_manager_.get(cluster_name);
     if (!cluster) {
-      upstream_handle_ = nullptr;
+      generic_pool_ = nullptr;
     } else if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) == 0) {
       // TODO(snowp): Ideally we should prevent this from being configured, but that's tricky to
       // get right since whether a cluster is invalid depends on both the tcp_proxy config +
@@ -462,27 +459,20 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
       Envoy::Http::ConnectionPool::Instance* conn_pool = cluster_manager_.httpConnPoolForCluster(
           cluster_name, Envoy::Upstream::ResourcePriority::Default, absl::nullopt, this);
       if (conn_pool) {
-        auto http_handle = std::make_unique<Envoy::TcpProxy::HttpGenericConnPool>(nullptr, *this);
-        auto http_upstream = std::make_shared<Envoy::TcpProxy::HttpUpstream>(*upstream_callbacks_,
-                                                                             std::string(hostname));
-        // Always create new handle so that handle and http_upstream is 1:1 mapping.
-        http_handle->setUpstream(http_upstream);
-        Envoy::Http::ConnectionPool::Cancellable* cancellable =
-            conn_pool->newStream(http_upstream->responseDecoder(), *http_handle);
-        http_handle->setUpstreamHandle(cancellable);
-        upstream_handle_ = std::move(http_handle);
+        generic_pool_ = std::make_unique<Envoy::TcpProxy::HttpGenericConnPool>(
+            *conn_pool, *this, *upstream_callbacks_, hostname);
       }
     }
   }
 
-  if (upstream_handle_ == nullptr ||
+  if (generic_pool_ == nullptr ||
       // Error during creating the conn pool.
-      (upstream_handle_->failedOnPool() && !upstream_handle_->failedOnConnection())) {
+      (generic_pool_->failedOnPool() && !generic_pool_->failedOnConnection())) {
     connecting_ = false;
     return UpstreamStatus::Error;
-  } else if (upstream_handle_->failedOnConnection()) {
+  } else if (generic_pool_->failedOnConnection()) {
     return UpstreamStatus::Retry;
-  } else if (upstream_handle_->isConnecting()) {
+  } else if (generic_pool_->isConnecting()) {
     // Connecting state applies to both H2 CONNECT and raw tcp.
     // Any connecting failure should be allowed to retry, including
     // 1. raw tcp fails to connect
@@ -492,21 +482,19 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
     // Upstream could be available now because of connection reuse.
     // TODO(lambdai): Invoke inline the onData here.
   }
-  // Http: always get upstream regardless handle is cancellable or not.
-  upstream_ = upstream_handle_->upstream();
   return UpstreamStatus::Ok;
 }
 
 void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                            Upstream::HostDescriptionConstSharedPtr host) {
-  if (!upstream_handle_) {
+  if (!generic_pool_) {
     // Failure occurs before creating the cancellable request.
     // The failure will be handled by handle owner.
     return;
   }
 
-  upstream_handle_->cancelAnyPendingRequest();
-  upstream_handle_ = nullptr;
+  generic_pool_->cancelAnyPendingRequest();
+  generic_pool_ = nullptr;
 
   read_callbacks_->upstreamHost(host);
   getStreamInfo().onUpstreamHostSelected(host);
@@ -583,11 +571,11 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
       disableIdleTimer();
     }
   }
-  if (upstream_handle_) {
+  if (generic_pool_) {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
       // Cancel the conn pool request and close any excess pending requests.
-      upstream_handle_->cancelAnyPendingRequest();
+      generic_pool_->cancelAnyPendingRequest();
     }
   }
 }

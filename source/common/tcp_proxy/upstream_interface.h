@@ -45,11 +45,8 @@ public:
   virtual ~GenericConnPool() = default;
   // Cancel the conn pool request and close any excess pending requests.
   virtual void cancelAnyPendingRequest() PURE;
-  virtual void complete() PURE;
-
   // Return the GenericUpstream associated with GenericConnPool.
   virtual GenericUpstreamSharedPtr upstream() PURE;
-
   // Return true if the conn pool is not valid. This can be called when this handle is
   // created.
   virtual bool failedOnPool() PURE;

@@ -148,6 +148,8 @@ void HttpUpstream::setRequestEncoder(Envoy::Http::RequestEncoder& request_encode
 
 void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
   if (!request_encoder_) {
+    // The stream is not established or is destructed from downstream to upstream.
+    ENVOY_LOG_MISC(debug, "Reset encode without a request decoder.");
     return;
   }
   request_encoder_->getStream().removeCallbacks(*this);

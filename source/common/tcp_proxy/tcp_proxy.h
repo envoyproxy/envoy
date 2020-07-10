@@ -370,7 +370,7 @@ protected:
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
 
-  TcpProxy::GenericConnPoolPtr upstream_handle_;
+  TcpProxy::GenericConnPoolPtr generic_pool_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
   std::shared_ptr<TcpProxy::GenericUpstream> upstream_;
