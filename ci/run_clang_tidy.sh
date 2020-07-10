@@ -50,19 +50,13 @@ function exclude_testdata() {
   grep -v tools/testdata/check_format/
 }
 
-# Do not run clang-tidy against Chromium URL import, this needs to largely
-# reflect the upstream structure.
-function exclude_chromium_url() {
-  grep -v source/common/chromium_url/
-}
-
 # Exclude files in third_party which are temporary forks from other OSS projects.
 function exclude_third_party() {
   grep -v third_party/
 }
 
 function filter_excludes() {
-  exclude_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party
+  exclude_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party
 }
 
 if [[ -z "${DIFF_REF}" && "${BUILD_REASON}" != "PullRequest" ]]; then
