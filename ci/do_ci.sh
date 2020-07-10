@@ -173,6 +173,7 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
+    --test_output=all \
     --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
     --test_env=PATH="/usr/sbin:${PATH}" \
     //test/extensions/transport_sockets/tls/integration:ssl_integration_test
