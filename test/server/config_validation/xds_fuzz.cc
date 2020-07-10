@@ -1,6 +1,5 @@
 #include "test/server/config_validation/xds_fuzz.h"
 
-#include "common/common/assert.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
