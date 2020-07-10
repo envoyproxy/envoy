@@ -1,6 +1,7 @@
 #include "server/admin/prometheus_stats.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/macros.h"
 #include "common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -11,6 +12,9 @@ namespace Server {
 namespace {
 
 const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_]"); }
+const std::regex& namespaceRegex() {
+  CONSTRUCT_ON_FIRST_USE(std::regex, "^[a-zA-Z_][a-zA-Z0-9]*$");
+}
 
 /**
  * Take a string and sanitize it according to Prometheus conventions.
@@ -18,12 +22,8 @@ const std::regex& promRegex() { CONSTRUCT_ON_FIRST_USE(std::regex, "[^a-zA-Z0-9_
 std::string sanitizeName(const std::string& name) {
   // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
-  std::string stats_name = std::regex_replace(name, promRegex(), "_");
-  if (stats_name[0] >= '0' && stats_name[0] <= '9') {
-    return absl::StrCat("_", stats_name);
-  } else {
-    return stats_name;
-  }
+  // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
+  return std::regex_replace(name, promRegex(), "_");
 }
 
 /*
@@ -176,6 +176,10 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   return output;
 };
 
+absl::flat_hash_set<std::string>& prometheusNamespaces() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>);
+}
+
 } // namespace
 
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
@@ -188,10 +192,19 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
 }
 
 std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
+  std::string sanitized_name = sanitizeName(extracted_name);
+
+  absl::string_view prom_namespace{sanitized_name};
+  prom_namespace = prom_namespace.substr(0, prom_namespace.find_first_of('_'));
+
+  if (prometheusNamespaces().contains(prom_namespace)) {
+    return sanitized_name;
+  }
+
   // Add namespacing prefix to avoid conflicts, as per best practice:
   // https://prometheus.io/docs/practices/naming/#metric-names
   // Also, naming conventions on https://prometheus.io/docs/concepts/data_model/
-  return sanitizeName(fmt::format("envoy_{0}", extracted_name));
+  return absl::StrCat("envoy_", sanitized_name);
 }
 
 // TODO(efimki): Add support of text readouts stats.
@@ -212,6 +225,24 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       response, used_only, regex, histograms, generateHistogramOutput, "histogram");
 
   return metric_name_count;
+}
+
+bool PrometheusStatsFormatter::registerPrometheusNamespace(absl::string_view prometheus_namespace) {
+  if (std::regex_match(prometheus_namespace.begin(), prometheus_namespace.end(),
+                       namespaceRegex())) {
+    return prometheusNamespaces().insert(std::string(prometheus_namespace)).second;
+  }
+  return false;
+}
+
+bool PrometheusStatsFormatter::unregisterPrometheusNamespace(
+    absl::string_view prometheus_namespace) {
+  auto it = prometheusNamespaces().find(prometheus_namespace);
+  if (it == prometheusNamespaces().end()) {
+    return false;
+  }
+  prometheusNamespaces().erase(it);
+  return true;
 }
 
 } // namespace Server
