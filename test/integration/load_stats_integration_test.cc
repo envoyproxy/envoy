@@ -264,10 +264,10 @@ public:
       AssertionResult result =
           loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
       RELEASE_ASSERT(result, result.message());
-      // Check that "envoy.lrs.supports_send_all_clusters" client feature is set.
       if (local_loadstats_request.has_node()) {
         EXPECT_THAT(local_loadstats_request.node().client_features(),
-                    ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters"));
+                    ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters",
+                                           "envoy.lrs.supports_request_latency_percentiles"));
       }
       // Sanity check and clear the measured load report interval and request latencies
       for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
@@ -281,11 +281,10 @@ public:
         cluster_stats.mutable_load_report_interval()->Clear();
 
         // sanity check request latencies aren't NAN
-        auto percentiles = cluster_stats.mutable_request_latency_percentiles();
-        for (auto iterator = percentiles->begin(); iterator != percentiles->end(); iterator++) {
-          EXPECT_THAT(std::isnan(iterator->second.value()), false);
+        for (auto& p : cluster_stats.request_latency_computed_percentiles()) {
+          EXPECT_THAT(std::isnan(p), false);
         }
-        cluster_stats.mutable_request_latency_percentiles()->clear();
+        cluster_stats.mutable_request_latency_computed_percentiles()->Clear();
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
 

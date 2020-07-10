@@ -99,8 +99,8 @@ public:
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
                Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-               Stats::ScopePtr&& stats_scope, bool added_via_api,
-               ClusterSlotUpdateCallBackSharedPtr factory);
+               Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_reporter_stats_store,
+               bool added_via_api, ClusterSlotUpdateCallBackSharedPtr factory);
 
   struct ClusterSlotsRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
   public:

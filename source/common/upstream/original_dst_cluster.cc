@@ -104,8 +104,9 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
 OriginalDstCluster::OriginalDstCluster(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
+    Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store, bool added_via_api)
+    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope),
+                      load_report_stats_store, added_via_api),
       dispatcher_(factory_context.dispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
@@ -192,9 +193,9 @@ OriginalDstClusterFactory::createClusterImpl(
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
   //                     the cluster should directly supply the load balancer. This will remove
   //                     a special case and allow this cluster to be compiled out as an extension.
-  auto new_cluster =
-      std::make_shared<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
-                                           std::move(stats_scope), context.addedViaApi());
+  auto new_cluster = std::make_shared<OriginalDstCluster>(
+      cluster, context.runtime(), socket_factory_context, std::move(stats_scope),
+      context.loadReportingStatsStore(), context.addedViaApi());
   auto lb = std::make_unique<OriginalDstCluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

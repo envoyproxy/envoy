@@ -25,9 +25,10 @@ class CustomStaticCluster : public Upstream::ClusterImplBase {
 public:
   CustomStaticCluster(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                       Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                      Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
-                      std::string address, uint32_t port)
-      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+                      Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store,
+                      bool added_via_api, uint32_t priority, std::string address, uint32_t port)
+      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
+                        load_report_stats_store, added_via_api),
         priority_(priority), address_(std::move(address)), port_(port), host_(makeHost()) {}
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

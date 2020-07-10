@@ -308,7 +308,10 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     }
 
     if (dropped) {
-      cluster_->loadReportStats().upstream_rq_dropped_.inc();
+      auto&& loadReportStats = cluster_->loadReportStats();
+      if (loadReportStats.has_value()) {
+        loadReportStats->upstream_rq_dropped_.inc();
+      }
     }
     if (upstream_host && Http::CodeUtility::is5xx(response_status_code)) {
       upstream_host->stats().rq_error_.inc();
@@ -1359,8 +1362,11 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
                                              upstreamZone(upstream_request.upstreamHost())};
 
     code_stats.chargeResponseTiming(info);
-    cluster_->loadReportRouterStats().http_upstream_rq_time_.recordValue(
-        info.response_time_.count());
+
+    auto&& loadReportStats = cluster_->loadReportStats();
+    if (loadReportStats.has_value()) {
+      loadReportStats->http_upstream_rq_time_.recordValue(info.response_time_.count());
+    }
 
     if (alt_stat_prefix_ != nullptr) {
       Http::CodeStats::ResponseTimingInfo info{config_.scope_,

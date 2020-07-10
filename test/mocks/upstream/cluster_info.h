@@ -118,8 +118,7 @@ public:
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
   MOCK_METHOD(ClusterStats&, stats, (), (const));
   MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
-  MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
-  MOCK_METHOD(ClusterLoadReportRouterStats&, loadReportRouterStats, (), (const));
+  MOCK_METHOD(absl::optional<ClusterLoadReportStats>&, loadReportStats, (), (const));
   MOCK_METHOD(absl::optional<ClusterTimeoutBudgetStats>&, timeoutBudgetStats, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
@@ -150,7 +149,7 @@ public:
   ClusterStats stats_;
   Upstream::TransportSocketMatcherPtr transport_socket_matcher_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
-  ClusterLoadReportStats load_report_stats_;
+  absl::optional<ClusterLoadReportStats> load_report_stats_;
   NiceMock<Stats::MockIsolatedStatsStore> timeout_budget_stats_store_;
   absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;

@@ -612,11 +612,7 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
 }
 
 ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope) {
-  return {PRIMITVE_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
-}
-
-ClusterLoadReportRouterStats ClusterInfoImpl::generateLoadReportRouterStats(Stats::Scope& scope) {
-  return {ALL_CLUSTER_LOAD_REPORT_ROUTER_STATS(POOL_HISTOGRAM(scope))};
+  return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope), POOL_HISTOGRAM(scope))};
 }
 
 ClusterTimeoutBudgetStats ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope) {
@@ -667,7 +663,8 @@ private:
 ClusterInfoImpl::ClusterInfoImpl(
     const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
-    TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
+    TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
+    Stats::StoreRootPtr& load_report_stats_store, bool added_via_api,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
@@ -682,9 +679,11 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
-      load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      load_report_router_stats_(generateLoadReportRouterStats(*stats_scope_)),
+      stats_(generateStats(*stats_scope_)),
+      load_report_stats_(load_report_stats_store != nullptr
+                             ? absl::make_optional<ClusterLoadReportStats>(
+                                   generateLoadReportStats(*load_report_stats_store))
+                             : absl::nullopt),
       timeout_budget_stats_(config.track_timeout_budgets()
                                 ? absl::make_optional<ClusterTimeoutBudgetStats>(
                                       generateTimeoutBudgetStats(*stats_scope_))
@@ -877,7 +876,7 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 ClusterImplBase::ClusterImplBase(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store, bool added_via_api)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
@@ -891,8 +890,8 @@ ClusterImplBase::ClusterImplBase(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_matcher),
-      std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor(),
-      factory_context);
+      std::move(stats_scope), load_report_stats_store, added_via_api,
+      factory_context.messageValidationVisitor(), factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);

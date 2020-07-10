@@ -515,12 +515,12 @@ public:
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
-                  bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor,
+                  Stats::StoreRootPtr& load_report_stats_store, bool added_via_api,
+                  ProtobufMessage::ValidationVisitor& validation_visitor,
                   Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
-  static ClusterLoadReportRouterStats generateLoadReportRouterStats(Stats::Scope& scope);
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
                                                                   const std::string& stat_prefix,
                                                                   bool track_remaining);
@@ -578,9 +578,8 @@ public:
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
-  ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
-  ClusterLoadReportRouterStats& loadReportRouterStats() const override {
-    return load_report_router_stats_;
+  absl::optional<ClusterLoadReportStats>& loadReportStats() const override {
+    return load_report_stats_;
   }
   const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const override {
     return timeout_budget_stats_;
@@ -637,9 +636,8 @@ private:
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
-  Stats::IsolatedStoreImpl load_report_stats_store_;
-  mutable ClusterLoadReportStats load_report_stats_;
-  mutable ClusterLoadReportRouterStats load_report_router_stats_;
+  mutable Stats::ScopePtr load_report_stats_scope_;
+  mutable absl::optional<ClusterLoadReportStats> load_report_stats_;
   const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
@@ -739,7 +737,8 @@ public:
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                   Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                  Stats::ScopePtr&& stats_scope, bool added_via_api);
+                  Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store,
+                  bool added_via_api);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,

@@ -16,7 +16,8 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                    Stats::ScopePtr&& stats_scope, bool added_via_api);
+                    Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_stats_store_root,
+                    bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

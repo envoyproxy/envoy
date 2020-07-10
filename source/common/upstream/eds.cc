@@ -19,9 +19,9 @@ namespace Upstream {
 EdsClusterImpl::EdsClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                             added_via_api),
+                             load_report_stats_store, added_via_api),
       Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           cluster.eds_cluster_config().eds_config().resource_api_version()),
       local_info_(factory_context.localInfo()),
@@ -288,7 +288,8 @@ EdsClusterFactory::createClusterImpl(
 
   return std::make_pair(
       std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                       std::move(stats_scope), context.addedViaApi()),
+                                       std::move(stats_scope), context.loadReportingStatsStore(),
+                                       context.addedViaApi()),
       nullptr);
 }
 

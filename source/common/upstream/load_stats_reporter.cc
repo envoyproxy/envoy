@@ -5,7 +5,6 @@
 #include <map>
 #include <set>
 
-#include "envoy/server/internal_stats_handler.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -17,10 +16,10 @@ namespace Upstream {
 
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
+                                     Stats::StoreRootPtr& load_report_stats_store,
                                      Grpc::RawAsyncClientPtr async_client,
                                      envoy::config::core::v3::ApiVersion transport_api_version,
-                                     Event::Dispatcher& dispatcher,
-                                     const Server::InternalStatsHandlerPtr& internal_stats_handler)
+                                     Event::Dispatcher& dispatcher)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
@@ -28,9 +27,12 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
           Grpc::VersionedMethods("envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats",
                                  "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
               .getMethodDescriptorForVersion(transport_api_version)),
-      time_source_(dispatcher.timeSource()), internal_stats_handler_(internal_stats_handler) {
+      time_source_(dispatcher.timeSource()),
+      load_report_stats_store_(load_report_stats_store), send_request_latencies_{false} {
+  ASSERT(load_report_stats_store != nullptr);
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
+  request_.mutable_node()->add_client_features("envoy.lrs.supports_request_latency_percentiles");
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
@@ -70,7 +72,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
   std::map<std::string, envoy::config::endpoint::v3::ClusterStats*> metrics_to_cluster_map;
-  std::set<std::string> relevant_metrics;
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
     auto cluster_info_map = cm_.clusters();
@@ -110,52 +111,57 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         }
       }
     }
+    ASSERT(cluster.info()->loadReportStats().has_value());
+
     cluster_stats->set_total_dropped_requests(
-        cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
+        cluster.info()->loadReportStats()->upstream_rq_dropped_.latch());
     const auto now = time_source_.monotonicTime().time_since_epoch();
     const auto measured_interval = now - cluster_name_and_timestamp.second;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
             std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
     clusters_[cluster_name] = now;
-    auto metric_name = cluster.info()->loadReportRouterStats().http_upstream_rq_time_.name();
-    relevant_metrics.insert(metric_name);
+
+    auto metric_name = cluster.info()->loadReportStats()->http_upstream_rq_time_.name();
     metrics_to_cluster_map.insert({metric_name, cluster_stats});
   }
 
-  internal_stats_handler_->receiveGlobalStats(
-      relevant_metrics,
-      [&](std::multimap<std::string, const Envoy::Stats::HistogramStatistics&> histogram_stats)
-          -> void {
-        for (auto entry : histogram_stats) {
-          if (metrics_to_cluster_map.find(entry.first) != metrics_to_cluster_map.end()) {
-            auto* cluster_stats = metrics_to_cluster_map[entry.first];
-            auto supported_quantiles = entry.second.supportedQuantiles();
-            auto computed_quantiles = entry.second.computedQuantiles();
-            for (size_t i = 0; i < supported_quantiles.size(); i++) {
-              double val = computed_quantiles[i];
-              if (std::isnan(val)) {
-                val = 0;
-              }
-              auto num = ProtobufWkt::DoubleValue();
-              num.set_value(val);
-              cluster_stats->mutable_request_latency_percentiles()->insert(
-                  Protobuf::MapPair<std::string, ProtobufWkt::DoubleValue>(
-                      std::to_string(supported_quantiles[i]), num));
-            }
+  if (send_request_latencies_) {
+    // merge histograms and add them to request
+    load_report_stats_store_->mergeHistograms([this, metrics_to_cluster_map] {
+      for (const auto& histogram_ref : load_report_stats_store_->histograms()) {
+        const auto& histogram = histogram_ref.get();
+        auto metric_name = histogram->name();
+        auto it = metrics_to_cluster_map.find(metric_name);
+        if (it != metrics_to_cluster_map.end()) {
+          auto cluster_stats = it->second;
+          auto& interval_stats = histogram->intervalStatistics();
+          for (auto& v : interval_stats.supportedQuantiles()) {
+            cluster_stats->add_request_latency_supported_percentiles(v);
+          }
+          for (auto& v : interval_stats.computedQuantiles()) {
+            cluster_stats->add_request_latency_computed_percentiles(v);
           }
         }
+      }
 
-        Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
-        ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
-        stream_->sendMessage(request_, false);
-        stats_.responses_.inc();
-        // When the connection is established, the message has not yet been read so we
-        // will not have a load reporting period.
-        if (message_) {
-          startLoadReportPeriod();
-        }
-      });
+      _sendLoadStatsRequest();
+    });
+  } else {
+    _sendLoadStatsRequest();
+  }
+}
+
+void LoadStatsReporter::_sendLoadStatsRequest() {
+  Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
+  ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
+  stream_->sendMessage(request_, false);
+  stats_.responses_.inc();
+  // When the connection is established, the message has not yet been read so we
+  // will not have a load reporting period.
+  if (message_) {
+    startLoadReportPeriod();
+  }
 }
 
 void LoadStatsReporter::handleFailure() {
@@ -188,6 +194,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // problems due to referencing of temporaries in the below loop with Google's
   // internal string type. Consider this optimization when the string types
   // converge.
+  send_request_latencies_ = message_->send_request_latency_percentiles();
   std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
     for (const auto& p : cm_.clusters()) {
@@ -219,6 +226,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
       return;
     }
     auto& cluster = it->second.get();
+
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (const auto& host : host_set->hosts()) {
         host->stats().rq_success_.latch();
@@ -226,7 +234,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
         host->stats().rq_total_.latch();
       }
     }
-    cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
+    cluster.info()->loadReportStats()->upstream_rq_dropped_.latch();
   };
   if (message_->send_all_clusters()) {
     for (const auto& p : cm_.clusters()) {

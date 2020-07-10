@@ -245,6 +245,7 @@ public:
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
+  Stats::StoreRootPtr& loadReportingStatsStore() override { return load_report_stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   ProcessContextOptRef processContext() override { return *process_context_; }
@@ -316,6 +317,8 @@ private:
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
+  std::unique_ptr<Stats::Allocator> allocator_;
+  Stats::StoreRootPtr load_report_stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
@@ -360,7 +363,6 @@ private:
   Stats::TimespanPtr initialization_timer_;
 
   ServerFactoryContextImpl server_contexts_;
-  InternalStatsHandlerPtr internal_stats_handler_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

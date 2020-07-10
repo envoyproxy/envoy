@@ -32,6 +32,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
+#include "common/stats/thread_local_store.h"
 #include "common/tcp/original_conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -392,7 +393,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
 void ClusterManagerImpl::initializeSecondaryClusters(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-    const Server::InternalStatsHandlerPtr& internal_stats_handler) {
+    Stats::StoreRootPtr& load_report_stats_store) {
   init_helper_.startInitializingSecondaryClusters();
 
   const auto& cm_config = bootstrap.cluster_manager();
@@ -400,11 +401,11 @@ void ClusterManagerImpl::initializeSecondaryClusters(
     const auto& load_stats_config = cm_config.load_stats_config();
 
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, *this, stats_,
+        local_info_, *this, stats_, load_report_stats_store,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->create(),
-        load_stats_config.transport_api_version(), dispatcher_, internal_stats_handler);
+        load_stats_config.transport_api_version(), dispatcher_);
   }
 }
 
@@ -1424,9 +1425,9 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
-      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
-      main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      outlier_event_logger, added_via_api,
+      cluster, cm, stats_, load_report_stats_store_, tls_, dns_resolver_, ssl_context_manager_,
+      runtime_, random_, main_thread_dispatcher_, log_manager_, local_info_, admin_,
+      singleton_manager_, outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
       api_);

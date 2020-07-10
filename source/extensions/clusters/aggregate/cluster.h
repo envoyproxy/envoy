@@ -35,7 +35,8 @@ public:
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Runtime::RandomGenerator& random,
           Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api);
+          Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store,
+          ThreadLocal::SlotAllocator& tls, bool added_via_api);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {

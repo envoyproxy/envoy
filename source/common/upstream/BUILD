@@ -64,6 +64,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/shared_pool:shared_pool_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/tcp:conn_pool_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
@@ -196,7 +197,6 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:async_client_lib",
-        "//source/server:internal_stats_handler_lib",
         "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
     ],
 )

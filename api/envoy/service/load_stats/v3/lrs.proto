@@ -74,6 +74,7 @@ message LoadStatsRequest {
 
 // The management server sends envoy a LoadStatsResponse with all clusters it
 // is interested in learning load stats about.
+// [#next-free-field: 6]
 message LoadStatsResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.load_stats.v2.LoadStatsResponse";
@@ -100,4 +101,7 @@ message LoadStatsResponse {
   // Set to *true* if the management server supports endpoint granularity
   // report.
   bool report_endpoint_granularity = 3;
+
+  // Set to *true* to enable the report of request latency percentiles
+  bool send_request_latency_percentiles = 5;
 }

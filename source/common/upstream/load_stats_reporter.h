@@ -1,8 +1,8 @@
 #include "envoy/event/dispatcher.h"
-#include "envoy/server/internal_stats_handler.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/store.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
@@ -32,10 +32,10 @@ class LoadStatsReporter
       Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
-                    Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
+                    Stats::Scope& scope, Stats::StoreRootPtr& load_report_stats_store,
+                    Grpc::RawAsyncClientPtr async_client,
                     envoy::config::core::v3::ApiVersion transport_api_version,
-                    Event::Dispatcher& dispatcher,
-                    const Server::InternalStatsHandlerPtr& internal_stats_handler);
+                    Event::Dispatcher& dispatcher);
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -55,6 +55,8 @@ private:
   void handleFailure();
   void startLoadReportPeriod();
 
+  void _sendLoadStatsRequest();
+
   ClusterManager& cm_;
   LoadReporterStats stats_;
   Grpc::AsyncClient<envoy::service::load_stats::v3::LoadStatsRequest,
@@ -70,7 +72,8 @@ private:
   // Map from cluster name to start of measurement interval.
   std::unordered_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;
-  const Server::InternalStatsHandlerPtr& internal_stats_handler_;
+  Stats::StoreRootPtr& load_report_stats_store_;
+  bool send_request_latencies_;
 };
 
 using LoadStatsReporterPtr = std::unique_ptr<LoadStatsReporter>;

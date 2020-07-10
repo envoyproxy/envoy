@@ -18,6 +18,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
+#include "common/stats/thread_local_store.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 #include "common/upstream/subset_lb.h"

@@ -41,15 +41,17 @@ class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   ProdClusterManagerFactory(
       Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
-      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
-      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
-      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
-      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      Stats::StoreRootPtr& load_report_stats_store, ThreadLocal::Instance& tls,
+      Runtime::RandomGenerator& random, Network::DnsResolverSharedPtr dns_resolver,
+      Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
+      const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
+      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      Http::Context& http_context, Grpc::Context& grpc_context,
       AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), validation_context_(validation_context),
         api_(api), http_context_(http_context), grpc_context_(grpc_context), admin_(admin),
-        runtime_(runtime), stats_(stats), tls_(tls), random_(random), dns_resolver_(dns_resolver),
+        runtime_(runtime), stats_(stats), load_report_stats_store_(load_report_stats_store),
+        tls_(tls), random_(random), dns_resolver_(dns_resolver),
         ssl_context_manager_(ssl_context_manager), local_info_(local_info),
         secret_manager_(secret_manager), log_manager_(log_manager),
         singleton_manager_(singleton_manager) {}
@@ -82,6 +84,7 @@ protected:
   Server::Admin& admin_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
+  Stats::StoreRootPtr& load_report_stats_store_;
   ThreadLocal::Instance& tls_;
   Runtime::RandomGenerator& random_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -259,9 +262,8 @@ public:
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
 
-  void initializeSecondaryClusters(
-      const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-      const Server::InternalStatsHandlerPtr& internal_stats_handler) override;
+  void initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                   Stats::StoreRootPtr& load_report_stats_store) override;
 
 protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
