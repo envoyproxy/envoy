@@ -85,8 +85,8 @@ HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::S
     : configs_([&config]() {
         std::vector<Config> configs;
         for (const auto& matcher : config.histogram_settings().bucket_settings()) {
-          configs.emplace_back(Config(Matchers::StringMatcherImpl(matcher.match()),
-                                      {matcher.buckets().begin(), matcher.buckets().end()}));
+          configs.emplace_back(matcher.match(), SupportedBuckets{matcher.buckets().begin(),
+                                                                 matcher.buckets().end()});
         }
 
         return configs;
