@@ -93,7 +93,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->stats().failure_mode_allowed_.inc();
     }
 
-    if (config_->emitDynamicMetadata()) {
+    if (!response->dynamic_metadata.fields().empty()) {
       filter_callbacks_->connection().streamInfo().setDynamicMetadata(
           NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
     }

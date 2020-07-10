@@ -1126,6 +1126,8 @@ TEST_P(HttpFilterTestParam, OkResponse) {
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  // Send an OK response Without setting the dynamic metadata field.
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromString("ext_authz.ok").value());
@@ -1445,7 +1447,7 @@ TEST_P(HttpFilterTestParam, OverrideEncodingHeaders) {
       filter_callbacks_.clusterInfo()->statsScope().counterFromString("upstream_rq_403").value());
 }
 
-// Verify that when returning an OK response and emit_dynamic_metadata is true, the filter emits
+// Verify that when returning an OK response with dynamic_metadata field set, the filter emits
 // dynamic metadata.
 TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   InSequence s;
@@ -1454,7 +1456,6 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_authz_server"
-  emit_dynamic_metadata: true
   )EOF");
 
   prepareCheck();

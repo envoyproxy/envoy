@@ -197,7 +197,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       }
     }
 
-    if (config_->emitDynamicMetadata()) {
+    if (!response->dynamic_metadata.fields().empty()) {
       callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
                                                   response->dynamic_metadata);
     }

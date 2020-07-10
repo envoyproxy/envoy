@@ -63,7 +63,6 @@ public:
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
-        emit_dynamic_metadata_(config.emit_dynamic_metadata()),
         max_request_bytes_(config.with_request_body().max_request_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
@@ -91,8 +90,6 @@ public:
   bool failureModeAllow() const { return failure_mode_allow_; }
 
   bool clearRouteCache() const { return clear_route_cache_; }
-
-  bool emitDynamicMetadata() const { return emit_dynamic_metadata_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
@@ -137,7 +134,6 @@ private:
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
   const bool clear_route_cache_;
-  const bool emit_dynamic_metadata_;
   const uint32_t max_request_bytes_;
   const Http::Code status_on_error_;
   Stats::Scope& scope_;

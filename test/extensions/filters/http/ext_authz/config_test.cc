@@ -28,7 +28,6 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
       stat_prefix: google
   failure_mode_allow: false
   transport_api_version: {}
-  emit_dynamic_metadata: false
   )EOF";
 
   ExtAuthzFilterConfig factory;

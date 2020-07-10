@@ -73,14 +73,10 @@ message OkHttpResponse {
 
   // Optional response metadata that will be emitted as dynamic metadata to be consumed by the next
   // filter. This metadata lives in a namespace specified by the canonical name of extension filter
-  // that requires it.
+  // that requires it:
   //
-  // .. csv-table::
-  //    :header: Namespaces, Enable flags
-  //    :widths: 1, 1
-  //
-  //    envoy.filters.http.ext_authz, :ref:`envoy.extensions.filters.http.ext_authz.v3.ExtAuthz.emit_dynamic_metadata <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_dynamic_metadata>`
-  //    envoy.filters.network.ext_authz, :ref:`envoy.extensions.filters.network.ext_authz.v3.ExtAuthz.emit_dynamic_metadata <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.emit_dynamic_metadata>`
+  // - :ref:`envoy.filters.http.ext_authz <config_http_filters_ext_authz_dynamic_metadata>` for HTTP filter.
+  // - :ref:`envoy.filters.network.ext_authz <config_network_filters_ext_authz_dynamic_metadata>` for network filter.
   google.protobuf.Struct dynamic_metadata = 3;
 }
 

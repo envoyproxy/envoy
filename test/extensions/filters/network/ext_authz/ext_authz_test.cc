@@ -38,10 +38,11 @@ namespace ExtAuthz {
 
 class ExtAuthzFilterTest : public testing::Test {
 public:
-  void initialize(const std::string& yaml_string = "") {
+  ExtAuthzFilterTest() { initialize(); }
+
+  void initialize() {
     envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
-    TestUtility::loadFromYaml(yaml_string.empty() ? default_yaml_string_ : yaml_string,
-                              proto_config);
+    TestUtility::loadFromYaml(default_yaml_string_, proto_config);
     config_ = std::make_shared<Config>(proto_config, stats_store_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
@@ -100,18 +101,6 @@ stat_prefix: name
 }
 
 TEST_F(ExtAuthzFilterTest, OKWithOnData) {
-  initialize(R"EOF(
-grpc_service:
-  envoy_grpc:
-    cluster_name: ext_authz_server
-
-failure_mode_allow: true
-stat_prefix: name
-
-# Emit metadata.
-emit_dynamic_metadata: true
-  )EOF");
-
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
@@ -166,8 +155,6 @@ emit_dynamic_metadata: true
 }
 
 TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
-  initialize();
-
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -207,8 +194,6 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
 }
 
 TEST_F(ExtAuthzFilterTest, FailOpen) {
-  initialize();
-
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -239,8 +224,6 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
 }
 
 TEST_F(ExtAuthzFilterTest, FailClose) {
-  initialize();
-
   InSequence s;
   // Explicitly set the failure_mode_allow to false.
   config_->setFailModeAllow(false);
@@ -272,8 +255,6 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
 // Test to verify that when callback from the authorization service has completed the filter
 // does not invoke Cancel on RemoteClose event.
 TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
-  initialize();
-
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -307,8 +288,6 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
 // Test to verify that Cancel is invoked when a RemoteClose event occurs while the call
 // to the authorization service was in progress.
 TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
-  initialize();
-
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -337,8 +316,6 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
 // Test to verify that on stack response from the authorization service does NOT
 // result in calling cancel.
 TEST_F(ExtAuthzFilterTest, ImmediateOK) {
-  initialize();
-
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -349,7 +326,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
           })));
-
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
@@ -369,8 +346,6 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 // Test to verify that on stack denied response from the authorization service does
 // result in stoppage of the filter chain.
 TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
-  initialize();
-
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -397,8 +372,6 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
 // Test to verify that on stack Error response when failure_mode_allow is configured
 // result in request being allowed.
 TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpen) {
-  initialize();
-
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
