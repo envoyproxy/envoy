@@ -38,14 +38,10 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
-      : client_secret_provider_(client_secret_provider),
-        token_secret_provider_(token_secret_provider), api_(api) {}
+      : client_secret_provider_(std::move(client_secret_provider)),
+        token_secret_provider_(std::move(token_secret_provider)), api_(api) {}
 
   std::string clientSecret() const override {
-    if (!client_secret_provider_) {
-      return EMPTY_STRING;
-    }
-
     const auto* secret = client_secret_provider_->secret();
     if (!secret) {
       return EMPTY_STRING;
@@ -55,9 +51,6 @@ public:
   }
 
   std::string tokenSecret() const override {
-    if (!token_secret_provider_) {
-      return EMPTY_STRING;
-    }
     const auto* secret = token_secret_provider_->secret();
     if (!secret) {
       return EMPTY_STRING;
