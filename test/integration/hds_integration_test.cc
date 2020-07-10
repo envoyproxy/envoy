@@ -368,14 +368,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointFieldMissingHttp) {
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->clear_unhealthy_threshold();
-  server_health_check_specifier_.mutable_cluster_health_checks(0)
-      ->mutable_health_checks(0)
-      ->mutable_timeout()
-      ->set_seconds(0);
-  server_health_check_specifier_.mutable_cluster_health_checks(0)
-      ->mutable_health_checks(0)
-      ->mutable_timeout()
-      ->set_nanos(100000000); // 0.1 seconds
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -387,7 +379,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointFieldMissingHttp) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // See that connection is closed
-  ASSERT_FALSE(host_upstream_->waitForHttpConnection(*dispatcher_, host_fake_connection_));
+  ASSERT_FALSE(host_upstream_->waitForHttpConnection(*dispatcher_, host_fake_connection_,
+                                                     std::chrono::milliseconds(1000)));
 
   // Clean up connections
   cleanupHostConnections();

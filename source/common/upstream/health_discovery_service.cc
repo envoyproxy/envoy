@@ -194,7 +194,7 @@ void HdsDelegate::onReceiveMessage(
 
   // Validate message fields
   try {
-    MessageUtil::validate(*message, ProtobufMessage::getStrictValidationVisitor());
+    MessageUtil::validate(*message, validation_visitor_);
   } catch (const ProtoValidationException& ex) {
     // Increment error count
     stats_.errors_.inc();
