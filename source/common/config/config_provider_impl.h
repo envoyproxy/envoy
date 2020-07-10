@@ -206,7 +206,7 @@ protected:
         parent_init_target_(fmt::format("ConfigSubscriptionCommonBase init target '{}'", name_),
                             [this]() { local_init_manager_.initialize(local_init_watcher_); }),
         local_init_watcher_(fmt::format("ConfigSubscriptionCommonBase local watcher '{}'", name_),
-                            [this]() { parent_init_target_.ready(); }),
+                            [this](const std::string) { parent_init_target_.ready(); }),
         local_init_manager_(
             fmt::format("ConfigSubscriptionCommonBase local init manager '{}'", name_)),
         manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),

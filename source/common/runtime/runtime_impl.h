@@ -262,7 +262,7 @@ private:
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
-  void onRdtsReady();
+  void onRdtsReady(const std::string target_name);
 
   RandomGenerator& generator_;
   RuntimeStats stats_;

@@ -266,7 +266,7 @@ class Loader {
 public:
   virtual ~Loader() = default;
 
-  using ReadyCallback = std::function<void()>;
+  using ReadyCallback = std::function<void(const std::string)>;
 
   /**
    * Post-construction initialization. Runtime will be generally available after

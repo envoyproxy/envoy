@@ -13,7 +13,7 @@ namespace Init {
  * A watcher is just a glorified callback function, called by a target or a manager when
  * initialization completes.
  */
-using ReadyFn = std::function<void()>;
+using ReadyFn = std::function<void(const std::string)>;
 
 /**
  * A WatcherHandleImpl functions as a weak reference to a Watcher. It is how a TargetImpl safely

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <list>
+#include <vector>
+#include <unordered_map>
 
 #include "envoy/init/manager.h"
 
@@ -35,8 +37,11 @@ public:
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
 
+  // For init manager to query unready targets
+  void checkUnreadyTargets();
+
 private:
-  void onTargetReady();
+  void onTargetReady(const std::string target_name);
   void ready();
 
   // Human-readable name for logging
@@ -56,6 +61,12 @@ private:
 
   // All registered targets
   std::list<TargetHandlePtr> target_handles_;
+  
+  // Corresponding name of registered targets
+  std::vector<std::string> target_names_;
+
+  // Count of target_name
+  std::unordered_map<std::string, uint32_t> target_names_count_;
 };
 
 } // namespace Init
