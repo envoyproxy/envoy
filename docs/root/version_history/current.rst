@@ -26,9 +26,11 @@ Removed Config or Runtime
 
 New Features
 ------------
-* tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
 
 * ext_authz filter: added support for emitting metadata for both :ref:`HTTP <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_dynamic_metadata>` and :ref:`Network <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.emit_dynamic_metadata>` filters.
+* tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
+
+
 
 Deprecated
 ----------
