@@ -8,20 +8,6 @@
 namespace Envoy {
 namespace Quic {
 
-// A ProofSource::Detail implementation which retains filter chain.
-class EnvoyQuicProofSourceDetails : public quic::ProofSource::Details {
-public:
-  explicit EnvoyQuicProofSourceDetails(const Network::FilterChain& filter_chain)
-      : filter_chain_(filter_chain) {}
-  EnvoyQuicProofSourceDetails(const EnvoyQuicProofSourceDetails& other)
-      : filter_chain_(other.filter_chain_) {}
-
-  const Network::FilterChain& filterChain() const { return filter_chain_; }
-
-private:
-  const Network::FilterChain& filter_chain_;
-};
-
 class EnvoyQuicProofSource : public EnvoyQuicFakeProofSource,
                              protected Logger::Loggable<Logger::Id::quic> {
 public:

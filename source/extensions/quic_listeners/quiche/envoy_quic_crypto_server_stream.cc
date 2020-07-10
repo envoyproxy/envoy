@@ -37,6 +37,8 @@ void EnvoyQuicCryptoServerStream::ProcessClientHello(
       std::make_unique<EnvoyProcessClientHelloResultCallback>(this, std::move(done_cb));
   ASSERT(done_cb_wrapper_ == nullptr);
   done_cb_wrapper_ = done_cb_wrapper.get();
+  // Old QUICHE code might call GetProof() earlier and pass in proof source instance here. But this
+  // is no longer the case, so proof_source_details should always be null.
   ASSERT(proof_source_details == nullptr);
   quic::QuicCryptoServerStream::ProcessClientHello(result, std::move(proof_source_details),
                                                    std::move(done_cb_wrapper));

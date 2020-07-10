@@ -786,7 +786,8 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
       }));
-  if (quic_version_[0].handshake_protocol == quic::PROTOCOL_QUIC_CRYPTO) {
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+  if (!quic_version_[0].UsesTls()) {
     envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   } else {
     if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
