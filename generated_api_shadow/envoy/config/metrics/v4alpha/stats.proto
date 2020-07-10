@@ -284,6 +284,7 @@ message HistogramSettings {
   // used:
   //
   //   .. code-block:: json
+  //
   //     [
   //       0.5,
   //       1,
