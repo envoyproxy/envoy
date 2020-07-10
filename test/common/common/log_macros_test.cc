@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 
+#include "common/common/fancy_logger.h"
 #include "common/common/logger.h"
 
 #include "test/mocks/http/mocks.h"
@@ -48,6 +49,7 @@ TEST(Logger, evaluateParams) {
   // Log message with higher severity and make sure that params were evaluated.
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "test message '{}'", i++);
+
   EXPECT_THAT(i, testing::Eq(2));
 }
 
@@ -135,6 +137,38 @@ TEST_F(FormatTest, OutputEscaped) {
   // Note this uses a raw string literal
   const Envoy::ExpectedLogMessages message{{"info", R"(line 1 \n line 2 \t tab \\r test)"}};
   EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(message, logMessageEscapeSequences());
+}
+
+/**
+ * Test for Fancy Logger macros.
+ */
+TEST(Fancy, Global) {
+  FANCY_LOG(info, "Hello world! Here's a line of fancy log!");
+  FANCY_LOG(error, "Fancy Error! Here's the second message!");
+
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> stream_;
+  FANCY_CONN_LOG(warn, "Fake info {} of connection", connection_, 1);
+  FANCY_STREAM_LOG(warn, "Fake warning {} of stream", stream_, 1);
+
+  FANCY_LOG(critical, "Critical message for later flush.");
+  FANCY_FLUSH_LOG();
+}
+
+TEST(Fancy, SetLevel) {
+  const char* file = "P=NP_file";
+  FancyContext::setFancyLogger(file, spdlog::level::trace);
+
+  FancyContext::setFancyLogger(__FILE__, spdlog::level::err);
+  FANCY_LOG(error, "Fancy Error! Here's a test for level.");
+  FANCY_LOG(warn, "Warning: you shouldn't see this message!");
+}
+
+TEST(Fancy, FastPath) {
+  FancyContext::setFancyLogger(__FILE__, spdlog::level::info);
+  for (int i = 0; i < 10; i++) {
+    FANCY_LOG(warn, "Fake warning No. {}", i);
+  }
 }
 
 } // namespace Envoy

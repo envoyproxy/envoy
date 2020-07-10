@@ -13,6 +13,7 @@
 #include "common/common/macros.h"
 #include "common/common/non_copyable.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 #include "fmt/ostream.h"
@@ -189,6 +190,8 @@ private:
   bool should_escape_{false};
 };
 
+enum class LoggerMode { Envoy, Fancy };
+
 /**
  * Defines a scope for the logging system with the specified lock and log level.
  * This is equivalent to setLogLevel, setLogFormat, and setLock, which can be
@@ -206,14 +209,20 @@ public:
           Thread::BasicLockable& lock, bool should_escape);
   ~Context();
 
+  static std::string getFancyLogFormat();
+  static spdlog::level::level_enum getFancyDefaultLevel();
+
 private:
-  void activate();
+  void activate(LoggerMode mode = LoggerMode::Envoy);
 
   const spdlog::level::level_enum log_level_;
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
   Context* const save_context_;
+
+  static std::string fancy_log_format_;
+  static spdlog::level::level_enum fancy_default_level_;
 };
 
 /**
