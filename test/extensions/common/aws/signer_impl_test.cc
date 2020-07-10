@@ -190,7 +190,7 @@ TEST_F(SignerImplTest, SignHostHeader) {
       message_->headers().get(Http::CustomHeaders::get().Authorization)->value().getStringView());
 }
 
-// Verify signing headers for services
+// Verify signing headers for services.
 TEST_F(SignerImplTest, SignHeadersByService) {
   expectSignHeaders("s3", "d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
                     SignatureConstants::get().UnsignedPayload);
@@ -198,7 +198,7 @@ TEST_F(SignerImplTest, SignHeadersByService) {
                     SignatureConstants::get().HashedEmptyString);
   expectSignHeaders("es", "0fd9c974bb2ad16c8d8a314dca4f6db151d32cbd04748d9c018afee2a685a02e",
                     SignatureConstants::get().UnsignedPayload);
-  expectSignHeaders("gracier", "06a594b2fa4cf2bfe43e8535dc4bd0a6d3b8ae3080f4fbdbc3c6d8b16b038941",
+  expectSignHeaders("glacier", "8d1f241d77c64cda57b042cd312180f16e98dbd7a96e5545681430f8dbde45a0",
                     SignatureConstants::get().UnsignedPayload);
 }
 

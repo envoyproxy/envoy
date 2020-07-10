@@ -121,7 +121,7 @@ GCP
 GETting
 GLB
 GOAWAY
-Gracier
+Glacier
 GRPC
 GSS
 GTEST
