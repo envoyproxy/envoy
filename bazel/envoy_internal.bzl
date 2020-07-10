@@ -33,7 +33,7 @@ def envoy_copts(repository, test = False):
         "-DNOIME",
         "-DNOCRYPT",
         # this is to silence the incorrect MSVC compiler warning when trying to convert between
-        # std::optional data types while conversions between primitive types are producing no error
+        # std::optional data types while conversion between primitive types are producing no error
         "-wd4244",
     ]
 
