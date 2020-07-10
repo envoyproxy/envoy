@@ -49,7 +49,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
 
-  // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service
+  // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service.
   envoy::config::core::v3::Metadata metadata_context;
   const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
@@ -78,6 +78,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   skip_check_ = skipCheckForRoute(route);
 
   if (!config_->filterEnabled() || skip_check_) {
+    if (skip_check_) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    if (config_->denyAtDisable()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter is disabled. Deny the request.", *callbacks_);
+      callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::UnauthorizedExternalService);
+      callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+                                 RcDetails::get().AuthzError);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -155,18 +166,33 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::OK: {
     ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the request:", *callbacks_);
     if (config_->clearRouteCache() &&
-        (!response->headers_to_add.empty() || !response->headers_to_append.empty())) {
+        (!response->headers_to_set.empty() || !response->headers_to_append.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *callbacks_);
       callbacks_->clearRouteCache();
     }
-    for (const auto& header : response->headers_to_add) {
+    for (const auto& header : response->headers_to_set) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
       request_headers_->setCopy(header.first, header.second);
     }
+    for (const auto& header : response->headers_to_add) {
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
+      request_headers_->addCopy(header.first, header.second);
+    }
     for (const auto& header : response->headers_to_append) {
       const Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
-      if (header_to_modify) {
+      // TODO(dio): Add a flag to allow appending non-existent headers, without setting it first
+      // (via `headers_to_add`). For example, given:
+      // 1. Original headers {"original": "true"}
+      // 2. Response headers from the authorization servers {{"append": "1"}, {"append": "2"}}
+      //
+      // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
+      // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
+      // to upstream server by only sets `headers_to_append`.
+      if (header_to_modify != nullptr) {
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
+        // The current behavior of appending is by combining entries with the same key, into one
+        // entry. The value of that combined entry is separated by ",".
+        // TODO(dio): Consider to use addCopy instead.
         request_headers_->appendCopy(header.first, header.second);
       }
     }
@@ -201,17 +227,17 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [& headers = response->headers_to_add,
+        [&headers = response->headers_to_set,
          &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
-          // First remove all headers requested by the ext_authz filter,
-          // to ensure that they will override existing headers
+          // Firstly, remove all headers requested by the ext_authz filter, to ensure that they will
+          // override existing headers.
           for (const auto& header : headers) {
             response_headers.remove(header.first);
           }
-          // Then set all of the requested headers, allowing the
-          // same header to be set multiple times, e.g. `Set-Cookie`
+          // Then set all of the requested headers, allowing the same header to be set multiple
+          // times, e.g. `Set-Cookie`.
           for (const auto& header : headers) {
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
             response_headers.addCopy(header.first, header.second);

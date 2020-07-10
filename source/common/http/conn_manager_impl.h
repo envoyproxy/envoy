@@ -84,7 +84,7 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Http::ConnectionCallbacks
-  void onGoAway() override;
+  void onGoAway(GoAwayErrorCode error_code) override;
 
   // Http::ServerConnectionCallbacks
   RequestDecoder& newStream(ResponseEncoder& response_encoder,
@@ -101,9 +101,6 @@ public:
   }
 
   TimeSource& timeSource() { return time_source_; }
-
-  // Return a reference to the shared_ptr so that it can be lazy created on demand.
-  std::shared_ptr<StreamInfo::FilterState>& filterState() { return filter_state_; }
 
 private:
   struct ActiveStream;
@@ -495,7 +492,7 @@ private:
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                        absl::string_view details);
+                        absl::string_view details) override;
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
     // As with most of the encode functions, this runs encodeHeaders on various
     // filters before calling encodeHeadersInternal which does final header munging and passes the
@@ -803,7 +800,6 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-  std::shared_ptr<StreamInfo::FilterState> filter_state_;
 };
 
 } // namespace Http

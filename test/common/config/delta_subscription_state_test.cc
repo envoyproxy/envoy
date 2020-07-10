@@ -61,7 +61,7 @@ protected:
     return state_.handleResponse(message);
   }
 
-  NiceMock<MockSubscriptionCallbacks> callbacks_;
+  NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   // We start out interested in three resources: name1, name2, and name3.

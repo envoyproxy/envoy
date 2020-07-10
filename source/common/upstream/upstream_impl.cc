@@ -31,8 +31,8 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
@@ -694,7 +694,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
-      lb_original_dst_config_(config.original_dst_lb_config()), added_via_api_(added_via_api),
+      lb_original_dst_config_(config.original_dst_lb_config()),
+      upstream_config_(config.has_upstream_config()
+                           ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+                                 config.upstream_config())
+                           : absl::nullopt),
+      added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),
@@ -856,7 +861,8 @@ void ClusterInfoImpl::createNetworkFilterChain(Network::Connection& connection) 
 
 Http::Protocol
 ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const {
-  if (features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
+  if (downstream_protocol.has_value() &&
+      features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return downstream_protocol.value();
   } else {
     return (features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
@@ -872,7 +878,6 @@ ClusterImplBase::ClusterImplBase(
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
-      symbol_table_(stats_scope->symbolTable()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           factory_context.singletonManager(), factory_context.dispatcher())) {
   factory_context.setInitManager(init_manager_);
@@ -1327,9 +1332,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   bool hosts_changed = false;
 
   // Go through and see if the list we have is different from what we just got. If it is, we make a
-  // new host list and raise a change notification. This uses an N^2 search given that this does not
-  // happen very often and the list sizes should be small (see
-  // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
+  // new host list and raise a change notification. We also check for duplicates here. It's
   // possible for DNS to return the same address multiple times, and a bad EDS implementation could
   // do the same thing.
 
@@ -1432,16 +1435,20 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
-  for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
-    auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
+  auto erase_from =
+      std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
+                     [&existing_hosts_for_current_priority](const HostSharedPtr& p) {
+                       auto existing_itr =
+                           existing_hosts_for_current_priority.find(p->address()->asString());
 
-    if (existing_itr != existing_hosts_for_current_priority.end()) {
-      existing_hosts_for_current_priority.erase(existing_itr);
-      itr = current_priority_hosts.erase(itr);
-    } else {
-      itr++;
-    }
-  }
+                       if (existing_itr != existing_hosts_for_current_priority.end()) {
+                         existing_hosts_for_current_priority.erase(existing_itr);
+                         return true;
+                       }
+
+                       return false;
+                     });
+  current_priority_hosts.erase(erase_from, current_priority_hosts.end());
 
   // If we saw existing hosts during this iteration from a different priority, then we've moved
   // a host from another priority into this one, so we should mark the priority as having changed.
@@ -1459,21 +1466,23 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
-    for (auto i = current_priority_hosts.begin(); i != current_priority_hosts.end();) {
-      if (!((*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
-            (*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
-        if ((*i)->weight() > max_host_weight) {
-          max_host_weight = (*i)->weight();
-        }
+    erase_from =
+        std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
+                       [&updated_hosts, &final_hosts, &max_host_weight](const HostSharedPtr& p) {
+                         if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
+                               p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
+                           if (p->weight() > max_host_weight) {
+                             max_host_weight = p->weight();
+                           }
 
-        final_hosts.push_back(*i);
-        updated_hosts[(*i)->address()->asString()] = *i;
-        (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
-        i = current_priority_hosts.erase(i);
-      } else {
-        i++;
-      }
-    }
+                           final_hosts.push_back(p);
+                           updated_hosts[p->address()->asString()] = p;
+                           p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+                           return true;
+                         }
+                         return false;
+                       });
+    current_priority_hosts.erase(erase_from, current_priority_hosts.end());
   }
 
   // At this point we've accounted for all the new hosts as well the hosts that previously

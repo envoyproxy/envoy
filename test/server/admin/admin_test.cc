@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <fstream>
+#include <memory>
 #include <regex>
 #include <unordered_map>
+#include <vector>
 
 #include "envoy/admin/v3/clusters.pb.h"
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -10,11 +12,14 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/json/json_object.h"
+#include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -41,7 +46,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   Buffer::OwnedImpl data;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   const std::string path("/healthcheck/fail");
   // TODO(jmarantz): the call to getCallback should be made to fail, but as an interim we will
   // just issue a warning, so that scripts using curl GET commands to mutate state can be fixed.
@@ -74,7 +79,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 
@@ -122,29 +127,29 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   const std::string planets = "jupiter>saturn>mars";
   EXPECT_TRUE(admin_.addHandler("/planets", planets, callback, true, false));
 
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const Http::HeaderString& content_type = header_map.ContentType()->value();
   EXPECT_THAT(std::string(content_type.getStringView()), testing::HasSubstr("text/html"));
-  EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0));
+  EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0, 0));
   const std::string escaped_planets = "jupiter&gt;saturn&gt;mars";
-  EXPECT_NE(-1, response.search(escaped_planets.data(), escaped_planets.size(), 0));
+  EXPECT_NE(-1, response.search(escaped_planets.data(), escaped_planets.size(), 0, 0));
 }
 
 TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const std::string logging_action = "<form action='logging' method='post'";
   const std::string stats_href = "<a href='stats'";
-  EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
-  EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
+  EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0, 0));
+  EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0, 0));
 }
 
 TEST_P(AdminInstanceTest, ConfigDump) {
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   auto entry = admin_.getConfigTracker().add("foo", [] {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("bar");
@@ -210,11 +215,288 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   // Run it multiple times and validate that order is preserved.
   for (size_t i = 0; i < 5; i++) {
     Buffer::OwnedImpl response;
-    Http::ResponseHeaderMapImpl header_map;
+    Http::TestResponseHeaderMapImpl header_map;
     EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
     const std::string output = response.toString();
     EXPECT_EQ(expected_json, output);
   }
+}
+
+// helper method for adding host's info
+void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname,
+                 const std::string& address_url, envoy::config::core::v3::Locality& locality,
+                 const std::string& hostname_for_healthcheck,
+                 const std::string& healthcheck_address_url, int weight, int priority) {
+  ON_CALL(host, locality()).WillByDefault(ReturnRef(locality));
+
+  Network::Address::InstanceConstSharedPtr address = Network::Utility::resolveUrl(address_url);
+  ON_CALL(host, address()).WillByDefault(Return(address));
+  ON_CALL(host, hostname()).WillByDefault(ReturnRef(hostname));
+
+  ON_CALL(host, hostnameForHealthChecks()).WillByDefault(ReturnRef(hostname_for_healthcheck));
+  Network::Address::InstanceConstSharedPtr healthcheck_address =
+      Network::Utility::resolveUrl(healthcheck_address_url);
+  ON_CALL(host, healthCheckAddress()).WillByDefault(Return(healthcheck_address));
+
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  ON_CALL(host, metadata()).WillByDefault(Return(metadata));
+
+  ON_CALL(host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+
+  ON_CALL(host, weight()).WillByDefault(Return(weight));
+  ON_CALL(host, priority()).WillByDefault(Return(priority));
+}
+
+// Test that using ?include_eds parameter adds EDS to the config dump.
+TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
+  cluster_map.emplace(cluster.info_->name_, cluster);
+
+  ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
+
+  Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  host_set->hosts_.emplace_back(host);
+
+  envoy::config::core::v3::Locality locality;
+  const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
+  const std::string hostname = "foo.com";
+
+  addHostInfo(*host, hostname, "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
+              "tcp://1.2.3.5:90", 5, 6);
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));
+  std::string output = response.toString();
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
+   "static_endpoint_configs": [
+    {
+     "endpoint_config": {
+      "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+      "cluster_name": "fake_cluster",
+      "endpoints": [
+       {
+        "locality": {},
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.4",
+             "port_value": 80
+            }
+           },
+           "health_check_config": {
+            "port_value": 90,
+            "hostname": "test_hostname_healthcheck"
+           },
+           "hostname": "foo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 5
+         }
+        ],
+        "priority": 6
+       }
+      ],
+      "policy": {
+       "overprovisioning_factor": 140
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(expected_json, output);
+}
+
+// Test EDS config dump while multiple localities and priorities exist
+TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
+  cluster_map.emplace(cluster.info_->name_, cluster);
+
+  ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
+
+  Upstream::MockHostSet* host_set_1 = cluster.priority_set_.getMockHostSet(0);
+  auto host_1 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  host_set_1->hosts_.emplace_back(host_1);
+
+  envoy::config::core::v3::Locality locality_1;
+  locality_1.set_region("oceania");
+  locality_1.set_zone("hello");
+  locality_1.set_sub_zone("world");
+
+  const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
+  const std::string hostname_1 = "foo.com";
+
+  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.4:80", locality_1, hostname_for_healthcheck,
+              "tcp://1.2.3.5:90", 5, 6);
+
+  auto host_2 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  host_set_1->hosts_.emplace_back(host_2);
+  const std::string empty_hostname_for_healthcheck = "";
+  const std::string hostname_2 = "boo.com";
+
+  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.7:8", locality_1, empty_hostname_for_healthcheck,
+              "tcp://1.2.3.7:8", 3, 6);
+
+  envoy::config::core::v3::Locality locality_2;
+
+  auto host_3 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  host_set_1->hosts_.emplace_back(host_3);
+  const std::string hostname_3 = "coo.com";
+
+  addHostInfo(*host_3, hostname_3, "tcp://1.2.3.8:8", locality_2, empty_hostname_for_healthcheck,
+              "tcp://1.2.3.8:8", 3, 4);
+
+  std::vector<Upstream::HostVector> locality_hosts = {
+      {Upstream::HostSharedPtr(host_1), Upstream::HostSharedPtr(host_2)},
+      {Upstream::HostSharedPtr(host_3)}};
+  auto hosts_per_locality = new Upstream::HostsPerLocalityImpl(std::move(locality_hosts), false);
+
+  Upstream::LocalityWeightsConstSharedPtr locality_weights{new Upstream::LocalityWeights{1, 3}};
+  ON_CALL(*host_set_1, hostsPerLocality()).WillByDefault(ReturnRef(*hosts_per_locality));
+  ON_CALL(*host_set_1, localityWeights()).WillByDefault(Return(locality_weights));
+
+  Upstream::MockHostSet* host_set_2 = cluster.priority_set_.getMockHostSet(1);
+  auto host_4 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  host_set_2->hosts_.emplace_back(host_4);
+  const std::string hostname_4 = "doo.com";
+
+  addHostInfo(*host_4, hostname_4, "tcp://1.2.3.9:8", locality_1, empty_hostname_for_healthcheck,
+              "tcp://1.2.3.9:8", 3, 2);
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));
+  std::string output = response.toString();
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
+   "static_endpoint_configs": [
+    {
+     "endpoint_config": {
+      "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+      "cluster_name": "fake_cluster",
+      "endpoints": [
+       {
+        "locality": {
+         "region": "oceania",
+         "zone": "hello",
+         "sub_zone": "world"
+        },
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.4",
+             "port_value": 80
+            }
+           },
+           "health_check_config": {
+            "port_value": 90,
+            "hostname": "test_hostname_healthcheck"
+           },
+           "hostname": "foo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 5
+         },
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.7",
+             "port_value": 8
+            }
+           },
+           "health_check_config": {},
+           "hostname": "boo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 3
+         }
+        ],
+        "load_balancing_weight": 1,
+        "priority": 6
+       },
+       {
+        "locality": {},
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.8",
+             "port_value": 8
+            }
+           },
+           "health_check_config": {},
+           "hostname": "coo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 3
+         }
+        ],
+        "load_balancing_weight": 3,
+        "priority": 4
+       },
+       {
+        "locality": {
+         "region": "oceania",
+         "zone": "hello",
+         "sub_zone": "world"
+        },
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.9",
+             "port_value": 8
+            }
+           },
+           "health_check_config": {},
+           "hostname": "doo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 3
+         }
+        ],
+        "priority": 2
+       }
+      ],
+      "policy": {
+       "overprovisioning_factor": 140
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(expected_json, output);
+  delete (hosts_per_locality);
 }
 
 // Test that using the resource query parameter filters the config dump.
@@ -222,7 +504,7 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
 // dynamic in the JSON with ?resource=dynamic_listeners.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
     auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
@@ -248,12 +530,99 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   EXPECT_EQ(expected_json, output);
 }
 
+// Test that using the resource query parameter filters the config dump including EDS.
+// We add both static and dynamic endpoint config to the dump, but expect only
+// dynamic in the JSON with ?resource=dynamic_endpoint_configs.
+TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster_1;
+  cluster_map.emplace(cluster_1.info_->name_, cluster_1);
+
+  ON_CALL(*cluster_1.info_, addedViaApi()).WillByDefault(Return(true));
+
+  Upstream::MockHostSet* host_set = cluster_1.priority_set_.getMockHostSet(0);
+  auto host_1 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  host_set->hosts_.emplace_back(host_1);
+
+  envoy::config::core::v3::Locality locality;
+  const std::string hostname_for_healthcheck = "test_hostname_healthcheck";
+  const std::string hostname_1 = "foo.com";
+
+  addHostInfo(*host_1, hostname_1, "tcp://1.2.3.4:80", locality, hostname_for_healthcheck,
+              "tcp://1.2.3.5:90", 5, 6);
+
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster_2;
+  cluster_2.info_->name_ = "fake_cluster_2";
+  cluster_map.emplace(cluster_2.info_->name_, cluster_2);
+
+  ON_CALL(*cluster_2.info_, addedViaApi()).WillByDefault(Return(false));
+
+  Upstream::MockHostSet* host_set_2 = cluster_2.priority_set_.getMockHostSet(0);
+  auto host_2 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  host_set_2->hosts_.emplace_back(host_2);
+  const std::string hostname_2 = "boo.com";
+
+  addHostInfo(*host_2, hostname_2, "tcp://1.2.3.5:8", locality, hostname_for_healthcheck,
+              "tcp://1.2.3.4:1", 3, 4);
+
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?include_eds&resource=dynamic_endpoint_configs", header_map,
+                        response));
+  std::string output = response.toString();
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump.DynamicEndpointConfig",
+   "endpoint_config": {
+    "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+    "cluster_name": "fake_cluster",
+    "endpoints": [
+     {
+      "locality": {},
+      "lb_endpoints": [
+       {
+        "endpoint": {
+         "address": {
+          "socket_address": {
+           "address": "1.2.3.4",
+           "port_value": 80
+          }
+         },
+         "health_check_config": {
+          "port_value": 90,
+          "hostname": "test_hostname_healthcheck"
+         },
+         "hostname": "foo.com"
+        },
+        "health_status": "HEALTHY",
+        "metadata": {},
+        "load_balancing_weight": 5
+       }
+      ],
+      "priority": 6
+     }
+    ],
+    "policy": {
+     "overprovisioning_factor": 140
+    }
+   }
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(expected_json, output);
+}
+
 // Test that using the mask query parameter filters the config dump.
 // We add both static and dynamic listener config to the dump, but expect only
 // dynamic in the JSON with ?mask=dynamic_listeners.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
     auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
@@ -306,7 +675,7 @@ ProtobufTypes::MessagePtr testDumpClustersConfig() {
 // only the desired resource and the fields specified in the mask.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
   const std::string expected_json = R"EOF({
  "configs": [
@@ -335,7 +704,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
 // of the config dump and the fields present in the mask query parameter.
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
   const std::string expected_json = R"EOF({
  "configs": [
@@ -355,7 +724,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
 // resource query parameter.
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("listeners_config");
@@ -368,7 +737,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
 // repeated field.
 TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", [] {
     auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
     msg->set_version_info("foo");
@@ -461,7 +830,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, priority()).WillByDefault(Return(6));
 
   Buffer::OwnedImpl response;
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
   std::string output_json = response.toString();
   envoy::admin::v3::Clusters output_proto;

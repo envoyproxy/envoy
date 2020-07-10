@@ -88,7 +88,7 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Finish the response.
-  upstream_request_->encodeTrailers(Http::TestHeaderMapImpl{{"trailer", "bar"}});
+  upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"trailer", "bar"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
 }
@@ -242,6 +242,9 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
       EXPECT_EQ("503", responses[i]->headers().getStatusValue());
     }
   }
+
+  EXPECT_EQ(0, test_server_->gauge("http2.streams_active")->value());
+  EXPECT_EQ(0, test_server_->gauge("http2.pending_send_bytes")->value());
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
@@ -386,7 +389,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl many_headers(default_response_headers_);
+  Http::TestResponseHeaderMapImpl many_headers(default_response_headers_);
   for (int i = 0; i < 100; i++) {
     many_headers.addCopy("many", std::string(1, 'a'));
   }
@@ -431,7 +434,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl large_headers(default_response_headers_);
+  Http::TestResponseHeaderMapImpl large_headers(default_response_headers_);
   large_headers.addCopy("large", std::string(60 * 1024, 'a'));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();

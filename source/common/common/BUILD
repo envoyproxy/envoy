@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
@@ -12,12 +10,18 @@ load(
     "envoy_select_boringssl",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_library(
     name = "assert_lib",
     srcs = ["assert.cc"],
     hdrs = ["assert.h"],
+    external_deps = [
+        "abseil_base",
+        "abseil_synchronization",
+    ],
     deps = [":minimal_logger_lib"],
 )
 
@@ -64,18 +68,6 @@ envoy_cc_library(
     hdrs = ["cleanup.h"],
     deps = [
         ":assert_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "substitution_format_string_lib",
-    srcs = ["substitution_format_string.cc"],
-    hdrs = ["substitution_format_string.h"],
-    deps = [
-        "//include/envoy/access_log:access_log_interface",
-        "//source/common/access_log:access_log_formatter_lib",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -257,6 +249,7 @@ envoy_cc_library(
         ":assert_lib",
         "//include/envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
         "@com_googlesource_code_re2//:re2",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -366,7 +359,11 @@ genrule(
 genrule(
     name = "generate_version_linkstamp",
     outs = ["lib/version_linkstamp.h"],
-    cmd = "$(location :generate_version_linkstamp.sh) >> $@",
+    cmd = select({
+        # Only iOS builds typically follow this logic, OS/X is built as a normal binary
+        "//bazel:apple": "$(location :generate_version_linkstamp.sh) Library >> $@",
+        "//conditions:default": "$(location :generate_version_linkstamp.sh) >> $@",
+    }),
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     # Used here because generate_version_linkstamp.sh depends on the workspace status files.

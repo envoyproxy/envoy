@@ -274,32 +274,6 @@ typed_config:
   }
 }
 
-// Add a health check filter and verify correct behavior when draining.
-TEST_P(ProtocolIntegrationTest, DrainClose) {
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
-  initialize();
-
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence(nullptr);
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
-  codec_client_->waitForDisconnect();
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    EXPECT_TRUE(codec_client_->sawGoAway());
-  } else {
-    EXPECT_EQ("close", response->headers().getConnectionValue());
-  }
-}
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/9873
 TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   initialize();
@@ -478,9 +452,12 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send back an upstream failure and end stream. Make sure an immediate reset
-  // doesn't cause problems.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  upstream_request_->encodeResetStream();
+  // doesn't cause problems. Schedule via the upstream_request_ dispatcher to ensure that the stream
+  // still exists when encoding the reset stream.
+  upstream_request_->postToConnectionThread([this]() {
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+    upstream_request_->encodeResetStream();
+  });
 
   // Make sure the fake stream is reset.
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
@@ -981,7 +958,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefa
                                      {"foo_bar", "baz"}});
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1015,6 +992,10 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // The invalid data will trigger disconnect.
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  }
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
@@ -1116,11 +1097,12 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
                                                                  {"content-length", "-1"}});
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
@@ -1147,7 +1129,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1172,7 +1154,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
                                                                  {"content-length", "3,2"}});
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
@@ -1201,7 +1183,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     response->waitForReset();
     codec_client_->close();
@@ -1370,6 +1352,16 @@ name: decode-headers-only
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
+  // Send one 95 kB URL with limit 60 kB headers.
+  testLargeRequestUrl(95, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
+  // Send one 95 kB URL with limit 96 kB headers.
+  testLargeRequestUrl(95, 96);
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
   // Send one 95 kB header with limit 60 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 60, 100);
@@ -1409,7 +1401,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("431", response->headers().getStatusValue());
   } else {
@@ -1480,9 +1472,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::RequestTrailerMapImpl request_trailers;
+  auto request_trailers = Http::RequestTrailerMapImpl::create();
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
+    request_trailers->addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1494,7 +1486,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
                                                                  {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  codec_client_->sendTrailers(*request_encoder_, *request_trailers);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -1532,7 +1524,7 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
@@ -1834,7 +1826,7 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // Test connection is closed after single request processed.
@@ -1943,7 +1935,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   } else {
     // For HTTP/2 this is handled by nghttp2 which resets the connection without
     // sending an HTTP response.
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     ASSERT_FALSE(response->complete());
   }
 }
@@ -1962,7 +1954,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
     EXPECT_TRUE(response->complete());
   } else {
     response->waitForReset();
-    codec_client_->waitForDisconnect();
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
 }
 

@@ -17,6 +17,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    accept_handle(Http::CustomHeaders::get().Accept);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    grpc_accept_encoding_handle(Http::CustomHeaders::get().GrpcAcceptEncoding);
+
 struct RcDetailsValues {
   // The grpc web filter couldn't decode the data as the size wasn't a multiple of 4.
   const std::string GrpcDecodeFailedDueToSize = "grpc_base_64_decode_failed_bad_size";
@@ -52,7 +57,6 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::RequestHeaderMap& headers) {
 // Implements StreamDecoderFilter.
 // TODO(fengli): Implements the subtypes of gRPC-Web content-type other than proto, like +json, etc.
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const Http::HeaderEntry* content_type = headers.ContentType();
   if (!isGrpcWebRequest(headers)) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -64,20 +68,17 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
   headers.removeContentLength();
   setupStatTracking(headers);
 
-  if (content_type != nullptr && (Http::Headers::get().ContentTypeValues.GrpcWebText ==
-                                      content_type->value().getStringView() ||
-                                  Http::Headers::get().ContentTypeValues.GrpcWebTextProto ==
-                                      content_type->value().getStringView())) {
+  const absl::string_view content_type = headers.getContentTypeValue();
+  if (content_type == Http::Headers::get().ContentTypeValues.GrpcWebText ||
+      content_type == Http::Headers::get().ContentTypeValues.GrpcWebTextProto) {
     // Checks whether gRPC-Web client is sending base64 encoded request.
     is_text_request_ = true;
   }
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 
-  const Http::HeaderEntry* accept = headers.Accept();
-  if (accept != nullptr &&
-      (Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().getStringView() ||
-       Http::Headers::get().ContentTypeValues.GrpcWebTextProto ==
-           accept->value().getStringView())) {
+  const absl::string_view accept = headers.getInlineValue(accept_handle.handle());
+  if (accept == Http::Headers::get().ContentTypeValues.GrpcWebText ||
+      accept == Http::Headers::get().ContentTypeValues.GrpcWebTextProto) {
     // Checks whether gRPC-Web client is asking for base64 encoded response.
     is_text_response_ = true;
   }
@@ -85,7 +86,8 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& h
   // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
   // Adds grpc-accept-encoding:identity,deflate,gzip. It's required for gRPC.
-  headers.setReferenceGrpcAcceptEncoding(Http::Headers::get().GrpcAcceptEncodingValues.Default);
+  headers.setReferenceInline(grpc_accept_encoding_handle.handle(),
+                             Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default);
   return Http::FilterHeadersStatus::Continue;
 }
 

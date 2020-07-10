@@ -137,7 +137,8 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
       // us 1.58432429547687e+15. Instead we store it as the string of 1584324295476870 (when it is
       // serialized: "1584324295476870"), and replace it post MessageToJsonString serialization with
       // integer (1584324295476870 without `"`), see: JsonV2Serializer::serialize.
-      (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(annotation.timestamp(), replacements);
+      (*fields)[SPAN_TIMESTAMP] =
+          Util::uint64Value(annotation.timestamp(), SPAN_TIMESTAMP, replacements);
       (*fields)[SPAN_LOCAL_ENDPOINT] =
           ValueUtil::structValue(toProtoEndpoint(annotation.endpoint()));
     }
@@ -157,7 +158,8 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
     if (zipkin_span.isSetDuration()) {
       // Since SPAN_DURATION has the same data type with SPAN_TIMESTAMP, we use Util::uint64Value to
       // store it.
-      (*fields)[SPAN_DURATION] = Util::uint64Value(zipkin_span.duration(), replacements);
+      (*fields)[SPAN_DURATION] =
+          Util::uint64Value(zipkin_span.duration(), SPAN_DURATION, replacements);
     }
 
     const auto& binary_annotations = zipkin_span.binaryAnnotations();

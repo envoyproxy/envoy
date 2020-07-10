@@ -10,6 +10,7 @@
 #include <unordered_set>
 
 #include "common/memory/stats.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
@@ -327,7 +328,7 @@ TEST_F(QuicPlatformTest, QuicLog) {
   EXPECT_LOG_CONTAINS("info", "i=1", QUIC_VLOG(1) << "i=" << (i = 1));
   EXPECT_EQ(1, i);
 
-  errno = EINVAL;
+  errno = SOCKET_ERROR_INVAL;
   EXPECT_LOG_CONTAINS("info", "i=3:", QUIC_PLOG(INFO) << "i=" << (i = 3));
   EXPECT_EQ(3, i);
 }
@@ -669,10 +670,9 @@ TEST_F(QuicPlatformTest, PickUnsedPort) {
         Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
     Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
         Envoy::Network::Utility::getAddressWithPort(*addr, port);
-    Envoy::Network::IoHandlePtr io_handle = Envoy::Network::SocketInterface::socket(
-        Envoy::Network::Address::SocketType::Datagram, addr_with_port);
+    Envoy::Network::SocketImpl sock(Envoy::Network::Socket::Type::Datagram, addr_with_port);
     // binding of given port should success.
-    EXPECT_EQ(0, addr_with_port->bind(io_handle->fd()).rc_);
+    EXPECT_EQ(0, sock.bind(addr_with_port).rc_);
   }
 }
 
@@ -686,7 +686,7 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   });
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
-      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
+      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
   EXPECT_DEATH_LOG_TO_STDERR(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
 }
 

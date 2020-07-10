@@ -66,10 +66,24 @@ following are the command line options that Envoy supports.
   set this option. However, if Envoy needs to be run multiple times on the same machine, each
   running Envoy will need a unique base ID so that the shared memory regions do not conflict.
 
+.. option:: --use-dynamic-base-id
+
+  *(optional)* Selects an unused base ID to use when allocating shared memory regions. Using
+  preselected values with :option:`--base-id` is preferred, however. If this option is enabled,
+  it supersedes the :option:`--base-id` value. This flag may not be used when the value of
+  :option:`--restart-epoch` is non-zero. Instead, for subsequent hot restarts, set
+  :option:`--base-id` option with the selected base ID. See :option:`--base-id-path`.
+
+.. option:: --base-id-path <path_string>
+
+  *(optional)* Writes the base ID to the given path. While this option is compatible with
+  :option:`--base-id`, its intended use is to provide access to the dynamic base ID selected by
+  :option:`--use-dynamic-base-id`.
+
 .. option:: --concurrency <integer>
 
   *(optional)* The number of :ref:`worker threads <arch_overview_threading>` to run. If not
-  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will 
+  specified defaults to the number of hardware threads on the machine. If set to zero, Envoy will
   still run one worker thread.
 
 .. option:: -l <string>, --log-level <string>
@@ -79,9 +93,9 @@ following are the command line options that Envoy supports.
 
 .. option:: --component-log-level <string>
 
-  *(optional)* The comma separated list of logging level per component. Non developers should generally 
-  never set this option. For example, if you want `upstream` component to run at `debug` level and 
-  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to 
+  *(optional)* The comma separated list of logging level per component. Non developers should generally
+  never set this option. For example, if you want `upstream` component to run at `debug` level and
+  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to
   this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
 
 .. option:: --cpuset-threads
@@ -239,14 +253,22 @@ following are the command line options that Envoy supports.
 
 .. option:: --drain-time-s <integer>
 
-  *(optional)* The time in seconds that Envoy will drain connections during 
+  *(optional)* The time in seconds that Envoy will drain connections during
   a :ref:`hot restart <arch_overview_hot_restart>` or when individual listeners are being
-  modified or removed via :ref:`LDS <arch_overview_dynamic_config_lds>`. 
-  Defaults to 600 seconds (10 minutes). Generally the drain time should be less than 
-  the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two 
+  modified or removed via :ref:`LDS <arch_overview_dynamic_config_lds>`.
+  Defaults to 600 seconds (10 minutes). Generally the drain time should be less than
+  the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two
   settings are configured depends on the specific deployment. In edge scenarios, it might be
   desirable to have a very long drain time. In service to service scenarios, it might be possible
   to make the drain and shutdown time much shorter (e.g., 60s/90s).
+
+.. option:: --drain-strategy <string>
+
+  *(optional)* Determine behaviour of Envoy during the hot restart drain sequence. During the drain sequence, the drain manager encourages draining through terminating connections on request completion, sending "Connection: CLOSE" on HTTP1, and sending GOAWAY on HTTP2.
+
+  * ``gradual``: *(default)* The percentage of requests encouraged to drain increases to 100% as the drain time elapses.
+
+  * ``immediate``: All requests are encouraged to drain as soon as the drain sequence begins.
 
 .. option:: --parent-shutdown-time-s <integer>
 

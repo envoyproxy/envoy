@@ -35,6 +35,7 @@ namespace Logger {
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(decompression)                                                                          \
   FUNCTION(dubbo)                                                                                  \
+  FUNCTION(envoy_bug)                                                                              \
   FUNCTION(ext_authz)                                                                              \
   FUNCTION(rocketmq)                                                                               \
   FUNCTION(file)                                                                                   \

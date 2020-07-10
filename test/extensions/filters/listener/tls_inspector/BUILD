@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -12,6 +10,8 @@ load(
     "envoy_extension_cc_benchmark_binary",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_test(
@@ -19,6 +19,7 @@ envoy_cc_test(
     srcs = ["tls_inspector_test.cc"],
     deps = [
         ":tls_utility_lib",
+        "//source/common/http:utility_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",
@@ -37,6 +38,7 @@ envoy_extension_cc_benchmark_binary(
     ],
     deps = [
         ":tls_utility_lib",
+        "//source/common/http:utility_lib",
         "//source/common/network:listen_socket_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",

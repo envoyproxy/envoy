@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 
-UberFilterFuzzer::UberFilterFuzzer() {
+UberFilterFuzzer::UberFilterFuzzer() : async_request_{&cluster_manager_.async_client_} {
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
       .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
@@ -34,6 +34,20 @@ UberFilterFuzzer::UberFilterFuzzer() {
         encoder_filter_ = filter;
         encoder_filter_->setEncoderFilterCallbacks(encoder_callbacks_);
       }));
+  // This filter supports access logging.
+  ON_CALL(filter_callback_, addAccessLogHandler(_))
+      .WillByDefault(
+          Invoke([&](AccessLog::InstanceSharedPtr handler) -> void { access_logger_ = handler; }));
+  // This handles stopping execution after a direct response is sent.
+  ON_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillByDefault(
+          Invoke([this](Http::Code code, absl::string_view body,
+                        std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details) {
+            enabled_ = false;
+            decoder_callbacks_.sendLocalReply_(code, body, modify_headers, grpc_status, details);
+          }));
   // Set expectations for particular filters that may get fuzzed.
   perFilterSetup();
 }
@@ -57,13 +71,15 @@ std::vector<std::string> UberFilterFuzzer::parseHttpData(const test::fuzz::HttpD
 template <class FilterType>
 void UberFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& data) {
   bool end_stream = false;
+  enabled_ = true;
   if (data.body_case() == test::fuzz::HttpData::BODY_NOT_SET && !data.has_trailers()) {
     end_stream = true;
   }
   const auto& headersStatus = sendHeaders(filter, data, end_stream);
-  if (headersStatus != Http::FilterHeadersStatus::Continue &&
-      headersStatus != Http::FilterHeadersStatus::StopIteration) {
-    ENVOY_LOG_MISC(debug, "Finished with FilterHeadersStatus: {}", headersStatus);
+  ENVOY_LOG_MISC(debug, "Finished with FilterHeadersStatus: {}", headersStatus);
+  if ((headersStatus != Http::FilterHeadersStatus::Continue &&
+       headersStatus != Http::FilterHeadersStatus::StopIteration) ||
+      !enabled_) {
     return;
   }
 
@@ -74,13 +90,13 @@ void UberFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
     }
     Buffer::OwnedImpl buffer(data_chunks[i]);
     const auto& dataStatus = sendData(filter, buffer, end_stream);
-    if (dataStatus != Http::FilterDataStatus::Continue) {
-      ENVOY_LOG_MISC(debug, "Finished with FilterDataStatus: {}", dataStatus);
+    ENVOY_LOG_MISC(debug, "Finished with FilterDataStatus: {}", dataStatus);
+    if (dataStatus != Http::FilterDataStatus::Continue || !enabled_) {
       return;
     }
   }
 
-  if (data.has_trailers()) {
+  if (data.has_trailers() && enabled_) {
     sendTrailers(filter, data);
   }
 }
@@ -120,7 +136,11 @@ Http::FilterHeadersStatus UberFilterFuzzer::sendHeaders(Http::StreamEncoderFilte
   }
 
   ENVOY_LOG_MISC(debug, "Encoding headers (end_stream={}):\n{} ", end_stream, response_headers_);
-  return filter->encodeHeaders(response_headers_, end_stream);
+  Http::FilterHeadersStatus status = filter->encodeHeaders(response_headers_, end_stream);
+  if (end_stream) {
+    filter->encodeComplete();
+  }
+  return status;
 }
 
 template <>
@@ -134,7 +154,11 @@ template <>
 Http::FilterDataStatus UberFilterFuzzer::sendData(Http::StreamEncoderFilter* filter,
                                                   Buffer::Instance& buffer, bool end_stream) {
   ENVOY_LOG_MISC(debug, "Encoding data (end_stream={}): {} ", end_stream, buffer.toString());
-  return filter->encodeData(buffer, end_stream);
+  Http::FilterDataStatus status = filter->encodeData(buffer, end_stream);
+  if (end_stream) {
+    filter->encodeComplete();
+  }
+  return status;
 }
 
 template <>
@@ -151,6 +175,13 @@ void UberFilterFuzzer::sendTrailers(Http::StreamEncoderFilter* filter,
   response_trailers_ = Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(data.trailers());
   ENVOY_LOG_MISC(debug, "Encoding trailers:\n{} ", response_trailers_);
   filter->encodeTrailers(response_trailers_);
+  filter->encodeComplete();
+}
+
+void UberFilterFuzzer::accessLog(AccessLog::Instance* access_logger,
+                                 const StreamInfo::StreamInfo& stream_info) {
+  ENVOY_LOG_MISC(debug, "Access logging");
+  access_logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
 }
 
 void UberFilterFuzzer::fuzz(
@@ -180,6 +211,9 @@ void UberFilterFuzzer::fuzz(
   if (encoder_filter_ != nullptr) {
     runData(encoder_filter_.get(), upstream_data);
   }
+  if (access_logger_ != nullptr) {
+    accessLog(access_logger_.get(), stream_info_);
+  }
 
   reset();
 }
@@ -195,6 +229,7 @@ void UberFilterFuzzer::reset() {
   }
   encoder_filter_.reset();
 
+  access_logger_.reset();
   request_headers_.clear();
   response_headers_.clear();
   request_trailers_.clear();

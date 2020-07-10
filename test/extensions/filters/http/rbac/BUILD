@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -9,6 +7,8 @@ load(
     "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 

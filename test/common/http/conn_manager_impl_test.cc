@@ -13,11 +13,11 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/macros.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
@@ -88,8 +88,8 @@ public:
       : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
-                access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
-                log_manager_)}},
+                access_log_path_, {},
+                Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
         codec_(new NiceMock<MockServerConnection>()),
         stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
@@ -195,6 +195,7 @@ public:
     EXPECT_CALL(stream_, addCallbacks(_))
         .WillOnce(Invoke(
             [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
+    EXPECT_CALL(stream_, setFlushTimeout(_));
     EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
   }
 
@@ -4784,6 +4785,8 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
         EXPECT_EQ("500", headers.getStatusValue());
         // Make sure Envoy standard sanitization has been applied.
         EXPECT_TRUE(headers.Date() != nullptr);
+        EXPECT_EQ("response_payload_too_large",
+                  decoder_filters_[0]->callbacks_->streamInfo().responseCodeDetails().value());
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
@@ -6108,6 +6111,10 @@ private:
 } // namespace
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      "connection_provided_data", std::make_shared<SimpleType>(555),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
   setup(false, "envoy-custom-server", false);
 
   setupFilterChain(1, 0, /* num_requests = */ 3);
@@ -6150,6 +6157,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           EXPECT_TRUE(
               decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
+                  "connection_provided_data"));
           return FilterHeadersStatus::StopIteration;
         }));
     EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
@@ -6163,6 +6173,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           EXPECT_TRUE(
               decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
+                  "connection_provided_data"));
           return FilterHeadersStatus::StopIteration;
         }));
   }
@@ -6176,6 +6189,10 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   conn_manager_->onData(fake_input, false);
   decoder_filters_[0]->callbacks_->recreateStream();
   conn_manager_->onData(fake_input, false);
+
+  // The connection life time data should have been written to the connection filter state.
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.filter_state_->hasData<SimpleType>(
+      "per_downstream_connection"));
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {

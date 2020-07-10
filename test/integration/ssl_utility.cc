@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
+#include "common/http/utility.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
@@ -54,8 +55,8 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {
-    common_context->add_alpn_protocols("h2");
-    common_context->add_alpn_protocols("http/1.1");
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+    common_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
   }
   if (options.san_) {
     common_context->mutable_validation_context()

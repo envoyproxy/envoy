@@ -3,34 +3,24 @@
 #include <string>
 #include <vector>
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/common/enum_to_int.h"
-#include "common/common/substitution_format_string.h"
 #include "common/config/datasource.h"
+#include "common/formatter/substitution_format_string.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace LocalReply {
-namespace {
-
-struct EmptyHeaders {
-  Http::RequestHeaderMapImpl request_headers;
-  Http::ResponseTrailerMapImpl response_trailers;
-};
-
-using StaticEmptyHeaders = ConstSingleton<EmptyHeaders>;
-
-} // namespace
 
 class BodyFormatter {
 public:
   BodyFormatter()
-      : formatter_(std::make_unique<Envoy::AccessLog::FormatterImpl>("%LOCAL_REPLY_BODY%")),
+      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
   BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config)
-      : formatter_(SubstitutionFormatStringUtils::fromProtoConfig(config)),
+      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config)),
         content_type_(
             config.format_case() ==
                     envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
@@ -48,7 +38,7 @@ public:
   }
 
 private:
-  const AccessLog::FormatterPtr formatter_;
+  const Formatter::FormatterPtr formatter_;
   const absl::string_view content_type_;
 };
 
@@ -137,14 +127,14 @@ public:
     stream_info.response_code_ = static_cast<uint32_t>(code);
 
     if (request_headers == nullptr) {
-      request_headers = &StaticEmptyHeaders::get().request_headers;
+      request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
     }
 
     BodyFormatter* final_formatter{};
     for (const auto& mapper : mappers_) {
       if (mapper->matchAndRewrite(*request_headers, response_headers,
-                                  StaticEmptyHeaders::get().response_trailers, stream_info, code,
-                                  body, final_formatter)) {
+                                  *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
+                                  code, body, final_formatter)) {
         break;
       }
     }
@@ -153,8 +143,8 @@ public:
       final_formatter = body_formatter_.get();
     }
     return final_formatter->format(*request_headers, response_headers,
-                                   StaticEmptyHeaders::get().response_trailers, stream_info, body,
-                                   content_type);
+                                   *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
+                                   body, content_type);
   }
 
 private:

@@ -74,7 +74,8 @@ We supply Docker images that act as the reference environment for this program:
 
 * `envoyproxy/envoy-google-vrp <https://hub.docker.com/r/envoyproxy/envoy-google-vrp/tags/>`_ images
   are based on Envoy point releases. Only the latest point release at the time of vulnerability
-  submission is eligible for the program.
+  submission is eligible for the program. The first point release available for VRP will be the
+  1.15.0 Envoy release.
 
 * `envoyproxy/envoy-google-vrp-dev <https://hub.docker.com/r/envoyproxy/envoy-google-vrp-dev/tags/>`_
   images are based on Envoy master builds. Only builds within the last 5 days at the time of

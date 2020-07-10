@@ -54,6 +54,50 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Verify that we gracefully handle an invalid pre-bind socket option when using reuse port.
+TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
+  // Reserve a port that we can then use on the integration listener with reuse port.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->set_reuse_port(true);
+    listener->mutable_address()->mutable_socket_address()->set_port_value(
+        addr_socket.second->localAddress()->ip()->port());
+    auto socket_option = listener->add_socket_options();
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
+    socket_option->set_level(10000);     // Invalid level.
+    socket_option->set_int_value(10000); // Invalid value.
+  });
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
+// Verify that we gracefully handle an invalid post-bind socket option when using reuse port.
+TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
+  // Reserve a port that we can then use on the integration listener with reuse port.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->set_reuse_port(true);
+    listener->mutable_address()->mutable_socket_address()->set_port_value(
+        addr_socket.second->localAddress()->ip()->port());
+    auto socket_option = listener->add_socket_options();
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
+    socket_option->set_level(10000);     // Invalid level.
+    socket_option->set_int_value(10000); // Invalid value.
+  });
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   concurrency_ = 2;
@@ -95,9 +139,6 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   codec_client2->close();
   check_listener_stats(0, 1);
 }
-
-// Validates that the drain actually drains the listeners.
-TEST_P(IntegrationTest, AdminDrainDrainsListeners) { testAdminDrain(downstreamProtocol()); }
 
 TEST_P(IntegrationTest, RouterDirectResponse) {
   const std::string body = "Response body";
@@ -151,7 +192,7 @@ TEST_P(IntegrationTest, ConnectionClose) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
@@ -368,8 +409,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
         "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: 36\r\ntransfer-encoding: chunked\r\n\r\n" +
         smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-              response);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
     std::string response;
@@ -377,8 +417,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
                                 "\r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-              response);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
   {
     std::string response;
@@ -386,8 +425,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
                                 "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-              response);
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
 }
 
@@ -395,7 +433,7 @@ TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, MissingDelimiter) {
@@ -404,7 +442,7 @@ TEST_P(IntegrationTest, MissingDelimiter) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http1.codec_error"));
 }
 
@@ -413,7 +451,7 @@ TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GE(T / HTTP/1.1\r\nHost: host\r\n\r\n",
                                 &response);
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, InvalidVersion) {
@@ -421,7 +459,7 @@ TEST_P(IntegrationTest, InvalidVersion) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
                                 &response);
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 // Expect that malformed trailers to break the connection
@@ -438,7 +476,7 @@ TEST_P(IntegrationTest, BadTrailer) {
                                 "badtrailer\r\n\r\n",
                                 &response);
 
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 // Expect malformed headers to break the connection
@@ -455,7 +493,7 @@ TEST_P(IntegrationTest, BadHeader) {
                                 "body\r\n0\r\n\r\n",
                                 &response);
 
-  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 }
 
 TEST_P(IntegrationTest, Http10Disabled) {
@@ -500,7 +538,7 @@ TEST_P(IntegrationTest, Http09WithKeepalive) {
   initialize();
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
+          Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
                                 &response, true);
@@ -539,8 +577,8 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
                                 "GET / HTTP/1.1\r\n"
                                 "Host: foo.com\r\n"
                                 "Foo: bar\r\n"
-                                "Cache-control: public\r\n"
-                                "Cache-control: 123\r\n"
+                                "User-Agent: public\r\n"
+                                "User-Agent: 123\r\n"
                                 "Eep: baz\r\n\r\n",
                                 &response, true);
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
@@ -549,7 +587,7 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
-  EXPECT_EQ(upstream_headers->CacheControl()->value(), "public,123");
+  EXPECT_EQ(upstream_headers->get_("User-Agent"), "public,123");
   ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")) != nullptr);
   EXPECT_EQ("bar",
             upstream_headers->get(Envoy::Http::LowerCaseString("foo"))->value().getStringView());
@@ -588,7 +626,7 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndContentLengthAndLws) {
   initialize();
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "10"}})));
+          Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "10"}})));
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.0\r\nHost: foo.com \r\nConnection:Keep-alive\r\n\r\n",
@@ -809,7 +847,7 @@ TEST_P(IntegrationTest, UpstreamProtocolError) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
   ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
@@ -820,10 +858,10 @@ TEST_P(IntegrationTest, TestHead) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl head_request{{":method", "HEAD"},
-                                       {":path", "/test/long/url"},
-                                       {":scheme", "http"},
-                                       {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl head_request{{":method", "HEAD"},
+                                              {":path", "/test/long/url"},
+                                              {":scheme", "http"},
+                                              {":authority", "host"}};
 
   // Without an explicit content length, assume we chunk for HTTP/1.1
   auto response = sendRequestAndWaitForResponse(head_request, 0, default_response_headers_, 0);
@@ -836,15 +874,14 @@ TEST_P(IntegrationTest, TestHead) {
   EXPECT_EQ(0, response->body().size());
 
   // Preserve explicit content length.
-  Http::TestHeaderMapImpl content_length_response{{":status", "200"}, {"content-length", "12"}};
+  Http::TestResponseHeaderMapImpl content_length_response{{":status", "200"},
+                                                          {"content-length", "12"}};
   response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
   EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().ContentLength, "12"));
   EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
   EXPECT_EQ(0, response->body().size());
-
-  cleanupUpstreamAndDownstream();
 }
 
 // The Envoy HTTP/1.1 codec ASSERTs that T-E headers are cleared in
@@ -854,7 +891,7 @@ TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("HEAD / HTTP/1.1\r\nHost: host\r\n\r\n");
+  ASSERT_TRUE(tcp_client->write("HEAD / HTTP/1.1\r\nHost: host\r\n\r\n"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
@@ -953,7 +990,7 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
   EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Via, "bar"));
@@ -1134,7 +1171,7 @@ TEST_P(IntegrationTest, ProcessObjectHealthy) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
@@ -1155,7 +1192,7 @@ TEST_P(IntegrationTest, ProcessObjectUnealthy) {
                                                                           {":authority", "host"},
                                                                           {"connection", "close"}});
   response->waitForEndStream();
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("500"));
@@ -1224,7 +1261,7 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
   // Set an Upstream reply with an invalid content-length, which will be rejected by the Envoy.
   auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
-      Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "invalid"}}));
+      Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "invalid"}}));
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::move(response_headers));
 
@@ -1301,7 +1338,6 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponse) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("Hello World", response->body());
-  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(IntegrationTest, ConnectWithNoBody) {
@@ -1313,7 +1349,7 @@ TEST_P(IntegrationTest, ConnectWithNoBody) {
   // Send the payload early so we can regression test that body data does not
   // get proxied until after the response headers are sent.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false);
+  ASSERT_TRUE(tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -1349,7 +1385,7 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-  tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false);
+  ASSERT_TRUE(tcp_client->write("CONNECT host.com:80 HTTP/1.1\r\n\r\npayload", false));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));

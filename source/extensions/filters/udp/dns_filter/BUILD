@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
@@ -7,22 +5,28 @@ load(
     "envoy_package",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_library(
     name = "dns_filter_lib",
     srcs = [
         "dns_filter.cc",
+        "dns_filter_resolver.cc",
         "dns_parser.cc",
     ],
     hdrs = [
         "dns_filter.h",
+        "dns_filter_resolver.h",
         "dns_parser.h",
     ],
     external_deps = ["ares"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/network:dns_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listener_interface",
         "//source/common/buffer:buffer_lib",

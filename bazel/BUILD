@@ -1,12 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-
 envoy_package()
-
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 exports_files([
     "gen_sh_test_runner.sh",

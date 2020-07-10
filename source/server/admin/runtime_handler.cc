@@ -84,7 +84,8 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
   if (params.empty()) {
     // Check if the params are in the request's body.
     if (admin_stream.getRequestBody() != nullptr &&
-        isFormUrlEncoded(admin_stream.getRequestHeaders().ContentType())) {
+        admin_stream.getRequestHeaders().getContentTypeValue() ==
+            Http::Headers::get().ContentTypeValues.FormUrlEncoded) {
       params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
     }
 
@@ -105,15 +106,6 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
   }
   response.add("OK\n");
   return Http::Code::OK;
-}
-
-bool RuntimeHandler::isFormUrlEncoded(const Http::HeaderEntry* content_type) {
-  if (content_type == nullptr) {
-    return false;
-  }
-
-  return content_type->value().getStringView() ==
-         Http::Headers::get().ContentTypeValues.FormUrlEncoded;
 }
 
 } // namespace Server

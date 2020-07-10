@@ -263,6 +263,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
+  new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
@@ -464,7 +465,7 @@ void ConnectionManagerImpl::doConnectionClose(
   }
 }
 
-void ConnectionManagerImpl::onGoAway() {
+void ConnectionManagerImpl::onGoAway(GoAwayErrorCode) {
   // Currently we do nothing with remote go away frames. In the future we can decide to no longer
   // push resources if applicable.
 }
@@ -533,7 +534,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
-                   connection_manager.filterState()),
+                   connection_manager_.read_callbacks_->connection().streamInfo().filterState(),
+                   StreamInfo::FilterState::LifeSpan::Connection),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
@@ -970,7 +972,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   if (hasCachedRoute()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
+      // TODO(mattklein123): Technically if the cached route changes, we should also see if the
+      // route idle timeout has changed and update the value.
       idle_timeout_ms_ = route_entry->idleTimeout().value();
+      response_encoder_->getStream().setFlushTimeout(idle_timeout_ms_);
       if (idle_timeout_ms_.count()) {
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
@@ -1254,7 +1259,7 @@ RequestTrailerMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
   // Trailers can only be added once.
   ASSERT(!request_trailers_);
 
-  request_trailers_ = std::make_unique<RequestTrailerMapImpl>();
+  request_trailers_ = RequestTrailerMapImpl::create();
   return *request_trailers_;
 }
 
@@ -1817,7 +1822,7 @@ ResponseTrailerMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
   // Trailers can only be added once.
   ASSERT(!response_trailers_);
 
-  response_trailers_ = std::make_unique<ResponseTrailerMapImpl>();
+  response_trailers_ = ResponseTrailerMapImpl::create();
   return *response_trailers_;
 }
 
@@ -2317,9 +2322,10 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer =
-      std::make_unique<Buffer::WatermarkBuffer>([this]() -> void { this->requestDataDrained(); },
-                                                [this]() -> void { this->requestDataTooLarge(); });
+  auto buffer = std::make_unique<Buffer::WatermarkBuffer>(
+      [this]() -> void { this->requestDataDrained(); },
+      [this]() -> void { this->requestDataTooLarge(); },
+      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
 }
@@ -2419,7 +2425,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataDrained() {
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", parent_);
-  parent_.response_encoder_->getStream().readDisable(false);
+  // If the state is destroyed, the codec's stream is already torn down. On
+  // teardown the codec will unwind any remaining read disable calls.
+  if (!parent_.state_.destroyed_) {
+    parent_.response_encoder_->getStream().readDisable(false);
+  }
   parent_.connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
 }
 
@@ -2463,6 +2473,9 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
   // heap allocation.
+  // TODO(snowp): In the case where connection level filter state has been set on the connection
+  // FilterState that we inherit, we'll end up copying this every time even though we could get
+  // away with just resetting it to the HCM filter_state_.
   if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
           StreamInfo::FilterState::LifeSpan::Request)) {
     (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
@@ -2486,8 +2499,10 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
-                                            [this]() -> void { this->responseDataTooLarge(); });
+  auto buffer = new Buffer::WatermarkBuffer(
+      [this]() -> void { this->responseDataDrained(); },
+      [this]() -> void { this->responseDataTooLarge(); },
+      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   buffer->setWatermarks(parent_.buffer_limit_);
   return Buffer::WatermarkBufferPtr{buffer};
 }
@@ -2550,9 +2565,8 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       // Make sure we won't end up with nested watermark calls from the body buffer.
       parent_.state_.encoder_filters_streaming_ = true;
       allowIteration();
-
       parent_.stream_info_.setResponseCodeDetails(
-          StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
+          StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
       // This does not call the standard sendLocalReply because if there is already response data
       // we do not want to pass a second set of response headers through the filter chain.
       // Instead, call the encodeHeadersInternal / encodeDataInternal helpers

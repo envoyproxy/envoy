@@ -93,7 +93,7 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   Upstream::ClusterManager& cm_;
   TimeSource& time_source_;
-  std::map<std::string, ClusterInfoSharedPtr> info_map_ GUARDED_BY(map_mutex_);
+  std::map<std::string, ClusterInfoSharedPtr> info_map_ ABSL_GUARDED_BY(map_mutex_);
   Thread::MutexBasicLockable map_mutex_;
 };
 

@@ -53,7 +53,7 @@ static_resources:
           - name: accesslog
             typed_config:
               "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-              path: /dev/null
+              path: {{ null_device_path }}
             filter:
               or_filter:
                 filters:
@@ -69,21 +69,6 @@ static_resources:
                       value:
                         default_value: 1000
                         runtime_key: access_log.access_error.duration
-  - address:
-      socket_address:
-        address: {{ ip_loopback_address }}
-        port_value: 0
-    filter_chains:
-    - filters:
-      - name: redis
-        typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
-          settings:
-            op_timeout: 0.4s
-          stat_prefix: redis
-          prefix_routes:
-            catch_all_route:
-              cluster: redis
   clusters:
   - name: cluster_1
     connect_timeout: 5s
@@ -181,7 +166,7 @@ layered_runtime:
     - name: admin
       admin_layer: {}
 admin:
-  access_log_path: "/dev/null"
+  access_log_path: "{{ null_device_path }}"
   profile_path: "{{ test_tmpdir }}/envoy.prof"
   address:
     socket_address:

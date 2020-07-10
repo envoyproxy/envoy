@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -12,6 +10,8 @@ load(
 )
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -69,13 +69,14 @@ envoy_cc_test(
     srcs = ["connection_handler_test.cc"],
     deps = [
         "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -163,7 +164,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "overload_manager_impl_test",
     srcs = ["overload_manager_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/registry",
         "//source/common/stats:isolated_store_lib",
@@ -358,6 +358,7 @@ envoy_cc_test(
         "//source/extensions/tracers/zipkin:config",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
+        "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/stats:stat_test_utility_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
@@ -428,5 +429,4 @@ envoy_benchmark_test(
     name = "filter_chain_benchmark_test_benchmark_test",
     timeout = "long",
     benchmark_binary = "filter_chain_benchmark_test",
-    tags = ["fails_on_windows"],
 )

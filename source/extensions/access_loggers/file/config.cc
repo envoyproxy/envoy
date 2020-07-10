@@ -8,9 +8,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/logger.h"
-#include "common/common/substitution_format_string.h"
+#include "common/formatter/substitution_format_string.h"
+#include "common/formatter/substitution_formatter.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -28,31 +28,36 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
   const auto& fal_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
       config, context.messageValidationVisitor());
-  AccessLog::FormatterPtr formatter;
+  Formatter::FormatterPtr formatter;
 
-  if (fal_config.has_log_format()) {
-    formatter = SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
-  } else if (fal_config.has_json_format()) {
-    formatter = SubstitutionFormatStringUtils::createJsonFormatter(fal_config.json_format(), false);
-  } else if (fal_config.access_log_format_case() !=
-             envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
-                 ACCESS_LOG_FORMAT_NOT_SET) {
-    envoy::config::core::v3::SubstitutionFormatString sff_config;
-    switch (fal_config.access_log_format_case()) {
-    case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
+  switch (fal_config.access_log_format_case()) {
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
+    if (fal_config.format().empty()) {
+      formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
+    } else {
+      envoy::config::core::v3::SubstitutionFormatString sff_config;
       sff_config.set_text_format(fal_config.format());
-      break;
-    case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
-        kTypedJsonFormat:
-      *sff_config.mutable_json_format() = fal_config.typed_json_format();
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
     }
-    formatter = SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
+    break;
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
+    formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
+        fal_config.json_format(), false);
+    break;
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
+      kTypedJsonFormat: {
+    envoy::config::core::v3::SubstitutionFormatString sff_config;
+    *sff_config.mutable_json_format() = fal_config.typed_json_format();
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config);
+    break;
   }
-  if (!formatter) {
-    formatter = AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kLogFormat:
+    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format());
+    break;
+  case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
+      ACCESS_LOG_FORMAT_NOT_SET:
+    formatter = Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter();
+    break;
   }
 
   return std::make_shared<FileAccessLog>(fal_config.path(), std::move(filter), std::move(formatter),

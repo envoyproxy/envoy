@@ -9,6 +9,7 @@
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
@@ -398,7 +399,7 @@ TEST(HttpUtility, getLastAddressFromXFF) {
 }
 
 TEST(HttpUtility, TestParseCookie) {
-  TestHeaderMapImpl headers{
+  TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
       {"cookie", "somekey=somevalue; someotherkey=someothervalue"},
       {"cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
@@ -410,10 +411,10 @@ TEST(HttpUtility, TestParseCookie) {
 }
 
 TEST(HttpUtility, TestParseCookieBadValues) {
-  TestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
-                            {"cookie", "token2=abc123;   "},
-                            {"cookie", "; token3=abc123;"},
-                            {"cookie", "=; token4=\"abc123\""}};
+  TestRequestHeaderMapImpl headers{{"cookie", "token1=abc123; = "},
+                                   {"cookie", "token2=abc123;   "},
+                                   {"cookie", "; token3=abc123;"},
+                                   {"cookie", "=; token4=\"abc123\""}};
 
   EXPECT_EQ(Utility::parseCookieValue(headers, "token1"), "abc123");
   EXPECT_EQ(Utility::parseCookieValue(headers, "token2"), "abc123");
@@ -422,7 +423,7 @@ TEST(HttpUtility, TestParseCookieBadValues) {
 }
 
 TEST(HttpUtility, TestParseCookieWithQuotes) {
-  TestHeaderMapImpl headers{
+  TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
       {"cookie", "dquote=\"; quoteddquote=\"\"\""},
       {"cookie", "leadingdquote=\"foobar;"},
@@ -665,10 +666,9 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
-  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
-  const Router::RouteSpecificFilterConfig* one = nullconfig + 1;
-  const Router::RouteSpecificFilterConfig* two = nullconfig + 2;
-  const Router::RouteSpecificFilterConfig* three = nullconfig + 3;
+  const Router::RouteSpecificFilterConfig one;
+  const Router::RouteSpecificFilterConfig two;
+  const Router::RouteSpecificFilterConfig three;
 
   // Test when there's nothing on the route
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
@@ -676,23 +676,23 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
 
   // Testing in reverse order, so that the method always returns the last object.
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(one));
-  EXPECT_EQ(one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+      .WillByDefault(Return(&one));
+  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(two));
-  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(&two));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(three));
-  EXPECT_EQ(three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                      filter_callbacks.route()));
+      .WillByDefault(Return(&three));
+  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                       filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 }
 
 // Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
@@ -702,16 +702,16 @@ TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
 
   // Create configs to test; to ease of testing instead of using real objects
   // we will use pointers that are actually indexes.
-  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
+  const std::vector<Router::RouteSpecificFilterConfig> nullconfigs(5);
   size_t num_configs = 1;
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
   num_configs++;
   ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
   num_configs++;
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
 
   // a vector to save which configs are visited by the traversePerFilterConfigGeneric
   std::vector<size_t> visited_configs(num_configs, 0);
@@ -720,7 +720,7 @@ TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
   size_t index = 0;
   Utility::traversePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
                                           [&](const Router::RouteSpecificFilterConfig& cfg) {
-                                            int cfg_index = &cfg - nullconfig;
+                                            int cfg_index = &cfg - nullconfigs.data();
                                             visited_configs[index] = cfg_index - 1;
                                             index++;
                                           });
@@ -827,7 +827,7 @@ TEST(HttpUtility, TestTeHeaderGzipTrailersSanitized) {
   // Expect that the set of headers is valid and can be sanitized
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -855,7 +855,7 @@ TEST(HttpUtility, TestNominatedConnectionHeader) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  TestHeaderMapImpl sanitized_headers = {
+  TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -883,7 +883,7 @@ TEST(HttpUtility, TestNominatedConnectionHeader2) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -910,7 +910,7 @@ TEST(HttpUtility, TestNominatedPseudoHeader) {
   };
 
   // Headers remain unchanged since there are nominated pseudo headers
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -932,7 +932,7 @@ TEST(HttpUtility, TestSanitizeEmptyTokensFromHeaders) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -959,7 +959,7 @@ TEST(HttpUtility, TestTooManyNominatedHeaders) {
   };
 
   // Headers remain unchanged because there are too many nominated headers
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -977,7 +977,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedFor) {
   };
 
   // Headers remain unchanged due to nominated X-Forwarded* header
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -995,7 +995,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
   };
 
   // Headers remain unchanged due to nominated X-Forwarded* header
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -1015,7 +1015,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
   // Headers are not sanitized due to nominated X-Forwarded* header
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -1039,7 +1039,7 @@ TEST(HttpUtility, TestRejectTrailersSubString) {
   };
   EXPECT_TRUE(Utility::sanitizeConnectionHeader(request_headers));
 
-  Http::TestHeaderMapImpl sanitized_headers = {
+  Http::TestRequestHeaderMapImpl sanitized_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -1077,7 +1077,7 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
   };
 
   // Headers remain unchanged because the TE value is too long
-  Http::TestHeaderMapImpl sanitized_headers(request_headers);
+  Http::TestRequestHeaderMapImpl sanitized_headers(request_headers);
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
@@ -1085,87 +1085,110 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
 
 TEST(Url, ParsingFails) {
   Utility::Url url;
-  EXPECT_FALSE(url.initialize("", false));
-  EXPECT_FALSE(url.initialize("foo", false));
-  EXPECT_FALSE(url.initialize("http://", false));
-  EXPECT_FALSE(url.initialize("random_scheme://host.com/path", false));
-  EXPECT_FALSE(url.initialize("http://www.foo.com", true));
-  EXPECT_FALSE(url.initialize("foo.com", true));
+  const bool is_connect = true;
+  EXPECT_FALSE(url.initialize("", !is_connect));
+  EXPECT_FALSE(url.initialize("foo", !is_connect));
+  EXPECT_FALSE(url.initialize("http://", !is_connect));
+  EXPECT_FALSE(url.initialize("random_scheme://host.com/path", !is_connect));
+  // Only port value in valid range (1-65535) is allowed.
+  EXPECT_FALSE(url.initialize("http://host.com:65536/path", !is_connect));
+  EXPECT_FALSE(url.initialize("http://host.com:0/path", !is_connect));
+  EXPECT_FALSE(url.initialize("http://host.com:-1/path", !is_connect));
+  EXPECT_FALSE(url.initialize("http://host.com:port/path", !is_connect));
+
+  // Test parsing fails for CONNECT request URLs.
+  EXPECT_FALSE(url.initialize("http://www.foo.com", is_connect));
+  EXPECT_FALSE(url.initialize("foo.com", is_connect));
+  // Only port value in valid range (1-65535) is allowed.
+  EXPECT_FALSE(url.initialize("foo.com:65536", is_connect));
+  EXPECT_FALSE(url.initialize("foo.com:0", is_connect));
+  EXPECT_FALSE(url.initialize("foo.com:-1", is_connect));
+  EXPECT_FALSE(url.initialize("foo.com:port", is_connect));
 }
 
 void validateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
-                 absl::string_view expected_host_port, absl::string_view expected_path) {
+                 absl::string_view expected_host_port, absl::string_view expected_path,
+                 uint16_t expected_port) {
   Utility::Url url;
-  ASSERT_TRUE(url.initialize(raw_url, false)) << "Failed to initialize " << raw_url;
+  ASSERT_TRUE(url.initialize(raw_url, /*is_connect=*/false)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.hostAndPort(), expected_host_port);
   EXPECT_EQ(url.pathAndQueryParams(), expected_path);
-}
-
-void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port) {
-  Utility::Url url;
-  ASSERT_TRUE(url.initialize(raw_url, true)) << "Failed to initialize " << raw_url;
-  EXPECT_TRUE(url.scheme().empty());
-  EXPECT_TRUE(url.pathAndQueryParams().empty());
-  EXPECT_EQ(url.hostAndPort(), expected_host_port);
+  EXPECT_EQ(url.port(), expected_port);
 }
 
 TEST(Url, ParsingTest) {
-  // Test url with no explicit path (with and without port)
-  validateUrl("http://www.host.com", "http", "www.host.com", "/");
-  validateUrl("http://www.host.com:80", "http", "www.host.com:80", "/");
+  // Test url with no explicit path (with and without port).
+  validateUrl("http://www.host.com", "http", "www.host.com", "/", 80);
+  validateUrl("http://www.host.com:80", "http", "www.host.com", "/", 80);
 
   // Test url with "/" path.
-  validateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
-  validateUrl("http://www.host.com/", "http", "www.host.com", "/");
+  validateUrl("http://www.host.com:80/", "http", "www.host.com", "/", 80);
+  validateUrl("http://www.host.com/", "http", "www.host.com", "/", 80);
 
   // Test url with "?".
-  validateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/?");
-  validateUrl("http://www.host.com/?", "http", "www.host.com", "/?");
+  validateUrl("http://www.host.com:80/?", "http", "www.host.com", "/?", 80);
+  validateUrl("http://www.host.com/?", "http", "www.host.com", "/?", 80);
 
   // Test url with "?" but without slash.
-  validateUrl("http://www.host.com:80?", "http", "www.host.com:80", "?");
-  validateUrl("http://www.host.com?", "http", "www.host.com", "?");
+  validateUrl("http://www.host.com:80?", "http", "www.host.com", "/?", 80);
+  validateUrl("http://www.host.com?", "http", "www.host.com", "/?", 80);
 
-  // Test url with multi-character path
-  validateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
-  validateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
+  // Test url with multi-character path.
+  validateUrl("http://www.host.com:80/path", "http", "www.host.com", "/path", 80);
+  validateUrl("http://www.host.com/path", "http", "www.host.com", "/path", 80);
 
-  // Test url with multi-character path and ? at the end
-  validateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path?");
-  validateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?");
+  // Test url with multi-character path and ? at the end.
+  validateUrl("http://www.host.com:80/path?", "http", "www.host.com", "/path?", 80);
+  validateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?", 80);
 
-  // Test https scheme
-  validateUrl("https://www.host.com", "https", "www.host.com", "/");
+  // Test https scheme.
+  validateUrl("https://www.host.com", "https", "www.host.com", "/", 443);
 
-  // Test url with query parameter
-  validateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
-  validateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
+  // Test url with query parameter.
+  validateUrl("http://www.host.com:80/?query=param", "http", "www.host.com", "/?query=param", 80);
+  validateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param", 80);
 
-  // Test url with query parameter but without slash
-  validateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
-  validateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
+  // Test url with query parameter but without slash. It will be normalized.
+  validateUrl("http://www.host.com:80?query=param", "http", "www.host.com", "/?query=param", 80);
+  validateUrl("http://www.host.com?query=param", "http", "www.host.com", "/?query=param", 80);
 
-  // Test url with multi-character path and query parameter
-  validateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",
-              "/path?query=param");
-  validateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param");
+  // Test url with multi-character path and query parameter.
+  validateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com",
+              "/path?query=param", 80);
+  validateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param",
+              80);
 
-  // Test url with multi-character path and more than one query parameter
-  validateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com:80",
-              "/path?query=param&query2=param2");
+  // Test url with multi-character path and more than one query parameter.
+  validateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com",
+              "/path?query=param&query2=param2", 80);
   validateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
-              "/path?query=param&query2=param2");
+              "/path?query=param&query2=param2", 80);
+
   // Test url with multi-character path, more than one query parameter and fragment
   validateUrl("http://www.host.com:80/path?query=param&query2=param2#fragment", "http",
-              "www.host.com:80", "/path?query=param&query2=param2#fragment");
+              "www.host.com", "/path?query=param&query2=param2#fragment", 80);
   validateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
-              "/path?query=param&query2=param2#fragment");
+              "/path?query=param&query2=param2#fragment", 80);
+
+  // Test url with non-default ports.
+  validateUrl("https://www.host.com:8443", "https", "www.host.com:8443", "/", 8443);
+  validateUrl("http://www.host.com:8080", "http", "www.host.com:8080", "/", 8080);
+}
+
+void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port,
+                        uint16_t expected_port) {
+  Utility::Url url;
+  ASSERT_TRUE(url.initialize(raw_url, /*is_connect=*/true)) << "Failed to initialize " << raw_url;
+  EXPECT_TRUE(url.scheme().empty());
+  EXPECT_TRUE(url.pathAndQueryParams().empty());
+  EXPECT_EQ(url.hostAndPort(), expected_host_port);
+  EXPECT_EQ(url.port(), expected_port);
 }
 
 TEST(Url, ParsingForConnectTest) {
-  validateConnectUrl("host.com:443", "host.com:443");
-  validateConnectUrl("host.com:80", "host.com:80");
+  validateConnectUrl("host.com:443", "host.com:443", 443);
+  validateConnectUrl("host.com:80", "host.com:80", 80);
 }
 
 void validatePercentEncodingEncodeDecode(absl::string_view source,
@@ -1193,6 +1216,12 @@ TEST(PercentEncoding, Trailing) {
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
+}
+
+TEST(PercentEncoding, Encoding) {
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
 }
 
 } // namespace Http

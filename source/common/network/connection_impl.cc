@@ -10,7 +10,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -49,10 +48,12 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this),
       read_buffer_([this]() -> void { this->onReadBufferLowWatermark(); },
-                   [this]() -> void { this->onReadBufferHighWatermark(); }),
+                   [this]() -> void { this->onReadBufferHighWatermark(); },
+                   []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }),
       write_buffer_(dispatcher.getWatermarkFactory().create(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
-          [this]() -> void { this->onWriteBufferHighWatermark(); })),
+          [this]() -> void { this->onWriteBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
@@ -240,32 +241,23 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  sockaddr_storage addr;
-  socklen_t len = sizeof(addr);
-
-  auto os_sys_calls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult result =
-      os_sys_calls.getsockname(ioHandle().fd(), reinterpret_cast<struct sockaddr*>(&addr), &len);
-
-  RELEASE_ASSERT(result.rc_ == 0, "");
-
-  if (addr.ss_family == AF_UNIX) {
+  if (socket_->addressType() == Address::Type::Pipe) {
     return;
   }
 
   // Set NODELAY
   int new_value = enable;
-  result = os_sys_calls.setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value,
-                                   sizeof(new_value));
+  Api::SysCallIntResult result =
+      socket_->setSocketOption(IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #if defined(__APPLE__)
-  if (SOCKET_FAILURE(result.rc_) && result.errno_ == EINVAL) {
+  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_INVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #elif defined(WIN32)
   if (SOCKET_FAILURE(result.rc_) &&
-      (result.errno_ == WSAEWOULDBLOCK || result.errno_ == WSAEINVAL)) {
+      (result.errno_ == SOCKET_ERROR_AGAIN || result.errno_ == SOCKET_ERROR_INVAL)) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
@@ -602,8 +594,8 @@ ConnectionImpl::unixSocketPeerCredentials() const {
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
-  int rc = getsockopt(ioHandle().fd(), SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size);
-  if (rc == -1) {
+  int rc = socket_->getSocketOption(SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size).rc_;
+  if (SOCKET_FAILURE(rc)) {
     return absl::nullopt;
   }
 
@@ -617,9 +609,7 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    RELEASE_ASSERT(Api::OsSysCallsSingleton::get()
-                           .getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size)
-                           .rc_ == 0,
+    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
                    "");
 
     if (error == 0) {
@@ -655,15 +645,18 @@ void ConnectionImpl::onWriteReady() {
   } else if ((inDelayedClose() && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-      ASSERT(delayed_close_timer_ != nullptr);
-      delayed_close_timer_->enableTimer(delayed_close_timeout_);
+      ASSERT(delayed_close_timer_ != nullptr && delayed_close_timer_->enabled());
+      if (result.bytes_processed_ > 0) {
+        delayed_close_timer_->enableTimer(delayed_close_timeout_);
+      }
     } else {
       ASSERT(bothSidesHalfClosed() || delayed_close_state_ == DelayedCloseState::CloseAfterFlush);
       closeConnectionImmediately();
     }
   } else {
     ASSERT(result.action_ == PostIoAction::KeepOpen);
-    if (delayed_close_timer_ != nullptr) {
+    ASSERT(!delayed_close_timer_ || delayed_close_timer_->enabled());
+    if (delayed_close_timer_ != nullptr && result.bytes_processed_ > 0) {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
     if (result.bytes_processed_ > 0) {
@@ -734,17 +727,19 @@ ClientConnectionImpl::ClientConnectionImpl(
       file_event_->activate(Event::FileReadyType::Write);
       return;
     }
-    const Network::Address::Instance* source_to_use = source_address.get();
+
+    const Network::Address::InstanceConstSharedPtr* source = &source_address;
+
     if (socket_->localAddress()) {
-      source_to_use = socket_->localAddress().get();
+      source = &socket_->localAddress();
     }
 
-    if (source_to_use != nullptr) {
-      const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
+    if (*source != nullptr) {
+      Api::SysCallIntResult result = socket_->bind(*source);
       if (result.rc_ < 0) {
         // TODO(lizan): consider add this error into transportFailureReason.
-        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
-                       strerror(result.errno_));
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source->get()->asString(),
+                       errorDetails(result.errno_));
         bind_error_ = true;
         // Set a special error state to ensure asynchronous close to give the owner of the
         // ConnectionImpl a chance to add callbacks and detect the "disconnect".
@@ -759,13 +754,20 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->remoteAddress()->connect(ioHandle().fd());
+  const Api::SysCallIntResult result = socket_->connect(socket_->remoteAddress());
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
   } else {
-    ASSERT(result.rc_ == -1);
-    if (result.errno_ == EINPROGRESS) {
+    ASSERT(SOCKET_FAILURE(result.rc_));
+#ifdef WIN32
+    // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
+    // cannot be completed immediately. We do not check for EINPROGRESS as that error is for
+    // blocking operations.
+    if (result.errno_ == SOCKET_ERROR_AGAIN) {
+#else
+    if (result.errno_ == SOCKET_ERROR_IN_PROGRESS) {
+#endif
       ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
@@ -776,12 +778,6 @@ void ClientConnectionImpl::connect() {
       // Trigger a write event. This is needed on macOS and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);
     }
-  }
-
-  // The local address can only be retrieved for IP connections. Other
-  // types, such as UDS, don't have a notion of a local address.
-  if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(SocketInterface::addressFromFd(ioHandle().fd()));
   }
 }
 } // namespace Network

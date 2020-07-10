@@ -1,6 +1,7 @@
 #include <vector>
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/http/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 
@@ -85,7 +86,8 @@ static void BM_TlsInspector(benchmark::State& state) {
     RELEASE_ASSERT(socket.detectedTransportProtocol() == "tls", "");
     RELEASE_ASSERT(socket.requestedServerName() == "example.com", "");
     RELEASE_ASSERT(socket.requestedApplicationProtocols().size() == 2 &&
-                       socket.requestedApplicationProtocols().front() == "h2",
+                       socket.requestedApplicationProtocols().front() ==
+                           Http::Utility::AlpnNames::get().Http2,
                    "");
     socket.setDetectedTransportProtocol("");
     socket.setRequestedServerName("");

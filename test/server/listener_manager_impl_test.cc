@@ -77,8 +77,8 @@ public:
                         ListenSocketCreationParams expected_creation_params = {true, true}) {
     if (expected_option.hasValue()) {
       expectCreateListenSocket(expected_state, expected_num_options, expected_creation_params);
-      expectSetsockopt(os_sys_calls_, expected_option.level(), expected_option.option(),
-                       expected_value, expected_num_options);
+      expectSetsockopt(expected_option.level(), expected_option.option(), expected_value,
+                       expected_num_options);
       manager_->addOrUpdateListener(listener, "", true);
       EXPECT_EQ(1U, manager_->listeners().size());
     } else {
@@ -94,7 +94,7 @@ public:
   envoy::config::listener::v3::Listener createDefaultListener() {
     envoy::config::listener::v3::Listener listener_proto;
     Protobuf::TextFormat::ParseFromString(R"EOF(
-    name: "foo"  
+    name: "foo"
     address: {
       socket_address: {
         address: "127.0.0.1"
@@ -336,8 +336,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, Network::Address::SocketType::Datagram, _, {{true, false}}));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(testing::AtLeast(1));
+              createListenSocket(_, Network::Socket::Type::Datagram, _, {{true, false}}))
+      .WillOnce(Invoke([this](const Network::Address::InstanceConstSharedPtr&,
+                              Network::Socket::Type, const Network::Socket::OptionsSharedPtr&,
+                              const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
+        return listener_factory_.socket_;
+      }));
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
@@ -1364,7 +1369,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, ListenSocketCreationParams(false)))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Address::SocketType socket_type,
+                           Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
@@ -1401,7 +1406,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {{true, false}}))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Address::SocketType socket_type,
+                           Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
@@ -1417,7 +1422,7 @@ TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_THROW_WITH_MESSAGE(real_listener_factory.createListenSocket(
                                 std::make_shared<Network::Address::PipeInstance>("/foo"),
-                                Network::Address::SocketType::Datagram, nullptr, {true}),
+                                Network::Socket::Type::Datagram, nullptr, {true}),
                             EnvoyException,
                             "socket type SocketType::Datagram not supported for pipes");
 }
@@ -1614,7 +1619,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
-per_connection_buffer_limit_bytes: 999    
+per_connection_buffer_limit_bytes: 999
 filter_chains:
 - filters: []
   )EOF";
@@ -1889,6 +1894,44 @@ filter_chains:
   EXPECT_EQ(
       1UL,
       server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
+}
+
+TEST_F(ListenerManagerImplTest, StaticListenerAddFailure) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into active.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 0.0.0.0
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", false));
+
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+  worker_->callAddCompletion(false);
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+
+  EXPECT_EQ(
+      1UL,
+      server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
+  EXPECT_EQ(0, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
@@ -2187,7 +2230,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with "http/1.1" ALPN - using 1st filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "8.8.8.8", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "8.8.8.8",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2230,8 +2276,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   EXPECT_EQ(filter_chain, nullptr);
 
   // LOCAL IPv4 client with "http/1.1" ALPN - using 1st filter chain.
-  filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2242,8 +2290,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // LOCAL UDS client with "http/1.1" ALPN - using 1st filter chain.
-  filter_chain =
-      findFilterChain(0, "/tmp/test.sock", "", "tls", {"h2", "http/1.1"}, "/tmp/test.sock", 111);
+  filter_chain = findFilterChain(
+      0, "/tmp/test.sock", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11},
+      "/tmp/test.sock", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2287,8 +2337,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   EXPECT_EQ(filter_chain, nullptr);
 
   // IPv4 client with source 10.0.0.10, Match.
-  filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "10.0.0.10", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "10.0.0.10",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2304,8 +2356,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
   EXPECT_EQ(filter_chain, nullptr);
 
   // UDS client. No match.
-  filter_chain =
-      findFilterChain(0, "/tmp/test.sock", "", "tls", {"h2", "http/1.1"}, "/tmp/test.sock", 0);
+  filter_chain = findFilterChain(
+      0, "/tmp/test.sock", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11},
+      "/tmp/test.sock", 0);
   ASSERT_EQ(filter_chain, nullptr);
 }
 
@@ -2389,7 +2443,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // Client with source port 101. No match.
-  filter_chain = findFilterChain(1234, "8.8.8.8", "", "tls", {"h2", "http/1.1"}, "4.4.4.4", 101);
+  filter_chain = findFilterChain(
+      1234, "8.8.8.8", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "4.4.4.4",
+      101);
   ASSERT_EQ(filter_chain, nullptr);
 }
 
@@ -2442,8 +2499,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // LOCAL TLS client with "http/1.1" ALPN - no match.
-  auto filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
+  auto filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   EXPECT_EQ(filter_chain, nullptr);
 
   // LOCAL TLS client without "http/1.1" ALPN - using 1st filter chain.
@@ -2458,7 +2517,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // EXTERNAL TLS client with "http/1.1" ALPN - using 2nd filter chain.
-  filter_chain = findFilterChain(1234, "8.8.8.8", "", "tls", {"h2", "http/1.1"}, "4.4.4.4", 111);
+  filter_chain = findFilterChain(
+      1234, "8.8.8.8", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "4.4.4.4",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2827,8 +2889,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with "h2,http/1.1" ALPN - using 2nd filter chain.
-  filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -2880,14 +2944,18 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with ALPN match but without SNI - using 1st filter chain.
-  filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {"h2", "http/1.1"}, "127.0.0.1", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client with exact SNI match and ALPN match - using 2nd filter chain.
-  filter_chain = findFilterChain(1234, "127.0.0.1", "server1.example.com", "tls",
-                                 {"h2", "http/1.1"}, "127.0.0.1", 111);
+  filter_chain = findFilterChain(
+      1234, "127.0.0.1", "server1.example.com", "tls",
+      {Http::Utility::AlpnNames::get().Http2, Http::Utility::AlpnNames::get().Http11}, "127.0.0.1",
+      111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
@@ -3416,7 +3484,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
                 route: { cluster: service_foo }
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
-      config: {}            
+      config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
   Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
@@ -3460,6 +3528,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
 
+  // Return error when trying to retrieve the original dst on the invalid handle
+  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
                                      Network::Address::InstanceConstSharedPtr{
@@ -3481,7 +3552,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 }
 
 class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
-  Network::Address::InstanceConstSharedPtr getOriginalDst(os_fd_t) override {
+  Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket&) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
   }
@@ -3555,7 +3626,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
 
 class OriginalDstTestFilterIPv6
     : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
-  Network::Address::InstanceConstSharedPtr getOriginalDst(os_fd_t) override {
+  Network::Address::InstanceConstSharedPtr getOriginalDst(Network::Socket&) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance("1::2", 2345)};
   }
@@ -3641,7 +3712,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}))
-      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
         EXPECT_EQ(options, nullptr);
@@ -3708,42 +3779,18 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForTcp) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
-
   auto listener = createIPv4Listener("UdpListener");
   listener.mutable_address()->mutable_socket_address()->set_protocol(
       envoy::config::core::v3::SocketAddress::UDP);
-  // For UDP, reuse_port is set to true forcibly, even it's set to false explicitly in config
+  // For UDP, verify that we fail if reuse port is false and concurrency is > 1.
   listener.set_reuse_port(false);
-
-  // Port should be 0 for creating the shared socket, otherwise socket
-  // creation will happen worker thread.
-  listener.mutable_address()->mutable_socket_address()->set_port_value(0);
-
-  // IpPacketInfo and RxQueueOverFlow are always set if supported
-  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 2,
-#else
-                           /* expected_num_options */ 1,
-#endif
-                           /* expected_creation_params */ {true, false});
-
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef SO_RXQ_OVFL
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_RXQ_OVFL,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#endif
-
   server_.options_.concurrency_ = 2;
-  manager_->addOrUpdateListener(listener, "", true);
-  EXPECT_EQ(1U, manager_->listeners().size());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(listener, "", true), EnvoyException,
+      "Listening on UDP when concurrency is > 1 without the SO_REUSEPORT socket option results in "
+      "unstable packet proxying. Configure the reuse_port listener option or set concurrency = 1.");
+  EXPECT_EQ(0, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
@@ -3764,14 +3811,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
 
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
                            /* expected_num_options */ 3);
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ 1,
-                   /* expected_sockopt_name */ 2,
-                   /* expected_value */ 3);
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ 4,
-                   /* expected_sockopt_name */ 5,
-                   /* expected_value */ 6);
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3);
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6);
   manager_->addOrUpdateListener(listener, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -4351,7 +4398,7 @@ filter_chains:
   EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
   filter_chain_drain_timer->invokeCallback();
 
-  // Once worker clean up is done, it's safe for the master thread to remove the original listener.
+  // Once worker clean up is done, it's safe for the main thread to remove the original listener.
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callDrainFilterChainsComplete();
   checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);

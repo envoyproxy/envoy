@@ -20,7 +20,6 @@
 
 namespace Envoy {
 namespace Config {
-
 /**
  * ADS API implementation that fetches via gRPC.
  */
@@ -38,12 +37,14 @@ public:
   void start() override;
 
   // GrpcMux
-  void pause(const std::string& type_url) override;
-  void resume(const std::string& type_url) override;
+  ScopedResume pause(const std::string& type_url) override;
+  ScopedResume pause(const std::vector<std::string> type_urls) override;
   bool paused(const std::string& type_url) const override;
+  bool paused(const std::vector<std::string> type_urls) const override;
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks) override;
+                           SubscriptionCallbacks& callbacks,
+                           OpaqueResourceDecoder& resource_decoder) override;
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
@@ -53,8 +54,9 @@ public:
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
-  void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) override;
+  void
+  onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+                      ControlPlaneStats& control_plane_stats) override;
   void onWriteable() override;
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
@@ -69,9 +71,10 @@ private:
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                     const std::string& type_url, GrpcMuxImpl& parent)
-        : resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
-          watches_(parent.api_state_[type_url].watches_) {
+                     OpaqueResourceDecoder& resource_decoder, const std::string& type_url,
+                     GrpcMuxImpl& parent)
+        : resources_(resources), callbacks_(callbacks), resource_decoder_(resource_decoder),
+          type_url_(type_url), parent_(parent), watches_(parent.api_state_[type_url].watches_) {
       watches_.emplace(watches_.begin(), this);
     }
 
@@ -95,6 +98,7 @@ private:
 
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;
+    OpaqueResourceDecoder& resource_decoder_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
 
@@ -140,20 +144,25 @@ class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   void start() override {}
-  void pause(const std::string&) override {}
-  void resume(const std::string&) override {}
+  ScopedResume pause(const std::string&) override {
+    return std::make_unique<Cleanup>([] {});
+  }
+  ScopedResume pause(const std::vector<std::string>) override {
+    return std::make_unique<Cleanup>([] {});
+  }
   bool paused(const std::string&) const override { return false; }
+  bool paused(const std::vector<std::string>) const override { return false; }
 
-  GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&,
-                           SubscriptionCallbacks&) override {
+  GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
+                           OpaqueResourceDecoder&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
 
   void onWriteable() override {}
   void onStreamEstablished() override {}
   void onEstablishmentFailure() override {}
-  void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&) override {}
+  void onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&,
+                           ControlPlaneStats&) override {}
 };
 
 } // namespace Config

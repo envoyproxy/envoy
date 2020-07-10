@@ -223,10 +223,13 @@ public:
   }
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* get(absl::string_view cluster) override;
-  Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                         ResourcePriority priority,
-                                                         Http::Protocol protocol,
-                                                         LoadBalancerContext* context) override;
+
+  using ClusterManager::httpConnPoolForCluster;
+
+  Http::ConnectionPool::Instance*
+  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                         absl::optional<Http::Protocol> downstream_protocol,
+                         LoadBalancerContext* context) override;
   Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
                                                        ResourcePriority priority,
                                                        LoadBalancerContext* context) override;
@@ -235,6 +238,9 @@ public:
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
+    if (resume_cds_ != nullptr) {
+      resume_cds_->cancel();
+    }
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     ads_mux_.reset();
@@ -327,7 +333,8 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
+      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
+                                               absl::optional<Http::Protocol> downstream_protocol,
                                                LoadBalancerContext* context);
 
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
@@ -494,6 +501,8 @@ private:
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxSharedPtr ads_mux_;
+  // Temporarily saved resume cds callback from updateClusterCounts invocation.
+  Config::ScopedResume resume_cds_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined.
   absl::optional<std::string> local_cluster_name_;

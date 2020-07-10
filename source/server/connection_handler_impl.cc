@@ -2,6 +2,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/network/exception.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
@@ -30,7 +31,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config) {
   ActiveListenerDetails details;
-  if (config.listenSocketFactory().socketType() == Network::Address::SocketType::Stream) {
+  if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
@@ -286,6 +287,11 @@ void ConnectionHandlerImpl::ActiveTcpSocket::continueFilterChain(bool success) {
   }
 }
 
+void ConnectionHandlerImpl::ActiveTcpSocket::setDynamicMetadata(const std::string& name,
+                                                                const ProtobufWkt::Struct& value) {
+  (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+}
+
 void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
   // Check if the socket may need to be redirected to another listener.
   ActiveTcpListenerOptRef new_listener;
@@ -317,11 +323,19 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
     // Particularly the assigned events need to reset before assigning new events in the follow up.
     accept_filters_.clear();
     // Create a new connection on this listener.
-    listener_.newConnection(std::move(socket_));
+    listener_.newConnection(std::move(socket_), dynamicMetadata());
   }
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
+  if (listenerConnectionLimitReached()) {
+    ENVOY_LOG(trace, "closing connection: listener connection limit reached for {}",
+              config_->name());
+    socket->close();
+    stats_.downstream_cx_overflow_.inc();
+    return;
+  }
+
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
 }
 
@@ -362,11 +376,18 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 } // namespace
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
-    Network::ConnectionSocketPtr&& socket) {
-  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
+    Network::ConnectionSocketPtr&& socket,
+    const envoy::config::core::v3::Metadata& dynamic_metadata) {
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
+      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
   stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
+
+  // merge from the given dynamic metadata if it's not empty
+  if (dynamic_metadata.filter_metadata_size() > 0) {
+    stream_info->dynamicMetadata().MergeFrom(dynamic_metadata);
+  }
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
@@ -521,16 +542,17 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
   active_connections_.listener_.parent_.decNumConnections();
 }
 
-ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
-                                     Event::Dispatcher& dispatcher, Network::ListenerConfig& config)
-    : ActiveUdpListener(
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Event::Dispatcher& dispatcher,
+                                           Network::ListenerConfig& config)
+    : ActiveRawUdpListener(
           parent,
           dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
           config) {}
 
-ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
-                                     Network::UdpListenerPtr&& listener,
-                                     Network::ListenerConfig& config)
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::UdpListenerPtr&& listener,
+                                           Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config),
       udp_listener_(std::move(listener)), read_filter_(nullptr) {
   // Create the filter chain on creating a new udp listener
@@ -544,26 +566,26 @@ ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
   }
 }
 
-void ActiveUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
+void ActiveRawUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
 
-void ActiveUdpListener::onReadReady() {}
+void ActiveRawUdpListener::onReadReady() {}
 
-void ActiveUdpListener::onWriteReady(const Network::Socket&) {
+void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
   // TODO(sumukhs): This is not used now. When write filters are implemented, this is a
   // trigger to invoke the on write ready API on the filters which is when they can write
   // data
 }
 
-void ActiveUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
+void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
   read_filter_->onReceiveError(error_code);
 }
 
-void ActiveUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
+void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
   ASSERT(read_filter_ == nullptr, "Cannot add a 2nd UDP read filter");
   read_filter_ = std::move(filter);
 }
 
-Network::UdpListener& ActiveUdpListener::udpListener() { return *udp_listener_; }
+Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }
 
 } // namespace Server
 } // namespace Envoy

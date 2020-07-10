@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 
 #include "common/event/libevent.h"
@@ -14,13 +15,14 @@ namespace Envoy {
 namespace Event {
 
 // Implements Scheduler based on libevent.
-class LibeventScheduler : public Scheduler {
+class LibeventScheduler : public Scheduler, public CallbackScheduler {
 public:
   using OnPrepareCallback = std::function<void()>;
   LibeventScheduler();
 
   // Scheduler
   TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) override;
+  SchedulableCallbackPtr createSchedulableCallback(const std::function<void()>& cb) override;
 
   /**
    * Runs the event loop.

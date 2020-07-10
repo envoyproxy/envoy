@@ -410,6 +410,16 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
         downstreamConnection()->streamInfo().filterState());
   }
 
+  if (!maybeTunnel(cluster_name)) {
+    // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
+    // cluster->stats().upstream_cx_none_healthy in the latter case.
+    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
+    onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
+  }
+  return Network::FilterStatus::StopIteration;
+}
+
+bool Filter::maybeTunnel(const std::string& cluster_name) {
   if (!config_->tunnelingConfig()) {
     Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
         cluster_name, Upstream::ResourcePriority::Default, this);
@@ -428,27 +438,39 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
       }
       // Because we never return open connections to the pool, this either has a handle waiting on
       // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
-      return Network::FilterStatus::StopIteration;
+      return true;
     }
   } else {
+    auto* cluster = cluster_manager_.get(cluster_name);
+    if (!cluster) {
+      return false;
+    }
+    // TODO(snowp): Ideally we should prevent this from being configured, but that's tricky to get
+    // right since whether a cluster is invalid depends on both the tcp_proxy config + cluster
+    // config.
+    if ((cluster->info()->features() & Upstream::ClusterInfo::Features::HTTP2) == 0) {
+      ENVOY_LOG(error, "Attempted to tunnel over HTTP/1.1, this is not supported. Set "
+                       "http2_protocol_options on the cluster.");
+      return false;
+    }
     Http::ConnectionPool::Instance* conn_pool = cluster_manager_.httpConnPoolForCluster(
-        cluster_name, Upstream::ResourcePriority::Default, Http::Protocol::Http2, this);
+        cluster_name, Upstream::ResourcePriority::Default, absl::nullopt, this);
     if (conn_pool) {
       upstream_ = std::make_unique<HttpUpstream>(*upstream_callbacks_,
                                                  config_->tunnelingConfig()->hostname());
       HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
-      upstream_handle_ = std::make_shared<HttpConnectionHandle>(
-          conn_pool->newStream(http_upstream->responseDecoder(), *this));
-      return Network::FilterStatus::StopIteration;
+      Http::ConnectionPool::Cancellable* cancellable =
+          conn_pool->newStream(http_upstream->responseDecoder(), *this);
+      if (cancellable) {
+        ASSERT(upstream_handle_.get() == nullptr);
+        upstream_handle_ = std::make_shared<HttpConnectionHandle>(cancellable);
+      }
+      return true;
     }
   }
-  // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
-  // cluster->stats().upstream_cx_none_healthy in the latter case.
-  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
-  onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
-  return Network::FilterStatus::StopIteration;
-}
 
+  return false;
+}
 void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
                            Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_.reset();
