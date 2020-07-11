@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/singleton/manager.h"
@@ -212,7 +213,7 @@ using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
 DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
                                          Event::Dispatcher& main_thread_dispatcher,
                                          ThreadLocal::SlotAllocator& tls,
-                                         Runtime::RandomGenerator& random, Runtime::Loader& loader,
+                                         Random::RandomGenerator& random, Runtime::Loader& loader,
                                          Stats::Scope& root_scope);
 
 /**
