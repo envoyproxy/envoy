@@ -26,6 +26,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
@@ -1553,7 +1554,7 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             Runtime::Loader& runtime, Random::RandomGenerator& random,
                              Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
                                 dispatcher, priority);

@@ -37,8 +37,7 @@ public:
 
   GrpcMuxSharedPtr grpcMux() { return grpc_mux_; }
 
-  void pause();
-  void resume();
+  ScopedResume pause();
 
 private:
   void disableInitFetchTimeoutTimer();

@@ -75,7 +75,7 @@ public:
   RedisClusterLoadBalancerFactorySharedPtr factory_;
   RedisClusterThreadAwareLoadBalancerPtr lb_;
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
 };
 
 class RedisLoadBalancerContextImplTest : public testing::Test {

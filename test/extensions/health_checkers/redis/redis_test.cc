@@ -206,7 +206,7 @@ public:
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};

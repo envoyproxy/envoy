@@ -113,7 +113,7 @@ ip_white_list:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
   Stats::TestUtil::TestStore stats_store_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_;
 };

@@ -3,19 +3,17 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 
+#include "common/common/random_generator.h"
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/listener_hooks.h"
-#include "server/proto_descriptors.h"
 #include "server/server.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
 namespace Envoy {
@@ -100,7 +98,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
     server = std::make_unique<InstanceImpl>(
         init_manager, options, test_time.timeSystem(),
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart, stats_store,
-        fakelock, component_factory, std::make_unique<Runtime::RandomGeneratorImpl>(),
+        fakelock, component_factory, std::make_unique<Random::RandomGeneratorImpl>(),
         thread_local_instance, Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         nullptr);
   } catch (const EnvoyException& ex) {

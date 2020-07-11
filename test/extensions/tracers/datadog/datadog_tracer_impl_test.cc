@@ -84,7 +84,7 @@ public:
   NiceMock<Event::MockTimer>* timer_;
   Stats::TestUtil::TestStore stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 

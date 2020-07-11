@@ -166,7 +166,7 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
-  Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
+  Envoy::Random::RandomGenerator& random() override { return server_.random(); }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
@@ -213,7 +213,7 @@ public:
                Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
+               Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                ProcessContextPtr process_context);
 
@@ -239,7 +239,7 @@ public:
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
-  Runtime::RandomGenerator& random() override { return *random_generator_; }
+  Random::RandomGenerator& random() override { return *random_generator_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
@@ -330,7 +330,7 @@ private:
   AdminImplPtr admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  Runtime::RandomGeneratorPtr random_generator_;
+  Random::RandomGeneratorPtr random_generator_;
   Runtime::ScopedLoaderSingletonPtr runtime_singleton_;
   Ssl::ContextManagerPtr ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;

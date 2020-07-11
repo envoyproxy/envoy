@@ -107,7 +107,7 @@ public:
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Random::RandomGenerator& random() override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
@@ -175,7 +175,7 @@ public:
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Random::RandomGenerator& random() override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;

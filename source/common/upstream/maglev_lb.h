@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -72,7 +73,7 @@ private:
 class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
   MaglevLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
-                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
                      uint64_t table_size = MaglevTable::DefaultTableSize);
 

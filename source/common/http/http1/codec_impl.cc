@@ -16,6 +16,7 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -458,8 +459,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
-      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
@@ -689,8 +688,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   // CONNECT request has no defined semantics, and may be rejected.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if ((reject_unsupported_transfer_encodings_ &&
-         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) ||
+    if (!absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked) ||
         parser_.method == HTTP_CONNECT) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);

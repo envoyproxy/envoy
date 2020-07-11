@@ -30,7 +30,7 @@ class ClusterTest : public testing::Test,
 public:
   void initialize(const std::string& yaml_config, bool uses_tls) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml_config);
+        Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
@@ -107,7 +107,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -199,9 +199,9 @@ TEST_F(ClusterTest, PopulatedCache) {
 
 class ClusterFactoryTest : public testing::Test {
 protected:
-  void createCluster(const std::string& yaml_config) {
+  void createCluster(const std::string& yaml_config, bool avoid_boosting = true) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml_config);
+        Upstream::parseClusterFromV3Yaml(yaml_config, avoid_boosting);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, random_, dispatcher_,
         log_manager_, local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_,
@@ -216,7 +216,7 @@ private:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -250,7 +250,7 @@ tls_context:
 )EOF");
 
   EXPECT_THROW_WITH_MESSAGE(
-      createCluster(yaml_config), EnvoyException,
+      createCluster(yaml_config, false), EnvoyException,
       "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
 }
 
@@ -274,7 +274,7 @@ tls_context:
 )EOF");
 
   EXPECT_THROW_WITH_MESSAGE(
-      createCluster(yaml_config), EnvoyException,
+      createCluster(yaml_config, false), EnvoyException,
       "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
 }
 

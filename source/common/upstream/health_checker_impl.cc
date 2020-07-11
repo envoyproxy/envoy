@@ -59,7 +59,7 @@ const std::string& getHostname(const HostSharedPtr& host,
 class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
 public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
-                                  Envoy::Runtime::RandomGenerator& random,
+                                  Envoy::Random::RandomGenerator& random,
                                   Event::Dispatcher& dispatcher,
                                   HealthCheckEventLoggerPtr&& event_logger,
                                   ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -69,7 +69,7 @@ public:
   }
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
-  Envoy::Runtime::RandomGenerator& random() override { return random_; }
+  Envoy::Random::RandomGenerator& random() override { return random_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   HealthCheckEventLoggerPtr eventLogger() override { return std::move(event_logger_); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -80,7 +80,7 @@ public:
 private:
   Upstream::Cluster& cluster_;
   Envoy::Runtime::Loader& runtime_;
-  Envoy::Runtime::RandomGenerator& random_;
+  Envoy::Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   HealthCheckEventLoggerPtr event_logger_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
@@ -89,7 +89,7 @@ private:
 
 HealthCheckerSharedPtr HealthCheckerFactory::create(
     const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+    Runtime::Loader& runtime, Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   HealthCheckEventLoggerPtr event_logger;
@@ -130,7 +130,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              const envoy::config::core::v3::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
-                                             Runtime::RandomGenerator& random,
+                                             Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
@@ -439,7 +439,7 @@ bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::I
 TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
                                            const envoy::config::core::v3::HealthCheck& config,
                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                           Runtime::RandomGenerator& random,
+                                           Random::RandomGenerator& random,
                                            HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       send_bytes_([&config] {
@@ -544,7 +544,7 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
                                              const envoy::config::core::v3::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
-                                             Runtime::RandomGenerator& random,
+                                             Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(

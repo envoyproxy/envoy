@@ -65,7 +65,7 @@ public:
   MOCK_METHOD(Envoy::MutexTracer*, mutexTracer, ());
   MOCK_METHOD(const Options&, options, ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
-  MOCK_METHOD(Runtime::RandomGenerator&, random, ());
+  MOCK_METHOD(Random::RandomGenerator&, random, ());
   MOCK_METHOD(Runtime::Loader&, runtime, ());
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
@@ -108,7 +108,7 @@ public:
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<MockHotRestart> hot_restart_;
   testing::NiceMock<MockOptions> options_;
-  testing::NiceMock<Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
@@ -134,7 +134,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
+  MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
@@ -154,7 +154,7 @@ public:
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<Envoy::Random::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
