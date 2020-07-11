@@ -263,7 +263,7 @@ request_direction_config:
     std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
         doHeaders(headers_before_filter, false /* end_stream */);
 
-    // The request direction adds Accept-Enconding by default. Other than this header, the rest of
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
     // the headers should be the same before and after the filter.
     headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
     EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
@@ -325,7 +325,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingAbsent) {
                   ->value()
                   .getStringView(),
               "mock");
-    // The request direction adds Accept-Enconding by default. Other than this header, the rest of
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
     // the headers should be the same before and after the filter.
     headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
   }
@@ -358,7 +358,7 @@ TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingNotCurrent) {
                   ->value()
                   .getStringView(),
               "mock");
-    // The request direction adds Accept-Enconding by default. Other than this header, the rest of
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
     // the headers should be the same before and after the filter.
     headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
   }
@@ -381,7 +381,7 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresent) {
                   ->value()
                   .getStringView(),
               "mock");
-    // The request direction adds Accept-Enconding by default. Other than this header, the rest of
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
     // the headers should be the same before and after the filter.
     headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
   }
@@ -405,7 +405,7 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) 
                   ->value()
                   .getStringView(),
               "mock");
-    // The request direction adds Accept-Enconding by default. Other than this header, the rest of
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
     // the headers should be the same before and after the filter.
     headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
   }
