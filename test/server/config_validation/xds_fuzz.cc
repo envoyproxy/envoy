@@ -152,8 +152,8 @@ AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
       ENVOY_LOG_MISC(info, "Received gRPC message with type {} and version {}",
-                     discovery_request.type_url(), expected_version);
-    } while (expected_type_url != discovery_request.type_url() &&
+                     discovery_request.type_url(), discovery_request.version_info());
+    } while (expected_type_url != discovery_request.type_url() ||
              expected_version != discovery_request.version_info());
   } else {
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
@@ -189,12 +189,16 @@ void XdsFuzzTest::replay() {
   // URL so just don't check them until a listener is added
   bool sent_listener = false;
 
+  uint32_t added = 0;
+  uint32_t modified = 0;
+  uint32_t removed = 0;
+
   for (const auto& action : actions_) {
     switch (action.action_selector_case()) {
     case test::server::config_validation::Action::kAddListener: {
       sent_listener = true;
       uint32_t listener_num = action.add_listener().listener_num();
-      removeListener(listener_num);
+      auto removed_name = removeListener(listener_num);
       auto listener = buildListener(listener_num, action.add_listener().route_num());
       listeners_.push_back(listener);
 
@@ -203,47 +207,58 @@ void XdsFuzzTest::replay() {
       // additional discoveryRequests at launch that we might not want to
       // respond to yet
       EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
+      if (removed_name) {
+        modified++;
+        test_server_->waitForCounterGe("listener_manager.listener_modified", modified);
+      } else {
+        added++;
+        test_server_->waitForCounterGe("listener_manager.listener_added", added);
+      }
       break;
     }
     case test::server::config_validation::Action::kRemoveListener: {
-      /* sent_listener = true; */
-      auto removed = removeListener(action.remove_listener().listener_num());
+      auto removed_name = removeListener(action.remove_listener().listener_num());
 
-      if (removed) {
-        updateListener(listeners_, {}, {*removed});
+      if (removed_name) {
+        removed++;
+        updateListener(listeners_, {}, {*removed_name});
         EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
+        test_server_->waitForCounterGe("listener_manager.listener_removed", removed);
       }
 
       break;
     }
     case test::server::config_validation::Action::kAddRoute: {
+      if (!sent_listener) {
+        ENVOY_LOG_MISC(info, "Ignoring request to add route_{}", action.add_route().route_num());
+        break;
+      }
       uint32_t route_num = action.add_route().route_num();
-      auto removed = removeRoute(route_num);
+      auto removed_name = removeRoute(route_num);
       auto route = buildRouteConfig(route_num);
       routes_.push_back(route);
 
-      if (removed) {
+      if (removed_name) {
         // if the route was already in routes_, don't send a duplicate add in delta request
         updateRoute(routes_, {}, {});
       } else {
         updateRoute(routes_, {route}, {});
       }
 
-      if (sent_listener) {
-        EXPECT_TRUE(
-            waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
-      }
+      EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
       break;
     }
     case test::server::config_validation::Action::kRemoveRoute: {
-      if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-        // routes cannot be removed in SOTW updates
-        break;
-      }
+      // it seems like routes cannot be removed - leaving a route out of an SOTW request does not
+      // remove it and sending a remove message in a delta request is ignored
+      ENVOY_LOG_MISC(info, "Ignoring request to remove route_{}",
+                     action.remove_route().route_num());
+      break;
 
-      auto removed = removeRoute(action.remove_route().route_num());
+      // TODO(samflattery): remove if it's true that routes cannot be removed
+      auto removed_name = removeRoute(action.remove_route().route_num());
       if (removed) {
-        updateRoute(routes_, {}, {*removed});
+        updateRoute(routes_, {}, {*removed_name});
         EXPECT_TRUE(
             waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
       }
