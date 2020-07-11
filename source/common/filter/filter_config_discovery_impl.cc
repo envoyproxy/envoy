@@ -41,15 +41,15 @@ void DynamicFilterConfigProviderImpl::validateConfig(
     Server::Configuration::NamedHttpFilterConfigFactory& factory) {
   if (factory.isTerminalFilter() && !require_terminal_) {
     throw EnvoyException(
-        fmt::format("Error: filter config {} must not be the last in the filter chain", name()));
+        fmt::format("Error: filter config {} must not be the last in the filter chain.", name()));
   } else if (!factory.isTerminalFilter() && require_terminal_) {
     throw EnvoyException(
-        fmt::format("Error: filter config {} must be the last in the filter chain", name()));
+        fmt::format("Error: filter config {} must be the last in the filter chain.", name()));
   }
   if (require_type_url_.has_value()) {
     auto type_url = Config::Utility::getFactoryType(proto_config);
-    if (type_url != require_type_url_.value()) {
-      throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}",
+    if (type_url != TypeUtil::typeUrlToDescriptorFullName(require_type_url_.value())) {
+      throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
                                        type_url, require_type_url_.value()));
     }
   }

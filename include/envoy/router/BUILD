@@ -37,17 +37,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "filter_config_provider_interface",
-    hdrs = ["filter_config_provider.h"],
-    deps = [
-        "//include/envoy/config:extension_config_provider_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/init:manager_interface",
-        "//include/envoy/server:filter_config_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "route_config_update_info_interface",
     hdrs = ["route_config_update_receiver.h"],
     external_deps = ["abseil_optional"],

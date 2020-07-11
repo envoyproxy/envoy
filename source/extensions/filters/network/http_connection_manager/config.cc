@@ -523,7 +523,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
   if (config_discovery.apply_default_config_without_warming() &&
       !config_discovery.has_default_config()) {
     throw EnvoyException(fmt::format(
-        "Error: filter config {} applied without warming but has no default config", name));
+        "Error: filter config {} applied without warming but has no default config.", name));
   }
   auto require_type_url = config_discovery.type_url().empty()
                               ? absl::nullopt

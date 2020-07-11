@@ -157,10 +157,6 @@ private:
 class HttpFilterConfigProviderManagerImpl : public HttpFilterConfigProviderManager,
                                             public Singleton::Instance {
 public:
-  ~HttpFilterConfigProviderManagerImpl() override{};
-
-  HttpFilterConfigProviderManagerImpl() = default;
-
   HttpFilterConfigProviderPtr
   createDynamicFilterConfigProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                     const std::string& filter_config_name, bool require_terminal,

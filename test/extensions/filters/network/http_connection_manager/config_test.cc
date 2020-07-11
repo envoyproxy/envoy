@@ -1669,6 +1669,172 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   ASSERT_NE(nullptr, request_id_extension);
 }
 
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { ads: {} }
+    apply_default_config_without_warming: true
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Error: filter config foo applied without warming but has no default config.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterBadDefault) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { ads: {} }
+    default_config:
+      "@type": type.googleapis.com/google.protobuf.Value
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Error: cannot find filter factory foo for default filter configuration with type URL "
+      "type.googleapis.com/google.protobuf.Value.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultNotTerminal) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { ads: {} }
+    default_config:
+      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "Error: filter config foo must be the last in the filter chain.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultTerminal) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { ads: {} }
+    default_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+- name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "Error: filter config foo must not be the last in the filter chain.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultRequireTypeUrl) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { ads: {} }
+    default_config:
+      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    type_url: type.googleapis.com/google.protobuf.Value
+- name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
+      "expect type.googleapis.com/google.protobuf.Value.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultValid) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { ads: {} }
+    default_config:
+      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      pass_through_mode: false
+    type_url: type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    apply_default_config_without_warming: true
+- name: envoy.filters.http.router
+  )EOF";
+
+  createHttpConnectionManagerConfig(yaml_string);
+}
+
 class FilterChainTest : public HttpConnectionManagerConfigTest {
 public:
   const std::string basic_config_ = R"EOF(
@@ -1701,6 +1867,36 @@ TEST_F(FilterChainTest, CreateFilterChain) {
   Http::MockFilterChainFactoryCallbacks callbacks;
   EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
   EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+  config.createFilterChain(callbacks);
+}
+
+TEST_F(FilterChainTest, CreateDynamicFilterChain) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { ads: {} }
+- name: envoy.filters.http.router
+  )EOF";
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(2); // Router and MissingConfigFilter
   config.createFilterChain(callbacks);
 }
 
