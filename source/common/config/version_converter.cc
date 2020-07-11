@@ -60,10 +60,19 @@ DynamicMessagePtr createForDescriptorWithCast(const Protobuf::Message& message,
   return dynamic_message;
 }
 
+} // namespace
+
+void VersionConverter::upgrade(const Protobuf::Message& prev_message,
+                               Protobuf::Message& next_message) {
+  wireCast(prev_message, next_message);
+  // Track original type to support recoverOriginal().
+  annotateWithOriginalType(*prev_message.GetDescriptor(), next_message);
+}
+
 // This needs to be recursive, since sub-messages are consumed and stored
 // internally, we later want to recover their original types.
-void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
-                              Protobuf::Message& next_message) {
+void VersionConverter::annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
+                                                Protobuf::Message& upgraded_message) {
   class TypeAnnotatingProtoVisitor : public ProtobufMessage::ProtoVisitor {
   public:
     void onMessage(Protobuf::Message& message, const void* ctxt) override {
@@ -103,16 +112,7 @@ void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
     }
   };
   TypeAnnotatingProtoVisitor proto_visitor;
-  ProtobufMessage::traverseMutableMessage(proto_visitor, next_message, &prev_descriptor);
-}
-
-} // namespace
-
-void VersionConverter::upgrade(const Protobuf::Message& prev_message,
-                               Protobuf::Message& next_message) {
-  wireCast(prev_message, next_message);
-  // Track original type to support recoverOriginal().
-  annotateWithOriginalType(*prev_message.GetDescriptor(), next_message);
+  ProtobufMessage::traverseMutableMessage(proto_visitor, upgraded_message, &prev_descriptor);
 }
 
 void VersionConverter::eraseOriginalTypeInformation(Protobuf::Message& message) {

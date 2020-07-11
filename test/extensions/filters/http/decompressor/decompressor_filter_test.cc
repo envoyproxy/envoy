@@ -55,12 +55,12 @@ decompressor_library:
       auto request_headers = std::make_unique<Http::TestRequestHeaderMapImpl>(headers);
       EXPECT_EQ(Http::FilterHeadersStatus::Continue,
                 filter_->decodeHeaders(*request_headers, end_stream));
-      return std::move(request_headers);
+      return request_headers;
     } else {
       auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(headers);
       EXPECT_EQ(Http::FilterHeadersStatus::Continue,
                 filter_->encodeHeaders(*response_headers, end_stream));
-      return std::move(response_headers);
+      return response_headers;
     }
   }
 

@@ -547,7 +547,7 @@ protected:
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
