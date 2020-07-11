@@ -23,9 +23,6 @@ public:
   // Therefore, 'isCacheableRequest' & 'isCacheableResponse' together
   // should cover https://httpwg.org/specs/rfc7234.html#response.cacheability
   static bool isCacheableResponse(const Http::ResponseHeaderMap& headers);
-
-private:
-  const static absl::flat_hash_set<absl::string_view> cacheable_status_codes_;
 };
 } // namespace Cache
 } // namespace HttpFilters
