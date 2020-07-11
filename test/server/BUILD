@@ -307,13 +307,10 @@ envoy_cc_fuzz_test(
     corpus = "server_corpus",
     deps = [
         "//source/common/thread_local:thread_local_lib",
-        "//source/server:proto_descriptors_lib",
         "//source/server:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
-        "//test/test_common:test_time_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
@@ -344,7 +341,6 @@ envoy_cc_test(
         ":server_test_data",
         ":static_validation_test_data",
     ],
-    # Fails on windows with cr/lf yaml file checkouts
     tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:version_lib",

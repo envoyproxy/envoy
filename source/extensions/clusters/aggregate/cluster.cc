@@ -14,7 +14,7 @@ namespace Aggregate {
 Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
                  Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
-                 Runtime::RandomGenerator& random,
+                 Random::RandomGenerator& random,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api)
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),

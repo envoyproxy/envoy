@@ -10,6 +10,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
@@ -81,7 +82,7 @@ public:
   /**
    * @return RandomGenerator& the random generator for the server.
    */
-  virtual Runtime::RandomGenerator& random() PURE;
+  virtual Random::RandomGenerator& random() PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
