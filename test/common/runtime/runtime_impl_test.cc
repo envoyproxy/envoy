@@ -921,7 +921,7 @@ public:
 // Empty resource lists are rejected.
 TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
   setup();
-  EXPECT_CALL(rtds_init_callback_, Call(""));
+  EXPECT_CALL(rtds_init_callback_, Call("init manager RTDS"));
   EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, ""), EnvoyException,
                             "Unexpected RTDS resource length: 0");
 
@@ -938,7 +938,7 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
   const envoy::service::runtime::v3::Runtime runtime;
   const auto decoded_resources = TestUtility::decodeResources({runtime, runtime});
 
-  EXPECT_CALL(rtds_init_callback_, Call(""));
+  EXPECT_CALL(rtds_init_callback_, Call("init manager RTDS"));
   EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(decoded_resources.refvec_, ""),
                             EnvoyException, "Unexpected RTDS resource length: 2");
 
@@ -952,7 +952,7 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
 TEST_F(RtdsLoaderImplTest, FailureSubscription) {
   setup();
 
-  EXPECT_CALL(rtds_init_callback_, Call(""));
+  EXPECT_CALL(rtds_init_callback_, Call("init manager RTDS"));
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   rtds_callbacks_[0]->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                            {});
@@ -998,7 +998,7 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
       foo: bar
       baz: meh
   )EOF");
-  EXPECT_CALL(rtds_init_callback_, Call(""));
+  EXPECT_CALL(rtds_init_callback_, Call("init manager RTDS"));
   doOnConfigUpdateVerifyNoThrow(runtime);
 
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
@@ -1037,7 +1037,7 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
       foo: bar
       baz: meh
   )EOF");
-  EXPECT_CALL(rtds_init_callback_, Call(""));
+  EXPECT_CALL(rtds_init_callback_, Call("init manager RTDS"));
   doDeltaOnConfigUpdateVerifyNoThrow(runtime);
 
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
@@ -1081,7 +1081,7 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
       foo: bar
       baz: meh
   )EOF");
-  EXPECT_CALL(rtds_init_callback_, Call("")).Times(1);
+  EXPECT_CALL(rtds_init_callback_, Call("init manager RTDS")).Times(1);
   doOnConfigUpdateVerifyNoThrow(runtime, 0);
 
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
