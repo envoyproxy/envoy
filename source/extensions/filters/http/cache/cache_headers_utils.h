@@ -14,11 +14,8 @@ namespace Cache {
 using OptionalDuration = absl::optional<SystemTime::duration>;
 
 struct RequestCacheControl {
-  RequestCacheControl(bool must_validate = false, bool no_store = false, bool no_transform = false,
-                      bool only_if_cached = false, OptionalDuration max_age = OptionalDuration(),
-                      OptionalDuration min_fresh = OptionalDuration(),
-                      OptionalDuration max_stale = OptionalDuration());
-  RequestCacheControl(absl::string_view cache_control_header);
+  RequestCacheControl() = default;
+  explicit RequestCacheControl(absl::string_view cache_control_header);
 
   // must_validate is true if 'no-cache' directive is present
   bool must_validate_ : 1;
@@ -33,10 +30,8 @@ struct RequestCacheControl {
 };
 
 struct ResponseCacheControl {
-  ResponseCacheControl(bool must_validate = false, bool no_store = false, bool no_transform = false,
-                       bool no_stale = false, bool is_public = false,
-                       OptionalDuration max_age = OptionalDuration());
-  ResponseCacheControl(absl::string_view cache_control_header);
+  ResponseCacheControl() = default;
+  explicit ResponseCacheControl(absl::string_view cache_control_header);
 
   // must_validate is true if 'no-cache' directive is present; arguments are ignored for now
   bool must_validate_ : 1;

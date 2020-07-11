@@ -49,13 +49,6 @@ separateDirectiveAndArgument(absl::string_view full_directive) {
 // quoted-pair     = "\" ( HTAB / SP / VCHAR / obs-text )
 // VCHAR           =  %x21-7E  ; visible (printing) characters
 
-RequestCacheControl::RequestCacheControl(bool must_validate, bool no_store, bool no_transform,
-                                         bool only_if_cached, OptionalDuration max_age,
-                                         OptionalDuration min_fresh, OptionalDuration max_stale)
-    : must_validate_(must_validate), no_store_(no_store), no_transform_(no_transform),
-      only_if_cached_(only_if_cached), max_age_(max_age), min_fresh_(min_fresh),
-      max_stale_(max_stale) {}
-
 RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header) {
   must_validate_ = no_store_ = no_transform_ = only_if_cached_ = false;
   std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
@@ -81,11 +74,6 @@ RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header)
     }
   }
 }
-
-ResponseCacheControl::ResponseCacheControl(bool must_validate, bool no_store, bool no_transform,
-                                           bool no_stale, bool is_public, OptionalDuration max_age)
-    : must_validate_(must_validate), no_store_(no_store), no_transform_(no_transform),
-      no_stale_(no_stale), is_public_(is_public), max_age_(max_age) {}
 
 ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_header) {
   must_validate_ = no_store_ = no_transform_ = no_stale_ = is_public_ = false;
