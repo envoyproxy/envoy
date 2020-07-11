@@ -17,6 +17,7 @@ envoy_cc_library(
         ":thread_local_cluster_interface",
         ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/grpc:async_client_manager_interface",

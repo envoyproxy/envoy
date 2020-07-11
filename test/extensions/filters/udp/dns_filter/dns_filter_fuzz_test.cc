@@ -4,8 +4,8 @@
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"
@@ -21,7 +21,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   static const auto local = Network::Utility::parseInternetAddressAndPort("127.0.2.1:5353");
   static const auto peer = Network::Utility::parseInternetAddressAndPort("127.0.2.1:55088");
 
-  static NiceMock<Runtime::MockRandomGenerator> random;
+  static NiceMock<Random::MockRandomGenerator> random;
   static NiceMock<Stats::MockHistogram> histogram;
   histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
   static Api::ApiPtr api = Api::createApiForTest();
