@@ -40,7 +40,7 @@ public:
   virtual void validateConfig(const ProtobufWkt::Any& proto_config, Factory& factory) PURE;
 
   /**
-   * Update the provider with a new configuraion.
+   * Update the provider with a new configuration.
    * @param config is an extension factory callback to be applied on the subsequent streams.
    * @param version_info is the version of the new extension configuration.
    */
