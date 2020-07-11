@@ -43,6 +43,7 @@ EnvoyQuicServerSession::CreateQuicCryptoServerStream(
   case quic::PROTOCOL_UNSUPPORTED:
     PANIC(fmt::format("Unknown handshake protocol: {}",
                       static_cast<int>(connection()->version().handshake_protocol)));
+    return nullptr;
   }
 }
 
