@@ -9,10 +9,6 @@ using spdlog::level::level_enum;
 
 namespace Envoy {
 
-/**
- * FancyLogger implementation: a logger with fine-grained log control.
- */
-
 absl::Mutex FancyContext::fancy_log_lock_(absl::kConstInit);
 
 FancyMapPtr FancyContext::getFancyLogMap() {
@@ -23,8 +19,7 @@ FancyMapPtr FancyContext::getFancyLogMap() {
 absl::Mutex* FancyContext::getFancyLogLock() { return &fancy_log_lock_; }
 
 /**
- * Implementation of BasicLockable, to avoid dependency
- * problem of thread.h.
+ * Implements a lock from BasicLockable, to avoid dependency problem of thread.h.
  */
 class FancyBasicLockable : public Thread::BasicLockable {
 public:
@@ -37,23 +32,16 @@ private:
   absl::Mutex mutex_;
 };
 
-/**
- * Initialize sink for the initialization of loggers, once and for all.
- */
 void FancyContext::initSink() {
   spdlog::sink_ptr sink = Logger::Registry::getSink();
   Logger::DelegatingLogSinkSharedPtr sp = std::static_pointer_cast<Logger::DelegatingLogSink>(sink);
   if (!sp->hasLock()) {
     static FancyBasicLockable tlock;
     sp->setLock(tlock);
-    sp->set_should_escape(false); // unsure
-    printf("sink lock: %s\n", sp->hasLock() ? "true" : "false");
+    sp->set_should_escape(false);
   }
 }
 
-/**
- * Create a logger and add it to map.
- */
 spdlog::logger* FancyContext::createLogger(std::string key, int level)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_) {
   SpdLoggerPtr new_logger = std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
@@ -71,9 +59,6 @@ spdlog::logger* FancyContext::createLogger(std::string key, int level)
   return new_logger.get();
 }
 
-/**
- * Initialize Fancy Logger and register it in global map if not done.
- */
 void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger) {
   absl::WriterMutexLock l(&FancyContext::fancy_log_lock_);
   auto it = getFancyLogMap()->find(key);
@@ -86,9 +71,6 @@ void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>
   logger.store(target);
 }
 
-/**
- * Set log level. If not found, return false.
- */
 bool FancyContext::setFancyLogger(std::string key, level_enum log_level) {
   absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
   auto it = getFancyLogMap()->find(key);
@@ -97,14 +79,6 @@ bool FancyContext::setFancyLogger(std::string key, level_enum log_level) {
     return true;
   }
   return false;
-}
-
-/**
- * Flush logger. Used in server.
- */
-void FancyContext::flushFancyLogger() {
-  absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
-  getFancyLogMap()->find(FANCY_KEY)->second->flush();
 }
 
 } // namespace Envoy

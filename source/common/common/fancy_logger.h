@@ -12,16 +12,34 @@ using FancyMap = absl::flat_hash_map<std::string, std::shared_ptr<spdlog::logger
 using FancyMapPtr = std::shared_ptr<FancyMap>;
 using SpdLoggerPtr = std::shared_ptr<spdlog::logger>;
 
+/**
+ * Stores the lock and functions used by Fancy Logger's macro so that we don't need to declaring
+ * them globally. Functions are provided to initialize a logger, set log level, flush a logger.
+ */
 class FancyContext {
 public:
   static FancyMapPtr getFancyLogMap();
   static absl::Mutex* getFancyLogLock();
+  /**
+   * Initializes Fancy Logger and register it in global map if not done.
+   */
   static void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger);
+
+  /**
+   * Sets log level. If not found, return false.
+   */
   static bool setFancyLogger(std::string key, spdlog::level::level_enum log_level);
-  static void flushFancyLogger(); // not work now, so not used...
 
 protected:
+  /**
+   * Initializes sink for the initialization of loggers, needed only in benchmark test.
+   */
   static void initSink();
+
+  /**
+   * Creates a logger given key and log level, and add it to map.
+   * Key is the log component name, e.g. file name now.
+   */
   static spdlog::logger* createLogger(std::string key, int level = -1)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
@@ -31,11 +49,6 @@ public:
    */
   ABSL_CONST_INIT static absl::Mutex fancy_log_lock_;
 };
-
-/**
- * ---------------------------------------------------------------
- * Fancy logging macros
- */
 
 #define FANCY_KEY std::string(__FILE__)
 
@@ -86,10 +99,5 @@ public:
     FancyContext::getFancyLogMap()->find(FANCY_KEY)->second->flush();                              \
     FancyContext::getFancyLogLock()->ReaderUnlock();                                               \
   }
-
-/**
- * End
- * ----------------------------------------------------------------
- */
 
 } // namespace Envoy
