@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -37,7 +38,7 @@ using FaultMessages = ConstSingleton<FaultMessagesValues>;
 class FaultManagerImpl : public FaultManager {
 public:
   FaultManagerImpl(
-      Runtime::RandomGenerator& random, Runtime::Loader& runtime,
+      Random::RandomGenerator& random, Runtime::Loader& runtime,
       const Protobuf::RepeatedPtrField<
           ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
           base_faults);
@@ -95,7 +96,7 @@ private:
   const FaultMap fault_map_;
 
 protected:
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   Runtime::Loader& runtime_;
 };
 

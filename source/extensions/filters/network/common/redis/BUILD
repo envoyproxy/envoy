@@ -116,6 +116,7 @@ envoy_cc_library(
     deps = [
         ":codec_lib",
         ":fault_interface",
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",

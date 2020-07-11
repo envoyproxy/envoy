@@ -1,3 +1,5 @@
+#include "envoy/common/random_generator.h"
+
 #include "common/common/assert.h"
 
 #include "extensions/filters/network/common/redis/fault_impl.h"
@@ -76,7 +78,7 @@ public:
     fault->mutable_delay()->set_seconds(duration.count());
   }
 
-  testing::NiceMock<Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<Random::MockRandomGenerator> random_;
   Runtime::MockLoader runtime_;
   testing::NiceMock<Runtime::MockSnapshot> snapshot_;
 };

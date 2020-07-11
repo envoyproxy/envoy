@@ -43,7 +43,7 @@ std::vector<std::string> FaultManagerImpl::FaultImpl::buildCommands(
 }
 
 FaultManagerImpl::FaultManagerImpl(
-    Runtime::RandomGenerator& random, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, Runtime::Loader& runtime,
     const Protobuf::RepeatedPtrField<
         ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
         faults)
