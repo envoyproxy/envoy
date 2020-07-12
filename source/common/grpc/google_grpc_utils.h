@@ -43,13 +43,10 @@ public:
    * Build gRPC channel based on the given GrpcService configuration.
    * @param config Google gRPC config.
    * @param api reference to the Api object
-   * @param enable_initial_metadata_interceptor enables initial metadata interceptor if it is
-   * configured.
    * @return static std::shared_ptr<grpc::Channel> a gRPC channel.
    */
   static std::shared_ptr<grpc::Channel>
-  createChannel(const envoy::config::core::v3::GrpcService& config, Api::Api& api,
-                bool enable_initial_metadata_interceptor);
+  createChannel(const envoy::config::core::v3::GrpcService& config, Api::Api& api);
 };
 
 } // namespace Grpc

@@ -44,46 +44,6 @@ getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc
   return credentials_factory->getChannelCredentials(grpc_service, api);
 }
 
-// InitialMetadataInterceptor is used to inject the given initial metadata to gRPC channel.
-class InitialMetadataInterceptor : public grpc::experimental::Interceptor {
-public:
-  InitialMetadataInterceptor(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& initial_metadata)
-      : initial_metadata_(initial_metadata) {}
-
-  void Intercept(grpc::experimental::InterceptorBatchMethods* methods) override {
-    if (methods->QueryInterceptionHookPoint(
-            grpc::experimental::InterceptionHookPoints::PRE_SEND_INITIAL_METADATA)) {
-      auto* metadata_map = methods->GetSendInitialMetadata();
-      if (metadata_map != nullptr) {
-        for (const auto& header_value : initial_metadata_) {
-          metadata_map->insert(std::make_pair(header_value.key(), header_value.value()));
-        }
-      }
-    }
-    methods->Proceed();
-  }
-
-private:
-  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& initial_metadata_;
-};
-
-class InitialMetadataInterceptorFactory
-    : public grpc::experimental::ClientInterceptorFactoryInterface {
-public:
-  InitialMetadataInterceptorFactory(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& initial_metadata)
-      : initial_metadata_(initial_metadata) {}
-
-  grpc::experimental::Interceptor*
-  CreateClientInterceptor(grpc::experimental::ClientRpcInfo*) override {
-    return new InitialMetadataInterceptor(initial_metadata_);
-  }
-
-private:
-  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
-};
-
 } // namespace
 
 struct BufferInstanceContainer {
@@ -174,23 +134,10 @@ GoogleGrpcUtils::channelArgsFromConfig(const envoy::config::core::v3::GrpcServic
 }
 
 std::shared_ptr<grpc::Channel>
-GoogleGrpcUtils::createChannel(const envoy::config::core::v3::GrpcService& config, Api::Api& api,
-                               bool enable_initial_metadata_interceptor) {
+GoogleGrpcUtils::createChannel(const envoy::config::core::v3::GrpcService& config, Api::Api& api) {
   std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config, api);
   const grpc::ChannelArguments args = channelArgsFromConfig(config);
-  if (!enable_initial_metadata_interceptor || config.initial_metadata().empty()) {
-    // Skip adding initial metadata interceptor if it is not enabled, or initial metadata is not
-    // configured.
-    return CreateCustomChannel(config.google_grpc().target_uri(), creds, args);
-  }
-
-  // Create gRPC channel with initial metadata interceptor.
-  std::vector<std::unique_ptr<grpc::experimental::ClientInterceptorFactoryInterface>>
-      interceptor_factories;
-  interceptor_factories.push_back(
-      std::make_unique<InitialMetadataInterceptorFactory>((config.initial_metadata())));
-  return ::grpc::experimental::CreateCustomChannelWithInterceptors(
-      config.google_grpc().target_uri(), creds, args, std::move(interceptor_factories));
+  return CreateCustomChannel(config.google_grpc().target_uri(), creds, args);
 }
 
 } // namespace Grpc
