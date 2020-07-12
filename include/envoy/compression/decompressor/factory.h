@@ -10,7 +10,7 @@ class DecompressorFactory {
 public:
   virtual ~DecompressorFactory() = default;
 
-  virtual DecompressorPtr createDecompressor() PURE;
+  virtual DecompressorPtr createDecompressor(const std::string& stats_prefix) PURE;
   virtual const std::string& statsPrefix() const PURE;
   // TODO(junr03): this method assumes that decompressors are used on http messages.
   // A more generic method might be `hint()` which gives the user of the decompressor a hint about

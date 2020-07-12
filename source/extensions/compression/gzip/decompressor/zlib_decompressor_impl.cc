@@ -1,5 +1,7 @@
 #include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
+#include <zlib.h>
+
 #include <memory>
 
 #include "envoy/common/exception.h"
@@ -14,13 +16,17 @@ namespace Compression {
 namespace Gzip {
 namespace Decompressor {
 
-ZlibDecompressorImpl::ZlibDecompressorImpl() : ZlibDecompressorImpl(4096) {}
+ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix)
+    : ZlibDecompressorImpl(scope, stats_prefix, 4096) {}
 
-ZlibDecompressorImpl::ZlibDecompressorImpl(uint64_t chunk_size)
-    : Zlib::Base(chunk_size, [](z_stream* z) {
-        inflateEnd(z);
-        delete z;
-      }) {
+ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
+                                           uint64_t chunk_size)
+    : Zlib::Base(chunk_size,
+                 [](z_stream* z) {
+                   inflateEnd(z);
+                   delete z;
+                 }),
+      stats_(generateStats(stats_prefix, scope)) {
   zstream_ptr_->zalloc = Z_NULL;
   zstream_ptr_->zfree = Z_NULL;
   zstream_ptr_->opaque = Z_NULL;
@@ -67,14 +73,38 @@ bool ZlibDecompressorImpl::inflateNext() {
 
   if (result < 0) {
     decompression_error_ = result;
-    ENVOY_LOG(
-        trace,
-        "zlib decompression error: {}. Error codes are defined in https://www.zlib.net/manual.html",
-        result);
+    ENVOY_LOG(trace,
+              "zlib decompression error: {}, msg: {}. Error codes are defined in "
+              "https://www.zlib.net/manual.html",
+              result, zstream_ptr_->msg);
+    chargeErrorStats(result);
     return false;
   }
 
   return true;
+}
+
+void ZlibDecompressorImpl::chargeErrorStats(const int result) {
+  switch (result) {
+  case Z_ERRNO:
+    stats_.zlib_errno_.inc();
+    break;
+  case Z_STREAM_ERROR:
+    stats_.zlib_stream_error_.inc();
+    break;
+  case Z_DATA_ERROR:
+    stats_.zlib_data_error_.inc();
+    break;
+  case Z_MEM_ERROR:
+    stats_.zlib_mem_error_.inc();
+    break;
+  case Z_BUF_ERROR:
+    stats_.zlib_buf_error_.inc();
+    break;
+  case Z_VERSION_ERROR:
+    stats_.zlib_version_error_.inc();
+    break;
+  }
 }
 
 } // namespace Decompressor

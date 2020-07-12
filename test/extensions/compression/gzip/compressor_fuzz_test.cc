@@ -1,5 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
@@ -19,9 +20,11 @@ namespace Fuzz {
 // trip compress-decompress pair; the decompressor itself is not fuzzed beyond
 // whatever the compressor emits, as it exists only as a test utility today.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+
   FuzzedDataProvider provider(buf, len);
   ZlibCompressorImpl compressor;
-  Decompressor::ZlibDecompressorImpl decompressor;
+  Stats::IsolatedStoreImpl stats_store;
+  Decompressor::ZlibDecompressorImpl decompressor{stats_store, "test"};
 
   // Select target compression level. We can't use ConsumeEnum() since the range
   // is non-contiguous.

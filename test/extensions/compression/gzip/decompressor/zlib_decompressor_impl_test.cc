@@ -1,5 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
@@ -13,7 +14,6 @@ namespace Extensions {
 namespace Compression {
 namespace Gzip {
 namespace Decompressor {
-namespace {
 
 class ZlibDecompressorImplTest : public testing::Test {
 protected:
@@ -46,7 +46,8 @@ protected:
     drainBuffer(buffer);
     ASSERT_EQ(0, buffer.length());
 
-    ZlibDecompressorImpl decompressor;
+    Stats::IsolatedStoreImpl stats_store{};
+    ZlibDecompressorImpl decompressor{stats_store, "test."};
     decompressor.init(window_bits);
 
     decompressor.decompress(accumulation_buffer, buffer);
@@ -66,17 +67,20 @@ protected:
 class ZlibDecompressorImplFailureTest : public ZlibDecompressorImplTest {
 protected:
   static void decompressorBadInitTestHelper(int64_t window_bits) {
-    ZlibDecompressorImpl decompressor;
+    Stats::IsolatedStoreImpl stats_store{};
+    ZlibDecompressorImpl decompressor{stats_store, "test."};
     decompressor.init(window_bits);
   }
 
   static void uninitializedDecompressorTestHelper() {
     Buffer::OwnedImpl input_buffer;
     Buffer::OwnedImpl output_buffer;
-    ZlibDecompressorImpl decompressor;
+    Stats::IsolatedStoreImpl stats_store{};
+    ZlibDecompressorImpl decompressor{stats_store, "test."};
     TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
     decompressor.decompress(input_buffer, output_buffer);
     ASSERT_TRUE(decompressor.decompression_error_ < 0);
+    ASSERT_EQ(stats_store.counterFromString("test.zlib_stream_error").value(), 1);
   }
 };
 
@@ -105,7 +109,8 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   compressor.compress(compressor_buffer, Envoy::Compression::Compressor::State::Flush);
   ASSERT_TRUE(compressor.checksum() > 0);
 
-  ZlibDecompressorImpl decompressor;
+  Stats::IsolatedStoreImpl stats_store{};
+  ZlibDecompressorImpl decompressor{stats_store, "test."};
   decompressor.init(gzip_window_bits);
   EXPECT_EQ(0, decompressor.checksum());
 
@@ -150,7 +155,8 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   drainBuffer(buffer);
   ASSERT_EQ(0, buffer.length());
 
-  ZlibDecompressorImpl decompressor;
+  Stats::IsolatedStoreImpl stats_store{};
+  ZlibDecompressorImpl decompressor{stats_store, "test."};
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);
@@ -180,12 +186,14 @@ TEST_F(ZlibDecompressorImplTest, FailedDecompression) {
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
   }
-  ZlibDecompressorImpl decompressor;
+  Stats::IsolatedStoreImpl stats_store{};
+  ZlibDecompressorImpl decompressor{stats_store, "test."};
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);
 
   ASSERT_TRUE(decompressor.decompression_error_ < 0);
+  ASSERT_EQ(stats_store.counterFromString("test.zlib_data_error").value(), 17);
 }
 
 // Exercises decompression with a very small output buffer.
@@ -218,7 +226,8 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   drainBuffer(buffer);
   ASSERT_EQ(0, buffer.length());
 
-  ZlibDecompressorImpl decompressor(16);
+  Stats::IsolatedStoreImpl stats_store{};
+  ZlibDecompressorImpl decompressor{stats_store, "test.", 16};
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);
@@ -284,7 +293,8 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   compressor.compress(buffer, Envoy::Compression::Compressor::State::Flush);
   accumulation_buffer.add(buffer);
 
-  ZlibDecompressorImpl decompressor;
+  Stats::IsolatedStoreImpl stats_store{};
+  ZlibDecompressorImpl decompressor{stats_store, "test."};
   decompressor.init(gzip_window_bits);
 
   drainBuffer(buffer);
@@ -298,7 +308,31 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   EXPECT_EQ(original_text, decompressed_text);
 }
 
-} // namespace
+class ZlibDecompressorStatsTest : public testing::Test {
+protected:
+  void chargeErrorStats(const int result) { decompressor_.chargeErrorStats(result); }
+
+  Stats::IsolatedStoreImpl stats_store_{};
+  ZlibDecompressorImpl decompressor_{stats_store_, "test."};
+};
+
+TEST_F(ZlibDecompressorStatsTest, ChargeErrorStats) {
+  decompressor_.init(31);
+
+  chargeErrorStats(Z_ERRNO);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_errno").value(), 1);
+  chargeErrorStats(Z_STREAM_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_stream_error").value(), 1);
+  chargeErrorStats(Z_DATA_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_data_error").value(), 1);
+  chargeErrorStats(Z_MEM_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_mem_error").value(), 1);
+  chargeErrorStats(Z_BUF_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_buf_error").value(), 1);
+  chargeErrorStats(Z_VERSION_ERROR);
+  ASSERT_EQ(stats_store_.counterFromString("test.zlib_version_error").value(), 1);
+}
+
 } // namespace Decompressor
 } // namespace Gzip
 } // namespace Compression
