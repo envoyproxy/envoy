@@ -599,7 +599,7 @@ public:
     return upstream_http_protocol_options_;
   }
 
-  absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
+  absl::optional<std::string> edsServiceName() const override { return eds_service_name_; }
 
   void createNetworkFilterChain(Network::Connection&) const override;
   Http::Protocol
@@ -787,7 +787,6 @@ private:
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
-  Stats::SymbolTable& symbol_table_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
 };
 

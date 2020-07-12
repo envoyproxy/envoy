@@ -344,6 +344,7 @@ WRONGPASS
 WRR
 WS
 WSA
+WSS
 Welford's
 Wi
 XDS
@@ -667,6 +668,7 @@ inflight
 -ing
 init
 initializer
+initializers
 inlined
 inlining
 inobservability

@@ -81,7 +81,8 @@ protected:
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
-    EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip, headers.get_("content-encoding"));
+    EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
+              headers.get_("content-encoding"));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
     if (with_trailers) {
       Buffer::OwnedImpl trailers_buffer;
@@ -159,7 +160,8 @@ protected:
   std::shared_ptr<GzipFilterConfig> config_;
   std::unique_ptr<Common::Compressors::CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
-  Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{stats_store_, "test"};
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
   Stats::TestUtil::TestStore stats_;

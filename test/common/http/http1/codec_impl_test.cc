@@ -238,7 +238,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
                            "body\r\n0\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
-  buffer = Buffer::OwnedImpl(trailer_string + "\r\n\r\n");
+  buffer = Buffer::OwnedImpl(trailer_string);
   if (enable_trailers) {
     EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
     status = codec_->dispatch(buffer);
@@ -1002,34 +1002,11 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// Ensures that requests with invalid HTTP header values are not rejected
-// when the runtime guard is not enabled for the feature.
-TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRuntimeGuard) {
-  TestScopedRuntime scoped_runtime;
-  // When the runtime-guarded feature is NOT enabled, invalid header values
-  // should be accepted by the codec.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.strict_header_validation", "false"}});
-
-  initialize();
-
-  MockRequestDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  Buffer::OwnedImpl buffer(
-      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
-}
-
 // Ensures that requests with invalid HTTP header values are properly rejected
-// when the runtime guard is enabled for the feature.
 TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   TestScopedRuntime scoped_runtime;
   // When the runtime-guarded feature is enabled, invalid header values
   // should result in a rejection.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.strict_header_validation", "true"}});
 
   initialize();
 
@@ -1138,27 +1115,6 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
   EXPECT_EQ(status.message(),
             "http/1.1 protocol error: request headers failed spec compliance checks");
   EXPECT_EQ("http.invalid_authority", response_encoder->getStream().responseDetails());
-}
-
-// Regression test for http-parser allowing embedded NULs in header values,
-// verify we reject them.
-TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.strict_header_validation", "false"}});
-  initialize();
-
-  InSequence sequence;
-
-  MockRequestDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  Buffer::OwnedImpl buffer(
-      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: bar", std::string(1, '\0'), "baz\r\n"));
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _, _, _));
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
-  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
 // Mutate an HTTP GET with embedded NULs, this should always be rejected in some
@@ -2520,26 +2476,60 @@ TEST_F(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
 
 TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejected) {
   // Default limit of 60 KiB
-  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
+  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
+  testTrailersExceedLimit(long_string, true);
+}
+
+TEST_F(Http1ServerConnectionImplTest, LargeTrailerFieldRejected) {
+  // Construct partial headers with a long field name that exceeds the default limit of 60KiB.
+  std::string long_string = "bigfield" + std::string(60 * 1024, 'q');
   testTrailersExceedLimit(long_string, true);
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyTrailersRejected) {
   // Send a request with 101 headers.
-  testTrailersExceedLimit(createHeaderFragment(101), true);
+  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", true);
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
   // Default limit of 60 KiB
-  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
+  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
+  testTrailersExceedLimit(long_string, false);
+}
+
+TEST_F(Http1ServerConnectionImplTest, LargeTrailerFieldRejectedIgnored) {
+  // Default limit of 60 KiB
+  std::string long_string = "bigfield" + std::string(60 * 1024, 'q') + ": value\r\n\r\n\r\n";
   testTrailersExceedLimit(long_string, false);
 }
 
 // Tests that the default limit for the number of request headers is 100.
 TEST_F(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
   // Send a request with 101 headers.
-  testTrailersExceedLimit(createHeaderFragment(101), false);
+  testTrailersExceedLimit(createHeaderFragment(101) + "\r\n\r\n", false);
+}
+
+TEST_F(Http1ServerConnectionImplTest, LargeRequestUrlRejected) {
+  initialize();
+
+  std::string exception_reason;
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  // Default limit of 60 KiB
+  std::string long_url = "/" + std::string(60 * 1024, 'q');
+  Buffer::OwnedImpl buffer("GET " + long_url + " HTTP/1.1\r\n");
+
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "headers size exceeds limit");
+  EXPECT_EQ("http1.headers_too_large", response_encoder->getStream().responseDetails());
 }
 
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
@@ -2631,8 +2621,27 @@ TEST_F(Http1ServerConnectionImplTest, ManyRequestHeadersAccepted) {
   testRequestHeadersAccepted(createHeaderFragment(150));
 }
 
-// Tests that response headers of 80 kB fails.
-TEST_F(Http1ClientConnectionImplTest, LargeResponseHeadersRejected) {
+// Tests that incomplete response headers of 80 kB header value fails.
+TEST_F(Http1ClientConnectionImplTest, ResponseHeadersWithLargeValueRejected) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  std::string long_header = "big: " + std::string(80 * 1024, 'q');
+  buffer = Buffer::OwnedImpl(long_header);
+  status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "headers size exceeds limit");
+}
+
+// Tests that incomplete response headers with a 80 kB header field fails.
+TEST_F(Http1ClientConnectionImplTest, ResponseHeadersWithLargeFieldRejected) {
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -2644,7 +2653,7 @@ TEST_F(Http1ClientConnectionImplTest, LargeResponseHeadersRejected) {
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
-  std::string long_header = "big: " + std::string(80 * 1024, 'q') + "\r\n";
+  std::string long_header = "big: " + std::string(80 * 1024, 'q');
   buffer = Buffer::OwnedImpl(long_header);
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));

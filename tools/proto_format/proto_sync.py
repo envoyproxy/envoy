@@ -95,7 +95,7 @@ def GetDestinationPath(src):
       matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
 
-def GetAbsDestinationPath(dst_root, src):
+def GetAbsRelDestinationPath(dst_root, src):
   """Obtain absolute path from a proto file path combined with destination root.
 
   Creates the parent directory if necessary.
@@ -107,7 +107,7 @@ def GetAbsDestinationPath(dst_root, src):
   rel_dst_path = GetDestinationPath(src)
   dst = dst_root.joinpath(rel_dst_path)
   dst.parent.mkdir(0o755, parents=True, exist_ok=True)
-  return dst
+  return dst, rel_dst_path
 
 
 def ProtoPrint(src, dst):
@@ -202,6 +202,10 @@ def GetImportDeps(proto_path):
         # Special case handling for UDPA annotations.
         if import_path.startswith('udpa/annotations/'):
           imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
+          continue
+        # Special case handling for UDPA core.
+        if import_path.startswith('udpa/core/v1/'):
+          imports.append('@com_github_cncf_udpa//udpa/core/v1:pkg')
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
@@ -326,7 +330,50 @@ def GitStatus(path):
   return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
 
 
+def GitModifiedFiles(path, suffix):
+  """Obtain a list of modified files since the last commit merged by GitHub.
+
+  Args:
+    path: path to examine.
+    suffix: path suffix to filter with.
+  Return:
+    A list of strings providing the paths of modified files in the repo.
+  """
+  try:
+    modified_files = subprocess.check_output(
+        ['tools/git/modified_since_last_github_commit.sh', 'api', 'proto']).decode().split()
+    return modified_files
+  except subprocess.CalledProcessError as e:
+    if e.returncode == 1:
+      return []
+    raise
+
+
+# If we're not forcing format, i.e. FORCE_PROTO_FORMAT=yes, in the environment,
+# then try and see if we can skip reformatting based on some simple path
+# heuristics. This saves a ton of time, since proto format and sync is not
+# running under Bazel and can't do change detection.
+def ShouldSync(path, api_proto_modified_files, py_tools_modified_files):
+  if os.getenv('FORCE_PROTO_FORMAT') == 'yes':
+    return True
+  # If tools change, safest thing to do is rebuild everything.
+  if len(py_tools_modified_files) > 0:
+    return True
+  # Check to see if the basename of the file has been modified since the last
+  # GitHub commit. If so, rebuild. This is safe and conservative across package
+  # migrations in v3 and v4alpha; we could achieve a lower rate of false
+  # positives if we examined package migration annotations, at the expense of
+  # complexity.
+  for p in api_proto_modified_files:
+    if os.path.basename(p) in path:
+      return True
+  # Otherwise we can safely skip syncing.
+  return False
+
+
 def Sync(api_root, mode, labels, shadow):
+  api_proto_modified_files = GitModifiedFiles('api', 'proto')
+  py_tools_modified_files = GitModifiedFiles('tools', 'py')
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
     paths = []
@@ -339,7 +386,13 @@ def Sync(api_root, mode, labels, shadow):
     dst_src_paths = defaultdict(list)
     for path in paths:
       if os.stat(path).st_size > 0:
-        dst_src_paths[GetAbsDestinationPath(dst_dir, path)].append(path)
+        abs_dst_path, rel_dst_path = GetAbsRelDestinationPath(dst_dir, path)
+        if ShouldSync(path, api_proto_modified_files, py_tools_modified_files):
+          dst_src_paths[abs_dst_path].append(path)
+        else:
+          print('Skipping sync of %s' % path)
+          src_path = str(pathlib.Path(api_root, rel_dst_path))
+          shutil.copy(src_path, abs_dst_path)
     with mp.Pool() as p:
       pkg_deps = p.map(SyncProtoFile, dst_src_paths.items())
     SyncBuildFiles(mode, dst_dir)

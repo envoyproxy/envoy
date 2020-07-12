@@ -255,7 +255,7 @@ private:
     // End-of-stream with no additional message.
     PendingMessage() = default;
 
-    const absl::optional<grpc::ByteBuffer> buf_;
+    const absl::optional<grpc::ByteBuffer> buf_{};
     const bool end_stream_{true};
   };
 

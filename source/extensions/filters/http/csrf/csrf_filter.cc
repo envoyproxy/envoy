@@ -6,6 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -14,6 +15,11 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Csrf {
+
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    origin_handle(Http::CustomHeaders::get().Origin);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer_handle(Http::CustomHeaders::get().Referer);
 
 struct RcDetailsValues {
   const std::string OriginMismatch = "csrf_origin_mismatch";
@@ -34,7 +40,7 @@ bool isModifyMethod(const Http::RequestHeaderMap& headers) {
 absl::string_view hostAndPort(const absl::string_view header) {
   Http::Utility::Url absolute_url;
   if (!header.empty()) {
-    if (absolute_url.initialize(header, false)) {
+    if (absolute_url.initialize(header, /*is_connect=*/false)) {
       return absolute_url.hostAndPort();
     }
     return header;
@@ -43,11 +49,11 @@ absl::string_view hostAndPort(const absl::string_view header) {
 }
 
 absl::string_view sourceOriginValue(const Http::RequestHeaderMap& headers) {
-  const absl::string_view origin = hostAndPort(headers.getOriginValue());
+  const absl::string_view origin = hostAndPort(headers.getInlineValue(origin_handle.handle()));
   if (origin != EMPTY_STRING) {
     return origin;
   }
-  return hostAndPort(headers.getRefererValue());
+  return hostAndPort(headers.getInlineValue(referer_handle.handle()));
 }
 
 absl::string_view targetOriginValue(const Http::RequestHeaderMap& headers) {

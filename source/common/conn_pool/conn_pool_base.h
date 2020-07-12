@@ -14,6 +14,13 @@ namespace ConnectionPool {
 
 class ConnPoolImplBase;
 
+// A placeholder struct for whatever data a given connection pool needs to
+// successfully attach and upstream connection to a downstream connection.
+struct AttachContext {
+  // Add a virtual destructor to allow for the dynamic_cast ASSERT in typedContext.
+  virtual ~AttachContext() = default;
+};
+
 // ActiveClient provides a base class for connection pool clients that handles connection timings
 // as well as managing the connection timeout.
 class ActiveClient : public LinkedObject<ActiveClient>,
@@ -80,10 +87,9 @@ public:
   // ConnectionPool::Cancellable
   void cancel(Envoy::ConnectionPool::CancelPolicy policy) override;
 
-  // TODO(alyssawilk) find an alternate to void*
   // The context here returns a pointer to whatever context is provided with newStream(),
   // which will be passed back to the parent in onPoolReady or onPoolFailure.
-  virtual void* context() PURE;
+  virtual AttachContext& context() PURE;
 
   ConnPoolImplBase& parent_;
 };
@@ -100,6 +106,12 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
   virtual ~ConnPoolImplBase();
+
+  // A helper function to get the specific context type from the base class context.
+  template <class T> T& typedContext(AttachContext& context) {
+    ASSERT(dynamic_cast<T*>(&context) != nullptr);
+    return *static_cast<T*>(&context);
+  }
 
   void addDrainedCallbackImpl(Instance::DrainedCb cb);
   void drainConnectionsImpl();
@@ -135,33 +147,41 @@ public:
                          Network::ConnectionEvent event);
   void checkForDrained();
   void onUpstreamReady();
-  ConnectionPool::Cancellable* newStream(void* context);
+  ConnectionPool::Cancellable* newStream(AttachContext& context);
 
-  virtual ConnectionPool::Cancellable* newPendingRequest(void* context) PURE;
+  virtual ConnectionPool::Cancellable* newPendingRequest(AttachContext& context) PURE;
 
   // Creates a new connection if allowed by resourceManager, or if created to avoid
   // starving this pool.
   void tryCreateNewConnection();
 
-  virtual void attachRequestToClient(ActiveClient& client, PendingRequest& request) PURE;
-  void attachRequestToClientImpl(Envoy::ConnectionPool::ActiveClient& client, void* pair);
+  void attachRequestToClient(Envoy::ConnectionPool::ActiveClient& client, AttachContext& context);
+
   virtual void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
                              absl::string_view failure_reason,
                              ConnectionPool::PoolFailureReason pool_failure_reason,
-                             void* context) PURE;
-  virtual void onPoolReady(ActiveClient& client, void* context) PURE;
+                             AttachContext& context) PURE;
+  virtual void onPoolReady(ActiveClient& client, AttachContext& context) PURE;
   // Called by derived classes any time a request is completed or destroyed for any reason.
   void onRequestClosed(Envoy::ConnectionPool::ActiveClient& client, bool delay_attaching_request);
 
+  const Upstream::HostConstSharedPtr& host() const { return host_; }
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
+  Upstream::ResourcePriority priority() const { return priority_; }
+  const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() { return socket_options_; }
+  const Network::TransportSocketOptionsSharedPtr& transportSocketOptions() {
+    return transport_socket_options_;
+  }
+
+protected:
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
 
-  friend class ActiveClient;
-  friend class PendingRequest;
   Event::Dispatcher& dispatcher_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
+protected:
   std::list<Instance::DrainedCb> drained_callbacks_;
   std::list<PendingRequestPtr> pending_requests_;
 

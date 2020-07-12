@@ -23,7 +23,8 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 
 using testing::NiceMock;
@@ -61,7 +62,7 @@ protected:
   const NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -80,7 +81,6 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
       connect_timeout: 0.25s
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: staticcluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -95,7 +95,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
   TestStaticClusterFactory factory;
   Registry::InjectFactory<ClusterFactory> registered_factory(factory);
 
-  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
@@ -123,7 +123,6 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
       connect_timeout: 0.25s
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: staticcluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -141,7 +140,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
               port_value: 80
     )EOF";
 
-  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
@@ -168,7 +167,6 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
       connect_timeout: 0.25s
       lb_policy: ROUND_ROBIN
       load_assignment:
-        cluster_name: staticcluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -185,7 +183,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
             port_value: 80
     )EOF";
 
-  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
@@ -212,7 +210,6 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
     load_assignment:
-        cluster_name: staticcluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -229,7 +226,7 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
   // the factory is not registered, expect to throw
   EXPECT_THROW_WITH_MESSAGE(
       {
-        const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+        const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
         ClusterFactoryImplBase::create(
             cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
             random_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
@@ -249,7 +246,6 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
         consistent_hashing_lb_config:
           use_hostname_for_hashing: true
       load_assignment:
-        cluster_name: staticcluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -263,7 +259,7 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
 
   EXPECT_THROW_WITH_MESSAGE(
       {
-        const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+        const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
         ClusterFactoryImplBase::create(
             cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
             random_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,

@@ -328,6 +328,14 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
+  if (listenerConnectionLimitReached()) {
+    ENVOY_LOG(trace, "closing connection: listener connection limit reached for {}",
+              config_->name());
+    socket->close();
+    stats_.downstream_cx_overflow_.inc();
+    return;
+  }
+
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
 }
 
@@ -370,7 +378,8 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket,
     const envoy::config::core::v3::Metadata& dynamic_metadata) {
-  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
+      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
   stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
