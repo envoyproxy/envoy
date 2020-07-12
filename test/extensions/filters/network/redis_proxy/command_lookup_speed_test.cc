@@ -68,7 +68,7 @@ public:
     }
   }
 
-  Router* router_{new NullRouterImpl()};
+  RouterPtr router_{std::make_unique<NullRouterImpl>()};
   Stats::IsolatedStoreImpl store_;
   Event::SimulatedTimeSystem time_system_;
   NiceMock<MockFaultManager> fault_manager_;
