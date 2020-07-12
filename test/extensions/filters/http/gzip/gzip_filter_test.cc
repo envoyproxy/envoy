@@ -160,7 +160,8 @@ protected:
   GzipFilterConfigSharedPtr config_;
   Common::Compressors::CompressorFilterPtr filter_;
   Buffer::OwnedImpl data_;
-  Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{stats_store_, "test"};
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
   Stats::TestUtil::TestStore stats_;
