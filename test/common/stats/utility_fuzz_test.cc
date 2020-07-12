@@ -21,10 +21,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   // Create a greater scope vector to store the string to prevent the string memory from being free
-  std::vector<std::string> string_vector;
-  auto make_string = [&string_vector](absl::string_view str) -> absl::string_view {
-    string_vector.push_back(std::string(str));
-    return string_vector.back();
+  std::list<std::string> string_list;
+  auto make_string = [&string_list](absl::string_view str) -> absl::string_view {
+    string_list.push_back(std::string(str));
+    return string_list.back();
   };
 
   // generate a random number as the maximum length of the stat name
