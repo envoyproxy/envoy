@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -63,6 +65,8 @@ private:
   Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
 };
+
+using ProxyFilterPtr = std::unique_ptr<ProxyFilter>;
 
 } // namespace DynamicForwardProxy
 } // namespace HttpFilters

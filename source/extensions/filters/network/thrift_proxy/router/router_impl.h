@@ -273,6 +273,8 @@ private:
   Buffer::OwnedImpl upstream_request_buffer_;
 };
 
+using RouterPtr = std::unique_ptr<Router>;
+
 } // namespace Router
 } // namespace ThriftProxy
 } // namespace NetworkFilters

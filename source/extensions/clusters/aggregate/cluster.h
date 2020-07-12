@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
@@ -65,6 +67,8 @@ private:
   PriorityContextPtr
   linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate);
 };
+
+using ClusterSharedPtr = std::shared_ptr<Cluster>;
 
 // Load balancer used by each worker thread. It will be refreshed when clusters, hosts or priorities
 // are updated.

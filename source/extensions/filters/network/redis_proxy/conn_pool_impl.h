@@ -193,6 +193,9 @@ private:
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
 };
 
+using InstanceImplPtr = std::unique_ptr<InstanceImpl>;
+using InstanceImplSharedPtr = std::shared_ptr<InstanceImpl>;
+
 } // namespace ConnPool
 } // namespace RedisProxy
 } // namespace NetworkFilters

@@ -143,6 +143,8 @@ private:
   Http::RequestHeaderMap* request_headers_{};
 };
 
+using FilterPtr = std::unique_ptr<Filter>;
+
 } // namespace RateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

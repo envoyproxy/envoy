@@ -158,6 +158,8 @@ private:
   std::unique_ptr<std::string> accept_encoding_;
 };
 
+using CompressorFilterPtr = std::unique_ptr<CompressorFilter>;
+
 } // namespace Compressors
 } // namespace Common
 } // namespace HttpFilters

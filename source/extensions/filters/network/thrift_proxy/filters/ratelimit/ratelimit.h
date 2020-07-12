@@ -96,6 +96,8 @@ private:
   bool initiating_call_{false};
 };
 
+using FilterPtr = std::unique_ptr<Filter>;
+
 } // namespace RateLimitFilter
 } // namespace ThriftFilters
 } // namespace Extensions

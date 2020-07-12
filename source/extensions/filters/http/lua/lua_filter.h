@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -344,7 +346,8 @@ private:
   absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
 };
 
-using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
 
 /**
  * Route configuration for the filter.
@@ -361,6 +364,8 @@ private:
   const bool disabled_;
   const std::string name_;
 };
+
+using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;
 
 namespace {
 

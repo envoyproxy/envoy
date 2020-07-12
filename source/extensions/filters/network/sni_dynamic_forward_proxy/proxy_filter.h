@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha/sni_dynamic_forward_proxy.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -59,6 +61,8 @@ private:
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
+
+using ProxyFilterPtr = std::unique_ptr<ProxyFilter>;
 
 } // namespace SniDynamicForwardProxy
 } // namespace NetworkFilters

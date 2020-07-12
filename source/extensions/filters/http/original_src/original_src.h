@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/http/filter.h"
 #include "envoy/network/address.h"
 
@@ -36,6 +38,8 @@ private:
   Config config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
+
+using OriginalSrcFilterPtr = std::unique_ptr<OriginalSrcFilter>;
 
 } // namespace OriginalSrc
 } // namespace HttpFilters

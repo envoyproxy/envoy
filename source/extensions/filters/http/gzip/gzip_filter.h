@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
@@ -54,6 +56,8 @@ private:
   const int32_t window_bits_;
   const uint32_t chunk_size_;
 };
+
+using GzipFilterConfigSharedPtr = std::shared_ptr<GzipFilterConfig>;
 
 } // namespace Gzip
 } // namespace HttpFilters

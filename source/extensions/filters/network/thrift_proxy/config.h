@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
@@ -94,6 +95,8 @@ private:
 
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
 };
+
+using ConfigImplPtr = std::unique_ptr<ConfigImpl>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

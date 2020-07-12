@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
@@ -177,6 +179,8 @@ private:
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
 };
+
+using RawHttpClientImplPtr = std::unique_ptr<RawHttpClientImpl>;
 
 } // namespace ExtAuthz
 } // namespace Common

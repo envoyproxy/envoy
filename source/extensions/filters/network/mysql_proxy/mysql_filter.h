@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -104,6 +106,8 @@ private:
   DecoderPtr decoder_;
   bool sniffing_{true};
 };
+
+using MySQLFilterPtr = std::unique_ptr<MySQLFilter>;
 
 } // namespace MySQLProxy
 } // namespace NetworkFilters

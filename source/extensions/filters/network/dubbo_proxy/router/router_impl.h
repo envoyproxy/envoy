@@ -98,6 +98,8 @@ private:
   bool filter_complete_{false};
 };
 
+using RouterPtr = std::unique_ptr<Router>;
+
 } // namespace Router
 } // namespace DubboProxy
 } // namespace NetworkFilters

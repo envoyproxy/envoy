@@ -284,6 +284,8 @@ private:
   std::string downstream_cluster_abort_grpc_status_key_{};
 };
 
+using FaultFilterPtr = std::unique_ptr<FaultFilter>;
+
 } // namespace Fault
 } // namespace HttpFilters
 } // namespace Extensions

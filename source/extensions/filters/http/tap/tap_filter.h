@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "envoy/http/filter.h"
@@ -115,6 +117,8 @@ private:
   FilterConfigSharedPtr config_;
   HttpPerRequestTapperPtr tapper_;
 };
+
+using FilterPtr = std::unique_ptr<Filter>;
 
 } // namespace TapFilter
 } // namespace HttpFilters

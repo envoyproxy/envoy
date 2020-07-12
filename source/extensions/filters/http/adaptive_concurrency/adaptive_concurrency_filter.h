@@ -69,6 +69,8 @@ private:
   CleanupPtr deferred_sample_task_;
 };
 
+using AdaptiveConcurrencyFilterPtr = std::unique_ptr<AdaptiveConcurrencyFilter>;
+
 } // namespace AdaptiveConcurrency
 } // namespace HttpFilters
 } // namespace Extensions

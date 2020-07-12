@@ -99,6 +99,8 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
 
+using IpTaggingFilterPtr = std::unique_ptr<IpTaggingFilter>;
+
 } // namespace IpTagging
 } // namespace HttpFilters
 } // namespace Extensions

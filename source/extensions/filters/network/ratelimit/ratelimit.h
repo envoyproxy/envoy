@@ -104,6 +104,9 @@ private:
   Status status_{Status::NotStarted};
   bool calling_limit_{};
 };
+
+using FilterPtr = std::unique_ptr<Filter>;
+
 } // namespace RateLimitFilter
 } // namespace NetworkFilters
 } // namespace Extensions

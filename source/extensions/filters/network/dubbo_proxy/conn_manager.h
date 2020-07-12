@@ -106,6 +106,8 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
+using ConnectionManagerPtr = std::unique_ptr<ConnectionManager>;
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

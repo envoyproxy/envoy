@@ -130,6 +130,8 @@ private:
   std::vector<RateLimitActionPtr> actions_;
 };
 
+using RateLimitPolicyEntryImplPtr = std::unique_ptr<RateLimitPolicyEntryImpl>;
+
 /**
  * Implementation of RateLimitPolicy that reads from the JSON route config.
  */

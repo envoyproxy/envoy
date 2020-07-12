@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/http/filter.h"
@@ -80,6 +81,8 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   TimeSource& time_source_;
 };
+
+using DynamoFilterPtr = std::unique_ptr<DynamoFilter>;
 
 } // namespace Dynamo
 } // namespace HttpFilters

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/http.pb.h"
@@ -87,6 +89,8 @@ private:
   Extensions::Common::Tap::TraceWrapperPtr buffered_streamed_response_body_;
   Extensions::Common::Tap::TraceWrapperPtr buffered_full_trace_;
 };
+
+using HttpPerRequestTapperImplPtr = std::unique_ptr<HttpPerRequestTapperImpl>;
 
 } // namespace TapFilter
 } // namespace HttpFilters

@@ -112,6 +112,8 @@ private:
   bool record_request_;
 };
 
+using AdmissionControlFilterSharedPtr = std::shared_ptr<AdmissionControlFilter>;
+
 } // namespace AdmissionControl
 } // namespace HttpFilters
 } // namespace Extensions

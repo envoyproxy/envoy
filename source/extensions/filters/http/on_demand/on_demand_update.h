@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/http/filter.h"
 
 namespace Envoy {
@@ -34,6 +36,8 @@ private:
   Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_callback_;
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
 };
+
+using OnDemandRouteUpdatePtr = std::unique_ptr<OnDemandRouteUpdate>;
 
 } // namespace OnDemand
 } // namespace HttpFilters

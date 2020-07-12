@@ -127,6 +127,8 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
+using ClientSslAuthFilterPtr = std::unique_ptr<ClientSslAuthFilter>;
+
 } // namespace ClientSslAuth
 } // namespace NetworkFilters
 } // namespace Extensions

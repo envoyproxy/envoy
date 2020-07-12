@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -119,6 +121,8 @@ private:
   Buffer::OwnedImpl backend_buffer_;
   DecoderPtr decoder_;
 };
+
+using PostgresFilterPtr = std::unique_ptr<PostgresFilter>;
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

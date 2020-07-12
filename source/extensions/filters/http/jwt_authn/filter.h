@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/http/filter.h"
 
 #include "common/common/lock_guard.h"
@@ -51,6 +53,8 @@ private:
   // Verify context for current request.
   ContextSharedPtr context_;
 };
+
+using FilterPtr = std::unique_ptr<Filter>;
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

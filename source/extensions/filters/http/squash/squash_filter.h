@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <regex>
 
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
@@ -141,6 +142,8 @@ private:
   // The state of a debug attachment object when an error has occurred.
   const static std::string ERROR_STATE;
 };
+
+using SquashFilterSharedPtr = std::shared_ptr<SquashFilter>;
 
 } // namespace Squash
 } // namespace HttpFilters

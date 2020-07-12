@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "extensions/filters/network/dubbo_proxy/message.h"
 
 namespace Envoy {
@@ -35,6 +37,8 @@ public:
 private:
   bool is_heartbeat_{false};
 };
+
+using ContextImplSharedPtr = std::shared_ptr<ContextImpl>;
 
 class RpcInvocationBase : public RpcInvocation {
 public:

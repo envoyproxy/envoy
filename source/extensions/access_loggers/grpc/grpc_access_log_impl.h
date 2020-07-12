@@ -161,6 +161,8 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 };
 
+using GrpcAccessLoggerCacheImplPtr = std::unique_ptr<GrpcAccessLoggerCacheImpl>;
+
 } // namespace GrpcCommon
 } // namespace AccessLoggers
 } // namespace Extensions

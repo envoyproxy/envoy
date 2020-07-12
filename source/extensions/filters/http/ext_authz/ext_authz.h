@@ -257,6 +257,8 @@ private:
   envoy::service::auth::v3::CheckRequest check_request_{};
 };
 
+using FilterPtr = std::unique_ptr<Filter>;
+
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions

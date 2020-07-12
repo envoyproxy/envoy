@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/upstream/cluster_manager.h"
 
@@ -186,6 +187,7 @@ public:
   virtual ReadPolicy readPolicy() const PURE;
 };
 
+using ConfigPtr = std::unique_ptr<Config>;
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**

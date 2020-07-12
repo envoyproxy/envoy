@@ -2,6 +2,8 @@
 
 #include <http_parser.h>
 
+#include <memory>
+
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
@@ -90,6 +92,8 @@ private:
   // Use static thread_local to avoid allocating buffer over and over again.
   static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];
 };
+
+using FilterPtr = std::unique_ptr<Filter>;
 
 } // namespace HttpInspector
 } // namespace ListenerFilters

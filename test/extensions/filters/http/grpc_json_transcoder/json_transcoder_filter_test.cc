@@ -1,5 +1,6 @@
 #include <fstream>
 #include <functional>
+#include <memory>
 
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 
@@ -31,6 +32,7 @@ using Envoy::Protobuf::util::MessageDifferencer;
 using Envoy::ProtobufUtil::error::Code;
 using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
+using TranscoderPtr = std::unique_ptr<Transcoder>;
 
 namespace Envoy {
 namespace Extensions {

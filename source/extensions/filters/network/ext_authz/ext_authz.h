@@ -116,6 +116,9 @@ private:
   bool calling_check_{};
   envoy::service::auth::v3::CheckRequest check_request_{};
 };
+
+using FilterPtr = std::unique_ptr<Filter>;
+
 } // namespace ExtAuthz
 } // namespace NetworkFilters
 } // namespace Extensions

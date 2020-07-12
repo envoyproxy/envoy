@@ -191,6 +191,8 @@ private:
   DecoderPtr decoder_;
 };
 
+using ZooKeeperFilterPtr = std::unique_ptr<ZooKeeperFilter>;
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions

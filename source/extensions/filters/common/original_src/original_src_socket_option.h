@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/listen_socket.h"
@@ -40,6 +42,8 @@ public:
 private:
   Network::Address::InstanceConstSharedPtr src_address_;
 };
+
+using OriginalSrcSocketOptionPtr = std::unique_ptr<OriginalSrcSocketOption>;
 
 } // namespace OriginalSrc
 } // namespace Common

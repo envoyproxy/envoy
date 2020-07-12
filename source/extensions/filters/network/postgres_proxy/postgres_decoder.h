@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/platform.h"
 
@@ -145,6 +146,8 @@ protected:
   MsgParserDict BE_errors_;
   MsgParserDict BE_notices_;
 };
+
+using DecoderImplPtr = std::unique_ptr<DecoderImpl>;
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

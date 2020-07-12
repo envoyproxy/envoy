@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
 #include "envoy/network/dns.h"
@@ -314,6 +316,8 @@ private:
   Network::Address::InstanceConstSharedPtr peer_;
   DnsFilterResolverCallback resolver_callback_;
 };
+
+using DnsFilterPtr = std::unique_ptr<DnsFilter>;
 
 } // namespace DnsFilter
 } // namespace UdpFilters

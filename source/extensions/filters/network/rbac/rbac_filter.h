@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -76,6 +78,8 @@ private:
 
   EngineResult checkEngine(Filters::Common::RBAC::EnforcementMode mode);
 };
+
+using RoleBasedAccessControlFilterPtr = std::unique_ptr<RoleBasedAccessControlFilter>;
 
 } // namespace RBACFilter
 } // namespace NetworkFilters

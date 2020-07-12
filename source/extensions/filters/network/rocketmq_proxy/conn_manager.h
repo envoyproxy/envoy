@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"
@@ -209,6 +210,9 @@ private:
    */
   absl::flat_hash_map<std::string, AckMessageDirective> ack_directive_table_;
 };
+
+using ConnectionManagerPtr = std::unique_ptr<ConnectionManager>;
+
 } // namespace RocketmqProxy
 } // namespace NetworkFilters
 } // namespace Extensions

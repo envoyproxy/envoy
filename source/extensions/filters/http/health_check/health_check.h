@@ -110,6 +110,8 @@ private:
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages_;
 };
 
+using HealthCheckFilterPtr = std::unique_ptr<HealthCheckFilter>;
+
 } // namespace HealthCheck
 } // namespace HttpFilters
 } // namespace Extensions

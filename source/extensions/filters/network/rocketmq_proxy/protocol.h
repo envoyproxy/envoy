@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <utility>
 
 #include "envoy/common/pure.h"
@@ -325,6 +326,8 @@ private:
   friend class Decoder;
 };
 
+using SendMessageRequestHeaderPtr = std::unique_ptr<SendMessageRequestHeader>;
+
 /**
  * Custom command header to respond to a send-message-request.
  */
@@ -369,6 +372,8 @@ private:
   std::string transaction_id_;
 };
 
+using SendMessageResponseHeaderPtr = std::unique_ptr<SendMessageResponseHeader>;
+
 /**
  * Classic RocketMQ needs to known addresses of each broker to work with. To resolve the addresses,
  * client SDK uses this command header to query name servers.
@@ -381,6 +386,8 @@ public:
 
   void decode(const ProtobufWkt::Value& ext_fields) override;
 };
+
+using GetRouteInfoRequestHeaderPtr = std::unique_ptr<GetRouteInfoRequestHeader>;
 
 /**
  * When a client wishes to consume messages stored in brokers, it sends a pop command to brokers.
@@ -456,6 +463,8 @@ private:
   bool order_{false};
 };
 
+using PopMessageRequestHeaderPtr = std::unique_ptr<PopMessageRequestHeader>;
+
 /**
  * The pop response command header. See pop request header for how-things-work explanation.
  */
@@ -510,6 +519,8 @@ private:
   std::string order_count_info_;
 };
 
+using PopMessageResponseHeaderPtr = std::unique_ptr<PopMessageResponseHeader>;
+
 /**
  * This command is used by the client to acknowledge message(s) that has been successfully consumed.
  * Once the broker received this request, the associated message will formally marked as consumed.
@@ -555,6 +566,8 @@ private:
   std::string key_;
 };
 
+using AckMessageRequestHeaderPtr = std::unique_ptr<AckMessageRequestHeader>;
+
 /**
  * When a client shuts down gracefully, it notifies broker(now envoy) this event.
  */
@@ -588,6 +601,8 @@ private:
   std::string consumer_group_;
 };
 
+using UnregisterClientRequestHeaderPtr = std::unique_ptr<UnregisterClientRequestHeader>;
+
 /**
  * Classic SDK clients use client-side load balancing. This header is kept for compatibility.
  */
@@ -606,6 +621,8 @@ public:
 private:
   std::string consumer_group_;
 };
+
+using GetConsumerListByGroupRequestHeaderPtr = std::unique_ptr<GetConsumerListByGroupRequestHeader>;
 
 /**
  * The response body.

@@ -127,6 +127,8 @@ private:
   bool connection_allowed_;
 };
 
+using ProxyFilterPtr = std::unique_ptr<ProxyFilter>;
+
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

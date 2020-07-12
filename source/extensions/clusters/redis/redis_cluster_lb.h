@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -203,6 +204,8 @@ private:
   Random::RandomGenerator& random_;
 };
 
+using RedisClusterLoadBalancerFactorySharedPtr = std::shared_ptr<RedisClusterLoadBalancerFactory>;
+
 class RedisClusterThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
 public:
   RedisClusterThreadAwareLoadBalancer(Upstream::LoadBalancerFactorySharedPtr factory)
@@ -215,6 +218,8 @@ public:
 private:
   Upstream::LoadBalancerFactorySharedPtr factory_;
 };
+
+using RedisClusterThreadAwareLoadBalancerPtr = std::unique_ptr<RedisClusterThreadAwareLoadBalancer>;
 
 } // namespace Redis
 } // namespace Clusters

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/random_generator.h"
@@ -272,6 +274,8 @@ private:
   DnsHeader response_header_;
   Random::RandomGenerator& rng_;
 };
+
+using DnsMessageParserPtr = std::unique_ptr<DnsMessageParser>;
 
 } // namespace DnsFilter
 } // namespace UdpFilters

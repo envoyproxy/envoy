@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
@@ -98,6 +100,8 @@ private:
   // Allows callbacks on the SSL_CTX to set fields in this class.
   friend class Config;
 };
+
+using FilterPtr = ::std::unique_ptr<Filter>;
 
 } // namespace TlsInspector
 } // namespace ListenerFilters
