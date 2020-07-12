@@ -32,11 +32,12 @@ const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
 
-RetryStatePtr
-RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
-                       const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                       Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
+RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
+                                     Http::RequestHeaderMap& request_headers,
+                                     const Upstream::ClusterInfo& cluster,
+                                     const VirtualCluster* vcluster, Runtime::Loader& runtime,
+                                     Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                                     Upstream::ResourcePriority priority) {
   RetryStatePtr ret;
 
   // We short circuit here and do not bother with an allocation if there is no chance we will retry.
@@ -63,7 +64,7 @@ RetryStateImpl::create(const RetryPolicy& route_policy, Http::RequestHeaderMap& 
 RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
                                Http::RequestHeaderMap& request_headers,
                                const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                               Runtime::Loader& runtime, Random::RandomGenerator& random,
                                Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority)
     : cluster_(cluster), vcluster_(vcluster), runtime_(runtime), random_(random),
       dispatcher_(dispatcher), retry_on_(route_policy.retryOn()),

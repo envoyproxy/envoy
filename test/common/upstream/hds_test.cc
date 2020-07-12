@@ -127,7 +127,7 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

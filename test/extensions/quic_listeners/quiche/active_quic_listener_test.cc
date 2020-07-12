@@ -84,9 +84,9 @@ protected:
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
-          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_29, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
         }()[0]) {}
 
@@ -257,8 +257,8 @@ protected:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
-  Runtime::MockRandomGenerator generator_;
-  Runtime::MockRandomGenerator rand_;
+  Random::MockRandomGenerator generator_;
+  Random::MockRandomGenerator rand_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;

@@ -130,7 +130,7 @@ using ClusterSlotUpdateCallBackSharedPtr = std::shared_ptr<ClusterSlotUpdateCall
 class RedisClusterLoadBalancerFactory : public ClusterSlotUpdateCallBack,
                                         public Upstream::LoadBalancerFactory {
 public:
-  RedisClusterLoadBalancerFactory(Runtime::RandomGenerator& random) : random_(random) {}
+  RedisClusterLoadBalancerFactory(Random::RandomGenerator& random) : random_(random) {}
 
   // ClusterSlotUpdateCallBack
   bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap all_hosts) override;
@@ -183,7 +183,7 @@ private:
   class RedisClusterLoadBalancer : public Upstream::LoadBalancer {
   public:
     RedisClusterLoadBalancer(SlotArraySharedPtr slot_array, ShardVectorSharedPtr shard_vector,
-                             Runtime::RandomGenerator& random)
+                             Random::RandomGenerator& random)
         : slot_array_(std::move(slot_array)), shard_vector_(std::move(shard_vector)),
           random_(random) {}
 
@@ -193,14 +193,14 @@ private:
   private:
     const SlotArraySharedPtr slot_array_;
     const ShardVectorSharedPtr shard_vector_;
-    Runtime::RandomGenerator& random_;
+    Random::RandomGenerator& random_;
   };
 
   absl::Mutex mutex_;
   SlotArraySharedPtr slot_array_ ABSL_GUARDED_BY(mutex_);
   ClusterSlotsSharedPtr current_cluster_slot_;
   ShardVectorSharedPtr shard_vector_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
 };
 
 class RedisClusterThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {

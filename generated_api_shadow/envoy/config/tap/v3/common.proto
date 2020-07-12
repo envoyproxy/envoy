@@ -47,7 +47,7 @@ message TapConfig {
 
 // Tap match configuration. This is a recursive structure which allows complex nested match
 // configurations to be built using various logical operators.
-// [#next-free-field: 9]
+// [#next-free-field: 11]
 message MatchPredicate {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.MatchPredicate";
@@ -89,6 +89,12 @@ message MatchPredicate {
 
     // HTTP response trailers match configuration.
     HttpHeadersMatch http_response_trailers_match = 8;
+
+    // HTTP request generic body match configuration.
+    HttpGenericBodyMatch http_request_generic_body_match = 9;
+
+    // HTTP response generic body match configuration.
+    HttpGenericBodyMatch http_response_generic_body_match = 10;
   }
 }
 
@@ -99,6 +105,36 @@ message HttpHeadersMatch {
 
   // HTTP headers to match.
   repeated route.v3.HeaderMatcher headers = 1;
+}
+
+// HTTP generic body match configuration.
+// List of text strings and hex strings to be located in HTTP body.
+// All specified strings must be found in the HTTP body for positive match.
+// The search may be limited to specified number of bytes from the body start.
+//
+// .. attention::
+//
+//   Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+//   If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
+//   to scan only part of the http body.
+message HttpGenericBodyMatch {
+  message GenericTextMatch {
+    oneof rule {
+      option (validate.required) = true;
+
+      // Text string to be located in HTTP body.
+      string string_match = 1;
+
+      // Sequence of bytes to be located in HTTP body.
+      bytes binary_match = 2;
+    }
+  }
+
+  // Limits search to specified number of bytes - default zero (no limit - match entire captured buffer).
+  uint32 bytes_limit = 1;
+
+  // List of patterns to match.
+  repeated GenericTextMatch patterns = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Tap output configuration.

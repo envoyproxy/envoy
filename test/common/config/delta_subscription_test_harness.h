@@ -13,11 +13,11 @@
 #include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
+#include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
@@ -194,7 +194,7 @@ public:
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
   Event::MockDispatcher dispatcher_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
   std::shared_ptr<NewGrpcMuxImpl> xds_context_;

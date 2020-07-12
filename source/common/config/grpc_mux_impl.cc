@@ -19,7 +19,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          envoy::config::core::v3::ApiVersion transport_api_version,
-                         Runtime::RandomGenerator& random, Stats::Scope& scope,
+                         Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
@@ -99,37 +99,32 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
   return watch;
 }
 
-void GrpcMuxImpl::pause(const std::string& type_url) {
-  ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url);
-  ApiState& api_state = api_state_[type_url];
-  ASSERT(!api_state.paused_);
-  ASSERT(!api_state.pending_);
-  api_state.paused_ = true;
+ScopedResume GrpcMuxImpl::pause(const std::string& type_url) {
+  return pause(std::vector<std::string>{type_url});
 }
 
-void GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
+ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   for (const auto& type_url : type_urls) {
-    pause(type_url);
+    ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url);
+    ApiState& api_state = api_state_[type_url];
+    ASSERT(!api_state.paused_);
+    ASSERT(!api_state.pending_);
+    api_state.paused_ = true;
   }
-}
+  return std::make_unique<Cleanup>([this, type_urls]() {
+    for (const auto& type_url : type_urls) {
+      ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
+      ApiState& api_state = api_state_[type_url];
+      ASSERT(api_state.paused_);
+      api_state.paused_ = false;
 
-void GrpcMuxImpl::resume(const std::string& type_url) {
-  ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
-  ApiState& api_state = api_state_[type_url];
-  ASSERT(api_state.paused_);
-  api_state.paused_ = false;
-
-  if (api_state.pending_) {
-    ASSERT(api_state.subscribed_);
-    queueDiscoveryRequest(type_url);
-    api_state.pending_ = false;
-  }
-}
-
-void GrpcMuxImpl::resume(const std::vector<std::string> type_urls) {
-  for (const auto& type_url : type_urls) {
-    resume(type_url);
-  }
+      if (api_state.pending_) {
+        ASSERT(api_state.subscribed_);
+        queueDiscoveryRequest(type_url);
+        api_state.pending_ = false;
+      }
+    }
+  });
 }
 
 bool GrpcMuxImpl::paused(const std::string& type_url) const {
