@@ -377,7 +377,7 @@ public:
       : router_(std::move(router)), fault_manager_(std::move(fault_manager)), scope_(scope),
         stat_prefix_(stat_prefix), time_source_(time_source),
         latency_in_micros_(latency_in_micros){};
-  CommandSplitterPtr create(Event::Dispatcher& dispatcher);
+  CommandSplitterPtr create(Event::Dispatcher& dispatcher) override;
 
 private:
   RouterPtr router_;
