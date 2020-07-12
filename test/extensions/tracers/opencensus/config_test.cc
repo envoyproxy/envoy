@@ -322,6 +322,9 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverGrpc) {
         google_grpc:
           target_uri: 127.0.0.1:55678
           stat_prefix: test
+        initial_metadata:
+        - key: foo
+          value: bar
   )EOF";
 
   envoy::config::trace::v3::Tracing configuration;
