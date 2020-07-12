@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 
 #include "common/network/utility.h"
@@ -57,6 +59,8 @@ private:
   Event::Dispatcher& dispatcher_;
   Event::FileEventPtr file_event_;
 };
+
+using EnvoyQuicClientConnectionPtr = std::unique_ptr<EnvoyQuicClientConnection>;
 
 } // namespace Quic
 } // namespace Envoy

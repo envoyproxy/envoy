@@ -42,6 +42,8 @@ private:
   MemoryStatsReaderPtr stats_;
 };
 
+using FixedHeapMonitorPtr = std::unique_ptr<FixedHeapMonitor>;
+
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

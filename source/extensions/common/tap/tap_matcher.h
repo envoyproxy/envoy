@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/tap/v3/common.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -25,6 +27,8 @@ class MatcherCtx {
 public:
   virtual ~MatcherCtx() = default;
 };
+
+using MatcherCtxPtr = std::unique_ptr<MatcherCtx>;
 
 /**
  * Base class for all tap matchers.
@@ -54,7 +58,7 @@ public:
 
     bool matches_{false};            // Does the matcher currently match?
     bool might_change_status_{true}; // Is it possible for matches_ to change in subsequent updates?
-    std::unique_ptr<MatcherCtx> ctx_{}; // Context used by matchers to save interim context.
+    MatcherCtxPtr ctx_{};            // Context used by matchers to save interim context.
   };
 
   using MatchStatusVector = std::vector<MatchStatus>;

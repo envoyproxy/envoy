@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/random_generator.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/local_info/local_info.h"
@@ -142,6 +144,8 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   TimeSource& time_source_;
 };
+
+using DriverPtr = std::unique_ptr<Driver>;
 
 /**
  * Information about the Zipkin collector.

@@ -146,6 +146,9 @@ private:
   Stats::StatNamePool pool_;
   const Grpc::Context::RequestStatNames request_stat_names_;
 };
+
+using LightStepDriverPtr = std::unique_ptr<LightStepDriver>;
+
 } // namespace Lightstep
 } // namespace Tracers
 } // namespace Extensions

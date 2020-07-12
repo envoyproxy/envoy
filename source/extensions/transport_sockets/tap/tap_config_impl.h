@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/transport.pb.h"
 #include "envoy/event/timer.h"
@@ -45,6 +47,8 @@ private:
   uint32_t rx_bytes_buffered_{};
   uint32_t tx_bytes_buffered_{};
 };
+
+using PerSocketTapperImplPtr = std::unique_ptr<PerSocketTapperImpl>;
 
 class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                             public SocketTapConfig,

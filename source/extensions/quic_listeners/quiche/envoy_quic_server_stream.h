@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -67,6 +69,8 @@ private:
 
   Http::RequestDecoder* request_decoder_{nullptr};
 };
+
+using EnvoyQuicServerStreamPtr = std::unique_ptr<EnvoyQuicServerStream>;
 
 } // namespace Quic
 } // namespace Envoy

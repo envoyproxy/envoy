@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -89,6 +91,8 @@ private:
   bool end_stream_read_{};
   bool read_error_{};
 };
+
+using TsiSocketPtr = std::unique_ptr<TsiSocket>;
 
 /**
  * An implementation of Network::TransportSocketFactory for TsiSocket

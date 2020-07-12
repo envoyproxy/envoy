@@ -68,5 +68,7 @@ private:
   Network::Connection* envoy_connection_{nullptr};
 };
 
+using EnvoyQuicConnectionPtr = std::unique_ptr<EnvoyQuicConnection>;
+
 } // namespace Quic
 } // namespace Envoy

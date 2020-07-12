@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -128,6 +129,8 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
+
+using GrpcAccessLoggerImplPtr = std::unique_ptr<GrpcAccessLoggerImpl>;
 
 class GrpcAccessLoggerCacheImpl : public Singleton::Instance, public GrpcAccessLoggerCache {
 public:

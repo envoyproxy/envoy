@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/health_check.pb.h"
@@ -127,6 +128,8 @@ private:
   const std::string key_;
   const std::string auth_password_;
 };
+
+using RedisHealthCheckerSharedPtr = std::shared_ptr<RedisHealthChecker>;
 
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers

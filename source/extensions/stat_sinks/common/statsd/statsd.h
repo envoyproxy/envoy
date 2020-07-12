@@ -145,6 +145,8 @@ private:
   Stats::Counter& cx_overflow_stat_;
 };
 
+using TcpStatsdSinkPtr = std::unique_ptr<TcpStatsdSink>;
+
 } // namespace Statsd
 } // namespace Common
 } // namespace StatSinks

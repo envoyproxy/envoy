@@ -61,6 +61,8 @@ private:
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };
 
+using TcpConnPoolPtr = std::unique_ptr<TcpConnPool>;
+
 class TcpUpstream : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks {
 public:
@@ -85,6 +87,8 @@ private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 };
+
+using TcpUpstreamPtr = std::unique_ptr<TcpUpstream>;
 
 } // namespace Tcp
 } // namespace Http

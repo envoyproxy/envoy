@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 
 #include "envoy/network/io_handle.h"
 
@@ -93,6 +94,8 @@ private:
   Network::IoHandle& io_handle_;
   bool closed_{false};
 };
+
+using QuicIoHandleWrapperPtr = std::unique_ptr<QuicIoHandleWrapper>;
 
 } // namespace Quic
 } // namespace Envoy

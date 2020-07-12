@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -38,6 +40,8 @@ private:
   opentracing::DynamicTracingLibraryHandle library_handle_;
   std::shared_ptr<opentracing::Tracer> tracer_;
 };
+
+using DynamicOpenTracingDriverPtr = std::unique_ptr<DynamicOpenTracingDriver>;
 
 } // namespace DynamicOt
 } // namespace Tracers

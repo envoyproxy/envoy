@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/server/admin.h"
 #include "envoy/singleton/manager.h"
@@ -83,6 +85,8 @@ private:
   std::unordered_map<std::string, std::unordered_set<ExtensionConfig*>> config_id_map_;
   absl::optional<const AttachedRequest> attached_request_;
 };
+
+using AdminHandlerPtr = std::unique_ptr<AdminHandler>;
 
 } // namespace Tap
 } // namespace Common

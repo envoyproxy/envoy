@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 
 #include "envoy/common/time.h"
 #include "envoy/ssl/context_manager.h"
@@ -46,6 +47,8 @@ private:
   std::list<std::weak_ptr<Envoy::Ssl::Context>> contexts_;
   PrivateKeyMethodManagerImpl private_key_method_manager_{};
 };
+
+using ContextManagerImplPtr = std::unique_ptr<ContextManagerImpl>;
 
 } // namespace Tls
 } // namespace TransportSockets

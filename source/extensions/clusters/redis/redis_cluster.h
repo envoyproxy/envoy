@@ -284,6 +284,8 @@ private:
   const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
 };
 
+using RedisClusterSharedPtr = std::shared_ptr<RedisCluster>;
+
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                                 envoy::config::cluster::redis::RedisClusterConfig> {
 public:

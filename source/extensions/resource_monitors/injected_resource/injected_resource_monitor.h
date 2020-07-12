@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
 #include "envoy/filesystem/filesystem.h"
@@ -38,6 +40,8 @@ private:
   absl::optional<EnvoyException> error_;
   Api::Api& api_;
 };
+
+using InjectedResourceMonitorPtr = std::unique_ptr<InjectedResourceMonitor>;
 
 } // namespace InjectedResourceMonitor
 } // namespace ResourceMonitors

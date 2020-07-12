@@ -25,6 +25,11 @@
 namespace quic {
 namespace test {
 namespace crypto_test_utils {
+
+using ProofSourcePtr = std::unique_ptr<ProofSource>;
+using ProofVerifierPtr = std::unique_ptr<ProofVerifier>;
+using ProofVerifyContextPtr = std::unique_ptr<ProofVerifyContext>;
+
 // NOLINTNEXTLINE(readability-identifier-naming)
 ProofSourcePtr ProofSourceForTesting() { return std::make_unique<Envoy::Quic::TestProofSource>(); }
 

@@ -2,6 +2,8 @@
 
 #include <datadog/opentracing.h>
 
+#include <memory>
+
 #include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -79,6 +81,8 @@ private:
   datadog::opentracing::TracerOptions tracer_options_;
   ThreadLocal::SlotPtr tls_;
 };
+
+using DriverPtr = std::unique_ptr<Driver>;
 
 /**
  * This class wraps the encoder provided with the tracer at initialization
