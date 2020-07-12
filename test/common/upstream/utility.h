@@ -56,9 +56,10 @@ inline envoy::config::cluster::v3::Cluster parseClusterFromV2Json(const std::str
   return cluster;
 }
 
-inline envoy::config::cluster::v3::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
+inline envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::string& yaml,
+                                                                  bool avoid_boosting = true) {
   envoy::config::cluster::v3::Cluster cluster;
-  TestUtility::loadFromYaml(yaml, cluster, true);
+  TestUtility::loadFromYaml(yaml, cluster, true, avoid_boosting);
   return cluster;
 }
 
@@ -123,6 +124,14 @@ makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
   return std::make_shared<LocalityWeights>(locality_weights);
 }
 
+inline envoy::config::core::v3::HealthCheck
+parseHealthCheckFromV3Yaml(const std::string& yaml_string, bool avoid_boosting = true) {
+  envoy::config::core::v3::HealthCheck health_check;
+  TestUtility::loadFromYamlAndValidate(yaml_string, health_check, false, avoid_boosting);
+  return health_check;
+}
+
+// For DEPRECATED TEST CASES
 inline envoy::config::core::v3::HealthCheck
 parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   envoy::config::core::v3::HealthCheck health_check;

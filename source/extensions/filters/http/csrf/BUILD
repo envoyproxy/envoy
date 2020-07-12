@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:url_utility_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

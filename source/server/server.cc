@@ -59,7 +59,7 @@ InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-    ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
+    ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
@@ -635,8 +635,9 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
+    Config::ScopedResume maybe_resume_rds;
     if (cm.adsMux()) {
-      cm.adsMux()->pause(type_urls);
+      maybe_resume_rds = cm.adsMux()->pause(type_urls);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -644,9 +645,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
-    if (cm.adsMux()) {
-      cm.adsMux()->resume(type_urls);
-    }
+    // This is done by tearing down the maybe_resume_rds Cleanup object.
   });
 }
 

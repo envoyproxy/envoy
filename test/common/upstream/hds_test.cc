@@ -16,7 +16,8 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -126,7 +127,7 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
