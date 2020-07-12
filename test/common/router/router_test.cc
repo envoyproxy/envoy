@@ -70,7 +70,7 @@ public:
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
                                  const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 Runtime::Loader&, Runtime::RandomGenerator&, Event::Dispatcher&,
+                                 Runtime::Loader&, Random::RandomGenerator&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
@@ -352,7 +352,7 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Envoy::ConnectionPool::MockCancellable cancellable_;
   Http::ContextImpl http_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;

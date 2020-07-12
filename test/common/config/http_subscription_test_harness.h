@@ -192,7 +192,7 @@ public:
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::config::core::v3::Node node_;
-  Runtime::MockRandomGenerator random_gen_;
+  Random::MockRandomGenerator random_gen_;
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks callbacks_;
