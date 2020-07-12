@@ -46,7 +46,7 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
                                ListenerHooks& listener_hooks,
                                Server::ComponentFactory& component_factory,
-                               Runtime::RandomGeneratorPtr&& random_generator,
+                               Random::RandomGeneratorPtr&& random_generator,
                                Thread::ThreadFactory& thread_factory,
                                Filesystem::Instance& file_system, ProcessContextPtr process_context)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
