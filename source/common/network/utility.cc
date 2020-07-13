@@ -571,7 +571,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
-    // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
+    // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor.
     const uint64_t max_packet_size_with_gro = 16 * udp_packet_processor.maxPacketSize();
 
     Api::IoCallUint64Result result =
