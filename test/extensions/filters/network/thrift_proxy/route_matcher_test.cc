@@ -19,9 +19,9 @@ namespace Router {
 namespace {
 
 envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
-parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+parseRouteConfigurationFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;
-  TestUtility::loadFromYaml(yaml, route_config);
+  TestUtility::loadFromYaml(yaml, route_config, false, avoid_boosting);
   TestUtility::validate(route_config);
   return route_config;
 }
@@ -41,7 +41,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -78,7 +78,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -121,7 +121,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
 
@@ -158,7 +158,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   EXPECT_THROW(new RouteMatcher(config), EnvoyException);
 }
@@ -178,7 +178,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -215,7 +215,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -258,7 +258,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
 
@@ -295,7 +295,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   EXPECT_THROW(new RouteMatcher(config), EnvoyException);
 }
@@ -314,7 +314,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -347,7 +347,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -385,7 +385,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -421,7 +421,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -458,7 +458,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -494,7 +494,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -532,7 +532,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -588,7 +588,7 @@ routes:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
   RouteMatcher matcher(config);
   MessageMetadata metadata;
 
@@ -632,7 +632,7 @@ routes:
 )EOF";
 
   const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
   EXPECT_THROW(RouteMatcher m(config), EnvoyException);
 }
 
@@ -656,7 +656,7 @@ routes:
 )EOF";
 
   const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
   RouteMatcher matcher(config);
   MessageMetadata metadata;
 
@@ -728,7 +728,7 @@ routes:
 )EOF";
 
   const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
   RouteMatcher matcher(config);
   MessageMetadata metadata;
   metadata.setMethodName("method1");
@@ -815,7 +815,7 @@ routes:
 )EOF";
 
   const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
+      parseRouteConfigurationFromV3Yaml(yaml);
   RouteMatcher matcher(config);
   MessageMetadata metadata;
   metadata.setMethodName("method1");
