@@ -32,7 +32,6 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
   ASSERT(load_report_stats_store != nullptr);
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
-  request_.mutable_node()->add_client_features("envoy.lrs.supports_request_latency_percentiles");
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
@@ -136,23 +135,24 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         if (it != metrics_to_cluster_map.end()) {
           auto cluster_stats = it->second;
           auto& interval_stats = histogram->intervalStatistics();
-          for (auto& v : interval_stats.supportedQuantiles()) {
-            cluster_stats->add_request_latency_supported_percentiles(v);
-          }
-          for (auto& v : interval_stats.computedQuantiles()) {
-            cluster_stats->add_request_latency_computed_percentiles(v);
+          auto& supported_quantiles = interval_stats.supportedQuantiles();
+          auto& computed_quantiles = interval_stats.computedQuantiles();
+          for (unsigned long i = 0; i < supported_quantiles.size(); i++) {
+            auto* percentile = cluster_stats->add_request_latency_percentiles();
+            percentile->mutable_percent()->set_value(supported_quantiles[i] * 100);
+            percentile->set_value(computed_quantiles[i]);
           }
         }
       }
 
-      _sendLoadStatsRequest();
+      sendLoadStatsRequestInner();
     });
   } else {
-    _sendLoadStatsRequest();
+    sendLoadStatsRequestInner();
   }
 }
 
-void LoadStatsReporter::_sendLoadStatsRequest() {
+void LoadStatsReporter::sendLoadStatsRequestInner() {
   Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
   stream_->sendMessage(request_, false);

@@ -52,10 +52,9 @@ private:
   void setRetryTimer();
   void establishNewStream();
   void sendLoadStatsRequest();
+  void sendLoadStatsRequestInner();
   void handleFailure();
   void startLoadReportPeriod();
-
-  void _sendLoadStatsRequest();
 
   ClusterManager& cm_;
   LoadReporterStats stats_;

@@ -4,6 +4,7 @@ package envoy.config.endpoint.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -118,10 +119,16 @@ message EndpointLoadMetricStats {
   double total_metric_value = 3;
 }
 
+message Percentile {
+  type.v3.Percent percent = 1;
+
+  float value = 2;
+}
+
 // Per cluster load stats. Envoy reports these stats a management server in a
 // :ref:`LoadStatsRequest<envoy_api_msg_service.load_stats.v3.LoadStatsRequest>`
 // Next ID: 9
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message ClusterStats {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.ClusterStats";
 
@@ -161,11 +168,9 @@ message ClusterStats {
   repeated DroppedRequests dropped_requests = 5;
 
   // the request latencies in this cluster. Only HTTP requests are currently
-  // supported. It's guaranteed that
-  // len(request_latency_supported_percentiles) == len(request_latency_computed_percentiles)
-  repeated double request_latency_supported_percentiles = 7;
-
-  repeated double request_latency_computed_percentiles = 8;
+  // supported. Only set if LoadStatsResponse.send_request_latency_percentiles
+  // is set.
+  repeated Percentile request_latency_percentiles = 7;
 
   // Period over which the actual load report occurred. This will be guaranteed to include every
   // request reported. Due to system load and delays between the *LoadStatsRequest* sent from Envoy

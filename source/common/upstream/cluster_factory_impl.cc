@@ -129,7 +129,6 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
       *new_cluster_pair.first, cluster, context.dispatcher(), context.runtime(),
       context.outlierEventLogger()));
-
   return new_cluster_pair;
 }
 

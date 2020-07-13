@@ -266,8 +266,7 @@ public:
       RELEASE_ASSERT(result, result.message());
       if (local_loadstats_request.has_node()) {
         EXPECT_THAT(local_loadstats_request.node().client_features(),
-                    ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters",
-                                           "envoy.lrs.supports_request_latency_percentiles"));
+                    ::testing::ElementsAre("envoy.lrs.supports_send_all_clusters"));
       }
       // Sanity check and clear the measured load report interval and request latencies
       for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
@@ -281,10 +280,9 @@ public:
         cluster_stats.mutable_load_report_interval()->Clear();
 
         // sanity check request latencies aren't NAN
-        for (auto& p : cluster_stats.request_latency_computed_percentiles()) {
-          EXPECT_THAT(std::isnan(p), false);
+        for (auto& p : cluster_stats.request_latency_percentiles()) {
+          EXPECT_THAT(std::isnan(p.value()), false);
         }
-        cluster_stats.mutable_request_latency_computed_percentiles()->Clear();
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
 

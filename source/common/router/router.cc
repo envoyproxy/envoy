@@ -308,9 +308,9 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     }
 
     if (dropped) {
-      auto&& loadReportStats = cluster_->loadReportStats();
-      if (loadReportStats.has_value()) {
-        loadReportStats->upstream_rq_dropped_.inc();
+      auto& load_report_stats = cluster_->loadReportStats();
+      if (load_report_stats.has_value()) {
+        load_report_stats->upstream_rq_dropped_.inc();
       }
     }
     if (upstream_host && Http::CodeUtility::is5xx(response_status_code)) {
