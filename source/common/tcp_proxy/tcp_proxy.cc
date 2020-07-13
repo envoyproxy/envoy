@@ -518,7 +518,7 @@ void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   }
 }
 
-void Filter::onPoolReady(const TcpProxy::GenericUpstreamSharedPtr& upstream,
+void Filter::onPoolReady(const Tcp::GenericUpstreamSharedPtr& upstream,
                          Upstream::HostDescriptionConstSharedPtr& host,
                          const Network::Address::InstanceConstSharedPtr& local_address,
                          const StreamInfo::StreamInfo& info) {

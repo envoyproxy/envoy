@@ -3,19 +3,18 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/tcp/upstream_interface.h"
 #include "envoy/upstream/upstream.h"
-
-#include "common/tcp_proxy/upstream_interface.h"
 
 namespace Envoy {
 namespace TcpProxy {
 
-class TcpUpstream : public Envoy::TcpProxy::GenericUpstream {
+class TcpUpstream : public Envoy::Tcp::GenericUpstream {
 public:
   TcpUpstream(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& data,
               Envoy::Tcp::ConnectionPool::UpstreamCallbacks& callbacks);
 
-  // TcpProxy::GenericUpstream
+  // Tcp::GenericUpstream
   bool readDisable(bool disable) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
@@ -27,12 +26,12 @@ private:
 };
 
 // An implementation of GenericConnPool which works with the Tcp::ConnectionPool.
-class TcpGenericConnPool final : public Envoy::TcpProxy::GenericConnPool,
+class TcpGenericConnPool final : public Envoy::Tcp::GenericConnPool,
                                  public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
   TcpGenericConnPool(Envoy::Tcp::ConnectionPool::Instance& tcp_pool_instance,
                      Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                     Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks)
+                     Envoy::Tcp::GenericUpstreamPoolCallbacks& generic_pool_callbacks)
       : tcp_upstream_callbacks_(upstream_callbacks),
         generic_pool_callbacks_(generic_pool_callbacks) {
     tcp_upstream_handle_ = tcp_pool_instance.newConnection(*this);
@@ -68,12 +67,12 @@ private:
   // The handle to cancel the callback to set the tcp upstream.
   Envoy::Tcp::ConnectionPool::Cancellable* tcp_upstream_handle_{};
   Envoy::Tcp::ConnectionPool::UpstreamCallbacks& tcp_upstream_callbacks_;
-  Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks_;
+  Envoy::Tcp::GenericUpstreamPoolCallbacks& generic_pool_callbacks_;
   std::shared_ptr<TcpUpstream> tcp_upstream_{};
   bool has_failure_{false};
 };
 
-class HttpUpstream : public Envoy::TcpProxy::GenericUpstream, Envoy::Http::StreamCallbacks {
+class HttpUpstream : public Envoy::Tcp::GenericUpstream, Envoy::Http::StreamCallbacks {
 public:
   HttpUpstream(Envoy::Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                const std::string& hostname);
@@ -84,7 +83,7 @@ public:
   void doneReading();
   void doneWriting();
 
-  // TcpProxy::GenericUpstream
+  // Tcp::GenericUpstream
   bool readDisable(bool disable) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
@@ -220,11 +219,11 @@ private:
   bool write_half_closed_{};
 };
 
-class HttpGenericConnPool final : public Envoy::TcpProxy::GenericConnPool,
+class HttpGenericConnPool final : public Envoy::Tcp::GenericConnPool,
                                   public Envoy::Http::ConnectionPool::Callbacks {
 public:
   HttpGenericConnPool(Envoy::Http::ConnectionPool::Instance& conn_pool,
-                      Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks,
+                      Envoy::Tcp::GenericUpstreamPoolCallbacks& generic_pool_callbacks,
                       Envoy::Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                       absl::string_view hostname)
       : generic_pool_callbacks_(generic_pool_callbacks),
@@ -239,7 +238,7 @@ public:
     }
   }
 
-  // Envoy::TcpProxy::GenericConnPool
+  // Envoy::Tcp::GenericConnPool
   void cancelAnyPendingRequest() override {
     if (upstream_http_handle_ != nullptr) {
       upstream_http_handle_->cancel(ConnectionPool::CancelPolicy::Default);
@@ -263,7 +262,7 @@ public:
                    const StreamInfo::StreamInfo& info) override;
 
 private:
-  Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks_;
+  Envoy::Tcp::GenericUpstreamPoolCallbacks& generic_pool_callbacks_;
   std::shared_ptr<HttpUpstream> http_upstream_;
   Envoy::Http::ConnectionPool::Cancellable* upstream_http_handle_{};
   bool has_failure_{false};

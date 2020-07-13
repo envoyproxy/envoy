@@ -17,6 +17,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/tcp/upstream_interface.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -26,7 +27,6 @@
 #include "common/network/hash_policy.h"
 #include "common/network/utility.h"
 #include "common/stream_info/stream_info_impl.h"
-#include "common/tcp_proxy/upstream_interface.h"
 #include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
@@ -232,7 +232,7 @@ private:
  */
 class Filter : public Network::ReadFilter,
                public Upstream::LoadBalancerContextBase,
-               public TcpProxy::GenericUpstreamPoolCallbacks,
+               public Tcp::GenericUpstreamPoolCallbacks,
                protected Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
@@ -246,10 +246,10 @@ public:
   }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
-  // TcpProxy::GenericUpstreamPoolCallbacks
+  // Tcp::GenericUpstreamPoolCallbacks
   void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(const TcpProxy::GenericUpstreamSharedPtr& upstream,
+  void onPoolReady(const Tcp::GenericUpstreamSharedPtr& upstream,
                    Upstream::HostDescriptionConstSharedPtr& host,
                    const Network::Address::InstanceConstSharedPtr& local_address,
                    const StreamInfo::StreamInfo& info) override;
@@ -371,7 +371,7 @@ protected:
   Event::TimerPtr idle_timer_;
 
   // Generic pool is used to drive the creation of generic upstream.
-  TcpProxy::GenericConnPoolPtr generic_pool_;
+  Tcp::GenericConnPoolPtr generic_pool_;
   // The connection state used when handling upstream event. In connecting state, some types of
   // failure should be resolved by reconnect.
   bool connecting_{};
@@ -380,7 +380,7 @@ protected:
                                                           // read filter.
   // The upstream is set up by generic_pool_. Once this upstream is valid, the generic should be
   // left untouch.
-  std::shared_ptr<TcpProxy::GenericUpstream> upstream_;
+  std::shared_ptr<Tcp::GenericUpstream> upstream_;
   RouteConstSharedPtr route_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};

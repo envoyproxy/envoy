@@ -18,3 +18,24 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "upstream_interface",
+    hdrs = [
+        "upstream_interface.h",
+    ],
+    deps = [
+        ":conn_pool_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "tcp_upstream_factory",
+    hdrs = [
+        "factory.h",
+    ],
+    deps = [
+        ":upstream_interface",
+        "//include/envoy/config:typed_config_interface",
+    ],
+)

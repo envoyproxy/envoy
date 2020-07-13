@@ -1,9 +1,10 @@
 #include <memory>
 
-#include "common/tcp_proxy/upstream.h"
-#include "common/tcp_proxy/upstream_interface.h"
+#include "envoy/tcp/upstream_interface.h"
 
-#include "test/common/tcp_proxy/mocks.h"
+#include "common/tcp_proxy/upstream.h"
+
+#include "test/common/tcp/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/http/stream_encoder.h"
@@ -112,7 +113,7 @@ TEST_F(HttpUpstreamTest, UpstreamWatermarks) {
 class HttpGenericConnPoolTest : public testing::Test {
 public:
   std::string hostname_{"default.com"};
-  Envoy::TcpProxy::MockGenericUpstreamPoolCallbacks generic_pool_callbacks_;
+  Envoy::Tcp::MockGenericUpstreamPoolCallbacks generic_pool_callbacks_;
   std::unique_ptr<HttpGenericConnPool> http_generic_pool_;
 
   Envoy::Http::ConnectionPool::MockInstance http_conn_pool_instance_;

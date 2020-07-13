@@ -9,16 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "tcp_upstream_factory",
-    hdrs = [
-        "factory.h",
-    ],
-    deps = [
-        ":upstream_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "tcp_proxy",
     srcs = [
         "tcp_proxy.cc",
@@ -28,7 +18,6 @@ envoy_cc_library(
     ],
     deps = [
         ":tcp_proxy_upstreams",
-        ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
@@ -42,6 +31,7 @@ envoy_cc_library(
         "//include/envoy/stats:timespan_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//include/envoy/tcp:conn_pool_interface",
+        "//include/envoy/tcp:upstream_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_lib",
@@ -66,16 +56,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "upstream_interface",
-    hdrs = [
-        "upstream_interface.h",
-    ],
-    deps = [
-        "//include/envoy/tcp:conn_pool_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "tcp_proxy_upstreams",
     srcs = [
         "upstream.cc",
@@ -84,7 +64,6 @@ envoy_cc_library(
         "upstream.h",
     ],
     deps = [
-        ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
@@ -98,6 +77,7 @@ envoy_cc_library(
         "//include/envoy/stats:timespan_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//include/envoy/tcp:conn_pool_interface",
+        "//include/envoy/tcp:upstream_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_lib",
