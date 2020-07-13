@@ -282,7 +282,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       }
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
-      const auto& initial_metadata = oc_config.stackdriver_grpc_service().initial_metadata();
+      const auto& initial_metadata = stackdriver_service.initial_metadata();
       if (!initial_metadata.empty()) {
         opts.prepare_client_context = [initial_metadata](grpc::ClientContext* ctx) {
           for (const auto& metadata : initial_metadata) {
