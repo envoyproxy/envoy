@@ -60,7 +60,7 @@ message ExtensionConfigSource {
   // to be supplied.
   bool apply_default_config_without_warming = 3;
 
-  // Optional constraint on the type URL. Extension configuration updates are rejected
-  // if they do not match the set type URL.
-  string type_url = 4;
+  // A set of permitted extension type URLs. Extension configuration updates are rejected
+  // if they do not match any type URL in the set.
+  repeated string type_urls = 4 [(validate.rules).repeated = {min_items: 1}];
 }

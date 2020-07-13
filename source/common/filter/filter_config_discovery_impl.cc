@@ -7,15 +7,17 @@
 #include "common/grpc/common.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Filter {
 
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
     HttpFilterConfigSubscriptionSharedPtr&& subscription, bool require_terminal,
-    absl::optional<std::string> require_type_url,
+    const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)), require_terminal_(require_terminal),
-      require_type_url_(require_type_url), tls_(factory_context.threadLocal().allocateSlot()),
+      require_type_urls_(require_type_urls), tls_(factory_context.threadLocal().allocateSlot()),
       init_target_("DynamicFilterConfigProviderImpl", [this]() {
         subscription_->start();
         init_target_.ready();
@@ -46,12 +48,10 @@ void DynamicFilterConfigProviderImpl::validateConfig(
     throw EnvoyException(
         fmt::format("Error: filter config {} must be the last in the filter chain.", name()));
   }
-  if (require_type_url_.has_value()) {
-    auto type_url = Config::Utility::getFactoryType(proto_config);
-    if (type_url != TypeUtil::typeUrlToDescriptorFullName(require_type_url_.value())) {
-      throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
-                                       type_url, require_type_url_.value()));
-    }
+  auto type_url = Config::Utility::getFactoryType(proto_config);
+  if (require_type_urls_.count(type_url) == 0) {
+    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
+                                     type_url, absl::StrJoin(require_type_urls_, ", ")));
   }
 }
 
@@ -190,7 +190,7 @@ std::shared_ptr<HttpFilterConfigSubscription> HttpFilterConfigProviderManagerImp
 HttpFilterConfigProviderPtr HttpFilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name, bool require_terminal,
-    absl::optional<std::string> require_type_url,
+    const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     bool apply_without_warming) {
   auto subscription =
@@ -202,7 +202,7 @@ HttpFilterConfigProviderPtr HttpFilterConfigProviderManagerImpl::createDynamicFi
     factory_context.initManager().add(subscription->initTarget());
   }
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      std::move(subscription), require_terminal, require_type_url, factory_context);
+      std::move(subscription), require_terminal, require_type_urls, factory_context);
   // Ensure the subscription starts if it has not already.
   if (apply_without_warming) {
     factory_context.initManager().add(provider->init_target_);

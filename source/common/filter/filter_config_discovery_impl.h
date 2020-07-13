@@ -32,7 +32,7 @@ class DynamicFilterConfigProviderImpl : public HttpFilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(HttpFilterConfigSubscriptionSharedPtr&& subscription,
                                   bool require_terminal,
-                                  absl::optional<std::string> require_type_url,
+                                  const std::set<std::string>& require_type_urls,
                                   Server::Configuration::FactoryContext& factory_context);
   ~DynamicFilterConfigProviderImpl() override;
 
@@ -51,7 +51,7 @@ private:
 
   HttpFilterConfigSubscriptionSharedPtr subscription_;
   const bool require_terminal_;
-  const absl::optional<std::string> require_type_url_;
+  const std::set<std::string> require_type_urls_;
   ThreadLocal::SlotPtr tls_;
 
   // Local initialization target to ensure that the subscription starts in
@@ -162,7 +162,7 @@ public:
   HttpFilterConfigProviderPtr
   createDynamicFilterConfigProvider(const envoy::config::core::v3::ConfigSource& config_source,
                                     const std::string& filter_config_name, bool require_terminal,
-                                    absl::optional<std::string> require_type_url,
+                                    const std::set<std::string>& require_type_urls,
                                     Server::Configuration::FactoryContext& factory_context,
                                     const std::string& stat_prefix,
                                     bool apply_without_warming) override;

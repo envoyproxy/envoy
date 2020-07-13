@@ -1688,6 +1688,8 @@ http_filters:
   config_discovery:
     config_source: { ads: {} }
     apply_default_config_without_warming: true
+    type_urls:
+    - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -1715,6 +1717,8 @@ http_filters:
     config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/google.protobuf.Value
+    type_urls:
+    - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -1743,6 +1747,8 @@ http_filters:
     config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    type_urls:
+    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
@@ -1769,6 +1775,8 @@ http_filters:
     config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    type_urls:
+    - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 - name: envoy.filters.http.router
   )EOF";
 
@@ -1799,14 +1807,15 @@ http_filters:
       type_url: type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
       value:
         pass_through_mode: false
-    type_url: type.googleapis.com/google.protobuf.Value
+    type_urls:
+    - type.googleapis.com/google.protobuf.Value
 - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
       createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
-      "expect type.googleapis.com/google.protobuf.Value.");
+      "expect google.protobuf.Value.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultValid) {
@@ -1830,7 +1839,8 @@ http_filters:
     default_config:
       "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
       pass_through_mode: false
-    type_url: type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    type_urls:
+    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     apply_default_config_without_warming: true
 - name: envoy.filters.http.router
   )EOF";
@@ -1891,6 +1901,8 @@ http_filters:
 - name: foo
   config_discovery:
     config_source: { ads: {} }
+    type_urls:
+    - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 - name: envoy.filters.http.router
   )EOF";
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,

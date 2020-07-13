@@ -77,7 +77,8 @@ public:
     envoy::config::core::v3::ConfigSource config_source;
     TestUtility::loadFromYaml("ads: {}", config_source);
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, terminal, absl::nullopt, factory_context_, "xds.", !warm);
+        config_source, name, terminal, {"envoy.extensions.filters.http.router.v3.Router"},
+        factory_context_, "xds.", !warm);
   }
 
   void setup(bool warm = true) {

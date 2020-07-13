@@ -791,6 +791,7 @@ message HttpFilter {
 
     // Configuration source specifier for an extension configuration discovery service.
     // In case of a failure and without the default configuration, the HTTP listener responds with 500.
+    // Extension configs delivered through this mechanism are not expected to require warming (see https://github.com/envoyproxy/envoy/issues/12061).
     config.core.v3.ExtensionConfigSource config_discovery = 5;
   }
 }

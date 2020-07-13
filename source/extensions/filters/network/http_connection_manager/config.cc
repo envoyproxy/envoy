@@ -526,11 +526,12 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
     throw EnvoyException(fmt::format(
         "Error: filter config {} applied without warming but has no default config.", name));
   }
-  auto require_type_url = config_discovery.type_url().empty()
-                              ? absl::nullopt
-                              : absl::optional<std::string>(config_discovery.type_url());
+  std::set<std::string> require_type_urls;
+  for (const auto& type_url : config_discovery.type_urls()) {
+    require_type_urls.emplace(TypeUtil::typeUrlToDescriptorFullName(type_url));
+  }
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-      config_discovery.config_source(), name, last_filter_in_current_config, require_type_url,
+      config_discovery.config_source(), name, last_filter_in_current_config, require_type_urls,
       context_, stats_prefix_, config_discovery.apply_default_config_without_warming());
   if (config_discovery.has_default_config()) {
     auto* default_factory =
