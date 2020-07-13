@@ -8,15 +8,12 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/listener_hooks.h"
-#include "server/proto_descriptors.h"
 #include "server/server.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
 namespace Envoy {
