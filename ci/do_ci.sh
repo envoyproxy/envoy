@@ -220,7 +220,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
-    --define use_legacy_codecs_in_test=true \
+    --define use_legacy_codecs_in_integration_tests=true \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
@@ -237,8 +237,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   echo "Building and testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
 
-  # Legacy codecs "--define legacy_codecs_in_test=true" should also be tested in integration tests
-  # with asan.
+  # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
+  # integration tests with asan.
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only

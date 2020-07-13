@@ -33,8 +33,8 @@ def envoy_select_hot_restart(xs, repository = ""):
     })
 
 # Select the given values if use legacy codecs in test is on in the current build.
-def envoy_select_legacy_codecs_in_test(xs, repository = ""):
+def envoy_select_legacy_codecs_in_integration_tests(xs, repository = ""):
     return select({
-        repository + "//bazel:enable_legacy_codecs_in_test": xs,
+        repository + "//bazel:enable_legacy_codecs_in_integration_tests": xs,
         "//conditions:default": [],
     })

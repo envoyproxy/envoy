@@ -286,7 +286,7 @@ FakeHttpConnection::FakeHttpConnection(
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();
-#ifdef ENVOY_USE_LEGACY_CODECS_IN_TEST
+#ifdef ENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS
     codec_ = std::make_unique<TestHttp1ServerConnectionImpl>(
         shared_connection_.connection(), stats, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
@@ -302,7 +302,7 @@ FakeHttpConnection::FakeHttpConnection(
     http2_options.set_allow_connect(true);
     http2_options.set_allow_metadata(true);
     Http::Http2::CodecStats& stats = fake_upstream.http2CodecStats();
-#ifdef ENVOY_USE_LEGACY_CODECS_IN_TEST
+#ifdef ENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
         shared_connection_.connection(), *this, stats, http2_options, max_request_headers_kb,
         max_request_headers_count, headers_with_underscores_action);
