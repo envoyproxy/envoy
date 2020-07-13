@@ -40,7 +40,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/health_checkers/redis:95.9"
 "source/extensions/quic_listeners:84.8"
 "source/extensions/quic_listeners/quiche:84.8"
-"source/extensions/resource_monitors/fixed_heap:90.9"
 "source/extensions/retry:95.5"
 "source/extensions/retry/host:85.7"
 "source/extensions/retry/host/omit_canary_hosts:64.3"
