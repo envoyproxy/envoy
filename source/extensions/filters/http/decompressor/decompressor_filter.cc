@@ -27,6 +27,7 @@ DecompressorFilterConfig::DecompressorFilterConfig(
     : stats_prefix_(fmt::format("{}decompressor.{}.{}", stats_prefix,
                                 proto_config.decompressor_library().name(),
                                 decompressor_factory->statsPrefix())),
+      decompressor_stats_prefix_(stats_prefix_ + "decompressor_library"),
       decompressor_factory_(std::move(decompressor_factory)),
       request_direction_config_(proto_config.request_direction_config(), stats_prefix_, scope,
                                 runtime),
