@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/filter/filter_config_provider.h"
 #include "envoy/protobuf/message_validator.h"
