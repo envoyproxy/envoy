@@ -15,7 +15,10 @@
 #include "server/options_impl.h"
 
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_component_factory.h"
+#include "test/mocks/server/worker.h"
+#include "test/mocks/server/worker_factory.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
