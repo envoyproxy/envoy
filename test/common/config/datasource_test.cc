@@ -6,19 +6,18 @@
 #include "common/protobuf/protobuf.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
-using testing::AtLeast;
-using testing::NiceMock;
-using testing::Return;
-
 namespace Envoy {
 namespace Config {
 namespace {
+using ::testing::AtLeast;
+using ::testing::NiceMock;
+using ::testing::Return;
 
 class AsyncDataSourceTest : public testing::Test {
 protected:

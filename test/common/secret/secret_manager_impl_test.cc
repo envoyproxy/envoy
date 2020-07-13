@@ -15,7 +15,9 @@
 #include "common/ssl/tls_certificate_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/config_tracker.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
