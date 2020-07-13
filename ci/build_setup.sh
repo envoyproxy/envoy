@@ -83,7 +83,7 @@ trap cleanup EXIT
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 "$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
-[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
+[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results"
 
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \

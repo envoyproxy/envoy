@@ -78,11 +78,12 @@ public:
         std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
     auto redis_command_stats =
         Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
-    std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
+    std::shared_ptr<InstanceImpl> conn_pool_impl = std::make_shared<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_),
         api_, std::move(store), redis_command_stats, cluster_refresh_manager_);
+    conn_pool_impl->init();
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_username_ = auth_username_;
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
@@ -174,6 +175,11 @@ public:
   std::list<InstanceImpl::ThreadLocalActiveClientPtr>& clientsToDrain() {
     InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
     return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().clients_to_drain_;
+  }
+
+  InstanceImpl::ThreadLocalPool& threadLocalPool() {
+    InstanceImpl* conn_pool_impl = dynamic_cast<InstanceImpl*>(conn_pool_.get());
+    return conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>();
   }
 
   Event::TimerPtr& drainTimer() {
@@ -382,7 +388,7 @@ TEST_F(RedisConnPoolImplTest, ClientRequestFailed) {
 TEST_F(RedisConnPoolImplTest, BasicWithReadPolicy) {
   testReadPolicy(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
                      ConnPoolSettings::PREFER_MASTER,
-                 NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+                 NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary);
   testReadPolicy(
       envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::REPLICA,
       NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
@@ -1151,6 +1157,61 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
   EXPECT_CALL(callbacks, onResponse_(Ref(ask_response4)));
   EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response4),
                                                                "10.1.2.3:4000", true));
+
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+}
+
+TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
+  tls_.defer_delete = true;
+  std::unique_ptr<NiceMock<Stats::MockStore>> store =
+      std::make_unique<NiceMock<Stats::MockStore>>();
+  cluster_refresh_manager_ =
+      std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
+  auto redis_command_stats =
+      Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
+  conn_pool_ = std::make_shared<InstanceImpl>(
+      cluster_name_, cm_, *this, tls_,
+      Common::Redis::Client::createConnPoolSettings(20, true, true, 100, read_policy_), api_,
+      std::move(store), redis_command_stats, cluster_refresh_manager_);
+  conn_pool_->init();
+
+  auto& local_pool = threadLocalPool();
+  conn_pool_.reset();
+
+  // Request
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::Client::MockPoolRequest active_request;
+  MockPoolCallbacks callbacks;
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return this->cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(this->test_address_));
+  EXPECT_CALL(*client, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request));
+  EXPECT_NE(nullptr, local_pool.makeRequest("hash_key", value, callbacks));
+
+  // Move redirection.
+  Common::Redis::Client::MockPoolRequest active_request2;
+  Common::Redis::Client::MockClient* client2 = new NiceMock<Common::Redis::Client::MockClient>();
+  Upstream::HostConstSharedPtr host1;
+  Common::Redis::RespValuePtr moved_response{new Common::Redis::RespValue()};
+  moved_response->type(Common::Redis::RespType::Error);
+  moved_response->asString() = "MOVED 1111 10.1.2.3:4000";
+
+  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client2)));
+  EXPECT_CALL(*client2, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request2));
+  EXPECT_TRUE(client->client_callbacks_.back()->onRedirection(std::move(moved_response),
+                                                              "10.1.2.3:4000", false));
+  EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
+  EXPECT_CALL(callbacks, onResponse_(_));
+  client2->client_callbacks_.back()->onResponse(std::make_unique<Common::Redis::RespValue>());
 
   EXPECT_CALL(*client, close());
   tls_.shutdownThread();

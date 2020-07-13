@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -99,7 +100,7 @@ public:
   Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
          Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
+         const LocalInfo::LocalInfo& localinfo, Random::RandomGenerator& random_generator,
          TimeSource& time_source);
 
   /**
@@ -201,6 +202,7 @@ public:
   // The callbacks below record Zipkin-span-related stats.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   /**
    * Creates a heap-allocated ZipkinReporter.

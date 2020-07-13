@@ -124,7 +124,7 @@ public:
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 
@@ -618,24 +618,24 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
 
     // Supply bogus context, that will be simply ignored.
     const std::string invalid_context = "notvalidcontext";
-    request_headers_.setOtSpanContext(invalid_context);
+    request_headers_.setCopy(Http::CustomHeaders::get().OtSpanContext, invalid_context);
     stats_.counter("tracing.opentracing.span_context_extraction_error").reset();
     driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
                        {Tracing::Reason::Sampling, true});
     EXPECT_EQ(1U, stats_.counter("tracing.opentracing.span_context_extraction_error").value());
 
-    std::string injected_ctx(request_headers_.getOtSpanContextValue());
+    std::string injected_ctx(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
     EXPECT_FALSE(injected_ctx.empty());
 
     // Supply empty context.
-    request_headers_.removeOtSpanContext();
+    request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
     Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                start_time_, {Tracing::Reason::Sampling, true});
 
-    EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+    EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
     span->injectContext(request_headers_);
 
-    injected_ctx = std::string(request_headers_.getOtSpanContextValue());
+    injected_ctx = std::string(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
     EXPECT_FALSE(injected_ctx.empty());
 
     // Context can be parsed fine.
@@ -647,9 +647,9 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
     // Supply parent context, request_headers has properly populated x-ot-span-context.
     Tracing::SpanPtr span_with_parent = driver_->startSpan(
         config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
-    request_headers_.removeOtSpanContext();
+    request_headers_.remove(Http::CustomHeaders::get().OtSpanContext);
     span_with_parent->injectContext(request_headers_);
-    injected_ctx = std::string(request_headers_.getOtSpanContextValue());
+    injected_ctx = std::string(request_headers_.get_(Http::CustomHeaders::get().OtSpanContext));
     EXPECT_FALSE(injected_ctx.empty());
   }
 }
@@ -684,9 +684,9 @@ TEST_F(LightStepDriverTest, MultiplePropagationModes) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
-  EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+  EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
   span->injectContext(request_headers_);
-  EXPECT_TRUE(request_headers_.has("x-ot-span-context"));
+  EXPECT_TRUE(request_headers_.has(Http::CustomHeaders::get().OtSpanContext));
   EXPECT_TRUE(request_headers_.has("ot-tracer-traceid"));
   EXPECT_TRUE(request_headers_.has("x-b3-traceid"));
   EXPECT_TRUE(request_headers_.has("traceparent"));
@@ -709,8 +709,10 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   childViaHeaders->injectContext(base1);
   childViaSpawn->injectContext(base2);
 
-  std::string base1_context = Base64::decode(std::string(base1.getOtSpanContextValue()));
-  std::string base2_context = Base64::decode(std::string(base2.getOtSpanContextValue()));
+  std::string base1_context =
+      Base64::decode(std::string(base1.get_(Http::CustomHeaders::get().OtSpanContext)));
+  std::string base2_context =
+      Base64::decode(std::string(base2.get_(Http::CustomHeaders::get().OtSpanContext)));
 
   EXPECT_FALSE(base1_context.empty());
   EXPECT_FALSE(base2_context.empty());

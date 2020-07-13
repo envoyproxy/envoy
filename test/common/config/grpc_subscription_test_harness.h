@@ -5,6 +5,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/hash.h"
@@ -54,8 +55,8 @@ public:
         *method_descriptor_, envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_,
         rate_limit_settings_, true);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        mux_, callbacks_, stats_, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_,
-        init_fetch_timeout, false);
+        mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,
+        dispatcher_, init_fetch_timeout, false);
   }
 
   ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)); }
@@ -115,7 +116,10 @@ public:
         response->add_resources()->PackFrom(API_DOWNGRADE(*load_assignment));
       }
     }
-    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response->resources()), version))
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+            *response, "cluster_name");
+    EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       expectSendMessage(last_cluster_names_, version, false);
@@ -174,11 +178,13 @@ public:
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  Random::MockRandomGenerator random_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::shared_ptr<GrpcMuxImpl> mux_;
   std::unique_ptr<GrpcSubscriptionImpl> subscription_;

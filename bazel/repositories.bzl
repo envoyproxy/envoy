@@ -125,7 +125,12 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
-        _repository_impl("io_bazel_rules_go")
+        _repository_impl(
+            name = "io_bazel_rules_go",
+            # TODO(wrowe, sunjayBhatia): remove when Windows RBE supports batch file invocation
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:rules_go.patch"],
+        )
         _repository_impl("bazel_gazelle")
 
 def envoy_dependencies(skip_targets = []):
@@ -192,6 +197,7 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
     _repository_impl("rules_cc")
+    _org_unicode_icuuc()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -694,6 +700,8 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     _repository_impl(
         name = "com_googlesource_googleurl",
+        patches = ["@envoy//bazel/external:googleurl.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "googleurl",
@@ -851,6 +859,17 @@ filegroup(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
         **_get_location("kafka_python_client")
+    )
+
+def _org_unicode_icuuc():
+    _repository_impl(
+        name = "org_unicode_icuuc",
+        build_file = "@envoy//bazel/external:icuuc.BUILD",
+        # TODO(dio): Consider patching udata when we need to embed some data.
+    )
+    native.bind(
+        name = "icuuc",
+        actual = "@org_unicode_icuuc//:common",
     )
 
 def _foreign_cc_dependencies():

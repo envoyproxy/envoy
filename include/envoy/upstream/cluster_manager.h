@@ -8,6 +8,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -367,7 +368,7 @@ public:
     ClusterManager& cm_;
     const LocalInfo::LocalInfo& local_info_;
     Event::Dispatcher& dispatcher_;
-    Runtime::RandomGenerator& random_;
+    Random::RandomGenerator& random_;
     Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
     ProtobufMessage::ValidationVisitor& validation_visitor_;

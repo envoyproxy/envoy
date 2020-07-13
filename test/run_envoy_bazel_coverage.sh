@@ -19,12 +19,9 @@ if [[ $# -gt 0 ]]; then
 elif [[ -n "${COVERAGE_TARGET}" ]]; then
   COVERAGE_TARGETS=${COVERAGE_TARGET}
 else
-  COVERAGE_TARGETS=//test/...
-fi
-
-# For fuzz builds, filter out only libFuzzer linked targets.
-if [ "${FUZZ_COVERAGE}" == "true" ]; then
-  COVERAGE_TARGETS="$(bazel query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'fuzzer', ${COVERAGE_TARGETS})")"
+  # For fuzz builds, this overrides to just fuzz targets.
+  COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} == "true" ]] &&
+    COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
 fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then

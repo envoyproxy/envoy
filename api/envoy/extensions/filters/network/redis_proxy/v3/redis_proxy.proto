@@ -8,6 +8,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -38,22 +39,22 @@ message RedisProxy {
     // because replication is asynchronous and requires some delay. You need to ensure that your
     // application can tolerate stale data.
     enum ReadPolicy {
-      // Default mode. Read from the current master node.
-      MASTER = 0;
+      // Default mode. Read from the current primary node.
+      MASTER = 0 [(udpa.annotations.enum_value_migrate).rename = "PRIMARY"];
 
-      // Read from the master, but if it is unavailable, read from replica nodes.
-      PREFER_MASTER = 1;
+      // Read from the primary, but if it is unavailable, read from replica nodes.
+      PREFER_MASTER = 1 [(udpa.annotations.enum_value_migrate).rename = "PREFER_PRIMARY"];
 
       // Read from replica nodes. If multiple replica nodes are present within a shard, a random
       // node is selected. Healthy nodes have precedent over unhealthy nodes.
       REPLICA = 2;
 
       // Read from the replica nodes (similar to REPLICA), but if all replicas are unavailable (not
-      // present or unhealthy), read from the master.
+      // present or unhealthy), read from the primary.
       PREFER_REPLICA = 3;
 
-      // Read from any node of the cluster. A random node is selected among the master and replicas,
-      // healthy nodes have precedent over unhealthy nodes.
+      // Read from any node of the cluster. A random node is selected among the primary and
+      // replicas, healthy nodes have precedent over unhealthy nodes.
       ANY = 4;
     }
 
@@ -116,7 +117,7 @@ message RedisProxy {
     // count. These commands are measured in microseconds.
     bool enable_command_stats = 8;
 
-    // Read policy. The default is to read from the master.
+    // Read policy. The default is to read from the primary.
     ReadPolicy read_policy = 7 [(validate.rules).enum = {defined_only: true}];
   }
 

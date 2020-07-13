@@ -291,5 +291,3 @@ BENCHMARK(compressChunks1024)->DenseRange(0, 8, 1)->UseManualTime()->Unit(benchm
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-
-BENCHMARK_MAIN();
