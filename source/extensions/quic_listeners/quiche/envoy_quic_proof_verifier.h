@@ -6,6 +6,8 @@
 namespace Envoy {
 namespace Quic {
 
+// A quic::ProofVerifier implementation which verifies cert chain using SSL
+// client context config.
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
   EnvoyQuicProofVerifier(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,

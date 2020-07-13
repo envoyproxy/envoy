@@ -8,19 +8,7 @@
 namespace Envoy {
 namespace Quic {
 
-class DetailsWithFilterChain : public quic::ProofSource::Details {
-public:
-  explicit DetailsWithFilterChain(const Network::FilterChain& filter_chain)
-      : filter_chain_(filter_chain) {}
-  DetailsWithFilterChain(const DetailsWithFilterChain& other)
-      : filter_chain_(other.filter_chain_) {}
-
-  const Network::FilterChain& filterChain() const { return filter_chain_; }
-
-private:
-  const Network::FilterChain& filter_chain_;
-};
-
+// A ProofSource implementation which supplies a proof instance with certs from filter chain.
 class EnvoyQuicProofSource : public EnvoyQuicProofSourceBase,
                              protected Logger::Loggable<Logger::Id::quic> {
 public:
@@ -32,6 +20,7 @@ public:
 
   ~EnvoyQuicProofSource() override = default;
 
+  // quic::ProofSource
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& server_address,
                const quic::QuicSocketAddress& client_address, const std::string& hostname) override;

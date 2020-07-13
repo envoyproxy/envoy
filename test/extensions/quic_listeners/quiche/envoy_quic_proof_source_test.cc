@@ -82,7 +82,7 @@ public:
     EXPECT_TRUE(ok);
     EXPECT_EQ(2, chain->certs.size());
     EXPECT_EQ(&expected_filter_chain_,
-              &static_cast<DetailsWithFilterChain*>(details.get())->filterChain());
+              &static_cast<EnvoyQuicProofSourceDetails*>(details.get())->filterChain());
     std::string error;
     EXPECT_EQ(quic::QUIC_SUCCESS,
               verifier_->VerifyProof("www.example.org", 54321, server_config_, version_, chlo_hash_,
