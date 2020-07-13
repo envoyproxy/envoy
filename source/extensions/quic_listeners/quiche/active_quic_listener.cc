@@ -35,20 +35,6 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        const quic::QuicConfig& quic_config,
                                        Network::Socket::OptionsSharedPtr options,
                                        const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
-    : ActiveQuicListener(dispatcher, parent, listen_socket, listener_config, quic_config,
-                         std::move(options),
-                         std::make_unique<EnvoyQuicProofSource>(
-                             listen_socket, listener_config.filterChainManager()),
-                         enabled) {}
-
-ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
-                                       Network::ConnectionHandler& parent,
-                                       Network::SocketSharedPtr listen_socket,
-                                       Network::ListenerConfig& listener_config,
-                                       const quic::QuicConfig& quic_config,
-                                       Network::Socket::OptionsSharedPtr options,
-                                       std::unique_ptr<quic::ProofSource> proof_source,
-                                       const envoy::config::core::v3::RuntimeFeatureFlag& enabled)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket), enabled_(enabled, Runtime::LoaderSingleton::get()) {
@@ -67,7 +53,10 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       quiche::QuicheStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
-      quic::QuicRandom::GetInstance(), std::move(proof_source), quic::KeyExchangeSource::Default());
+      quic::QuicRandom::GetInstance(),
+      std::make_unique<EnvoyQuicProofSource>(listen_socket_, listener_config.filterChainManager(),
+                                             stats_),
+      quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());

@@ -24,6 +24,20 @@
 namespace Envoy {
 namespace Quic {
 
+// A ProofSource::Detail implementation which retains filter chain.
+class EnvoyQuicProofSourceDetails : public quic::ProofSource::Details {
+public:
+  explicit EnvoyQuicProofSourceDetails(const Network::FilterChain& filter_chain)
+      : filter_chain_(filter_chain) {}
+  EnvoyQuicProofSourceDetails(const EnvoyQuicProofSourceDetails& other)
+      : filter_chain_(other.filter_chain_) {}
+
+  const Network::FilterChain& filterChain() const { return filter_chain_; }
+
+private:
+  const Network::FilterChain& filter_chain_;
+};
+
 // A fake implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
 // TODO(danzh) Rename it to EnvoyQuicProofSource once it's fully implemented.
 class EnvoyQuicFakeProofSource : public quic::ProofSource {
@@ -41,36 +55,39 @@ public:
     quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
         GetCertChain(server_address, client_address, hostname);
     quic::QuicCryptoProof proof;
-    bool success = false;
     // TODO(danzh) Get the signature algorithm from leaf cert.
-    auto signature_callback = std::make_unique<FakeSignatureCallback>(success, proof.signature);
+    auto signature_callback = std::make_unique<SignatureCallback>(std::move(callback), chain);
     ComputeTlsSignature(server_address, client_address, hostname, SSL_SIGN_RSA_PSS_RSAE_SHA256,
                         server_config, std::move(signature_callback));
-    ASSERT(success);
-    proof.leaf_cert_scts = "Fake timestamp";
-    callback->Run(true, chain, proof, nullptr /* details */);
   }
 
   TicketCrypter* GetTicketCrypter() override { return nullptr; }
 
 private:
-  // Used by GetProof() to get fake signature.
-  class FakeSignatureCallback : public quic::ProofSource::SignatureCallback {
+  // Used by GetProof() to get signature.
+  class SignatureCallback : public quic::ProofSource::SignatureCallback {
   public:
     // TODO(danzh) Pass in Details to retain the certs chain, and quic::ProofSource::Callback to be
     // triggered in Run().
-    FakeSignatureCallback(bool& success, std::string& signature)
-        : success_(success), signature_(signature) {}
+    SignatureCallback(std::unique_ptr<quic::ProofSource::Callback> callback,
+                      quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain)
+        : callback_(std::move(callback)), chain_(chain) {}
 
     // quic::ProofSource::SignatureCallback
-    void Run(bool ok, std::string signature, std::unique_ptr<Details> /*details*/) override {
-      success_ = ok;
-      signature_ = signature;
+    void Run(bool ok, std::string signature, std::unique_ptr<Details> details) override {
+      quic::QuicCryptoProof proof;
+      if (!ok) {
+        callback_->Run(false, chain_, proof, nullptr);
+        return;
+      }
+      proof.signature = signature;
+      proof.leaf_cert_scts = "Fake timestamp";
+      callback_->Run(true, chain_, proof, std::move(details));
     }
 
   private:
-    bool& success_;
-    std::string& signature_;
+    std::unique_ptr<quic::ProofSource::Callback> callback_;
+    quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain_;
   };
 };
 

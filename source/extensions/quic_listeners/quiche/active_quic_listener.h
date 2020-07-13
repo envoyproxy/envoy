@@ -36,13 +36,6 @@ public:
                      Network::Socket::OptionsSharedPtr options,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
 
-  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::SocketSharedPtr listen_socket,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     Network::Socket::OptionsSharedPtr options,
-                     std::unique_ptr<quic::ProofSource> proof_source,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled);
-
   ~ActiveQuicListener() override;
 
   void onListenerShutdown();

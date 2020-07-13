@@ -85,6 +85,7 @@ envoy_cc_library(
         ":quic_transport_socket_factory_lib",
         "//include/envoy/ssl:tls_certificate_config_interface",
         "//source/extensions/transport_sockets:well_known_names",
+        "//source/server:connection_handler_lib",
         "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
     ],
 )
@@ -171,6 +172,7 @@ envoy_cc_library(
     ],
     tags = ["nofips"],
     deps = [
+        ":envoy_quic_crypto_server_stream_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
@@ -342,5 +344,16 @@ envoy_cc_extension(
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_crypto_server_stream_lib",
+    srcs = ["envoy_quic_crypto_server_stream.cc"],
+    hdrs = ["envoy_quic_crypto_server_stream.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_proof_source_lib",
+        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
 )

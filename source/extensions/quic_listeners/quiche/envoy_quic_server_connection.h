@@ -15,19 +15,11 @@ public:
                             quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
                             bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
-                            Network::ListenerConfig& listener_config,
-                            Server::ListenerStats& listener_stats, Network::Socket& listen_socket);
+                            Network::Socket& listen_socket);
 
   // EnvoyQuicConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
-
-private:
-  Network::ListenerConfig& listener_config_;
-  Server::ListenerStats& listener_stats_;
-  // Latched to the corresponding quic FilterChain after connection_socket_ is
-  // initialized.
-  const Network::FilterChain* filter_chain_{nullptr};
 };
 
 } // namespace Quic
