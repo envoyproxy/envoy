@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/runtime/runtime.h"
@@ -46,7 +47,7 @@ GradientControllerConfig::GradientControllerConfig(
 GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
                                        const std::string& stats_prefix, Stats::Scope& scope,
-                                       Runtime::RandomGenerator& random, TimeSource& time_source)
+                                       Random::RandomGenerator& random, TimeSource& time_source)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
       stats_(generateStats(scope_, stats_prefix)), random_(random), time_source_(time_source),
       deferred_limit_value_(0), num_rq_outstanding_(0),

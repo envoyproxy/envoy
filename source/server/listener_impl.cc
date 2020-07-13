@@ -168,7 +168,7 @@ Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.ht
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
-Envoy::Runtime::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
+Envoy::Random::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
   return server_.random();
 }
 Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
@@ -538,7 +538,7 @@ Http::Context& PerListenerFactoryContextImpl::httpContext() {
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
 }
-Envoy::Runtime::RandomGenerator& PerListenerFactoryContextImpl::random() {
+Envoy::Random::RandomGenerator& PerListenerFactoryContextImpl::random() {
   return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {

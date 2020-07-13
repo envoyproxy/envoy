@@ -25,7 +25,7 @@ public:
   ~MockDecompressorFactory() override;
 
   // Decompressor::DecompressorFactory
-  MOCK_METHOD(DecompressorPtr, createDecompressor, ());
+  MOCK_METHOD(DecompressorPtr, createDecompressor, (const std::string&));
   MOCK_METHOD(const std::string&, statsPrefix, (), (const));
   MOCK_METHOD(const std::string&, contentEncoding, (), (const));
 
