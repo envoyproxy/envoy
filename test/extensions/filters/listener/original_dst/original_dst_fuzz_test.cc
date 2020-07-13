@@ -15,7 +15,7 @@ namespace ListenerFilters {
 namespace OriginalDst {
 
 DEFINE_PROTO_FUZZER(
-    const envoy::extensions::filters::listener::original_dst::v3::OriginalDstTestCase& input) {
+    const envoy::extensions::filters::listener::original_dst::OriginalDstTestCase& input) {
 
   try {
     TestUtility::validate(input);
