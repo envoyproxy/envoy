@@ -1046,11 +1046,11 @@ class RedisSingleServerRequestWithErrorWithDelayFaultTest
     : public RedisSingleServerRequestWithFaultTest {
 public:
   RedisSingleServerRequestWithErrorWithDelayFaultTest() {
-    delay_ms_ = 13;
+    delay_ms_ = 5;
     Common::Redis::FaultSharedPtr fault_ptr = Common::Redis::FaultManagerImpl::makeFaultForTest(
         Common::Redis::FaultType::Error, std::chrono::milliseconds(delay_ms_));
     ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
-    timer_ = new NiceMock<Event::MockTimer>();
+    timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   }
 };
 
