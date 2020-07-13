@@ -97,6 +97,28 @@ uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
   }
 }
 
+Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::InstancePtr& buffer,
+                                       IoHandle::RecvMsgOutput& output, IoHandle& handle,
+                                       const Address::Instance& local_address) {
+
+  Buffer::RawSlice slice;
+  const uint64_t num_slices = buffer->reserve(max_packet_size, &slice, 1);
+  ASSERT(num_slices == 1u);
+
+  Api::IoCallUint64Result result =
+      handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
+
+  if (!result.ok()) {
+    return result;
+  }
+
+  // Adjust memory length and commit slice to buffer
+  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
+  buffer->commit(&slice, 1);
+
+  return result;
+}
+
 } // namespace
 
 std::string Utility::hostFromTcpUrl(const std::string& url) {
@@ -537,28 +559,6 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                              peer_addess->asString(), local_address->asString(), bytes_read));
   udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
                                      std::move(buffer), receive_time);
-}
-
-Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::InstancePtr& buffer,
-                                       IoHandle::RecvMsgOutput& output, IoHandle& handle,
-                                       const Address::Instance& local_address) {
-
-  Buffer::RawSlice slice;
-  const uint64_t num_slices = buffer->reserve(max_packet_size, &slice, 1);
-  ASSERT(num_slices == 1u);
-
-  Api::IoCallUint64Result result =
-      handle.recvmsg(&slice, num_slices, local_address.ip()->port(), output);
-
-  if (!result.ok()) {
-    return result;
-  }
-
-  // Adjust memory length and commit slice to buffer
-  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
-  buffer->commit(&slice, 1);
-
-  return result;
 }
 
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
