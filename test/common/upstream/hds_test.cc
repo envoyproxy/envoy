@@ -243,6 +243,10 @@ TEST_F(HdsTest, TestProcessMessageMissingFields) {
   // getting a bad message
   hds_delegate_->onReceiveMessage(std::move(message));
 
+  // Ensure that we never enabled the response timer that would start health checks,
+  // since this config was invalid.
+  EXPECT_FALSE(server_response_timer_->enabled_);
+
   // Check Correctness by verifying one request and one error has been generated in stat_
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 1);
@@ -278,10 +282,12 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
   // remove healthy threshold field to create an error
   message->mutable_cluster_health_checks(0)->mutable_health_checks(0)->clear_healthy_threshold();
 
-  // call onReceiveMessage function for testing. Should increment stat_ errors upon
-  // getting a bad message
-  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  // Pass invalid message through. Should increment stat_ errors upon
+  // getting a bad message.
   hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Ensure that the timer is enabled since there was a previous valid specifier.
+  EXPECT_TRUE(server_response_timer_->enabled_);
 
   // Check Correctness by verifying one request and one error has been generated in stat_
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
