@@ -11,14 +11,13 @@ namespace Envoy {
 class XdsVerifier {
 public:
   XdsVerifier();
-  void listenerAdded(envoy::config::listener::v3::Listener listener);
+  void listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update = false);
   void listenerUpdated(envoy::config::listener::v3::Listener listener);
   void listenerRemoved(std::string& name);
   void drainedListener(const std::string& name);
 
   void routeAdded(envoy::config::route::v3::RouteConfiguration route);
   void routeUpdated(envoy::config::route::v3::RouteConfiguration route);
-  void routeRemoved(std::string& name);
 
   enum ListenerState { WARMING, ACTIVE, DRAINING };
   struct ListenerRep {
@@ -35,13 +34,24 @@ public:
   uint32_t numActive() { return num_active_; }
   uint32_t numDraining() { return num_draining_; }
 
+  uint32_t numAdded() { return num_added_; }
+  uint32_t numModified() { return num_modified_; }
+  uint32_t numRemoved() { return num_removed_; }
+
+  void dumpState();
+
 private:
   std::string getRoute(envoy::config::listener::v3::Listener);
+  bool hasRoute(envoy::config::listener::v3::Listener listener);
   std::vector<ListenerRep> listeners_;
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
   uint32_t num_warming_;
   uint32_t num_active_;
   uint32_t num_draining_;
+
+  uint32_t num_added_;
+  uint32_t num_modified_;
+  uint32_t num_removed_;
 };
 
 } // namespace Envoy

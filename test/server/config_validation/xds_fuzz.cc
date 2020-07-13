@@ -68,6 +68,8 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
 
+  drain_time_ = std::chrono::seconds(5);
+
   if (input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
   } else {
@@ -125,10 +127,9 @@ bool XdsFuzzTest::eraseListener(std::string listener_name) {
  * @param the route number to be removed
  * @return the route as an optional so that it can be used in a delta request
  */
-bool XdsFuzzTest::eraseRoute(std::string route_name) {
-  for (auto it = routes_.begin(); it != routes_.end(); ++it) {
-    if (it->name() == route_name) {
-      routes_.erase(it);
+bool XdsFuzzTest::hasRoute(std::string route_name) {
+  for (auto& route : routes_) {
+    if (route.name() == route_name) {
       return true;
     }
   }
@@ -152,11 +153,11 @@ void XdsFuzzTest::addListener(std::string listener_name, std::string route_name)
   if (removed) {
     num_modified_++;
     verifier_.listenerUpdated(listener);
-    test_server_->waitForCounterGe("listener_manager.listener_modified", num_modified_);
+    test_server_->waitForCounterGe("listener_manager.listener_modified", verifier_.numModified());
   } else {
     num_added_++;
     verifier_.listenerAdded(listener);
-    test_server_->waitForCounterGe("listener_manager.listener_added", num_added_);
+    test_server_->waitForCounterGe("listener_manager.listener_added", verifier_.numAdded());
   }
 }
 
@@ -172,7 +173,7 @@ void XdsFuzzTest::removeListener(std::string listener_name) {
     updateListener(listeners_, {}, {listener_name});
     EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
     verifier_.listenerRemoved(listener_name);
-    test_server_->waitForCounterGe("listener_manager.listener_removed", num_removed_);
+    test_server_->waitForCounterGe("listener_manager.listener_removed", verifier_.numRemoved());
   }
 }
 
@@ -181,11 +182,11 @@ void XdsFuzzTest::removeListener(std::string listener_name) {
  */
 void XdsFuzzTest::addRoute(std::string route_name) {
   ENVOY_LOG_MISC(info, "Adding {}", route_name);
-  bool removed = eraseRoute(route_name);
+  bool has_route = hasRoute(route_name);
   auto route = buildRouteConfig(route_name);
   routes_.push_back(route);
 
-  if (removed) {
+  if (has_route) {
     // if the route was already in routes_, don't send a duplicate add in delta request
     updateRoute(routes_, {}, {});
     verifier_.routeUpdated(route);
@@ -195,23 +196,6 @@ void XdsFuzzTest::addRoute(std::string route_name) {
   }
 
   EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
-}
-
-/**
- * this is a no-op for now because it seems like routes cannot be removed - leaving a route out of
- * a SOTW request does not remove it and sending a remove message in a delta request is ignored
- */
-void XdsFuzzTest::removeRoute(std::string route_name) {
-  ENVOY_LOG_MISC(info, "Ignoring request to remove {}", route_name);
-  return;
-
-  // TODO(samflattery): remove if it's true that routes cannot be removed
-  auto removed = eraseRoute(route_name);
-  if (removed) {
-    updateRoute(routes_, {}, {route_name});
-    verifier_.routeRemoved(route_name);
-    EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
-  }
 }
 
 /**
@@ -274,6 +258,7 @@ void XdsFuzzTest::replay() {
       addListener(listener_name, route_name);
       if (!sent_listener) {
         addRoute(route_name);
+        test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
       }
       sent_listener = true;
       break;
@@ -295,15 +280,18 @@ void XdsFuzzTest::replay() {
       addRoute(route_name);
       break;
     }
-    case test::server::config_validation::Action::kRemoveRoute: {
-      std::string route_name =
-          absl::StrCat("route_config_", action.remove_route().route_num() % RoutesMax);
-      removeRoute(route_name);
-      break;
-    }
     default:
       break;
     }
+    ENVOY_LOG_MISC(info, "{}", getListenersConfigDump().DebugString());
+    ENVOY_LOG_MISC(
+        info, "added {} ({}), modified {} ({}), removed {} ({}), warming {}, active {}",
+        verifier_.numAdded(), test_server_->counter("listener_manager.listener_added")->value(),
+        verifier_.numModified(),
+        test_server_->counter("listener_manager.listener_modified")->value(),
+        verifier_.numRemoved(), test_server_->counter("listener_manager.listener_removed")->value(),
+        test_server_->gauge("listener_manager.total_listeners_warming")->value(),
+        test_server_->gauge("listener_manager.total_listeners_active")->value());
   }
 
   verifyState();
@@ -324,7 +312,8 @@ void XdsFuzzTest::verifyListeners() {
     bool found = false;
     for (auto& dump_listener : listener_dump.dynamic_listeners()) {
       if (dump_listener.name() == listener_rep.listener.name()) {
-        ENVOY_LOG_MISC(info, "warm {}, active {}, drain: {}", dump_listener.has_warming_state(), dump_listener.has_active_state(), dump_listener.has_draining_state());
+        ENVOY_LOG_MISC(info, "warm {}, active {}, drain: {}", dump_listener.has_warming_state(),
+                       dump_listener.has_active_state(), dump_listener.has_draining_state());
         switch (listener_rep.state) {
         case XdsVerifier::DRAINING:
           if (dump_listener.has_draining_state()) {
@@ -352,8 +341,11 @@ void XdsFuzzTest::verifyListeners() {
     if (!found) {
       ENVOY_LOG_MISC(info, "Expected to find listener {} in config dump",
                      listener_rep.listener.name());
-      throw EnvoyException(
-          fmt::format("Expected to find listener {} in config dump", listener_rep.listener.name()));
+      EXPECT_EQ(1, 0);
+      return;
+      /* throw EnvoyException( */
+      /*     fmt::format("Expected to find listener {} in config dump",
+       * listener_rep.listener.name())); */
     }
   }
 }

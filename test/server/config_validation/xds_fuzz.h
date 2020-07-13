@@ -54,7 +54,6 @@ private:
   void addListener(std::string listener_name, std::string route_name);
   void removeListener(std::string listener_name);
   void addRoute(std::string route_name);
-  void removeRoute(std::string route_name);
 
   void verifyState();
   void verifyListeners();
@@ -64,7 +63,7 @@ private:
   XdsVerifier verifier_;
 
   bool eraseListener(std::string listener_name);
-  bool eraseRoute(std::string route_num);
+  bool hasRoute(std::string route_num);
   AssertionResult waitForAck(const std::string& expected_type_url,
                              const std::string& expected_version);
 
