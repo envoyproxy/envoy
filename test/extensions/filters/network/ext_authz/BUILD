@@ -38,7 +38,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.ext_authz",
     deps = [
         "//source/extensions/filters/network/ext_authz:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
     ],
