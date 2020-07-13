@@ -13,15 +13,23 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
+
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // This filters that have already been covered by this fuzzer.
   // Will extend to cover other network filters one by one.
   static ::std::vector<absl::string_view> filter_names_;
   if (filter_names_.empty()) {
-    filter_names_ = {"envoy.filters.network.ext_authz",   "envoy.filters.network.local_ratelimit",
-                     "envoy.filters.network.redis_proxy", "envoy.filters.network.client_ssl_auth",
-                     "envoy.filters.network.echo",        "envoy.filters.network.direct_response",
-                     "envoy.filters.network.sni_cluster"};
+    filter_names_ = {
+                    "envoy.filters.network.ext_authz",   
+                    "envoy.filters.network.local_ratelimit",
+                    "envoy.filters.network.redis_proxy", 
+                    "envoy.filters.network.client_ssl_auth",
+                    "envoy.filters.network.echo",        
+                    // "envoy.filters.network.tcp_proxy"
+                     "envoy.filters.network.direct_response",
+                    // "envoy.filters.network.sni_dynamic_forward_proxy",
+                     "envoy.filters.network.sni_cluster"
+                     };
   }
   return filter_names_;
 }
@@ -49,15 +57,11 @@ void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
 
   // Set up response for ext_authz filter
   if (filter_name == "envoy.filters.network.ext_authz") {
-    addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
-    ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
-        .WillByDefault(testing::ReturnRef(addr_));
-    ON_CALL(read_filter_callbacks_->connection_, localAddress())
-        .WillByDefault(testing::ReturnRef(addr_));
+ 
 
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
-    async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
+    
 
     ON_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
         .WillByDefault(testing::WithArgs<3>(Invoke([&](Grpc::RawAsyncRequestCallbacks& callbacks) {
@@ -65,7 +69,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
               dynamic_cast<Filters::Common::ExtAuthz::GrpcClientImpl*>(&callbacks);
           const std::string empty_body{};
           const auto expected_headers =
-              Filters::Common::ExtAuthz::TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
+              Filters::Common::ExtAuthz::TestCommon::makeHeaderValueOption({});
           auto check_response = Filters::Common::ExtAuthz::TestCommon::makeCheckResponse(
               Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body,
               expected_headers);
@@ -77,7 +81,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
       return std::move(async_client_);
     }));
 
-    ON_CALL(cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+    ON_CALL(factory_context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return std::move(async_client_factory_); }));
   }
@@ -93,17 +97,27 @@ void UberFilterFuzzer::fuzzerSetup() {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
       }));
-  // Prepare sni for sni_cluster filter
+  // Prepare sni for sni_cluster filter and sni_dynamic_forward_proxy filter
   ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
       .WillByDefault(testing::Return("filter_state_cluster"));
   // Prepare time source for filters such as local_ratelimit filter
-  api_ = Api::createApiForTest(time_source_);
-  dispatcher_ = api_->allocateDispatcher("test_thread");
-  ON_CALL(factory_context_, dispatcher()).WillByDefault(testing::ReturnRef(*dispatcher_));
-  ON_CALL(factory_context_, runtime()).WillByDefault(testing::ReturnRef(runtime_));
-  ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source_));
+  factory_context_.prepareSimulatedSystemTime();
+
+  addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+  ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
+      .WillByDefault(testing::ReturnRef(addr_));
+  ON_CALL(read_filter_callbacks_->connection_, localAddress())
+      .WillByDefault(testing::ReturnRef(addr_));
+
+  async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
+  // time_source_ = dynamic_cast<Event::SimulatedTimeSystem*>(&factory_context_.timeSource());
+  // time_source_=factory_context_.timeSource();
+  // api_ = Api::createApiForTest(time_source_);
+  // dispatcher_ = api_->allocateDispatcher("test_thread");
+  // ON_CALL(factory_context_, dispatcher()).WillByDefault(testing::ReturnRef(*dispatcher_));
+  // ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source_));
   // Prepare general expectations for all the filters.
-  ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
+  // ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
 }
 
 void UberFilterFuzzer::filterSetup(const envoy::config::listener::v3::Filter& proto_config) {
@@ -116,7 +130,7 @@ void UberFilterFuzzer::filterSetup(const envoy::config::listener::v3::Filter& pr
   ENVOY_LOG_MISC(info, "Config content: {}", message->DebugString());
   cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
 }
-UberFilterFuzzer::UberFilterFuzzer() { fuzzerSetup(); }
+UberFilterFuzzer::UberFilterFuzzer() :factory_context_{},time_source_(factory_context_.SimulatedTimeSystem()){ fuzzerSetup(); }
 
 void UberFilterFuzzer::fuzz(
     const envoy::config::listener::v3::Filter& proto_config,
@@ -125,13 +139,14 @@ void UberFilterFuzzer::fuzz(
     // Try to create the filter callback(cb_). Exit early if the config is invalid or violates PGV
     // constraints.
     filterSetup(proto_config);
+    perFilterSetup(proto_config.name());
+    // Add filter to connection_
+    cb_(read_filter_callbacks_->connection_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup{}", e.what());
     return;
   }
-  perFilterSetup(proto_config.name());
-  // Add filter to connection_
-  cb_(read_filter_callbacks_->connection_);
+
   // if (actions.size() > 5) {
   //   PANIC("A case is found!");
   // }
@@ -154,7 +169,7 @@ void UberFilterFuzzer::fuzz(
     case test::extensions::filters::network::Action::kAdvanceTime: {
       time_source_.advanceTimeAsync(
           std::chrono::milliseconds(action.advance_time().milliseconds()));
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+      factory_context_.dispatcher().run(Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default:
