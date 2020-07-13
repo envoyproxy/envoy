@@ -59,6 +59,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
     TestUtility::validate(input);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
   }
 
   Stats::TestUtil::TestStore stats_store;
