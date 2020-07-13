@@ -111,6 +111,11 @@ void HttpFilterConfigSubscription::onConfigUpdate(
     throw EnvoyException(fmt::format("Unexpected resource name in ExtensionConfigDS response: {}",
                                      filter_config.name()));
   }
+  // Skip update if hash matches
+  const uint64_t new_hash = MessageUtil::hash(filter_config.typed_config());
+  if (new_hash == last_config_hash_) {
+    return;
+  }
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           filter_config);
@@ -123,10 +128,11 @@ void HttpFilterConfigSubscription::onConfigUpdate(
   Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-  stats_.config_reload_.inc();
   for (auto* provider : filter_config_providers_) {
     provider->onConfigUpdate(factory_callback, version_info);
   }
+  stats_.config_reload_.inc();
+  last_config_hash_ = new_hash;
 }
 
 void HttpFilterConfigSubscription::onConfigUpdate(

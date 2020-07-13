@@ -15,6 +15,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/filter:filter_config_discovery_lib",
         "//source/common/json:json_loader_lib",
+        "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/router:config",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",

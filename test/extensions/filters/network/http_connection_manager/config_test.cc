@@ -1896,8 +1896,26 @@ http_filters:
                                      filter_config_provider_manager_);
 
   Http::MockFilterChainFactoryCallbacks callbacks;
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(2); // Router and MissingConfigFilter
+  Http::StreamDecoderFilterSharedPtr missing_config_filter;
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_))
+      .Times(2)
+      .WillOnce(testing::SaveArg<0>(&missing_config_filter))
+      .WillOnce(Return()); // MissingConfigFilter and router
   config.createFilterChain(callbacks);
+
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _))
+      .WillRepeatedly(Return());
+  Http::TestRequestHeaderMapImpl headers;
+  missing_config_filter->setDecoderFilterCallbacks(decoder_callbacks);
+  missing_config_filter->decodeHeaders(headers, false);
+  EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound));
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, missing_config_filter->decodeData(data, true));
+  Http::TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, missing_config_filter->decodeTrailers(trailers));
 }
 
 // Tests where upgrades are configured on via the HCM.

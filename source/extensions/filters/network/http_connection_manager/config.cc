@@ -484,7 +484,6 @@ void HttpConnectionManagerConfig::processFilter(
     int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
     const char* filter_chain_type, bool last_filter_in_current_config) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
-  ENVOY_LOG(debug, "      name: {}", proto_config.name());
   if (proto_config.config_type_case() ==
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::ConfigTypeCase::
           kConfigDiscovery) {
@@ -492,13 +491,6 @@ void HttpConnectionManagerConfig::processFilter(
                                last_filter_in_current_config, filter_factories);
     return;
   }
-  ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessage(
-                proto_config.has_typed_config()
-                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                    : static_cast<const Protobuf::Message&>(
-                          proto_config.hidden_envoy_deprecated_config()),
-                true));
 
   // Now see if there is a factory that will accept the config.
   auto& factory =
@@ -513,13 +505,22 @@ void HttpConnectionManagerConfig::processFilter(
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
       callback, proto_config.name());
+  ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
+  ENVOY_LOG(debug, "    config: {}",
+            MessageUtil::getJsonStringFromMessage(
+                proto_config.has_typed_config()
+                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                    : static_cast<const Protobuf::Message&>(
+                          proto_config.hidden_envoy_deprecated_config()),
+                true));
   filter_factories.push_back(std::move(filter_config_provider));
 }
 
 void HttpConnectionManagerConfig::processDynamicFilterConfig(
     const std::string& name, const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
     bool last_filter_in_current_config, FilterFactoriesList& filter_factories) {
-  ENVOY_LOG(debug, "      discovery: {}", MessageUtil::getJsonStringFromMessage(config_discovery));
+  ENVOY_LOG(debug, "      name: {}", proto_config.name());
+  ENVOY_LOG(debug, " discovery: {}", MessageUtil::getJsonStringFromMessage(config_discovery));
   if (config_discovery.apply_default_config_without_warming() &&
       !config_discovery.has_default_config()) {
     throw EnvoyException(fmt::format(

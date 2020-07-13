@@ -109,6 +109,7 @@ private:
 
   std::unique_ptr<Config::Subscription> subscription_;
   const std::string filter_config_name_;
+  uint64_t last_config_hash_{0ul};
   Server::Configuration::FactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
 
