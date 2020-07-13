@@ -151,9 +151,12 @@ public:
 
   virtual ConnectionPool::Cancellable* newPendingRequest(AttachContext& context) PURE;
 
-  // Creates a new connection if allowed by resourceManager, or if created to avoid
-  // starving this pool.
-  void tryCreateNewConnection();
+  // Creates up to 3 connections, based on the prefetch ratio.
+  void tryCreateNewConnections();
+
+  // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
+  // to avoid starving this pool.
+  bool tryCreateNewConnection();
 
   void attachRequestToClient(Envoy::ConnectionPool::ActiveClient& client, AttachContext& context);
 
@@ -174,6 +177,14 @@ public:
   }
 
 protected:
+  // A helper function which determines if a canceled pending connection should
+  // be closed as excess or not.
+  bool connectingConnectionIsExcess() const;
+
+  // A helper function which determines if a new incoming request should trigger
+  // connection prefetch.
+  bool shouldCreateNewConnection() const;
+
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
 
@@ -181,7 +192,6 @@ protected:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
-protected:
   std::list<Instance::DrainedCb> drained_callbacks_;
   std::list<PendingRequestPtr> pending_requests_;
 

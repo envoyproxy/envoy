@@ -33,11 +33,31 @@ void ConnPoolImplBase::destructAllConnections() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-void ConnPoolImplBase::tryCreateNewConnection() {
-  if (pending_requests_.size() <= connecting_request_capacity_) {
-    // There are already enough CONNECTING connections for the number
-    // of queued requests.
-    return;
+bool ConnPoolImplBase::shouldCreateNewConnection() const {
+  // The number of requests we want to be provisioned for is the number of
+  // pending and active requests times the prefetch ratio.
+  // The number of requests we are (theoretically) provisioned for is the
+  // connecting request capacity plus the number of active requests.
+  //
+  // If prefetch ratio is not set, it defaults to 1, and this simplifies to the
+  // legacy value of pending_requests_.size() > connecting_request_capacity_
+  return (pending_requests_.size() + num_active_requests_) * host_->cluster().prefetchRatio() >
+         (connecting_request_capacity_ + num_active_requests_);
+}
+
+void ConnPoolImplBase::tryCreateNewConnections() {
+  // Prefetch ratio is capped at 3, so we should never need to fetch more than 3 at a time.
+  for (int i = 0; i < 3; ++i) {
+    if (!tryCreateNewConnection()) {
+      return;
+    }
+  }
+}
+
+bool ConnPoolImplBase::tryCreateNewConnection() {
+  // There are already enough CONNECTING connections for the number of queued requests.
+  if (!shouldCreateNewConnection()) {
+    return false;
   }
 
   const bool can_create_connection =
@@ -58,6 +78,7 @@ void ConnPoolImplBase::tryCreateNewConnection() {
     connecting_request_capacity_ += client->effectiveConcurrentRequestLimit();
     client->moveIntoList(std::move(client), owningList(client->state_));
   }
+  return can_create_connection;
 }
 
 void ConnPoolImplBase::attachRequestToClient(Envoy::ConnectionPool::ActiveClient& client,
@@ -120,6 +141,9 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "using existing connection", client);
     attachRequestToClient(client, context);
+    // Even if there's a ready client, we may want to prefetch a new connection
+    // to handle the next incoming request.
+    tryCreateNewConnections();
     return nullptr;
   }
 
@@ -128,7 +152,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 
     // This must come after newPendingRequest() because this function uses the
     // length of pending_requests_ to determine if a new connection is needed.
-    tryCreateNewConnection();
+    tryCreateNewConnections();
 
     return pending;
   } else {
@@ -280,6 +304,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
       purgePendingRequests(client.real_host_description_, failure_reason, reason);
+      // See if we should prefetch another connection based on active connections.
+      tryCreateNewConnections();
     }
 
     // We need to release our resourceManager() resources before checking below for
@@ -297,7 +323,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
     // If we have pending requests and we just lost a connection we should make a new one.
     if (!pending_requests_.empty()) {
-      tryCreateNewConnection();
+      tryCreateNewConnections();
     }
   } else if (event == Network::ConnectionEvent::Connected) {
     client.conn_connect_ms_->complete();
@@ -345,6 +371,21 @@ void ConnPoolImplBase::purgePendingRequests(
   }
 }
 
+bool ConnPoolImplBase::connectingConnectionIsExcess() const {
+  ASSERT(connecting_request_capacity_ >=
+         connecting_clients_.front()->effectiveConcurrentRequestLimit());
+  // If prefetchRatio is one, this simplifies to checking if there would still be sufficient
+  // connecting request capacity to serve all pending requests if the most recent client were
+  // removed from the picture.
+  //
+  // If prefetch ratio is set, it also factors in the anticipated load based on both queued requests
+  // and active requests, and makes sure the connecting capacity would still be sufficient to serve
+  // that even with the most recent client removed.
+  return (pending_requests_.size() + num_active_requests_) * host_->cluster().prefetchRatio() <=
+         (connecting_request_capacity_ -
+          connecting_clients_.front()->effectiveConcurrentRequestLimit() + num_active_requests_);
+}
+
 void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request,
                                               Envoy::ConnectionPool::CancelPolicy policy) {
   ENVOY_LOG(debug, "cancelling pending request");
@@ -357,13 +398,8 @@ void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request,
   } else {
     request.removeFromList(pending_requests_);
   }
-  // There's excess capacity if
-  // pending_requests < connecting_request_capacity_ - capacity of most recent client.
-  // It's calculated below with addition instead to avoid underflow issues, overflow being
-  // assumed to not be a problem across the connection pool.
   if (policy == Envoy::ConnectionPool::CancelPolicy::CloseExcess && !connecting_clients_.empty() &&
-      (pending_requests_.size() + connecting_clients_.front()->effectiveConcurrentRequestLimit() <=
-       connecting_request_capacity_)) {
+      connectingConnectionIsExcess()) {
     auto& client = *connecting_clients_.front();
     transitionActiveClientState(client, ActiveClient::State::DRAINING);
     client.close();
