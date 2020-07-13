@@ -1699,6 +1699,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
   }
 
+  // The BadRequest error code indicates there has been a messaging error.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
       !connection_manager_.config_.streamErrorOnInvalidHttpMessaging() &&

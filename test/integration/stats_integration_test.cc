@@ -300,7 +300,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 44715);
+    EXPECT_MEMORY_EQ(m_per_cluster, 45003);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
@@ -372,7 +372,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 36827);
+    EXPECT_MEMORY_EQ(m_per_cluster, 37115);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
