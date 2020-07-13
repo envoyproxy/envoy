@@ -85,9 +85,9 @@ public:
 
 class ProofSourceDetailsSetter {
 public:
-  virtual ~ProofSourceDetailsSetter(){};
+  virtual ~ProofSourceDetailsSetter() = default;
 
-  virtual void setProofSourceDetails(std::unique_ptr<DetailsWithFilterChain> details) = 0;
+  virtual void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) = 0;
 };
 
 class TestQuicCryptoServerStream : public EnvoyQuicCryptoServerStream,
@@ -103,14 +103,14 @@ public:
 
   bool encryption_established() const override { return true; }
 
-  const DetailsWithFilterChain* proofSourceDetails() const override { return details_.get(); }
+  const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
 
-  void setProofSourceDetails(std::unique_ptr<DetailsWithFilterChain> details) override {
+  void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
     details_ = std::move(details);
   }
 
 private:
-  std::unique_ptr<DetailsWithFilterChain> details_;
+  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
 };
 
 class TestEnvoyQuicTlsServerHandshaker : public EnvoyQuicTlsServerHandshaker,
@@ -126,8 +126,8 @@ public:
   }
 
   bool encryption_established() const override { return true; }
-  const DetailsWithFilterChain* proofSourceDetails() const override { return details_.get(); }
-  void setProofSourceDetails(std::unique_ptr<DetailsWithFilterChain> details) override {
+  const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
+  void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
     details_ = std::move(details);
   }
   const quic::QuicCryptoNegotiatedParameters& crypto_negotiated_params() const override {
@@ -135,7 +135,7 @@ public:
   }
 
 private:
-  std::unique_ptr<DetailsWithFilterChain> details_;
+  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
   quic::QuicReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
 };
 
@@ -145,9 +145,9 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_28, GetParam());
-          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_29, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         quic_connection_(new TestEnvoyQuicServerConnection(
@@ -183,6 +183,7 @@ public:
     setQuicConfigWithDefaultValues(envoy_quic_session_.config());
     envoy_quic_session_.OnConfigNegotiated();
     quic::test::QuicConfigPeer::SetNegotiated(envoy_quic_session_.config(), true);
+    quic::test::QuicConnectionPeer::SetAddressValidated(quic_connection_);
     // Switch to a encryption forward secure crypto stream.
     quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
     quic::QuicCryptoServerStreamBase* crypto_stream = nullptr;
@@ -766,7 +767,8 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
 
 TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
   Network::MockFilterChain filter_chain;
-  crypto_stream_->setProofSourceDetails(std::make_unique<DetailsWithFilterChain>(filter_chain));
+  crypto_stream_->setProofSourceDetails(
+      std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain));
   std::vector<Network::FilterFactoryCb> filter_factory{[this](
                                                            Network::FilterManager& filter_manager) {
     filter_manager.addReadFilter(read_filter_);
@@ -785,7 +787,8 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
       }));
-  if (quic_version_[0].handshake_protocol == quic::PROTOCOL_QUIC_CRYPTO) {
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+  if (!quic_version_[0].UsesTls()) {
     envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   } else {
     if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {

@@ -23,7 +23,6 @@
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/test_time_system.h"
@@ -226,7 +225,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   };
   initialize();
 
-  codec_client_ = makeRawHttpConnection(makeSslClientConnection());
+  codec_client_ = makeRawHttpConnection(makeSslClientConnection(), absl::nullopt);
   // the connection state is not connected.
   EXPECT_FALSE(codec_client_->connected());
   codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);

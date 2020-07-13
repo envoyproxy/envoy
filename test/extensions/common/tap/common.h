@@ -64,6 +64,9 @@ public:
   MOCK_METHOD(void, onHttpResponseTrailers,
               (const Http::ResponseTrailerMap& response_trailers, MatchStatusVector& statuses),
               (const));
+  MOCK_METHOD(void, onRequestBody, (const Buffer::Instance& data, MatchStatusVector& statuses));
+  MOCK_METHOD(void, onResponseBody, (const Buffer::Instance& data, MatchStatusVector& statuses),
+              ());
 };
 
 } // namespace Tap

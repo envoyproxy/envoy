@@ -84,9 +84,9 @@ protected:
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
-          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_29, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
         }()[0]) {}
 
@@ -119,7 +119,9 @@ protected:
     quic::QuicCryptoServerConfig& crypto_config =
         ActiveQuicListenerPeer::cryptoConfig(*quic_listener_);
     quic::test::QuicCryptoServerConfigPeer crypto_config_peer(&crypto_config);
-    crypto_config_peer.ResetProofSource(std::make_unique<TestProofSource>());
+    auto proof_source = std::make_unique<TestProofSource>();
+    filter_chain_ = &proof_source->filterChain();
+    crypto_config_peer.ResetProofSource(std::move(proof_source));
     simulated_time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
 
@@ -131,6 +133,45 @@ protected:
     ProtobufTypes::MessagePtr config_proto = config_factory.createEmptyConfigProto();
     TestUtility::loadFromYaml(yaml, *config_proto);
     return config_factory.createActiveUdpListenerFactory(*config_proto, /*concurrency=*/1);
+  }
+
+  void maybeConfigureMocks(int connection_count) {
+    if (quic_version_.UsesTls()) {
+      return;
+    }
+    EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);
+    EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+        .Times(connection_count)
+        .WillRepeatedly(Invoke([](Network::Connection& connection,
+                                  const std::vector<Network::FilterFactoryCb>& filter_factories) {
+          EXPECT_EQ(1u, filter_factories.size());
+          Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+          return true;
+        }));
+    EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+        .Times(connection_count);
+    EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+        .Times(connection_count);
+
+    testing::Sequence seq;
+    for (int i = 0; i < connection_count; ++i) {
+      auto read_filter = std::make_shared<Network::MockReadFilter>();
+      filter_factories_.push_back(
+          {Network::FilterFactoryCb([read_filter, this](Network::FilterManager& filter_manager) {
+            filter_manager.addReadFilter(read_filter);
+            read_filter->callbacks_->connection().addConnectionCallbacks(
+                network_connection_callbacks_);
+          })});
+      // Stop iteration to avoid calling getRead/WriteBuffer().
+      EXPECT_CALL(*read_filter, onNewConnection())
+          .WillOnce(Return(Network::FilterStatus::StopIteration));
+      read_filters_.push_back(std::move(read_filter));
+      // A Sequence must be used to allow multiple EXPECT_CALL().WillOnce()
+      // calls for the same object.
+      EXPECT_CALL(*filter_chain_, networkFilterFactories())
+          .InSequence(seq)
+          .WillOnce(ReturnRef(filter_factories_.back()));
+    }
   }
 
   void sendCHLO(quic::QuicConnectionId connection_id) {
@@ -211,14 +252,19 @@ protected:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
-  Runtime::MockRandomGenerator generator_;
-  Runtime::MockRandomGenerator rand_;
+  Random::MockRandomGenerator generator_;
+  Random::MockRandomGenerator rand_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
   std::list<std::unique_ptr<Socket>> client_sockets_;
+  std::list<std::shared_ptr<Network::MockReadFilter>> read_filters_;
   Network::MockFilterChainManager filter_chain_manager_;
+  // The following two containers must guarantee pointer stability as addresses
+  // of elements are saved in expectations before new elements are added.
+  std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
+  const Network::MockFilterChain* filter_chain_;
   quic::ParsedQuicVersion quic_version_;
 };
 
@@ -243,6 +289,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
+  maybeConfigureMocks(/* connection_count = */ 1);
   sendCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
@@ -253,6 +300,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
 TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
+  maybeConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 1; ++i) {
@@ -292,6 +340,7 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabledAndEnabled) {
   EXPECT_TRUE(quic_dispatcher_->session_map().empty());
   EXPECT_FALSE(ActiveQuicListenerPeer::enabled(*quic_listener_));
   Runtime::LoaderSingleton::getExisting()->mergeValues({{"quic.enabled", " true"}});
+  maybeConfigureMocks(/* connection_count = */ 1);
   sendCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(quic_dispatcher_->session_map().empty());
@@ -315,6 +364,7 @@ INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerEmptyFlagConfigTests,
 TEST_P(ActiveQuicListenerEmptyFlagConfigTest, ReceiveFullQuicCHLO) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
+  maybeConfigureMocks(/* connection_count = */ 1);
   sendCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());

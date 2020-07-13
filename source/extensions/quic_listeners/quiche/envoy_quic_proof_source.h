@@ -27,8 +27,8 @@ public:
   EnvoyQuicProofSource(Network::Socket& listen_socket,
                        Network::FilterChainManager& filter_chain_manager,
                        Server::ListenerStats& listener_stats)
-      : EnvoyQuicProofSourceBase(), listen_socket_(listen_socket),
-        filter_chain_manager_(filter_chain_manager), listener_stats_(listener_stats) {}
+      : listen_socket_(listen_socket), filter_chain_manager_(filter_chain_manager),
+        listener_stats_(listener_stats) {}
 
   ~EnvoyQuicProofSource() override = default;
 
@@ -42,9 +42,10 @@ public:
                            std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
-  using CertConfigWithFilterChain =
-      std::pair<absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>,
-                absl::optional<DetailsWithFilterChain>>;
+  struct CertConfigWithFilterChain {
+    absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_;
+    absl::optional<std::reference_wrapper<const Network::FilterChain>> filter_chain_;
+  };
 
   CertConfigWithFilterChain
   getTlsCertConfigAndFilterChain(const quic::QuicSocketAddress& server_address,

@@ -41,10 +41,9 @@ EnvoyQuicServerSession::CreateQuicCryptoServerStream(
   case quic::PROTOCOL_TLS1_3:
     return std::make_unique<EnvoyQuicTlsServerHandshaker>(this, *crypto_config);
   case quic::PROTOCOL_UNSUPPORTED:
-    break;
+    PANIC(fmt::format("Unknown handshake protocol: {}",
+                      static_cast<int>(connection()->version().handshake_protocol)));
   }
-  QUIC_BUG << "Unknown handshake protocol: "
-           << static_cast<int>(connection()->version().handshake_protocol);
   return nullptr;
 }
 
@@ -111,45 +110,28 @@ void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
   if (level != quic::ENCRYPTION_FORWARD_SECURE) {
     return;
   }
+  maybeCreateNetworkFilters();
   // This is only reached once, when handshake is done.
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
-
-  const DetailsWithFilterChain* proof_source_detail =
-      dynamic_cast<const EnvoyQuicCryptoServerStream*>(GetCryptoStream())->proofSourceDetails();
-  if (proof_source_detail == nullptr) {
-    // Unit tests using TestProofSource might not set ProofSource::Details.
-    ENVOY_CONN_LOG(
-        trace,
-        "ProofSource didn't provide ProofSource::Details. No filter chain will be installed.",
-        *this);
-
-    return;
-  }
-  createNetworkFilters(proof_source_detail->filterChain());
 }
 
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 void EnvoyQuicServerSession::OnOneRttKeysAvailable() {
   quic::QuicServerSessionBase::OnOneRttKeysAvailable();
+  maybeCreateNetworkFilters();
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
-
-  const DetailsWithFilterChain* details =
-      dynamic_cast<const EnvoyQuicTlsServerHandshaker*>(GetCryptoStream())->proofSourceDetails();
-  if (details == nullptr) {
-    ENVOY_CONN_LOG(
-        trace,
-        "ProofSource didn't provide ProofSource::Details. No filter chain will be installed.",
-        *this);
-    return;
-  }
-  createNetworkFilters(details->filterChain());
 }
 
-void EnvoyQuicServerSession::createNetworkFilters(const Network::FilterChain& filter_chain) {
+void EnvoyQuicServerSession::maybeCreateNetworkFilters() {
+  const EnvoyQuicProofSourceDetails* proof_source_details =
+      dynamic_cast<const EnvoyCryptoServerStream*>(GetCryptoStream())->proofSourceDetails();
+  ASSERT(proof_source_details != nullptr,
+         "ProofSource didn't provide ProofSource::Details. No filter chain will be installed.");
+
   const bool has_filter_initialized =
       listener_config_.filterChainFactory().createNetworkFilterChain(
-          *this, filter_chain.networkFilterFactories());
+          *this, proof_source_details->filterChain().networkFilterFactories());
   ASSERT(has_filter_initialized);
 }
 

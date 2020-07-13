@@ -168,7 +168,7 @@ Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.ht
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
-Envoy::Runtime::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
+Envoy::Random::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
   return server_.random();
 }
 Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
@@ -246,6 +246,11 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
+      cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
+                            ".connection_limit"),
+      open_connections_(std::make_shared<BasicResourceLimitImpl>(
+          std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
+          cx_limit_runtime_key_)),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
         if (workers_started_) {
           parent_.onListenerWarmed(*this);
@@ -255,6 +260,16 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           listener_init_target_.ready();
         }
       }) {
+
+  const absl::optional<std::string> runtime_val =
+      listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
+  if (runtime_val && runtime_val->empty()) {
+    ENVOY_LOG(warn,
+              "Listener connection limit runtime key {} is empty. There are currently no "
+              "limitations on the number of accepted connections for listener {}.",
+              cx_limit_runtime_key_, config_.name());
+  }
+
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
@@ -278,7 +293,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   }
 }
 
-ListenerImpl::ListenerImpl(const ListenerImpl& origin,
+ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
@@ -322,6 +337,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
   buildTlsInspectorListenerFilter();
+  open_connections_ = origin.open_connections_;
 }
 
 void ListenerImpl::buildAccessLog() {
@@ -522,7 +538,7 @@ Http::Context& PerListenerFactoryContextImpl::httpContext() {
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
 }
-Envoy::Runtime::RandomGenerator& PerListenerFactoryContextImpl::random() {
+Envoy::Random::RandomGenerator& PerListenerFactoryContextImpl::random() {
   return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {

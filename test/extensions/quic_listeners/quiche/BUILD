@@ -235,6 +235,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_source_base_lib",
+        "//test/mocks/network:network_mocks",
         "@com_googlesource_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )

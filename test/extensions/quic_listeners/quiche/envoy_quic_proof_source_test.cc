@@ -89,6 +89,8 @@ public:
                                      chain->certs, proof.leaf_cert_scts, proof.signature, nullptr,
                                      &error, nullptr, nullptr))
         << error;
+    EXPECT_EQ(&expected_filter_chain_,
+              &static_cast<EnvoyQuicProofSourceDetails*>(details.get())->filterChain());
     called_ = true;
   }
 
@@ -113,7 +115,6 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-
         proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {}
 
 protected:
