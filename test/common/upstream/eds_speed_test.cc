@@ -152,7 +152,7 @@ public:
   Config::SubscriptionCallbacks* eds_callbacks_{};
   Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{validation_visitor_, "cluster_name"};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;

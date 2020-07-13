@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -41,7 +42,7 @@ class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   ProdClusterManagerFactory(
       Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
+      ThreadLocal::Instance& tls, Random::RandomGenerator& random,
       Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
       Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
@@ -83,7 +84,7 @@ protected:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
   const LocalInfo::LocalInfo& local_info_;
@@ -192,7 +193,7 @@ public:
   ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                      ClusterManagerFactory& factory, Stats::Store& stats,
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                     Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
@@ -487,7 +488,7 @@ private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
 
 protected:
   ClusterMap active_clusters_;
