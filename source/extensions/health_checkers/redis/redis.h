@@ -125,6 +125,7 @@ private:
   Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
   Type type_;
   const std::string key_;
+  const std::string auth_username_;
   const std::string auth_password_;
 };
 
