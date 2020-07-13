@@ -1795,7 +1795,10 @@ http_filters:
   config_discovery:
     config_source: { ads: {} }
     default_config:
-      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+      type_url: type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      value:
+        pass_through_mode: false
     type_url: type.googleapis.com/google.protobuf.Value
 - name: envoy.filters.http.router
   )EOF";

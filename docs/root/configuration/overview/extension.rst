@@ -61,3 +61,13 @@ follows:
           "@type": type.googleapis.com/udpa.type.v1.TypedStruct
           type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3Router
 
+Discovery service
+^^^^^^^^^^^^^^^^^
+
+Extension configuration can be supplied dynamically from a :ref:`an xDS
+management server<xds_protocol>` using :ref:`ExtensionConfiguration discovery
+service<envoy_v3_api_file_envoy/service/extension/v3/config_discovery.proto>`.
+The name field in the extension configuration acts as the resource identifier.
+For example, HTTP connection manager supports :ref:`dynamic filter
+re-configuration<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`
+for HTTP filters.
