@@ -44,6 +44,7 @@ envoy_cc_test_library(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/extensions/filters/network/direct_response/v3:pkg_cc_proto",
     ],
 )
 
