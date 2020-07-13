@@ -18,6 +18,9 @@ protected:
   void fuzzerSetup();
   // Setup mock expectations each time fuzz() is called.
   void filterSetup(const envoy::config::listener::v3::Filter& proto_config);
+
+  // fuzz() will call filterSetup(), then perFilterSetup(), and then onAccept()
+
 private:
   NiceMock<MockConnectionSocket> socket_;
   NiceMock<MockListenerFilterCallbacks> cb_;
@@ -27,4 +30,3 @@ private:
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy
-

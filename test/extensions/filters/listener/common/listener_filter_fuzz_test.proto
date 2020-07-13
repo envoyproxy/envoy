@@ -7,5 +7,5 @@ import "envoy/config/listener/v3/listener_components.proto";
 
 message FilterFuzzTestCase {
   envoy.config.listener.v3.Filter config = 1;
-  bytes data = 2;
+  string data = 2;
 }
