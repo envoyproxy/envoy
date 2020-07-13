@@ -1092,7 +1092,7 @@ public:
     Common::Redis::FaultSharedPtr fault_ptr = Common::Redis::FaultManagerImpl::makeFaultForTest(
         Common::Redis::FaultType::Delay, std::chrono::milliseconds(delay_ms_));
     ON_CALL(fault_manager_, getFaultForCommand(_)).WillByDefault(Return(fault_ptr.get()));
-    timer_ = new NiceMock<Event::MockTimer>();
+    timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   }
 };
 
