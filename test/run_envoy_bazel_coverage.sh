@@ -20,9 +20,13 @@ elif [[ -n "${COVERAGE_TARGET}" ]]; then
   COVERAGE_TARGETS=${COVERAGE_TARGET}
 else
   # For fuzz builds, this overrides to just fuzz targets.
-  COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} == "true" ]] &&
-    COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
+  COVERAGE_TARGETS=//test/...
 fi
+
+if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
+  COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
+fi
+echo "COVERAGE_TARGETS=${COVERAGE_TARGETS}"
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
   BAZEL_BUILD_OPTIONS+=" --config=fuzz-coverage --test_tag_filters=-nocoverage"
