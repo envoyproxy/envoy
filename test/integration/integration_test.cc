@@ -1404,6 +1404,29 @@ TEST_P(IntegrationTest, ConnectWithChunkedBody) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
+// Verifies that a 204 response returns without a body
+TEST_P(IntegrationTest, Response204WithBody) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  // Create a response with a body
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "204"}}, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("204"));
+  // The body should be removed
+  EXPECT_EQ(0, response->body().size());
+}
+
 TEST_P(IntegrationTest, QuitQuitQuit) {
   initialize();
   test_server_->useAdminInterfaceToQuit(true);
