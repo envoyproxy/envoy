@@ -57,12 +57,11 @@ public:
                                 quic::QuicAlarmFactory& alarm_factory,
                                 quic::QuicPacketWriter& writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
-                                Network::ListenerConfig& listener_config,
-                                Server::ListenerStats& stats, Network::Socket& listen_socket)
+                                Network::Socket& listen_socket)
       : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
                                   quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
                                   helper, alarm_factory, &writer, /*owns_writer=*/false,
-                                  supported_versions, listener_config, stats, listen_socket) {}
+                                  supported_versions, listen_socket) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return EnvoyQuicConnection::connectionStats();
@@ -84,17 +83,60 @@ public:
   }
 };
 
-class TestQuicCryptoServerStream : public quic::QuicCryptoServerStream {
+class ProofSourceDetailsSetter {
 public:
+  virtual ~ProofSourceDetailsSetter() = default;
+
+  virtual void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) = 0;
+};
+
+class TestQuicCryptoServerStream : public EnvoyQuicCryptoServerStream,
+                                   public ProofSourceDetailsSetter {
+public:
+  ~TestQuicCryptoServerStream() override = default;
+
   explicit TestQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                       quic::QuicCompressedCertsCache* compressed_certs_cache,
                                       quic::QuicSession* session,
                                       quic::QuicCryptoServerStreamBase::Helper* helper)
-      : quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
-
-  using quic::QuicCryptoServerStream::QuicCryptoServerStream;
+      : EnvoyQuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
 
   bool encryption_established() const override { return true; }
+
+  const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
+
+  void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
+    details_ = std::move(details);
+  }
+
+private:
+  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
+};
+
+class TestEnvoyQuicTlsServerHandshaker : public EnvoyQuicTlsServerHandshaker,
+                                         public ProofSourceDetailsSetter {
+public:
+  ~TestEnvoyQuicTlsServerHandshaker() override = default;
+
+  TestEnvoyQuicTlsServerHandshaker(quic::QuicSession* session,
+                                   const quic::QuicCryptoServerConfig& crypto_config)
+      : EnvoyQuicTlsServerHandshaker(session, crypto_config),
+        params_(new quic::QuicCryptoNegotiatedParameters) {
+    params_->cipher_suite = 1;
+  }
+
+  bool encryption_established() const override { return true; }
+  const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
+  void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
+    details_ = std::move(details);
+  }
+  const quic::QuicCryptoNegotiatedParameters& crypto_negotiated_params() const override {
+    return *params_;
+  }
+
+private:
+  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
+  quic::QuicReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
 };
 
 class EnvoyQuicServerSessionTest : public testing::TestWithParam<bool> {
@@ -108,19 +150,16 @@ public:
           SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
-        listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
-                                            POOL_GAUGE(listener_config_.listenerScope()),
-                                            POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         quic_connection_(new TestEnvoyQuicServerConnection(
-            connection_helper_, alarm_factory_, writer_, quic_version_, listener_config_,
-            listener_stats_, *listener_config_.socket_)),
+            connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         envoy_quic_session_(quic_config_, quic_version_,
                             std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_,
-                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5),
+                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
+                            listener_config_),
         read_filter_(new Network::MockReadFilter()) {
 
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
@@ -143,14 +182,23 @@ public:
     envoy_quic_session_.Initialize();
     setQuicConfigWithDefaultValues(envoy_quic_session_.config());
     envoy_quic_session_.OnConfigNegotiated();
+    quic::test::QuicConfigPeer::SetNegotiated(envoy_quic_session_.config(), true);
     quic::test::QuicConnectionPeer::SetAddressValidated(quic_connection_);
-
     // Switch to a encryption forward secure crypto stream.
     quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
-    quic::test::QuicServerSessionBasePeer::SetCryptoStream(
-        &envoy_quic_session_,
-        new TestQuicCryptoServerStream(&crypto_config_, &compressed_certs_cache_,
-                                       &envoy_quic_session_, &crypto_stream_helper_));
+    quic::QuicCryptoServerStreamBase* crypto_stream = nullptr;
+    if (quic_version_[0].handshake_protocol == quic::PROTOCOL_QUIC_CRYPTO) {
+      auto test_crypto_stream = new TestQuicCryptoServerStream(
+          &crypto_config_, &compressed_certs_cache_, &envoy_quic_session_, &crypto_stream_helper_);
+      crypto_stream = test_crypto_stream;
+      crypto_stream_ = test_crypto_stream;
+    } else {
+      auto test_crypto_stream =
+          new TestEnvoyQuicTlsServerHandshaker(&envoy_quic_session_, crypto_config_);
+      crypto_stream = test_crypto_stream;
+      crypto_stream_ = test_crypto_stream;
+    }
+    quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, crypto_stream);
     quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
@@ -213,11 +261,11 @@ protected:
   quic::ParsedQuicVersionVector quic_version_;
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  Server::ListenerStats listener_stats_;
   TestEnvoyQuicServerConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
+  ProofSourceDetailsSetter* crypto_stream_;
   TestEnvoyQuicServerSession envoy_quic_session_;
   quic::QuicCompressedCertsCache compressed_certs_cache_{100};
   std::shared_ptr<Network::MockReadFilter> read_filter_;
@@ -718,31 +766,9 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
 }
 
 TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
-  std::string packet_content("random payload");
-  auto encrypted_packet =
-      std::unique_ptr<quic::QuicEncryptedPacket>(quic::test::ConstructEncryptedPacket(
-          quic_connection_->connection_id(), quic::EmptyQuicConnectionId(), /*version_flag=*/true,
-          /*reset_flag*/ false, /*packet_number=*/1, packet_content));
-
-  quic::QuicSocketAddress self_address(
-      envoyAddressInstanceToQuicSocketAddress(listener_config_.socket_->localAddress()));
-  auto packet = std::unique_ptr<quic::QuicReceivedPacket>(
-      quic::test::ConstructReceivedPacket(*encrypted_packet, connection_helper_.GetClock()->Now()));
-
-  // Receiving above packet should trigger filter chain retrieval.
-  Network::MockFilterChainManager filter_chain_manager;
-  EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   Network::MockFilterChain filter_chain;
-  EXPECT_CALL(filter_chain_manager, findFilterChain(_))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket& socket) {
-        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(quic_connection_->peer_address()),
-                  *socket.remoteAddress());
-        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(self_address), *socket.localAddress());
-        EXPECT_EQ(listener_config_.socket_->ioHandle().fd(), socket.ioHandle().fd());
-        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                  socket.detectedTransportProtocol());
-        return &filter_chain;
-      }));
+  crypto_stream_->setProofSourceDetails(
+      std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain));
   std::vector<Network::FilterFactoryCb> filter_factory{[this](
                                                            Network::FilterManager& filter_manager) {
     filter_manager.addReadFilter(read_filter_);
@@ -761,11 +787,15 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
       }));
-  // Connection should be closed because this packet has invalid payload.
-  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(_, _));
-  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  quic_connection_->ProcessUdpPacket(self_address, quic_connection_->peer_address(), *packet);
-  EXPECT_FALSE(quic_connection_->connected());
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+  if (!quic_version_[0].UsesTls()) {
+    envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
+  } else {
+    if (quic::VersionUsesHttp3(quic_version_[0].transport_version)) {
+      EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+    }
+    envoy_quic_session_.OnOneRttKeysAvailable();
+  }
   EXPECT_EQ(nullptr, envoy_quic_session_.socketOptions());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().isOpen());
   EXPECT_TRUE(quic_connection_->connectionSocket()->ioHandle().close().ok());
