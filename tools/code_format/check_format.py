@@ -185,7 +185,7 @@ NON_TYPE_ALIAS_ALLOWED_TYPES = {
     r"^.*\[\]$",
 }
 
-USING_TYPE_ALIAS_REGEX = re.compile("using .* = .*;")
+USING_TYPE_ALIAS_REGEX = re.compile("(using .* = .*;|typedef .* .*;)")
 SMART_PTR_REGEX = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>(?!;)")
 OPTIONAL_REF_REGEX = re.compile("absl::optional<std::reference_wrapper<(.*?)>>(?!;)")
 NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(f"({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})")

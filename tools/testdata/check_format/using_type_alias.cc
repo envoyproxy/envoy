@@ -5,6 +5,7 @@ namespace Network {
 class Connection;
 
 using ConnectionPtr = std::unique_ptr<Connection>;
+typedef std::unique_ptr<Connection> ConnectionPtr;
 
 template <class C> using EdfSchedulerPtr = std::unique_ptr<EdfScheduler<C>>;
 
