@@ -41,11 +41,9 @@ public:
   MockGenericConnPool();
   ~MockGenericConnPool() override;
   MOCK_METHOD(void, cancelAnyPendingRequest, ());
-  MOCK_METHOD(void, complete, ());
   MOCK_METHOD(GenericUpstreamSharedPtr, upstream, ());
   MOCK_METHOD(bool, failedOnPool, ());
   MOCK_METHOD(bool, failedOnConnection, ());
-  MOCK_METHOD(bool, isConnecting, ());
 };
 } // namespace TcpProxy
 } // namespace Envoy

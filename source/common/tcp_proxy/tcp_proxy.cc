@@ -440,8 +440,8 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
     Envoy::Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
         cluster_name, Envoy::Upstream::ResourcePriority::Default, this);
     if (conn_pool) {
-      generic_pool_ =
-          std::make_unique<Envoy::TcpProxy::TcpConnPool>(*conn_pool, *upstream_callbacks_, *this);
+      generic_pool_ = std::make_unique<Envoy::TcpProxy::TcpGenericConnPool>(
+          *conn_pool, *upstream_callbacks_, *this);
     }
   } else {
     auto* cluster = cluster_manager_.get(cluster_name);
@@ -472,15 +472,15 @@ Filter::UpstreamStatus Filter::maybeTunnel(const std::string& cluster_name) {
     return UpstreamStatus::Error;
   } else if (generic_pool_->failedOnConnection()) {
     return UpstreamStatus::Retry;
-  } else if (generic_pool_->isConnecting()) {
+  } else if (upstream_ == nullptr) {
     // Connecting state applies to both H2 CONNECT and raw tcp.
     // Any connecting failure should be allowed to retry, including
     // 1. raw tcp fails to connect
     // 2. H2 CONNECT header is not encoded yet.
   } else {
-    connecting_ = false;
     // Upstream could be available now because of connection reuse.
-    // TODO(lambdai): Invoke inline the onData here.
+    // No further retry is allowed.
+    connecting_ = false;
   }
   return UpstreamStatus::Ok;
 }

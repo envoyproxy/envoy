@@ -51,18 +51,18 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   return nullptr;
 }
 
-void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                              Upstream::HostDescriptionConstSharedPtr host) {
+void TcpGenericConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                                     Upstream::HostDescriptionConstSharedPtr host) {
   Network::Connection& latched_conn = conn_data->connection();
-  tcp_upstream_ = std::make_shared<TcpUpstream>(std::move(conn_data), tcp_upstream_callbacks_);
   // Disable cancel.
   tcp_upstream_handle_ = nullptr;
+  tcp_upstream_ = std::make_shared<TcpUpstream>(std::move(conn_data), tcp_upstream_callbacks_);
   generic_pool_callbacks_.onPoolReady(tcp_upstream_, host, latched_conn.localAddress(),
                                       latched_conn.streamInfo());
 }
 
-void TcpConnPool::onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason reason,
-                                Upstream::HostDescriptionConstSharedPtr host) {
+void TcpGenericConnPool::onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason reason,
+                                       Upstream::HostDescriptionConstSharedPtr host) {
   if (tcp_upstream_handle_ == nullptr) {
     // An immediate failure before creating the connection.
     has_failure_ = true;
@@ -178,6 +178,10 @@ void HttpUpstream::doneWriting() {
 
 void HttpGenericConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                         Upstream::HostDescriptionConstSharedPtr host) {
+  if (upstream_http_handle_ == nullptr) {
+    // An immediate failure before creating the newStream.
+    has_failure_ = true;
+  }
   generic_pool_callbacks_.onPoolFailure(reason, host);
 }
 

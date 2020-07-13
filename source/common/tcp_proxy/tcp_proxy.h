@@ -370,14 +370,20 @@ protected:
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
 
+  // Generic pool is used to drive the creation of generic upstream.
   TcpProxy::GenericConnPoolPtr generic_pool_;
+  // The connection state used when handling upstream event. In connecting state, some types of
+  // failure should be resolved by reconnect.
+  bool connecting_{};
+
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
+  // The upstream is set up by generic_pool_. Once this upstream is valid, the generic should be
+  // left untouch.
   std::shared_ptr<TcpProxy::GenericUpstream> upstream_;
   RouteConstSharedPtr route_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
-  bool connecting_{};
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

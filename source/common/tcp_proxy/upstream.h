@@ -27,18 +27,18 @@ private:
 };
 
 // An implementation of GenericConnPool which works with the Tcp::ConnectionPool.
-class TcpConnPool final : public Envoy::TcpProxy::GenericConnPool,
-                          public Envoy::Tcp::ConnectionPool::Callbacks {
+class TcpGenericConnPool final : public Envoy::TcpProxy::GenericConnPool,
+                                 public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Envoy::Tcp::ConnectionPool::Instance& tcp_pool_instance,
-              Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-              Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks)
+  TcpGenericConnPool(Envoy::Tcp::ConnectionPool::Instance& tcp_pool_instance,
+                     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                     Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks)
       : tcp_upstream_callbacks_(upstream_callbacks),
         generic_pool_callbacks_(generic_pool_callbacks) {
     tcp_upstream_handle_ = tcp_pool_instance.newConnection(*this);
   }
 
-  ~TcpConnPool() override {
+  ~TcpGenericConnPool() override {
     if (tcp_upstream_handle_ != nullptr) {
       tcp_upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::CloseExcess);
     }
@@ -51,15 +51,11 @@ public:
     }
   }
 
-  Envoy::TcpProxy::GenericUpstreamSharedPtr upstream() override { return tcp_upstream_; }
-
-  bool failedOnPool() override { return tcp_upstream_handle_ == nullptr; }
+  bool failedOnPool() override {
+    return tcp_upstream_ == nullptr && tcp_upstream_handle_ == nullptr;
+  }
 
   bool failedOnConnection() override { return has_failure_; }
-
-  bool isConnecting() override {
-    return tcp_upstream_handle_ != nullptr && tcp_upstream_ == nullptr;
-  }
 
   // Envoy::Tcp::ConnectionPool::Callbacks
   void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -251,15 +247,11 @@ public:
     }
   }
 
-  Envoy::TcpProxy::GenericUpstreamSharedPtr upstream() override { return http_upstream_; }
-
   bool failedOnPool() override {
     return http_upstream_ == nullptr && upstream_http_handle_ == nullptr;
   }
 
   bool failedOnConnection() override { return has_failure_; }
-
-  bool isConnecting() override { return upstream_http_handle_ != nullptr; }
 
   // Http::ConnectionPool::Callbacks
   void onPoolFailure(Envoy::ConnectionPool::PoolFailureReason reason,
@@ -273,7 +265,7 @@ public:
 private:
   Envoy::TcpProxy::GenericUpstreamPoolCallbacks& generic_pool_callbacks_;
   std::shared_ptr<HttpUpstream> http_upstream_;
-  Envoy::Http::ConnectionPool::Cancellable* upstream_http_handle_;
+  Envoy::Http::ConnectionPool::Cancellable* upstream_http_handle_{};
   bool has_failure_{false};
 };
 
