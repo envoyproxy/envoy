@@ -198,6 +198,13 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
     foo_zz_sub = grpc_mux_->addWatch("foo", {"zz"}, callbacks_, resource_decoder_);
     expectSendMessage("foo", {"zz", "z", "x", "y"}, "");
   }
+  // When nesting, we only have a single resumption.
+  {
+    ScopedResume a = grpc_mux_->pause("foo");
+    ScopedResume b = grpc_mux_->pause("foo");
+    foo_zz_sub = grpc_mux_->addWatch("foo", {"zz"}, callbacks_, resource_decoder_);
+    expectSendMessage("foo", {"zz", "z", "x", "y"}, "");
+  }
   grpc_mux_->pause("foo")->cancel();
 }
 
@@ -527,7 +534,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
 
   // Validate that drain_request_timer is enabled when there are no tokens.
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100), _));
-  onReceiveMessage(99);
+  onReceiveMessage(100);
   EXPECT_EQ(1, stats_.counter("control_plane.rate_limit_enforced").value());
   EXPECT_EQ(
       1,
@@ -588,10 +595,10 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(500), _))
       .Times(AtLeast(1));
   onReceiveMessage(160);
-  EXPECT_EQ(12, stats_.counter("control_plane.rate_limit_enforced").value());
+  EXPECT_EQ(11, stats_.counter("control_plane.rate_limit_enforced").value());
   Stats::Gauge& pending_requests =
       stats_.gauge("control_plane.pending_requests", Stats::Gauge::ImportMode::Accumulate);
-  EXPECT_EQ(12, pending_requests.value());
+  EXPECT_EQ(11, pending_requests.value());
 
   // Validate that drain requests call when there are multiple requests in queue.
   time_system_.setMonotonicTime(std::chrono::seconds(10));

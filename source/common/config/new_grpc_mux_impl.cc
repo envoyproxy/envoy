@@ -37,7 +37,9 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   return std::make_unique<Cleanup>([this, type_urls]() {
     for (const auto& type_url : type_urls) {
       pausable_ack_queue_.resume(type_url);
-      trySendDiscoveryRequests();
+      if (!pausable_ack_queue_.paused(type_url)) {
+        trySendDiscoveryRequests();
+      }
     }
   });
 }

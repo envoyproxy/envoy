@@ -37,7 +37,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 
   ApiState& api_state = api_state_[type_url];
-  if (api_state.paused_) {
+  if (api_state.pauses_ > 0) {
     ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
     api_state.pending_ = true;
     return; // Drop this request; the unpause will enqueue a new one.
@@ -94,7 +94,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
   // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
   // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
   // only send a single RDS/EDS update after the CDS/LDS update.
-  queueDiscoveryRequest(type_url);
+  sendDiscoveryRequest(type_url);
 
   return watch;
 }
@@ -105,21 +105,19 @@ ScopedResume GrpcMuxImpl::pause(const std::string& type_url) {
 
 ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   for (const auto& type_url : type_urls) {
-    ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url);
     ApiState& api_state = api_state_[type_url];
-    ASSERT(!api_state.paused_);
-    ASSERT(!api_state.pending_);
-    api_state.paused_ = true;
+    ENVOY_LOG(debug, "Pausing discovery requests for {} (previous count {})", type_url,
+              api_state.pauses_);
+    ++api_state.pauses_;
   }
   return std::make_unique<Cleanup>([this, type_urls]() {
     for (const auto& type_url : type_urls) {
-      ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
       ApiState& api_state = api_state_[type_url];
-      ASSERT(api_state.paused_);
-      api_state.paused_ = false;
+      ENVOY_LOG(debug, "Resuming discovery requests for {} (previous count {})", type_url,
+                api_state.pauses_);
+      ASSERT(api_state.pauses_ > 0);
 
-      if (api_state.pending_) {
-        ASSERT(api_state.subscribed_);
+      if (--api_state.pauses_ == 0 && api_state.pending_ && api_state.subscribed_) {
         queueDiscoveryRequest(type_url);
         api_state.pending_ = false;
       }
@@ -132,7 +130,7 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
   if (entry == api_state_.end()) {
     return false;
   }
-  return entry->second.paused_;
+  return entry->second.pauses_ > 0;
 }
 
 bool GrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
@@ -173,10 +171,16 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // No watches and we have resources - this should not happen. send a NACK (by not
       // updating the version).
       ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
-      queueDiscoveryRequest(type_url);
+      sendDiscoveryRequest(type_url);
     }
     return;
   }
+  ScopedResume same_type_resume;
+  // We pause updates of the same type. This is necessary for SotW and GrpcMuxImpl, since unlike
+  // delta and NewGRpcMuxImpl, independent watch additions/removals trigger updates regardless of
+  // the delta state. The proper fix for this is to converge these implementations,
+  // see https://github.com/envoyproxy/envoy/issues/11477.
+  same_type_resume = pause(type_url);
   try {
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
@@ -234,7 +238,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
-  queueDiscoveryRequest(type_url);
+  sendDiscoveryRequest(type_url);
 }
 
 void GrpcMuxImpl::onWriteable() { drainRequests(); }

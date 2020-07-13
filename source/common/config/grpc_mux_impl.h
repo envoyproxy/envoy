@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <queue>
 #include <unordered_map>
 
@@ -113,8 +114,8 @@ private:
     std::list<GrpcMuxWatchImpl*> watches_;
     // Current DiscoveryRequest for API.
     envoy::service::discovery::v3::DiscoveryRequest request_;
-    // Paused via pause()?
-    bool paused_{};
+    // Count of unresumed pause() invocations.
+    uint32_t pauses_{};
     // Was a DiscoveryRequest elided during a pause?
     bool pending_{};
     // Has this API been tracked in subscriptions_?
