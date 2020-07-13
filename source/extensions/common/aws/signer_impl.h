@@ -74,6 +74,16 @@ private:
 
   const std::string service_name_;
   const std::string region_;
+
+  // S3, Glacier, ES payloads require special treatment.
+  // S3:
+  // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html.
+  // ES:
+  // https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-request-signing.html.
+  // Glacier:
+  // https://docs.aws.amazon.com/amazonglacier/latest/dev/amazon-glacier-signing-requests.html.
+  const bool require_content_hash_{service_name_ == "s3" || service_name_ == "glacier" ||
+                                   service_name_ == "es"};
   CredentialsProviderSharedPtr credentials_provider_;
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;
