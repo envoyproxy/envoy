@@ -78,7 +78,7 @@ public:
         std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
     auto redis_command_stats =
         Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
-    InstanceImplPtr conn_pool_impl = std::make_unique<InstanceImpl>(
+    InstanceImplSharedPtr conn_pool_impl = std::make_shared<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_),

@@ -53,6 +53,10 @@ public:
   void onFailure() override{};
 };
 
+class InstanceImpl;
+
+using InstanceImplSharedPtr = std::shared_ptr<InstanceImpl>;
+
 class InstanceImpl : public Instance, public std::enable_shared_from_this<InstanceImpl> {
 public:
   InstanceImpl(
@@ -100,8 +104,6 @@ private:
     Upstream::HostConstSharedPtr host_;
     Common::Redis::Client::ClientPtr redis_client_;
   };
-
-  using InstanceImplSharedPtr = std::shared_ptr<InstanceImpl>;
 
   using ThreadLocalActiveClientPtr = std::unique_ptr<ThreadLocalActiveClient>;
 
@@ -194,7 +196,6 @@ private:
 };
 
 using InstanceImplPtr = std::unique_ptr<InstanceImpl>;
-using InstanceImplSharedPtr = std::shared_ptr<InstanceImpl>;
 
 } // namespace ConnPool
 } // namespace RedisProxy
