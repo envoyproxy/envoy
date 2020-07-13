@@ -523,6 +523,14 @@ bazel test -c dbg --config=macos-asan //test/...
 
 Log verbosity is controlled at runtime in all builds.
 
+To obtain `nghttp2` traces, you can set `ENVOY_NGHTTP2_TRACE` in the environment for enhanced
+logging at `-l trace`. For example, in tests:
+
+```
+bazel test //test/integration:protocol_integration_test --test_output=streamed \
+  --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
+```
+
 ## Disabling optional features
 
 The following optional features can be disabled on the Bazel build command-line:
@@ -641,10 +649,10 @@ The latest coverage report for master is available
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
 passing coverage targets as the command-line arguments and using the `VALIDATE_COVERAGE` environment
-variable, e.g.:
+variable, e.g. for a fuzz test:
 
 ```
-VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh //test/common/common:base64_fuzz_test
+FUZZ_COVERAGE=true VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh //test/common/common:base64_fuzz_test
 ```
 
 # Cleaning the build and test artifacts

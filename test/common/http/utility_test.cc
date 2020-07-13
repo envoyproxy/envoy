@@ -29,16 +29,65 @@ namespace Http {
 
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString("/hello"));
+
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString("/hello?"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
             Utility::parseQueryString("/hello?hello=world"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
+            Utility::parseAndDecodeQueryString("/hello?hello=world"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello="));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello="));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello=&"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
             Utility::parseQueryString("/hello?hello=&hello2=world2"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
+            Utility::parseAndDecodeQueryString("/hello?hello=&hello2=world2"));
+
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
             Utility::parseQueryString("/logging?name=admin&level=trace"));
+  EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
+            Utility::parseAndDecodeQueryString("/logging?name=admin&level=trace"));
+
+  EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a%26b"}}),
+            Utility::parseQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
+  EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a&b"}}),
+            Utility::parseAndDecodeQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
+
+  EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_%26", "a%26b"}, {"ok", "1"}}),
+            Utility::parseQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+  EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_&", "a&b"}, {"ok", "1"}}),
+            Utility::parseAndDecodeQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+
+  // A sample of request path with query strings by Prometheus:
+  // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
+  EXPECT_EQ(
+      Utility::QueryParams(
+          {{"filter",
+            "%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+            "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"}}),
+      Utility::parseQueryString(
+          "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
+  EXPECT_EQ(
+      Utility::QueryParams(
+          {{"filter", "(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|"
+                      "rq_complete|rq_active|cx_active))|(server.version)"}}),
+      Utility::parseAndDecodeQueryString(
+          "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
 }
 
 TEST(HttpUtility, getResponseStatus) {
@@ -1212,7 +1261,19 @@ TEST(PercentEncoding, EncodeDecode) {
   validatePercentEncodingEncodeDecode("_-ok-_", "_-ok-_");
 }
 
-TEST(PercentEncoding, Trailing) {
+TEST(PercentEncoding, Decoding) {
+  EXPECT_EQ(Utility::PercentEncoding::decode("a%26b"), "a&b");
+  EXPECT_EQ(Utility::PercentEncoding::decode("hello%20world"), "hello world");
+  EXPECT_EQ(Utility::PercentEncoding::decode("upstream%7Cdownstream"), "upstream|downstream");
+  EXPECT_EQ(
+      Utility::PercentEncoding::decode(
+          "filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_bucket%"
+          "7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"),
+      "filter=(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|rq_"
+      "complete|rq_active|cx_active))|(server.version)");
+}
+
+TEST(PercentEncoding, DecodingWithTrailingInput) {
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
