@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <list>
 #include <locale>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -53,7 +54,7 @@ private:
     WatcherImpl* watcher_;
   };
 
-  typedef DirectoryWatchPtr DirectoryWatchPtr;
+  typedef std::unique_ptr<DirectoryWatch> DirectoryWatchPtr;
 
   Api::Api& api_;
   std::unordered_map<std::string, DirectoryWatchPtr> callback_map_;

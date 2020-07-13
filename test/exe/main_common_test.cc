@@ -130,7 +130,7 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
 
   EXPECT_THROW_WITH_MESSAGE(
       MainCommonBase(second_options, real_time_system, default_listener_hooks,
-                     prod_component_factory, Runtime::RandomGeneratorPtr{mock_rng},
+                     prod_component_factory, Random::RandomGeneratorPtr{mock_rng},
                      platform.threadFactory(), platform.fileSystem(), nullptr),
       EnvoyException, "unable to select a dynamic base id");
 #endif

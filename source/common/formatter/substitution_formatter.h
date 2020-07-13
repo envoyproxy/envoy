@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -101,6 +102,8 @@ private:
   std::vector<FormatterProviderPtr> providers_;
 };
 
+using FormatterImplPtr = std::unique_ptr<FormatterImpl>;
+
 class JsonFormatterImpl : public Formatter {
 public:
   JsonFormatterImpl(const absl::flat_hash_map<std::string, std::string>& format_mapping,
@@ -123,6 +126,8 @@ private:
                                const StreamInfo::StreamInfo& stream_info,
                                absl::string_view local_reply_body) const;
 };
+
+using JsonFormatterImplPtr = std::unique_ptr<JsonFormatterImpl>;
 
 /**
  * FormatterProvider for string literals. It ignores headers and stream info and returns string by
