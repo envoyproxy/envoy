@@ -45,7 +45,7 @@ The fuzz test will be executed in three environments:
    and basic sanitizers just on the supplied corpus.
    
 1. Using the libFuzzer fuzzing engine and ASAN when run in the Envoy repository with `bazel run
-   //test/path/to/some_fuzz_test_with_libfuzzer --config asan-fuzzer`. This is where real fuzzing
+   //test/path/to/some_fuzz_test --config asan-fuzzer`. This is where real fuzzing
    takes place locally. The built binary can take libFuzzer command-line flags, including the number
    of runs and the maximum input length.
 
@@ -66,7 +66,7 @@ The fuzz test will be executed in three environments:
 4. Run the `envoy_cc_fuzz_test` target to test against the seed corpus. E.g. `bazel test
    //test/common/common:base64_fuzz_test`.
    
-5. Run the `*_fuzz_test_with_libfuzzer` target against libFuzzer. E.g. `bazel run
+5. Run the `*_fuzz_test` target against libFuzzer. E.g. `bazel run
    //test/common/common:base64_fuzz_test --config asan-fuzzer`.
    
 ## Protobuf fuzz tests
@@ -88,15 +88,15 @@ Within the Envoy repository, we have various `*_fuzz_test` targets. When run und
 these will exercise the corpus as inputs but not actually link and run against any fuzzer (e.g.
 [`libfuzzer`](https://llvm.org/docs/LibFuzzer.html)).
 
-To get actual fuzzing performed, the `*_fuzz_test_with_libfuzzer` target needs to be built with
-`--config asan-fuzzer`. This links the target to the libFuzzer fuzzing engine. This is recommended
-when writing new fuzz tests to check if they pick up any low hanging fruit (i.e. what you can find
-on your local machine vs. the fuzz cluster). The binary takes the location of the seed corpus
+To get actual fuzzing performed, the `*_fuzz_test` target needs to be built with `--config
+asan-fuzzer`. This links the target to the libFuzzer fuzzing engine. This is recommended when
+writing new fuzz tests to check if they pick up any low hanging fruit (i.e. what you can find on
+your local machine vs. the fuzz cluster). The binary takes the location of the seed corpus
 directory. Fuzzing continues indefinitely until a bug is found or the number of iterations it should
 perform is specified with `-runs`. For example,
 
-`bazel run //test/common/common:base64_fuzz_test_with_libfuzzer --config asan-fuzzer --
-test/common/common/base64_corpus -runs=1000`
+`bazel run //test/common/common:base64_fuzz_test --config asan-fuzzer
+--test/common/common/base64_corpus -runs=1000`
 
 The fuzzer prints information to stderr:
 
