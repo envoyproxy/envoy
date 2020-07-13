@@ -8,8 +8,8 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
 #include "common/common/fmt.h"
+#include "common/common/random_generator.h"
 #include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -69,7 +69,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store)};
   stats.max_host_weight_.set(weight);
   NiceMock<Runtime::MockLoader> runtime;
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
   LeastRequestLoadBalancer lb_{
@@ -235,7 +235,7 @@ public:
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   NiceMock<Runtime::MockLoader> runtime_;
-  Runtime::RandomGeneratorImpl random_;
+  Random::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
