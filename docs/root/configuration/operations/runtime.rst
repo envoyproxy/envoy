@@ -24,7 +24,8 @@ runtime <envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime>` bootstrap configu
 layering. Runtime settings in later layers override earlier layers. A typical configuration might
 be:
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.bootstrap.v3.LayeredRuntime
 
   layers:
   - name: static_layer_0
