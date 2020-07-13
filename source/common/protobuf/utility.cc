@@ -577,16 +577,18 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
         Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
     // If the earlier version matches, unpack and upgrade.
     if (earlier_version_desc != nullptr && any_full_name == earlier_version_desc->full_name()) {
-      Protobuf::DynamicMessageFactory dmf;
-      auto earlier_message =
-          ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
-      ASSERT(earlier_message != nullptr);
-      if (!any_message.UnpackTo(earlier_message.get())) {
+      // Take the Any message but adjust its type URL, since earlier/later versions are wire
+      // compatible.
+      ProtobufWkt::Any any_message_with_fixup;
+      any_message_with_fixup.MergeFrom(any_message);
+      any_message_with_fixup.set_type_url("type.googleapis.com/" +
+                                          message.GetDescriptor()->full_name());
+      if (!any_message_with_fixup.UnpackTo(&message)) {
         throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                         earlier_message->GetDescriptor()->full_name(),
-                                         any_message.DebugString()));
+                                         earlier_version_desc->full_name(),
+                                         any_message_with_fixup.DebugString()));
       }
-      Config::VersionConverter::upgrade(*earlier_message, message);
+      Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
       return;
     }
   }
