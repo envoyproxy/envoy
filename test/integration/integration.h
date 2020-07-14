@@ -13,13 +13,15 @@
 #include "common/config/version_converter.h"
 #include "common/http/codec_client.h"
 
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
