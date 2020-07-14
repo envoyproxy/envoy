@@ -83,6 +83,7 @@ typed_config:
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Response rate limited with no trailers.
@@ -107,6 +108,7 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Request delay and response rate limited via header configuration.
@@ -142,6 +144,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Request abort controlled via header configuration.
@@ -163,6 +166,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Request faults controlled via header configuration.
@@ -188,6 +192,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultsConfig0PercentageHeaders) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Request faults controlled via header configuration.
@@ -211,6 +216,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultsConfig100PercentageHeaders)
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Header configuration with no headers, so no fault injection.
@@ -223,6 +229,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfigNoHeaders) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Request abort with grpc status, controlled via header configuration.
@@ -251,6 +258,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig) {
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Request abort with grpc status, controlled via header configuration.
@@ -273,6 +281,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig0PercentageHe
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Request abort with grpc status, controlled via configuration.
@@ -300,6 +309,7 @@ TEST_P(FaultIntegrationTestAllProtocols, FaultAbortGrpcConfig) {
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Fault integration tests that run with HTTP/2 only, used for fully testing trailers.
@@ -336,6 +346,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 // Rate limiting with trailers received before the body has been flushed.
@@ -363,6 +374,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+  EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 }
 
 } // namespace
