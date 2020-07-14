@@ -213,37 +213,59 @@ void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_
   addFileDescriptor(file_proto);
 }
 
+Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor,
+                                          const std::string& field_path_str,
+                                          std::vector<const Protobuf::Field*>* field_path,
+                                          bool* is_http_body) {
+  const Protobuf::Type* message_type =
+      type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
+  if (message_type == nullptr) {
+    return ProtobufUtil::Status(Code::NOT_FOUND,
+                                "Could not resolve type: " + descriptor->full_name());
+  }
+
+  Status status = type_helper_->ResolveFieldPath(
+      *message_type, field_path_str == "*" ? "" : field_path_str, field_path);
+  if (!status.ok()) {
+    return status;
+  }
+
+  if (field_path->empty()) {
+    *is_http_body = descriptor->full_name() == google::api::HttpBody::descriptor()->full_name();
+  } else {
+    const Protobuf::Type* body_type =
+        type_helper_->Info()->GetTypeByTypeUrl(field_path->back()->type_url());
+    *is_http_body = body_type != nullptr &&
+                    body_type->name() == google::api::HttpBody::descriptor()->full_name();
+  }
+  return Status::OK;
+}
+
 Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                               const HttpRule& http_rule,
                                               MethodInfoSharedPtr& method_info) {
   method_info = std::make_shared<MethodInfo>();
   method_info->descriptor_ = descriptor;
-  method_info->response_type_is_http_body_ =
-      descriptor->output_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
-
-  const Protobuf::Type* request_type = type_helper_->Info()->GetTypeByTypeUrl(
-      Grpc::Common::typeUrl(descriptor->input_type()->full_name()));
-  if (request_type == nullptr) {
-    return ProtobufUtil::Status(Code::NOT_FOUND,
-                                "Could not resolve type: " + descriptor->input_type()->full_name());
-  }
 
   Status status =
-      type_helper_->ResolveFieldPath(*request_type, http_rule.body() == "*" ? "" : http_rule.body(),
-                                     &method_info->request_body_field_path);
+      resolveField(descriptor->input_type(), http_rule.body(),
+                   &method_info->request_body_field_path, &method_info->request_type_is_http_body_);
   if (!status.ok()) {
     return status;
   }
 
-  if (method_info->request_body_field_path.empty()) {
-    method_info->request_type_is_http_body_ =
-        descriptor->input_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
-  } else {
-    const Protobuf::Type* body_type = type_helper_->Info()->GetTypeByTypeUrl(
-        method_info->request_body_field_path.back()->type_url());
-    method_info->request_type_is_http_body_ =
-        body_type != nullptr &&
-        body_type->name() == google::api::HttpBody::descriptor()->full_name();
+  status = resolveField(descriptor->output_type(), http_rule.response_body(),
+                        &method_info->response_body_field_path,
+                        &method_info->response_type_is_http_body_);
+  if (!status.ok()) {
+    return status;
+  }
+
+  if (!method_info->response_body_field_path.empty() && !method_info->response_type_is_http_body_) {
+    // TODO(euroelessar): Implement https://github.com/envoyproxy/envoy/issues/11136.
+    return Status(Code::UNIMPLEMENTED,
+                  "Setting \"response_body\" is not supported yet for non-HttpBody fields: " +
+                      descriptor->full_name());
   }
 
   return Status::OK;
@@ -681,8 +703,14 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
   google::api::HttpBody http_body;
   for (auto& frame : frames) {
     if (frame.length_ > 0) {
+      http_body.Clear();
       Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
-      http_body.ParseFromZeroCopyStream(&stream);
+      if (!HttpBodyUtils::parseMessageByFieldPath(&stream, method_->response_body_field_path,
+                                                  &http_body)) {
+        // TODO(euroelessar): Return error to client.
+        encoder_callbacks_->resetStream();
+        return true;
+      }
       const auto& body = http_body.data();
 
       data.add(body);
