@@ -18,6 +18,9 @@ envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
+    # This test takes a while to run specially under tsan.
+    # Shard it to avoid test timeout.
+    shard_count = 2,
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
