@@ -33,9 +33,11 @@ envoy_cc_fuzz_test(
     srcs = ["original_dst_fuzz_test.cc"],
     corpus = "original_dst_corpus",
     deps = [
-        ":original_dst_fuzz_test_proto_cc_proto",
+        #"//test/extensions/filters/listener/common:listener_filter_fuzz_test_proto_cc_proto",
+        "//test/extensions/filters/listener/common:uber_filter_lib",
+        #":original_dst_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_dst:original_dst_lib",
-        "//test/mocks/network:network_fakes",
-        "//test/mocks/network:network_mocks",
+        #"//test/mocks/network:network_fakes",
+        #"//test/mocks/network:network_mocks",
     ],
 )

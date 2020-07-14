@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package text.extensions.filters.listener;
+package test.extensions.filters.listener;
 
 message Socket {
   string local_address = 1;

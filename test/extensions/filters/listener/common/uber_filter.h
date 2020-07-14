@@ -2,6 +2,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/fakes.h"
 
+#include "envoy/network/filter.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -10,22 +12,22 @@ namespace ListenerFilters {
 
 class UberFilterFuzzer {
 public:
-  UberFilterFuzzer(const std::unique_ptr<ListenerFilter>& filter,
-                   const envoy::extensions::filters::listener::FilterFuzzTestCase& input)
-      : filter_(filter)
-      , socket_(socketSetup(input)) {}
-
-  void fuzz();
+  void fuzz(Network::ListenerFilter& filter,
+            const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
 private:
-  Network::FakeConnectionSocket socketSetup(
-      const envoy::extensions::filters::listener::FilterFuzzTestCase& input);
 
-  std::unique_ptr<ListenerFilter> filter_;
+  void fuzzerSetup(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
+    ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
+    socketSetup(input);
+  }
+
+  void socketSetup(const test::extensions::filters::listener::FilterFuzzTestCase& input);
+
   NiceMock<Network::MockListenerFilterCallbacks> cb_;
   Network::FakeConnectionSocket socket_;
   // NiceMock<Event::MockDispatcher> dispatcher_;
-}
+};
 
 } // namespace ListenerFilters
 } // namespace Extensions

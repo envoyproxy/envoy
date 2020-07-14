@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -25,6 +26,7 @@ envoy_cc_test_library(
     hdrs = ["uber_filter.h"],
     deps = [
         ":listener_filter_fuzz_test_proto_cc_proto",
+        "//include/envoy/network:filter_interface",
         "//test/mocks/network:network_fakes",
         "//test/mocks/network:network_mocks",
     ],

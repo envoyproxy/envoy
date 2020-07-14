@@ -10,10 +10,20 @@ class FakeConnectionSocket : public MockConnectionSocket {
 public:
   ~FakeConnectionSocket() override = default;
 
+  FakeConnectionSocket() : local_address_(nullptr), remote_address_(nullptr) {}
+
   FakeConnectionSocket(const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
       : local_address_(local_address)
       , remote_address_(remote_address) {}
+
+  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
+    local_address_ = local_address;
+  }
+
+  void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
+    remote_address_ = remote_address;
+  }
 
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
 

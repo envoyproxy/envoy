@@ -1,1 +1,3 @@
-address: "hello world"
+sock {
+  local_address: "hello world"
+}  
