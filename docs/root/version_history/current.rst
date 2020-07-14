@@ -30,6 +30,7 @@ Removed Config or Runtime
 New Features
 ------------
 * signal: added support for calling fatal error handlers without envoy's signal handler, via FatalErrorHandler::callFatalErrorHandlers().
+* grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
 * tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
 
 Deprecated
