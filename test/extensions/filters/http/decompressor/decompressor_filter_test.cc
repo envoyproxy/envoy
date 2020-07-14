@@ -102,7 +102,7 @@ decompressor_library:
     // Keep the decompressor to set expectations about it
     auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
     auto* decompressor_ptr = decompressor.get();
-    EXPECT_CALL(*decompressor_factory_, createDecompressor())
+    EXPECT_CALL(*decompressor_factory_, createDecompressor(_))
         .WillOnce(Return(ByMove(std::move(decompressor))));
 
     std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
@@ -233,12 +233,12 @@ response_direction_config:
       runtime_key: does_not_exist
 )EOF");
 
-  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                        {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 
   expectNoDecompression();
 }
@@ -259,10 +259,15 @@ request_direction_config:
                                                        {"content-length", "256"}};
 
   if (isRequestDirection()) {
-    EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+    EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
     std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
         doHeaders(headers_before_filter, false /* end_stream */);
-    TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+    EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
+
     expectNoDecompression();
   } else {
     decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
@@ -291,71 +296,102 @@ response_direction_config:
     decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
                         absl::nullopt /* expected_accept_encoding */);
   } else {
-    EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+    EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
     std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
         doHeaders(headers_before_filter, false /* end_stream */);
-    TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+    EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
+
     expectNoDecompression();
   }
 }
 
 TEST_P(DecompressorFilterTest, NoDecompressionHeadersOnly) {
-  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers_before_filter;
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, true /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 }
 
 TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingAbsent) {
-  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+  if (isRequestDirection()) {
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+                  ->value()
+                  .getStringView(),
+              "mock");
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+  }
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 
   expectNoDecompression();
 }
 
 TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingDoesNotMatch) {
-  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "not-matching"},
                                                        {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
 
   expectNoDecompression();
 }
 
 TEST_P(DecompressorFilterTest, NoDecompressionContentEncodingNotCurrent) {
-  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
   // The decompressor's content scheme is not the first value in the comma-delimited list in the
   // Content-Encoding header. Therefore, compression will not occur.
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "gzip,mock"},
                                                        {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+  if (isRequestDirection()) {
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+                  ->value()
+                  .getStringView(),
+              "mock");
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+  }
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 
   expectNoDecompression();
 }
 
 TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresent) {
-  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers_before_filter{
       {"cache-control", Http::CustomHeaders::get().CacheControlValues.NoTransform},
       {"content-encoding", "mock"},
       {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+  if (isRequestDirection()) {
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+                  ->value()
+                  .getStringView(),
+              "mock");
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+  }
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 
   expectNoDecompression();
 }
 
 TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) {
-  EXPECT_CALL(*decompressor_factory_, createDecompressor()).Times(0);
+  EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
   Http::TestRequestHeaderMapImpl headers_before_filter{
       {"cache-control", fmt::format("{}, {}", Http::CustomHeaders::get().CacheControlValues.NoCache,
                                     Http::CustomHeaders::get().CacheControlValues.NoTransform)},
@@ -363,7 +399,17 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) 
       {"content-length", "256"}};
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, false /* end_stream */);
-  TestUtility::headerMapEqualIgnoreOrder(headers_before_filter, *headers_after_filter);
+
+  if (isRequestDirection()) {
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+                  ->value()
+                  .getStringView(),
+              "mock");
+    // The request direction adds Accept-Encoding by default. Other than this header, the rest of
+    // the headers should be the same before and after the filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+  }
+  EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 
   expectNoDecompression();
 }

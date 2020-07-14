@@ -174,9 +174,6 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
-
-      // Assert 1xx (may have content) OR 204 and end stream.
-      ASSERT(*status < 200 || end_stream);
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
       // https://tools.ietf.org/html/rfc7231#section-4.3.6.
