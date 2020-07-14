@@ -36,6 +36,17 @@ TEST(OmitCanaryHostsRetryPredicateTest, PredicateTest) {
   ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host2));
 }
 
+TEST(OmitCanaryHostsRetryPredicateTest, EmptyConfig) {
+  auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
+      RetryHostPredicateValues::get().OmitCanaryHostsPredicate);
+
+  ASSERT_NE(nullptr, factory);
+
+  ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
+  EXPECT_TRUE(dynamic_cast<envoy::config::retry::omit_canary_hosts::v2::OmitCanaryHostsPredicate*>(
+      config.get()));
+}
+
 } // namespace
 } // namespace Host
 } // namespace Retry
