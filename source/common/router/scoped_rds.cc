@@ -183,13 +183,15 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       exception_msgs.emplace_back(absl::StrCat("", e.what()));
     }
   }
-  applyConfigUpdate([updated_scopes](ConfigProvider::ConfigConstSharedPtr config)
-                        -> ConfigProvider::ConfigConstSharedPtr {
-    auto* thread_local_scoped_config =
-        const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
-    thread_local_scoped_config->addOrUpdateRoutingScopes(updated_scopes);
-    return config;
-  });
+  if (!updated_scopes.empty()) {
+    applyConfigUpdate([updated_scopes](ConfigProvider::ConfigConstSharedPtr config)
+                          -> ConfigProvider::ConfigConstSharedPtr {
+      auto* thread_local_scoped_config =
+          const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+      thread_local_scoped_config->addOrUpdateRoutingScopes(updated_scopes);
+      return config;
+    });
+  }
   return any_applied;
 }
 
