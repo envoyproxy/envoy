@@ -21,7 +21,8 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 
 using testing::_;
@@ -547,7 +548,7 @@ protected:
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;

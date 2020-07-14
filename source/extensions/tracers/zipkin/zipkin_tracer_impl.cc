@@ -68,7 +68,7 @@ Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
 Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-               const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator,
+               const LocalInfo::LocalInfo& local_info, Random::RandomGenerator& random_generator,
                TimeSource& time_source)
     : cm_(cluster_manager), tracer_stats_{ZIPKIN_TRACER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},

@@ -341,6 +341,19 @@ config_setting(
     values = {"define": "logger=android"},
 )
 
+config_setting(
+    name = "libfuzzer_coverage",
+    define_values = {
+        "FUZZING_ENGINE": "libfuzzer",
+        "ENVOY_CONFIG_COVERAGE": "1",
+    },
+)
+
+config_setting(
+    name = "libfuzzer",
+    values = {"define": "FUZZING_ENGINE=libfuzzer"},
+)
+
 alias(
     name = "apple",
     actual = select(

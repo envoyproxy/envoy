@@ -14,15 +14,19 @@ namespace Http {
 namespace Http2 {
 
 void initializeNghttp2Logging() {
+  // Event when ENVOY_NGHTTP2_TRACE is not set, we install a debug logger, to prevent nghttp2
+  // logging directly to stdout at -l trace.
   nghttp2_set_debug_vprintf_callback([](const char* format, va_list args) {
-    char buf[2048];
-    const int n = ::vsnprintf(buf, sizeof(buf), format, args);
-    // nghttp2 inserts new lines, but we also insert a new line in the ENVOY_LOG
-    // below, so avoid double \n.
-    if (n >= 1 && static_cast<size_t>(n) < sizeof(buf) && buf[n - 1] == '\n') {
-      buf[n - 1] = '\0';
+    if (std::getenv("ENVOY_NGHTTP2_TRACE") != nullptr) {
+      char buf[2048];
+      const int n = ::vsnprintf(buf, sizeof(buf), format, args);
+      // nghttp2 inserts new lines, but we also insert a new line in the ENVOY_LOG
+      // below, so avoid double \n.
+      if (n >= 1 && static_cast<size_t>(n) < sizeof(buf) && buf[n - 1] == '\n') {
+        buf[n - 1] = '\0';
+      }
+      ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::http2), trace, "nghttp2: {}", buf);
     }
-    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::http2), trace, "nghttp2: {}", buf);
   });
 }
 
