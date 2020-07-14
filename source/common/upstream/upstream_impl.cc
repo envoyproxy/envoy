@@ -102,8 +102,10 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
                           const envoy::config::core::v3::BindConfig bind_config) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options =
       std::make_shared<Network::ConnectionSocket::Options>();
+  // The process-wide `signal(SIGPIPE, SIG_IGN)` may fail to handle SIGPIPE if overridden elsewhere
+  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
   Network::Socket::appendOptions(cluster_options,
-                                 Network::SocketOptionFactory::buildSocketSigpipeOptions());
+                                 Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
   // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
   if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
       config.upstream_bind_config().freebind().value()) {
