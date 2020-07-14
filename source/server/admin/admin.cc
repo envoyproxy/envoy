@@ -138,6 +138,11 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
+// Helper method to get the unreadytargets parameter.
+bool shouldIncludeUnreadyTargetsInDump(const Http::Utility::QueryParams& params) {
+  return Utility::queryParam(params, "include_unready_targets") != absl::nullopt;
+}
+
 // Helper method that ensures that we've setting flags based on all the health flag values on the
 // host.
 void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
@@ -457,18 +462,19 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url,
 }
 
 void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                                   const absl::optional<std::string>& mask,
-                                   bool include_eds) const {
+                                   const absl::optional<std::string>& mask, bool include_eds,
+                                   bool include_unready_targets) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     if (!server_.clusterManager().clusters().empty()) {
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
     }
   }
-  bool include_unready_targets = true;
+
   if (include_unready_targets) {
-    callbacks_map.emplace("unready", [this] { return dumpUnreadyTargetsConfigs(); });
+    callbacks_map.emplace("unreadytargets", [this] { return dumpUnreadyTargetsConfigs(); });
   }
+
   for (const auto& key_callback_pair : callbacks_map) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     ASSERT(message);
@@ -489,17 +495,18 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
 absl::optional<std::pair<Http::Code, std::string>>
 AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
                              const absl::optional<std::string>& mask, const std::string& resource,
-                             bool include_eds) const {
+                             bool include_eds, bool include_unready_targets) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     if (!server_.clusterManager().clusters().empty()) {
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
     }
   }
-  bool include_unready_targets = true;
+
   if (include_unready_targets) {
-    callbacks_map.emplace("unready", [this] { return dumpUnreadyTargetsConfigs(); });
+    callbacks_map.emplace("unreadytargets", [this] { return dumpUnreadyTargetsConfigs(); });
   }
+
   for (const auto& key_callback_pair : callbacks_map) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     ASSERT(message);
@@ -653,17 +660,19 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
+  const bool include_unready_targets = shouldIncludeUnreadyTargetsInDump(query_params);
 
   envoy::admin::v3::ConfigDump dump;
 
   if (resource.has_value()) {
-    auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
+    auto err =
+        addResourceToDump(dump, mask, resource.value(), include_eds, include_unready_targets);
     if (err.has_value()) {
       response.add(err.value().second);
       return err.value().first;
     }
   } else {
-    addAllConfigToDump(dump, mask, include_eds);
+    addAllConfigToDump(dump, mask, include_eds, include_unready_targets);
   }
   MessageUtil::redact(dump);
 

@@ -33,7 +33,6 @@ TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   t2.expectInitializeWillCallReady();
   w.expectReady();
   m.initialize(w);
-
   expectInitialized(m);
 }
 
