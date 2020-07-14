@@ -97,7 +97,6 @@ envoy_cc_fuzz_test(
     deps = [
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
-        "//source/server:proto_descriptors_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:options_mocks",
         "//test/test_common:environment_lib",

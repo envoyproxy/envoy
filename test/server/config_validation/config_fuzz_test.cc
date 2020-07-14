@@ -6,7 +6,6 @@
 #include "common/network/address_impl.h"
 
 #include "server/config_validation/server.h"
-#include "server/proto_descriptors.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"

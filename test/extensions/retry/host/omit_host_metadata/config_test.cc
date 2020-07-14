@@ -82,6 +82,8 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
         )EOF"))));
 
   ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host));
+
+  predicate->onHostAttempted(host);
 }
 } // namespace
 } // namespace Host

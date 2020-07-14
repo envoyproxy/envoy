@@ -100,11 +100,11 @@ ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::S
 
 ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const Network::DrainDecision& drain_close,
-                                             Runtime::RandomGenerator& random_generator,
+                                             Random::RandomGenerator& random_generator,
                                              Http::Context& http_context, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
-                                             Server::OverloadManager* overload_manager,
+                                             Server::OverloadManager& overload_manager,
                                              TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
@@ -113,14 +113,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
       local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
-      overload_stop_accepting_requests_ref_(
-          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 Server::OverloadActionNames::get().StopAcceptingRequests)
-                           : Server::OverloadManager::getInactiveState()),
-      overload_disable_keepalive_ref_(
-          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 Server::OverloadActionNames::get().DisableHttpKeepAlive)
-                           : Server::OverloadManager::getInactiveState()),
+      overload_stop_accepting_requests_ref_(overload_manager.getThreadLocalOverloadState().getState(
+          Server::OverloadActionNames::get().StopAcceptingRequests)),
+      overload_disable_keepalive_ref_(overload_manager.getThreadLocalOverloadState().getState(
+          Server::OverloadActionNames::get().DisableHttpKeepAlive)),
       time_source_(time_source) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -534,7 +530,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
-                   connection_manager.filterState()),
+                   connection_manager_.read_callbacks_->connection().streamInfo().filterState(),
+                   StreamInfo::FilterState::LifeSpan::Connection),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
@@ -2472,6 +2469,9 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
   // heap allocation.
+  // TODO(snowp): In the case where connection level filter state has been set on the connection
+  // FilterState that we inherit, we'll end up copying this every time even though we could get
+  // away with just resetting it to the HCM filter_state_.
   if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
           StreamInfo::FilterState::LifeSpan::Request)) {
     (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
