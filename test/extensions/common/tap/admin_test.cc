@@ -2,7 +2,8 @@
 
 #include "extensions/common/tap/admin.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/admin_stream.h"
 
 #include "gtest/gtest.h"
 
