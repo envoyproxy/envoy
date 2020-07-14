@@ -1472,6 +1472,10 @@ message RateLimit {
       // Metadata struct that defines the key and path to retrieve the string value. A match will
       // only happen if the value in the dynamic metadata is of type string.
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+
+      // An optional value to use if *metadata_key* is empty. If not set and
+      // no value is present under the metadata_key then no descriptor is generated.
+      string default_value = 3;
     }
 
     oneof action_specifier {
