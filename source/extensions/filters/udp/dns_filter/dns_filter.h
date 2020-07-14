@@ -26,6 +26,7 @@ namespace DnsFilter {
 #define ALL_DNS_FILTER_STATS(COUNTER, HISTOGRAM)                                                   \
   COUNTER(a_record_queries)                                                                        \
   COUNTER(aaaa_record_queries)                                                                     \
+  COUNTER(srv_record_queries)                                                                      \
   COUNTER(cluster_a_record_answers)                                                                \
   COUNTER(cluster_aaaa_record_answers)                                                             \
   COUNTER(cluster_unsupported_answers)                                                             \
@@ -42,6 +43,7 @@ namespace DnsFilter {
   COUNTER(known_domain_queries)                                                                    \
   COUNTER(local_a_record_answers)                                                                  \
   COUNTER(local_aaaa_record_answers)                                                               \
+  COUNTER(local_srv_record_answers)                                                                \
   COUNTER(local_unsupported_answers)                                                               \
   COUNTER(unanswered_queries)                                                                      \
   COUNTER(unsupported_queries)                                                                     \
@@ -63,6 +65,7 @@ struct DnsFilterStats {
 struct DnsEndpointConfig {
   absl::optional<AddressConstPtrVec> address_list;
   absl::optional<std::string> cluster_name;
+  absl::optional<DnsSrvRecordPtrVec> service_list;
 };
 
 using DnsVirtualDomainConfig = absl::flat_hash_map<std::string, DnsEndpointConfig>;
@@ -173,7 +176,25 @@ private:
   bool resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRecord& query);
 
   /**
-   * @brief Resolves the supplied query from configured hosts
+   * @brief Resolves the supplied query from the configured set of domains
+   *
+   * @param context object containing the query context
+   * @param query query object containing the name to be resolved
+   * @return bool true if the requested name matched a cluster and an answer record was constructed
+   */
+  bool resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQueryRecord& query);
+
+  /**
+   * @brief Resolves the supplied query from configured services
+   *
+   * @param context object containing the query context
+   * @param query query object containing the name to be resolved
+   * @return bool true if the requested name matched a cluster and an answer record was constructed
+   */
+  bool resolveConfiguredService(DnsQueryContextPtr& context, const DnsQueryRecord& query);
+
+  /**
+   * @brief Resolves the supplied query from configured hostnames or services
    *
    * @param context object containing the query context
    * @param query query object containing the name to be resolved
@@ -225,6 +246,9 @@ private:
     case DNS_RECORD_TYPE_AAAA:
       config_->stats().aaaa_record_queries_.inc();
       break;
+    case DNS_RECORD_TYPE_SRV:
+      config_->stats().srv_record_queries_.inc();
+      break;
     default:
       config_->stats().unsupported_queries_.inc();
       break;
@@ -264,6 +288,9 @@ private:
     case DNS_RECORD_TYPE_AAAA:
       config_->stats().local_aaaa_record_answers_.inc();
       break;
+    case DNS_RECORD_TYPE_SRV:
+      config_->stats().local_srv_record_answers_.inc();
+      break;
     default:
       config_->stats().local_unsupported_answers_.inc();
       break;
@@ -294,6 +321,11 @@ private:
    * @brief Helper function to retrieve the Endpoint configuration for a requested domain
    */
   const DnsEndpointConfig* getEndpointConfigForDomain(const absl::string_view domain);
+
+  /**
+   * @brief Helper function to retrieve the Service Map for a requested domain
+   */
+  const DnsSrvRecordPtrVec* getServiceListForDomain(const absl::string_view domain);
 
   /**
    * @brief Helper function to retrieve the Address List for a requested domain

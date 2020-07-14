@@ -54,6 +54,20 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "dns_filter_utils_test",
+    srcs = ["dns_filter_utils_test.cc"],
+    extension_name = "envoy.filters.udp_listener.dns_filter",
+    tags = ["fails_on_windows"],
+    deps = [
+        ":dns_filter_test_lib",
+        "//source/extensions/filters/udp/dns_filter:config",
+        "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
+        "//test/integration:integration_lib",
+        "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "dns_filter_fuzz_test",
     srcs = ["dns_filter_fuzz_test.cc"],

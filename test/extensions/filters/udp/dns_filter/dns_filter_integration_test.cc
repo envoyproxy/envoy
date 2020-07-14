@@ -47,10 +47,11 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: {}
                 port_value: 0
     )EOF",
-                       TestEnvironment::nullDevicePath());
+                       TestEnvironment::nullDevicePath(),
+                       Network::Test::getLoopbackAddressString(GetParam()));
   }
 
   Network::Address::InstanceConstSharedPtr getListenerBindAddressAndPort() {

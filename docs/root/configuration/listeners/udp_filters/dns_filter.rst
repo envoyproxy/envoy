@@ -53,6 +53,8 @@ Example Configuration
           - suffix: "domain1.com"
           - suffix: "domain2.com"
           - suffix: "domain3.com"
+          - suffix: "domain4.com"
+          - suffix: "domain5.com"
           virtual_domains:
            - name: "www.domain1.com"
              endpoint:
@@ -73,6 +75,31 @@ Example Configuration
             - name: "www.domain4.com"
               endpoint:
                 cluster_name: cluster_0
+            - name: "voip.domain5.com"
+              endpoint:
+                service_list:
+                  dns_services:
+                    - service_name: "sip"
+                      protocol: { number: 6 }
+                      ttl: 86400s
+                      priority: 10
+                      weight: 30
+                      port: 5060
+                      target_address: "primary.voip.domain5.com"
+                    - service_name: "sip"
+                      protocol: { name: "tcp" }
+                      ttl: 86400s
+                      priority: 10
+                      weight: 20
+                      port: 5060
+                      target_address: "secondary.voip.domain5.com"
+                    - service_name: "_sip"
+                      protocol: { name: "_tcp" }
+                      ttl: 86400s
+                      priority: 10
+                      weight: 10
+                      port: 5060
+                      target_address: "backup.voip.domain5.com"
 
 
 In this example, Envoy is configured to respond to client queries for four domains. For any
@@ -80,11 +107,18 @@ other query, it will forward upstream to external resolvers. The filter will ret
 matching the input query type. If the query is for type A records and no A records are configured,
 Envoy will return no addresses and set the response code appropriately. Conversely, if there are
 matching records for the query type, each configured address is returned. This is also true for
-AAAA records. Only A and AAAA records are supported. If the filter parses other queries for other
-record types, the filter immediately responds indicating that the query is not supported. The
-filter can also redirect a query for a DNS name to the enpoints of a cluster. The last domain
+AAAA records. Only A, AAAA, and SRV records are supported. If the filter parses queries for other
+record types, the filter immediately responds indicating that the type is not supported. The
+filter can also redirect a query for a DNS name to the enpoints of a cluster. "www.domain4.com"
 in the configuration demonstrates this. Along with an address list, a cluster name is a valid
 endpoint for a DNS name.
+
+The DNS filter now supports responding to SRV Records. The records for "domain5.com" illustrate
+the configuration necessary to support responding to SRV records. The "target_address" populated
+in the configuration must be fully qualified domain names. These target addresses must be defined
+in the DNS Filter table so that Envoy can resolve the target hosts' IP addresses. The "protocol"
+of the SRV record can be defined by a name or number. As configured in the example, the filter
+will successfully respond to SRV record requests for "_sip._tcp.voip.domain5.com".
 
 The filter can also consume its domain configuration from an external DNS table. The same entities
 appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
