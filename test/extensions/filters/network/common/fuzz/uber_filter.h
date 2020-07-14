@@ -51,29 +51,8 @@ public:
   Http::Context& httpContext() override { return http_context_; }
   ~FakeFactoryContext() = default;
 
-  // const testing::NiceMock<MockServerFactoryContext> server_factory_context_;
-  // testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
-  // testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  // testing::NiceMock<Event::MockDispatcher> dispatcher_;
   Event::DispatcherPtr dispatcher_;
-  // testing::NiceMock<MockDrainManager> drain_manager_;
-  // testing::NiceMock<Init::MockManager> init_manager_;
-  // testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
-  // testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  // testing::NiceMock<Envoy::Random::MockRandomGenerator> random_;
-  // testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
-  // testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
-  // testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
-  // Singleton::ManagerPtr singleton_manager_;
-  // testing::NiceMock<MockAdmin> admin_;
-  // Stats::IsolatedStoreImpl listener_scope_;
-  // Event::GlobalTimeSystem time_system_;
   Event::SimulatedTimeSystem time_system_;
-  // testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
-  // testing::NiceMock<MockOverloadManager> overload_manager_;
-  // Grpc::ContextImpl grpc_context_;
-  // Http::ContextImpl http_context_;
-  // testing::NiceMock<Api::MockApi> api_;
   Api::ApiPtr api_;
 };
 
