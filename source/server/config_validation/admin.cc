@@ -3,11 +3,12 @@
 namespace Envoy {
 namespace Server {
 
+// Pretend that handler was added successfully.
 bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) {
-  return false;
+  return true;
 }
 
-bool ValidationAdmin::removeHandler(const std::string&) { return false; }
+bool ValidationAdmin::removeHandler(const std::string&) { return true; }
 
 const Network::Socket& ValidationAdmin::socket() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
