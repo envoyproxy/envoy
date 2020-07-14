@@ -68,7 +68,7 @@ public:
 
 private:
   EnvoyProcessClientHelloResultCallback* done_cb_wrapper_{nullptr};
-  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
+  EnvoyQuicProofSourceDetailsPtr details_;
 };
 
 // A dedicated stream to do TLS1.3 handshake.

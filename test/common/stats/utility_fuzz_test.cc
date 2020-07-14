@@ -39,8 +39,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   } else {
     symbol_table = std::make_unique<Stats::SymbolTableImpl>();
   }
-  std::unique_ptr<Stats::IsolatedStoreImpl> store =
-      std::make_unique<Stats::IsolatedStoreImpl>(*symbol_table);
+  Stats::IsolatedStoreImplPtr store = std::make_unique<Stats::IsolatedStoreImpl>(*symbol_table);
   Stats::StatNamePool pool(*symbol_table);
   Stats::ScopePtr scope = store->createScope(provider.ConsumeRandomLengthString(max_len));
   Stats::ElementVec ele_vec;

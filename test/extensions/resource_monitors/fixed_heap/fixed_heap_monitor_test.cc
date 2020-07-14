@@ -61,7 +61,7 @@ TEST(FixedHeapMonitorTest, ComputeUsageWithRealMemoryStats) {
   const double expected_usage =
       (stats_reader->reservedHeapBytes() - stats_reader->unmappedHeapBytes()) /
       static_cast<double>(max_heap);
-  std::unique_ptr<FixedHeapMonitor> monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
+  FixedHeapMonitorPtr monitor(new FixedHeapMonitor(config, std::move(stats_reader)));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);

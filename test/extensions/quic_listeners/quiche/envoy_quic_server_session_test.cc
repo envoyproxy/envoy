@@ -87,7 +87,7 @@ class ProofSourceDetailsSetter {
 public:
   virtual ~ProofSourceDetailsSetter() = default;
 
-  virtual void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) = 0;
+  virtual void setProofSourceDetails(EnvoyQuicProofSourceDetailsPtr details) = 0;
 };
 
 class TestQuicCryptoServerStream : public EnvoyQuicCryptoServerStream,
@@ -105,12 +105,12 @@ public:
 
   const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
 
-  void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
+  void setProofSourceDetails(EnvoyQuicProofSourceDetailsPtr details) override {
     details_ = std::move(details);
   }
 
 private:
-  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
+  EnvoyQuicProofSourceDetailsPtr details_;
 };
 
 class TestEnvoyQuicTlsServerHandshaker : public EnvoyQuicTlsServerHandshaker,
@@ -127,7 +127,7 @@ public:
 
   bool encryption_established() const override { return true; }
   const EnvoyQuicProofSourceDetails* proofSourceDetails() const override { return details_.get(); }
-  void setProofSourceDetails(std::unique_ptr<EnvoyQuicProofSourceDetails> details) override {
+  void setProofSourceDetails(EnvoyQuicProofSourceDetailsPtr details) override {
     details_ = std::move(details);
   }
   const quic::QuicCryptoNegotiatedParameters& crypto_negotiated_params() const override {
@@ -135,7 +135,7 @@ public:
   }
 
 private:
-  std::unique_ptr<EnvoyQuicProofSourceDetails> details_;
+  EnvoyQuicProofSourceDetailsPtr details_;
   quic::QuicReferenceCountedPointer<quic::QuicCryptoNegotiatedParameters> params_;
 };
 

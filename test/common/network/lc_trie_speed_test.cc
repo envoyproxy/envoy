@@ -94,7 +94,7 @@ BENCHMARK(lcTrieConstructMinimal);
 static void lcTrieLookup(benchmark::State& state) {
   CidrInputs cidr_inputs;
   AddressInputs address_inputs;
-  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie =
+  Envoy::Network::LcTrie::LcTriePtr<std::string> lc_trie =
       std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(cidr_inputs.tag_data_);
 
   static size_t i = 0;
@@ -112,7 +112,7 @@ BENCHMARK(lcTrieLookup);
 static void lcTrieLookupWithNestedPrefixes(benchmark::State& state) {
   CidrInputs cidr_inputs;
   AddressInputs address_inputs;
-  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie_nested_prefixes =
+  Envoy::Network::LcTrie::LcTriePtr<std::string> lc_trie_nested_prefixes =
       std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(
           cidr_inputs.tag_data_nested_prefixes_);
 
@@ -131,7 +131,7 @@ BENCHMARK(lcTrieLookupWithNestedPrefixes);
 static void lcTrieLookupMinimal(benchmark::State& state) {
   CidrInputs cidr_inputs;
   AddressInputs address_inputs;
-  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie_minimal =
+  Envoy::Network::LcTrie::LcTriePtr<std::string> lc_trie_minimal =
       std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(cidr_inputs.tag_data_minimal_);
 
   static size_t i = 0;

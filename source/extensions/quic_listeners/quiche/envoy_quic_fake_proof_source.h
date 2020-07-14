@@ -39,6 +39,8 @@ private:
   const Network::FilterChain& filter_chain_;
 };
 
+using EnvoyQuicProofSourceDetailsPtr = std::unique_ptr<EnvoyQuicProofSourceDetails>;
+
 // A fake implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
 // TODO(danzh) Rename it to EnvoyQuicProofSource once it's fully implemented.
 class EnvoyQuicFakeProofSource : public quic::ProofSource {
