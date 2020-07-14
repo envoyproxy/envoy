@@ -1,16 +1,17 @@
 #include "test/extensions/filters/network/common/fuzz/uber_filter.h"
 
+#include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
+#include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
+
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
-#include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
-#include "extensions/filters/network/well_known_names.h"
 #include "extensions/filters/network/common/utility.h"
+#include "extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
-
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -22,24 +23,19 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // Will extend to cover other network filters one by one.
   static ::std::vector<absl::string_view> filter_names_;
   if (filter_names_.empty()) {
-    filter_names_ = {
-                    NetworkFilterNames::get().ExtAuthorization, 
-                    NetworkFilterNames::get().LocalRateLimit,
-                    NetworkFilterNames::get().RedisProxy,
-                    NetworkFilterNames::get().ClientSslAuth,
-                    NetworkFilterNames::get().Echo,      
-                    // NetworkFilterNames::get().TcpProxy,
-                    NetworkFilterNames::get().DirectResponse,
-                    // NetworkFilterNames::get().SniDynamicForwardProxy,
-                    NetworkFilterNames::get().DubboProxy,
-                    NetworkFilterNames::get().SniCluster
-                     };
+    filter_names_ = {NetworkFilterNames::get().ExtAuthorization,
+                     NetworkFilterNames::get().LocalRateLimit, NetworkFilterNames::get().RedisProxy,
+                     NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().Echo,
+                     NetworkFilterNames::get().DirectResponse,
+                     // NetworkFilterNames::get().SniDynamicForwardProxy,
+                     // NetworkFilterNames::get().TcpProxy,
+                     NetworkFilterNames::get().DubboProxy, NetworkFilterNames::get().SniCluster};
   }
   return filter_names_;
 }
 
 void UberFilterFuzzer::reset(const std::string) {
-  // Close the connection to make sure the filter' callback is set to nullptr.
+  // Close the connection to make sure the filter's callback is set to nullptr.
   read_filter_callbacks_->connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   // Clear the filter's raw poninter stored inside the connection_ and reset the connection_.
   read_filter_callbacks_->connection_.callbacks_.clear();
@@ -47,15 +43,11 @@ void UberFilterFuzzer::reset(const std::string) {
   read_filter_callbacks_->connection_.state_ = Network::Connection::State::Open;
 }
 void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
-  std::cout << "setup for filter:" << filter_name << std::endl;
-
   // Set up response for ext_authz filter
-  if (filter_name == "envoy.filters.network.ext_authz") {
- 
+  if (filter_name == NetworkFilterNames::get().ExtAuthorization) {
 
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
-    
 
     ON_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
         .WillByDefault(testing::WithArgs<3>(Invoke([&](Grpc::RawAsyncRequestCallbacks& callbacks) {
@@ -67,6 +59,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
           auto check_response = Filters::Common::ExtAuthz::TestCommon::makeCheckResponse(
               Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body,
               expected_headers);
+          // Give response to the grpc_client by calling onSuccess()
           grpc_client_impl->onSuccess(std::move(check_response), span_);
           return async_request_.get();
         })));
@@ -77,9 +70,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
 
     ON_CALL(factory_context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                                  bool) { 
-                                    return std::move(async_client_factory_); 
-                                    }));
+                                  bool) { return std::move(async_client_factory_); }));
   }
 }
 void UberFilterFuzzer::fuzzerSetup() {
@@ -95,10 +86,10 @@ void UberFilterFuzzer::fuzzerSetup() {
       }));
   // Prepare sni for sni_cluster filter and sni_dynamic_forward_proxy filter
   ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
-      .WillByDefault(testing::Return("filter_state_cluster"));
+      .WillByDefault(testing::Return("fake_cluster"));
   // Prepare time source for filters such as local_ratelimit filter
   factory_context_.prepareSimulatedSystemTime();
-
+  // Prepare address for filters such as ext_authz filter
   addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
   ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
       .WillByDefault(testing::ReturnRef(addr_));
@@ -108,17 +99,31 @@ void UberFilterFuzzer::fuzzerSetup() {
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
 }
 
-UberFilterFuzzer::UberFilterFuzzer() :factory_context_{},time_source_(factory_context_.SimulatedTimeSystem()){ 
-  fuzzerSetup(); 
+UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.SimulatedTimeSystem()) {
+  fuzzerSetup();
 }
-bool UberFilterFuzzer::containsSystemCall(absl::string_view filter_name, Protobuf::Message* config_message){
+bool UberFilterFuzzer::invalidInputForFuzzer(absl::string_view filter_name,
+                                             Protobuf::Message* config_message) {
+  // System calls such as reading files are prohibited in this fuzzer. Some input that crashes the
+  // mock/fake objects are also prohibited.
   const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
-    std::string(filter_name));
-  if(filter_name == NetworkFilterNames::get().DirectResponse){
+      std::string(filter_name));
+  if (filter_name == NetworkFilterNames::get().DirectResponse) {
     envoy::extensions::filters::network::direct_response::v3::Config& config =
-        dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(*config_message);
-    if(config.response().specifier_case()==envoy::config::core::v3::DataSource::SpecifierCase::kFilename){
-      ENVOY_LOG_MISC(info, "direct_response filter trying to open a file: {}", config.DebugString());
+        dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(
+            *config_message);
+    if (config.response().specifier_case() ==
+        envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
+      return true;
+    }
+  } else if (filter_name == NetworkFilterNames::get().LocalRateLimit) {
+    envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& config =
+        dynamic_cast<envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit&>(
+            *config_message);
+    if (config.token_bucket().fill_interval().seconds() > seconds_in_one_day_) {
+      // Too large fill_interval may cause "c++/v1/chrono" overflow when simulated_time_system_ is
+      // converting it to a smaller unit. Constraining fill_interval to no greater than one day is
+      // reasonable.
       return true;
     }
   }
@@ -137,14 +142,12 @@ void UberFilterFuzzer::fuzz(
         Server::Configuration::NamedNetworkFilterConfigFactory>(filter_name);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
-    if(containsSystemCall(filter_name, message.get())){
+    if (invalidInputForFuzzer(filter_name, message.get())) {
       // Make sure no invalid system calls are executed in fuzzer.
       return;
     }
-    ENVOY_LOG_MISC(info, "Config content: {}", message->DebugString());
+    ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
-
-    // filterSetup(proto_config);
     perFilterSetup(proto_config.name());
     // Add filter to connection_
     cb_(read_filter_callbacks_->connection_);
@@ -153,9 +156,6 @@ void UberFilterFuzzer::fuzz(
     return;
   }
 
-  // if (actions.size() > 5) {
-  //   PANIC("A case is found!");
-  // }
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
