@@ -247,6 +247,9 @@ TEST_F(HdsTest, TestProcessMessageMissingFields) {
   // since this config was invalid.
   EXPECT_FALSE(server_response_timer_->enabled_);
 
+  // ensure that no partial information was stored in hds_clusters_
+  EXPECT_TRUE(hds_delegate_->hdsClusters().empty());
+
   // Check Correctness by verifying one request and one error has been generated in stat_
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 1);
