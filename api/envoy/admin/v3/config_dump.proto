@@ -388,7 +388,7 @@ message ListenerUnreadyTargetsConfigDump {
   string listener_init_manager_name = 1;
 
   // Names of unready targets in the hash map.
-  repeated string listener_names = 2;
+  repeated string target_names = 2;
 }
 
 // Envoy's admin fills this message with active listeners. Each listener has an init manager
