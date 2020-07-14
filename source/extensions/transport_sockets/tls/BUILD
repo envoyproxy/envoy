@@ -40,9 +40,12 @@ envoy_cc_library(
     deps = [
         ":context_config_lib",
         ":context_lib",
+        ":handshaker_lib",
         ":utility_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/ssl:handshaker_interface",
+        "//include/envoy/ssl:socket_state",
         "//include/envoy/ssl:ssl_socket_extended_info_interface",
         "//include/envoy/ssl/private_key:private_key_callbacks_interface",
         "//include/envoy/ssl/private_key:private_key_interface",
@@ -63,6 +66,7 @@ envoy_cc_library(
         "ssl",
     ],
     deps = [
+        ":handshaker_lib",
         "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_provider_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -115,6 +119,35 @@ envoy_cc_library(
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "handshaker_lib",
+    srcs = ["handshaker_impl.cc"],
+    hdrs = ["handshaker_impl.h"],
+    external_deps = [
+        "ssl",
+    ],
+    deps = [
+        "//include/envoy/ssl:context_config_interface",
+        "//include/envoy/ssl:context_interface",
+        "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/ssl:handshaker_interface",
+        "//include/envoy/ssl:socket_state",
+        "//include/envoy/ssl:ssl_socket_extended_info_interface",
+        "//include/envoy/ssl/private_key:private_key_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
+        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
     ],
 )
 

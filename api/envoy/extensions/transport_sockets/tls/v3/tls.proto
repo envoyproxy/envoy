@@ -98,8 +98,13 @@ message DownstreamTlsContext {
   }];
 }
 
+// Custom config for customizing listener handshaker behavior.
+message CustomListenerHandshaker {
+  config.core.v3.TypedExtensionConfig typed_config = 1;
+}
+
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -201,4 +206,7 @@ message CommonTlsContext {
   //
   // There is no default for this parameter. If empty, Envoy will not expose ALPN.
   repeated string alpn_protocols = 4;
+
+  // Custom TLS handshaker. If empty, defaults to native TLS handshaker.
+  CustomListenerHandshaker custom_listener_handshaker = 11;
 }

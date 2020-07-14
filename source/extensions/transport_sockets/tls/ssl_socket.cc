@@ -1,5 +1,6 @@
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -14,6 +15,7 @@
 #include "openssl/x509v3.h"
 
 using Envoy::Network::PostIoAction;
+using Envoy::Ssl::SocketState;
 
 namespace Envoy {
 namespace Extensions {
@@ -43,9 +45,11 @@ public:
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                     Ssl::HandshakerPtr handshaker)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), state_(SocketState::PreHandshake) {
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), handshaker_(std::move(handshaker)),
+      state_(SocketState::PreHandshake) {
   bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
   info_ = std::make_shared<SslSocketInfo>(std::move(ssl), ctx_);
 
@@ -55,11 +59,13 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
     ASSERT(state == InitialState::Server);
     SSL_set_accept_state(rawSsl());
   }
+  handshaker_->initialize(rawSsl());
 }
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
+  handshaker_->setTransportSocketCallbacks(callbacks);
 
   // Associate this SSL connection with all the certificates (with their potentially different
   // private key methods).
@@ -168,37 +174,14 @@ void SslSocket::onPrivateKeyMethodComplete() {
   }
 }
 
-PostIoAction SslSocket::doHandshake() {
-  ASSERT(state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent);
-  int rc = SSL_do_handshake(rawSsl());
-  if (rc == 1) {
-    ENVOY_CONN_LOG(debug, "handshake complete", callbacks_->connection());
-    state_ = SocketState::HandshakeComplete;
-    ctx_->logHandshake(rawSsl());
-    callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+bssl::UniquePtr<SSL> SslSocket::Handoff() { return info_->handoffSsl(); }
+void SslSocket::Handback(bssl::UniquePtr<SSL> ssl) { info_->handbackSsl(std::move(ssl)); }
+void SslSocket::LogHandshake(SSL* ssl) { ctx_->logHandshake(ssl); }
+void SslSocket::ErrorCb() { drainErrorQueue(); }
 
-    // It's possible that we closed during the handshake callback.
-    return callbacks_->connection().state() == Network::Connection::State::Open
-               ? PostIoAction::KeepOpen
-               : PostIoAction::Close;
-  } else {
-    int err = SSL_get_error(rawSsl(), rc);
-    switch (err) {
-    case SSL_ERROR_WANT_READ:
-    case SSL_ERROR_WANT_WRITE:
-      ENVOY_CONN_LOG(debug, "handshake expecting {}", callbacks_->connection(),
-                     err == SSL_ERROR_WANT_READ ? "read" : "write");
-      return PostIoAction::KeepOpen;
-    case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
-      ENVOY_CONN_LOG(debug, "handshake continued asynchronously", callbacks_->connection());
-      state_ = SocketState::HandshakeInProgress;
-      return PostIoAction::KeepOpen;
-    default:
-      ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_->connection(), err);
-      drainErrorQueue();
-      return PostIoAction::Close;
-    }
-  }
+PostIoAction SslSocket::doHandshake() {
+  return handshaker_->doHandshake(state_, rawSsl(),
+                                  /*callbacks=*/*this);
 }
 
 void SslSocket::drainErrorQueue() {
@@ -623,7 +606,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   }
   if (ssl_ctx) {
     return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
-                                       transport_socket_options);
+                                       transport_socket_options, config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -663,7 +646,8 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSha
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr);
+    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
+                                       config_->createHandshaker());
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

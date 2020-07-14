@@ -6,7 +6,9 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
+#include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
+#include "envoy/ssl/socket_state.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -14,6 +16,7 @@
 #include "common/common/logger.h"
 
 #include "extensions/transport_sockets/tls/context_impl.h"
+#include "extensions/transport_sockets/tls/handshaker_impl.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_map.h"
@@ -39,7 +42,6 @@ struct SslSocketFactoryStats {
 };
 
 enum class InitialState { Client, Server };
-enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
 class SslExtendedSocketInfoImpl : public Envoy::Ssl::SslExtendedSocketInfo {
 public:
@@ -77,6 +79,8 @@ public:
   const std::string& tlsVersion() const override;
   absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
   SSL* ssl() const { return ssl_.get(); }
+  bssl::UniquePtr<SSL> handoffSsl() { return std::move(ssl_); }
+  void handbackSsl(bssl::UniquePtr<SSL> ssl) { ssl_ = std::move(ssl); }
 
   bssl::UniquePtr<SSL> ssl_;
 
@@ -97,20 +101,22 @@ private:
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
 };
 
-using SslSocketInfoConstSharedPtr = std::shared_ptr<const SslSocketInfo>;
+using SslSocketInfoSharedPtr = std::shared_ptr<SslSocketInfo>;
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::PrivateKeyConnectionCallbacks,
+                  public Envoy::Ssl::HandshakerCallbacks,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-            const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+            const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+            Ssl::HandshakerPtr handshaker);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
   absl::string_view failureReason() const override;
-  bool canFlushClose() override { return state_ == SocketState::HandshakeComplete; }
+  bool canFlushClose() override { return state_ == Envoy::Ssl::SocketState::HandshakeComplete; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
@@ -118,6 +124,11 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
+  // Ssl::HandshakerCallbacks
+  bssl::UniquePtr<SSL> Handoff() override;
+  void Handback(bssl::UniquePtr<SSL> ssl) override;
+  void LogHandshake(SSL* ssl) override;
+  void ErrorCb() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 
@@ -141,11 +152,12 @@ private:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
+  Ssl::HandshakerPtr handshaker_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
-  SocketState state_;
+  Envoy::Ssl::SocketState state_;
 
-  SslSocketInfoConstSharedPtr info_;
+  SslSocketInfoSharedPtr info_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

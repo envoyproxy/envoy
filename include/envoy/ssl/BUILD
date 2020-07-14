@@ -28,6 +28,7 @@ envoy_cc_library(
     hdrs = ["context_config.h"],
     deps = [
         ":certificate_validation_context_config_interface",
+        ":handshaker_interface",
         ":tls_certificate_config_interface",
     ],
 )
@@ -67,4 +68,21 @@ envoy_cc_library(
     hdrs = ["ssl_socket_extended_info.h"],
     deps = [
     ],
+)
+
+envoy_cc_library(
+    name = "handshaker_interface",
+    hdrs = ["handshaker.h"],
+    external_deps = ["ssl"],
+    deps = [
+        ":socket_state",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:transport_socket_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_state",
+    hdrs = ["socket_state.h"],
+    deps = [],
 )

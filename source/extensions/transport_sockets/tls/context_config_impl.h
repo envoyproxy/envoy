@@ -13,6 +13,8 @@
 #include "common/json/json_loader.h"
 #include "common/ssl/tls_certificate_config_impl.h"
 
+#include "extensions/transport_sockets/tls/handshaker_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -60,6 +62,8 @@ public:
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
           dynamic_cvc);
 
+  Ssl::HandshakerPtr createHandshaker() const override;
+
 protected:
   ContextConfigImpl(const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
                     const unsigned default_min_protocol_version,
@@ -94,6 +98,10 @@ private:
   Envoy::Common::CallbackHandle* cvc_validation_callback_handle_{};
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
+
+  // Ptr to HandshakerFactory. If nullptr, uses default Handshaker impl.
+  Ssl::HandshakerFactory* handshaker_factory_{};
+  ProtobufTypes::MessagePtr handshaker_config_message_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

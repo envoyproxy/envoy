@@ -93,6 +93,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "handshaker_test",
+    srcs = ["handshaker_test.cc"],
+    data = [
+        "gen_unittest_certs.sh",
+        "//test/config/integration/certs",
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    external_deps = ["ssl"],
+    deps = [
+        ":ssl_socket_test",
+        ":ssl_test_utils",
+        "//source/extensions/transport_sockets/tls:handshaker_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = [
         "utility_test.cc",

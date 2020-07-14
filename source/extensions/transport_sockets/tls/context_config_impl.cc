@@ -213,6 +213,15 @@ ContextConfigImpl::ContextConfigImpl(
       }
     }
   }
+
+  if (config.has_custom_listener_handshaker()) {
+    auto& handshaker_config = config.custom_listener_handshaker().typed_config();
+    handshaker_factory_ =
+        &Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
+    handshaker_config_message_ = Config::Utility::translateAnyToFactoryConfig(
+        handshaker_config.typed_config(), factory_context.messageValidationVisitor(),
+        *handshaker_factory_);
+  }
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -222,6 +231,15 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
       *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
   return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc, api_);
+}
+
+Ssl::HandshakerPtr ContextConfigImpl::createHandshaker() const {
+  if (handshaker_factory_ == nullptr) {
+    return std::make_unique<HandshakerImpl>();
+  } else {
+    HandshakerFactoryContextImpl context(api_, alpnProtocols());
+    return handshaker_factory_->createHandshaker(*handshaker_config_message_, context);
+  }
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
@@ -409,7 +427,9 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
   if ((config.common_tls_context().tls_certificates().size() +
        config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
-    throw EnvoyException("No TLS certificates found for server context");
+    if (createHandshaker()->requireCertificates()) {
+      throw EnvoyException("No TLS certificates found for server context");
+    }
   } else if (!config.common_tls_context().tls_certificates().empty() &&
              !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
     throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
