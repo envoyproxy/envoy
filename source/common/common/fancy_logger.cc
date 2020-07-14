@@ -59,7 +59,7 @@ bool FancyContext::setFancyLogger(std::string key, level_enum log_level)
 void FancyContext::setDefaultFancyLevelFormat(spdlog::level::level_enum level, std::string format)
     ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
   absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
-  for(const auto& it : *fancy_log_map_) {
+  for (const auto& it : *fancy_log_map_) {
     it.second->set_level(level);
     it.second->set_pattern(format);
   }
@@ -78,7 +78,7 @@ void FancyContext::initSink() {
 spdlog::logger* FancyContext::createLogger(std::string key, int level)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_) {
   SpdLoggerPtr new_logger = std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
-  if (!Logger::Registry::getSink()->hasLock()) {
+  if (!Logger::Registry::getSink()->hasLock()) { // occurs in benchmark test
     initSink();
   }
   level_enum lv = Logger::Context::getFancyDefaultLevel();
