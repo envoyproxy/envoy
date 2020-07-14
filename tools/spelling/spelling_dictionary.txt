@@ -231,6 +231,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+PSS
 Postgre
 Postgres
 Prereq
@@ -256,6 +257,7 @@ RLS
 RNG
 RPC
 RSA
+RSAE
 RST
 RTDS
 RTTI
