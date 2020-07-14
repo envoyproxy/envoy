@@ -42,7 +42,7 @@ TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
 // can be sent, not just with pausing: rate limiting or a down gRPC stream would also do it).
 TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   startSubscription({"name1", "name2", "name3"});
-  subscription_->pause();
+  auto resume_sub = subscription_->pause();
 
   expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   // If not for the pause, these updates would make the expectSendMessage fail due to too many
@@ -52,8 +52,6 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   subscription_->updateResourceInterest({"name3", "name4"});
   subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
   subscription_->updateResourceInterest({"name3", "name4"});
-
-  subscription_->resume();
 }
 
 TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
@@ -65,7 +63,7 @@ TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
 // resume, *all* ACKs that arrived during the pause are sent (in order).
 TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   startSubscription({"name1", "name2", "name3"});
-  subscription_->pause();
+  auto resume_sub = subscription_->pause();
   // The server gives us our first version of resource name1.
   // subscription_ now wants to ACK name1 (but can't due to pause).
   {
@@ -118,7 +116,6 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
           nonce_acks_sent_.push(nonce);
         }
       }));
-  subscription_->resume();
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
 }
@@ -133,7 +130,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   EXPECT_CALL(local_info, node()).WillRepeatedly(testing::ReturnRef(node));
 
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
   NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;

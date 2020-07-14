@@ -179,7 +179,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
         "//source/server:configuration_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "@com_googlesource_quiche//:quic_test_tools_crypto_server_config_peer_lib",
@@ -221,6 +221,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps = [
         "//source/extensions/quic_listeners/quiche:envoy_quic_fake_proof_source_lib",
+        "//test/mocks/network:network_mocks",
         "@com_googlesource_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )
