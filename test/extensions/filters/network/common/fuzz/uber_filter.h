@@ -15,17 +15,7 @@ namespace Server {
 namespace Configuration {
 class FakeFactoryContext : public MockFactoryContext {
 public:
-  FakeFactoryContext() {
-    // instantizate
-    // api_ = Api::createApiForTest(time_system_);
-    // dispatcher_ = api_->allocateDispatcher("test_thread");
-  }
-  //  ServerFactoryContext& getServerFactoryContext() {
-  //   return server_factory_context_;
-  // }
-  // TransportSocketFactoryContext& getTransportSocketFactoryContext() const{
-  //   return re
-  // }
+  FakeFactoryContext() {}
   void prepareSimulatedSystemTime() {
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");

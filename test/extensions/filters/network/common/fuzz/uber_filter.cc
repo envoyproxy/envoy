@@ -37,7 +37,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
 void UberFilterFuzzer::reset(const std::string) {
   // Close the connection to make sure the filter's callback is set to nullptr.
   read_filter_callbacks_->connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
-  // Clear the filter's raw poninter stored inside the connection_ and reset the connection_.
+  // Clear the filter's raw pointer stored inside the connection_ and reset the connection_.
   read_filter_callbacks_->connection_.callbacks_.clear();
   read_filter_callbacks_->connection_.bytes_sent_callbacks_.clear();
   read_filter_callbacks_->connection_.state_ = Network::Connection::State::Open;
