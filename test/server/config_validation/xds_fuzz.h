@@ -29,17 +29,17 @@ public:
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name);
 
-  envoy::config::listener::v3::Listener buildListener(std::string listener_name,
-                                                      std::string route_name);
+  envoy::config::listener::v3::Listener buildListener(const std::string& listener_name,
+                                                      const std::string& route_name);
 
-  envoy::config::route::v3::RouteConfiguration buildRouteConfig(std::string route_name);
+  envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& route_name);
 
   void updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners,
                       const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
                       const std::vector<std::string>& removed);
 
   void
-  updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
+  updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration>& routes,
               const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
               const std::vector<std::string>& removed);
 
@@ -51,21 +51,21 @@ public:
   const size_t RoutesMax = 5;
 
 private:
-  void addListener(std::string listener_name, std::string route_name);
-  void removeListener(std::string listener_name);
-  void addRoute(std::string route_name);
+  void addListener(const std::string& listener_name, const std::string& route_name);
+  void removeListener(const std::string& listener_name);
+  void addRoute(const std::string& route_name);
 
   void verifyState();
   void verifyListeners();
 
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
 
-  XdsVerifier verifier_;
-
-  bool eraseListener(std::string listener_name);
-  bool hasRoute(std::string route_num);
+  bool eraseListener(const std::string& listener_name);
+  bool hasRoute(const std::string& route_num);
   AssertionResult waitForAck(const std::string& expected_type_url,
                              const std::string& expected_version);
+
+  XdsVerifier verifier_;
 
   Protobuf::RepeatedPtrField<test::server::config_validation::Action> actions_;
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
@@ -75,10 +75,6 @@ private:
   envoy::config::core::v3::ApiVersion api_version_;
 
   Network::Address::IpVersion ip_version_;
-
-  uint32_t num_added_;
-  uint32_t num_modified_;
-  uint32_t num_removed_;
 };
 
 } // namespace Envoy

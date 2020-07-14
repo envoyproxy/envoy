@@ -11,7 +11,7 @@ XdsVerifier::XdsVerifier()
 /**
  * get the route referenced by a listener
  */
-std::string XdsVerifier::getRoute(envoy::config::listener::v3::Listener listener) {
+std::string XdsVerifier::getRoute(const envoy::config::listener::v3::Listener& listener) {
   envoy::config::listener::v3::Filter filter0 = listener.filter_chains()[0].filters()[0];
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager conn_man;
   filter0.typed_config().UnpackTo(&conn_man);
@@ -21,13 +21,8 @@ std::string XdsVerifier::getRoute(envoy::config::listener::v3::Listener listener
 /**
  * @return true iff the route listener refers to is in routes_
  */
-bool XdsVerifier::hasRoute(envoy::config::listener::v3::Listener listener) {
-  for (auto& route : routes_) {
-    if (getRoute(listener) == route.name()) {
-      return true;
-    }
-  }
-  return false;
+bool XdsVerifier::hasRoute(const envoy::config::listener::v3::Listener& listener) {
+  return routes_.contains(getRoute(listener));
 }
 
 /**
@@ -35,8 +30,9 @@ bool XdsVerifier::hasRoute(envoy::config::listener::v3::Listener listener) {
  */
 void XdsVerifier::dumpState() {
   ENVOY_LOG_MISC(info, "Listener Dump:");
-  for (auto listener_rep : listeners_) {
-    ENVOY_LOG_MISC(info, "Name: {}, Route {}, State: {}", listener_rep.listener.name(), getRoute(listener_rep.listener), listener_rep.state);
+  for (auto rep : listeners_) {
+    ENVOY_LOG_MISC(info, "Name: {}, Route {}, State: {}", rep.listener.name(),
+                   getRoute(rep.listener), rep.state);
   }
 }
 
@@ -68,7 +64,8 @@ void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener
   dumpState();
   auto it = listeners_.begin();
   while (it != listeners_.end()) {
-    if (it->listener.name() == listener.name() && getRoute(listener) == getRoute(it->listener) && it->state != DRAINING) {
+    if (it->listener.name() == listener.name() && getRoute(listener) == getRoute(it->listener) &&
+        it->state != DRAINING) {
       // the same listener has been added again, ignore it
       ENVOY_LOG_MISC(info, "Ignoring duplicate add of {}", listener.name());
       return;
@@ -109,12 +106,12 @@ void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener
  */
 void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update) {
   // if the same listener being added is already draining, it will be moved back to active
-  for (auto& listener_rep : listeners_) {
-    if (listener_rep.listener.name() == listener.name() && getRoute(listener_rep.listener) == getRoute(listener) &&
-        listener_rep.state == DRAINING) {
+  for (auto& rep : listeners_) {
+    if (rep.listener.name() == listener.name() && getRoute(rep.listener) == getRoute(listener) &&
+        rep.state == DRAINING) {
       num_draining_--;
       ENVOY_LOG_MISC(info, "Changing {} from DRAINING back to ACTIVE", listener.name());
-      listener_rep.state = ACTIVE;
+      rep.state = ACTIVE;
       num_active_++;
       return;
     }
@@ -143,7 +140,7 @@ void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener, 
  * remove a listener and drain it if it was active
  * @param name the name of the listener to be removed
  */
-void XdsVerifier::listenerRemoved(std::string& name) {
+void XdsVerifier::listenerRemoved(const std::string& name) {
   auto it = listeners_.begin();
   bool found = false;
   while (it != listeners_.end()) {
@@ -185,16 +182,17 @@ void XdsVerifier::routeUpdated(envoy::config::route::v3::RouteConfiguration rout
  * add a new route and update any listeners that refer to this route
  */
 void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route) {
-  routes_.push_back(route);
-  for (auto& listener_rep : listeners_) {
-    if (getRoute(listener_rep.listener) == route.name()) {
-      if (listener_rep.state == WARMING) {
+  routes_.insert({route.name(), route});
+  for (auto& rep : listeners_) {
+    if (getRoute(rep.listener) == route.name()) {
+      if (rep.state == WARMING) {
         // it should successfully warm now
-        ENVOY_LOG_MISC(info, "Moving {} to ACTIVE state", listener_rep.listener.name());
+        ENVOY_LOG_MISC(info, "Moving {} to ACTIVE state", rep.listener.name());
+
         // if there were any active listeners that were waiting to be updated, they will now be
         // changed to draining and the warming listener will take their place
         for (auto& old_listener : listeners_) {
-          if (old_listener.listener.name() == listener_rep.listener.name() &&
+          if (old_listener.listener.name() == rep.listener.name() &&
               getRoute(old_listener.listener) != route.name() && old_listener.state == ACTIVE) {
             old_listener.state = DRAINING;
             num_active_--;
@@ -203,7 +201,7 @@ void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route)
         }
         num_warming_--;
         num_active_++;
-        listener_rep.state = ACTIVE;
+        rep.state = ACTIVE;
       }
     }
   }

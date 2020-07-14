@@ -6,6 +6,8 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 
 class XdsVerifier {
@@ -13,22 +15,19 @@ public:
   XdsVerifier();
   void listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update = false);
   void listenerUpdated(envoy::config::listener::v3::Listener listener);
-  void listenerRemoved(std::string& name);
+  void listenerRemoved(const std::string& name);
   void drainedListener(const std::string& name);
 
   void routeAdded(envoy::config::route::v3::RouteConfiguration route);
   void routeUpdated(envoy::config::route::v3::RouteConfiguration route);
 
   enum ListenerState { WARMING, ACTIVE, DRAINING };
-  struct ListenerRep {
+  struct ListenerRepresentation {
     envoy::config::listener::v3::Listener listener;
     ListenerState state;
   };
 
-  const std::vector<ListenerRep>& listeners() const { return listeners_; }
-  const std::vector<envoy::config::route::v3::RouteConfiguration>& routes() const {
-    return routes_;
-  }
+  const std::vector<ListenerRepresentation>& listeners() const { return listeners_; }
 
   uint32_t numWarming() { return num_warming_; }
   uint32_t numActive() { return num_active_; }
@@ -41,10 +40,11 @@ public:
   void dumpState();
 
 private:
-  std::string getRoute(envoy::config::listener::v3::Listener);
-  bool hasRoute(envoy::config::listener::v3::Listener listener);
-  std::vector<ListenerRep> listeners_;
-  std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
+  std::string getRoute(const envoy::config::listener::v3::Listener& listener);
+  bool hasRoute(const envoy::config::listener::v3::Listener& listener);
+  std::vector<ListenerRepresentation> listeners_;
+  absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration> routes_;
+
   uint32_t num_warming_;
   uint32_t num_active_;
   uint32_t num_draining_;

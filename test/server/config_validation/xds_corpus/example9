@@ -17,10 +17,5 @@ actions {
   add_route {
   }
 }
-actions {
-  remove_route {
-    route_num: 1
-  }
-}
 config {
 }

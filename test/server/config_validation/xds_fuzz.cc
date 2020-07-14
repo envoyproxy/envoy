@@ -20,14 +20,15 @@ XdsFuzzTest::buildClusterLoadAssignment(const std::string& name) {
       fake_upstreams_[0]->localAddress()->ip()->port(), api_version_);
 }
 
-envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(std::string listener_name,
-                                                                 std::string route_name) {
+envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(const std::string& listener_name,
+                                                                 const std::string& route_name) {
   return ConfigHelper::buildListener(listener_name, route_name,
                                      Network::Test::getLoopbackAddressString(ip_version_),
                                      "ads_test", api_version_);
 }
 
-envoy::config::route::v3::RouteConfiguration XdsFuzzTest::buildRouteConfig(std::string route_name) {
+envoy::config::route::v3::RouteConfiguration
+XdsFuzzTest::buildRouteConfig(const std::string& route_name) {
   return ConfigHelper::buildRouteConfig(route_name, "cluster_0", api_version_);
 }
 
@@ -43,7 +44,7 @@ void XdsFuzzTest::updateListener(
 }
 
 void XdsFuzzTest::updateRoute(
-    const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
+    const std::vector<envoy::config::route::v3::RouteConfiguration>& routes,
     const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
     const std::vector<std::string>& removed) {
   ENVOY_LOG_MISC(info, "Sending Route DiscoveryResponse version {}", version_);
@@ -62,8 +63,7 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
                                          : "DELTA_GRPC",
                                      api_version)),
       actions_(input.actions()), version_(1), api_version_(api_version),
-      ip_version_(TestEnvironment::getIpVersionsForTest()[0]), num_added_(0), num_modified_(0),
-      num_removed_(0) {
+      ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
@@ -108,54 +108,42 @@ void XdsFuzzTest::close() {
 }
 
 /**
- * remove a listener from the list of listeners if it exists
- * @param the listener number to be removed
- * @return the listener as an optional so that it can be used in a delta request
+ * @return true iff listener_name is in listeners_ (and removes it from the vector)
  */
-bool XdsFuzzTest::eraseListener(std::string listener_name) {
-  for (auto it = listeners_.begin(); it != listeners_.end(); ++it) {
-    if (it->name() == listener_name) {
-      listeners_.erase(it);
-      return true;
-    }
-  }
-  return false;
+bool XdsFuzzTest::eraseListener(const std::string& listener_name) {
+  const auto orig_size = listeners_.size();
+  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
+                                  [&](auto& listener) { return listener.name() == listener_name; }),
+                   listeners_.end());
+  return orig_size != listeners_.size();
 }
 
 /**
- * remove a route from the list of routes if it exists
- * @param the route number to be removed
- * @return the route as an optional so that it can be used in a delta request
+ * @return true iff route_name has already been added to routes_
  */
-bool XdsFuzzTest::hasRoute(std::string route_name) {
-  for (auto& route : routes_) {
-    if (route.name() == route_name) {
-      return true;
-    }
-  }
-  return false;
+bool XdsFuzzTest::hasRoute(const std::string& route_name) {
+  return std::any_of(routes_.begin(), routes_.end(),
+                     [&](auto& route) { return route.name() == route_name; });
 }
 
 /**
  * send an xDS response to add a listener and update state accordingly
  */
-void XdsFuzzTest::addListener(std::string listener_name, std::string route_name) {
+void XdsFuzzTest::addListener(const std::string& listener_name, const std::string& route_name) {
   ENVOY_LOG_MISC(info, "Adding {} with reference to {}", listener_name, route_name);
   bool removed = eraseListener(listener_name);
   auto listener = buildListener(listener_name, route_name);
   listeners_.push_back(listener);
 
   updateListener(listeners_, {listener}, {});
-  // use waitForAck instead of compareDiscoveryRequest as the client makes
-  // additional discoveryRequests at launch that we might not want to
-  // respond to yet
+
+  // use waitForAck instead of compareDiscoveryRequest as the client makes additional
+  // discoveryRequests at launch that we might not want to respond to yet
   EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
   if (removed) {
-    num_modified_++;
     verifier_.listenerUpdated(listener);
     test_server_->waitForCounterGe("listener_manager.listener_modified", verifier_.numModified());
   } else {
-    num_added_++;
     verifier_.listenerAdded(listener);
     test_server_->waitForCounterGe("listener_manager.listener_added", verifier_.numAdded());
   }
@@ -164,12 +152,11 @@ void XdsFuzzTest::addListener(std::string listener_name, std::string route_name)
 /**
  * send an xDS response to remove a listener and update state accordingly
  */
-void XdsFuzzTest::removeListener(std::string listener_name) {
+void XdsFuzzTest::removeListener(const std::string& listener_name) {
   ENVOY_LOG_MISC(info, "Removing {}", listener_name);
   bool removed = eraseListener(listener_name);
 
   if (removed) {
-    num_removed_++;
     updateListener(listeners_, {}, {listener_name});
     EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
     verifier_.listenerRemoved(listener_name);
@@ -180,7 +167,7 @@ void XdsFuzzTest::removeListener(std::string listener_name) {
 /**
  * send an xDS response to add a route and update state accordingly
  */
-void XdsFuzzTest::addRoute(std::string route_name) {
+void XdsFuzzTest::addRoute(const std::string& route_name) {
   ENVOY_LOG_MISC(info, "Adding {}", route_name);
   bool has_route = hasRoute(route_name);
   auto route = buildRouteConfig(route_name);
@@ -303,49 +290,36 @@ void XdsFuzzTest::replay() {
  */
 void XdsFuzzTest::verifyListeners() {
   ENVOY_LOG_MISC(info, "Verifying listeners");
-  const auto& listeners = verifier_.listeners();
-  envoy::admin::v3::ListenersConfigDump listener_dump = getListenersConfigDump();
-  ENVOY_LOG_MISC(info, "{}", listener_dump.DebugString());
-  for (auto& listener_rep : listeners) {
-    ENVOY_LOG_MISC(info, "Verifying {} with state {}", listener_rep.listener.name(),
-                   listener_rep.state);
-    bool found = false;
-    for (auto& dump_listener : listener_dump.dynamic_listeners()) {
-      if (dump_listener.name() == listener_rep.listener.name()) {
-        ENVOY_LOG_MISC(info, "warm {}, active {}, drain: {}", dump_listener.has_warming_state(),
-                       dump_listener.has_active_state(), dump_listener.has_draining_state());
-        switch (listener_rep.state) {
-        case XdsVerifier::DRAINING:
-          if (dump_listener.has_draining_state()) {
-            ENVOY_LOG_MISC(info, "{} is draining", listener_rep.listener.name());
-            found = true;
-          }
-          break;
-        case XdsVerifier::WARMING:
-          if (dump_listener.has_warming_state()) {
-            ENVOY_LOG_MISC(info, "{} is warming", listener_rep.listener.name());
-            found = true;
-          }
-          break;
-        case XdsVerifier::ACTIVE:
-          if (dump_listener.has_active_state()) {
-            ENVOY_LOG_MISC(info, "{} is active", listener_rep.listener.name());
-            found = true;
-          }
-          break;
-        default:
-          NOT_REACHED_GCOVR_EXCL_LINE;
-        }
-      }
+  const auto& abstract_rep = verifier_.listeners();
+  Protobuf::RepeatedPtrField<envoy::admin::v3::ListenersConfigDump::DynamicListener> dump =
+      getListenersConfigDump().dynamic_listeners();
+
+  // each listener in the abstract representation should have a matching listener in the config dump
+  for (auto& rep : abstract_rep) {
+    ENVOY_LOG_MISC(info, "Verifying {} with state {}", rep.listener.name(), rep.state);
+
+    auto listener_dump = std::find_if(dump.begin(), dump.end(), [&](auto& listener) {
+      return listener.name() == rep.listener.name();
+    });
+
+    if (listener_dump == dump.end()) {
+      throw EnvoyException(fmt::format("Expected to find {} in config dump", rep.listener.name()));
     }
-    if (!found) {
-      ENVOY_LOG_MISC(info, "Expected to find listener {} in config dump",
-                     listener_rep.listener.name());
-      EXPECT_EQ(1, 0);
-      return;
-      /* throw EnvoyException( */
-      /*     fmt::format("Expected to find listener {} in config dump",
-       * listener_rep.listener.name())); */
+
+    ENVOY_LOG_MISC(info, "warm {}, active {}, drain: {}", listener_dump->has_warming_state(),
+                   listener_dump->has_active_state(), listener_dump->has_draining_state());
+    switch (rep.state) {
+    case XdsVerifier::DRAINING:
+      EXPECT_TRUE(listener_dump->has_draining_state());
+      break;
+    case XdsVerifier::WARMING:
+      EXPECT_TRUE(listener_dump->has_warming_state());
+      break;
+    case XdsVerifier::ACTIVE:
+      EXPECT_TRUE(listener_dump->has_active_state());
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 }
