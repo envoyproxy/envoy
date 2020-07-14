@@ -217,7 +217,11 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    tags = ["fails_on_windows"],
+    tags = [
+        "fails_on_windows",
+        # https://github.com/envoyproxy/envoy/issues/9784
+        "no_tsan",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
