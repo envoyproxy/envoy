@@ -96,17 +96,22 @@ using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;
  */
 class IntegrationTcpClient {
 public:
-  IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
-                       Network::Address::IpVersion version, bool enable_half_close = false);
+  IntegrationTcpClient(Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system,
+                       MockBufferFactory& factory, uint32_t port,
+                       Network::Address::IpVersion version, bool enable_half_close,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
   // wait for at least `length` bytes to be received
-  void waitForData(size_t length);
+  ABSL_MUST_USE_RESULT AssertionResult
+  waitForData(size_t length, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
-  void write(const std::string& data, bool end_stream = false, bool verify = true);
+  ABSL_MUST_USE_RESULT AssertionResult
+  write(const std::string& data, bool end_stream = false, bool verify = true,
+        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
   // clear up to the `count` number of bytes of received data
@@ -124,6 +129,7 @@ private:
     IntegrationTcpClient& parent_;
   };
 
+  Event::TestTimeSystem& time_system_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
@@ -161,8 +167,7 @@ public:
   BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
-
-  virtual ~BaseIntegrationTest();
+  virtual ~BaseIntegrationTest() = default;
 
   // TODO(jmarantz): Remove this once
   // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
@@ -187,7 +192,9 @@ public:
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
-  IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
+  IntegrationTcpClientPtr
+  makeTcpConnection(uint32_t port,
+                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr);
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
@@ -399,6 +406,11 @@ protected:
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
+  // Make sure the test server will be torn down after any fake client.
+  // The test server owns the runtime, which is often accessed by client and
+  // fake upstream codecs and must outlast them.
+  IntegrationTestServerPtr test_server_;
+
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
   // IP Address to use when binding sockets on upstreams.
@@ -415,14 +427,41 @@ protected:
   // pre-init, control plane synchronization needed for server start.
   std::function<void()> on_server_init_function_;
 
-  std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
-  // Target number of upstreams.
-  uint32_t fake_upstreams_count_{1};
-  spdlog::level::level_enum default_log_level_;
-  IntegrationTestServerPtr test_server_;
   // A map of keys to port names. Generally the names are pulled from the v2 listener name
   // but if a listener is created via ADS, it will be from whatever key is used with registerPort.
   TestEnvironment::PortMap port_map_;
+
+  // The DrainStrategy that dictates the behaviour of
+  // DrainManagerImpl::drainClose().
+  Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
+
+  // Member variables for xDS testing.
+  FakeUpstream* xds_upstream_{};
+  FakeHttpConnectionPtr xds_connection_;
+  FakeStreamPtr xds_stream_;
+  bool create_xds_upstream_{false};
+  bool tls_xds_upstream_{false};
+  bool use_lds_{true}; // Use the integration framework's LDS set up.
+
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+
+  // The fake upstreams_ are created using the context_manager, so make sure
+  // they are destroyed before it is.
+  std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
+
+  Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
+
+  spdlog::level::level_enum default_log_level_;
+
+  // Target number of upstreams.
+  uint32_t fake_upstreams_count_{1};
+
+  // The duration of the drain manager graceful drain period.
+  std::chrono::seconds drain_time_{1};
+
+  // The number of worker threads that the test server uses.
+  uint32_t concurrency_{1};
 
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
@@ -442,27 +481,6 @@ protected:
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.
   bool defer_listener_finalization_{false};
-
-  // The number of worker threads that the test server uses.
-  uint32_t concurrency_{1};
-
-  // The duration of the drain manager graceful drain period.
-  std::chrono::seconds drain_time_{1};
-
-  // The DrainStrategy that dictates the behaviour of
-  // DrainManagerImpl::drainClose().
-  Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
-
-  // Member variables for xDS testing.
-  FakeUpstream* xds_upstream_{};
-  FakeHttpConnectionPtr xds_connection_;
-  FakeStreamPtr xds_stream_;
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
-  bool create_xds_upstream_{false};
-  bool tls_xds_upstream_{false};
-  bool use_lds_{true}; // Use the integration framework's LDS set up.
-  Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
 
   // By default the test server will use custom stats to notify on increment.
   // This override exists for tests measuring stats memory.

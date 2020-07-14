@@ -26,6 +26,12 @@ The documentation can be built locally in the root of https://github.com/envoypr
 docs/build.sh
 ```
 
+To skip configuration examples validation:
+
+```
+SPHINX_SKIP_CONFIG_VALIDATION=true docs/build.sh
+```
+
 Or to use a hermetic Docker container:
 
 ```

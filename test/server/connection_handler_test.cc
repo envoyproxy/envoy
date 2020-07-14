@@ -6,6 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/io_socket_handle_impl.h"
@@ -14,9 +15,9 @@
 
 #include "server/connection_handler_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -102,6 +103,12 @@ public:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
+    ResourceLimit& openConnections() override { return open_connections_; }
+
+    void setMaxConnections(const uint32_t num_connections) {
+      open_connections_.setMax(num_connections);
+    }
+    void clearMaxConnections() { open_connections_.resetMax(); }
 
     ConnectionHandlerTest& parent_;
     std::shared_ptr<Network::MockListenSocket> socket_;
@@ -114,6 +121,7 @@ public:
     const bool continue_on_listener_filters_timeout_;
     std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
     Network::ConnectionBalancerPtr connection_balancer_;
+    BasicResourceLimitImpl open_connections_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
   };
@@ -228,6 +236,88 @@ TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
   handler_->removeListeners(1);
   post_cb();
 #endif
+}
+
+TEST_F(ConnectionHandlerTest, ListenerConnectionLimitEnforced) {
+  Network::ListenerCallbacks* listener_callbacks1;
+  auto listener1 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener1 =
+      addListener(1, false, false, "test_listener1", listener1, &listener_callbacks1);
+  Network::Address::InstanceConstSharedPtr normal_address(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
+  // Only allow a single connection on this listener.
+  test_listener1->setMaxConnections(1);
+  handler_->addListener(absl::nullopt, *test_listener1);
+
+  auto listener2 = new NiceMock<Network::MockListener>();
+  Network::ListenerCallbacks* listener_callbacks2;
+  TestListener* test_listener2 =
+      addListener(2, false, false, "test_listener2", listener2, &listener_callbacks2);
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("127.0.0.2", 20002));
+  EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(alt_address));
+  // Do not allow any connections on this listener.
+  test_listener2->setMaxConnections(0);
+  handler_->addListener(absl::nullopt, *test_listener2);
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillRepeatedly(Return(filter_chain_.get()));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillRepeatedly(Return(true));
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  EXPECT_CALL(*test_filter, destroy_());
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        manager.addAcceptFilter(listener_filter_matcher_, Network::ListenerFilterPtr{test_filter});
+        return true;
+      }));
+  EXPECT_CALL(*test_filter, onAccept(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
+        return Network::FilterStatus::Continue;
+      }));
+
+  // For listener 2, verify its connection limit is independent of listener 1.
+
+  // We expect that listener 2 accepts the connection, so there will be a call to
+  // createServerConnection and active cx should increase, while cx overflow remains the same.
+  listener_callbacks2->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+  EXPECT_EQ(0, handler_->numConnections());
+  EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(0, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "downstream_cx_overflow")->value());
+
+  // For listener 1, verify connections are limited after one goes active.
+
+  // First connection attempt should result in an active connection being created.
+  auto conn1 = new NiceMock<Network::MockConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(conn1));
+  listener_callbacks1->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+  EXPECT_EQ(1, handler_->numConnections());
+  // Note that these stats are not the per-worker stats, but the per-listener stats.
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(1, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "downstream_cx_overflow")->value());
+
+  // Don't expect server connection to be created, should be instantly closed and increment
+  // overflow stat.
+  listener_callbacks1->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+  EXPECT_EQ(1, handler_->numConnections());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(1, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(2, TestUtility::findCounter(stats_store_, "downstream_cx_overflow")->value());
+
+  // Check behavior again for good measure.
+  listener_callbacks1->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+  EXPECT_EQ(1, handler_->numConnections());
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(1, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(3, TestUtility::findCounter(stats_store_, "downstream_cx_overflow")->value());
+
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*listener2, onDestroy());
 }
 
 TEST_F(ConnectionHandlerTest, RemoveListener) {

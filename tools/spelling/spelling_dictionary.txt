@@ -79,8 +79,10 @@ ECMP
 ECONNREFUSED
 EDESTRUCTION
 EDF
+EINPROGRESS
 EINVAL
 ELB
+EMSGSIZE
 ENOTFOUND
 ENOTSUP
 ENV
@@ -342,6 +344,7 @@ WRONGPASS
 WRR
 WS
 WSA
+WSS
 Welford's
 Wi
 XDS
@@ -665,6 +668,7 @@ inflight
 -ing
 init
 initializer
+initializers
 inlined
 inlining
 inobservability
@@ -973,6 +977,7 @@ sanitizer
 satisfiable
 scalability
 sched
+schedulable
 schemas
 scopekey
 sendmsg
@@ -1104,6 +1109,7 @@ typedef
 typeid
 typesafe
 ucontext
+udpa
 uint
 un-
 unacked
@@ -1155,8 +1161,6 @@ vptr
 wakeup
 wakeups
 websocket
-whitelist
-whitelisted
 whitespace
 whitespaces
 wildcard

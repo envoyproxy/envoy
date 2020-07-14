@@ -19,6 +19,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/common/basic_resource_impl.h"
 #include "common/common/callback_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/lock_guard.h"
@@ -80,6 +81,23 @@ public:
   bool receivedData() { return received_data_; }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
+  }
+  void
+  sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
+                 const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
+                 bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 absl::string_view /*details*/) override {
+    Http::Utility::sendLocalReply(
+        false,
+        Http::Utility::EncodeFunctions(
+            {nullptr,
+             [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+               encoder_.encodeHeaders(*headers, end_stream);
+             },
+             [&](Buffer::Instance& data, bool end_stream) -> void {
+               encoder_.encodeData(data, end_stream);
+             }}),
+        Http::Utility::LocalReplyData({is_grpc_request, code, body, grpc_status, is_head_request}));
   }
 
   ABSL_MUST_USE_RESULT
@@ -447,7 +465,7 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
-  void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onGoAway(Http::GoAwayErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -705,11 +723,18 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
+    ResourceLimit& openConnections() override { return connection_resource_; }
+
+    void setMaxConnections(const uint32_t num_connections) {
+      connection_resource_.setMax(num_connections);
+    }
+    void clearMaxConnections() { connection_resource_.resetMax(); }
 
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+    BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   };
 

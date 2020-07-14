@@ -27,12 +27,15 @@ API
   api/why_versioning
   api/incremental
 
+.. _faq_overview_debug:
+
 Debugging
 ---------
 .. toctree::
   :maxdepth: 2
 
   debugging/why_is_envoy_sending_internal_responses
+  debugging/why_is_envoy_sending_http2_resets
   debugging/why_is_envoy_404ing_connect_requests
   debugging/why_is_envoy_sending_413s
   debugging/why_is_my_route_not_found
@@ -60,6 +63,7 @@ Configuration
   configuration/flow_control
   configuration/timeouts
   configuration/deprecation
+  configuration/resource_limits
 
 Load balancing
 --------------

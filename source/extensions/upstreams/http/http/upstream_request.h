@@ -50,7 +50,7 @@ private:
 
 class HttpUpstream : public Router::GenericUpstream, public Envoy::Http::StreamCallbacks {
 public:
-  HttpUpstream(Router::UpstreamRequest& upstream_request, Envoy::Http::RequestEncoder* encoder)
+  HttpUpstream(Router::UpstreamToDownstream& upstream_request, Envoy::Http::RequestEncoder* encoder)
       : upstream_request_(upstream_request), request_encoder_(encoder) {
     request_encoder_->getStream().addCallbacks(*this);
   }
@@ -83,15 +83,15 @@ public:
   }
 
   void onAboveWriteBufferHighWatermark() override {
-    upstream_request_.disableDataFromDownstreamForFlowControl();
+    upstream_request_.onAboveWriteBufferHighWatermark();
   }
 
   void onBelowWriteBufferLowWatermark() override {
-    upstream_request_.enableDataFromDownstreamForFlowControl();
+    upstream_request_.onBelowWriteBufferLowWatermark();
   }
 
 private:
-  Router::UpstreamRequest& upstream_request_;
+  Router::UpstreamToDownstream& upstream_request_;
   Envoy::Http::RequestEncoder* request_encoder_{};
 };
 

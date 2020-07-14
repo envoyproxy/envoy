@@ -1,4 +1,4 @@
-FROM gcr.io/envoy-ci/envoy-build:12b3d2c2ffa582507e5d6dd34632b2b990f1b195
+FROM gcr.io/envoy-ci/envoy-build:f21773ab398a879f976936f72c78c9dd3718ca1e
 
 ARG USERNAME=vscode
 ARG USER_UID=501
@@ -14,10 +14,12 @@ RUN apt-get -y update \
   && groupmod -g 65515 pcap && chgrp pcap /usr/sbin/tcpdump \
   # Create a non-root user to use if preferred - see https://aka.ms/vscode-remote/containers/non-root-user.
   && groupadd --gid $USER_GID $USERNAME \
-  && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME -d /build \
+  && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME -G pcap -d /build \
   # [Optional] Add sudo support for non-root user
   && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
   && chmod 0440 /etc/sudoers.d/$USERNAME
 
 ENV DEBIAN_FRONTEND=
 ENV PATH=/opt/llvm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ENV CLANG_FORMAT=/opt/llvm/bin/clang-format

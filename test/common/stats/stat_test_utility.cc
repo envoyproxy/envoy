@@ -124,14 +124,14 @@ MemoryTest::Mode MemoryTest::mode() {
                    "$ENVOY_MEMORY_TEST_EXACT is set for canonical memory measurements, "
                    "but memory measurement looks broken");
     return Mode::Canonical;
-  } else {
-    // Different versions of STL and other compiler/architecture differences may
-    // also impact memory usage, so when not compiling with MEMORY_TEST_EXACT,
-    // memory comparisons must be given some slack. There have recently emerged
-    // some memory-allocation differences between development and Envoy CI and
-    // Bazel CI (which compiles Envoy as a test of Bazel).
-    return can_measure_memory ? Mode::Approximate : Mode::Disabled;
   }
+
+  // Different versions of STL and other compiler/architecture differences may
+  // also impact memory usage, so when not compiling with MEMORY_TEST_EXACT,
+  // memory comparisons must be given some slack. There have recently emerged
+  // some memory-allocation differences between development and Envoy CI and
+  // Bazel CI (which compiles Envoy as a test of Bazel).
+  return can_measure_memory ? Mode::Approximate : Mode::Disabled;
 #endif
 }
 
@@ -152,7 +152,8 @@ Counter& TestStore::counterFromStatNameWithTags(const StatName& stat_name,
   } else {
     // Ensures StatNames with the same string representation are specified
     // consistently using symbolic/dynamic components on every access.
-    ASSERT(counter_ref->statName() == stat_name);
+    ASSERT(counter_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
+                                                 "stat name specification");
   }
   return *counter_ref;
 }
@@ -173,7 +174,8 @@ Gauge& TestStore::gaugeFromStatNameWithTags(const StatName& stat_name,
   if (gauge_ref == nullptr) {
     gauge_ref = &IsolatedStoreImpl::gaugeFromStatNameWithTags(stat_name, tags, mode);
   } else {
-    ASSERT(gauge_ref->statName() == stat_name);
+    ASSERT(gauge_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
+                                               "stat name specification");
   }
   return *gauge_ref;
 }
@@ -194,7 +196,8 @@ Histogram& TestStore::histogramFromStatNameWithTags(const StatName& stat_name,
   if (histogram_ref == nullptr) {
     histogram_ref = &IsolatedStoreImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
   } else {
-    ASSERT(histogram_ref->statName() == stat_name);
+    ASSERT(histogram_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
+                                                   "stat name specification");
   }
   return *histogram_ref;
 }

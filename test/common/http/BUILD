@@ -182,6 +182,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -363,6 +364,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:url_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",

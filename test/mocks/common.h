@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "envoy/common/conn_pool.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
@@ -51,8 +52,9 @@ public:
   // where timer callbacks are triggered by the advancement of time. This implementation
   // matches recent behavior, where real-time timers were created directly in libevent
   // by dispatcher_impl.cc.
-  Event::SchedulerPtr createScheduler(Event::Scheduler& base_scheduler) override {
-    return real_time_.createScheduler(base_scheduler);
+  Event::SchedulerPtr createScheduler(Event::Scheduler& base_scheduler,
+                                      Event::CallbackScheduler& cb_scheduler) override {
+    return real_time_.createScheduler(base_scheduler, cb_scheduler);
   }
   void advanceTimeWait(const Duration& duration) override { real_time_.advanceTimeWait(duration); }
   void advanceTimeAsync(const Duration& duration) override {
@@ -107,5 +109,18 @@ public:
   MOCK_METHOD(void, cancel, (CancelPolicy cancel_policy));
 };
 } // namespace ConnectionPool
+
+namespace Random {
+class MockRandomGenerator : public RandomGenerator {
+public:
+  MockRandomGenerator();
+  ~MockRandomGenerator() override;
+
+  MOCK_METHOD(uint64_t, random, ());
+  MOCK_METHOD(std::string, uuid, ());
+
+  const std::string uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
+};
+} // namespace Random
 
 } // namespace Envoy

@@ -16,13 +16,14 @@ namespace DynamicForwardProxy {
 
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-    Runtime::RandomGenerator& random, Stats::Scope& root_scope,
+    Random::RandomGenerator& random, Runtime::Loader& loader, Stats::Scope& root_scope,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
-      stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
+      stats_(generateDnsCacheStats(*scope_)),
+      resource_manager_(*scope_, loader, config.name(), config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
@@ -44,6 +45,10 @@ DnsCacheImpl::~DnsCacheImpl() {
   for (auto update_callbacks : update_callbacks_) {
     update_callbacks->cancel();
   }
+}
+
+DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
+  return {ALL_DNS_CACHE_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult
@@ -70,6 +75,20 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
             std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_, host,
                                                           callbacks)};
   }
+}
+
+Upstream::ResourceAutoIncDecPtr
+DnsCacheImpl::canCreateDnsRequest(ResourceLimitOptRef pending_requests) {
+  const auto has_pending_requests = pending_requests.has_value();
+  auto& current_pending_requests =
+      has_pending_requests ? pending_requests->get() : resource_manager_.pendingRequests();
+  if (!current_pending_requests.canCreate()) {
+    if (!has_pending_requests) {
+      stats_.dns_rq_pending_overflow_.inc();
+    }
+    return nullptr;
+  }
+  return std::make_unique<Upstream::ResourceAutoIncDec>(current_pending_requests);
 }
 
 absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> DnsCacheImpl::hosts() {

@@ -25,13 +25,13 @@ DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_WHITELIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
+GOOGLE_PROTOBUF_ALLOWLIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
 # Files matching these exact names can reference real-world time. These include the class
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
-REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
+REAL_TIME_ALLOWLIST = ("./source/common/common/utility.h",
                        "./source/extensions/common/aws/utility.cc",
                        "./source/common/event/real_time_system.cc",
                        "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
@@ -46,11 +46,11 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
 # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
 # perform temporary registrations.
-REGISTER_FACTORY_TEST_WHITELIST = ("./test/common/config/registry_test.cc",
+REGISTER_FACTORY_TEST_ALLOWLIST = ("./test/common/config/registry_test.cc",
                                    "./test/integration/clusters/", "./test/integration/filters/")
 
 # Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_WHITELIST = (
+SERIALIZE_AS_STRING_ALLOWLIST = (
     "./source/common/config/version_converter.cc",
     "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
@@ -62,17 +62,17 @@ SERIALIZE_AS_STRING_WHITELIST = (
 )
 
 # Files in these paths can use Protobuf::util::JsonStringToMessage
-JSON_STRING_TO_MESSAGE_WHITELIST = ("./source/common/protobuf/utility.cc")
+JSON_STRING_TO_MESSAGE_ALLOWLIST = ("./source/common/protobuf/utility.cc")
 
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
-HISTOGRAM_WITH_SI_SUFFIX_WHITELIST = ("downstream_cx_length_ms", "downstream_cx_length_ms",
+HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST = ("downstream_cx_length_ms", "downstream_cx_length_ms",
                                       "initialization_time_ms", "loop_duration_us", "poll_delay_us",
                                       "request_time_ms", "upstream_cx_connect_ms",
                                       "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
-STD_REGEX_WHITELIST = (
+STD_REGEX_ALLOWLIST = (
     "./source/common/common/utility.cc", "./source/common/common/regex.h",
     "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
     "./source/common/stats/tag_extractor_impl.cc",
@@ -85,7 +85,7 @@ STD_REGEX_WHITELIST = (
     "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
-GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
+GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
@@ -98,6 +98,11 @@ INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
 X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
+DESIGNATED_INITIALIZER_REGEX = re.compile(r"\{\s*\.\w+\s*\=")
+MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}")
+HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
+TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
+EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -213,11 +218,7 @@ def readFile(path):
 # lookPath searches for the given executable in all directories in PATH
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
-  for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
-    if os.path.exists(executable_path):
-      return executable_path
-  return ""
+  return shutil.which(executable) or ''
 
 
 # pathExists checks whether the given path exists. This function assumes that
@@ -305,49 +306,49 @@ def packageNameForProto(file_path):
 
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
-def whitelistedForProtobufDeps(file_path):
+def allowlistedForProtobufDeps(file_path):
   return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
-          any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
+          any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
 
 
 # Real-world time sources should not be instantiated in the source, except for a few
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
-def whitelistedForRealTime(file_path):
+def allowlistedForRealTime(file_path):
   if file_path.endswith(".md"):
     return True
-  return file_path in REAL_TIME_WHITELIST
+  return file_path in REAL_TIME_ALLOWLIST
 
 
-def whitelistedForRegisterFactory(file_path):
+def allowlistedForRegisterFactory(file_path):
   if not file_path.startswith("./test/"):
     return True
 
-  return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_WHITELIST)
+  return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_ALLOWLIST)
 
 
-def whitelistedForSerializeAsString(file_path):
-  return file_path in SERIALIZE_AS_STRING_WHITELIST
+def allowlistedForSerializeAsString(file_path):
+  return file_path in SERIALIZE_AS_STRING_ALLOWLIST
 
 
-def whitelistedForJsonStringToMessage(file_path):
-  return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
+def allowlistedForJsonStringToMessage(file_path):
+  return file_path in JSON_STRING_TO_MESSAGE_ALLOWLIST
 
 
-def whitelistedForHistogramSiSuffix(name):
-  return name in HISTOGRAM_WITH_SI_SUFFIX_WHITELIST
+def allowlistedForHistogramSiSuffix(name):
+  return name in HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST
 
 
-def whitelistedForStdRegex(file_path):
-  return file_path.startswith("./test") or file_path in STD_REGEX_WHITELIST or file_path.endswith(
+def allowlistedForStdRegex(file_path):
+  return file_path.startswith("./test") or file_path in STD_REGEX_ALLOWLIST or file_path.endswith(
       DOCS_SUFFIX)
 
 
-def whitelistedForGrpcInit(file_path):
-  return file_path in GRPC_INIT_WHITELIST
+def allowlistedForGrpcInit(file_path):
+  return file_path in GRPC_INIT_ALLOWLIST
 
 
-def whitelistedForUnpackTo(file_path):
+def allowlistedForUnpackTo(file_path):
   return file_path.startswith("./test") or file_path in [
       "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
   ]
@@ -560,6 +561,22 @@ def isInSubdir(filename, *subdirs):
   return False
 
 
+# Determines if given token exists in line without leading or trailing token characters
+# e.g. will return True for a line containing foo() but not foo_bar() or baz_foo
+def tokenInLine(token, line):
+  index = 0
+  while True:
+    index = line.find(token, index)
+    if index < 1:
+      break
+    if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
+      if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
+                                                 line[index + len(token)] == '_'):
+        return True
+    index = index + 1
+  return False
+
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
@@ -584,7 +601,7 @@ def checkSourceLine(line, file_path, reportError):
   # Some errors cannot be fixed automatically, and actionable, consistent,
   # navigable messages should be emitted to make it easy to find and fix
   # the errors by hand.
-  if not whitelistedForProtobufDeps(file_path):
+  if not allowlistedForProtobufDeps(file_path):
     if '"google/protobuf' in line or "google::protobuf" in line:
       reportError("unexpected direct dependency on google.protobuf, use "
                   "the definitions in common/protobuf/protobuf.h instead.")
@@ -597,37 +614,39 @@ def checkSourceLine(line, file_path, reportError):
     # We don't check here for std::shared_timed_mutex because that may
     # legitimately show up in comments, for example this one.
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
-  if not whitelistedForRealTime(file_path) and not "NO_CHECK_FORMAT(real_time)" in line:
+  if not allowlistedForRealTime(file_path) and not "NO_CHECK_FORMAT(real_time)" in line:
     if "RealTimeSource" in line or \
        ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
-  if not whitelistedForRegisterFactory(file_path):
+  if not allowlistedForRegisterFactory(file_path):
     if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
       reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
                   "use Registry::InjectFactory instead.")
-  if not whitelistedForUnpackTo(file_path):
+  if not allowlistedForUnpackTo(file_path):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   # Check that we use the absl::Time library
-  if "std::get_time" in line:
+  if tokenInLine("std::get_time", line):
     if "test/" in file_path:
       reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
     else:
       reportError("Don't use std::get_time; use the injectable time system")
-  if "std::put_time" in line:
+  if tokenInLine("std::put_time", line):
     reportError("Don't use std::put_time; use absl::Time equivalent instead")
-  if "gmtime" in line:
+  if tokenInLine("gmtime", line):
     reportError("Don't use gmtime; use absl::Time equivalent instead")
-  if "mktime" in line:
+  if tokenInLine("mktime", line):
     reportError("Don't use mktime; use absl::Time equivalent instead")
-  if "localtime" in line:
+  if tokenInLine("localtime", line):
     reportError("Don't use localtime; use absl::Time equivalent instead")
-  if "strftime" in line:
+  if tokenInLine("strftime", line):
     reportError("Don't use strftime; use absl::FormatTime instead")
-  if "strptime" in line:
+  if tokenInLine("strptime", line):
     reportError("Don't use strptime; use absl::FormatTime instead")
+  if tokenInLine("strerror", line):
+    reportError("Don't use strerror; use Envoy::errorDetails instead")
   if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
@@ -637,7 +656,7 @@ def checkSourceLine(line, file_path, reportError):
     # can be used instead
     reportError("Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in include/envoy/common/platform.h instead")
-  if re.search("\{\s*\.\w+\s*\=", line):
+  if DESIGNATED_INITIALIZER_REGEX.search(line):
     # Designated initializers are not part of the C++14 standard and are not supported
     # by MSVC
     reportError("Don't use designated initializers in struct initialization, "
@@ -649,17 +668,17 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
   if line.startswith("using testing::TestWithParams;"):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if re.search("TEST(_.\(.*,\s|\()[a-z].*\)\s\{", line):
+  if TEST_NAME_STARTING_LOWER_CASE_REGEX.search(line):
     # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
     # with a lowercase letter.
     reportError("Test names should be CamelCase, starting with a capital letter")
-  if not whitelistedForSerializeAsString(file_path) and "SerializeAsString" in line:
+  if not allowlistedForSerializeAsString(file_path) and "SerializeAsString" in line:
     # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
     # use MessageUtil::hash instead.
     reportError(
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
     )
-  if not whitelistedForJsonStringToMessage(file_path) and "JsonStringToMessage" in line:
+  if not allowlistedForJsonStringToMessage(file_path) and "JsonStringToMessage" in line:
     # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
     # behavior.
     reportError("Don't use Protobuf::util::JsonStringToMessage, use TestUtility::loadFromJson.")
@@ -671,20 +690,20 @@ def checkSourceLine(line, file_path, reportError):
       '->histogramFromString(' in line or '->textReadoutFromString(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
-  if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
+  if MANGLED_PROTOBUF_NAME_REGEX.search(line):
     reportError("Don't use mangled Protobuf names for enum constants")
 
-  hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
-  if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
+  hist_m = HISTOGRAM_SI_SUFFIX_REGEX.search(line)
+  if hist_m and not allowlistedForHistogramSiSuffix(hist_m.group(0)):
     reportError(
         "Don't suffix histogram names with the unit symbol, "
         "it's already part of the histogram object and unit-supporting sinks can use this information natively, "
         "other sinks can add the suffix automatically on flush should they prefer to do so.")
 
-  if not whitelistedForStdRegex(file_path) and "std::regex" in line:
+  if not allowlistedForStdRegex(file_path) and "std::regex" in line:
     reportError("Don't use std::regex in code that handles untrusted input. Use RegexMatcher")
 
-  if not whitelistedForGrpcInit(file_path):
+  if not allowlistedForGrpcInit(file_path):
     grpc_init_or_shutdown = line.find("grpc_init()")
     grpc_shutdown = line.find("grpc_shutdown()")
     if grpc_init_or_shutdown == -1 or (grpc_shutdown != -1 and
@@ -701,7 +720,7 @@ def checkBuildLine(line, file_path, reportError):
   if "@bazel_tools" in line and not (isSkylarkFile(file_path) or file_path.startswith("./bazel/") or
                                      "python/runfiles" in line):
     reportError("unexpected @bazel_tools reference, please indirect via a definition in //bazel")
-  if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
+  if not allowlistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
@@ -1009,7 +1028,7 @@ if __name__ == "__main__":
         for line in f:
           # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
           # name and store it in the list of directories with documented owners.
-          m = re.search(r'.*(extensions[^@]*\s+)(@.*)', line)
+          m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
           if m is not None and not line.startswith('#'):
             owned.append(m.group(1).strip())
             owners = re.findall('@\S+', m.group(2).strip())

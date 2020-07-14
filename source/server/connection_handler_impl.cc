@@ -287,6 +287,11 @@ void ConnectionHandlerImpl::ActiveTcpSocket::continueFilterChain(bool success) {
   }
 }
 
+void ConnectionHandlerImpl::ActiveTcpSocket::setDynamicMetadata(const std::string& name,
+                                                                const ProtobufWkt::Struct& value) {
+  (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+}
+
 void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
   // Check if the socket may need to be redirected to another listener.
   ActiveTcpListenerOptRef new_listener;
@@ -318,11 +323,19 @@ void ConnectionHandlerImpl::ActiveTcpSocket::newConnection() {
     // Particularly the assigned events need to reset before assigning new events in the follow up.
     accept_filters_.clear();
     // Create a new connection on this listener.
-    listener_.newConnection(std::move(socket_));
+    listener_.newConnection(std::move(socket_), dynamicMetadata());
   }
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
+  if (listenerConnectionLimitReached()) {
+    ENVOY_LOG(trace, "closing connection: listener connection limit reached for {}",
+              config_->name());
+    socket->close();
+    stats_.downstream_cx_overflow_.inc();
+    return;
+  }
+
   onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false);
 }
 
@@ -363,11 +376,18 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 } // namespace
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
-    Network::ConnectionSocketPtr&& socket) {
-  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
+    Network::ConnectionSocketPtr&& socket,
+    const envoy::config::core::v3::Metadata& dynamic_metadata) {
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
+      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
   stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
+
+  // merge from the given dynamic metadata if it's not empty
+  if (dynamic_metadata.filter_metadata_size() > 0) {
+    stream_info->dynamicMetadata().MergeFrom(dynamic_metadata);
+  }
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);

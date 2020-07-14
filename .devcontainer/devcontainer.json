@@ -4,6 +4,8 @@
   "runArgs": [
     "--user=vscode",
     "--cap-add=SYS_PTRACE",
+    "--cap-add=NET_RAW",
+    "--cap-add=NET_ADMIN",
     "--security-opt=seccomp=unconfined",
     "--volume=${env:HOME}:${env:HOME}",
     "--volume=envoy-build:/build",
@@ -17,7 +19,7 @@
     "python.pythonPath": "/usr/bin/python3",
     "python.formatting.provider": "yapf",
     "python.formatting.yapfArgs": [
-      "style=tools/code_format/.style.yapf"
+      "--style=${workspaceFolder}/tools/code_format/.style.yapf"
     ],
     "files.exclude": {
       "**/.clangd/**": true,

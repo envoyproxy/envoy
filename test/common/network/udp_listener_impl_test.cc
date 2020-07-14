@@ -14,7 +14,6 @@
 #include "test/common/network/listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -315,7 +314,8 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, supportsMmsg());
-  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -385,14 +385,16 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
   auto send_result = listener_->send(send_data);
   EXPECT_FALSE(send_result.ok());
   EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
   // Failed write shouldn't drain the data.
   EXPECT_EQ(payload.length(), buffer->length());
 
-  ON_CALL(os_sys_calls, sendmsg(_, _, _)).WillByDefault(Return(Api::SysCallSizeResult{-1, EINVAL}));
+  ON_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillByDefault(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
   // EINVAL should cause RELEASE_ASSERT.
   EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
 }
