@@ -1110,7 +1110,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 }
 
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
-TEST_P(DownstreamProtocolIntegrationTest, InalidContentLengthAllowed) {
+TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
