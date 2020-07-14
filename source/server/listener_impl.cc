@@ -371,7 +371,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 }
 
 void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
-  // The process-wide `signal(SIGPIPE, SIG_IGN)` may fail to handle SIGPIPE if overridden elsewhere
+  // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
   // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
   addListenSocketOptions(Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
