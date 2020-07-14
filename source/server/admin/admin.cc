@@ -45,6 +45,7 @@
 #include "common/upstream/host_utility.h"
 
 #include "server/admin/utils.h"
+#include "server/listener_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
@@ -464,7 +465,10 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
     }
   }
-
+  bool include_unready_targets = true;
+  if (include_unready_targets) {
+    callbacks_map.emplace("unready", [this] { return dumpUnreadyTargetsConfigs(); });
+  }
   for (const auto& key_callback_pair : callbacks_map) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     ASSERT(message);
@@ -492,7 +496,10 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
     }
   }
-
+  bool include_unready_targets = true;
+  if (include_unready_targets) {
+    callbacks_map.emplace("unready", [this] { return dumpUnreadyTargetsConfigs(); });
+  }
   for (const auto& key_callback_pair : callbacks_map) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     ASSERT(message);
@@ -617,6 +624,26 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
     }
   }
   return endpoint_config_dump;
+}
+
+ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs() const {
+  auto unready_targets_config_dump = std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDump>();
+
+  for (auto& listenerConfig : server_.listenerManager().listeners()) {
+    auto& listener_message =
+        *unready_targets_config_dump->mutable_listener_unready_targets_configs()->Add();
+    listener_message.set_listener_init_manager_name(listenerConfig.get().name());
+
+    auto& listener = dynamic_cast<ListenerImpl&>(listenerConfig.get());
+    const auto& init_manager = dynamic_cast<Init::ManagerImpl&>(listener.initManager());
+    const absl::flat_hash_map<std::string, uint32_t>& unready_targets =
+        init_manager.unreadyTargets();
+
+    for (const auto& unready_target : unready_targets) {
+      listener_message.add_target_names(unready_target.first);
+    }
+  }
+  return unready_targets_config_dump;
 }
 
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url,

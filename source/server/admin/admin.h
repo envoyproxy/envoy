@@ -279,6 +279,7 @@ private:
   void addLbEndpoint(const Upstream::HostSharedPtr& host,
                      envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
   ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
+  ProtobufTypes::MessagePtr dumpUnreadyTargetsConfigs() const;
   /**
    * URL handlers.
    */

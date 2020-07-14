@@ -1,5 +1,7 @@
 #include "common/init/manager_impl.h"
 
+#include <functional>
+
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -61,13 +63,9 @@ void ManagerImpl::initialize(const Watcher& watcher) {
   }
 }
 
-// For init manager to query unready targets.
-void ManagerImpl::checkUnreadyTargets() {
-  ENVOY_LOG(debug, "QUERY: List of unready targets..................");
-  for (const auto& unready_target : target_names_count_) {
-    ENVOY_LOG(debug, "{} x {}", unready_target.first, unready_target.second);
-  }
-  ENVOY_LOG(debug, "QUERY ENDS......................................");
+const absl::flat_hash_map<std::string, uint32_t>& ManagerImpl::unreadyTargets() const {
+  return std::reference_wrapper<const absl::flat_hash_map<std::string, uint32_t>>(
+      target_names_count_);
 }
 
 void ManagerImpl::onTargetReady(absl::string_view target_name) {

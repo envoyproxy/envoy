@@ -37,8 +37,7 @@ public:
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
 
-  // For init manager to query unready targets.
-  void checkUnreadyTargets();
+  const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const;
 
 private:
   void onTargetReady(absl::string_view target_name);

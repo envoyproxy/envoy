@@ -381,3 +381,19 @@ message EndpointsConfigDump {
   // The dynamically loaded endpoint configs.
   repeated DynamicEndpointConfig dynamic_endpoint_configs = 3;
 }
+
+// Message of unready targets of listener's init manager.
+message ListenerUnreadyTargetsConfigDump {
+  // Names of the listener's init manager
+  string listener_init_manager_name = 1;
+
+  // Names of unready targets in the hash map.
+  repeated string target_names = 2;
+}
+
+// Envoy's admin fills this message with active listeners. Each listener has an init manager
+// which provides the information of its unready targets.
+message UnreadyTargetsConfigDump {
+  // The unready targets information of each listener of Envoy's admin.
+  repeated ListenerUnreadyTargetsConfigDump listener_unready_targets_configs = 1;
+}

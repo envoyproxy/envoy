@@ -4,6 +4,8 @@
 #include "envoy/init/target.h"
 #include "envoy/init/watcher.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Init {
 
@@ -73,6 +75,7 @@ struct Manager {
    * @param watcher the watcher to notify when initialization is complete.
    */
   virtual void initialize(const Watcher& watcher) PURE;
+  // virtual absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() PURE;
 };
 
 } // namespace Init
