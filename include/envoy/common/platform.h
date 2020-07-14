@@ -235,3 +235,32 @@ struct mmsghdr {
   unsigned int msg_len;
 };
 #endif
+
+#define SUPPORTS_GETIFADDRS
+#ifdef WIN32
+#undef SUPPORTS_GETIFADDRS
+#endif
+
+// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
+#ifdef __ANDROID_API__
+#if __ANDROID_API__ < 24
+#undef SUPPORTS_GETIFADDRS
+#endif // __ANDROID_API__ < 24
+#endif // ifdef __ANDROID_API__
+
+#ifdef __linux__
+#define SUPPORTS_PTHREAD_GETNAME_NP 1
+#endif
+
+// https://android.googlesource.com/platform/bionic/+/master/docs/status.md
+// ``pthread_getname_np`` is introduced in API 26
+#ifdef __ANDROID_API__
+#if __ANDROID_API__ > 26
+#define SUPPORTS_PTHREAD_GETNAME_NP 1
+#endif // __ANDROID_API__ > 26
+#endif // ifdef __ANDROID_API__
+
+// Ensure `SUPPORTS_PTHREAD_GETNAME_NP` is set
+#ifndef SUPPORTS_PTHREAD_GETNAME_NP
+#define SUPPORTS_PTHREAD_GETNAME_NP 0
+#endif
