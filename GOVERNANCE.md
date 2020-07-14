@@ -65,8 +65,8 @@
   questions and do all reviews, but it is their responsibility to make sure that everything is
   being actively covered by someone.
 * The on-call rotation is tracked at Opsgenie. The calendar is visible
-[here](https://calendar.google.com/calendar/embed?src=ms6efr2erlvum9aolnvg1688cd3mu85e%40import.calendar.google.com&ctz=America%2FNew_York)
-or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/getRecentSchedule?webcalToken=75f2990470ca21de1033ecf4586bea1e40bae32bf3c39e2289f6186da1904ee0&scheduleId=a3505963-c064-4c97-8865-947dfcb06060)
+[here](https://calendar.google.com/calendar/embed?src=d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com&ctz=America%2FNew_York)
+or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.com/webapi/webcal/getRecentSchedule?webcalToken=39dd1a892faa8d0d689f889b9d09ae787355ddff894396546726a5a02bac5b26&scheduleId=a3505963-c064-4c97-8865-947dfcb06060)
 
 ## Cutting a release
 
