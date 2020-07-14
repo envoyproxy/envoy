@@ -20,6 +20,8 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
+#include "external/envoy_api/envoy/api/v2/discovery.pb.h"
+#include "external/envoy_api/envoy/service/discovery/v3/discovery.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -31,12 +33,12 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class DeltaSubscriptionTestHarness : public SubscriptionTestHarness {
+class DeltaSubscriptionTestHarness : public VersionedSubscriptionTestHarness {
 public:
   DeltaSubscriptionTestHarness() : DeltaSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
   DeltaSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
+            versionedStreamEndpointResourceName())),
         async_client_(new Grpc::MockAsyncClient()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
@@ -45,9 +47,9 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
         local_info_);
-    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        xds_context_, callbacks_, resource_decoder_, stats_,
-        Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false);
+    subscription_ =
+        std::make_unique<GrpcSubscriptionImpl>(xds_context_, callbacks_, resource_decoder_, stats_,
+                                               type_url_, dispatcher_, init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
@@ -87,12 +89,27 @@ public:
     expectSendMessage(cluster_names, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   }
 
+  template <class T> void expectSendRawMessage(Protobuf::Message& expected_request) {
+    EXPECT_CALL(async_stream_,
+                sendMessageRaw_(Grpc::ProtoBufferEqIgnoringField(dynamic_cast<T&>(expected_request),
+                                                                 "response_nonce"),
+                                false))
+        .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
+          T message;
+          EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
+          const std::string nonce = message.response_nonce();
+          if (!nonce.empty()) {
+            nonce_acks_sent_.push(nonce);
+          }
+        });
+  }
+
   void expectSendMessage(const std::set<std::string>& subscribe,
                          const std::set<std::string>& unsubscribe, const Protobuf::int32 error_code,
                          const std::string& error_message,
                          std::map<std::string, std::string> initial_resource_versions) {
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) expected_request;
-    expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(node_));
+    envoy::service::discovery::v3::DeltaDiscoveryRequest expected_request;
+    expected_request.mutable_node()->CopyFrom(node_);
     std::copy(
         subscribe.begin(), subscribe.end(),
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_subscribe()));
@@ -103,7 +120,7 @@ public:
       nonce_acks_required_.push(last_response_nonce_);
       last_response_nonce_ = "";
     }
-    expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    expected_request.set_type_url(type_url_);
 
     for (auto const& resource : initial_resource_versions) {
       (*expected_request.mutable_initial_resource_versions())[resource.first] = resource.second;
@@ -114,17 +131,14 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(async_stream_,
-                sendMessageRaw_(
-                    Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
-        .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
-          API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
-          EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
-          const std::string nonce = message.response_nonce();
-          if (!nonce.empty()) {
-            nonce_acks_sent_.push(nonce);
-          }
-        });
+
+    if (isMajorVersion()) {
+      expectSendRawMessage<envoy::service::discovery::v3::DeltaDiscoveryRequest>(expected_request);
+    } else {
+      envoy::api::v2::DeltaDiscoveryRequest downgraded_request;
+      downgraded_request.CopyFrom(API_DOWNGRADE(expected_request));
+      expectSendRawMessage<envoy::api::v2::DeltaDiscoveryRequest>(downgraded_request);
+    }
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -133,7 +147,7 @@ public:
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_system_version_info(version);
-    response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    response->set_type_url(type_url_);
 
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
@@ -144,7 +158,8 @@ public:
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(API_DOWNGRADE(*load_assignment));
+        resource->mutable_resource()->PackFrom(isMajorVersion() ? *load_assignment
+                                                                : API_DOWNGRADE(*load_assignment));
       }
     }
     Protobuf::RepeatedPtrField<std::string> removed_resources;
@@ -156,8 +171,10 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
+
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -190,6 +207,14 @@ public:
   }
 
   void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
+
+  std::string versionedStreamEndpointResourceName() {
+    if (isMajorVersion()) {
+      return "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints";
+    } else {
+      return "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints";
+    }
+  }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;

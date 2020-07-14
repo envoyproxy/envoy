@@ -1135,4 +1135,13 @@ MATCHER_P(JsonStringEq, expected, "") {
   return equal;
 }
 
+#define SUPPORTED_API_VERSIONS                                                                     \
+  testing::Values(envoy::config::core::v3::ApiVersion::V3,                                         \
+                  envoy::config::core::v3::ApiVersion::V2,                                         \
+                  envoy::config::core::v3::ApiVersion::AUTO)
+
+#define SUPPORTED_MAJOR_API_VERSION testing::Values(envoy::config::core::v3::ApiVersion::V3)
+
+#define SUPPORTED_PREV_MAJOR_API_VERSION testing::Values(envoy::config::core::v3::ApiVersion::V2)
+
 } // namespace Envoy

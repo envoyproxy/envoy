@@ -120,5 +120,18 @@ ACTION_P(ThrowOnRejectedConfig, accept) {
   }
 }
 
+class VersionedSubscriptionTestHarness
+    : public virtual SubscriptionTestHarness,
+      public testing::TestWithParam<std::tuple<envoy::config::core::v3::ApiVersion>> {
+public:
+  bool isMajorVersion() {
+    return std::get<0>(GetParam()) == envoy::config::core::v3::ApiVersion::V3;
+  }
+
+  const std::string type_url_{
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          std::get<0>(GetParam()))};
+};
+
 } // namespace Config
 } // namespace Envoy

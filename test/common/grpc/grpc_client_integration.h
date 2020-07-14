@@ -113,9 +113,7 @@ public:
 #define VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS                                                   \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
-                   testing::Values(envoy::config::core::v3::ApiVersion::V3,                        \
-                                   envoy::config::core::v3::ApiVersion::V2,                        \
-                                   envoy::config::core::v3::ApiVersion::AUTO))
+                   SUPPORTED_API_VERSIONS)
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
@@ -126,10 +124,7 @@ public:
                    testing::Values(Grpc::ClientType::EnvoyGrpc))
 #define VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS                                                   \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
-                   testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \
-                   testing::Values(envoy::config::core::v3::ApiVersion::V3,                        \
-                                   envoy::config::core::v3::ApiVersion::V2,                        \
-                                   envoy::config::core::v3::ApiVersion::AUTO))
+                   testing::Values(Grpc::ClientType::EnvoyGrpc), SUPPORTED_API_VERSIONS)
 #define DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                                  \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc),                                   \

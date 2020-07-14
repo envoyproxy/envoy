@@ -5,6 +5,7 @@
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/config/api_version.h"
+#include "common/config/resource_name.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"
 
@@ -12,9 +13,21 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness, public testing::Test {
+class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness {
 protected:
   DeltaSubscriptionImplTest() = default;
+
+  template <class T> void expectSendRawMessage() {
+    EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
+        .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
+          T message;
+          EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
+          const std::string nonce = message.response_nonce();
+          if (!nonce.empty()) {
+            nonce_acks_sent_.push(nonce);
+          }
+        }));
+  }
 
   // We need to destroy the subscription before the test's destruction, because the subscription's
   // destructor removes its watch from the NewGrpcMuxImpl, and that removal process involves
@@ -22,7 +35,10 @@ protected:
   void TearDown() override { doSubscriptionTearDown(); }
 };
 
-TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
+INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionImplTest, DeltaSubscriptionImplTest,
+                         ::testing::Combine(SUPPORTED_API_VERSIONS));
+
+TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   startSubscription({"name1", "name2", "name3"});
   expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name3", "name4"});
@@ -40,7 +56,7 @@ TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
 // Also demonstrates the collapsing of subscription interest updates into a single
 // request. (This collapsing happens any time multiple updates arrive before a request
 // can be sent, not just with pausing: rate limiting or a down gRPC stream would also do it).
-TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
+TEST_P(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   startSubscription({"name1", "name2", "name3"});
   auto resume_sub = subscription_->pause();
 
@@ -54,14 +70,14 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   subscription_->updateResourceInterest({"name3", "name4"});
 }
 
-TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
+TEST_P(DeltaSubscriptionImplTest, ResponseCausesAck) {
   startSubscription({"name1"});
   deliverConfigUpdate({"name1"}, "someversion", true);
 }
 
 // Checks that after a pause(), no ACK requests are sent until resume(), but that after the
 // resume, *all* ACKs that arrived during the pause are sent (in order).
-TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
+TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   startSubscription({"name1", "name2", "name3"});
   auto resume_sub = subscription_->pause();
   // The server gives us our first version of resource name1.
@@ -73,7 +89,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version1A");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version1A"));
     message->set_nonce(nonce);
-    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    message->set_type_url(type_url_);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message), control_plane_stats_);
@@ -87,7 +103,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version2A");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version2A"));
     message->set_nonce(nonce);
-    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    message->set_type_url(type_url_);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message), control_plane_stats_);
@@ -101,26 +117,25 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version1B");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version1B"));
     message->set_nonce(nonce);
-    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    message->set_type_url(type_url_);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
-  // All ACK sendMessage()s will happen upon calling resume().
-  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
-      .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
-        API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
-        EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
-        const std::string nonce = message.response_nonce();
-        if (!nonce.empty()) {
-          nonce_acks_sent_.push(nonce);
-        }
-      }));
+  // All ACK sendMessage()s will happen upon calling resume()
+  if (isMajorVersion()) {
+    expectSendRawMessage<envoy::service::discovery::v3::DeltaDiscoveryRequest>();
+  } else {
+    expectSendRawMessage<envoy::api::v2::DeltaDiscoveryRequest>();
+  }
+
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
 }
 
 TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
+  auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      envoy::config::core::v3::ApiVersion::V3);
   Stats::IsolatedStoreImpl stats_store;
   SubscriptionStats stats(Utility::generateStats(stats_store));
 
@@ -145,8 +160,8 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
       local_info);
 
   std::unique_ptr<GrpcSubscriptionImpl> subscription = std::make_unique<GrpcSubscriptionImpl>(
-      xds_context, callbacks, resource_decoder, stats, Config::TypeUrl::get().ClusterLoadAssignment,
-      dispatcher, std::chrono::milliseconds(12345), false);
+      xds_context, callbacks, resource_decoder, stats, type_url, dispatcher,
+      std::chrono::milliseconds(12345), false);
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 
