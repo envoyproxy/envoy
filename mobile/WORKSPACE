@@ -37,8 +37,8 @@ envoy_mobile_dependencies()
 load("@envoy_mobile//bazel:envoy_mobile_toolchains.bzl", "envoy_mobile_toolchains")
 envoy_mobile_toolchains()
 
-# Fixing to API 24. Need to lower to API 21: https://github.com/lyft/envoy-mobile/issues/936
 # Note: proguard is failing for API 30+
-android_sdk_repository(name = "androidsdk", api_level = 24)
+android_sdk_repository(name = "androidsdk", api_level = 29)
 
+# Fixing to API 24. Need to lower to API 21: https://github.com/lyft/envoy-mobile/issues/936
 android_ndk_repository(name = "androidndk", api_level = 24)

@@ -1,4 +1,5 @@
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+load("@rules_jvm_external//:defs.bzl", "artifact")
 
 licenses(["notice"])  # Apache 2
 
@@ -18,6 +19,6 @@ kt_android_library(
     ]),
     visibility = ["//visibility:public"],
     deps = [
-        "@androidsdk//com.android.support:recyclerview-v7-25.0.0",
+        artifact("androidx.recyclerview:recyclerview"),
     ],
 )

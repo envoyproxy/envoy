@@ -1,5 +1,6 @@
 load("@build_bazel_rules_android//android:rules.bzl", "android_binary")
 load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kt_android_library")
+load("@rules_jvm_external//:defs.bzl", "artifact")
 
 licenses(["notice"])  # Apache 2
 
@@ -29,7 +30,7 @@ kt_android_library(
     deps = [
         "//dist:envoy_mobile_android",
         "//examples/kotlin/shared:hello_envoy_shared_lib",
-        "@androidsdk//com.android.support:appcompat-v7-25.0.0",
-        "@androidsdk//com.android.support:recyclerview-v7-25.0.0",
+        artifact("androidx.recyclerview:recyclerview"),
+        artifact("androidx.annotation:annotation"),
     ],
 )
