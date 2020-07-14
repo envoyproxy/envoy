@@ -382,23 +382,6 @@ void InstanceImpl::initialize(const Options& options,
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
-  if (initial_config.admin().address()) {
-    if (initial_config.admin().accessLogPath().empty()) {
-      throw EnvoyException("An admin access log path is required for a listening server.");
-    }
-    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
-    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
-                              initial_config.admin().address(),
-                              initial_config.admin().socketOptions(),
-                              stats_store_.createScope("listener.admin."));
-  } else {
-    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
-  }
-  config_tracker_entry_ =
-      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
-  if (initial_config.admin().address()) {
-    admin_->addListenerToHandler(handler_.get());
-  }
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -426,6 +409,24 @@ void InstanceImpl::initialize(const Options& options,
   // It's now safe to start writing stats from the main thread's dispatcher.
   if (bootstrap_.enable_dispatcher_stats()) {
     dispatcher_->initializeStats(stats_store_, "server.");
+  }
+
+  if (initial_config.admin().address()) {
+    if (initial_config.admin().accessLogPath().empty()) {
+      throw EnvoyException("An admin access log path is required for a listening server.");
+    }
+    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
+    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
+                              initial_config.admin().address(),
+                              initial_config.admin().socketOptions(),
+                              stats_store_.createScope("listener.admin."));
+  } else {
+    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
+  }
+  config_tracker_entry_ =
+      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
+  if (initial_config.admin().address()) {
+    admin_->addListenerToHandler(handler_.get());
   }
 
   // The broad order of initialization from this point on is the following:

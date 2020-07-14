@@ -3,7 +3,6 @@
 #include "extensions/filters/network/rocketmq_proxy/active_message.h"
 #include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
 
-#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
