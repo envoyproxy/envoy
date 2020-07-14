@@ -431,6 +431,7 @@ envoy_cc_test(
         "//source/extensions/common/crypto:utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

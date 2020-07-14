@@ -295,9 +295,9 @@ TEST_F(WatermarkBufferTest, GetRawSlices) {
 TEST_F(WatermarkBufferTest, Search) {
   buffer_.add(TEN_BYTES, 10);
 
-  EXPECT_EQ(1, buffer_.search(&TEN_BYTES[1], 2, 0));
+  EXPECT_EQ(1, buffer_.search(&TEN_BYTES[1], 2, 0, 0));
 
-  EXPECT_EQ(-1, buffer_.search(&TEN_BYTES[1], 2, 5));
+  EXPECT_EQ(-1, buffer_.search(&TEN_BYTES[1], 2, 5, 0));
 }
 
 TEST_F(WatermarkBufferTest, StartsWith) {
