@@ -52,7 +52,7 @@ public:
         this);
     RELEASE_ASSERT(rc == 0, "");
 
-#ifdef __linux__
+#if SUPPORTS_PTHREAD_GETNAME_NP
     // If the name was not specified, get it from the OS. If the name was
     // specified, write it into the thread, and assert that the OS sees it the
     // same way.
@@ -93,7 +93,7 @@ public:
   }
 
 private:
-#ifdef __linux__
+#if SUPPORTS_PTHREAD_GETNAME_NP
   // Attempts to get the name from the operating system, returning true and
   // updating 'name' if successful. Note that during normal operation this
   // may fail, if the thread exits prior to the system call.
