@@ -742,6 +742,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "socket_interface_integration_test",
+    srcs = ["socket_interface_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/network:socket_interface_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
     # The symbol table cluster memory tests take a while to run specially under tsan.

@@ -16,11 +16,11 @@ namespace Network {
 // implemented by all factories that derive SocketInterfaceBase
 class SocketInterfaceExtension : public Server::BootstrapExtension {
 public:
-  SocketInterfaceExtension(SocketInterface* sock_interface) : sock_interface_(sock_interface) {}
-  SocketInterface* socketInterface() { return sock_interface_; }
+  SocketInterfaceExtension(SocketInterface& sock_interface) : sock_interface_(sock_interface) {}
+  SocketInterface& socketInterface() { return sock_interface_; }
 
 private:
-  SocketInterface* sock_interface_;
+  SocketInterface& sock_interface_;
 };
 
 // Class to be derived by all SocketInterface implementations.
