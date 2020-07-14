@@ -14,8 +14,8 @@ namespace NetworkFilters {
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
       [](test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
-        // This post-processor mutation is applied only when libprotobuf-mutator 
-        // calls mutate on an input, and *not* during fuzz target execution. 
+        // This post-processor mutation is applied only when libprotobuf-mutator
+        // calls mutate on an input, and *not* during fuzz target execution.
         // Replaying a corpus through the fuzzer will not be affected by the
         // post-processor mutation.
 
