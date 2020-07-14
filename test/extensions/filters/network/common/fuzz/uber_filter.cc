@@ -35,7 +35,9 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   return filter_names_;
 }
 
-void UberFilterFuzzer::reset(const std::string) {
+void UberFilterFuzzer::reset() {
+  // Reset some changes made by current filter on some mock objects
+
   // Close the connection to make sure the filter's callback is set to nullptr.
   read_filter_callbacks_->connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
   // Clear the filter's raw pointer stored inside the connection_ and reset the connection_.
@@ -43,7 +45,7 @@ void UberFilterFuzzer::reset(const std::string) {
   read_filter_callbacks_->connection_.bytes_sent_callbacks_.clear();
   read_filter_callbacks_->connection_.state_ = Network::Connection::State::Open;
 }
-void UberFilterFuzzer::perFilterSetup(const std::string filter_name) {
+void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
   // Set up response for ext_authz filter
   if (filter_name == NetworkFilterNames::get().ExtAuthorization) {
 
@@ -103,7 +105,7 @@ void UberFilterFuzzer::fuzzerSetup() {
 UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.SimulatedTimeSystem()) {
   fuzzerSetup();
 }
-bool UberFilterFuzzer::invalidInputForFuzzer(absl::string_view filter_name,
+bool UberFilterFuzzer::invalidInputForFuzzer(const std::string& filter_name,
                                              Protobuf::Message* config_message) {
   // System calls such as reading files are prohibited in this fuzzer. Some input that crashes the
   // mock/fake objects are also prohibited.
@@ -185,7 +187,7 @@ void UberFilterFuzzer::fuzz(
     }
   }
 
-  reset(proto_config.name());
+  reset();
 }
 
 } // namespace NetworkFilters

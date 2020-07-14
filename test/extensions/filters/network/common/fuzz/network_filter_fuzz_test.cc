@@ -14,11 +14,9 @@ namespace NetworkFilters {
 DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase& input) {
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
       [](test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
-        // This ensures that the mutated configs all have valid filter names and type_urls. The list
-        // of names and type_urls is pulled from the NamedNetworkFilterConfigFactory. All Envoy
-        // extensions are built with this test (see BUILD file). This post-processor mutation is
-        // applied only when libprotobuf-mutator calls mutate on an input, and *not* during fuzz
-        // target execution. Replaying a corpus through the fuzzer will not be affected by the
+        // This post-processor mutation is applied only when libprotobuf-mutator 
+        // calls mutate on an input, and *not* during fuzz target execution. 
+        // Replaying a corpus through the fuzzer will not be affected by the
         // post-processor mutation.
 
         // After extending to cover all the filters, we can use `Registry::FactoryRegistry<
@@ -31,7 +29,6 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          // filter_name = "envoy.filters.network.sni_dynamic_forward_proxy";
           input->mutable_config()->set_name(std::string(filter_name));
         }
         // Set the corresponding type_url for Any.
@@ -43,7 +40,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
 
   try {
     TestUtility::validate(input);
-    // Fuzz filter.
+    // Check the filter's name in case some filters are not supported yet.
     static const auto filter_names = UberFilterFuzzer::filterNames();
     if (std::find(filter_names.begin(), filter_names.end(), input.config().name()) ==
         std::end(filter_names)) {

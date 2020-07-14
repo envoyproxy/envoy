@@ -91,15 +91,16 @@ public:
        const Protobuf::RepeatedPtrField<::test::extensions::filters::network::Action>& actions);
   // Get the name of filters which has been covered by this fuzzer.
   static std::vector<absl::string_view> filterNames();
-
-  bool invalidInputForFuzzer(absl::string_view filter_name, Protobuf::Message* config_message);
+  // Check whether the filter's config is invalid for fuzzer(e.g. system call)
+  bool invalidInputForFuzzer(const std::string& filter_name, Protobuf::Message* config_message);
 
 protected:
   // Set-up filter specific mock expectations in constructor.
   void fuzzerSetup();
-  // Avoid issues in destructors.
-  void reset(const std::string filter_name);
-  void perFilterSetup(const std::string filter_name);
+  // Reset the states of the mock objects.
+  void reset();
+  // Mock behaviors for specific filters.
+  void perFilterSetup(const std::string& filter_name);
 
 private:
   Server::Configuration::FakeFactoryContext factory_context_;
