@@ -364,6 +364,7 @@ public:
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
+using FilterChainOptConstRef = absl::optional<std::reference_wrapper<const FilterChain>>;
 
 /**
  * A filter chain that can be drained.

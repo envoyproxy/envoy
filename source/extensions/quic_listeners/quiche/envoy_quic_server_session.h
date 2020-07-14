@@ -15,6 +15,7 @@
 
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_crypto_server_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -32,7 +33,8 @@ public:
                          quic::QuicCryptoServerStreamBase::Helper* helper,
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                         Network::ListenerConfig& listener_config);
 
   ~EnvoyQuicServerSession() override;
 
@@ -73,8 +75,10 @@ protected:
 
 private:
   void setUpRequestDecoder(EnvoyQuicServerStream& stream);
+  void maybeCreateNetworkFilters();
 
   EnvoyQuicConnectionPtr quic_connection_;
+  Network::ListenerConfig& listener_config_;
   // These callbacks are owned by network filters and quic session should out live
   // them.
   Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
