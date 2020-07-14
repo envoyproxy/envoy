@@ -55,7 +55,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
-  absl::optional<Network::ProxyProtocolData> proxy_protocol_options = absl::nullopt;
+  absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   bool needs_transport_socket_options = false;
   if (filter_state.hasData<UpstreamServerName>(UpstreamServerName::key())) {
