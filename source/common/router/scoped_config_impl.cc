@@ -127,6 +127,18 @@ void ScopedConfigImpl::addOrUpdateRoutingScope(
   scoped_route_info_by_key_[scoped_route_info->scopeKey().hash()] = scoped_route_info;
 }
 
+void ScopedConfigImpl::addOrUpdateRoutingScopes(
+    const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos) {
+  for (auto& scoped_route_info : scoped_route_infos)
+    addOrUpdateRoutingScope(scoped_route_info);
+}
+
+void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope_names) {
+  for (std::string const& scope_name : scope_names) {
+    removeRoutingScope(scope_name);
+  }
+}
+
 void ScopedConfigImpl::removeRoutingScope(const std::string& scope_name) {
   const auto iter = scoped_route_info_by_name_.find(scope_name);
   if (iter != scoped_route_info_by_name_.end()) {

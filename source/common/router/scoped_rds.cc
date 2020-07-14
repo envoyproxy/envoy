@@ -19,6 +19,7 @@
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 #include "common/router/rds_impl.h"
+#include "common/router/scoped_config_impl.h"
 
 #include "absl/strings/str_join.h"
 
@@ -141,6 +142,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
   absl::flat_hash_set<std::string> unique_resource_names;
+  std::vector<ScopedRouteInfoConstSharedPtr> updated_scopes;
   for (const auto& resource : resources) {
     try {
       // Explicit copy so that we can std::move later.
@@ -173,13 +175,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       route_provider_by_scope_.insert({scope_name, std::move(rds_config_provider_helper)});
       scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
       scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
-      applyConfigUpdate([scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
-                            -> ConfigProvider::ConfigConstSharedPtr {
-        auto* thread_local_scoped_config =
-            const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
-        thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
-        return config;
-      });
+      updated_scopes.push_back(scoped_route_info);
       any_applied = true;
       ENVOY_LOG(debug, "srds: add/update scoped_route '{}', version: {}",
                 scoped_route_info->scopeName(), version_info);
@@ -187,6 +183,13 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       exception_msgs.emplace_back(absl::StrCat("", e.what()));
     }
   }
+  applyConfigUpdate([updated_scopes](ConfigProvider::ConfigConstSharedPtr config)
+                        -> ConfigProvider::ConfigConstSharedPtr {
+    auto* thread_local_scoped_config =
+        const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+    thread_local_scoped_config->addOrUpdateRoutingScopes(updated_scopes);
+    return config;
+  });
   return any_applied;
 }
 
@@ -195,6 +198,7 @@ ScopedRdsConfigSubscription::removeScopes(
     const Protobuf::RepeatedPtrField<std::string>& scope_names, const std::string& version_info) {
   std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
       to_be_removed_rds_providers;
+  std::vector<std::string> removed_scope_names;
   for (const auto& scope_name : scope_names) {
     auto iter = scoped_route_map_.find(scope_name);
     if (iter != scoped_route_map_.end()) {
@@ -206,15 +210,18 @@ ScopedRdsConfigSubscription::removeScopes(
       }
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
-      applyConfigUpdate([scope_name](ConfigProvider::ConfigConstSharedPtr config)
-                            -> ConfigProvider::ConfigConstSharedPtr {
-        auto* thread_local_scoped_config =
-            const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
-        thread_local_scoped_config->removeRoutingScope(scope_name);
-        return config;
-      });
+      removed_scope_names.push_back(scope_name);
       ENVOY_LOG(debug, "srds: remove scoped route '{}', version: {}", scope_name, version_info);
     }
+  }
+  if (!removed_scope_names.empty()) {
+    applyConfigUpdate([removed_scope_names](ConfigProvider::ConfigConstSharedPtr config)
+                          -> ConfigProvider::ConfigConstSharedPtr {
+      auto* thread_local_scoped_config =
+          const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+      thread_local_scoped_config->removeRoutingScopes(removed_scope_names);
+      return config;
+    });
   }
   return to_be_removed_rds_providers;
 }
