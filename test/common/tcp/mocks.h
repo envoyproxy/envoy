@@ -1,0 +1,50 @@
+#pragma once
+
+#include <memory>
+
+#include "envoy/tcp/upstream_interface.h"
+
+#include "common/tcp_proxy/upstream.h"
+
+#include "test/mocks/buffer/mocks.h"
+#include "test/mocks/http/stream_encoder.h"
+#include "test/mocks/tcp/mocks.h"
+
+namespace Envoy {
+namespace Tcp {
+class MockGenericUpstream : public GenericUpstream {
+public:
+  MockGenericUpstream();
+  ~MockGenericUpstream() override;
+  MOCK_METHOD(bool, readDisable, (bool disable));
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, addBytesSentCallback, (Network::Connection::BytesSentCb cb));
+  MOCK_METHOD(Tcp::ConnectionPool::ConnectionData*, onDownstreamEvent,
+              (Network::ConnectionEvent event));
+};
+
+class MockGenericUpstreamPoolCallbacks : public GenericUpstreamPoolCallbacks {
+public:
+  MockGenericUpstreamPoolCallbacks();
+  ~MockGenericUpstreamPoolCallbacks() override;
+  MOCK_METHOD(void, onPoolFailure,
+              (ConnectionPool::PoolFailureReason reason,
+               Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, onPoolReady,
+              (const GenericUpstreamSharedPtr& upstream,
+               Upstream::HostDescriptionConstSharedPtr& host,
+               const Network::Address::InstanceConstSharedPtr& local_address,
+               const StreamInfo::StreamInfo& info));
+};
+
+class MockGenericConnPool : public GenericConnPool {
+public:
+  MockGenericConnPool();
+  ~MockGenericConnPool() override;
+  MOCK_METHOD(void, cancelAnyPendingRequest, ());
+  MOCK_METHOD(GenericUpstreamSharedPtr, upstream, ());
+  MOCK_METHOD(bool, failedOnPool, ());
+  MOCK_METHOD(bool, failedOnConnection, ());
+};
+} // namespace Tcp
+} // namespace Envoy
