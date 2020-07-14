@@ -31,7 +31,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

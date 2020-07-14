@@ -8,7 +8,7 @@
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 #include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

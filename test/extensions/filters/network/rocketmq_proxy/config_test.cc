@@ -4,7 +4,8 @@
 #include "extensions/filters/network/rocketmq_proxy/config.h"
 
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
