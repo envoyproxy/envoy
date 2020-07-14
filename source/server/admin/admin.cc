@@ -138,7 +138,7 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
-// Helper method to get the unreadytargets parameter.
+// Helper method to get the unready_targets parameter.
 bool shouldIncludeUnreadyTargetsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_unready_targets") != absl::nullopt;
 }
