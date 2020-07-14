@@ -263,7 +263,7 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasi
         if (!alarms_.empty()) {
           // If there's another alarm pending, sleep forward to it.
           const AlarmRegistration& alarm_registration = *alarms_.begin();
-          next_wakeup = std::min(alarm_registration.time, next_wakeup);
+          next_wakeup = std::min(alarm_registration.time_, next_wakeup);
         }
         setMonotonicTimeLockHeld(next_wakeup);
         waitForNoPendingLockHeld();
@@ -332,7 +332,7 @@ void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& mo
     // range-iterate over the set.
     while (!alarms_.empty()) {
       const AlarmRegistration& alarm_registration = *alarms_.begin();
-      MonotonicTime alarm_time = alarm_registration.time;
+      MonotonicTime alarm_time = alarm_registration.time_;
       if (alarm_time > monotonic_time) {
         break;
       }
@@ -340,7 +340,7 @@ void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& mo
       system_time_ +=
           std::chrono::duration_cast<SystemTime::duration>(alarm_time - monotonic_time_);
       monotonic_time_ = alarm_time;
-      Alarm* alarm = alarm_registration.alarm;
+      Alarm* alarm = alarm_registration.alarm_;
       removeAlarmLockHeld(alarm);
       alarmActivateLockHeld(alarm);
     }

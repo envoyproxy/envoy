@@ -66,23 +66,23 @@ private:
   class Alarm;
   friend class Alarm; // Needed to reference mutex for thread annotations.
   struct AlarmRegistration {
-    AlarmRegistration(MonotonicTime _time, uint64_t _randomness, Alarm* _alarm)
-        : time(_time), randomness(_randomness), alarm(_alarm) {}
+    AlarmRegistration(MonotonicTime time, uint64_t randomness, Alarm* alarm)
+        : time_(time), randomness_(randomness), alarm_(alarm) {}
 
-    MonotonicTime time;
+    MonotonicTime time_;
     // Random tie-breaker for alarms scheduled for the same monotonic time used to mimic
     // non-deterministic execution of real alarms scheduled for the same wall time.
-    uint64_t randomness;
-    Alarm* alarm;
+    uint64_t randomness_;
+    Alarm* alarm_;
 
     friend bool operator<(const AlarmRegistration& lhs, const AlarmRegistration& rhs) {
-      if (lhs.time != rhs.time) {
-        return lhs.time < rhs.time;
+      if (lhs.time_ != rhs.time_) {
+        return lhs.time_ < rhs.time_;
       }
-      if (lhs.randomness != rhs.randomness) {
-        return lhs.randomness < rhs.randomness;
+      if (lhs.randomness_ != rhs.randomness_) {
+        return lhs.randomness_ < rhs.randomness_;
       }
-      return lhs.alarm < rhs.alarm;
+      return lhs.alarm_ < rhs.alarm_;
     }
   };
   using AlarmSet = std::set<AlarmRegistration>;
