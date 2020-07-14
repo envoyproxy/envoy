@@ -257,7 +257,14 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
                      0, envoy::config::core::v3::UNKNOWN));
   }
-  initialize([] {});
+  initialization_complete_callback_ = [] {};
+  for (const auto& host : *initial_hosts_) {
+    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  priority_set_.updateHosts(
+      0, HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
+      *initial_hosts_, {}, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
