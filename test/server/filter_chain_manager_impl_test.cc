@@ -25,7 +25,8 @@
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/drain_manager.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"

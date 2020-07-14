@@ -11,7 +11,7 @@
 #include "server/guarddog_impl.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/main.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
