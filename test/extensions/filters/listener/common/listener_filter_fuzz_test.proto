@@ -2,9 +2,6 @@ syntax = "proto3";
 
 package text.extensions.filters.listener;
 
-import "test/fuzz/common.proto";
-import "envoy/config/listener/v3/listener_components.proto";
-
 message Socket {
   string local_address = 1;
   string remote_address = 2;

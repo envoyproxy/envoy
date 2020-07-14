@@ -9,7 +9,7 @@ namespace Extensions {
 namespace ListenerFilters {
 
 void UberFilterFuzzer::fuzz() {
-  filter_->onAccept();
+  filter_->onAccept(cb_);
 }
 
 Network::FakeConnectionSocket UberFilterFuzzer::socketSetup(
