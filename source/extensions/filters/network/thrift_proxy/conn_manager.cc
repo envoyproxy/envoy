@@ -203,7 +203,7 @@ FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl::string_view na
     // encounter in a reply is either field 0 (success) or not (IDL exception returned).
     // If first fieldType is FieldType::Stop then it is a void success and handled in messageEnd()
     // because decoder state machine does not call decoder event callback fieldBegin on FieldType::Stop.
-    success_ = field_id == 0;
+    success_ = (field_id == 0);
     first_reply_field_ = false;
   }
 
