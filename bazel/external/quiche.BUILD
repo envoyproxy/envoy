@@ -59,6 +59,7 @@ quiche_copts = select({
         # Remove these after upstream fix.
         "-Wno-unused-parameter",
         "-Wno-unused-function",
+        "-Wno-return-type",
         "-Wno-unknown-warning-option",
         "-Wno-deprecated-copy",
         "-Wno-ignored-qualifiers",
@@ -66,6 +67,8 @@ quiche_copts = select({
         "-Wno-inconsistent-missing-override",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
+        # to suppress errors re: size_t vs. int comparisons
+        "-Wno-sign-compare",
     ],
 })
 
