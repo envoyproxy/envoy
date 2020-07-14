@@ -34,8 +34,7 @@ public:
     ON_CALL(client_context_config_, ecdhCurves)
         .WillByDefault(
             ReturnRef(Extensions::TransportSockets::Tls::ClientContextConfigImpl::DEFAULT_CURVES));
-    const std::string alpn("h2,http/1.1");
-    ON_CALL(client_context_config_, alpnProtocols()).WillByDefault(ReturnRef(alpn));
+    ON_CALL(client_context_config_, alpnProtocols()).WillByDefault(ReturnRef(alpn_));
     ;
     const std::string empty_string;
     ON_CALL(client_context_config_, serverNameIndication()).WillByDefault(ReturnRef(empty_string));
@@ -80,6 +79,7 @@ public:
   }
 
 protected:
+  const std::string alpn_{"h2,http/1.1"};
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
   std::string leaf_cert_;
   NiceMock<Stats::MockStore> store_;

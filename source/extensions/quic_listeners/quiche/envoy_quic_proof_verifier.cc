@@ -66,7 +66,6 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
       quic::CertificateView::ParseSingleCertificate(certs[0]);
   ASSERT(cert_view != nullptr);
   for (const absl::string_view config_san : cert_view->subject_alt_name_domains()) {
-    std::cerr << "config_san " << config_san << "\n";
     if (config_san == hostname) {
       return quic::QUIC_SUCCESS;
     }
