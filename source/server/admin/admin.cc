@@ -660,6 +660,7 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
+  null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
   socket_factory_ = std::make_shared<AdminListenSocketFactory>(socket_);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
@@ -679,6 +680,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       request_id_extension_(Http::RequestIDExtensionFactory::defaultInstance(server_.random())),
       profile_path_(profile_path),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
+      null_overload_manager_(server_.threadLocal()),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSource()),
@@ -760,11 +762,12 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {
-  // Don't pass in the overload manager so that the admin interface is accessible even when
-  // the envoy is overloaded.
+  // Pass in the null overload manager so that the admin interface is accessible even when Envoy is
+  // overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
-      server_.localInfo(), server_.clusterManager(), nullptr, server_.timeSource())});
+      server_.localInfo(), server_.clusterManager(), null_overload_manager_,
+      server_.timeSource())});
   return true;
 }
 
