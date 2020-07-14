@@ -66,6 +66,9 @@ private:
   class Alarm;
   friend class Alarm; // Needed to reference mutex for thread annotations.
   struct AlarmRegistration {
+    AlarmRegistration(MonotonicTime _time, uint64_t _randomness, Alarm* _alarm)
+        : time(_time), randomness(_randomness), alarm(_alarm) {}
+
     MonotonicTime time;
     // Random tie-breaker for alarms scheduled for the same monotonic time used to mimic
     // non-deterministic execution of real alarms scheduled for the same wall time.
