@@ -24,12 +24,13 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   static ::std::vector<absl::string_view> filter_names_;
   if (filter_names_.empty()) {
     filter_names_ = {NetworkFilterNames::get().ExtAuthorization,
-                     NetworkFilterNames::get().LocalRateLimit, NetworkFilterNames::get().RedisProxy,
-                     NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().Echo,
+                     NetworkFilterNames::get().LocalRateLimit,
+                     NetworkFilterNames::get().RedisProxy,
+                     NetworkFilterNames::get().ClientSslAuth,
+                     NetworkFilterNames::get().Echo,
                      NetworkFilterNames::get().DirectResponse,
-                     // NetworkFilterNames::get().SniDynamicForwardProxy,
-                     // NetworkFilterNames::get().TcpProxy,
-                     NetworkFilterNames::get().DubboProxy, NetworkFilterNames::get().SniCluster};
+                     NetworkFilterNames::get().DubboProxy,
+                     NetworkFilterNames::get().SniCluster};
   }
   return filter_names_;
 }
