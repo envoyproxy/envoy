@@ -131,6 +131,7 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
               "WARNING runtime key '{}': numerator ({}) > denominator ({}), condition always "
               "evaluates to true",
               key, percent.numerator(), denominator_value);
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
