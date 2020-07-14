@@ -21,7 +21,7 @@ void UberFilterFuzzer::fuzz(Network::ListenerFilter& filter,
 void UberFilterFuzzer::socketSetup(
     const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
-  // socket_.setRemoteAddress(Network::Utility::resolveUrl(input.sock().remote_address()));
+  socket_.setRemoteAddress(Network::Utility::resolveUrl(input.sock().remote_address()));
 }
 
 } // namespace ListenerFilters
