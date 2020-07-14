@@ -12,7 +12,7 @@ class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
   EnvoyQuicProofVerifier(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                          TimeSource& time_source)
-      : EnvoyQuicProofVerifierBase(), context_impl_(scope, config, time_source) {}
+      : context_impl_(scope, config, time_source) {}
 
   // EnvoyQuicProofVerifierBase
   quic::QuicAsyncStatus

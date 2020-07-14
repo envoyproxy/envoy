@@ -39,7 +39,7 @@ public:
     const std::string empty_string;
     ON_CALL(client_context_config_, serverNameIndication()).WillByDefault(ReturnRef(empty_string));
     ON_CALL(client_context_config_, signingAlgorithmsForTest())
-        .WillByDefault(ReturnRef(empty_string));
+        .WillByDefault(ReturnRef(sig_algs_));
     ON_CALL(client_context_config_, certificateValidationContext())
         .WillByDefault(Return(&cert_validation_ctx_config_));
   }
@@ -80,6 +80,7 @@ public:
 
 protected:
   const std::string alpn_{"h2,http/1.1"};
+  const std::string sig_algs_{"rsa_pss_rsae_sha256"};
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
   std::string leaf_cert_;
   NiceMock<Stats::MockStore> store_;

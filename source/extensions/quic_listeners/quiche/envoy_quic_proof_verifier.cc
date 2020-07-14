@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Quic {
 
-static X509* ParseDERCertificate(const std::string& der_bytes, std::string* error_details) {
+static X509* parseDERCertificate(const std::string& der_bytes, std::string* error_details) {
   const uint8_t* data;
   const uint8_t* orig_data;
   orig_data = data = reinterpret_cast<const uint8_t*>(der_bytes.data());
@@ -27,13 +27,13 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const quic::ProofVerifyContext* /*context*/, std::string* error_details,
     std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
     std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
-  if (certs.size() == 0) {
+  if (certs.empty()) {
     return quic::QUIC_FAILURE;
   }
   bssl::UniquePtr<STACK_OF(X509)> intermediates(sk_X509_new_null());
   bssl::UniquePtr<X509> leaf;
   for (size_t i = 0; i < certs.size(); i++) {
-    X509* cert = ParseDERCertificate(certs[i], error_details);
+    X509* cert = parseDERCertificate(certs[i], error_details);
     if (!cert) {
       return quic::QUIC_FAILURE;
     }
