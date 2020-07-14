@@ -425,18 +425,14 @@ public:
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Get all headers with matching keys.
     std::vector<absl::string_view> values;
-    std::pair<std::string, std::vector<absl::string_view>*> context =
-        std::make_pair(key_.get(), &values);
     Envoy::Http::HeaderMap::ConstIterateCb get_headers_cb =
-        [](const Envoy::Http::HeaderEntry& header, void* context) {
-          auto* typed_context =
-              static_cast<std::pair<std::string, std::vector<absl::string_view>*>*>(context);
-          if (header.key().getStringView() == typed_context->first) {
-            typed_context->second->push_back(header.value().getStringView());
+        [key = key_.get(), &values](const Envoy::Http::HeaderEntry& header) {
+          if (header.key().getStringView() == key) {
+            values.push_back(header.value().getStringView());
           }
           return Envoy::Http::HeaderMap::Iterate::Continue;
         };
-    headers.iterate(get_headers_cb, &context);
+    headers.iterate(get_headers_cb);
 
     if (values.empty()) {
       *listener << "which has no '" << key_.get() << "' header";
@@ -506,6 +502,14 @@ MATCHER_P(HttpStatusIs, expected_code, "") {
   return true;
 }
 
+inline HeaderMap::ConstIterateCb
+SaveHeaders(std::vector<std::pair<absl::string_view, absl::string_view>>* output) {
+  return [output](const HeaderEntry& header) {
+    output->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
+    return HeaderMap::Iterate::Continue;
+  };
+}
+
 template <typename HeaderMapT>
 class IsSubsetOfHeadersMatcherImpl : public testing::MatcherInterface<HeaderMapT> {
 public:
@@ -520,15 +524,11 @@ public:
 
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Collect header maps into vectors, to use for IsSubsetOf.
-    auto get_headers_cb = [](const HeaderEntry& header, void* headers) {
-      static_cast<std::vector<std::pair<absl::string_view, absl::string_view>>*>(headers)
-          ->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
-      return HeaderMap::Iterate::Continue;
-    };
     std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
-    headers.iterate(get_headers_cb, &arg_headers_vec);
+    headers.iterate(SaveHeaders(&arg_headers_vec));
+
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
-    expected_headers_.iterate(get_headers_cb, &expected_headers_vec);
+    expected_headers_.iterate(SaveHeaders(&expected_headers_vec));
 
     return ExplainMatchResult(testing::IsSubsetOf(expected_headers_vec), arg_headers_vec, listener);
   }
@@ -575,15 +575,11 @@ public:
 
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Collect header maps into vectors, to use for IsSupersetOf.
-    auto get_headers_cb = [](const HeaderEntry& header, void* headers) {
-      static_cast<std::vector<std::pair<absl::string_view, absl::string_view>>*>(headers)
-          ->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
-      return HeaderMap::Iterate::Continue;
-    };
     std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
-    headers.iterate(get_headers_cb, &arg_headers_vec);
+    headers.iterate(SaveHeaders(&arg_headers_vec));
+
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
-    expected_headers_.iterate(get_headers_cb, &expected_headers_vec);
+    expected_headers_.iterate(SaveHeaders(&expected_headers_vec));
 
     return ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
                               listener);

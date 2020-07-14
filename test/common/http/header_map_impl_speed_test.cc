@@ -132,12 +132,12 @@ static void headerMapImplIterate(benchmark::State& state) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   size_t num_callbacks = 0;
   addDummyHeaders(*headers, state.range(0));
-  auto counting_callback = [](const HeaderEntry&, void* context) -> HeaderMap::Iterate {
-    (*static_cast<size_t*>(context))++;
+  auto counting_callback = [&num_callbacks](const HeaderEntry&) -> HeaderMap::Iterate {
+    num_callbacks++;
     return HeaderMap::Iterate::Continue;
   };
   for (auto _ : state) {
-    headers->iterate(counting_callback, &num_callbacks);
+    headers->iterate(counting_callback);
   }
   benchmark::DoNotOptimize(num_callbacks);
 }
