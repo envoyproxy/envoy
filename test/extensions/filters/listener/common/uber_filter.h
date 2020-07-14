@@ -1,4 +1,8 @@
+#include "test/extensions/filters/listener/common/listener_filter_fuzz_test.pb.validate.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/network/fakes.h"
+
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -6,25 +10,21 @@ namespace ListenerFilters {
 
 class UberFilterFuzzer {
 public:
-  UberFilterFuzzer();
+  UberFilterFuzzer(const std::unique_ptr<ListenerFilter>& filter,
+                   const envoy::extensions::filters::listener::FilterFuzzTestCase& input)
+      : filter_(filter)
+      , socket_(socketSetup(input)) {}
 
-  // Create the filter config and ingest the fuzzed data.
-  // TODO: Not sure about what type data should be yet.
-  void fuzz(const envoy::config::listener::v3::Filter& proto_config, const std::string data);
-  // Setup filter-specific mock expectations - maybe not necessary with FakeConnectionSocket?
-  void perFilterSetup(const std::string filter_name);
-protected:
-  // Setup mock expectations in constructor relevant to all listener filters.
-  void fuzzerSetup();
-  // Setup mock expectations each time fuzz() is called.
-  void filterSetup(const envoy::config::listener::v3::Filter& proto_config);
-
-  // fuzz() will call filterSetup(), then perFilterSetup(), and then onAccept()
+  void fuzz();
 
 private:
-  NiceMock<MockConnectionSocket> socket_;
-  NiceMock<MockListenerFilterCallbacks> cb_;
-  NiceMock<MockDispatcher> dispatcher_;
+  Network::FakeConnectionSocket socketSetup(
+      const envoy::extensions::filters::listener::FilterFuzzTestCase& input);
+
+  std::unique_ptr<ListenerFilter> filter_;
+  NiceMock<Network::MockListenerFilterCallbacks> cb_;
+  Network::FakeConnectionSocket socket_;
+  // NiceMock<Event::MockDispatcher> dispatcher_;
 }
 
 } // namespace ListenerFilters

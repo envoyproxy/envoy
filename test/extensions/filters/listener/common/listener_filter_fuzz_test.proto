@@ -5,7 +5,11 @@ package text.extensions.filters.listener;
 import "test/fuzz/common.proto";
 import "envoy/config/listener/v3/listener_components.proto";
 
+message Socket {
+  string local_address = 1;
+  string remote_address = 2;
+}
+
 message FilterFuzzTestCase {
-  envoy.config.listener.v3.Filter config = 1;
-  string data = 2;
+  Socket sock = 1;
 }
