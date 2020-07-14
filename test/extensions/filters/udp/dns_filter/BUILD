@@ -32,7 +32,8 @@ envoy_extension_cc_test(
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3alpha:pkg_cc_proto",

@@ -9,7 +9,7 @@
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

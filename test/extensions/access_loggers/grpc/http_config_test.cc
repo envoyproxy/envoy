@@ -7,7 +7,7 @@
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

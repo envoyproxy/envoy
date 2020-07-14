@@ -5,7 +5,9 @@
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 

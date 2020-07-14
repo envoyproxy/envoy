@@ -32,7 +32,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/original_src:config",
         "//source/extensions/filters/listener/original_src:config_lib",
         "//source/extensions/filters/listener/original_src:original_src_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
     ],
 )
 

@@ -6,9 +6,10 @@
 #include "extensions/health_checkers/redis/config.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/health_checker_factory_context.h"
 #include "test/mocks/upstream/mocks.h"
 
 namespace Envoy {

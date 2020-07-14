@@ -21,7 +21,8 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 
 using testing::_;
