@@ -196,7 +196,7 @@ void Utility::throwWithMalformedIp(absl::string_view ip_address) {
 // need to be updated in the future. Discussion can be found at Github issue #939.
 Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr ret;
-#ifndef WIN32
+#ifdef SUPPORTS_GETIFADDRS
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
 
