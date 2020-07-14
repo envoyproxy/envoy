@@ -29,7 +29,8 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.header_to_metadata",
     deps = [
         "//source/extensions/filters/http/header_to_metadata:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],

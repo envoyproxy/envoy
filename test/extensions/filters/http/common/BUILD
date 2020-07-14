@@ -23,7 +23,7 @@ envoy_cc_test_library(
     ],
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -46,6 +46,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//test/extensions/filters/http/common:mock_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
