@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "common/common/fancy_logger.h"
 #include "common/common/lock_guard.h"
 
 #include "absl/strings/ascii.h"
@@ -116,6 +117,7 @@ void Context::activate(LoggerMode mode) {
   if (mode == LoggerMode::Fancy) {
     fancy_default_level_ = log_level_;
     fancy_log_format_ = log_format_;
+    FancyContext::setDefaultFancyLevelFormat(log_level_, log_format_);
   }
 }
 

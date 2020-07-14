@@ -18,19 +18,27 @@ using SpdLoggerPtr = std::shared_ptr<spdlog::logger>;
  */
 class FancyContext {
 public:
-  static FancyMapPtr getFancyLogMap();
-  static absl::Mutex* getFancyLogLock();
+  static SpdLoggerPtr getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
   /**
    * Initializes Fancy Logger and register it in global map if not done.
    */
-  static void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger);
+  static void initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
+      ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
    * Sets log level. If not found, return false.
    */
-  static bool setFancyLogger(std::string key, spdlog::level::level_enum log_level);
+  static bool setFancyLogger(std::string key, spdlog::level::level_enum log_level)
+      ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
-protected:
+  /**
+   * Set the default logger level and format when updating context.
+   */
+  static void setDefaultFancyLevelFormat(spdlog::level::level_enum level, std::string format)
+      ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
+private:
   /**
    * Initializes sink for the initialization of loggers, needed only in benchmark test.
    */
@@ -43,18 +51,18 @@ protected:
   static spdlog::logger* createLogger(std::string key, int level = -1)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_);
 
-public:
   /**
-   * Lock for the following global map (not for the corresponding loggers).
+   * Lock for the following map (not for the corresponding loggers).
    */
   ABSL_CONST_INIT static absl::Mutex fancy_log_lock_;
+
+  /**
+   * Map that stores <key, logger> pairs, key can be the file name.
+   */
+  static FancyMapPtr fancy_log_map_ ABSL_GUARDED_BY(fancy_log_lock_);
 };
 
 #define FANCY_KEY std::string(__FILE__)
-
-// #define FANCY_KEY std::string(__FILE__ ":" __func__)
-
-// #define FANCY_KEY std::string(__FILE__ ":" __func__) + std::to_string(__LINE__)
 
 /**
  * Macro for fancy logger.
@@ -94,10 +102,6 @@ public:
  * Convenient macro for log flush.
  */
 #define FANCY_FLUSH_LOG()                                                                          \
-  {                                                                                                \
-    FancyContext::getFancyLogLock()->ReaderLock();                                                 \
-    FancyContext::getFancyLogMap()->find(FANCY_KEY)->second->flush();                              \
-    FancyContext::getFancyLogLock()->ReaderUnlock();                                               \
-  }
+  { FancyContext::getFancyLogEntry(FANCY_KEY)->flush(); }
 
 } // namespace Envoy

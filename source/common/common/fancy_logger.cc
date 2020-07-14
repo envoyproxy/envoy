@@ -11,12 +11,7 @@ namespace Envoy {
 
 absl::Mutex FancyContext::fancy_log_lock_(absl::kConstInit);
 
-FancyMapPtr FancyContext::getFancyLogMap() {
-  static FancyMapPtr fancy_log_map = std::make_shared<FancyMap>();
-  return fancy_log_map;
-}
-
-absl::Mutex* FancyContext::getFancyLogLock() { return &fancy_log_lock_; }
+FancyMapPtr FancyContext::fancy_log_map_ = std::make_shared<FancyMap>();
 
 /**
  * Implements a lock from BasicLockable, to avoid dependency problem of thread.h.
@@ -31,6 +26,44 @@ public:
 private:
   absl::Mutex mutex_;
 };
+
+SpdLoggerPtr FancyContext::getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  absl::ReaderMutexLock l(&fancy_log_lock_);
+  return fancy_log_map_->find(key)->second;
+}
+
+void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
+    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  absl::WriterMutexLock l(&FancyContext::fancy_log_lock_);
+  auto it = fancy_log_map_->find(key);
+  spdlog::logger* target;
+  if (it == fancy_log_map_->end()) {
+    target = createLogger(key);
+  } else {
+    target = it->second.get();
+  }
+  logger.store(target);
+}
+
+bool FancyContext::setFancyLogger(std::string key, level_enum log_level)
+    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
+  auto it = fancy_log_map_->find(key);
+  if (it != fancy_log_map_->end()) {
+    it->second->set_level(log_level);
+    return true;
+  }
+  return false;
+}
+
+void FancyContext::setDefaultFancyLevelFormat(spdlog::level::level_enum level, std::string format)
+    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
+  for(const auto& it : *fancy_log_map_) {
+    it.second->set_level(level);
+    it.second->set_pattern(format);
+  }
+}
 
 void FancyContext::initSink() {
   spdlog::sink_ptr sink = Logger::Registry::getSink();
@@ -55,30 +88,8 @@ spdlog::logger* FancyContext::createLogger(std::string key, int level)
   new_logger->set_level(lv);
   new_logger->set_pattern(Logger::Context::getFancyLogFormat());
   new_logger->flush_on(level_enum::critical);
-  getFancyLogMap()->insert(std::make_pair(key, new_logger));
+  fancy_log_map_->insert(std::make_pair(key, new_logger));
   return new_logger.get();
-}
-
-void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger) {
-  absl::WriterMutexLock l(&FancyContext::fancy_log_lock_);
-  auto it = getFancyLogMap()->find(key);
-  spdlog::logger* target;
-  if (it == getFancyLogMap()->end()) {
-    target = createLogger(key);
-  } else {
-    target = it->second.get();
-  }
-  logger.store(target);
-}
-
-bool FancyContext::setFancyLogger(std::string key, level_enum log_level) {
-  absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
-  auto it = getFancyLogMap()->find(key);
-  if (it != getFancyLogMap()->end()) {
-    it->second->set_level(log_level);
-    return true;
-  }
-  return false;
 }
 
 } // namespace Envoy
