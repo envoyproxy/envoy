@@ -678,6 +678,24 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
+TEST_F(StaticLoaderImplTest, InvalidNumerator) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    invalid_numerator:
+      numerator: 111
+      denominator: HUNDRED
+  )EOF");
+  setup();
+
+  envoy::type::v3::FractionalPercent fractional_percent;
+
+  // Numerator > denominator -> exception
+  EXPECT_CALL(generator_, random()).WillOnce(Return(500000));
+  EXPECT_THROW_WITH_MESSAGE(
+      loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent), EnvoyException,
+      "WARNING runtime key 'invalid_numerator': numerator (111) > denominator (100), condition "
+      "always evaluates to true");
+}
+
 TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   // Force the thread to be considered a non-worker thread.
   tls_.registered_ = false;
