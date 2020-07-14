@@ -144,8 +144,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(),
-        &context.overloadManager(), context.dispatcher().timeSource())});
+        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
+        context.dispatcher().timeSource())});
   };
 }
 
@@ -588,8 +588,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(),
-        &context.overloadManager(), context.dispatcher().timeSource());
+        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
+        context.dispatcher().timeSource());
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.
