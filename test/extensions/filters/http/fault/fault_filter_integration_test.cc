@@ -93,6 +93,10 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   IntegrationStreamDecoderPtr decoder =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
+
+  // Active faults gauge is incremented.
+  EXPECT_EQ(1UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+
   upstream_request_->encodeHeaders(default_response_headers_, false);
   Buffer::OwnedImpl data(std::string(127, 'a'));
   upstream_request_->encodeData(data, true);
@@ -127,6 +131,8 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
 
   // At least 200ms of simulated time should have elapsed before we got the upstream request.
   EXPECT_LE(std::chrono::milliseconds(200), simTime().monotonicTime() - current_time);
+  // Active faults gauge is incremented.
+  EXPECT_EQ(1UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
 
   // Verify response body throttling.
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -326,6 +332,10 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   IntegrationStreamDecoderPtr decoder =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
+
+  // Active fault gauge is incremented.
+  EXPECT_EQ(1UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+
   upstream_request_->encodeHeaders(default_response_headers_, false);
   Buffer::OwnedImpl data(std::string(127, 'a'));
   upstream_request_->encodeData(data, false);
