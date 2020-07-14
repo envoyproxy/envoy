@@ -40,12 +40,12 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
 // Use this test handler instead of a mock, because fatal error handlers must be
 // signal-safe and a mock might allocate memory.
 class TestFatalErrorHandler : public FatalErrorHandlerInterface {
-  void onFatalError() const override { std::cerr << "HERE!"; }
+  void onFatalError(std::ostream& os) const override { os << "HERE!"; }
 };
 
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
   TestFatalErrorHandler handler;
-  SignalAction::registerFatalErrorHandler(handler);
+  FatalErrorHandler::registerFatalErrorHandler(handler);
   SignalAction actions;
   // Make sure the fatal error log "HERE" registered above is logged on fatal error.
   EXPECT_DEATH_LOG_TO_STDERR(
@@ -155,8 +155,7 @@ TEST(FatalErrorHandler, CallHandler) {
   s.reserve(1024);
   std::ostringstream os(std::move(s));
 
-  MockFatalErrorHandler handler;
-  EXPECT_CALL(handler, onFatalError(_)).WillOnce([](std::ostream& os) { os << "HERE!"; });
+  TestFatalErrorHandler handler;
   FatalErrorHandler::registerFatalErrorHandler(handler);
 
   FatalErrorHandler::callFatalErrorHandlers(os);
