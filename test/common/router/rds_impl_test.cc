@@ -484,8 +484,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   EXPECT_FALSE(provider_->configInfo().has_value());
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
-  route_configs.Add()->PackFrom(parseRouteConfigurationFromV3Yaml(R"EOF(
+  const auto route_config = parseRouteConfigurationFromV3Yaml(R"EOF(
 name: foo_route_config
 virtual_hosts:
   - name: bar
@@ -566,8 +565,7 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
   EXPECT_EQ(Init::Manager::State::Initializing, real_init_manager.state());
 
   {
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
-    route_configs.Add()->PackFrom(parseRouteConfigurationFromV3Yaml(R"EOF(
+    const auto route_config = parseRouteConfigurationFromV3Yaml(R"EOF(
 name: foo_route_config
 virtual_hosts:
   - name: bar
