@@ -1,0 +1,41 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    actions {
+}
+actions {
+  mutate {
+    offset: 255
+    value: 255
+  }
+}
+actions {
+}
+actions {
+}  headers {
+        key: ":method"
+        value: "GET"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+        headers {
+          key: ":status"
+          value: "204"
+        }
+      }
+    }
+  }
+}
