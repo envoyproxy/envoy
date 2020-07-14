@@ -121,7 +121,17 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
     percent = default_value;
   }
 
-  return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
+  // When numerator > denominator condition is always evaluates to TRUE
+  // It becomes hard to debug why configuration does not work in case of wrong numerator.
+  // Log debug message that numerator is invalid.
+  uint64_t denominator_value = ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator());
+  if (percent.numerator() > denominator_value) {
+    ENVOY_LOG(debug,
+              "WARNING runtime key '{}': numerator ({}) > denominator ({}), condition always evaluates to true",
+              key, percent.numerator(), denominator_value);
+  }
+
+    return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
 }
 
 uint64_t SnapshotImpl::getInteger(absl::string_view key, uint64_t default_value) const {
