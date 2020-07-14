@@ -37,15 +37,15 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
       "backtrace.*Segmentation fault");
 }
 
-class MockFatalErrorHandler : public FatalErrorHandlerInterface {
-public:
-  MOCK_METHOD(void, onFatalError, (std::ostream & os), (const override));
+// Use this test handler instead of a mock, because fatal error handlers must be
+// signal-safe and a mock might allocate memory.
+class TestFatalErrorHandler : public FatalErrorHandlerInterface {
+  void onFatalError() const override { std::cerr << "HERE!"; }
 };
 
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
-  MockFatalErrorHandler handler;
-  ON_CALL(handler, onFatalError(_)).WillByDefault([](std::ostream& os) { os << "HERE!"; });
-  FatalErrorHandler::registerFatalErrorHandler(handler);
+  TestFatalErrorHandler handler;
+  SignalAction::registerFatalErrorHandler(handler);
   SignalAction actions;
   // Make sure the fatal error log "HERE" registered above is logged on fatal error.
   EXPECT_DEATH_LOG_TO_STDERR(
@@ -168,6 +168,23 @@ TEST(FatalErrorHandler, CallHandler) {
   FatalErrorHandler::removeFatalErrorHandler(handler);
 }
 
+// Use this specialized test handler instead of a mock, because fatal error
+// handlers must be signal-safe and a mock might allocate memory.
+class MemoryCheckingFatalErrorHandler : public FatalErrorHandlerInterface {
+public:
+  MemoryCheckingFatalErrorHandler(const Stats::TestUtil::MemoryTest& memory_test,
+                                  uint64_t& allocated_after_call)
+      : memory_test_(memory_test), allocated_after_call_(allocated_after_call) {}
+  void onFatalError(std::ostream& os) const override {
+    UNREFERENCED_PARAMETER(os);
+    allocated_after_call_ = memory_test_.consumedBytes();
+  }
+
+private:
+  const Stats::TestUtil::MemoryTest& memory_test_;
+  uint64_t& allocated_after_call_;
+};
+
 // FatalErrorHandler::callFatalErrorHandlers shouldn't allocate any heap memory,
 // so that it's safe to call from a signal handler. Test by comparing the
 // allocated memory before a call with the allocated memory during a handler.
@@ -179,11 +196,8 @@ TEST(FatalErrorHandler, DontAllocateMemory) {
 
   Stats::TestUtil::MemoryTest memory_test;
 
-  MockFatalErrorHandler handler;
   uint64_t allocated_after_call;
-  EXPECT_CALL(handler, onFatalError(_)).WillOnce(testing::InvokeWithoutArgs([&]() {
-    allocated_after_call = memory_test.consumedBytes();
-  }));
+  MemoryCheckingFatalErrorHandler handler(memory_test, allocated_after_call);
   FatalErrorHandler::registerFatalErrorHandler(handler);
 
   uint64_t allocated_before_call = memory_test.consumedBytes();
