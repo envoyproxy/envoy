@@ -273,11 +273,16 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
   hds_delegate_->onReceiveMessage(std::move(message));
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  // Send Response
-  auto msg = hds_delegate_->sendResponse();
-
   // Create a invalid message
   message.reset(createSimpleMessage());
+
+  // set this address to be distinguishable from the previous message in sendResponse()
+  message->mutable_cluster_health_checks(0)
+      ->mutable_locality_endpoints(0)
+      ->mutable_endpoints(0)
+      ->mutable_address()
+      ->mutable_socket_address()
+      ->set_address("9.9.9.9");
 
   // remove healthy threshold field to create an error
   message->mutable_cluster_health_checks(0)->mutable_health_checks(0)->clear_healthy_threshold();
@@ -288,6 +293,17 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
 
   // Ensure that the timer is enabled since there was a previous valid specifier.
   EXPECT_TRUE(server_response_timer_->enabled_);
+
+  // read the response and check that it is pinging the old
+  // address 127.0.0.0 instead of the new 9.9.9.9
+  auto response = hds_delegate_->sendResponse();
+  EXPECT_EQ(response.endpoint_health_response()
+                .endpoints_health(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.0");
 
   // Check Correctness by verifying one request and one error has been generated in stat_
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
