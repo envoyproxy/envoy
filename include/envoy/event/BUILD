@@ -41,6 +41,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "range_timer_interface",
+    hdrs = ["range_timer.h"],
+)
+
+envoy_cc_library(
     name = "schedulable_cb_interface",
     hdrs = ["schedulable_cb.h"],
 )
