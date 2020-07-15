@@ -318,7 +318,7 @@ private:
   void addLbEndpoint(const Upstream::HostSharedPtr& host,
                      envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
   ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
-  ProtobufTypes::MessagePtr dumpUnreadyTargetsConfigs(bool dumpActiveListeners) const;
+  ProtobufTypes::MessagePtr dumpUnreadyTargetsConfigs(bool is_active_listeners) const;
   /**
    * URL handlers.
    */

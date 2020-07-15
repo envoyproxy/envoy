@@ -652,9 +652,9 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
   return endpoint_config_dump;
 }
 
-ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool dumpActiveListeners) const {
+ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool is_active_listeners) const {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
-  if (dumpActiveListeners) {
+  if (is_active_listeners) {
     listeners = server_.listenerManager().listeners();
   } else {
     listeners = server_.listenerManager().warmingListeners();
