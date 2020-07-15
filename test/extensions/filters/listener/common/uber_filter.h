@@ -2,8 +2,8 @@
 
 #include "test/extensions/filters/listener/common/listener_filter_fuzz_test.pb.validate.h"
 
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/network/fakes.h"
+#include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"
 
