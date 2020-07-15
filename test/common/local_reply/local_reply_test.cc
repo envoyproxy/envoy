@@ -304,16 +304,16 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
               runtime_key: key_b
       headers_to_add:
         - header:
-            key: "foo-1"
-            value: "bar1"
+            key: foo-1
+            value: bar1
           append: true
         - header:
-            key: "foo-2"
-            value: "override-bar2"
+            key: foo-2
+            value: override-bar2
           append: false
         - header:
-            key: "foo-3"
-            value: "append-bar3"
+            key: foo-3
+            value: append-bar3
           append: true
 )";
   TestUtility::loadFromYaml(yaml, config_);
