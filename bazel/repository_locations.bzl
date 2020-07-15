@@ -168,12 +168,9 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     com_github_gperftools_gperftools = dict(
-        # TODO(cmluciano): Bump to release 2.8
-        # The currently used version is specifically chosen to fix ppc64le builds that require inclusion
-        # of asm/ptrace.h, and also s390x builds that require special handling of mmap syscall.
-        sha256 = "97f0bc2b389c29305f5d1d8cc4d95e9212c33b55827ae65476fc761d78e3ec5d",
-        strip_prefix = "gperftools-gperftools-2.7.90",
-        urls = ["https://github.com/gperftools/gperftools/archive/gperftools-2.7.90.tar.gz"],
+        sha256 = "240deacdd628b6459671b83eb0c4db8e97baadf659f25b92e9a078d536bd513e",
+        strip_prefix = "gperftools-2.8",
+        urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-2.8/gperftools-2.8.tar.gz"],
         use_category = ["test"],
     ),
     com_github_grpc_grpc = dict(
@@ -278,10 +275,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "d2e28897c297bd04429e43a1b485f7350acc23cbfee6365b8a3634c17840b2f6",
-        strip_prefix = "jwt_verify_lib-f44cf49d185ad0694b472da78071b4d67313fb86",
-        # 2020-06-03
-        urls = ["https://github.com/google/jwt_verify_lib/archive/f44cf49d185ad0694b472da78071b4d67313fb86.tar.gz"],
+        sha256 = "f1fde4f3ebb3b2d841332c7a02a4b50e0529a19709934c63bc6208d1bbe28fb1",
+        strip_prefix = "jwt_verify_lib-7276a339af8426724b744216f619c99152f8c141",
+        # 2020-07-09
+        urls = ["https://github.com/google/jwt_verify_lib/archive/7276a339af8426724b744216f619c99152f8c141.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
