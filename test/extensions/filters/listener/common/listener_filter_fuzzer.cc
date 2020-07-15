@@ -6,8 +6,9 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 
-void ListenerFilterFuzzer::fuzz(Network::ListenerFilter& filter,
-                            const test::extensions::filters::listener::FilterFuzzTestCase& input) {
+void ListenerFilterFuzzer::fuzz(
+    Network::ListenerFilter& filter,
+    const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   try {
     fuzzerSetup(input);
   } catch (const EnvoyException& e) {
