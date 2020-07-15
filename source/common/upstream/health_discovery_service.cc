@@ -211,7 +211,7 @@ void HdsDelegate::onReceiveMessage(
   // Set response
   auto server_response_ms = PROTOBUF_GET_MS_OR_DEFAULT(*message, interval, 1000);
 
-  // Process the HealthCheckSpecifier message
+  // Process the HealthCheckSpecifier message.
   processMessage(std::move(message));
 
   if (server_response_ms_ != server_response_ms) {
