@@ -37,6 +37,7 @@ public:
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
 
+  // Expose the read-only target_names_count_ hash map to public.
   const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const;
 
 private:

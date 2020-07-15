@@ -42,8 +42,8 @@ private:
   // Name of the watcher (either the name of the manager, or the name of the client).
   const std::string name_;
 
-  // If the function constructed is std::function<void(string_view)>
-  bool fn_has_parameter_;
+  // When the function constructed is ReadyFnSendName, set this to true.
+  bool fn_send_name_;
 
   // The watcher's callback function, only called if the weak pointer can be "locked".
   const std::weak_ptr<ReadyFn> fn_;
@@ -75,8 +75,8 @@ private:
   // Human-readable name for logging.
   const std::string name_;
 
-  // If the function constructed is std::function<void(string_view)>
-  bool fn_has_parameter_;
+  // When the function constructed is ReadyFnSendName, set this to true.
+  bool fn_send_name_;
 
   // The callback function, called via WatcherHandleImpl by either the target or the manager.
   const std::shared_ptr<ReadyFn> fn_;
