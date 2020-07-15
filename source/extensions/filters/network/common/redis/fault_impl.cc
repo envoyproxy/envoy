@@ -88,15 +88,15 @@ FaultMap FaultManagerImpl::buildFaultMap(
 // Fault checking algorithm:
 //
 // For example, if we have an ERROR fault at 5% for all commands, and a DELAY fault at 10% for GET,
-// if we receive a GET, we want 5% of GETs to get DELAY, and 5% to get ERROR. Thus, we need to
+// if we receive a GET, we want 5% of GETs to get DELAY, and 10% to get ERROR. Thus, we need to
 // amortize the percentages.
 //
 // 0. Get random number.
-// 1. Get faults for given command.s
+// 1. Get faults for given command.
 // 2. For each fault, calculate the amortized fault injection percentage.
 //
 // Note that we do not check to make sure the probabilities of faults are <= 100%!
-const Fault* FaultManagerImpl::getFaultForCommandInternal(std::string command) const {
+const Fault* FaultManagerImpl::getFaultForCommandInternal(const std::string& command) const {
   FaultMap::const_iterator it_outer = fault_map_.find(command);
   if (it_outer != fault_map_.end()) {
     auto random_number = random_.random() % 100;
@@ -117,7 +117,7 @@ const Fault* FaultManagerImpl::getFaultForCommandInternal(std::string command) c
   return nullptr;
 }
 
-const Fault* FaultManagerImpl::getFaultForCommand(std::string command) const {
+const Fault* FaultManagerImpl::getFaultForCommand(const std::string& command) const {
   if (!fault_map_.empty()) {
     if (fault_map_.count(command) > 0) {
       return getFaultForCommandInternal(command);

@@ -523,7 +523,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // the delay fault itself wraps the request (or other fault) and the delay fault itself
   // implements the callbacks functions, and in turn calls the real callbacks after injecting
   // delay on the result of the wrapped request or fault.
-  bool has_delay_fault =
+  const bool has_delay_fault =
       fault_ptr != nullptr && fault_ptr->delayMs() > std::chrono::milliseconds(0);
   std::unique_ptr<DelayFaultRequest> delay_fault_ptr;
   if (has_delay_fault) {

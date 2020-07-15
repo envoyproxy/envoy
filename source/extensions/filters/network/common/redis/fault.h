@@ -40,7 +40,7 @@ public:
    * Get fault type and delay given a Redis command.
    * @param command supplies the Redis command string.
    */
-  virtual const Fault* getFaultForCommand(std::string command) const PURE;
+  virtual const Fault* getFaultForCommand(const std::string& command) const PURE;
 };
 
 using FaultManagerPtr = std::unique_ptr<FaultManager>;

@@ -365,8 +365,6 @@ private:
   TimeSource& time_source_;
   Common::Redis::FaultManager& fault_manager_;
   Event::Dispatcher& dispatcher_;
-
-  const std::string error_fault_ = "error_fault";
 };
 
 class CommandSplitterFactoryImpl : public CommandSplitterFactory {

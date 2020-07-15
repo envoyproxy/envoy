@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <string>
 #include <vector>
 
@@ -20,7 +19,7 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 
-using FaultMap = std::unordered_map<std::string, std::vector<FaultSharedPtr>>;
+using FaultMap = absl::flat_hash_map<std::string, std::vector<FaultSharedPtr>>;
 
 /**
  * Message returned for particular types of faults.
@@ -43,7 +42,7 @@ public:
           ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
           base_faults);
 
-  const Fault* getFaultForCommand(std::string command) const override;
+  const Fault* getFaultForCommand(const std::string& command) const override;
 
   static FaultSharedPtr makeFaultForTest(Common::Redis::FaultType fault_type,
                                          std::chrono::milliseconds delay_ms) {
@@ -92,7 +91,7 @@ private:
                 ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
                     faults);
 
-  const Fault* getFaultForCommandInternal(std::string command) const;
+  const Fault* getFaultForCommandInternal(const std::string& command) const;
   const FaultMap fault_map_;
 
 protected:
