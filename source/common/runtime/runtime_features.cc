@@ -86,10 +86,10 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
-    // Sentinel and test flag.
-    "envoy.reloadable_features.test_feature_false",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
+    // Sentinel and test flag.
+    "envoy.reloadable_features.test_feature_false",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

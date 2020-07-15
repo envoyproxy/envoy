@@ -168,12 +168,9 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     com_github_gperftools_gperftools = dict(
-        # TODO(cmluciano): Bump to release 2.8
-        # The currently used version is specifically chosen to fix ppc64le builds that require inclusion
-        # of asm/ptrace.h, and also s390x builds that require special handling of mmap syscall.
-        sha256 = "97f0bc2b389c29305f5d1d8cc4d95e9212c33b55827ae65476fc761d78e3ec5d",
-        strip_prefix = "gperftools-gperftools-2.7.90",
-        urls = ["https://github.com/gperftools/gperftools/archive/gperftools-2.7.90.tar.gz"],
+        sha256 = "240deacdd628b6459671b83eb0c4db8e97baadf659f25b92e9a078d536bd513e",
+        strip_prefix = "gperftools-2.8",
+        urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-2.8/gperftools-2.8.tar.gz"],
         use_category = ["test"],
     ),
     com_github_grpc_grpc = dict(
