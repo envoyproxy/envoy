@@ -1,0 +1,15 @@
+# Fix FIPS build (from BoringSSL commit 4ca15d5dcbe6e8051a4654df7c971ea8307abfe0).
+--- boringssl/util/fipstools/acvp/modulewrapper/modulewrapper.cc
++++ boringssl/util/fipstools/acvp/modulewrapper/modulewrapper.cc
+@@ -12,9 +12,11 @@
+  * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. */
+ 
++#include <string>
+ #include <vector>
+ 
+ #include <assert.h>
++#include <errno.h>
+ #include <string.h>
+ #include <sys/uio.h>
+ #include <unistd.h>
