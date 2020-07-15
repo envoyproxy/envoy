@@ -14,7 +14,7 @@
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -318,7 +318,7 @@ public:
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<ConnectionManager> conn_manager_;
   MockSerializer* custom_serializer_{};
   MockProtocol* custom_protocol_{};

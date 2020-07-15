@@ -175,12 +175,14 @@ envoy_cc_library(
     hdrs = ["load_balancer_impl.h"],
     deps = [
         ":edf_scheduler_lib",
+        "//include/envoy/common:random_generator_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_protos_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
