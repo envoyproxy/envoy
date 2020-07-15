@@ -66,7 +66,7 @@ private:
 
 /**
  * Macro for fancy logger.
- * Use a global map to store logger and take use of thread-safe spdlog::logger.
+ * Uses a global map to store logger and take use of thread-safe spdlog::logger.
  * The local pointer is used to avoid another load() when logging. Here we use
  * spdlog::logger* as atomic<shared_ptr> is a C++20 feature.
  */
