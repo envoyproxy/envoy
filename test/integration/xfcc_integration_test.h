@@ -8,7 +8,7 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_replace.h"

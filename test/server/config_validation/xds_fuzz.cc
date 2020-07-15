@@ -20,17 +20,15 @@ XdsFuzzTest::buildClusterLoadAssignment(const std::string& name) {
       fake_upstreams_[0]->localAddress()->ip()->port(), api_version_);
 }
 
-envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(uint32_t listener_num,
-                                                                 uint32_t route_num) {
-  std::string name = absl::StrCat("listener_", listener_num % ListenersMax);
-  std::string route = absl::StrCat("route_config_", route_num % RoutesMax);
-  return ConfigHelper::buildListener(
-      name, route, Network::Test::getLoopbackAddressString(ip_version_), "ads_test", api_version_);
+envoy::config::listener::v3::Listener XdsFuzzTest::buildListener(std::string listener_name,
+                                                                 std::string route_name) {
+  return ConfigHelper::buildListener(listener_name, route_name,
+                                     Network::Test::getLoopbackAddressString(ip_version_),
+                                     "ads_test", api_version_);
 }
 
-envoy::config::route::v3::RouteConfiguration XdsFuzzTest::buildRouteConfig(uint32_t route_num) {
-  std::string route = absl::StrCat("route_config_", route_num % RoutesMax);
-  return ConfigHelper::buildRouteConfig(route, "cluster_0", api_version_);
+envoy::config::route::v3::RouteConfiguration XdsFuzzTest::buildRouteConfig(std::string route_name) {
+  return ConfigHelper::buildRouteConfig(route_name, "cluster_0", api_version_);
 }
 
 // helper functions to send API responses
@@ -38,7 +36,7 @@ void XdsFuzzTest::updateListener(
     const std::vector<envoy::config::listener::v3::Listener>& listeners,
     const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
     const std::vector<std::string>& removed) {
-  ENVOY_LOG_MISC(debug, "Sending Listener DiscoveryResponse version {}", version_);
+  ENVOY_LOG_MISC(info, "Sending Listener DiscoveryResponse version {}", version_);
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
                                                                listeners, added_or_updated, removed,
                                                                std::to_string(version_));
@@ -48,7 +46,7 @@ void XdsFuzzTest::updateRoute(
     const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
     const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
     const std::vector<std::string>& removed) {
-  ENVOY_LOG_MISC(debug, "Sending Route DiscoveryResponse version {}", version_);
+  ENVOY_LOG_MISC(info, "Sending Route DiscoveryResponse version {}", version_);
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, routes, added_or_updated, removed,
       std::to_string(version_));
@@ -64,7 +62,8 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
                                          : "DELTA_GRPC",
                                      api_version)),
       actions_(input.actions()), version_(1), api_version_(api_version),
-      ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
+      ip_version_(TestEnvironment::getIpVersionsForTest()[0]), num_added_(0), num_modified_(0),
+      num_removed_(0) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
@@ -111,16 +110,14 @@ void XdsFuzzTest::close() {
  * @param the listener number to be removed
  * @return the listener as an optional so that it can be used in a delta request
  */
-absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
-  std::string match = absl::StrCat("listener_", listener_num % ListenersMax);
-
+bool XdsFuzzTest::eraseListener(std::string listener_name) {
   for (auto it = listeners_.begin(); it != listeners_.end(); ++it) {
-    if (it->name() == match) {
+    if (it->name() == listener_name) {
       listeners_.erase(it);
-      return match;
+      return true;
     }
   }
-  return {};
+  return false;
 }
 
 /**
@@ -128,15 +125,87 @@ absl::optional<std::string> XdsFuzzTest::removeListener(uint32_t listener_num) {
  * @param the route number to be removed
  * @return the route as an optional so that it can be used in a delta request
  */
-absl::optional<std::string> XdsFuzzTest::removeRoute(uint32_t route_num) {
-  std::string match = absl::StrCat("route_config_", route_num % RoutesMax);
+bool XdsFuzzTest::eraseRoute(std::string route_name) {
   for (auto it = routes_.begin(); it != routes_.end(); ++it) {
-    if (it->name() == match) {
+    if (it->name() == route_name) {
       routes_.erase(it);
-      return match;
+      return true;
     }
   }
-  return {};
+  return false;
+}
+
+/**
+ * send an xDS response to add a listener and update state accordingly
+ */
+void XdsFuzzTest::addListener(std::string listener_name, std::string route_name) {
+  ENVOY_LOG_MISC(info, "Adding {} with reference to {}", listener_name, route_name);
+  bool removed = eraseListener(listener_name);
+  auto listener = buildListener(listener_name, route_name);
+  listeners_.push_back(listener);
+
+  updateListener(listeners_, {listener}, {});
+  // use waitForAck instead of compareDiscoveryRequest as the client makes
+  // additional discoveryRequests at launch that we might not want to
+  // respond to yet
+  EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
+  if (removed) {
+    num_modified_++;
+    test_server_->waitForCounterGe("listener_manager.listener_modified", num_modified_);
+  } else {
+    num_added_++;
+    test_server_->waitForCounterGe("listener_manager.listener_added", num_added_);
+  }
+}
+
+/**
+ * send an xDS response to remove a listener and update state accordingly
+ */
+void XdsFuzzTest::removeListener(std::string listener_name) {
+  ENVOY_LOG_MISC(info, "Removing {}", listener_name);
+  bool removed = eraseListener(listener_name);
+
+  if (removed) {
+    num_removed_++;
+    updateListener(listeners_, {}, {listener_name});
+    EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
+    test_server_->waitForCounterGe("listener_manager.listener_removed", num_removed_);
+  }
+}
+
+/**
+ * send an xDS response to add a route and update state accordingly
+ */
+void XdsFuzzTest::addRoute(std::string route_name) {
+  ENVOY_LOG_MISC(info, "Adding {}", route_name);
+  bool removed = eraseRoute(route_name);
+  auto route = buildRouteConfig(route_name);
+  routes_.push_back(route);
+
+  if (removed) {
+    // if the route was already in routes_, don't send a duplicate add in delta request
+    updateRoute(routes_, {}, {});
+  } else {
+    updateRoute(routes_, {route}, {});
+  }
+
+  EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
+}
+
+/**
+ * this is a no-op for now because it seems like routes cannot be removed - leaving a route out of
+ * a SOTW request does not remove it and sending a remove message in a delta request is ignored
+ */
+void XdsFuzzTest::removeRoute(std::string route_name) {
+  ENVOY_LOG_MISC(info, "Ignoring request to remove {}", route_name);
+  return;
+
+  // TODO(samflattery): remove if it's true that routes cannot be removed
+  auto removed = eraseRoute(route_name);
+  if (removed) {
+    updateRoute(routes_, {}, {route_name});
+    EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
+  }
 }
 
 /**
@@ -152,8 +221,8 @@ AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
       ENVOY_LOG_MISC(info, "Received gRPC message with type {} and version {}",
-                     discovery_request.type_url(), expected_version);
-    } while (expected_type_url != discovery_request.type_url() &&
+                     discovery_request.type_url(), discovery_request.version_info());
+    } while (expected_type_url != discovery_request.type_url() ||
              expected_version != discovery_request.version_info());
   } else {
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
@@ -192,65 +261,43 @@ void XdsFuzzTest::replay() {
   for (const auto& action : actions_) {
     switch (action.action_selector_case()) {
     case test::server::config_validation::Action::kAddListener: {
+      std::string listener_name =
+          absl::StrCat("listener_", action.add_listener().listener_num() % ListenersMax);
+      std::string route_name =
+          absl::StrCat("route_config_", action.add_listener().route_num() % RoutesMax);
+      addListener(listener_name, route_name);
+      if (!sent_listener) {
+        addRoute(route_name);
+        test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
+      }
       sent_listener = true;
-      uint32_t listener_num = action.add_listener().listener_num();
-      removeListener(listener_num);
-      auto listener = buildListener(listener_num, action.add_listener().route_num());
-      listeners_.push_back(listener);
-
-      updateListener(listeners_, {listener}, {});
-      // use waitForAck instead of compareDiscoveryRequest as the client makes
-      // additional discoveryRequests at launch that we might not want to
-      // respond to yet
-      EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
       break;
     }
     case test::server::config_validation::Action::kRemoveListener: {
-      /* sent_listener = true; */
-      auto removed = removeListener(action.remove_listener().listener_num());
-
-      if (removed) {
-        updateListener(listeners_, {}, {*removed});
-        EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
-      }
-
+      std::string listener_name =
+          absl::StrCat("listener_", action.remove_listener().listener_num() % ListenersMax);
+      removeListener(listener_name);
       break;
     }
     case test::server::config_validation::Action::kAddRoute: {
-      uint32_t route_num = action.add_route().route_num();
-      auto removed = removeRoute(route_num);
-      auto route = buildRouteConfig(route_num);
-      routes_.push_back(route);
-
-      if (removed) {
-        // if the route was already in routes_, don't send a duplicate add in delta request
-        updateRoute(routes_, {}, {});
-      } else {
-        updateRoute(routes_, {route}, {});
+      if (!sent_listener) {
+        ENVOY_LOG_MISC(info, "Ignoring request to add route_{}",
+                       action.add_route().route_num() % RoutesMax);
+        break;
       }
-
-      if (sent_listener) {
-        EXPECT_TRUE(
-            waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
-      }
+      std::string route_name =
+          absl::StrCat("route_config_", action.add_route().route_num() % RoutesMax);
+      addRoute(route_name);
       break;
     }
     case test::server::config_validation::Action::kRemoveRoute: {
-      if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-        // routes cannot be removed in SOTW updates
-        break;
-      }
-
-      auto removed = removeRoute(action.remove_route().route_num());
-      if (removed) {
-        updateRoute(routes_, {}, {*removed});
-        EXPECT_TRUE(
-            waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
-      }
+      std::string route_name =
+          absl::StrCat("route_config_", action.remove_route().route_num() % RoutesMax);
+      removeRoute(route_name);
       break;
     }
     default:
-      break;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
