@@ -110,6 +110,8 @@ dependencies:
   in the `event` target in `bazel/foreign_cc/BUILD` for verbose tracing of
   libevent processing.
 
+* `nghttp2`: set `ENVOY_NGHTTP2_TRACE` in the environment and run at `-l trace`.
+
 # Distdir - prefetching dependencies
 
 Usually Bazel downloads all dependencies during build time. But there is a

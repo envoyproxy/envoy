@@ -32,9 +32,11 @@
 #include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -606,7 +608,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   if (!options.clientSession().empty()) {
     const SslSocketInfo* ssl_socket =
         dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-    SSL* client_ssl_socket = ssl_socket->rawSslForTest();
+    SSL* client_ssl_socket = ssl_socket->ssl();
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_socket);
     SSL_SESSION* client_ssl_session =
         SSL_SESSION_from_bytes(reinterpret_cast<const uint8_t*>(options.clientSession().data()),
@@ -649,7 +651,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       const SslSocketInfo* ssl_socket =
           dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-      SSL* client_ssl_socket = ssl_socket->rawSslForTest();
+      SSL* client_ssl_socket = ssl_socket->ssl();
       if (!options.expectedProtocolVersion().empty()) {
         EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
       }
@@ -664,7 +666,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       absl::optional<std::string> server_ssl_requested_server_name;
       const SslSocketInfo* server_ssl_socket =
           dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
-      SSL* server_ssl = server_ssl_socket->rawSslForTest();
+      SSL* server_ssl = server_ssl_socket->ssl();
       auto requested_server_name = SSL_get_servername(server_ssl, TLSEXT_NAMETYPE_host_name);
       if (requested_server_name != nullptr) {
         server_ssl_requested_server_name = std::string(requested_server_name);
@@ -2511,7 +2513,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   const SslSocketInfo* ssl_socket =
       dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
   SSL_set_cert_cb(
-      ssl_socket->rawSslForTest(),
+      ssl_socket->ssl(),
       [](SSL* ssl, void*) -> int {
         STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
         EXPECT_NE(nullptr, list);
@@ -2624,7 +2626,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         const SslSocketInfo* ssl_socket =
             dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-        ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
+        ssl_session = SSL_get1_session(ssl_socket->ssl());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         if (expected_lifetime_hint) {
           auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
@@ -2647,7 +2649,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const SslSocketInfo* ssl_socket =
       dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-  SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
+  SSL_set_session(ssl_socket->ssl(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
   client_connection->connect();
@@ -2753,7 +2755,7 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
 
         const SslSocketInfo* ssl_socket =
             dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
-        SSL* server_ssl_socket = ssl_socket->rawSslForTest();
+        SSL* server_ssl_socket = ssl_socket->ssl();
         SSL_CTX* server_ssl_context = SSL_get_SSL_CTX(server_ssl_socket);
         if (expect_support) {
           EXPECT_EQ(0, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
@@ -3207,7 +3209,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         const SslSocketInfo* ssl_socket =
             dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-        ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
+        ssl_session = SSL_get1_session(ssl_socket->ssl());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -3226,7 +3228,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const SslSocketInfo* ssl_socket =
       dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-  SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
+  SSL_set_session(ssl_socket->ssl(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
   client_connection->connect();

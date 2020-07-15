@@ -13,13 +13,15 @@
 #include "common/config/version_converter.h"
 #include "common/http/codec_client.h"
 
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -104,7 +106,8 @@ public:
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
   // wait for at least `length` bytes to be received
-  void waitForData(size_t length);
+  ABSL_MUST_USE_RESULT AssertionResult
+  waitForData(size_t length, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
