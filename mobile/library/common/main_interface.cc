@@ -1,8 +1,11 @@
 #include "library/common/main_interface.h"
 
 #include <atomic>
+#include <string>
 
+#include "library/common/api/external.h"
 #include "library/common/engine.h"
+#include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/http/dispatcher.h"
 
 // NOLINT(namespace-envoy)
@@ -54,6 +57,10 @@ envoy_status_t reset_stream(envoy_stream_t stream) {
 envoy_engine_t init_engine() {
   // TODO(goaway): return new handle once multiple engine support is in place.
   // https://github.com/lyft/envoy-mobile/issues/332
+
+  // Register stub implementation of a platform filter (hardcoded in configuration).
+  register_platform_api("PlatformStub", safe_calloc(1, sizeof(envoy_http_filter)));
+
   return 1;
 }
 
@@ -66,6 +73,11 @@ void flush_stats() {
   if (auto e = engine_.lock()) {
     e->flushStats();
   }
+}
+
+envoy_status_t register_platform_api(const char* name, void* api) {
+  Envoy::Api::External::registerApi(std::string(name), api);
+  return ENVOY_SUCCESS;
 }
 
 /**
