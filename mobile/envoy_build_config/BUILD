@@ -22,5 +22,6 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
         "@envoy//source/extensions/stat_sinks/metrics_service:config",
         "@envoy//source/extensions/transport_sockets/tls:config",
+        "@envoy//source/extensions/upstreams/http/generic:config",
     ],
 )

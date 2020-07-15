@@ -117,31 +117,31 @@ TEST(RequestTrailerDataConstructorTest, FromCToCpp) {
 }
 
 TEST(HeaderDataConstructorTest, FromCppToCEmpty) {
-  HeaderMapImpl empty_headers;
-  envoy_headers c_headers = Utility::toBridgeHeaders(std::move(empty_headers));
+  RequestHeaderMapPtr empty_headers = RequestHeaderMapImpl::create();
+  envoy_headers c_headers = Utility::toBridgeHeaders(*empty_headers);
   ASSERT_EQ(0, c_headers.length);
   release_envoy_headers(c_headers);
 }
 
 TEST(HeaderDataConstructorTest, FromCppToC) {
-  HeaderMapImpl cpp_headers;
-  cpp_headers.addCopy(LowerCaseString(std::string(":method")), std::string("GET"));
-  cpp_headers.addCopy(LowerCaseString(std::string(":scheme")), std::string("https"));
-  cpp_headers.addCopy(LowerCaseString(std::string(":authority")), std::string("api.lyft.com"));
-  cpp_headers.addCopy(LowerCaseString(std::string(":path")), std::string("/ping"));
+  RequestHeaderMapPtr cpp_headers = RequestHeaderMapImpl::create();
+  cpp_headers->addCopy(LowerCaseString(std::string(":method")), std::string("GET"));
+  cpp_headers->addCopy(LowerCaseString(std::string(":scheme")), std::string("https"));
+  cpp_headers->addCopy(LowerCaseString(std::string(":authority")), std::string("api.lyft.com"));
+  cpp_headers->addCopy(LowerCaseString(std::string(":path")), std::string("/ping"));
 
-  envoy_headers c_headers = Utility::toBridgeHeaders(std::move(cpp_headers));
+  envoy_headers c_headers = Utility::toBridgeHeaders(*cpp_headers);
 
-  ASSERT_EQ(c_headers.length, static_cast<envoy_header_size_t>(cpp_headers.size()));
+  ASSERT_EQ(c_headers.length, static_cast<envoy_header_size_t>(cpp_headers->size()));
 
   for (envoy_header_size_t i = 0; i < c_headers.length; i++) {
     auto actual_key = LowerCaseString(Utility::convertToString(c_headers.headers[i].key));
     auto actual_value = Utility::convertToString(c_headers.headers[i].value);
 
     // Key is present.
-    EXPECT_NE(cpp_headers.get(actual_key), nullptr);
+    EXPECT_NE(cpp_headers->get(actual_key), nullptr);
     // Value for the key is the same.
-    EXPECT_EQ(actual_value, cpp_headers.get(actual_key)->value().getStringView());
+    EXPECT_EQ(actual_value, cpp_headers->get(actual_key)->value().getStringView());
   }
 
   release_envoy_headers(c_headers);
