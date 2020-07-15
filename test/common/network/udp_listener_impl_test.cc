@@ -161,12 +161,10 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
-
         EXPECT_EQ(data.buffer_->toString(), first);
       }))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, Api::OsSysCallsSingleton::get().supportsMmsg() ? 16u : 1u);
-
         EXPECT_EQ(data.buffer_->toString(), second);
 
         dispatcher_->exit();
@@ -417,9 +415,7 @@ TEST_P(UdpListenerImplTest, SendDataError) {
 /**
  * Test that multiple stacked packets of the same size are properly segmented
  * when UDP GRO is enabled on the platform.
- *
- * [Only run the following test if UDP_GRO is configured]
- **/
+ */
 #ifdef UDP_GRO
 TEST_P(UdpListenerImplTest, UdpGroBasic) {
   // We send 4 packets (3 of equal length and 1 as a trail), which are concatenated together by
