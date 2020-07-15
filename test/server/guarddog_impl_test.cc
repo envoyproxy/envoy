@@ -128,7 +128,7 @@ protected:
    * This does everything but the final forceCheckForTest() that should cause
    * death for the multiple kill case using threshold (100% of watchdogs over the threshold).
    */
-  void SetupForMultiDeathThreshold() {
+  void setupForMultiDeathThreshold() {
     InSequence s;
     initGuardDog(fakestats_, config_multikill_threshold_);
 
@@ -208,7 +208,7 @@ TEST_P(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
 
 TEST_P(GuardDogDeathTest, MultiKillThresholdDeathTest) {
   auto die_function = [&]() -> void {
-    SetupForMultiDeathThreshold();
+    setupForMultiDeathThreshold();
 
     // Pet the last two dogs so we're just at the threshold that causes death.
     dogs_.at(4)->touch();
@@ -224,7 +224,7 @@ TEST_P(GuardDogAlmostDeadTest, MultiKillUnderThreshold) {
   // This does everything the death test does not except it pets an additional watchdog
   // that causes us to be under the threshold (60%) of multikill death.
   auto die_function = [&]() -> void {
-    SetupForMultiDeathThreshold();
+    setupForMultiDeathThreshold();
 
     // Pet the last three dogs so we're just under the threshold that causes death.
     dogs_.at(4)->touch();
