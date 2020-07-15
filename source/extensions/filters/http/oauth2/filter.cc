@@ -1,4 +1,4 @@
-#include "extensions/filters/http/oauth/filter.h"
+#include "extensions/filters/http/oauth2/filter.h"
 
 #include <algorithm>
 #include <chrono>
@@ -32,7 +32,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Oauth {
+namespace Oauth2 {
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -61,7 +61,7 @@ const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "sta
 } // namespace
 
 FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::oauth::v3::OAuth2Config& proto_config,
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
     Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
     Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
@@ -422,7 +422,7 @@ void OAuth2Filter::sendUnauthorizedResponse() {
                                      absl::nullopt, EMPTY_STRING);
 }
 
-} // namespace Oauth
+} // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

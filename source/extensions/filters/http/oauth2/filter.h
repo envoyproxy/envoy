@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -14,15 +14,15 @@
 #include "common/http/rest_api_fetcher.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/oauth/oauth.h"
-#include "extensions/filters/http/oauth/oauth_client.h"
+#include "extensions/filters/http/oauth2/oauth.h"
+#include "extensions/filters/http/oauth2/oauth_client.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Oauth {
+namespace Oauth2 {
 
 class OAuth2Client;
 
@@ -85,7 +85,7 @@ struct FilterStats {
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::oauth::v3::OAuth2Config& proto_config,
+  FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Upstream::ClusterManager& cluster_manager,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
                const std::string& stats_prefix);
@@ -209,7 +209,7 @@ private:
   std::string extractAccessToken(const Http::RequestHeaderMap& headers) const;
 };
 
-} // namespace Oauth
+} // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

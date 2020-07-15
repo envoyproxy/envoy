@@ -10,12 +10,12 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 
-#include "extensions/filters/http/oauth/oauth.h"
+#include "extensions/filters/http/oauth2/oauth.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Oauth {
+namespace Oauth2 {
 
 /**
  * An OAuth client abstracts away everything regarding how to communicate with
@@ -98,7 +98,7 @@ private:
   }
 };
 
-} // namespace Oauth
+} // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

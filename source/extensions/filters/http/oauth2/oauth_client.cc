@@ -1,4 +1,4 @@
-#include "extensions/filters/http/oauth/oauth_client.h"
+#include "extensions/filters/http/oauth2/oauth_client.h"
 
 #include <chrono>
 
@@ -11,12 +11,12 @@
 #include "common/http/message_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 
-#include "source/extensions/filters/http/oauth/oauth_response.pb.h"
+#include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Oauth {
+namespace Oauth2 {
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -96,7 +96,7 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
   parent_->sendUnauthorizedResponse();
 }
 
-} // namespace Oauth
+} // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

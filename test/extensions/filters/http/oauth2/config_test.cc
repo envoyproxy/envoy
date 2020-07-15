@@ -1,12 +1,12 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
 
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/oauth/config.h"
+#include "extensions/filters/http/oauth2/config.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Oauth {
+namespace Oauth2 {
 
 using testing::NiceMock;
 
@@ -33,7 +33,7 @@ config:
     timeout: 3s
     )EOF";
 
-  envoy::extensions::filters::http::oauth::v3::OAuth2 proto_config;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
   MessageUtil::loadFromYaml(yaml, proto_config, ProtobufMessage::getStrictValidationVisitor());
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto cb = config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context);
@@ -45,7 +45,7 @@ config:
 TEST(ConfigTest, CreateFilterMissingConfig) {
   OAuth2Config config;
 
-  envoy::extensions::filters::http::oauth::v3::OAuth2 proto_config;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
@@ -53,7 +53,7 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
       EnvoyException, "config must be present for global config");
 }
 
-} // namespace Oauth
+} // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

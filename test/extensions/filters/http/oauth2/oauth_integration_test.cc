@@ -1,6 +1,6 @@
 #include "common/protobuf/utility.h"
 
-#include "source/extensions/filters/http/oauth/oauth_response.pb.h"
+#include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -38,7 +38,7 @@ public:
     config_helper_.addFilter(R"EOF(
 name: oauth
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth.v3.OAuth2
+  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
   config:
     cluster: oauth
     hostname: oauth.com

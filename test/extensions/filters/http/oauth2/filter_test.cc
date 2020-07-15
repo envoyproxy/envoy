@@ -1,13 +1,13 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/oauth/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
 #include "common/http/message_impl.h"
 
-#include "extensions/filters/http/oauth/filter.h"
+#include "extensions/filters/http/oauth2/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -20,7 +20,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Oauth {
+namespace Oauth2 {
 
 using testing::_;
 using testing::NiceMock;
@@ -73,7 +73,7 @@ public:
     std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
 
     // Set up proto fields
-    envoy::extensions::filters::http::oauth::v3::OAuth2Config p;
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     p.set_cluster("auth.example.com");
     p.set_hostname("auth.example.com");
     p.set_callback_path(TEST_CALLBACK);
@@ -643,7 +643,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
   EXPECT_EQ(request_headers_before, request_headers_after);
 }
 
-} // namespace Oauth
+} // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

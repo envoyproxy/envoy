@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Oauth {
+namespace Oauth2 {
 
 /**
  * Callback interface to enable the OAuth client to trigger actions upon completion of an
@@ -25,7 +25,7 @@ public:
   virtual void sendUnauthorizedResponse() PURE;
 };
 
-} // namespace Oauth
+} // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

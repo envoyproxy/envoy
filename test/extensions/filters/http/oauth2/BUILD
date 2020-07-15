@@ -14,23 +14,23 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.oauth",
+    extension_name = "envoy.filters.http.oauth2",
     deps = [
-        "//source/extensions/filters/http/oauth:config",
+        "//source/extensions/filters/http/oauth2:config",
         "//test/mocks/server:factory_context_mocks",
-        "@envoy_api//envoy/extensions/filters/http/oauth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )
 
 envoy_extension_cc_test(
     name = "oauth_integration_test",
     srcs = ["oauth_integration_test.cc"],
-    extension_name = "envoy.filters.http.oauth",
+    extension_name = "envoy.filters.http.oauth2",
     tags = [
         "fails_on_windows",
     ],
     deps = [
-        "//source/extensions/filters/http/oauth:config",
+        "//source/extensions/filters/http/oauth2:config",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -40,25 +40,25 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    extension_name = "envoy.filters.http.oauth",
+    extension_name = "envoy.filters.http.oauth2",
     deps = [
-        "//source/extensions/filters/http/oauth:config",
-        "//source/extensions/filters/http/oauth:oauth_callback_interface",
-        "//source/extensions/filters/http/oauth:oauth_client",
-        "//source/extensions/filters/http/oauth:oauth_lib",
+        "//source/extensions/filters/http/oauth2:config",
+        "//source/extensions/filters/http/oauth2:oauth_callback_interface",
+        "//source/extensions/filters/http/oauth2:oauth_client",
+        "//source/extensions/filters/http/oauth2:oauth_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/extensions/filters/http/oauth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )
 
 envoy_extension_cc_test(
     name = "oauth_client_test",
     srcs = ["oauth_test.cc"],
-    extension_name = "envoy.filters.http.oauth",
+    extension_name = "envoy.filters.http.oauth2",
     deps = [
-        "//source/extensions/filters/http/oauth:oauth_client",
+        "//source/extensions/filters/http/oauth2:oauth_client",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",

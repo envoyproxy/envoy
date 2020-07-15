@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.oauth.v4alpha;
+package envoy.extensions.filters.http.oauth2.v3;
 
-import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -10,29 +10,26 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.oauth.v4alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.oauth2.v3";
 option java_outer_classname = "OauthProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: OAuth]
 // OAuth :ref:`configuration overview <config_http_filters_oauth>`.
-// [#extension: envoy.filters.http.oauth]
+// [#extension: envoy.filters.http.oauth2]
 //
 
 message OAuth2Credentials {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.filters.http.oauth.v3.OAuth2Credentials";
-
   // The client_id to be used in the authorize calls.
   string client_id = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The secret used to retrieve the access token.
-  transport_sockets.tls.v4alpha.SdsSecretConfig token_secret = 2
+  transport_sockets.tls.v3.SdsSecretConfig token_secret = 2
       [(validate.rules).message = {required: true}];
 
   // The secret used to perform the HMAC validation.
-  transport_sockets.tls.v4alpha.SdsSecretConfig hmac_secret = 3
+  transport_sockets.tls.v3.SdsSecretConfig hmac_secret = 3
       [(validate.rules).message = {required: true}];
 }
 
@@ -40,9 +37,6 @@ message OAuth2Credentials {
 //
 // [#next-free-field: 10]
 message OAuth2Config {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.filters.http.oauth.v3.OAuth2Config";
-
   // Name of the cluster to send OAuth requests to.
   string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -64,7 +58,10 @@ message OAuth2Config {
   string token_path = 6 [(validate.rules).string = {min_bytes: 1}];
 
   // The timeout for outgoing auth requests.
-  google.protobuf.Duration timeout = 7 [(validate.rules).duration = {required: true}];
+  google.protobuf.Duration timeout = 7 [(validate.rules).duration = {
+    required: true
+    gte {}
+  }];
 
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 8;
@@ -75,9 +72,6 @@ message OAuth2Config {
 
 // Filter config.
 message OAuth2 {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.filters.http.oauth.v3.OAuth2";
-
   // Leave this empty to disable OAuth2 for a specific route, using per filter config.
   OAuth2Config config = 1;
 }

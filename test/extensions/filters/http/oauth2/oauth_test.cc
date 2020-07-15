@@ -3,8 +3,8 @@
 
 #include "common/http/message_impl.h"
 
-#include "extensions/filters/http/oauth/oauth.h"
-#include "extensions/filters/http/oauth/oauth_client.h"
+#include "extensions/filters/http/oauth2/oauth.h"
+#include "extensions/filters/http/oauth2/oauth_client.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Oauth {
+namespace Oauth2 {
 
 using testing::_;
 using testing::Invoke;
@@ -195,7 +195,7 @@ TEST_F(OAuth2ClientTest, NetworkError) {
   }));
 }
 
-} // namespace Oauth
+} // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

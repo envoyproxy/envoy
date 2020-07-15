@@ -33,7 +33,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/http:message_lib",
         "//source/common/protobuf:message_validator_lib",
-        "//source/extensions/filters/http/oauth:oauth_callback_interface",
+        "//source/extensions/filters/http/oauth2:oauth_callback_interface",
     ],
 )
 
@@ -51,8 +51,8 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/filters/http/oauth:oauth_client",
-        "@envoy_api//envoy/extensions/filters/http/oauth/v3:pkg_cc_proto",
+        "//source/extensions/filters/http/oauth2:oauth_client",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )
 
@@ -65,8 +65,8 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "//source/extensions/filters/http/oauth:oauth_lib",
+        "//source/extensions/filters/http/oauth2:oauth_lib",
         "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/oauth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )
