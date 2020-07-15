@@ -1525,8 +1525,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
       !connection_manager_.config_.streamErrorOnInvalidHttpMessaging() &&
-      code == Http::Code::BadRequest &&
-      connection_manager_.codec_->protocol() < Protocol::Http2) {
+      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2) {
     state_.saw_connection_close_ = true;
   }
 
