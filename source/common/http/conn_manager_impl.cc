@@ -1521,6 +1521,15 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   // a no-op.
   createFilterChain();
 
+  // The BadRequest error code indicates there has been a messaging error.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      !connection_manager_.config_.streamErrorOnInvalidHttpMessaging() &&
+      code == Http::Code::BadRequest &&
+      connection_manager_.codec_->protocol() < Protocol::Http2) {
+    state_.saw_connection_close_ = true;
+  }
+
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       state_.destroyed_,
@@ -1693,15 +1702,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     connection_manager_.startDrainSequence();
     connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
     ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
-  }
-
-  // The BadRequest error code indicates there has been a messaging error.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      !connection_manager_.config_.streamErrorOnInvalidHttpMessaging() &&
-      Utility::getResponseStatus(headers) == enumToInt(Http::Code::BadRequest) &&
-      connection_manager_.codec_->protocol() < Protocol::Http2) {
-    state_.saw_connection_close_ = true;
   }
 
   if (connection_manager_.codec_->protocol() == Protocol::Http10) {
