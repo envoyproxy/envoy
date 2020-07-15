@@ -634,6 +634,41 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
 }
 
+TEST_F(HttpInspectorTest, IncompleteRead) {
+  init();
+  const absl::string_view data = "GE";
+  bool end_stream = false;
+  {
+    InSequence s;
+
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+    }));
+
+    for (size_t i = 1; i <= data.size(); i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(Invoke([&data, &end_stream, i](int, void* buffer, size_t length,
+                                                   int) -> Api::SysCallSizeResult {
+            ASSERT(length >= i);
+            memcpy(buffer, data.data(), i);
+            if (i == data.size() - 1) {
+              end_stream = true;
+            }
+
+            return Api::SysCallSizeResult{ssize_t(i), 0};
+          }));
+    }
+  }
+
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_EQ(0, cfg_->stats().http_not_found_.value());
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  while (!end_stream) {
+    file_event_callback_(Event::FileReadyType::Read);
+  }
+  file_event_callback_(Event::FileReadyType::Closed);
+}
+
 } // namespace
 } // namespace HttpInspector
 } // namespace ListenerFilters
