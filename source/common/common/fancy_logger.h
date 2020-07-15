@@ -38,6 +38,11 @@ public:
   static void setDefaultFancyLevelFormat(spdlog::level::level_enum level, std::string format)
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
+  /**
+   * Lists keys and levels of all loggers in a string for admin page usage.
+   */
+  static std::string listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
 private:
   /**
    * Initializes sink for the initialization of loggers, needed only in benchmark test.
