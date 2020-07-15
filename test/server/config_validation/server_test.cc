@@ -5,10 +5,11 @@
 #include "server/config_validation/server.h"
 
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 namespace Server {

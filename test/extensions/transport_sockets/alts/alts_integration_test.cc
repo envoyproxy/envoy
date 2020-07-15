@@ -21,7 +21,8 @@
 #include "test/integration/integration.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
+
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
