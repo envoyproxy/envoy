@@ -10,6 +10,8 @@
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Event {
 
@@ -124,7 +126,7 @@ private:
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
   AlarmSet alarms_ ABSL_GUARDED_BY(mutex_);
-  std::unordered_map<Alarm*, AlarmSet::const_iterator>
+  absl::flat_hash_map<Alarm*, AlarmSet::const_iterator>
       alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
