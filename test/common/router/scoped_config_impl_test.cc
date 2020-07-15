@@ -445,8 +445,8 @@ public:
 // Test a ScopedConfigImpl returns the correct route Config.
 TEST_F(ScopedConfigImplTest, PickRoute) {
   scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_a_);
-  scoped_config_impl_->addOrUpdateRoutingScope(scope_info_b_);
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
+  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
 
   // Key (foo, bar) maps to scope_info_a_.
   ConfigConstSharedPtr route_config = scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{

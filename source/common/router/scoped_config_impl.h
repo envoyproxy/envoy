@@ -186,11 +186,7 @@ public:
   void
   addOrUpdateRoutingScopes(const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos);
 
-  void addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr& scoped_route_info);
-
   void removeRoutingScopes(const std::vector<std::string>& scope_names);
-
-  void removeRoutingScope(const std::string& scope_name);
 
   // Envoy::Router::ScopedConfig
   Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;

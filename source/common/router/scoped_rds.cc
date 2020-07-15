@@ -307,7 +307,7 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
                         -> ConfigProvider::ConfigConstSharedPtr {
     auto* thread_local_scoped_config =
         const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
-    thread_local_scoped_config->addOrUpdateRoutingScope(new_scoped_route_info);
+    thread_local_scoped_config->addOrUpdateRoutingScopes({new_scoped_route_info});
     return config;
   });
 }
