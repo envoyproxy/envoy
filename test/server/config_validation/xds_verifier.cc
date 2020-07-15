@@ -76,12 +76,14 @@ void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener
     if (rep.listener.name() == listener.name()) {
       if (rep.state == ACTIVE) {
         if (hasRoute(listener)) {
-          // if the new listener is ready to take traffic, the old listener will be drained
-          ENVOY_LOG_MISC(info, "Moving {} to DRAINING state", listener.name());
+          // if the new listener is ready to take traffic, the old listener will be removed
+          // it seems to be directly removed without being added to the config dump as draining
+          ENVOY_LOG_MISC(info, "Removing {} after update", listener.name());
           num_modified_++;
           num_active_--;
-          num_draining_++;
-          rep.state = DRAINING;
+          /* num_draining_++; */
+          /* rep.state = DRAINING; */
+          listeners_.erase(listeners_.begin() + i);
         } else {
           // if the new listener has not gotten its route yet, the old listener will remain active
           // until that happens
@@ -179,17 +181,25 @@ void XdsVerifier::routeUpdated(envoy::config::route::v3::RouteConfiguration rout
  */
 void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route) {
   routes_.insert({route.name(), route});
+  /* bool added = false; */
   for (auto& rep : listeners_) {
     if (getRoute(rep.listener) == route.name() && rep.state == WARMING) {
       // it should successfully warm now
+      /* if (!added) { */
+      /*   routes_.insert({route.name(), route}); */
+      /*   added = true; */
+      /* } */
       ENVOY_LOG_MISC(info, "Moving {} to ACTIVE state", rep.listener.name());
 
       // if there were any active listeners that were waiting to be updated, they will now be
-      // changed to draining and the warming listener will take their place
-      for (auto& old_listener : listeners_) {
+      // removed and the warming listener will take their place
+      for (unsigned long i = 0; i < listeners_.size(); ++i) {
+        auto& old_listener = listeners_[i];
         if (old_listener.listener.name() == rep.listener.name() &&
             getRoute(old_listener.listener) != route.name() && old_listener.state == ACTIVE) {
-          old_listener.state = DRAINING;
+          // mark it as removed to remove it after the loop so as not to invalidate the first
+          // iterator
+          old_listener.state = REMOVED;
           num_active_--;
           num_modified_++;
         }
@@ -199,6 +209,9 @@ void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route)
       rep.state = ACTIVE;
     }
   }
+  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
+                                  [&](auto& listener) { return listener.state == REMOVED; }),
+                   listeners_.end());
 }
 
 /**

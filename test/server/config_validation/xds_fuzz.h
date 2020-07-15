@@ -59,6 +59,7 @@ private:
   void verifyListeners();
 
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
+  envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
 
   bool eraseListener(const std::string& listener_name);
   bool hasRoute(const std::string& route_num);

@@ -21,7 +21,7 @@ public:
   void routeAdded(envoy::config::route::v3::RouteConfiguration route);
   void routeUpdated(envoy::config::route::v3::RouteConfiguration route);
 
-  enum ListenerState { WARMING, ACTIVE, DRAINING };
+  enum ListenerState { WARMING, ACTIVE, DRAINING, REMOVED };
   struct ListenerRepresentation {
     envoy::config::listener::v3::Listener listener;
     ListenerState state;
