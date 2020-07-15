@@ -22,6 +22,7 @@ build --enable_platform_specific_config
 
 # Enable position independent code, this option is not supported on Windows and default on on macOS.
 build:linux --copt=-fPIC
+build:linux --cxxopt=-std=c++17
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -65,6 +66,7 @@ build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
+build:macos --cxxopt=-std=c++17
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
@@ -265,6 +267,7 @@ build:windows --define manual_stamp=manual_stamp
 build:windows --copt="-DCARES_STATICLIB"
 build:windows --copt="-DNGHTTP2_STATICLIB"
 build:windows --copt="-DCURL_STATICLIB"
+build:windows --cxxopt="/std:c++17"
 
 # Required to work around build defects on Windows MSVC cl
 # Unguarded gcc pragmas in quiche are not recognized by MSVC

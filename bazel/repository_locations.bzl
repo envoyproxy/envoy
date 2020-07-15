@@ -422,10 +422,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
-        sha256 = "1b283f93619b130504880d2f400bd449de9ab6be94ef26ecd2bb96921f48dd6c",
-        strip_prefix = "cel-cpp-50196761917300bbd47b59bd162e84817b67b7ab",
-        # 2020-06-08
-        urls = ["https://github.com/google/cel-cpp/archive/50196761917300bbd47b59bd162e84817b67b7ab.tar.gz"],
+        sha256 = "cad7d01139947d78e413d112cb8f7431fbb33cf66b0adf9c280824803fc2a72e",
+        strip_prefix = "cel-cpp-b9453a09b28a1531c4917e8792b3ea61f6b1a447",
+        # 2020-07-14
+        urls = ["https://github.com/google/cel-cpp/archive/b9453a09b28a1531c4917e8792b3ea61f6b1a447.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
