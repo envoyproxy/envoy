@@ -170,6 +170,11 @@ bool OsSysCallsImpl::supportsMmsg() const {
   return false;
 }
 
+bool OsSysCallsImpl::supportsUdpGro() const {
+  // Windows doesn't support it.
+  return false;
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::_chsize_s(fd, length);
   return {rc, rc == 0 ? 0 : errno};

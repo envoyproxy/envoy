@@ -63,6 +63,11 @@ public:
   virtual bool supportsMmsg() const PURE;
 
   /**
+   * return true if the OS supports UDP GRO.
+   */
+  virtual bool supportsUdpGro() const PURE;
+
+  /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */

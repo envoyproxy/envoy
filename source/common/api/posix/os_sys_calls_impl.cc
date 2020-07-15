@@ -73,6 +73,28 @@ bool OsSysCallsImpl::supportsMmsg() const {
 #endif
 }
 
+bool OsSysCallsImpl::supportsUdpGro() const {
+#if !defined(__linux__)
+  return false;
+#else
+#ifndef UDP_GRO
+  return false;
+#else
+  static const bool is_supported = [] {
+    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    int val = 1;
+    bool result = (0 == ::setsockopt(fd, IPPROTO_UDP, UDP_GRO, &val, sizeof(val)));
+    ::close(fd);
+    return result;
+  }();
+  return is_supported;
+#endif
+#endif
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, rc != -1 ? 0 : errno};

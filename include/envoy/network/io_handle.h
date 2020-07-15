@@ -85,6 +85,8 @@ public:
     Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
+    // The gso_size, if specified in the transport header
+    unsigned int gso_size_{0};
   };
 
   /**
@@ -140,6 +142,11 @@ public:
    * return true if the platform supports recvmmsg() and sendmmsg().
    */
   virtual bool supportsMmsg() const PURE;
+
+  /**
+   * return true if the platform supports udp_gro
+   */
+  virtual bool supportsUdpGro() const PURE;
 
   /**
    * Bind to address. The handle should have been created with a call to socket()

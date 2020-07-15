@@ -22,6 +22,7 @@ public:
   SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen, int flags,
                             struct timespec* timeout) override;
   bool supportsMmsg() const override;
+  bool supportsUdpGro() const override;
   SysCallIntResult close(os_fd_t fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
