@@ -14,7 +14,7 @@ namespace Init {
  * initialization completes.
  */
 using ReadyFn = std::function<void()>;
-using ExtraReadyFn = std::function<void(absl::string_view)>;
+using ReadyFnSendName = std::function<void(absl::string_view)>;
 
 /**
  * A WatcherHandleImpl functions as a weak reference to a Watcher. It is how a TargetImpl safely
@@ -28,7 +28,7 @@ private:
   WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
                     std::weak_ptr<ReadyFn> fn);
   WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
-                    std::weak_ptr<ExtraReadyFn> fn);
+                    std::weak_ptr<ReadyFnSendName> fn);
 
 public:
   // Init::WatcherHandle
@@ -49,7 +49,7 @@ private:
   const std::weak_ptr<ReadyFn> fn_;
 
   // The watcher's callback function, only called if the weak pointer can be "locked".
-  const std::weak_ptr<ExtraReadyFn> exfn_;
+  const std::weak_ptr<ReadyFnSendName> fn_sn_;
 };
 
 /**
@@ -64,7 +64,7 @@ public:
    * @param fn a callback function to invoke when `ready` is called on the handle.
    */
   WatcherImpl(absl::string_view name, ReadyFn fn);
-  WatcherImpl(absl::string_view name, ExtraReadyFn fn);
+  WatcherImpl(absl::string_view name, ReadyFnSendName fn);
   ~WatcherImpl() override;
 
   // Init::Watcher
@@ -82,7 +82,7 @@ private:
   const std::shared_ptr<ReadyFn> fn_;
 
   // The callback function, called via WatcherHandleImpl by either the target or the manager.
-  const std::shared_ptr<ExtraReadyFn> exfn_;
+  const std::shared_ptr<ReadyFnSendName> fn_sn_;
 };
 
 } // namespace Init
