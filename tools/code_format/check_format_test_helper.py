@@ -25,8 +25,11 @@ errors = 0
 # Runs the 'check_format' operation, on the specified file, printing
 # the comamnd run and the status code as well as the stdout, and returning
 # all of that to the caller.
-def runCheckFormat(operation, filename):
-  command = check_format + " " + operation + " " + filename
+def runCheckFormat(operation, filename, options=None):
+  command = f"{check_format} {operation} {filename} "
+  if options is not None:
+    command += f"{' '.join(options)} "
+
   status, stdout, stderr = runCommand(command)
   return (command, status, stdout + stderr)
 
@@ -47,9 +50,9 @@ def getInputFile(filename, extra_input_files=None):
 # Attempts to fix file, returning a 4-tuple: the command, input file name,
 # output filename, captured stdout as an array of lines, and the error status
 # code.
-def fixFileHelper(filename, extra_input_files=None):
+def fixFileHelper(filename, extra_input_files=None, options=None):
   command, status, stdout = runCheckFormat(
-      "fix", getInputFile(filename, extra_input_files=extra_input_files))
+      "fix", getInputFile(filename, extra_input_files=extra_input_files), options)
   infile = os.path.join(src, filename)
   return command, infile, filename, status, stdout
 
@@ -57,9 +60,10 @@ def fixFileHelper(filename, extra_input_files=None):
 # Attempts to fix a file, returning the status code and the generated output.
 # If the fix was successful, the diff is returned as a string-array. If the file
 # was not fixable, the error-messages are returned as a string-array.
-def fixFileExpectingSuccess(file, extra_input_files=None):
+def fixFileExpectingSuccess(file, extra_input_files=None, options=None):
   command, infile, outfile, status, stdout = fixFileHelper(file,
-                                                           extra_input_files=extra_input_files)
+                                                           extra_input_files=extra_input_files,
+                                                           options=options)
   if status != 0:
     print("FAILED: " + infile)
     emitStdoutAsError(stdout)
@@ -110,11 +114,11 @@ def checkFileExpectingError(filename, expected_substring, extra_input_files=None
   return expectError(filename, status, stdout, expected_substring)
 
 
-def checkAndFixError(filename, expected_substring, extra_input_files=None):
+def checkAndFixError(filename, expected_substring, extra_input_files=None, options=None):
   errors = checkFileExpectingError(filename,
                                    expected_substring,
                                    extra_input_files=extra_input_files)
-  errors += fixFileExpectingSuccess(filename, extra_input_files=extra_input_files)
+  errors += fixFileExpectingSuccess(filename, extra_input_files=extra_input_files, options=options)
   return errors
 
 
@@ -216,6 +220,11 @@ def runChecks():
       "grpc_shutdown.cc",
       "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
       "See #8282")
+  errors += checkUnfixableError("non_type_alias_smart_ptr.cc",
+                                "Use type alias for 'Network::Connection' instead. See STYLE.md")
+  errors += checkUnfixableError(
+      "non_type_alias_optional_ref.cc",
+      "Use type alias for 'ConnectionHandlerImpl::ActiveTcpListener' instead. See STYLE.md")
   errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
   errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
   errors += checkUnfixableError("clang_format_double_on.cc", "clang-format nested on")
@@ -269,10 +278,18 @@ def runChecks():
   errors += checkAndFixError(
       "cpp_std.cc",
       "term absl::make_unique< should be replaced with standard library term std::make_unique<")
+  errors += checkAndFixError("non_type_alias_types.cc",
+                             "Use type alias for",
+                             options=[
+                                 "--aggressive",
+                             ])
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
+  errors += checkFileExpectingOK("using_type_alias.cc")
+  errors += checkFileExpectingOK("non_type_alias_allowed_type.cc")
+
   return errors
 
 

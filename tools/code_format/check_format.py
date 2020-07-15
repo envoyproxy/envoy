@@ -175,6 +175,21 @@ UNOWNED_EXTENSIONS = {
 }
 # yapf: enable
 
+NON_TYPE_ALIAS_ALLOWED_TYPES = {
+    "^(?![A-Z].*).*$",
+    "^(.*::){,1}(StrictMock<|NiceMock<).*$",
+    "^(.*::){,1}(Test|Mock|Fake).*$",
+    "^Protobuf.*::.*$",
+    "^[A-Z]$",
+    "^.*, .*",
+    r"^.*\[\]$",
+}
+
+USING_TYPE_ALIAS_REGEX = re.compile("(using .* = .*;|typedef .* .*;)")
+SMART_PTR_REGEX = re.compile("std::(unique_ptr|shared_ptr)<(.*?)>(?!;)")
+OPTIONAL_REF_REGEX = re.compile("absl::optional<std::reference_wrapper<(.*?)>>(?!;)")
+NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX = re.compile(f"({'|'.join(NON_TYPE_ALIAS_ALLOWED_TYPES)})")
+
 
 # Map a line transformation function across each line of a file,
 # writing the result lines as requested.
@@ -348,6 +363,10 @@ def allowlistedForGrpcInit(file_path):
   return file_path in GRPC_INIT_ALLOWLIST
 
 
+def whitelistedForNonTypeAlias(name):
+  return NON_TYPE_ALIAS_ALLOWED_TYPE_REGEX.match(name)
+
+
 def allowlistedForUnpackTo(file_path):
   return file_path.startswith("./test") or file_path in [
       "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
@@ -510,6 +529,71 @@ def checkFileContents(file_path, checker):
   return error_messages
 
 
+def replaceWithTypeAlias(line):
+
+  def replaceSmartPtr(match):
+    kind = match.group(1)
+    name = match.group(2)
+    const = "const " in name
+    if const:
+      name = name.replace("const ", "")
+    if whitelistedForNonTypeAlias(name):
+      return match.group()
+
+    with_type_param = "<" in name
+
+    if kind == "unique_ptr" and not const and not with_type_param:
+      return f"{name}Ptr"
+    elif kind == "unique_ptr" and const and not with_type_param:
+      return f"{name}ConstPtr"
+    elif kind == "unique_ptr" and not const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}Ptr<{splitted[1]}"
+    elif kind == "unique_ptr" and const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}ConstPtr<{splitted[1]}"
+    elif kind == "shared_ptr" and not const and not with_type_param:
+      return f"{name}SharedPtr"
+    elif kind == "shared_ptr" and const and not with_type_param:
+      return f"{name}ConstSharedPtr"
+    elif kind == "shared_ptr" and not const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}SharedPtr<{splitted[1]}"
+    elif kind == "shared_ptr" and const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}ConstSharedPtr<{splitted[1]}"
+    else:
+      return match.group()
+
+  def replaceOptionalRef(match):
+    name = match.group(1)
+    const = "const " in name
+    if const:
+      name = name.replace("const ", "")
+    if whitelistedForNonTypeAlias(name):
+      return match.group()
+
+    with_type_param = "<" in name
+
+    if not const and not with_type_param:
+      return f"{name}OptRef"
+    elif const and not with_type_param:
+      return f"{name}OptConstRef"
+    elif not const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}OptRef<{splitted[1]}"
+    elif const and with_type_param:
+      splitted = name.split("<")
+      return f"{splitted[0]}OptConstRef<{splitted[1]}"
+    else:
+      return match.group()
+
+  line = SMART_PTR_REGEX.sub(replaceSmartPtr, line)
+  line = OPTIONAL_REF_REGEX.sub(replaceOptionalRef, line)
+
+  return line
+
+
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 
 
@@ -528,6 +612,9 @@ def fixSourceLine(line, line_number):
   # Use recommended cpp stdlib
   for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
     line = line.replace(invalid_construct, valid_construct)
+
+  if aggressive and not USING_TYPE_ALIAS_REGEX.search(line):
+    line = replaceWithTypeAlias(line)
 
   return line
 
@@ -714,6 +801,17 @@ def checkSourceLine(line, file_path, reportError):
       if comment == -1 or comment > grpc_init_or_shutdown:
         reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                     "Grpc::GoogleGrpcContext. See #8282")
+
+  if not USING_TYPE_ALIAS_REGEX.search(line):
+    smart_ptrs = SMART_PTR_REGEX.finditer(line)
+    for smart_ptr in smart_ptrs:
+      if not whitelistedForNonTypeAlias(smart_ptr.group(2)):
+        reportError(f"Use type alias for '{smart_ptr.group(2)}' instead. See STYLE.md")
+
+    optional_refs = OPTIONAL_REF_REGEX.finditer(line)
+    for optional_ref in optional_refs:
+      if not whitelistedForNonTypeAlias(optional_ref.group(1)):
+        reportError(f"Use type alias for '{optional_ref.group(1)}' instead. See STYLE.md")
 
 
 def checkBuildLine(line, file_path, reportError):
@@ -989,6 +1087,9 @@ if __name__ == "__main__":
                       type=str,
                       default=",".join(common.includeDirOrder()),
                       help="specify the header block include directory order.")
+  parser.add_argument("--aggressive",
+                      action='store_true',
+                      help="specify if it fixes formats making risky changes.")
   args = parser.parse_args()
 
   operation_type = args.operation_type
@@ -1006,6 +1107,7 @@ if __name__ == "__main__":
       "./tools/clang_tools",
   ]
   include_dir_order = args.include_dir_order
+  aggressive = args.aggressive
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
