@@ -57,14 +57,9 @@ Filters::Common::ExtAuthz::CheckStatus resultCaseToCheckStatus(
 DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAuthzTestCase& input) {
   try {
     TestUtility::validate(input);
-  } catch (const ProtoValidationException& e) {
-    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
-    return;
-  } catch (const ProtobufMessage::DeprecatedProtoFieldException& e) {
-    ENVOY_LOG_MISC(debug, "DeprecatedProtoFieldException: {}", e.what());
-    return;
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
   }
 
   Stats::TestUtil::TestStore stats_store;
