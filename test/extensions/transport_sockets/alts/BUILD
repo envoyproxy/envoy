@@ -17,10 +17,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.transport_sockets.alts",
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/transport_sockets/alts:config",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
     ],
 )
 
@@ -89,6 +90,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
     ],

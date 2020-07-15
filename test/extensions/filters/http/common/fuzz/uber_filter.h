@@ -1,7 +1,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 
 namespace Envoy {

@@ -18,7 +18,11 @@
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/bootstrap_extension_factory.h"
+#include "test/mocks/server/hot_restart.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/options.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
@@ -187,7 +191,7 @@ protected:
         *init_manager_, options_, time_system_,
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
         stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
     EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
@@ -206,7 +210,7 @@ protected:
         *init_manager_, options_, time_system_,
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
         stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
+        std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists(TestEnvironment::nullDevicePath()));
@@ -990,7 +994,7 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
       server_.reset(new InstanceImpl(*init_manager_, options_, time_system_,
                                      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                                      hooks_, restart_, stats_store_, fakelock_, component_factory_,
-                                     std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(),
+                                     std::make_unique<NiceMock<Random::MockRandomGenerator>>(),
                                      *thread_local_, Thread::threadFactoryForTest(),
                                      Filesystem::fileSystemForTest(), nullptr)),
       EnvoyException,

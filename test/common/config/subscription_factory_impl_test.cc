@@ -50,7 +50,7 @@ public:
 
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  Random::MockRandomGenerator random_;
   MockSubscriptionCallbacks callbacks_;
   MockOpaqueResourceDecoder resource_decoder_;
   Http::MockAsyncClientRequest http_request_;

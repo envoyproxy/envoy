@@ -10,10 +10,6 @@ using testing::ReturnArg;
 namespace Envoy {
 namespace Runtime {
 
-MockRandomGenerator::MockRandomGenerator() { ON_CALL(*this, uuid()).WillByDefault(Return(uuid_)); }
-
-MockRandomGenerator::~MockRandomGenerator() = default;
-
 MockSnapshot::MockSnapshot() {
   ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getDouble(_, _)).WillByDefault(ReturnArg<1>());
