@@ -181,6 +181,7 @@ protected:
     }
     init_manager_ = use_intializing_instance ? std::make_unique<InitializingInitManager>("Server")
                                              : std::make_unique<Init::ManagerImpl>("Server");
+
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
@@ -203,7 +204,7 @@ protected:
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
-        stats_store_, allocator_, fakelock_, component_factory_,
+        stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
@@ -253,7 +254,6 @@ protected:
   DefaultListenerHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
   std::unique_ptr<ThreadLocal::InstanceImpl> thread_local_;
-  Stats::AllocatorImpl allocator_;
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;

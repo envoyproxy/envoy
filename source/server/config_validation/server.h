@@ -96,7 +96,6 @@ public:
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
-  Stats::StoreRootPtr& loadReportingStatsStore() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   ProcessContextOptRef processContext() override { return absl::nullopt; }

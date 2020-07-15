@@ -43,7 +43,6 @@ public:
   HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
              const envoy::config::cluster::v3::Cluster& cluster,
              const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
-             Stats::StoreRootPtr& load_report_stats_store_,
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
@@ -81,7 +80,6 @@ private:
   const envoy::config::cluster::v3::Cluster& cluster_;
   const envoy::config::core::v3::BindConfig& bind_config_;
   Stats::Store& stats_;
-  Stats::StoreRootPtr& load_report_stats_store_;
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;
 
@@ -121,7 +119,6 @@ public:
   HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
               envoy::config::core::v3::ApiVersion transport_api_version,
               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
-              Stats::StoreRootPtr& load_report_stats_store_,
               Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
               ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
@@ -161,7 +158,6 @@ private:
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats_;
-  Envoy::Stats::StoreRootPtr& load_report_stats_store_;
   Ssl::ContextManager& ssl_context_manager_;
   Runtime::RandomGenerator& random_;
   ClusterInfoFactory& info_factory_;

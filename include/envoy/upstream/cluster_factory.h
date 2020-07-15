@@ -104,11 +104,6 @@ public:
   virtual Stats::Store& stats() PURE;
 
   /**
-   * @return the server-wide load stats store.
-   */
-  virtual Stats::StoreRootPtr& loadReportingStatsStore() PURE;
-
-  /**
    * @return the server's TLS slot allocator.
    */
   virtual ThreadLocal::SlotAllocator& tls() PURE;

@@ -42,7 +42,7 @@ public:
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *api_, http_context_, grpc_context_);
     cluster_manager_->setPrimaryClustersInitializedCb(
-        [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap, nullptr); });
+        [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {

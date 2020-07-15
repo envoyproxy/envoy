@@ -64,9 +64,7 @@ InstanceImpl::InstanceImpl(
                                              !options.rejectUnknownDynamicFields(),
                                              options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store),
-      allocator_(std::make_unique<Stats::AllocatorImpl>(stats_store_.symbolTable())),
-      load_report_stats_store_(nullptr), thread_local_(tls),
+      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
                          process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
@@ -455,17 +453,11 @@ void InstanceImpl::initialize(const Options& options,
   const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
 
-  // the load stats reporter needs a custom stats root for independent merge intervals
-  if (bootstrap_.cluster_manager().has_load_stats_config()) {
-    load_report_stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(*allocator_);
-    load_report_stats_store_->initializeThreading(*dispatcher_, thread_local_);
-  }
-
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      *admin_, Runtime::LoaderSingleton::get(), stats_store_, load_report_stats_store_,
-      thread_local_, *random_generator_, dns_resolver_, *ssl_context_manager_, *dispatcher_,
-      *local_info_, *secret_manager_, messageValidationContext(), *api_, http_context_,
-      grpc_context_, access_log_manager_, *singleton_manager_);
+      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
+      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
+      messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
+      *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -518,7 +510,7 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
 
-  clusterManager().initializeSecondaryClusters(bootstrap_, load_report_stats_store_);
+  clusterManager().initializeSecondaryClusters(bootstrap_);
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
@@ -530,10 +522,9 @@ void InstanceImpl::onRuntimeReady() {
                                                        stats_store_, false)
             ->create(),
         hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, load_report_stats_store_, *ssl_context_manager_, *random_generator_,
-        info_factory_, access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
-        *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
-        *api_);
+        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
+        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
+        messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 }
 
@@ -672,9 +663,6 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
-  if (load_report_stats_store_ != nullptr) {
-    load_report_stats_store_->shutdownThreading();
-  }
 
   if (overload_manager_) {
     overload_manager_->stop();

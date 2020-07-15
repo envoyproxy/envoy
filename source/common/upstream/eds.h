@@ -30,8 +30,7 @@ class EdsClusterImpl
 public:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                 Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store,
-                 bool added_via_api);
+                 Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }

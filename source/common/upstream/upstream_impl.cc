@@ -876,7 +876,7 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 ClusterImplBase::ClusterImplBase(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store, bool added_via_api)
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
@@ -890,7 +890,7 @@ ClusterImplBase::ClusterImplBase(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_matcher),
-      std::move(stats_scope), load_report_stats_store, added_via_api,
+      std::move(stats_scope), factory_context.clusterManager().loadReportStatsStore(), added_via_api,
       factory_context.messageValidationVisitor(), factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.

@@ -119,8 +119,8 @@ public:
    * The "initialized callback" set in the method above is invoked when secondary and
    * dynamically provisioned clusters have finished initializing.
    */
-  virtual void initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                           Stats::StoreRootPtr& load_report_stats_store) PURE;
+  virtual void
+  initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   using ClusterInfoMap = std::unordered_map<std::string, std::reference_wrapper<const Cluster>>;
 
@@ -236,6 +236,11 @@ public:
    * configured.
    */
   virtual const absl::optional<std::string>& localClusterName() const PURE;
+
+  /**
+   * @return Pointer to the load report stats store. The pointer is nullptr if store is not initialized
+   */
+  virtual Stats::StoreRootPtr& loadReportStatsStore() PURE;
 
   /**
    * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.
@@ -360,7 +365,6 @@ public:
     const envoy::config::cluster::v3::Cluster& cluster_;
     const envoy::config::core::v3::BindConfig& bind_config_;
     Stats::Store& stats_;
-    Stats::StoreRootPtr& load_report_stats_store_;
     Ssl::ContextManager& ssl_context_manager_;
     const bool added_via_api_;
     ClusterManager& cm_;
