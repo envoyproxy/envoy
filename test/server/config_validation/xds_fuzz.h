@@ -28,9 +28,10 @@ public:
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name);
 
-  envoy::config::listener::v3::Listener buildListener(uint32_t listener_num, uint32_t route_num);
+  envoy::config::listener::v3::Listener buildListener(std::string listener_name,
+                                                      std::string route_name);
 
-  envoy::config::route::v3::RouteConfiguration buildRouteConfig(uint32_t route_num);
+  envoy::config::route::v3::RouteConfiguration buildRouteConfig(std::string route_name);
 
   void updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners,
                       const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
@@ -49,8 +50,13 @@ public:
   const size_t RoutesMax = 5;
 
 private:
-  absl::optional<std::string> removeListener(uint32_t listener_num);
-  absl::optional<std::string> removeRoute(uint32_t route_num);
+  void addListener(std::string listener_name, std::string route_name);
+  void removeListener(std::string listener_name);
+  void addRoute(std::string route_name);
+  void removeRoute(std::string route_name);
+
+  bool eraseListener(std::string listener_name);
+  bool eraseRoute(std::string route_num);
   AssertionResult waitForAck(const std::string& expected_type_url,
                              const std::string& expected_version);
 
@@ -62,6 +68,10 @@ private:
   envoy::config::core::v3::ApiVersion api_version_;
 
   Network::Address::IpVersion ip_version_;
+
+  uint32_t num_added_;
+  uint32_t num_modified_;
+  uint32_t num_removed_;
 };
 
 } // namespace Envoy
