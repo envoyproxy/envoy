@@ -50,7 +50,9 @@ public:
   // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
   void OnTestStart(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      if (!Runtime::RuntimeFeaturesPeer::addFeature(runtime_override_, disable_)) {
+      bool reset = disable_ ? Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_)
+                            : Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_);
+      if (!reset) {
         // If the entry was already in the hash map, don't remove it OnTestEnd.
         runtime_override_.clear();
       }
@@ -60,7 +62,8 @@ public:
   // As each test ends, clean up the RuntimeFeaturesDefaults state.
   void OnTestEnd(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      Runtime::RuntimeFeaturesPeer::removeFeature(runtime_override_, disable_);
+      disable_ ? Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_)
+               : Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_);
     }
   }
   std::string runtime_override_;

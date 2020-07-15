@@ -79,3 +79,16 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "runtime_flag_override_noop_test",
+    srcs = ["runtime_flag_override_noop_test.cc"],
+    args = [
+        "--runtime-feature-override-for-tests=envoy.reloadable_features.test_feature_true",
+        "--runtime-feature-disable-for-tests=envoy.reloadable_features.test_feature_false",
+    ],
+    coverage = False,
+    deps = [
+        "//source/common/runtime:runtime_lib",
+    ],
+)
