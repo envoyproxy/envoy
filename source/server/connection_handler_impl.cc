@@ -544,10 +544,10 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(
-          parent,
-          dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
-          config) {}
+    : ActiveRawUdpListener(parent,
+                           dispatcher.createUdpListener(
+                               config.listenSocketFactory().getListenSocket(), *this, config),
+                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
                                            Network::UdpListenerPtr&& listener,
@@ -573,6 +573,9 @@ void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
   // TODO(sumukhs): This is not used now. When write filters are implemented, this is a
   // trigger to invoke the on write ready API on the filters which is when they can write
   // data
+
+  // Clear write_blocked_ status for udpPacketWriter
+  udp_listener_->udpPacketWriter()->setWritable();
 }
 
 void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {

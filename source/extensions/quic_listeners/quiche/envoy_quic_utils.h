@@ -32,6 +32,8 @@ namespace Quic {
 Network::Address::InstanceConstSharedPtr
 quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address);
 
+quic::QuicIpAddress envoyAddressIpToQuicIpAddress(const Network::Address::Ip* envoy_ip);
+
 quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
     const Network::Address::InstanceConstSharedPtr& envoy_address);
 

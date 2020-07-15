@@ -157,7 +157,8 @@ public:
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
-                                                    Network::UdpListenerCallbacks& cb) PURE;
+                                                    Network::UdpListenerCallbacks& cb,
+                                                    Network::ListenerConfig& config) PURE;
   /**
    * Allocates a timer. @see Timer for docs on how to use the timer.
    * @param cb supplies the callback to invoke when the timer fires.

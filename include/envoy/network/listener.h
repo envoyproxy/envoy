@@ -12,6 +12,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/udp_packet_writer_handler.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
@@ -133,6 +134,12 @@ public:
    * nullptr.
    */
   virtual ActiveUdpListenerFactory* udpListenerFactory() PURE;
+
+  /**
+   * @return factory pointer if writing on UDP socket, otherwise return
+   * nullptr.
+   */
+  virtual UdpPacketWriterFactory* udpPacketWriterFactory() PURE;
 
   /**
    * @return traffic direction of the listener.
@@ -305,6 +312,11 @@ public:
    * sender.
    */
   virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
+
+  /**
+   * @return udp_packet_writer_
+   * */
+  virtual Network::UdpPacketWriter* udpPacketWriter() PURE;
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;

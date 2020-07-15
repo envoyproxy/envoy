@@ -62,7 +62,8 @@ public:
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::ListenerCallbacks& cb, bool bind_to_port) override;
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
-                                            Network::UdpListenerCallbacks& cb) override;
+                                            Network::UdpListenerCallbacks& cb,
+                                            Network::ListenerConfig& config) override;
   TimerPtr createTimer(TimerCb cb) override;
   Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;

@@ -223,7 +223,11 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   // NOTE: We do not specify the local IP to use for the sendmsg call. We allow the OS to select
   //       the right IP based on outbound routing rules.
   Api::IoCallUint64Result rc =
-      Network::Utility::writeToSocket(*io_handle_, buffer, nullptr, *host_->address());
+      cluster_.filter_.read_callbacks_->udpListener().udpPacketWriter()->writeToSocket(
+          buffer, nullptr, *host_->address());
+  // Api::IoCallUint64Result rc =
+  //     Network::Utility::writeToSocket(*io_handle_, buffer, nullptr, *host_->address());
+
   if (!rc.ok()) {
     cluster_.cluster_stats_.sess_tx_errors_.inc();
   } else {

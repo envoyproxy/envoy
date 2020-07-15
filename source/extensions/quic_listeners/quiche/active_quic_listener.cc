@@ -14,6 +14,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/quic_envoy_packet_writer.h"
 
 namespace Envoy {
 namespace Quic {
@@ -62,7 +63,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     }
     listen_socket_.addOptions(options);
   }
-  udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
+  udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this, listener_config);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
@@ -77,7 +78,20 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_);
-  quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
+
+  auto udp_packet_writer = udp_listener_->udpPacketWriter();
+  if (udp_packet_writer->name() == Network::UdpWriterNames::get().GsoBatchWriter) {
+    quic_dispatcher_->InitializeWithWriter(
+        dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer));
+  } else {
+    // TODO(yugant): We do not want to pass the ownership of the pointer.
+    // Make QuicEnvoyPacketWriter to take just UdpPacketWriter
+    Network::UdpPacketWriterPtr udp_packet_writer_ptr =
+        Network::UdpPacketWriterPtr(udp_packet_writer);
+    quic_dispatcher_->InitializeWithWriter(new QuicEnvoyPacketWriter(udp_packet_writer_ptr));
+  }
+
+  // quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -117,6 +131,8 @@ void ActiveQuicListener::onReadReady() {
 }
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
+  // Clear write_blocked_ status for udpPacketWriter
+  udp_listener_->udpPacketWriter()->setWritable();
   quic_dispatcher_->OnCanWrite();
 }
 

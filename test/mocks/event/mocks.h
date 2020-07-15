@@ -69,8 +69,9 @@ public:
   }
 
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
-                                            Network::UdpListenerCallbacks& cb) override {
-    return Network::UdpListenerPtr{createUdpListener_(std::move(socket), cb)};
+                                            Network::UdpListenerCallbacks& cb,
+                                            Network::ListenerConfig& config) override {
+    return Network::UdpListenerPtr{createUdpListener_(std::move(socket), cb, config)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -117,7 +118,8 @@ public:
               (Network::SocketSharedPtr && socket, Network::ListenerCallbacks& cb,
                bool bind_to_port));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr && socket, Network::UdpListenerCallbacks& cb));
+              (Network::SocketSharedPtr && socket, Network::UdpListenerCallbacks& cb,
+               Network::ListenerConfig& config));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));

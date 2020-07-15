@@ -9,6 +9,7 @@ import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
 import "envoy/config/listener/v3/udp_listener_config.proto";
+import "envoy/config/listener/v3/udp_writer_config.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -35,7 +36,7 @@ message ListenerCollection {
   udpa.core.v1.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -248,4 +249,9 @@ message Listener {
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by this listener.
   repeated accesslog.v3.AccessLog access_log = 22;
+
+  // UdpWriterProto in Listener Config
+  // This field specifies the udp_writer_name, e.g. "udp_default_writer" or
+  // "udp_gso_batch_writer", that can be used to instantiate udp_writer.
+  UdpWriterConfig udp_writer_config = 23;
 }

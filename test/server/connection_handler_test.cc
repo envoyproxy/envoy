@@ -95,6 +95,9 @@ public:
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
+    Network::UdpPacketWriterFactory* udpPacketWriterFactory() override {
+      return udp_writer_factory_.get();
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -119,6 +122,7 @@ public:
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
+    std::unique_ptr<Network::UdpPacketWriterFactory> udp_writer_factory_;
     Network::ConnectionBalancerPtr connection_balancer_;
     BasicResourceLimitImpl open_connections_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
@@ -160,9 +164,9 @@ public:
             return listener;
           }));
     } else {
-      EXPECT_CALL(dispatcher_, createUdpListener_(_, _))
-          .WillOnce(Invoke([listener](Network::SocketSharedPtr&&,
-                                      Network::UdpListenerCallbacks&) -> Network::UdpListener* {
+      EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
+          .WillOnce(Invoke([listener](Network::SocketSharedPtr&&, Network::UdpListenerCallbacks&,
+                                      Network::ListenerConfig&) -> Network::UdpListener* {
             return dynamic_cast<Network::UdpListener*>(listener);
           }));
     }

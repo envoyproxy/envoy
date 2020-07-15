@@ -17,6 +17,7 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
+#include "common/network/well_known_names.h"
 
 #include "absl/container/fixed_array.h"
 #include "event2/listener.h"
@@ -29,7 +30,8 @@ namespace Envoy {
 namespace Network {
 
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                                 UdpListenerCallbacks& cb, TimeSource& time_source)
+                                 UdpListenerCallbacks& cb, TimeSource& time_source,
+                                 ListenerConfig& config)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
   file_event_ = dispatcher_.createFileEvent(
       socket_->ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
@@ -42,6 +44,9 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
                                               socket_->localAddress()->asString()));
   }
+
+  // Create udp_packet_writer
+  udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(*socket_);
 }
 
 UdpListenerImpl::~UdpListenerImpl() {
@@ -108,8 +113,12 @@ const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   ENVOY_UDP_LOG(trace, "send");
   Buffer::Instance& buffer = send_data.buffer_;
-  Api::IoCallUint64Result send_result = Utility::writeToSocket(
-      socket_->ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);
+
+  Api::IoCallUint64Result send_result =
+      udpPacketWriter()->writeToSocket(buffer, send_data.local_ip_, send_data.peer_address_);
+
+  // Api::IoCallUint64Result send_result = Utility::writeToSocket(
+  //     socket_->ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);
 
   // The send_result normalizes the rc_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.

@@ -6,6 +6,7 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/network/socket_option_impl.h"
+#include "common/network/well_known_names.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_protos.h"
 

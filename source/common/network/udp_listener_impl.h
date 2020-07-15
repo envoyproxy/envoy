@@ -23,7 +23,7 @@ class UdpListenerImpl : public BaseListenerImpl,
                         protected Logger::Loggable<Logger::Id::udp> {
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                  UdpListenerCallbacks& cb, TimeSource& time_source);
+                  UdpListenerCallbacks& cb, TimeSource& time_source, ListenerConfig& config);
 
   ~UdpListenerImpl() override;
 
@@ -45,6 +45,8 @@ public:
     return MAX_UDP_PACKET_SIZE;
   }
 
+  UdpPacketWriter* udpPacketWriter() override { return udp_packet_writer_.get(); }
+
 protected:
   void handleWriteCallback();
   void handleReadCallback();
@@ -57,6 +59,7 @@ private:
 
   TimeSource& time_source_;
   Event::FileEventPtr file_event_;
+  UdpPacketWriterPtr udp_packet_writer_;
 };
 
 } // namespace Network

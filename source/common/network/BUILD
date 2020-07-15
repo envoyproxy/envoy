@@ -220,6 +220,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":listen_socket_lib",
+        ":well_known_names_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/network:exception_interface",
@@ -384,6 +385,40 @@ envoy_cc_library(
     deps = [
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "well_known_names_lib",
+    hdrs = ["well_known_names.h"],
+    deps = ["//source/common/singleton:const_singleton"],
+)
+
+envoy_cc_library(
+    name = "udp_packet_writer_handler_lib",
+    srcs = ["udp_packet_writer_handler_impl.cc"],
+    hdrs = ["udp_packet_writer_handler_impl.h"],
+    deps = [
+        ":io_socket_error_lib",
+        ":utility_lib",
+        ":well_known_names_lib",
+        "//include/envoy/network:socket_interface",
+        "//include/envoy/network:udp_packet_writer_config_interface",
+        "//include/envoy/network:udp_packet_writer_handler_interface",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "udp_default_writer_config",
+    srcs = ["udp_default_writer_config.cc"],
+    hdrs = ["udp_default_writer_config.h"],
+    deps = [
+        ":udp_packet_writer_handler_lib",
+        ":well_known_names_lib",
+        "//include/envoy/network:udp_packet_writer_config_interface",
+        "//include/envoy/registry",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
