@@ -3149,7 +3149,7 @@ public:
     expectSetsockopts(names_vals);
   }
 
-  void expectNoSocketOptions() {
+  void expectOnlyNoSigpipeOptions() {
     std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
         {ENVOY_SOCKET_SO_NOSIGPIPE, 1}};
     expectSetsockopts(names_vals);
@@ -3177,7 +3177,7 @@ TEST_F(SockoptsTest, SockoptsUnset) {
                     port_value: 11001
   )EOF";
   initialize(yaml);
-  expectNoSocketOptions();
+  expectOnlyNoSigpipeOptions();
 }
 
 TEST_F(SockoptsTest, FreebindClusterOnly) {
@@ -3440,6 +3440,31 @@ public:
   }
 
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+
+  void expectOnlyNoSigpipeOptions() {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    NiceMock<Network::MockConnectionSocket> socket;
+    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+        .WillOnce(Invoke([this, &socket](Network::Address::InstanceConstSharedPtr,
+                                         Network::Address::InstanceConstSharedPtr,
+                                         Network::TransportSocketPtr&,
+                                         const Network::ConnectionSocket::OptionsSharedPtr& options)
+                             -> Network::ClientConnection* {
+          EXPECT_NE(nullptr, options.get());
+          EXPECT_TRUE((Network::Socket::applyOptions(
+              options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
+          return connection_;
+        }));
+    EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_NOSIGPIPE.level(),
+                                        ENVOY_SOCKET_SO_NOSIGPIPE.option(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return {0, 0};
+        }));
+    auto conn_data = cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
+    EXPECT_EQ(connection_, conn_data.connection_.get());
+  }
 };
 
 TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
@@ -3461,7 +3486,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
                     port_value: 11001
   )EOF";
   initialize(yaml);
-  expectSetsockoptSoKeepalive({}, {}, {});
+  expectOnlyNoSigpipeOptions();
 }
 
 TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {
