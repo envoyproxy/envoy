@@ -39,6 +39,4 @@ envoy_mobile_toolchains()
 
 # Note: proguard is failing for API 30+
 android_sdk_repository(name = "androidsdk", api_level = 29)
-
-# Fixing to API 24. Need to lower to API 21: https://github.com/lyft/envoy-mobile/issues/936
-android_ndk_repository(name = "androidndk", api_level = 24)
+android_ndk_repository(name = "androidndk", api_level = 21)
