@@ -45,6 +45,7 @@ public:
       std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
     hd.processMessage(std::move(message));
   };
+  HdsDelegateStats getStats(HdsDelegate& hd) { return hd.stats_; };
 };
 
 class HdsTest : public testing::Test {
@@ -225,6 +226,91 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   // Check Correctness
   EXPECT_EQ(hds_delegate_->hdsClusters()[0]->healthCheckers().size(), 2);
   EXPECT_EQ(hds_delegate_->hdsClusters()[1]->healthCheckers().size(), 3);
+}
+
+// Test if processMessage exits gracefully upon receiving a malformed message
+TEST_F(HdsTest, TestProcessMessageMissingFields) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+  // remove healthy threshold field to create an error
+  message->mutable_cluster_health_checks(0)->mutable_health_checks(0)->clear_healthy_threshold();
+
+  // call onReceiveMessage function for testing. Should increment stat_ errors upon
+  // getting a bad message
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Ensure that we never enabled the response timer that would start health checks,
+  // since this config was invalid.
+  EXPECT_FALSE(server_response_timer_->enabled_);
+
+  // ensure that no partial information was stored in hds_clusters_
+  EXPECT_TRUE(hds_delegate_->hdsClusters().empty());
+
+  // Check Correctness by verifying one request and one error has been generated in stat_
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 1);
+}
+
+// Test if processMessage exits gracefully upon receiving a malformed message
+// There was a previous valid config, so we go back to that.
+TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Create a invalid message
+  message.reset(createSimpleMessage());
+
+  // set this address to be distinguishable from the previous message in sendResponse()
+  message->mutable_cluster_health_checks(0)
+      ->mutable_locality_endpoints(0)
+      ->mutable_endpoints(0)
+      ->mutable_address()
+      ->mutable_socket_address()
+      ->set_address("9.9.9.9");
+
+  // remove healthy threshold field to create an error
+  message->mutable_cluster_health_checks(0)->mutable_health_checks(0)->clear_healthy_threshold();
+
+  // Pass invalid message through. Should increment stat_ errors upon
+  // getting a bad message.
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Ensure that the timer is enabled since there was a previous valid specifier.
+  EXPECT_TRUE(server_response_timer_->enabled_);
+
+  // read the response and check that it is pinging the old
+  // address 127.0.0.0 instead of the new 9.9.9.9
+  auto response = hds_delegate_->sendResponse();
+  EXPECT_EQ(response.endpoint_health_response()
+                .endpoints_health(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.0");
+
+  // Check Correctness by verifying one request and one error has been generated in stat_
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
 }
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
