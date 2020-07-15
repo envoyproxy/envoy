@@ -1096,7 +1096,6 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   redis_client->close();
 }
 
-// This test injects an error fault. The server responds with an error.
 TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
   std::string fault_response =
       fmt::format("-{}\r\n", Extensions::NetworkFilters::Common::Redis::FaultMessages::get().Error);
@@ -1107,7 +1106,6 @@ TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error_fault")->value());
 }
 
-// This test injects a delay fault. The response from the server is unaffected.
 TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
   const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
   const std::string& set_response = ":1\r\n";
