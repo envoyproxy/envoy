@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.kafka_broker",
     deps = [
         "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
 
