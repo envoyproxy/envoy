@@ -117,7 +117,7 @@ int TestRunner::RunTests(int argc, char** argv) {
                         "Running with runtime feature override disable {}",
                         runtime_override_disable);
     // Set up a listener which will create a global runtime and set the feature
-    // to true for the duration of each test instance.
+    // to false for the duration of each test instance.
     ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
     listeners.Append(new RuntimeManagingListener(runtime_override_disable, true));
   }
