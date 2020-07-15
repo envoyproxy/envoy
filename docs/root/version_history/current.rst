@@ -32,6 +32,7 @@ Removed Config or Runtime
 New Features
 ------------
 * grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
+* load balancer: added a :ref:`configuration<envoy_v3_api_msg_config.cluster.v3.Cluster.LeastRequestLbConfig>` option to specify the active request bias used by the least request load balancer.
 * tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
 
 Deprecated
