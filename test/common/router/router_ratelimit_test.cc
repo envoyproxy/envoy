@@ -28,15 +28,16 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::config::route::v3::RateLimit parseRateLimitFromV2Yaml(const std::string& yaml_string) {
+envoy::config::route::v3::RateLimit parseRateLimitFromV3Yaml(const std::string& yaml_string,
+                                                             bool avoid_boosting = true) {
   envoy::config::route::v3::RateLimit rate_limit;
-  TestUtility::loadFromYaml(yaml_string, rate_limit);
+  TestUtility::loadFromYaml(yaml_string, rate_limit, false, avoid_boosting);
   TestUtility::validate(rate_limit);
   return rate_limit;
 }
 
 TEST(BadRateLimitConfiguration, MissingActions) {
-  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV2Yaml("{}"), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV3Yaml("{}"), EnvoyException,
                           "value must contain at least");
 }
 
@@ -46,7 +47,7 @@ actions:
 - request_headers: {}
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV2Yaml(yaml_one), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV3Yaml(yaml_one), EnvoyException,
                           "value length must be at least");
 
   const std::string yaml_two = R"EOF(
@@ -55,7 +56,7 @@ actions:
     header_name: test
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV2Yaml(yaml_two), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV3Yaml(yaml_two), EnvoyException,
                           "value length must be at least");
 
   const std::string yaml_three = R"EOF(
@@ -64,7 +65,7 @@ actions:
     descriptor_key: test
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV2Yaml(yaml_three), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(parseRateLimitFromV3Yaml(yaml_three), EnvoyException,
                           "value length must be at least");
 }
 
@@ -268,7 +269,7 @@ virtual_hosts:
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV2Yaml(yaml));
+    rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromV3Yaml(yaml));
     descriptors_.clear();
   }
 
