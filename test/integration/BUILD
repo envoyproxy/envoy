@@ -753,6 +753,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/network:socket_interface_lib",
+        "//source/extensions/filters/network/echo:config",
     ],
 )
 

@@ -18,13 +18,27 @@ public:
 
   static std::string config() {
     // At least one empty filter chain needs to be specified.
-    return absl::StrCat(ConfigHelper::httpProxyConfig(), R"EOF(
+    return absl::StrCat(echoConfig(), R"EOF(
 bootstrap_extensions:
   - name: envoy.extensions.network.socket_interface.default_socket_interface
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.network.socket_interface.v3.DefaultSocketInterface
 default_socket_interface: "envoy.extensions.network.socket_interface.default_socket_interface"
     )EOF");
+  }
+  static std::string echoConfig() {
+    return absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
+    filter_chains:
+      filters:
+        name: ratelimit
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.rate_limit.v2.RateLimit
+          domain: foo
+          stats_prefix: name
+          descriptors: [{"key": "foo", "value": "bar"}]
+      filters:
+        name: envoy.filters.network.echo
+      )EOF");
   }
 };
 
@@ -37,6 +51,16 @@ TEST_P(SocketInterfaceIntegrationTest, Basic) {
   const Network::SocketInterface* factory = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
   ASSERT_TRUE(Network::SocketInterfaceSingleton::getExisting() == factory);
+
+  std::string response;
+  auto connection = createConnectionDriver(
+      lookupPort("listener_0"), "hello",
+      [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        conn.close(Network::ConnectionCloseType::FlushWrite);
+      });
+  connection->run();
+  EXPECT_EQ("hello", response);
 }
 
 } // namespace
