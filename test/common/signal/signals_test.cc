@@ -21,6 +21,12 @@ namespace Envoy {
 #define ASANITIZED /* Sanitized by GCC */
 #endif
 
+// Use this test handler instead of a mock, because fatal error handlers must be
+// signal-safe and a mock might allocate memory.
+class TestFatalErrorHandler : public FatalErrorHandlerInterface {
+  void onFatalError(std::ostream& os) const override { os << "HERE!"; }
+};
+
 // Death tests that expect a particular output are disabled under address sanitizer.
 // The sanitizer does its own special signal handling and prints messages that are
 // not ours instead of what this test expects. As of latest Clang this appears
@@ -32,16 +38,10 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
       []() -> void {
         // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
-        *(nasty_ptr) = 0;
+        *(nasty_ptr) = 0; // NOLINT
       }(),
       "backtrace.*Segmentation fault");
 }
-
-// Use this test handler instead of a mock, because fatal error handlers must be
-// signal-safe and a mock might allocate memory.
-class TestFatalErrorHandler : public FatalErrorHandlerInterface {
-  void onFatalError(std::ostream& os) const override { os << "HERE!"; }
-};
 
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
   TestFatalErrorHandler handler;
