@@ -18,6 +18,9 @@ using SpdLoggerPtr = std::shared_ptr<spdlog::logger>;
  */
 class FancyContext {
 public:
+  /**
+   * Gets a logger from map given the key (e.g. file name).
+   */
   static SpdLoggerPtr getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
@@ -71,7 +74,7 @@ private:
 
 /**
  * Macro for fancy logger.
- * Use a global map to store logger and take use of thread-safe spdlog::logger.
+ * Uses a global map to store logger and take use of thread-safe spdlog::logger.
  * The local pointer is used to avoid another load() when logging. Here we use
  * spdlog::logger* as atomic<shared_ptr> is a C++20 feature.
  */
