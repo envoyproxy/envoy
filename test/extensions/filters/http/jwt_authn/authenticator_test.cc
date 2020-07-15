@@ -185,18 +185,17 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
   expectVerifyStatus(Status::JwtMissed, headers);
 }
 
-// This test verifies if there are multiple tokens, request is rejected.
+// This test verifies a request with multiple tokens is rejected.
 TEST_F(AuthenticatorTest, TestMultipleJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
   // headers with multiple tokens
-  auto headers =
-      Http::TestRequestHeaderMapImpl{
-    {"Authorization", "Bearer " + std::string(NonExistKidToken)},
-    {":path", "/foo?access_token=invalid-token"},
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {"Authorization", "Bearer " + std::string(NonExistKidToken)},
+      {":path", "/foo?access_token=invalid-token"},
   };
 
-  expectVerifyStatus(Status::JwtMissed, headers);
+  expectVerifyStatus(Status::JwtMultipleTokens, headers);
 }
 
 // This test verifies if Jwt is invalid, JwtBadFormat status is returned.

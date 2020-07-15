@@ -130,10 +130,16 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
     return;
   }
 
-  // For a valid provider without allow_failed, multiple tokens exist, reject it.
+  // By default, this filter extracts JWT token from Authorization header and
+  // access_token query parameter. A request may have multiple JWT tokens, and will be
+  // forwarded to the backend if one of the tokens is good. It poses a security risk:
+  // a hacker can put a good token in the query parameter and an invalid one in
+  // the Authorization header. Envoy will forward the request to the backend,
+  // and the backend will use the bad token in Authorization header.
+  // This check will patch such security hole.
   if (tokens_.size() > 1 && provider_ && !is_allow_failed_) {
     tokens_.clear();
-    doneWithStatus(Status::JwtMissed);
+    doneWithStatus(Status::JwtMultipleTokens);
     return;
   }
 
