@@ -198,7 +198,7 @@ There are four suggested options for testing new runtime features:
    GetParam() as outlined in (1).
 3. Set up integration tests with custom runtime defaults as documented in the
    [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
-4. Run a given unit test with the new runtime value explicitly set true as done
+4. Run a given unit test with the new runtime value explicitly set true or false as done
    for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD)
 
 Runtime code is held to the same standard as regular Envoy code, so both the old
