@@ -8,7 +8,7 @@
  namespace Http2 {
  
  // This is not the full client magic, but it's the smallest size that should be able to
-@@ -87,7 +88,7 @@
+@@ -89,7 +90,7 @@
   */
  class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
  public:
@@ -17,7 +17,7 @@
                   const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                   const uint32_t max_headers_kb, const uint32_t max_headers_count);
  
-@@ -250,9 +251,9 @@
+@@ -252,9 +253,9 @@
      virtual void decodeTrailers() PURE;
  
      // Get MetadataEncoder for this stream.
@@ -29,7 +29,7 @@
      // Callback function for MetadataDecoder.
      void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
  
-@@ -271,8 +272,8 @@
+@@ -273,8 +274,8 @@
          [this]() -> void { this->pendingSendBufferHighWatermark(); },
          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
      HeaderMapPtr pending_trailers_to_encode_;
@@ -40,7 +40,7 @@
      absl::optional<StreamResetReason> deferred_reset_;
      HeaderString cookies_;
      bool local_end_stream_sent_ : 1;
-@@ -412,7 +413,7 @@
+@@ -414,7 +415,7 @@
  
    std::list<StreamImplPtr> active_streams_;
    nghttp2_session* session_{};
@@ -49,16 +49,16 @@
    Network::Connection& connection_;
    const uint32_t max_headers_kb_;
    const uint32_t max_headers_count_;
-@@ -519,7 +520,7 @@
- class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
+@@ -522,7 +523,7 @@
  public:
+   using SessionFactory = Nghttp2SessionFactory;
    ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
 -                       CodecStats& stats,
 +                       Http::Http2::CodecStats& stats,
                         const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                         const uint32_t max_response_headers_kb,
                         const uint32_t max_response_headers_count,
-@@ -554,7 +555,7 @@
+@@ -557,7 +558,7 @@
  class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
  public:
    ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
@@ -67,7 +67,7 @@
                         const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                         const uint32_t max_request_headers_kb,
                         const uint32_t max_request_headers_count,
-@@ -593,6 +594,7 @@
+@@ -596,6 +597,7 @@
  };
  
  } // namespace Http2

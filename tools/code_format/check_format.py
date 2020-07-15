@@ -98,10 +98,7 @@ CODEC_DIFFS = (("./source/common/http/http1/codec_impl.h",
                 "./tools/code_format/codec_diffs/http2_codec_impl_h"),
                ("./source/common/http/http2/codec_impl.cc",
                 "./source/common/http/http2/codec_impl_legacy.cc",
-                "./tools/code_format/codec_diffs/http2_codec_impl_cc"),
-               ("./test/common/http/http2/codec_impl_test.cc",
-                "./test/common/http/http2/codec_impl_legacy_test.cc",
-                "./tools/code_format/codec_diffs/http2_codec_impl_test_cc"))
+                "./tools/code_format/codec_diffs/http2_codec_impl_cc"))
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")

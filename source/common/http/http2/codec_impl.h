@@ -54,14 +54,16 @@ class ConnectionImpl;
 // Abstract nghttp2_session factory. Used to enable injection of factories for testing.
 class Nghttp2SessionFactory {
 public:
+  using ConnectionImplType = ConnectionImpl;
   virtual ~Nghttp2SessionFactory() = default;
 
   // Returns a new nghttp2_session to be used with |connection|.
   virtual nghttp2_session* create(const nghttp2_session_callbacks* callbacks,
-                                  ConnectionImpl* connection, const nghttp2_option* options) PURE;
+                                  ConnectionImplType* connection,
+                                  const nghttp2_option* options) PURE;
 
   // Initializes the |session|.
-  virtual void init(nghttp2_session* session, ConnectionImpl* connection,
+  virtual void init(nghttp2_session* session, ConnectionImplType* connection,
                     const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
 };
 
@@ -518,12 +520,13 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
+  using SessionFactory = Nghttp2SessionFactory;
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
-                       Nghttp2SessionFactory& http2_session_factory);
+                       SessionFactory& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
