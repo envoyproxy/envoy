@@ -52,7 +52,7 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
       []() -> void {
         // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
-        *(nasty_ptr) = 0;
+        *(nasty_ptr) = 0; // NOLINT
       }(),
       "HERE");
   FatalErrorHandler::removeFatalErrorHandler(handler);
