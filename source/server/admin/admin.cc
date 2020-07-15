@@ -679,48 +679,6 @@ ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool dumpActiveLi
   return unready_targets_config_dump;
 }
 
-// ProtobufTypes::MessagePtr AdminImpl::dumpActiveListenerUnreadyTargetsConfigs() const {
-//   auto unready_targets_config_dump =
-//   std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDump>();
-
-//   for (auto& listenerConfig : server_.listenerManager().listeners()) {
-//     auto& listener_message =
-//         *unready_targets_config_dump->mutable_listener_unready_targets_configs()->Add();
-//     listener_message.set_listener_init_manager_name(listenerConfig.get().name());
-
-//     auto& listener = dynamic_cast<ListenerImpl&>(listenerConfig.get());
-//     const auto& init_manager = dynamic_cast<Init::ManagerImpl&>(listener.initManager());
-//     const absl::flat_hash_map<std::string, uint32_t>& unready_targets =
-//         init_manager.unreadyTargets();
-
-//     for (const auto& unready_target : unready_targets) {
-//       listener_message.add_target_names(unready_target.first);
-//     }
-//   }
-//   return unready_targets_config_dump;
-// }
-
-// ProtobufTypes::MessagePtr AdminImpl::dumpWarmingListenersUnreadyTargetsConfigs() const {
-//   auto unready_targets_config_dump =
-//   std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDump>();
-
-//   for (auto& listenerConfig : server_.listenerManager().warmingListeners()) {
-//     auto& listener_message =
-//         *unready_targets_config_dump->mutable_listener_unready_targets_configs()->Add();
-//     listener_message.set_listener_init_manager_name(listenerConfig.get().name());
-
-//     auto& listener = dynamic_cast<ListenerImpl&>(listenerConfig.get());
-//     const auto& init_manager = dynamic_cast<Init::ManagerImpl&>(listener.initManager());
-//     const absl::flat_hash_map<std::string, uint32_t>& unready_targets =
-//         init_manager.unreadyTargets();
-
-//     for (const auto& unready_target : unready_targets) {
-//       listener_message.add_target_names(unready_target.first);
-//     }
-//   }
-//   return unready_targets_config_dump;
-// }
-
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
                                         Http::ResponseHeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) const {
