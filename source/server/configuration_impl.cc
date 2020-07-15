@@ -92,16 +92,17 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, megamiss_timeout, 1000));
 
   uint64_t kill_timeout = PROTOBUF_GET_MS_OR_DEFAULT(watchdog, kill_timeout, 0);
-  const uint64_t max_skew = PROTOBUF_GET_MS_OR_DEFAULT(watchdog, max_kill_skew, 0);
+  const uint64_t max_kill_timeout_jitter =
+      PROTOBUF_GET_MS_OR_DEFAULT(watchdog, max_kill_timeout_jitter, 0);
 
   // Adjust kill timeout if we have skew enabled.
-  if (kill_timeout > 0 && max_skew > 0) {
+  if (kill_timeout > 0 && max_kill_timeout_jitter > 0) {
 
-    // Increments the kill timeout with a random value in (0, max_skew).
+    // Increments the kill timeout with a random value in (0, max_skew].
     // We shouldn't have overflow issues due to the range of Duration.
     // This won't be entirely uniform, depending on how large max_skew
     // is relation to uint64.
-    kill_timeout += (server.random().random() % max_skew) + 1;
+    kill_timeout += (server.random().random() % max_kill_timeout_jitter) + 1;
   }
 
   watchdog_kill_timeout_ = std::chrono::milliseconds(kill_timeout);
