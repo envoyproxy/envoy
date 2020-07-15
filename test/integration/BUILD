@@ -749,6 +749,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "socket_interface_integration_test",
     srcs = ["socket_interface_integration_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
         "//source/common/network:socket_interface_lib",
