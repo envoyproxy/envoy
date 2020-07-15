@@ -119,3 +119,19 @@ test infrastructure that wants to be agnostic to which `TimeSystem` is used in a
 test. When no `TimeSystem` is instantiated in a test, the `Event::GlobalTimeSystem`
 will lazy-initialize itself into a concrete `TimeSystem`. Currently this is
 `TestRealTimeSystem` but will be changed in the future to `SimulatedTimeSystem`.
+
+
+## Benchmark tests
+
+Envoy uses [Google Benchmark](https://github.com/google/benchmark/) for
+microbenchmarks. There are custom bazel rules, `envoy_cc_benchmark_binary` and
+`envoy_benchmark_test`, to execute them locally and in CI environments
+respectively. `envoy_benchmark_test` rules call the bechmark binary from a
+[script](https://github.com/envoyproxy/envoy/blob/master/bazel/test_for_benchmark_wrapper.sh)
+which runs the test quickly instead of rigourously. In order to collect
+meaningful bechmarks, `bazel run -c opt` the benchmark binary target on a
+quiescent machine.
+
+If you would like to detect when your benchmark test is running under the
+wrapper, call
+[`Envoy::benchmark::skipExpensiveBechmarks()`](https://github.com/envoyproxy/envoy/blob/master/test/benchmark/main.h).
