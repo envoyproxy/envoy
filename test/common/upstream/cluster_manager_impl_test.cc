@@ -3439,11 +3439,7 @@ public:
     EXPECT_EQ(connection_, conn_data.connection_.get());
   }
 
-  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
-
   void expectOnlyNoSigpipeOptions() {
-    NiceMock<Api::MockOsSysCalls> os_sys_calls;
-    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     NiceMock<Network::MockConnectionSocket> socket;
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Invoke([this, &socket](Network::Address::InstanceConstSharedPtr,
@@ -3465,6 +3461,8 @@ public:
     auto conn_data = cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
     EXPECT_EQ(connection_, conn_data.connection_.get());
   }
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
 };
 
 TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
