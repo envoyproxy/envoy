@@ -178,7 +178,7 @@ private:
   // only after referencing members are gone, since initialization continuation can potentially
   // occur at any point during member lifetime.
   Init::ManagerImpl init_manager_{"Validation server"};
-  Init::WatcherImpl init_watcher_{"(no-op)", [](absl::string_view) {}};
+  Init::WatcherImpl init_watcher_{"(no-op)", []() {}};
   // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
   // only after these members can no longer reference it, since:
   // - There may be active filter chains referencing it in listener_manager_.

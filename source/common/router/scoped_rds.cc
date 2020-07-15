@@ -258,7 +258,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
           Init::WatcherImpl noop_watcher(
               // Note: we just throw it away.
               fmt::format("SRDS ConfigUpdate watcher {}:{}", name_, version_info),
-              [](absl::string_view) { /*Do nothing.*/ });
+              []() { /*Do nothing.*/ });
           srds_init_mgr->initialize(noop_watcher);
         });
   }

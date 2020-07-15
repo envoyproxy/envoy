@@ -250,7 +250,7 @@ private:
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
-  void onRdtsReady(absl::string_view target_name);
+  void onRdtsReady();
 
   Random::RandomGenerator& generator_;
   RuntimeStats stats_;

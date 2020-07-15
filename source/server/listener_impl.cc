@@ -251,16 +251,15 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
           std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
           cx_limit_runtime_key_)),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this](absl::string_view) {
-                            if (workers_started_) {
-                              parent_.onListenerWarmed(*this);
-                            } else {
-                              // Notify Server that this listener is
-                              // ready.
-                              listener_init_target_.ready();
-                            }
-                          }) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this]() {
+        if (workers_started_) {
+          parent_.onListenerWarmed(*this);
+        } else {
+          // Notify Server that this listener is
+          // ready.
+          listener_init_target_.ready();
+        }
+      }) {
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -322,11 +321,10 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this](absl::string_view) {
-                            ASSERT(workers_started_);
-                            parent_.inPlaceFilterChainUpdate(*this);
-                          }) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this]() {
+        ASSERT(workers_started_);
+        parent_.inPlaceFilterChainUpdate(*this);
+      }) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);

@@ -73,7 +73,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       parent_init_target_(fmt::format("RdsRouteConfigSubscription init {}", route_config_name_),
                           [this]() { local_init_manager_.initialize(local_init_watcher_); }),
       local_init_watcher_(fmt::format("RDS local-init-watcher {}", rds.route_config_name()),
-                          [this](absl::string_view) { parent_init_target_.ready(); }),
+                          [this]() { parent_init_target_.ready(); }),
       local_init_target_(
           fmt::format("RdsRouteConfigSubscription local-init-target {}", route_config_name_),
           [this]() { subscription_->start({route_config_name_}); }),
@@ -169,7 +169,7 @@ void RdsRouteConfigSubscription::maybeCreateInitManager(
       Init::WatcherImpl noop_watcher(
           // Note: we just throw it away.
           fmt::format("VHDS ConfigUpdate watcher {}:{}", route_config_name_, version_info),
-          [](absl::string_view) { /*Do nothing.*/ });
+          []() { /*Do nothing.*/ });
       init_manager->initialize(noop_watcher);
     });
   }

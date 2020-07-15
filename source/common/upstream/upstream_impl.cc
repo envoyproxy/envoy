@@ -875,8 +875,7 @@ ClusterImplBase::ClusterImplBase(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
-      init_watcher_("ClusterImplBase", [this](absl::string_view) { onInitDone(); }),
-      runtime_(runtime),
+      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
