@@ -1,4 +1,4 @@
-#include "test/extensions/filters/listener/common/uber_filter.h"
+#include "test/extensions/filters/listener/common/listener_filter_fuzzer.h"
 
 #include "common/network/utility.h"
 
@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 
-void UberFilterFuzzer::fuzz(Network::ListenerFilter& filter,
+void ListenerFilterFuzzer::fuzz(Network::ListenerFilter& filter,
                             const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   try {
     fuzzerSetup(input);
@@ -18,7 +18,7 @@ void UberFilterFuzzer::fuzz(Network::ListenerFilter& filter,
   filter.onAccept(cb_);
 }
 
-void UberFilterFuzzer::socketSetup(
+void ListenerFilterFuzzer::socketSetup(
     const test::extensions::filters::listener::FilterFuzzTestCase& input) {
   socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
   socket_.setRemoteAddress(Network::Utility::resolveUrl(input.sock().remote_address()));

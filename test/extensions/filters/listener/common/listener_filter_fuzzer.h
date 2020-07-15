@@ -1,6 +1,6 @@
 #include "envoy/network/filter.h"
 
-#include "test/extensions/filters/listener/common/listener_filter_fuzz_test.pb.validate.h"
+#include "test/extensions/filters/listener/common/listener_filter_fuzzer.pb.validate.h"
 #include "test/mocks/network/fakes.h"
 #include "test/mocks/network/mocks.h"
 
@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 
-class UberFilterFuzzer {
+class ListenerFilterFuzzer {
 public:
   void fuzz(Network::ListenerFilter& filter,
             const test::extensions::filters::listener::FilterFuzzTestCase& input);
@@ -25,7 +25,6 @@ private:
 
   NiceMock<Network::MockListenerFilterCallbacks> cb_;
   Network::FakeConnectionSocket socket_;
-  // NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 } // namespace ListenerFilters

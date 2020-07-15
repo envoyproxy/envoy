@@ -10,18 +10,16 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_proto_library(
-    name = "listener_filter_fuzz_test_proto",
-    srcs = ["listener_filter_fuzz_test.proto"],
+    name = "listener_filter_fuzzer_proto",
+    srcs = ["listener_filter_fuzzer.proto"],
 )
 
 envoy_cc_test_library(
-    name = "uber_filter_lib",
-    srcs = [
-        "uber_filter.cc",
-    ],
-    hdrs = ["uber_filter.h"],
+    name = "listener_filter_fuzzer_lib",
+    srcs = ["listener_filter_fuzzer.cc"],
+    hdrs = ["listener_filter_fuzzer.h"],
     deps = [
-        ":listener_filter_fuzz_test_proto_cc_proto",
+        ":listener_filter_fuzzer_proto_cc_proto",
         "//include/envoy/network:filter_interface",
         "//test/mocks/network:network_fakes",
         "//test/mocks/network:network_mocks",
