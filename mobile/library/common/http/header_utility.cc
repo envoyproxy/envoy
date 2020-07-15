@@ -11,7 +11,7 @@ std::string convertToString(envoy_data s) {
 }
 
 RequestHeaderMapPtr toRequestHeaders(envoy_headers headers) {
-  RequestHeaderMapPtr transformed_headers = std::make_unique<RequestHeaderMapImpl>();
+  RequestHeaderMapPtr transformed_headers = RequestHeaderMapImpl::create();
   for (envoy_header_size_t i = 0; i < headers.length; i++) {
     transformed_headers->addCopy(LowerCaseString(convertToString(headers.headers[i].key)),
                                  convertToString(headers.headers[i].value));
@@ -22,7 +22,7 @@ RequestHeaderMapPtr toRequestHeaders(envoy_headers headers) {
 }
 
 RequestTrailerMapPtr toRequestTrailers(envoy_headers trailers) {
-  RequestTrailerMapPtr transformed_trailers = std::make_unique<RequestTrailerMapImpl>();
+  RequestTrailerMapPtr transformed_trailers = RequestTrailerMapImpl::create();
   for (envoy_header_size_t i = 0; i < trailers.length; i++) {
     transformed_trailers->addCopy(LowerCaseString(convertToString(trailers.headers[i].key)),
                                   convertToString(trailers.headers[i].value));

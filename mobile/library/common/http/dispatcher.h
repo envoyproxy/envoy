@@ -168,6 +168,8 @@ private:
     // TODO: https://github.com/lyft/envoy-mobile/issues/825
     void readDisable(bool /*disable*/) override {}
     uint32_t bufferLimit() override { return 65000; }
+    // Not applicable
+    void setFlushTimeout(std::chrono::milliseconds) override {}
 
     void closeLocal(bool end_stream);
 

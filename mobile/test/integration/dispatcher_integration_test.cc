@@ -19,7 +19,7 @@ namespace {
 
 // Based on Http::Utility::toRequestHeaders() but only used for these tests.
 Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
-  Http::ResponseHeaderMapPtr transformed_headers = std::make_unique<Http::ResponseHeaderMapImpl>();
+  Http::ResponseHeaderMapPtr transformed_headers = Http::ResponseHeaderMapImpl::create();
   for (envoy_header_size_t i = 0; i < headers.length; i++) {
     transformed_headers->addCopy(
         Http::LowerCaseString(Http::Utility::convertToString(headers.headers[i].key)),
@@ -195,7 +195,7 @@ TEST_P(DispatcherIntegrationTest, BasicNon2xx) {
   // Set response header status to be non-2xx to test that the correct stats get charged.
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
       ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestHeaderMapImpl({{":status", "503"}, {"content-length", "0"}})));
+          Http::TestResponseHeaderMapImpl({{":status", "503"}, {"content-length", "0"}})));
 
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response.
