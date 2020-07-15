@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier_base.h"
 
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+
 #include "openssl/ssl.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/core/crypto/crypto_protocol.h"
@@ -29,7 +31,6 @@ bool EnvoyQuicProofVerifierBase::verifySignature(const std::string& server_confi
                                                  absl::string_view chlo_hash,
                                                  const std::string& cert,
                                                  const std::string& signature) {
-
   size_t payload_size = sizeof(quic::kProofSignatureLabel) + sizeof(uint32_t) + chlo_hash.size() +
                         server_config.size();
   auto payload = std::make_unique<char[]>(payload_size);
@@ -46,8 +47,14 @@ bool EnvoyQuicProofVerifierBase::verifySignature(const std::string& server_confi
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(cert);
   ASSERT(cert_view != nullptr);
+  std::string error;
+  int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), &error);
+  if (sign_alg == 0) {
+    ENVOY_LOG(warn, absl::StrCat("Invalid leaf cert, ", error));
+    return false;
+  }
   return cert_view->VerifySignature(quiche::QuicheStringPiece(payload.get(), payload_size),
-                                    signature, SSL_SIGN_RSA_PSS_RSAE_SHA256);
+                                    signature, sign_alg);
 }
 
 } // namespace Quic

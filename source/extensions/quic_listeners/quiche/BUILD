@@ -68,6 +68,7 @@ envoy_cc_library(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
+        ":envoy_quic_utils_lib",
         "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
         "@com_googlesource_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@com_googlesource_quiche//:quic_core_crypto_proof_source_interface_lib",
@@ -101,6 +102,7 @@ envoy_cc_library(
     external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
+        ":envoy_quic_utils_lib",
         "@com_googlesource_quiche//:quic_core_crypto_certificate_view_lib",
         "@com_googlesource_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@com_googlesource_quiche//:quic_core_versions_lib",
@@ -115,6 +117,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_verifier_base_lib",
+        ":envoy_quic_utils_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
     ],
 )
@@ -335,7 +338,10 @@ envoy_cc_library(
     name = "envoy_quic_utils_lib",
     srcs = ["envoy_quic_utils.cc"],
     hdrs = ["envoy_quic_utils.h"],
-    external_deps = ["quiche_quic_platform"],
+    external_deps = [
+        "quiche_quic_platform",
+        "ssl",
+    ],
     tags = ["nofips"],
     deps = [
         "//include/envoy/http:codec_interface",

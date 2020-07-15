@@ -1,25 +1,11 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+
 #include "quiche/quic/core/crypto/certificate_view.h"
 
 namespace Envoy {
 namespace Quic {
-
-static X509* parseDERCertificate(const std::string& der_bytes, std::string* error_details) {
-  const uint8_t* data;
-  const uint8_t* orig_data;
-  orig_data = data = reinterpret_cast<const uint8_t*>(der_bytes.data());
-  bssl::UniquePtr<X509> cert(d2i_X509(nullptr, &data, der_bytes.size()));
-  if (!cert.get()) {
-    *error_details = "d2i_X509";
-    return nullptr;
-  }
-  if (data < orig_data || static_cast<size_t>(data - orig_data) != der_bytes.size()) {
-    // Trailing garbage.
-    return nullptr;
-  }
-  return cert.release();
-}
 
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& hostname, const uint16_t /*port*/, const std::vector<std::string>& certs,
@@ -33,14 +19,14 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   bssl::UniquePtr<STACK_OF(X509)> intermediates(sk_X509_new_null());
   bssl::UniquePtr<X509> leaf;
   for (size_t i = 0; i < certs.size(); i++) {
-    X509* cert = parseDERCertificate(certs[i], error_details);
+    bssl::UniquePtr<X509> cert = parseDERCertificate(certs[i], error_details);
     if (!cert) {
       return quic::QUIC_FAILURE;
     }
     if (i == 0) {
-      leaf.reset(cert);
+      leaf = std::move(cert);
     } else {
-      sk_X509_push(intermediates.get(), cert);
+      sk_X509_push(intermediates.get(), cert.release());
     }
   }
 

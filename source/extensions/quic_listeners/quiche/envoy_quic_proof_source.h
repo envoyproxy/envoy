@@ -9,8 +9,7 @@ namespace Envoy {
 namespace Quic {
 
 // A ProofSource implementation which supplies a proof instance with certs from filter chain.
-class EnvoyQuicProofSource : public EnvoyQuicProofSourceBase,
-                             protected Logger::Loggable<Logger::Id::quic> {
+class EnvoyQuicProofSource : public EnvoyQuicProofSourceBase {
 public:
   EnvoyQuicProofSource(Network::Socket& listen_socket,
                        Network::FilterChainManager& filter_chain_manager,

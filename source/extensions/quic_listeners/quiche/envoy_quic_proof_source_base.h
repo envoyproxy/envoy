@@ -21,6 +21,7 @@
 #include "openssl/ssl.h"
 #include "envoy/network/filter.h"
 #include "server/backtrace.h"
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Quic {
@@ -40,7 +41,8 @@ private:
 };
 
 // A partial implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
-class EnvoyQuicProofSourceBase : public quic::ProofSource {
+class EnvoyQuicProofSourceBase : public quic::ProofSource,
+                                 protected Logger::Loggable<Logger::Id::quic> {
 public:
   ~EnvoyQuicProofSourceBase() override = default;
 

@@ -12,12 +12,15 @@
 
 #pragma GCC diagnostic pop
 
+#include "common/common/logger.h"
+
 namespace Envoy {
 namespace Quic {
 
 // A partial implementation of quic::ProofVerifier which does signature
 // verification using SSL_SIGN_RSA_PSS_RSAE_SHA256.
-class EnvoyQuicProofVerifierBase : public quic::ProofVerifier {
+class EnvoyQuicProofVerifierBase : public quic::ProofVerifier,
+                                   protected Logger::Loggable<Logger::Id::quic> {
 public:
   ~EnvoyQuicProofVerifierBase() override = default;
 

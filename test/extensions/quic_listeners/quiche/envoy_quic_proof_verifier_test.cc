@@ -23,7 +23,8 @@ namespace Quic {
 class EnvoyQuicProofVerifierTest : public testing::Test {
 public:
   EnvoyQuicProofVerifierTest()
-      : leaf_cert_([=]() {
+      : root_ca_cert_(cert_chain_.substr(cert_chain_.rfind("-----BEGIN CERTIFICATE-----"))),
+        leaf_cert_([=]() {
           std::stringstream pem_stream(cert_chain_);
           std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
           return chain[0];
@@ -35,9 +36,7 @@ public:
         .WillByDefault(
             ReturnRef(Extensions::TransportSockets::Tls::ClientContextConfigImpl::DEFAULT_CURVES));
     ON_CALL(client_context_config_, alpnProtocols()).WillByDefault(ReturnRef(alpn_));
-    ;
-    const std::string empty_string;
-    ON_CALL(client_context_config_, serverNameIndication()).WillByDefault(ReturnRef(empty_string));
+    ON_CALL(client_context_config_, serverNameIndication()).WillByDefault(ReturnRef(empty_string_));
     ON_CALL(client_context_config_, signingAlgorithmsForTest()).WillByDefault(ReturnRef(sig_algs_));
     ON_CALL(client_context_config_, certificateValidationContext())
         .WillByDefault(Return(&cert_validation_ctx_config_));
@@ -47,9 +46,7 @@ public:
   // paths for BoringSSL cert verification success and failure.
   void configCertVerificationDetails(bool allow_expired_cert) {
     // Getting the last cert in the chain as the root CA cert.
-    const std::string& root_ca_cert =
-        cert_chain_.substr(cert_chain_.rfind("-----BEGIN CERTIFICATE-----"));
-    EXPECT_CALL(cert_validation_ctx_config_, caCert()).WillRepeatedly(ReturnRef(root_ca_cert));
+    EXPECT_CALL(cert_validation_ctx_config_, caCert()).WillRepeatedly(ReturnRef(root_ca_cert_));
     EXPECT_CALL(cert_validation_ctx_config_, caCertPath()).WillRepeatedly(ReturnRef(path_string_));
     EXPECT_CALL(cert_validation_ctx_config_, trustChainVerification)
         .WillRepeatedly(Return(envoy::extensions::transport_sockets::tls::v3::
@@ -57,7 +54,7 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, allowExpiredCertificate())
         .WillRepeatedly(Return(allow_expired_cert));
     EXPECT_CALL(cert_validation_ctx_config_, certificateRevocationList())
-        .WillRepeatedly(ReturnRef(crl_list_));
+        .WillRepeatedly(ReturnRef(empty_string_));
     EXPECT_CALL(cert_validation_ctx_config_, certificateRevocationListPath())
         .WillRepeatedly(ReturnRef(path_string_));
     EXPECT_CALL(cert_validation_ctx_config_, verifySubjectAltNameList())
@@ -77,10 +74,11 @@ protected:
   const std::string alpn_{"h2,http/1.1"};
   const std::string sig_algs_{"rsa_pss_rsae_sha256"};
   const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_;
-  const std::string crl_list_;
+  const std::string empty_string_;
   const std::vector<std::string> empty_string_list_;
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
-  std::string leaf_cert_;
+  const std::string root_ca_cert_;
+  const std::string leaf_cert_;
   NiceMock<Stats::MockStore> store_;
   Event::GlobalTimeSystem time_system_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;

@@ -8,6 +8,8 @@
 
 #pragma GCC diagnostic pop
 
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -36,9 +38,27 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& server_ad
     return;
   }
 
+  std::string error_details;
+  bssl::UniquePtr<X509> cert = parseDERCertificate(chain->certs[0], &error_details);
+  if (cert == nullptr) {
+    ENVOY_LOG(warn, absl::StrCat("Invalid leaf cert: ", error_details));
+    quic::QuicCryptoProof proof;
+    callback->Run(/*ok=*/false, nullptr, proof, nullptr);
+    return;
+  }
+
+  bssl::UniquePtr<EVP_PKEY> pub_key(X509_get_pubkey(cert.get()));
+  int sign_alg = deduceSignatureAlgorithmFromPublicKey(pub_key.get(), &error_details);
+  if (sign_alg == 0) {
+    ENVOY_LOG(warn, error_details);
+    quic::QuicCryptoProof proof;
+    callback->Run(/*ok=*/false, nullptr, proof, nullptr);
+    return;
+  }
+
   // TODO(danzh) Get the signature algorithm from leaf cert.
   auto signature_callback = std::make_unique<SignatureCallback>(std::move(callback), chain);
-  ComputeTlsSignature(server_address, client_address, hostname, SSL_SIGN_RSA_PSS_RSAE_SHA256,
+  ComputeTlsSignature(server_address, client_address, hostname, sign_alg,
                       quiche::QuicheStringPiece(payload.get(), payload_size),
                       std::move(signature_callback));
 }
