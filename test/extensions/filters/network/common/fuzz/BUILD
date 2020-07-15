@@ -7,7 +7,6 @@ load(
 )
 load(
     "//source/extensions:all_extensions.bzl",
-    # "envoy_all_extensions",
     "envoy_all_network_filters",
 )
 

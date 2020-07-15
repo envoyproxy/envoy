@@ -21,7 +21,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
 
         // After extending to cover all the filters, we can use `Registry::FactoryRegistry<
         // Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames()`
-        // to get all the filter names instead of calling `UberFilterFuzzer::filter_names()`
+        // to get all the filter names instead of calling `UberFilterFuzzer::filter_names()`.
         static const auto filter_names = UberFilterFuzzer::filterNames();
         static const auto factories = Registry::FactoryRegistry<
             Server::Configuration::NamedNetworkFilterConfigFactory>::factories();

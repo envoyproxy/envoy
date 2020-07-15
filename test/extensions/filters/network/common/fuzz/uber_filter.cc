@@ -36,7 +36,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
 }
 
 void UberFilterFuzzer::reset() {
-  // Reset some changes made by current filter on some mock objects
+  // Reset some changes made by current filter on some mock objects.
 
   // Close the connection to make sure the filter's callback is set to nullptr.
   read_filter_callbacks_->connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
@@ -62,7 +62,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           auto check_response = Filters::Common::ExtAuthz::TestCommon::makeCheckResponse(
               Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body,
               expected_headers);
-          // Give response to the grpc_client by calling onSuccess()
+          // Give response to the grpc_client by calling onSuccess().
           grpc_client_impl->onSuccess(std::move(check_response), span_);
           return async_request_.get();
         })));
@@ -87,12 +87,12 @@ void UberFilterFuzzer::fuzzerSetup() {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
       }));
-  // Prepare sni for sni_cluster filter and sni_dynamic_forward_proxy filter
+  // Prepare sni for sni_cluster filter and sni_dynamic_forward_proxy filter.
   ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
       .WillByDefault(testing::Return("fake_cluster"));
-  // Prepare time source for filters such as local_ratelimit filter
+  // Prepare time source for filters such as local_ratelimit filter.
   factory_context_.prepareSimulatedSystemTime();
-  // Prepare address for filters such as ext_authz filter
+  // Prepare address for filters such as ext_authz filter.
   addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
   ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
       .WillByDefault(testing::ReturnRef(addr_));
@@ -152,7 +152,7 @@ void UberFilterFuzzer::fuzz(
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
     perFilterSetup(proto_config.name());
-    // Add filter to connection_
+    // Add filter to connection_.
     cb_(read_filter_callbacks_->connection_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup{}", e.what());
@@ -182,7 +182,7 @@ void UberFilterFuzzer::fuzz(
       break;
     }
     default:
-      // Unhandled actions
+      // Unhandled actions.
       PANIC("A case is missing for an action");
     }
   }
