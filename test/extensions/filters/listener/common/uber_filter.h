@@ -1,8 +1,9 @@
+#include "envoy/network/filter.h"
+
 #include "test/extensions/filters/listener/common/listener_filter_fuzz_test.pb.validate.h"
+
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/fakes.h"
-
-#include "envoy/network/filter.h"
 
 #include "gmock/gmock.h"
 
@@ -16,7 +17,6 @@ public:
             const test::extensions::filters::listener::FilterFuzzTestCase& input);
 
 private:
-
   void fuzzerSetup(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
     socketSetup(input);

@@ -1,4 +1,5 @@
 #include "common/network/utility.h"
+
 #include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"
@@ -14,8 +15,7 @@ public:
 
   FakeConnectionSocket(const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : local_address_(local_address)
-      , remote_address_(remote_address) {}
+      : local_address_(local_address), remote_address_(remote_address) {}
 
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;

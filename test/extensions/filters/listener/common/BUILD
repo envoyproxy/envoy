@@ -4,10 +4,6 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
-load(
-    "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
-)
 
 licenses(["notice"])  # Apache 2
 

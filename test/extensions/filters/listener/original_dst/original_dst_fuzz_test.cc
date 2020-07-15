@@ -1,20 +1,15 @@
-// #include "common/network/utility.h"
-
 #include "extensions/filters/listener/original_dst/original_dst.h"
 
 #include "test/extensions/filters/listener/common/listener_filter_fuzz_test.pb.validate.h"
 #include "test/extensions/filters/listener/common/uber_filter.h"
-
 #include "test/fuzz/fuzz_runner.h"
-
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
 
-DEFINE_PROTO_FUZZER(
-    const test::extensions::filters::listener::FilterFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
 
   try {
     TestUtility::validate(input);

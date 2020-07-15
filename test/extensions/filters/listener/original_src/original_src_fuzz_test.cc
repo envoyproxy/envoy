@@ -1,8 +1,8 @@
 #include "extensions/filters/listener/original_src/original_src.h"
 
-#include "test/extensions/filters/listener/original_src/original_src_fuzz_test.pb.validate.h"
 #include "test/extensions/filters/listener/common/uber_filter.h"
 
+#include "test/extensions/filters/listener/original_src/original_src_fuzz_test.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
