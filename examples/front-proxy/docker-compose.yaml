@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.3"
 services:
 
   front-envoy:
@@ -17,6 +17,8 @@ services:
       - "8080:8080"
       - "8443:8443"
       - "8001:8001"
+    environment:
+      - ENVOY_UID=0
 
   service1:
     build:
