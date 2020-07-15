@@ -13,11 +13,11 @@ namespace Envoy {
 namespace Filter {
 
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
-    HttpFilterConfigSubscriptionSharedPtr&& subscription, bool require_terminal,
+    HttpFilterConfigSubscriptionSharedPtr&& subscription,
     const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context)
-    : subscription_(std::move(subscription)), require_terminal_(require_terminal),
-      require_type_urls_(require_type_urls), tls_(factory_context.threadLocal().allocateSlot()),
+    : subscription_(std::move(subscription)), require_type_urls_(require_type_urls),
+      tls_(factory_context.threadLocal().allocateSlot()),
       init_target_("DynamicFilterConfigProviderImpl", [this]() {
         subscription_->start();
         init_target_.ready();
@@ -39,15 +39,7 @@ absl::optional<Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() 
 }
 
 void DynamicFilterConfigProviderImpl::validateConfig(
-    const ProtobufWkt::Any& proto_config,
-    Server::Configuration::NamedHttpFilterConfigFactory& factory) {
-  if (factory.isTerminalFilter() && !require_terminal_) {
-    throw EnvoyException(
-        fmt::format("Error: filter config {} must not be the last in the filter chain.", name()));
-  } else if (!factory.isTerminalFilter() && require_terminal_) {
-    throw EnvoyException(
-        fmt::format("Error: filter config {} must be the last in the filter chain.", name()));
-  }
+    const ProtobufWkt::Any& proto_config, Server::Configuration::NamedHttpFilterConfigFactory&) {
   auto type_url = Config::Utility::getFactoryType(proto_config);
   if (require_type_urls_.count(type_url) == 0) {
     throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
@@ -189,8 +181,7 @@ std::shared_ptr<HttpFilterConfigSubscription> HttpFilterConfigProviderManagerImp
 
 HttpFilterConfigProviderPtr HttpFilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ConfigSource& config_source,
-    const std::string& filter_config_name, bool require_terminal,
-    const std::set<std::string>& require_type_urls,
+    const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     bool apply_without_warming) {
   auto subscription =
@@ -202,7 +193,7 @@ HttpFilterConfigProviderPtr HttpFilterConfigProviderManagerImpl::createDynamicFi
     factory_context.initManager().add(subscription->initTarget());
   }
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      std::move(subscription), require_terminal, require_type_urls, factory_context);
+      std::move(subscription), require_type_urls, factory_context);
   // Ensure the subscription starts if it has not already.
   if (apply_without_warming) {
     factory_context.initManager().add(provider->init_target_);

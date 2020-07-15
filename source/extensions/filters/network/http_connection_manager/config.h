@@ -181,8 +181,8 @@ private:
   void
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-                             bool last_filter_in_current_config,
-                             FilterFactoriesList& filter_factories);
+                             FilterFactoriesList& filter_factories, const char* filter_chain_type,
+                             bool last_filter_in_current_config);
   void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
                                      const FilterFactoriesList& filter_factories);
 

@@ -29,20 +29,17 @@ public:
    * the underlying subscriptions to the filter config discovery service.
    * @param config_source supplies the configuration source for the filter configs.
    * @param filter_config_name the filter config resource name.
-   * @param require_terminal enforces that the filter config must be for a terminal filter.
    * @param require_type_urls enforces that the typed filter config must have a certain type URL.
    * @param factory_context is the context to use for the filter config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
    * @param apply_without_warming initializes immediately with the default config and starts the
    * subscription.
    */
-  virtual HttpFilterConfigProviderPtr
-  createDynamicFilterConfigProvider(const envoy::config::core::v3::ConfigSource& config_source,
-                                    const std::string& filter_config_name, bool require_terminal,
-                                    const std::set<std::string>& require_type_urls,
-                                    Server::Configuration::FactoryContext& factory_context,
-                                    const std::string& stat_prefix,
-                                    bool apply_without_warming) PURE;
+  virtual HttpFilterConfigProviderPtr createDynamicFilterConfigProvider(
+      const envoy::config::core::v3::ConfigSource& config_source,
+      const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      bool apply_without_warming) PURE;
 
   /**
    * Get an HttpFilterConfigProviderPtr for a statically inlined filter config.

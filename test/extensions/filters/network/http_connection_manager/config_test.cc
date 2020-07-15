@@ -1751,8 +1751,10 @@ http_filters:
     - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-                            "Error: filter config foo must be the last in the filter chain.");
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Error: non-terminal filter named foo of type envoy.filters.http.health_check is the last "
+      "filter in a http filter chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultTerminal) {
@@ -1781,7 +1783,8 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-                            "Error: filter config foo must not be the last in the filter chain.");
+                            "Error: terminal filter named foo of type envoy.filters.http.router "
+                            "must be the last filter in a http filter chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultRequireTypeUrl) {
@@ -1804,18 +1807,43 @@ http_filters:
     config_source: { ads: {} }
     default_config:
       "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-      type_url: type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
-      value:
-        pass_through_mode: false
+      type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     type_urls:
-    - type.googleapis.com/google.protobuf.Value
+    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
 - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
       createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-      "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
-      "expect google.protobuf.Value.");
+      "Error: filter config has type URL envoy.extensions.filters.http.router.v3.Router but "
+      "expect envoy.config.filter.http.health_check.v2.HealthCheck.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterRequireTypeUrlMissingFactory) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { ads: {} }
+    type_urls:
+    - type.googleapis.com/google.protobuf.Value
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Error: no factory found for a required type URL google.protobuf.Value.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultValid) {
@@ -1902,7 +1930,7 @@ http_filters:
   config_discovery:
     config_source: { ads: {} }
     type_urls:
-    - type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
 - name: envoy.filters.http.router
   )EOF";
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,

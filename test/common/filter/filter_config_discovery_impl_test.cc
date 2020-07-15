@@ -72,17 +72,17 @@ public:
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
-  HttpFilterConfigProviderPtr createProvider(std::string name, bool terminal, bool warm) {
+  HttpFilterConfigProviderPtr createProvider(std::string name, bool warm) {
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ConfigSource config_source;
     TestUtility::loadFromYaml("ads: {}", config_source);
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, terminal, {"envoy.extensions.filters.http.router.v3.Router"},
-        factory_context_, "xds.", !warm);
+        config_source, name, {"envoy.extensions.filters.http.router.v3.Router"}, factory_context_,
+        "xds.", !warm);
   }
 
   void setup(bool warm = true) {
-    provider_ = createProvider("foo", true, warm);
+    provider_ = createProvider("foo", warm);
     callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     if (!warm) {
@@ -242,7 +242,7 @@ TEST_F(FilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
 TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
   InSequence s;
   setup();
-  auto provider2 = createProvider("foo", true, true);
+  auto provider2 = createProvider("foo", true);
   EXPECT_EQ("foo", provider2->name());
   EXPECT_EQ(absl::nullopt, provider2->config());
   const std::string response_yaml = R"EOF(
@@ -267,14 +267,15 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
 TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   InSequence s;
   setup();
-  auto provider2 = createProvider("foo", false, true);
+  auto provider2 = createProvider("foo", true);
   const std::string response_yaml = R"EOF(
   version_info: "1"
   resources:
   - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
     name: foo
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+      pass_through_mode: false
   )EOF";
   const auto response =
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
@@ -283,7 +284,9 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
-      EnvoyException, "Error: filter config foo must not be the last in the filter chain.");
+      EnvoyException,
+      "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
+      "expect envoy.extensions.filters.http.router.v3.Router.");
   EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
 }
 

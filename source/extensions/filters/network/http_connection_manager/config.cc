@@ -9,6 +9,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
@@ -488,7 +489,7 @@ void HttpConnectionManagerConfig::processFilter(
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::ConfigTypeCase::
           kConfigDiscovery) {
     processDynamicFilterConfig(proto_config.name(), proto_config.config_discovery(),
-                               last_filter_in_current_config, filter_factories);
+                               filter_factories, filter_chain_type, last_filter_in_current_config);
     return;
   }
 
@@ -518,7 +519,8 @@ void HttpConnectionManagerConfig::processFilter(
 
 void HttpConnectionManagerConfig::processDynamicFilterConfig(
     const std::string& name, const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-    bool last_filter_in_current_config, FilterFactoriesList& filter_factories) {
+    FilterFactoriesList& filter_factories, const char* filter_chain_type,
+    bool last_filter_in_current_config) {
   ENVOY_LOG(debug, "      name: {}", name);
   ENVOY_LOG(debug, " discovery: {}", MessageUtil::getJsonStringFromMessage(config_discovery));
   if (config_discovery.apply_default_config_without_warming() &&
@@ -528,11 +530,21 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
   }
   std::set<std::string> require_type_urls;
   for (const auto& type_url : config_discovery.type_urls()) {
-    require_type_urls.emplace(TypeUtil::typeUrlToDescriptorFullName(type_url));
+    auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+    require_type_urls.emplace(factory_type_url);
+    auto* factory = Registry::FactoryRegistry<
+        Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(factory_type_url);
+    if (factory == nullptr) {
+      throw EnvoyException(
+          fmt::format("Error: no factory found for a required type URL {}.", factory_type_url));
+    }
+    Config::Utility::validateTerminalFilters(name, factory->name(), filter_chain_type,
+                                             factory->isTerminalFilter(),
+                                             last_filter_in_current_config);
   }
   auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-      config_discovery.config_source(), name, last_filter_in_current_config, require_type_urls,
-      context_, stats_prefix_, config_discovery.apply_default_config_without_warming());
+      config_discovery.config_source(), name, require_type_urls, context_, stats_prefix_,
+      config_discovery.apply_default_config_without_warming());
   if (config_discovery.has_default_config()) {
     auto* default_factory =
         Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(

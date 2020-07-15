@@ -31,7 +31,6 @@ using HttpFilterConfigSubscriptionSharedPtr = std::shared_ptr<HttpFilterConfigSu
 class DynamicFilterConfigProviderImpl : public HttpFilterConfigProvider {
 public:
   DynamicFilterConfigProviderImpl(HttpFilterConfigSubscriptionSharedPtr&& subscription,
-                                  bool require_terminal,
                                   const std::set<std::string>& require_type_urls,
                                   Server::Configuration::FactoryContext& factory_context);
   ~DynamicFilterConfigProviderImpl() override;
@@ -50,7 +49,6 @@ private:
   };
 
   HttpFilterConfigSubscriptionSharedPtr subscription_;
-  const bool require_terminal_;
   const std::set<std::string> require_type_urls_;
   ThreadLocal::SlotPtr tls_;
 
@@ -159,13 +157,11 @@ private:
 class HttpFilterConfigProviderManagerImpl : public HttpFilterConfigProviderManager,
                                             public Singleton::Instance {
 public:
-  HttpFilterConfigProviderPtr
-  createDynamicFilterConfigProvider(const envoy::config::core::v3::ConfigSource& config_source,
-                                    const std::string& filter_config_name, bool require_terminal,
-                                    const std::set<std::string>& require_type_urls,
-                                    Server::Configuration::FactoryContext& factory_context,
-                                    const std::string& stat_prefix,
-                                    bool apply_without_warming) override;
+  HttpFilterConfigProviderPtr createDynamicFilterConfigProvider(
+      const envoy::config::core::v3::ConfigSource& config_source,
+      const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      bool apply_without_warming) override;
 
   HttpFilterConfigProviderPtr
   createStaticFilterConfigProvider(const Http::FilterFactoryCb& config,
