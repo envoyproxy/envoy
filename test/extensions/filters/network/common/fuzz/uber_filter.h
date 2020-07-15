@@ -83,13 +83,14 @@ private:
   Server::Configuration::FakeFactoryContext factory_context_;
   Network::ReadFilterSharedPtr read_filter_;
   Network::FilterFactoryCb cb_;
-  Network::Address::InstanceConstSharedPtr addr_;
+  // Network::Address::InstanceConstSharedPtr addr_;
   Event::SimulatedTimeSystem& time_source_;
   std::shared_ptr<NiceMock<Network::MockReadFilterCallbacks>> read_filter_callbacks_;
   std::unique_ptr<Grpc::MockAsyncRequest> async_request_;
   std::unique_ptr<Grpc::MockAsyncClient> async_client_;
   std::unique_ptr<Grpc::MockAsyncClientFactory> async_client_factory_;
   Tracing::MockSpan span_;
+  std::shared_ptr<Ssl::MockConnectionInfo> ssl_connection_ = std::make_shared<Ssl::MockConnectionInfo>();
   int seconds_in_one_day_ = 86400;
 };
 

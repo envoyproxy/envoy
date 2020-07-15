@@ -30,7 +30,8 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
                      NetworkFilterNames::get().Echo,
                      NetworkFilterNames::get().DirectResponse,
                      NetworkFilterNames::get().DubboProxy,
-                     NetworkFilterNames::get().SniCluster};
+                     NetworkFilterNames::get().SniCluster,
+                     NetworkFilterNames::get().HttpConnectionManager};
   }
   return filter_names_;
 }
@@ -44,8 +45,13 @@ void UberFilterFuzzer::reset() {
   read_filter_callbacks_->connection_.callbacks_.clear();
   read_filter_callbacks_->connection_.bytes_sent_callbacks_.clear();
   read_filter_callbacks_->connection_.state_ = Network::Connection::State::Open;
+  // Clear the pointers inside the mock_dispatcher
+  Event::MockDispatcher& mock_dispatcher = dynamic_cast<Event::MockDispatcher&>(read_filter_callbacks_->connection_.dispatcher_);
+  mock_dispatcher.to_delete_.clear();
+
 }
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
+  std::cout<<"setup for"<<filter_name<<std::endl;
   // Set up response for ext_authz filter
   if (filter_name == NetworkFilterNames::get().ExtAuthorization) {
 
@@ -74,6 +80,21 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
     ON_CALL(factory_context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return std::move(async_client_factory_); }));
+    read_filter_callbacks_->connection_.local_address_ =
+        std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+    read_filter_callbacks_->connection_.remote_address_ =
+        std::make_shared<Network::Address::PipeInstance>("/test/test.sock");                            
+  }
+  else if(filter_name == NetworkFilterNames::get().HttpConnectionManager){
+    // ON_CALL(read_filter_callbacks_->connection_, ssl()).WillByDefault(testing::Return(ssl_connection_));
+    // ON_CALL(Const(read_filter_callbacks_->connection_), ssl()).WillByDefault(testing::Return(ssl_connection_));
+    // ON_CALL(read_filter_callbacks_.connection_, close(_))
+    //     .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
+
+    read_filter_callbacks_->connection_.local_address_ =
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+    read_filter_callbacks_->connection_.remote_address_ =
+        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");  
   }
 }
 void UberFilterFuzzer::fuzzerSetup() {
@@ -84,6 +105,7 @@ void UberFilterFuzzer::fuzzerSetup() {
   read_filter_callbacks_ = std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
   ON_CALL(read_filter_callbacks_->connection_, addReadFilter(_))
       .WillByDefault(Invoke([&](Network::ReadFilterSharedPtr read_filter) -> void {
+        std::cout<<"add filter"<<read_filter.use_count()<<std::endl;
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
       }));
@@ -93,13 +115,15 @@ void UberFilterFuzzer::fuzzerSetup() {
   // Prepare time source for filters such as local_ratelimit filter
   factory_context_.prepareSimulatedSystemTime();
   // Prepare address for filters such as ext_authz filter
-  addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
-  ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
-      .WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(read_filter_callbacks_->connection_, localAddress())
-      .WillByDefault(testing::ReturnRef(addr_));
+  // addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+  // ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
+  //     .WillByDefault(testing::ReturnRef(addr_));
+  // ON_CALL(read_filter_callbacks_->connection_, localAddress())
+  //     .WillByDefault(testing::ReturnRef(addr_));
 
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
+  // Prepare protocol for http_connection_manager
+  read_filter_callbacks_->connection_.stream_info_.protocol_ = Http::Protocol::Http2;
 }
 
 UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.simulatedTimeSystem()) {
@@ -158,7 +182,9 @@ void UberFilterFuzzer::fuzz(
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup{}", e.what());
     return;
   }
-
+//  if (actions.size() > 5) {
+//    PANIC("A case is found!");
+//  }
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
