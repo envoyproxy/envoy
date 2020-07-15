@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
+#include <memory>
 #include <queue>
 #include <set>
 #include <vector>
@@ -12,6 +14,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_protos.h"
 #include "common/upstream/edf_scheduler.h"
 
 namespace Envoy {
@@ -368,6 +371,8 @@ protected:
 
   void initialize();
 
+  virtual void refresh(uint32_t priority);
+
   // Seed to allow us to desynchronize load balancers across a fleet. If we don't
   // do this, multiple Envoys that receive an update at the same time (or even
   // multiple load balancers on the same host) will send requests to
@@ -376,7 +381,6 @@ protected:
   const uint64_t seed_;
 
 private:
-  void refresh(uint32_t priority);
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
@@ -438,7 +442,8 @@ private:
  *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
  *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
+class LeastRequestLoadBalancer : public EdfLoadBalancerBase,
+                                 Logger::Loggable<Logger::Id::upstream> {
 public:
   LeastRequestLoadBalancer(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
@@ -451,26 +456,71 @@ public:
         choice_count_(
             least_request_config.has_value()
                 ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
-                : 2) {
+                : 2),
+        active_request_bias_runtime_(
+            least_request_config.has_value() && least_request_config->has_active_request_bias()
+                ? std::make_unique<Runtime::Double>(least_request_config->active_request_bias(),
+                                                    runtime)
+                : nullptr) {
     initialize();
+  }
+
+protected:
+  void refresh(uint32_t priority) override {
+    active_request_bias_ =
+        active_request_bias_runtime_ != nullptr ? active_request_bias_runtime_->value() : 1.0;
+
+    if (active_request_bias_ < 0.0) {
+      ENVOY_LOG(warn, "upstream: invalid active request bias supplied (runtime key {}), using 1.0",
+                active_request_bias_runtime_->runtimeKey());
+      active_request_bias_ = 1.0;
+    }
+
+    EdfLoadBalancerBase::refresh(priority);
   }
 
 private:
   void refreshHostSource(const HostsSource&) override {}
   double hostWeight(const Host& host) override {
-    // Here we scale host weight by the number of active requests at the time we do the pick. We
-    // always add 1 to avoid division by 0. It might be possible to do better by picking two hosts
-    // off of the schedule, and selecting the one with fewer active requests at the time of
-    // selection.
-    // TODO(mattklein123): @htuch brings up the point that how we are scaling weight here might not
-    // be the only/best way of doing this. Essentially, it makes weight and active requests equally
-    // important. Are they equally important in practice? There is no right answer here and we might
-    // want to iterate on this as we gain more experience.
-    return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+    // This method is called to calculate the dynamic weight as following when all load balancing
+    // weights are not equal:
+    //
+    // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
+    //
+    // `active_request_bias` can be configured via runtime and its value is cached in
+    // `active_request_bias_` to avoid having to do a runtime lookup each time a host weight is
+    // calculated.
+    //
+    // When `active_request_bias == 0.0` we behave like `RoundRobinLoadBalancer` and return the
+    // host weight without considering the number of active requests at the time we do the pick.
+    //
+    // When `active_request_bias > 0.0` we scale the host weight by the number of active
+    // requests at the time we do the pick. We always add 1 to avoid division by 0.
+    //
+    // It might be possible to do better by picking two hosts off of the schedule, and selecting the
+    // one with fewer active requests at the time of selection.
+    if (active_request_bias_ == 0.0) {
+      return host.weight();
+    }
+
+    if (active_request_bias_ == 1.0) {
+      return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+    }
+
+    return static_cast<double>(host.weight()) /
+           std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
   }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
+
   const uint32_t choice_count_;
+
+  // The exponent used to calculate host weights can be configured via runtime. We cache it for
+  // performance reasons and refresh it in `LeastRequestLoadBalancer::refresh(uint32_t priority)`
+  // whenever a `HostSet` is updated.
+  double active_request_bias_{};
+
+  const std::unique_ptr<Runtime::Double> active_request_bias_runtime_;
 };
 
 /**
