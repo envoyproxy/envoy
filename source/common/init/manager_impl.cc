@@ -10,7 +10,9 @@ namespace Init {
 
 ManagerImpl::ManagerImpl(absl::string_view name)
     : name_(fmt::format("init manager {}", name)), state_(State::Uninitialized), count_(0),
-      watcher_(name_, [this](absl::string_view target_name) { onTargetReadySendTargetName(target_name); }) {}
+      watcher_(name_, [this](absl::string_view target_name) {
+        onTargetReadySendTargetName(target_name);
+      }) {}
 
 Manager::State ManagerImpl::state() const { return state_; }
 
@@ -83,7 +85,7 @@ void ManagerImpl::onTargetReady() {
 void ManagerImpl::onTargetReadySendTargetName(absl::string_view target_name) {
   // If there are no remaining targets and one mysteriously calls us back, this manager is haunted.
   ASSERT(count_ != 0, fmt::format("{} called back by target after initialization complete"));
-  
+
   // Decrease target_name count by 1.
   if (--target_names_count_[target_name] == 0) {
     target_names_count_.erase(target_name);

@@ -47,7 +47,7 @@ private:
 
   // The watcher's callback function, only called if the weak pointer can be "locked".
   const std::weak_ptr<ReadyFn> fn_;
-  
+
   // The watcher's callback function, only called if the weak pointer can be "locked".
   const std::weak_ptr<ExtraReadyFn> exfn_;
 };
@@ -74,7 +74,7 @@ public:
 private:
   // Human-readable name for logging.
   const std::string name_;
-  
+
   // If the function constructed is std::function<void(string_view)>
   bool fn_has_parameter_;
 

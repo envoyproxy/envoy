@@ -13,7 +13,7 @@ WatcherHandleImpl::WatcherHandleImpl(absl::string_view handle_name, absl::string
 
 bool WatcherHandleImpl::ready() const {
   // With extra string_view parameter
-  if (fn_has_parameter_) { 
+  if (fn_has_parameter_) {
     auto locked_fn(exfn_.lock());
     if (locked_fn) {
       // If we can "lock" a shared pointer to the watcher's callback function, call it.
@@ -37,7 +37,7 @@ bool WatcherHandleImpl::ready() const {
       ENVOY_LOG(debug, "{} initialized, but can't notify {} (unavailable)", handle_name_, name_);
       return false;
     }
-  }  
+  }
 }
 
 WatcherImpl::WatcherImpl(absl::string_view name, ReadyFn fn)
@@ -54,13 +54,12 @@ WatcherHandlePtr WatcherImpl::createHandle(absl::string_view handle_name) const 
   // Note: can't use std::make_unique because WatcherHandleImpl ctor is private.
   if (fn_has_parameter_) {
     return std::unique_ptr<WatcherHandle>(
-      new WatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFn>(fn_)));
+        new WatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFn>(fn_)));
   } else {
     return std::unique_ptr<WatcherHandle>(
-      new WatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFn>(fn_)));
+        new WatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFn>(fn_)));
   }
 }
-
 
 } // namespace Init
 } // namespace Envoy
