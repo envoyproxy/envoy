@@ -72,6 +72,7 @@ envoy_cc_test(
     srcs = ["runtime_flag_override_test.cc"],
     args = [
         "--runtime-feature-override-for-tests=envoy.reloadable_features.test_feature_false",
+        "--runtime-feature-disable-for-tests=envoy.reloadable_features.test_feature_true",
     ],
     coverage = False,
     deps = [
