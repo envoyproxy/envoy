@@ -752,7 +752,7 @@ TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
   {
     "watchdog": {
       "kill_timeout": "1.0s",
-      "max_kill_skew": "0.5s"
+      "max_kill_timeout_jitter": "0.5s"
     },
   })EOF";
 
@@ -763,13 +763,14 @@ TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_LT(std::chrono::milliseconds(1000), config.wdKillTimeout());
+  EXPECT_GE(std::chrono::milliseconds(1500), config.wdKillTimeout());
 }
 
 TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
   const std::string json = R"EOF(
   {
     "watchdog": {
-      "max_kill_skew": "0.5s"
+      "max_kill_timeout_jitter": "0.5s"
     },
   })EOF";
 
