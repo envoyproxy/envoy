@@ -18,6 +18,9 @@ using SpdLoggerPtr = std::shared_ptr<spdlog::logger>;
  */
 class FancyContext {
 public:
+  /**
+   * Gets a logger from map given the key (e.g. file name).
+   */
   static SpdLoggerPtr getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
