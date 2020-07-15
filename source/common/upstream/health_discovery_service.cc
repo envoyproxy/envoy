@@ -179,6 +179,7 @@ void HdsDelegate::processMessage(
                                               store_stats_, ssl_context_manager_, false,
                                               info_factory_, cm_, local_info_, dispatcher_, random_,
                                               singleton_manager_, tls_, validation_visitor_, api_));
+    hds_clusters_.back()->initialize([] {});
 
     hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_,
                                             api_);
@@ -257,14 +258,6 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
                      0, envoy::config::core::v3::UNKNOWN));
   }
-  initialization_complete_callback_ = [] {};
-  for (const auto& host : *initial_hosts_) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
-
-  priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
-      *initial_hosts_, {}, absl::nullopt);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
