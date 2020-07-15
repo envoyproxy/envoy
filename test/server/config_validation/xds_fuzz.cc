@@ -230,9 +230,9 @@ void XdsFuzzTest::replay() {
       Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "0");
 
-  // the client will not subscribe to the RouteConfiguration type URL until it
-  // receives a listener, and the ACKS it sends back seem to be an empty type
-  // URL so just don't check them until a listener is added
+  // the client will not subscribe to the RouteConfiguration type URL until it receives a listener,
+  // and the ACKS it sends back seem to be an empty type URL so just don't check them until a
+  // listener is added
   bool sent_listener = false;
 
   for (const auto& action : actions_) {
@@ -294,7 +294,6 @@ void XdsFuzzTest::verifyListeners() {
   Protobuf::RepeatedPtrField<envoy::admin::v3::ListenersConfigDump::DynamicListener> dump =
       getListenersConfigDump().dynamic_listeners();
 
-  // each listener in the abstract representation should have a matching listener in the config dump
   for (auto& rep : abstract_rep) {
     ENVOY_LOG_MISC(info, "Verifying {} with state {}", rep.listener.name(), rep.state);
 
@@ -302,12 +301,14 @@ void XdsFuzzTest::verifyListeners() {
       return listener.name() == rep.listener.name();
     });
 
+    // there should be a listener of the same name in the dump
     if (listener_dump == dump.end()) {
       throw EnvoyException(fmt::format("Expected to find {} in config dump", rep.listener.name()));
     }
 
     ENVOY_LOG_MISC(info, "warm {}, active {}, drain: {}", listener_dump->has_warming_state(),
                    listener_dump->has_active_state(), listener_dump->has_draining_state());
+    // the state should match
     switch (rep.state) {
     case XdsVerifier::DRAINING:
       EXPECT_TRUE(listener_dump->has_draining_state());

@@ -62,35 +62,36 @@ void XdsVerifier::dumpState() {
 void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener) {
   ENVOY_LOG_MISC(info, "About to update listener {}", listener.name());
   dumpState();
-  auto it = listeners_.begin();
-  while (it != listeners_.end()) {
-    if (it->listener.name() == listener.name() && getRoute(listener) == getRoute(it->listener) &&
-        it->state != DRAINING) {
-      // the same listener has been added again, ignore it
-      ENVOY_LOG_MISC(info, "Ignoring duplicate add of {}", listener.name());
-      return;
-    } else if (it->listener.name() == listener.name()) {
-      if (it->state == ACTIVE) {
+
+  if (std::any_of(listeners_.begin(), listeners_.end(), [&](auto& rep) {
+        return rep.listener.name() == listener.name() &&
+               getRoute(listener) == getRoute(rep.listener) && rep.state != DRAINING;
+      })) {
+    ENVOY_LOG_MISC(info, "Ignoring duplicate add of {}", listener.name());
+    return;
+  }
+
+  for (unsigned long i = 0; i < listeners_.size(); ++i) {
+    auto& rep = listeners_[i];
+    if (rep.listener.name() == listener.name()) {
+      if (rep.state == ACTIVE) {
         if (hasRoute(listener)) {
           // if the new listener is ready to take traffic, the old listener will be drained
           ENVOY_LOG_MISC(info, "Moving {} to DRAINING state", listener.name());
           num_modified_++;
           num_active_--;
           num_draining_++;
-          it->state = DRAINING;
+          rep.state = DRAINING;
         } else {
           // if the new listener has not gotten its route yet, the old listener will remain active
           // until that happens
           ENVOY_LOG_MISC(info, "Keeping {} as ACTIVE", listener.name());
         }
-        ++it;
-      } else if (it->state == WARMING) {
+      } else if (rep.state == WARMING) {
         // if the old listener is warming, it will be removed and replaced with the new
         ENVOY_LOG_MISC(info, "Removed warming listener {}", listener.name());
         num_warming_--;
-        it = listeners_.erase(it);
-      } else {
-        ++it;
+        listeners_.erase(listeners_.begin() + i);
       }
     }
   }
@@ -141,27 +142,22 @@ void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener, 
  * @param name the name of the listener to be removed
  */
 void XdsVerifier::listenerRemoved(const std::string& name) {
-  auto it = listeners_.begin();
   bool found = false;
-  while (it != listeners_.end()) {
-    if (it->listener.name() == name) {
-      if (it->state == ACTIVE) {
-        // the listener will be drained before being removed
-        ENVOY_LOG_MISC(info, "Changing {} to DRAINING", name);
-        num_active_--;
-        num_draining_++;
-        it->state = DRAINING;
-        found = true;
-        ++it;
-      } else if (it->state == WARMING) {
-        // the listener will be removed immediately
-        ENVOY_LOG_MISC(info, "Removed warming listener {}", name);
-        num_warming_--;
-        it = listeners_.erase(it);
-        found = true;
-      } else {
-        ++it;
-      }
+  for (unsigned long i = 0; i < listeners_.size(); ++i) {
+    auto& rep = listeners_[i];
+    if (rep.state == ACTIVE) {
+      // the listener will be drained before being removed
+      ENVOY_LOG_MISC(info, "Changing {} to DRAINING", name);
+      found = true;
+      num_active_--;
+      num_draining_++;
+      rep.state = DRAINING;
+    } else if (rep.state == WARMING) {
+      // the listener will be removed immediately
+      ENVOY_LOG_MISC(info, "Removed warming listener {}", name);
+      found = true;
+      listeners_.erase(listeners_.begin() + i);
+      num_warming_--;
     }
   }
   if (found) {
@@ -184,25 +180,23 @@ void XdsVerifier::routeUpdated(envoy::config::route::v3::RouteConfiguration rout
 void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route) {
   routes_.insert({route.name(), route});
   for (auto& rep : listeners_) {
-    if (getRoute(rep.listener) == route.name()) {
-      if (rep.state == WARMING) {
-        // it should successfully warm now
-        ENVOY_LOG_MISC(info, "Moving {} to ACTIVE state", rep.listener.name());
+    if (getRoute(rep.listener) == route.name() && rep.state == WARMING) {
+      // it should successfully warm now
+      ENVOY_LOG_MISC(info, "Moving {} to ACTIVE state", rep.listener.name());
 
-        // if there were any active listeners that were waiting to be updated, they will now be
-        // changed to draining and the warming listener will take their place
-        for (auto& old_listener : listeners_) {
-          if (old_listener.listener.name() == rep.listener.name() &&
-              getRoute(old_listener.listener) != route.name() && old_listener.state == ACTIVE) {
-            old_listener.state = DRAINING;
-            num_active_--;
-            num_modified_++;
-          }
+      // if there were any active listeners that were waiting to be updated, they will now be
+      // changed to draining and the warming listener will take their place
+      for (auto& old_listener : listeners_) {
+        if (old_listener.listener.name() == rep.listener.name() &&
+            getRoute(old_listener.listener) != route.name() && old_listener.state == ACTIVE) {
+          old_listener.state = DRAINING;
+          num_active_--;
+          num_modified_++;
         }
-        num_warming_--;
-        num_active_++;
-        rep.state = ACTIVE;
       }
+      num_warming_--;
+      num_active_++;
+      rep.state = ACTIVE;
     }
   }
 }
