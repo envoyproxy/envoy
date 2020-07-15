@@ -71,9 +71,11 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
       return std::move(async_client_);
     }));
 
-    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                                  bool) { return std::move(async_client_factory_); }));
+    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
+                factoryForGrpcService(_, _, _))
+        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          return std::move(async_client_factory_);
+        }));
   }
 }
 void UberFilterFuzzer::fuzzerSetup() {
