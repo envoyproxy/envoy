@@ -100,6 +100,14 @@ envoy_status_t set_preferred_network(envoy_network_t network);
 void flush_stats();
 
 /**
+ * Statically register APIs leveraging platform libraries.
+ * Warning: Must be completed before any calls to run_engine().
+ * @param name, identifier of the platform API
+ * @param api, type-erased c struct containing function pointers and context.
+ */
+envoy_status_t register_platform_api(const char* name, void* api);
+
+/**
  * External entry point for library.
  * @param engine, handle to the engine to run.
  * @param callbacks, the callbacks that will run the engine callbacks.

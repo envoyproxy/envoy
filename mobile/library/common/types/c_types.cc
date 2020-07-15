@@ -13,6 +13,14 @@ void* safe_malloc(size_t size) {
   return ptr;
 }
 
+void* safe_calloc(size_t count, size_t size) {
+  void* ptr = calloc(count, size);
+  if (count > 0 && size > 0) {
+    RELEASE_ASSERT(ptr != nullptr, "calloc failure");
+  }
+  return ptr;
+}
+
 void envoy_noop_release(void* context) { (void)context; }
 
 void release_envoy_headers(envoy_headers headers) {

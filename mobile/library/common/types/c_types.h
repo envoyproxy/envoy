@@ -104,6 +104,14 @@ extern "C" { // utility functions
 void* safe_malloc(size_t size);
 
 /**
+ * calloc wrapper that asserts that the returned pointer is valid. Otherwise, the program exits.
+ * @param count, the number of elements to be allocated.
+ * @param size, the size of elements in bytes.
+ * @return void*, pointer to the allocated memory.
+ */
+void* safe_calloc(size_t count, size_t size);
+
+/**
  * Helper function to free/release memory associated with underlying headers.
  * @param headers, envoy_headers to release.
  */
