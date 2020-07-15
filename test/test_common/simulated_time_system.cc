@@ -144,7 +144,7 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
   if (armed_) {
-    time_system_.removeAlarmLockHeld(this);
+    time_system_.removeAlarmLockHeld(*this);
     armed_ = false;
   }
   if (pending_) {
@@ -171,7 +171,7 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
   if (duration.count() == 0) {
     activateLockHeld();
   } else {
-    time_system_.addAlarmLockHeld(this, duration);
+    time_system_.addAlarmLockHeld(*this, duration);
   }
 }
 
@@ -279,32 +279,32 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasi
   return Thread::CondVar::WaitStatus::Timeout;
 }
 
-void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm* alarm) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm& alarm) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   // We disable thread-safety analysis as the compiler can't detect that
-  // alarm_->timeSystem() == this, so we must be holding the right mutex.
-  ASSERT(&(alarm->timeSystem()) == this);
-  alarm->activateLockHeld();
+  // alarm_.timeSystem() == this, so we must be holding the right mutex.
+  ASSERT(&(alarm.timeSystem()) == this);
+  alarm.activateLockHeld();
 }
 
 void SimulatedTimeSystemHelper::addAlarmLockHeld(
-    Alarm* alarm, const std::chrono::microseconds& duration) ABSL_NO_THREAD_SAFETY_ANALYSIS {
-  ASSERT(&(alarm->timeSystem()) == this);
+    Alarm& alarm, const std::chrono::microseconds& duration) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+  ASSERT(&(alarm.timeSystem()) == this);
   ASSERT(alarms_.size() == alarm_registrations_map_.size());
-  ASSERT(alarm_registrations_map_.find(alarm) == alarm_registrations_map_.end());
+  ASSERT(alarm_registrations_map_.find(&alarm) == alarm_registrations_map_.end());
 
   auto insert_result = alarms_.insert({monotonic_time_ + duration, random_source_.random(), alarm});
   ASSERT(insert_result.second);
-  alarm_registrations_map_.emplace(alarm, insert_result.first);
+  alarm_registrations_map_.emplace(&alarm, insert_result.first);
 
   // Sanity check that the parallel data structures used for alarm registration have the same number
   // of entries.
   ASSERT(alarms_.size() == alarm_registrations_map_.size());
 }
 
-void SimulatedTimeSystemHelper::removeAlarmLockHeld(Alarm* alarm) {
+void SimulatedTimeSystemHelper::removeAlarmLockHeld(Alarm& alarm) {
   ASSERT(alarms_.size() == alarm_registrations_map_.size());
 
-  auto it = alarm_registrations_map_.find(alarm);
+  auto it = alarm_registrations_map_.find(&alarm);
   ASSERT(it != alarm_registrations_map_.end());
   alarms_.erase(it->second);
   alarm_registrations_map_.erase(it);
@@ -340,7 +340,7 @@ void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& mo
       system_time_ +=
           std::chrono::duration_cast<SystemTime::duration>(alarm_time - monotonic_time_);
       monotonic_time_ = alarm_time;
-      Alarm* alarm = alarm_registration.alarm_;
+      Alarm& alarm = alarm_registration.alarm_;
       removeAlarmLockHeld(alarm);
       alarmActivateLockHeld(alarm);
     }

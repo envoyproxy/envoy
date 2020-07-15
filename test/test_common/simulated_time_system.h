@@ -66,14 +66,14 @@ private:
   class Alarm;
   friend class Alarm; // Needed to reference mutex for thread annotations.
   struct AlarmRegistration {
-    AlarmRegistration(MonotonicTime time, uint64_t randomness, Alarm* alarm)
+    AlarmRegistration(MonotonicTime time, uint64_t randomness, Alarm& alarm)
         : time_(time), randomness_(randomness), alarm_(alarm) {}
 
     MonotonicTime time_;
     // Random tie-breaker for alarms scheduled for the same monotonic time used to mimic
     // non-deterministic execution of real alarms scheduled for the same wall time.
     uint64_t randomness_;
-    Alarm* alarm_;
+    Alarm& alarm_;
 
     friend bool operator<(const AlarmRegistration& lhs, const AlarmRegistration& rhs) {
       if (lhs.time_ != rhs.time_) {
@@ -82,7 +82,11 @@ private:
       if (lhs.randomness_ != rhs.randomness_) {
         return lhs.randomness_ < rhs.randomness_;
       }
-      return lhs.alarm_ < rhs.alarm_;
+      // Out of paranoia, use pointer comparison on the alarms as a final tie-breaker but also
+      // ASSERT that this branch isn't hit in debug modes since in practice the randomness_
+      // associated with two registrations should never be equal.
+      ASSERT(false, "Alarm registration randomness_ for two alarms should never be equal.");
+      return &lhs.alarm_ < &rhs.alarm_;
     }
   };
   using AlarmSet = std::set<AlarmRegistration>;
@@ -98,12 +102,12 @@ private:
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  void alarmActivateLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void alarmActivateLockHeld(Alarm& alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Adds/removes an alarm.
-  void addAlarmLockHeld(Alarm*, const std::chrono::microseconds& duration)
+  void addAlarmLockHeld(Alarm&, const std::chrono::microseconds& duration)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeAlarmLockHeld(Alarm*) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeAlarmLockHeld(Alarm&) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Keeps track of how many alarms have been activated but not yet called,
   // which helps waitFor() determine when to give up and declare a timeout.
@@ -120,7 +124,8 @@ private:
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
   TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
   AlarmSet alarms_ ABSL_GUARDED_BY(mutex_);
-  std::map<Alarm*, AlarmSet::const_iterator> alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
+  std::unordered_map<Alarm*, AlarmSet::const_iterator>
+      alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
   Thread::OnlyOneThread only_one_thread_;
