@@ -282,6 +282,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/06/10  11561    44491       44811   Make upstreams pluggable
   // 2020/06/29  11751    44715       46000   Improve time complexity of removing callback handle
   //                                          in callback manager.
+  // 2020/07/07  11252    44971       46000   Introduce Least Request LB active request bias config
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -299,7 +300,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 44715);
+    EXPECT_MEMORY_EQ(m_per_cluster, 44971);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
@@ -353,6 +354,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/06/10  11561    36603       36923   Make upstreams pluggable
   // 2020/06/29  11751    36827       38000   Improve time complexity of removing callback handle.
   //                                          in callback manager.
+  // 2020/07/07  11252    37083       38000   Introduce Least Request LB active request bias config
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -370,7 +372,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 36827);
+    EXPECT_MEMORY_EQ(m_per_cluster, 37083);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
