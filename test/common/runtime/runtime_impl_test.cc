@@ -692,7 +692,7 @@ TEST_F(StaticLoaderImplTest, InvalidNumerator) {
   EXPECT_CALL(generator_, random()).WillOnce(Return(500000));
   EXPECT_THROW_WITH_MESSAGE(
       loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent), EnvoyException,
-      "WARNING runtime key 'invalid_numerator': numerator (111) > denominator (100), condition "
+      "runtime key 'invalid_numerator': numerator (111) > denominator (100), condition "
       "always evaluates to true");
 }
 

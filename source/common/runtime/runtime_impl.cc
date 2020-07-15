@@ -128,7 +128,7 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
   uint64_t denominator_value =
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator());
   if (percent.numerator() > denominator_value) {
-    throw EnvoyException(fmt::format("WARNING runtime key '{}': numerator ({}) > denominator ({}), "
+    throw EnvoyException(fmt::format("runtime key '{}': numerator ({}) > denominator ({}), "
                                      "condition always evaluates to true",
                                      key, percent.numerator(), denominator_value));
   }
