@@ -40,8 +40,9 @@ public:
   const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const;
 
 private:
-  void onTargetReady(absl::string_view target_name);
+  void onTargetReady();
   void ready();
+  void onTargetReadySendTargetName(absl::string_view target_name);
 
   // Human-readable name for logging
   const std::string name_;
