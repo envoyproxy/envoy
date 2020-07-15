@@ -1,4 +1,5 @@
 #include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
@@ -19,8 +20,12 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AllOf;
+using testing::DoubleEq;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Not;
+using testing::Property;
 
 namespace Envoy {
 namespace Server {
@@ -176,7 +181,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   int cb_count = 0;
   manager->registerForAction("envoy.overload_actions.dummy_action", dispatcher_,
                              [&](OverloadActionState state) {
-                               is_active = state == OverloadActionState::Active;
+                               is_active = state.isSaturated();
                                cb_count++;
                              });
   manager->registerForAction("envoy.overload_actions.unknown_action", dispatcher_,
@@ -198,7 +203,8 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory1_.monitor_->setPressure(0.5);
   timer_cb_();
   EXPECT_FALSE(is_active);
-  EXPECT_EQ(action_state, OverloadActionState::Inactive);
+  EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
+                                  Property(&OverloadActionState::value, 0)));
   EXPECT_EQ(0, cb_count);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(50, pressure_gauge1.value());
@@ -207,7 +213,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory1_.monitor_->setPressure(0.95);
   timer_cb_();
   EXPECT_TRUE(is_active);
-  EXPECT_EQ(action_state, OverloadActionState::Active);
+  EXPECT_TRUE(action_state.isSaturated());
   EXPECT_EQ(1, cb_count);
   EXPECT_EQ(1, active_gauge.value());
   EXPECT_EQ(95, pressure_gauge1.value());
@@ -216,7 +222,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory1_.monitor_->setPressure(0.94);
   timer_cb_();
   EXPECT_TRUE(is_active);
-  EXPECT_EQ(action_state, OverloadActionState::Active);
+  EXPECT_TRUE(action_state.isSaturated());
   EXPECT_EQ(1, cb_count);
   EXPECT_EQ(94, pressure_gauge1.value());
 
@@ -224,7 +230,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory2_.monitor_->setPressure(0.9);
   timer_cb_();
   EXPECT_TRUE(is_active);
-  EXPECT_EQ(action_state, OverloadActionState::Active);
+  EXPECT_TRUE(action_state.isSaturated());
   EXPECT_EQ(1, cb_count);
   EXPECT_EQ(90, pressure_gauge2.value());
 
@@ -232,7 +238,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory1_.monitor_->setPressure(0.5);
   timer_cb_();
   EXPECT_TRUE(is_active);
-  EXPECT_EQ(action_state, OverloadActionState::Active);
+  EXPECT_TRUE(action_state.isSaturated());
   EXPECT_EQ(1, cb_count);
   EXPECT_EQ(50, pressure_gauge1.value());
   EXPECT_EQ(90, pressure_gauge2.value());
@@ -241,7 +247,8 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory2_.monitor_->setPressure(0.3);
   timer_cb_();
   EXPECT_FALSE(is_active);
-  EXPECT_EQ(action_state, OverloadActionState::Inactive);
+  EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
+                                  Property(&OverloadActionState::value, 0)));
   EXPECT_EQ(2, cb_count);
   EXPECT_EQ(30, pressure_gauge2.value());
 
@@ -250,7 +257,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory2_.monitor_->setPressure(0.96);
   timer_cb_();
   EXPECT_TRUE(is_active);
-  EXPECT_EQ(action_state, OverloadActionState::Active);
+  EXPECT_TRUE(action_state.isSaturated());
   EXPECT_EQ(3, cb_count);
   EXPECT_EQ(97, pressure_gauge1.value());
   EXPECT_EQ(96, pressure_gauge2.value());
@@ -260,7 +267,8 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory2_.monitor_->setPressure(0.42);
   timer_cb_();
   EXPECT_FALSE(is_active);
-  EXPECT_EQ(action_state, OverloadActionState::Inactive);
+  EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
+                                  Property(&OverloadActionState::value, 0)));
   EXPECT_EQ(4, cb_count);
   EXPECT_EQ(41, pressure_gauge1.value());
   EXPECT_EQ(42, pressure_gauge2.value());

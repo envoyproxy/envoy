@@ -11,7 +11,7 @@ namespace Server {
 using ::testing::ReturnRef;
 
 MockThreadLocalOverloadState::MockThreadLocalOverloadState()
-    : disabled_state_(OverloadActionState::Inactive) {
+    : disabled_state_(OverloadActionState::inactive()) {
   ON_CALL(*this, getState).WillByDefault(ReturnRef(disabled_state_));
 }
 

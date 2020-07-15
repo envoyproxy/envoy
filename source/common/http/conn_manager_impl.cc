@@ -833,8 +833,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   filter_manager_.maybeEndDecode(end_stream);
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
-  if (connection_manager_.overload_stop_accepting_requests_ref_ ==
-      Server::OverloadActionState::Active) {
+  if (connection_manager_.overload_stop_accepting_requests_ref_.isSaturated()) {
     // In this one special case, do not create the filter chain. If there is a risk of memory
     // overload it is more important to avoid unnecessary allocation than to create the filters.
     state_.created_filter_chain_ = true;
@@ -1824,7 +1823,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
   }
 
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.overload_disable_keepalive_ref_ == Server::OverloadActionState::Active) {
+      connection_manager_.overload_disable_keepalive_ref_.isSaturated()) {
     ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
     connection_manager_.drain_state_ = DrainState::Closing;
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
