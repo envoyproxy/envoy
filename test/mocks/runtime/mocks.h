@@ -70,7 +70,6 @@ public:
   MOCK_METHOD(Stats::Scope&, getRootScope, ());
 
   testing::NiceMock<MockSnapshot> snapshot_;
-  SnapshotConstSharedPtr snapshot_ptr_;
   testing::NiceMock<Stats::MockStore> store_;
 };
 
