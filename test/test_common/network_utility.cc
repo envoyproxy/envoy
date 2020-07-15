@@ -200,6 +200,10 @@ namespace {
 struct SyncPacketProcessor : public Network::UdpPacketProcessor {
   SyncPacketProcessor(std::list<Network::UdpRecvData>& data) : data_(data) {}
 
+  // No effects
+  void disable() override {}
+  void enable() override {}
+
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override {

@@ -453,6 +453,19 @@ public:
   testing::NiceMock<MockConnection> connection_;
 };
 
+class MockUdpPacketProcessor : public UdpPacketProcessor {
+public:
+  MockUdpPacketProcessor();
+  ~MockUdpPacketProcessor() override;
+
+  MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, enable, ());
+  MOCK_METHOD(void, processPacket,
+              (Address::InstanceConstSharedPtr, Address::InstanceConstSharedPtr,
+               Buffer::InstancePtr, MonotonicTime));
+  MOCK_METHOD(uint64_t, maxPacketSize, (), (const));
+};
+
 class MockUdpListener : public UdpListener {
 public:
   MockUdpListener();
@@ -461,11 +474,14 @@ public:
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, enable, ());
   MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, addUpstreamProcessor, (UdpPacketProcessor*));
+  MOCK_METHOD(void, removeUpstreamProcessor, (UdpPacketProcessor*));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
 
   Event::MockDispatcher dispatcher_;
+  std::list<UdpPacketProcessor*> processors_;
 };
 
 class MockUdpReadFilterCallbacks : public UdpReadFilterCallbacks {

@@ -54,6 +54,8 @@ public:
 
   MOCK_METHOD(void, SendConnectionClosePacket, (quic::QuicErrorCode, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+  MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, enable, ());
 
   using EnvoyQuicClientConnection::connectionStats;
 };

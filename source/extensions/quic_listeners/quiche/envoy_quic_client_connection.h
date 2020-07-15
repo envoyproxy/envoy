@@ -32,6 +32,11 @@ public:
                             Network::ConnectionSocketPtr&& connection_socket);
 
   // Network::UdpPacketProcessor
+  void disable() override { /*file_event_->setEnable(0);*/
+  }
+  void enable() override { /*file_event_->setEnable(Event::FileReadyType::Read |
+                              Event::FileReadyType::Write);*/
+  }
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time) override;

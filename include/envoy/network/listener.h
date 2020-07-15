@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Network {
 
 class ActiveUdpListenerFactory;
+class UdpPacketProcessor;
 
 /**
  * ListenSocketFactory is a member of ListenConfig to provide listen socket.
@@ -282,6 +283,20 @@ using ListenerPtr = std::unique_ptr<Listener>;
 class UdpListener : public virtual Listener {
 public:
   ~UdpListener() override = default;
+
+  /**
+   * Add a upstream processor to this listener.
+   *
+   * @param session A upstream processor that is belonging to this listener.
+   */
+  virtual void addUpstreamProcessor(UdpPacketProcessor* processor) PURE;
+
+  /**
+   * Remove a upstream processor from this listener.
+   *
+   * @param session A upstream processor that is belonging to this listener.
+   */
+  virtual void removeUpstreamProcessor(UdpPacketProcessor* processor) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this listener.

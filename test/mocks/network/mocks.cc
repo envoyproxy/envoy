@@ -175,7 +175,16 @@ MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
 }
 MockTransportSocketCallbacks::~MockTransportSocketCallbacks() = default;
 
+MockUdpPacketProcessor::MockUdpPacketProcessor() = default;
+MockUdpPacketProcessor::~MockUdpPacketProcessor() = default;
+
 MockUdpListener::MockUdpListener() {
+  ON_CALL(*this, addUpstreamProcessor(_)).WillByDefault([this](UdpPacketProcessor* processor) {
+    processors_.push_back(processor);
+  });
+  ON_CALL(*this, removeUpstreamProcessor(_)).WillByDefault([this](UdpPacketProcessor* processor) {
+    processors_.remove(processor);
+  });
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
 }
 

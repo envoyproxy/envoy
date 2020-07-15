@@ -132,10 +132,17 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
   auto new_session_ptr = new_session.get();
   sessions_.emplace(std::move(new_session));
   host_to_sessions_[host.get()].emplace(new_session_ptr);
+  filter_.read_callbacks_->udpListener()->addUpstreamProcessor(new_session_ptr);
   return new_session_ptr;
 }
 
-void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
+void UdpProxyFilter::ClusterInfo::removeSession(ActiveSession* session) {
+  // Remove it from udp listener.
+  Network::UdpListener* const udpListener = filter_.read_callbacks_->udpListener();
+  if (udpListener != nullptr) {
+    udpListener->removeUpstreamProcessor(session);
+  }
+
   // First remove from the host to sessions map.
   ASSERT(host_to_sessions_[&session->host()].count(session) == 1);
   auto host_sessions_it = host_to_sessions_.find(&session->host());
@@ -243,21 +250,8 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
   cluster_.cluster_stats_.sess_rx_datagrams_.inc();
   cluster_.cluster_.info()->stats().upstream_cx_rx_bytes_total_.add(buffer_length);
 
-  Network::UdpListener* const udpListener = cluster_.filter_.read_callbacks_->udpListener();
-  if (udpListener == nullptr) {
-    // In this case, the udp listener is removed or not added yet.
-    // So, we simply ignore datagram that incoming.
-    ENVOY_LOG(
-        debug,
-        "the udp listener is invalid. drop incoming datagram: downstream={} local={} upstream={}",
-        addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
-        host_->address()->asStringView());
-    cluster_.filter_.config_->stats().downstream_sess_tx_errors_.inc();
-    return;
-  }
-
   Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *buffer};
-  const Api::IoCallUint64Result rc = udpListener->send(data);
+  const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener()->send(data);
   if (!rc.ok()) {
     cluster_.filter_.config_->stats().downstream_sess_tx_errors_.inc();
   } else {
