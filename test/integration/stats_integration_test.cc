@@ -282,7 +282,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/06/10  11561    44491       44811   Make upstreams pluggable
   // 2020/06/29  11751    44715       46000   Improve time complexity of removing callback handle
   //                                          in callback manager.
-  // 2020/07/01  11748    45003       46000   Stream error on invalid messaging
+  // 2020/07/07  11252    44971       46000   Introduce Least Request LB active request bias config
+  // 2020/07/15  11748    45003       46000   Stream error on invalid messaging
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -354,7 +355,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/06/10  11561    36603       36923   Make upstreams pluggable
   // 2020/06/29  11751    36827       38000   Improve time complexity of removing callback handle.
   //                                          in callback manager.
-  // 2020/07/01  11748    37115       38000   Stream error on invalid messaging
+  // 2020/07/07  11252    37083       38000   Introduce Least Request LB active request bias config
+  // 2020/07/15  11748    37115       38000   Stream error on invalid messaging
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you

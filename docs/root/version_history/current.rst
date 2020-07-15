@@ -21,6 +21,8 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* fault: fixed an issue with `active_faults` gauge not being decremented for when abort faults were injected.
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -31,6 +33,7 @@ Removed Config or Runtime
 New Features
 ------------
 * grpc-json: support specifying `response_body` field in for `google.api.HttpBody` message.
+* load balancer: added a :ref:`configuration<envoy_v3_api_msg_config.cluster.v3.Cluster.LeastRequestLbConfig>` option to specify the active request bias used by the least request load balancer.
 * tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
 
 Deprecated

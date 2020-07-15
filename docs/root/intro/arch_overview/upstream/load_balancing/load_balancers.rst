@@ -41,11 +41,25 @@ same or different weights.
   less than or equal to all of the other hosts.
 * *all weights not equal*:  If two or more hosts in the cluster have different load balancing
   weights, the load balancer shifts into a mode where it uses a weighted round robin schedule in
-  which weights are dynamically adjusted based on the host's request load at the time of selection
-  (weight is divided by the current active request count. For example, a host with weight 2 and an
-  active request count of 4 will have a synthetic weight of 2 / 4 = 0.5). This algorithm provides
-  good balance at steady state but may not adapt to load imbalance as quickly. Additionally, unlike
-  P2C, a host will never truly drain, though it will receive fewer requests over time.
+  which weights are dynamically adjusted based on the host's request load at the time of selection.
+
+  In this case the weights are calculated at the time a host is picked using the following formula:
+
+  `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`.
+
+  :ref:`active_request_bias<envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.active_request_bias>`
+  can be configured via runtime and defaults to 1.0. It must be greater than or equal to 0.0.
+
+  The larger the active request bias is, the more aggressively active requests will lower the
+  effective weight.
+
+  If `active_request_bias` is set to 0.0, the least request load balancer behaves like the round
+  robin load balancer and ignores the active request count at the time of picking.
+
+  For example, if active_request_bias is 1.0, a host with weight 2 and an active request count of 4
+  will have an effective weight of 2 / (4 + 1)^1 = 0.4. This algorithm provides good balance at
+  steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C, a host will
+  never truly drain, though it will receive fewer requests over time.
 
 .. _arch_overview_load_balancing_types_ring_hash:
 
