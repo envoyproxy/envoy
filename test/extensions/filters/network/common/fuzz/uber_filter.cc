@@ -102,7 +102,7 @@ void UberFilterFuzzer::fuzzerSetup() {
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
 }
 
-UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.SimulatedTimeSystem()) {
+UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.simulatedTimeSystem()) {
   fuzzerSetup();
 }
 bool UberFilterFuzzer::invalidInputForFuzzer(const std::string& filter_name,

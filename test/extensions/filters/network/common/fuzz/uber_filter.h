@@ -15,7 +15,6 @@ namespace Server {
 namespace Configuration {
 class FakeFactoryContext : public MockFactoryContext {
 public:
-  FakeFactoryContext() {}
   void prepareSimulatedSystemTime() {
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("test_thread");
@@ -43,7 +42,7 @@ public:
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return ProtobufMessage::getStrictValidationVisitor();
   }
-  Event::SimulatedTimeSystem& SimulatedTimeSystem() {
+  Event::SimulatedTimeSystem& simulatedTimeSystem() {
     return dynamic_cast<Event::SimulatedTimeSystem&>(time_system_);
   }
   Event::TestTimeSystem& timeSystem() { return time_system_; }
