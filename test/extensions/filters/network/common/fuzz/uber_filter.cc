@@ -67,12 +67,12 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    ON_CALL(*async_client_factory_, create()).WillByDefault(Invoke([&] {
+    EXPECT_CALL(*async_client_factory_, create()).WillOnce(Invoke([&] {
       return std::move(async_client_);
     }));
 
-    ON_CALL(factory_context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return std::move(async_client_factory_); }));
   }
 }
@@ -94,11 +94,8 @@ void UberFilterFuzzer::fuzzerSetup() {
   factory_context_.prepareSimulatedSystemTime();
   // Prepare address for filters such as ext_authz filter.
   addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
-  ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
-      .WillByDefault(testing::ReturnRef(addr_));
-  ON_CALL(read_filter_callbacks_->connection_, localAddress())
-      .WillByDefault(testing::ReturnRef(addr_));
-
+  read_filter_callbacks_->connection_.remote_address_ = addr_;
+  read_filter_callbacks_->connection_.local_address_ = addr_;
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
 }
 
