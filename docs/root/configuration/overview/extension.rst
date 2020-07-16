@@ -71,3 +71,15 @@ The name field in the extension configuration acts as the resource identifier.
 For example, HTTP connection manager supports :ref:`dynamic filter
 re-configuration<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`
 for HTTP filters.
+
+Extension config discovery service has a :ref:`statistics
+<subscription_statistics>` tree rooted at
+*<stat_prefix>.extension_config_discovery.<extension_config_name>.*. In addition
+to the common subscription statistics, it also provides the following:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  config_reload, Counter, Total number of successful configuration updates
+  config_fail, Counter, Total number of failed configuration updates
