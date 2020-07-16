@@ -528,7 +528,8 @@ public:
     if (!instance_.name().empty()) {
       FactoryRegistry<Base>::registerFactory(instance_, instance_.name());
     } else {
-      ASSERT(deprecated_names.size() != 0);
+      ASSERT(deprecated_names.size() != 0,
+             "Attempted to register a factory without a name or deprecated name");
     }
 
     for (auto deprecated_name : deprecated_names) {
