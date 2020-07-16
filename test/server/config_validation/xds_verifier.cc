@@ -5,8 +5,7 @@
 namespace Envoy {
 
 XdsVerifier::XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta)
-    : num_warming_(0), num_active_(0), num_draining_(0), num_added_(0), num_modified_(0),
-      num_removed_(0) {
+    : num_warming_(0), num_active_(0), num_draining_(0) {
   if (sotw_or_delta == test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = SOTW;
   } else {
@@ -90,7 +89,6 @@ void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener
           // if the new listener is ready to take traffic, the old listener will be removed
           // it seems to be directly removed without being added to the config dump as draining
           ENVOY_LOG_MISC(info, "Removing {} after update", listener.name());
-          num_modified_++;
           num_active_--;
           /* num_draining_++; */
           /* rep.state = DRAINING; */
@@ -109,16 +107,15 @@ void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener
     }
   }
   dumpState();
-  listenerAdded(listener, true);
+  listenerAdded(listener);
 }
 
 /**
  * add a new listener to listeners_ in either an active or warming state
  * @param listener the listener to be added
- * @param from_update whether this was called from the listenerUpdated function, in which case
  * num_added_ should not be incremented
  */
-void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update) {
+void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener) {
   // if the same listener being added is already draining, it will be moved back to active
   //
   for (auto& rep : listeners_) {
@@ -130,11 +127,6 @@ void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener, 
       num_active_++;
       return;
     }
-  }
-
-  if (!from_update) {
-    // don't want to increment this as it was already incremented when old listener was added
-    num_added_++;
   }
 
   if (hasActiveRoute(listener)) {
@@ -173,9 +165,6 @@ void XdsVerifier::listenerRemoved(const std::string& name) {
       listeners_.erase(listeners_.begin() + i);
       num_warming_--;
     }
-  }
-  if (found) {
-    num_removed_++;
   }
 }
 
@@ -230,7 +219,6 @@ void XdsVerifier::markForRemoval(ListenerRepresentation& rep) {
       // the caller function
       old_listener.state = REMOVED;
       num_active_--;
-      num_modified_++;
     }
   }
 

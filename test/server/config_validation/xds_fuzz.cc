@@ -142,10 +142,8 @@ void XdsFuzzTest::addListener(const std::string& listener_name, const std::strin
   EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
   if (removed) {
     verifier_.listenerUpdated(listener);
-    /* test_server_->waitForCounterGe("listener_manager.listener_modified", verifier_.numModified()); */
   } else {
     verifier_.listenerAdded(listener);
-    /* test_server_->waitForCounterGe("listener_manager.listener_added", verifier_.numAdded()); */
   }
 }
 
@@ -160,7 +158,6 @@ void XdsFuzzTest::removeListener(const std::string& listener_name) {
     updateListener(listeners_, {}, {listener_name});
     EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
     verifier_.listenerRemoved(listener_name);
-    /* test_server_->waitForCounterGe("listener_manager.listener_removed", verifier_.numRemoved()); */
   }
 }
 
@@ -270,20 +267,10 @@ void XdsFuzzTest::replay() {
     default:
       break;
     }
-    if (sent_listener) {
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", verifier_.numWarming());
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive());
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", verifier_.numDraining());
-    }
     ENVOY_LOG_MISC(info, "{}", getListenersConfigDump().DebugString());
     ENVOY_LOG_MISC(
         info,
-        "added {} ({}), modified {} ({}), removed {} ({}), warming {} ({}), active {} ({}), "
-        "draining {} ({})",
-        verifier_.numAdded(), test_server_->counter("listener_manager.listener_added")->value(),
-        verifier_.numModified(),
-        test_server_->counter("listener_manager.listener_modified")->value(),
-        verifier_.numRemoved(), test_server_->counter("listener_manager.listener_removed")->value(),
+        "warming {} ({}), active {} ({}), draining {} ({})",
         verifier_.numWarming(),
         test_server_->gauge("listener_manager.total_listeners_warming")->value(),
         verifier_.numActive(),
@@ -337,10 +324,10 @@ void XdsFuzzTest::verifyListeners() {
 }
 
 void XdsFuzzTest::verifyState() {
-
-  /* test_server_->waitForCounterGe("listener_manager.total_listeners_warming", verifier_.numWarming()); */
-  /* test_server_->waitForCounterGe("listener_manager.total_listeners_active", verifier_.numActive()); */
-  /* test_server_->waitForCounterGe("listener_manager.total_listeners_draining", verifier_.numDraining()); */
+  // wait for all of the updates to take effect
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", verifier_.numWarming());
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive());
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", verifier_.numDraining());
   verifyListeners();
   ENVOY_LOG_MISC(info, "Verified listeners");
 
@@ -353,12 +340,7 @@ void XdsFuzzTest::verifyState() {
   ENVOY_LOG_MISC(info, "Verified stats");
   ENVOY_LOG_MISC(
       info,
-      "added {} ({}), modified {} ({}), removed {} ({}), warming {} ({}), active {} ({}), "
-      "draining {} ({})",
-      verifier_.numAdded(), test_server_->counter("listener_manager.listener_added")->value(),
-      verifier_.numModified(),
-      test_server_->counter("listener_manager.listener_modified")->value(),
-      verifier_.numRemoved(), test_server_->counter("listener_manager.listener_removed")->value(),
+      "warming {} ({}), active {} ({}), draining {} ({})",
       verifier_.numWarming(),
       test_server_->gauge("listener_manager.total_listeners_warming")->value(),
       verifier_.numActive(),
