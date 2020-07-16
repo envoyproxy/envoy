@@ -3,7 +3,8 @@
 # This is run on every commit that CircleCI picks up. It assumes that docs have already been built
 # via docs/build.sh. The push behavior differs depending on the nature of the commit:
 # * Tag commit (e.g. v1.6.0): pushes docs to versioned location.
-# * Main commit: pushes docs to latest.
+# * Main commit: pushes docs to latest. Note that envoy-mobile.github.io uses `master` rather than
+#                `main` because using `main` as the default branch currently results in 404s.
 # * Otherwise: noop.
 
 set -e
@@ -27,7 +28,7 @@ echo 'cloning'
 git clone git@github.com:envoy-mobile/envoy-mobile.github.io "$CHECKOUT_DIR"
 
 git -C "$CHECKOUT_DIR" fetch
-git -C "$CHECKOUT_DIR" checkout -B main origin/main
+git -C "$CHECKOUT_DIR" checkout -B master origin/master
 rm -fr "$PUBLISH_DIR"
 mkdir -p "$PUBLISH_DIR"
 cp -r "$DOCS_DIR"/* "$PUBLISH_DIR"
@@ -40,4 +41,4 @@ git add .
 echo 'commit'
 git commit -m "docs envoy-mobile@$BUILD_SHA"
 echo 'push'
-git push origin main
+git push origin master
