@@ -76,16 +76,16 @@ void UberFilterFuzzer::fuzz(
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
     case test::extensions::filters::network::Action::kOnData: {
-      if (read_filter_ != nullptr) {
-        Buffer::OwnedImpl buffer(action.on_data().data());
-        read_filter_->onData(buffer, action.on_data().end_stream());
-      }
+      ASSERT(read_filter_ != nullptr);
+      Buffer::OwnedImpl buffer(action.on_data().data());
+      read_filter_->onData(buffer, action.on_data().end_stream());
+    
       break;
     }
     case test::extensions::filters::network::Action::kOnNewConnection: {
-      if (read_filter_ != nullptr) {
+      ASSERT(read_filter_ != nullptr);
         read_filter_->onNewConnection();
-      }
+
       break;
     }
     case test::extensions::filters::network::Action::kAdvanceTime: {
