@@ -53,15 +53,15 @@ jobs:
   - job: release_arm64
     displayName: "Linux-arm64 release.server_only"
     dependsOn: ["format"]
-    condition: ne(variables['Build.Reason'], 'PullRequest')
     pool: "arm-large"
     steps:
       - template: bazel.yml
         parameters:
           managedAgent: false
-          ciTarget: bazel.release.server_only
+          ciTarget: bazel.release
           rbe: false
           artifactSuffix: ".arm64"
+          bazelBuildExtraOptions: "--define=hot_restart=disabled --test_env=HEAPCHECK= --conlyopt=-fexceptions"
 
   - job: bazel
     displayName: "Linux-x64"
