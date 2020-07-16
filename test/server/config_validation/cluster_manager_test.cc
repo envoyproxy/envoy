@@ -36,7 +36,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   testing::NiceMock<Secret::MockSecretManager> secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{api->timeSource()};

@@ -17,37 +17,32 @@ class GrpcSubscriptionImpl : public Subscription,
                              Logger::Loggable<Logger::Id::config> {
 public:
   GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
-                       SubscriptionStats stats, absl::string_view type_url,
-                       Event::Dispatcher& dispatcher, std::chrono::milliseconds init_fetch_timeout,
-                       bool is_aggregated);
+                       OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
+                       absl::string_view type_url, Event::Dispatcher& dispatcher,
+                       std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
 
   // Config::Subscription
   void start(const std::set<std::string>& resource_names) override;
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
-
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) override;
-
+  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
-
-  std::string resourceName(const ProtobufWkt::Any& resource) override;
 
   GrpcMuxSharedPtr grpcMux() { return grpc_mux_; }
 
-  void pause();
-  void resume();
+  ScopedResume pause();
 
 private:
   void disableInitFetchTimeoutTimer();
 
   GrpcMuxSharedPtr grpc_mux_;
   SubscriptionCallbacks& callbacks_;
+  OpaqueResourceDecoder& resource_decoder_;
   SubscriptionStats stats_;
   const std::string type_url_;
   GrpcMuxWatchPtr watch_;

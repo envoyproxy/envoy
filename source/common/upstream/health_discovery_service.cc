@@ -6,10 +6,13 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/service/health/v3/hds.pb.h"
+#include "envoy/service/health/v3/hds.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/version_converter.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -29,7 +32,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                          envoy::config::core::v3::ApiVersion transport_api_version,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                          Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                         Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory,
+                         Random::RandomGenerator& random, ClusterInfoFactory& info_factory,
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
                          Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
@@ -176,6 +179,7 @@ void HdsDelegate::processMessage(
                                               store_stats_, ssl_context_manager_, false,
                                               info_factory_, cm_, local_info_, dispatcher_, random_,
                                               singleton_manager_, tls_, validation_visitor_, api_));
+    hds_clusters_.back()->initialize([] {});
 
     hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_,
                                             api_);
@@ -189,13 +193,25 @@ void HdsDelegate::onReceiveMessage(
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
 
+  // Validate message fields
+  try {
+    MessageUtil::validate(*message, validation_visitor_);
+  } catch (const ProtoValidationException& ex) {
+    // Increment error count
+    stats_.errors_.inc();
+    ENVOY_LOG(warn, "Unable to validate health check specifier: {}", ex.what());
+
+    // Do not continue processing message
+    return;
+  }
+
   // Reset
   hds_clusters_.clear();
 
   // Set response
   auto server_response_ms = PROTOBUF_GET_MS_OR_DEFAULT(*message, interval, 1000);
 
-  // Process the HealthCheckSpecifier message
+  // Process the HealthCheckSpecifier message.
   processMessage(std::move(message));
 
   if (server_response_ms_ != server_response_ms) {
@@ -222,7 +238,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                        ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                       Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
+                       Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
                        ThreadLocal::SlotAllocator& tls,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : runtime_(runtime), cluster_(cluster), bind_config_(bind_config), stats_(stats),
@@ -242,7 +258,6 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
                      0, envoy::config::core::v3::UNKNOWN));
   }
-  initialize([] {});
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -269,7 +284,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 }
 
 void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manager,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                                    Event::Dispatcher& dispatcher, Api::Api& api) {
   for (auto& health_check : cluster_.health_checks()) {
     health_checkers_.push_back(

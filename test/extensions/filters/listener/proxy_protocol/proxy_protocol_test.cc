@@ -23,7 +23,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -83,6 +83,7 @@ public:
   bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
+  ResourceLimit& openConnections() override { return open_connections_; }
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   envoy::config::core::v3::TrafficDirection direction() const override {
@@ -191,6 +192,7 @@ public:
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
+  BasicResourceLimitImpl open_connections_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   Api::OsSysCallsImpl os_sys_calls_actual_;
@@ -1274,6 +1276,7 @@ public:
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
+  ResourceLimit& openConnections() override { return open_connections_; }
   bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
@@ -1338,6 +1341,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  BasicResourceLimitImpl open_connections_;
   Network::MockListenSocketFactory socket_factory_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;

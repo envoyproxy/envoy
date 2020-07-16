@@ -34,6 +34,7 @@
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
+#include "common/network/listener_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -56,7 +57,7 @@ InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-    ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
+    ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
@@ -381,23 +382,6 @@ void InstanceImpl::initialize(const Options& options,
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
-  if (initial_config.admin().address()) {
-    if (initial_config.admin().accessLogPath().empty()) {
-      throw EnvoyException("An admin access log path is required for a listening server.");
-    }
-    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
-    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
-                              initial_config.admin().address(),
-                              initial_config.admin().socketOptions(),
-                              stats_store_.createScope("listener.admin."));
-  } else {
-    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
-  }
-  config_tracker_entry_ =
-      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
-  if (initial_config.admin().address()) {
-    admin_->addListenerToHandler(handler_.get());
-  }
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -425,6 +409,24 @@ void InstanceImpl::initialize(const Options& options,
   // It's now safe to start writing stats from the main thread's dispatcher.
   if (bootstrap_.enable_dispatcher_stats()) {
     dispatcher_->initializeStats(stats_store_, "server.");
+  }
+
+  if (initial_config.admin().address()) {
+    if (initial_config.admin().accessLogPath().empty()) {
+      throw EnvoyException("An admin access log path is required for a listening server.");
+    }
+    ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
+    admin_->startHttpListener(initial_config.admin().accessLogPath(), options.adminAddressPath(),
+                              initial_config.admin().address(),
+                              initial_config.admin().socketOptions(),
+                              stats_store_.createScope("listener.admin."));
+  } else {
+    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
+  }
+  config_tracker_entry_ =
+      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
+  if (initial_config.admin().address()) {
+    admin_->addListenerToHandler(handler_.get());
   }
 
   // The broad order of initialization from this point on is the following:
@@ -526,6 +528,15 @@ void InstanceImpl::onRuntimeReady() {
         *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }
+
+  // If there is no global limit to the number of active connections, warn on startup.
+  // TODO (tonya11en): Move this functionality into the overload manager.
+  if (!runtime().snapshot().get(Network::ListenerImpl::GlobalMaxCxRuntimeKey)) {
+    ENVOY_LOG(warn,
+              "there is no configured limit to the number of allowed active connections. Set a "
+              "limit via the runtime key {}",
+              Network::ListenerImpl::GlobalMaxCxRuntimeKey);
+  }
 }
 
 void InstanceImpl::startWorkers() {
@@ -614,8 +625,9 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
+    Config::ScopedResume maybe_resume_rds;
     if (cm.adsMux()) {
-      cm.adsMux()->pause(type_urls);
+      maybe_resume_rds = cm.adsMux()->pause(type_urls);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -623,9 +635,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
-    if (cm.adsMux()) {
-      cm.adsMux()->resume(type_urls);
-    }
+    // This is done by tearing down the maybe_resume_rds Cleanup object.
   });
 }
 

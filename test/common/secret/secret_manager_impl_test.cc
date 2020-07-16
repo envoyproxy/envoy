@@ -257,7 +257,7 @@ TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
 
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -340,7 +340,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
 
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -368,11 +368,10 @@ tls_certificate:
 )EOF";
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
-  secret_resources.Add()->PackFrom(typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(secret_resources,
-                                                                                   "");
+  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, "");
   Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), nullptr, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
@@ -419,11 +418,10 @@ generic_secret:
 )EOF";
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
-  secret_resources.Add()->PackFrom(typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(secret_resources,
-                                                                                   "");
+  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, "");
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
       *secret_provider->secret());
@@ -440,7 +438,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -469,11 +467,10 @@ tls_certificate:
 )EOF";
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
-  secret_resources.Add()->PackFrom(typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
-  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(secret_resources,
-                                                                                   "keycert-v1");
+  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, "keycert-v1");
   Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), nullptr, *api_);
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
@@ -511,12 +508,11 @@ validation_context:
     inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA"
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(validation_yaml), typed_secret);
-  secret_resources.Clear();
-  secret_resources.Add()->PackFrom(typed_secret);
+  const auto decoded_resources_2 = TestUtility::decodeResources({typed_secret});
 
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      secret_resources, "validation-context-v1");
+      decoded_resources_2.refvec_, "validation-context-v1");
   Ssl::CertificateValidationContextConfigImpl cert_validation_context(
       *context_secret_provider->secret(), *api_);
   EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context.caCert());
@@ -563,12 +559,11 @@ session_ticket_keys:
     - inline_bytes: "RFVNTVlfSU5MSU5FX0JZVEVT"
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(stek_yaml), typed_secret);
-  secret_resources.Clear();
-  secret_resources.Add()->PackFrom(typed_secret);
+  const auto decoded_resources_3 = TestUtility::decodeResources({typed_secret});
 
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      secret_resources, "stek-context-v1");
+      decoded_resources_3.refvec_, "stek-context-v1");
   EXPECT_EQ(stek_secret_provider->secret()->keys()[1].inline_string(), "DUMMY_INLINE_STRING");
 
   const std::string updated_once_more_config_dump = R"EOF(
@@ -625,11 +620,10 @@ generic_secret:
     inline_string: "DUMMY_ECDSA_KEY"
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(generic_secret_yaml), typed_secret);
-  secret_resources.Clear();
-  secret_resources.Add()->PackFrom(typed_secret);
+  const auto decoded_resources_4 = TestUtility::decodeResources({typed_secret});
   init_target_handle->initialize(init_watcher);
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      secret_resources, "signing-key-v1");
+      decoded_resources_4.refvec_, "signing-key-v1");
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
       *generic_secret_provider->secret());
@@ -698,7 +692,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -831,7 +825,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -903,7 +897,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
@@ -948,7 +942,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
   envoy::config::core::v3::ConfigSource config_source;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Init::MockManager> init_manager;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
