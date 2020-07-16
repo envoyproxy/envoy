@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package envoy.extensions.filters.listener.original_dst.v3;
-
-message OriginalDstTestCase {
-  string address = 2;
-}

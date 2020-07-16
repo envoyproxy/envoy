@@ -63,3 +63,11 @@ envoy_cc_mock(
         "//source/common/network:utility_lib",
     ],
 )
+
+envoy_cc_mock(
+    name = "network_fakes",
+    hdrs = ["fakes.h"],
+    deps = [
+        ":network_mocks",
+    ],
+)

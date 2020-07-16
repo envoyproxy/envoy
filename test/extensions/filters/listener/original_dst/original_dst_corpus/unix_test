@@ -1,1 +1,4 @@
-address: "unix://tmp/server"
+sock {
+  local_address: "unix://tmp/server"
+  remote_address: "tcp://0.0.0.0:0"
+}
