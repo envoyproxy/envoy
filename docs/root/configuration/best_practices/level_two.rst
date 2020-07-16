@@ -10,7 +10,7 @@ edge use case may need to be adjusted when using Envoy in a multi-level deployme
 .. image:: /_static/multilevel_deployment.svg
 
 **In summary, if you run level two Envoy version 1.11.1 or greater which terminates 
-HTTP/2, we strongly advise you to change the HCM configuration of your level
+HTTP/2, we strongly advise you to change the HttpConnectionManager configuration of your level
 two Envoy, by setting its downstream**
 :ref:`validation of HTTP messaging option <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
 **to true.**
