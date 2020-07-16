@@ -48,7 +48,7 @@ void UberFilterFuzzer::reset() {
   read_filter_.reset();
 }
 
-// TODO(jianwendong): seperate the methods for per filter processing to a different file.
+// TODO(jianwendong): separate the methods for per filter processing to a different file.
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
   // Set up response for ext_authz filter
   if (filter_name == NetworkFilterNames::get().ExtAuthorization) {
