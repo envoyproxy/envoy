@@ -8,6 +8,9 @@
 
 #include "test/test_common/only_one_thread.h"
 #include "test/test_common/test_time_system.h"
+#include "test/test_common/utility.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Event {
@@ -64,10 +67,31 @@ private:
   class SimulatedScheduler;
   class Alarm;
   friend class Alarm; // Needed to reference mutex for thread annotations.
-  struct CompareAlarms {
-    bool operator()(const Alarm* a, const Alarm* b) const;
+  struct AlarmRegistration {
+    AlarmRegistration(MonotonicTime time, uint64_t randomness, Alarm& alarm)
+        : time_(time), randomness_(randomness), alarm_(alarm) {}
+
+    MonotonicTime time_;
+    // Random tie-breaker for alarms scheduled for the same monotonic time used to mimic
+    // non-deterministic execution of real alarms scheduled for the same wall time.
+    uint64_t randomness_;
+    Alarm& alarm_;
+
+    friend bool operator<(const AlarmRegistration& lhs, const AlarmRegistration& rhs) {
+      if (lhs.time_ != rhs.time_) {
+        return lhs.time_ < rhs.time_;
+      }
+      if (lhs.randomness_ != rhs.randomness_) {
+        return lhs.randomness_ < rhs.randomness_;
+      }
+      // Out of paranoia, use pointer comparison on the alarms as a final tie-breaker but also
+      // ASSERT that this branch isn't hit in debug modes since in practice the randomness_
+      // associated with two registrations should never be equal.
+      ASSERT(false, "Alarm registration randomness_ for two alarms should never be equal.");
+      return &lhs.alarm_ < &rhs.alarm_;
+    }
   };
-  using AlarmSet = std::set<Alarm*, CompareAlarms>;
+  using AlarmSet = std::set<AlarmRegistration>;
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves
@@ -80,17 +104,12 @@ private:
   void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  MonotonicTime alarmTimeLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void alarmActivateLockHeld(Alarm* alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
-  // The simulation keeps a unique ID for each alarm to act as a deterministic
-  // tie-breaker for alarm-ordering.
-  int64_t nextIndex();
+  void alarmActivateLockHeld(Alarm& alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Adds/removes an alarm.
-  void addAlarmLockHeld(Alarm*, const std::chrono::microseconds& duration)
+  void addAlarmLockHeld(Alarm&, const std::chrono::microseconds& duration)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeAlarmLockHeld(Alarm*) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeAlarmLockHeld(Alarm&) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Keeps track of how many alarms have been activated but not yet called,
   // which helps waitFor() determine when to give up and declare a timeout.
@@ -105,8 +124,10 @@ private:
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);
   SystemTime system_time_ ABSL_GUARDED_BY(mutex_);
+  TestRandomGenerator random_source_ ABSL_GUARDED_BY(mutex_);
   AlarmSet alarms_ ABSL_GUARDED_BY(mutex_);
-  uint64_t index_ ABSL_GUARDED_BY(mutex_);
+  absl::flat_hash_map<Alarm*, AlarmSet::const_iterator>
+      alarm_registrations_map_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   uint32_t pending_alarms_ ABSL_GUARDED_BY(mutex_);
   Thread::OnlyOneThread only_one_thread_;
