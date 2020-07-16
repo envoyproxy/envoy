@@ -1,3 +1,4 @@
+load("@rules_java//java:defs.bzl", "java_binary")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@build_bazel_rules_android//android:rules.bzl", "android_binary")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
@@ -251,7 +252,7 @@ def _create_sources_javadocs(name, android_library):
     _javadocs_name = name + "_android_javadocs"
 
     # This implicitly outputs {name}_deploy-src.jar which is the sources jar
-    native.java_binary(
+    java_binary(
         name = _sources_name,
         runtime_deps = [android_library],
     )
