@@ -539,15 +539,6 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
   connection->run();
 }
 
-IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
-    const std::string& bootstrap_path,
-    std::function<void(IntegrationTestServer&)> on_server_ready_function,
-    std::function<void()> on_server_init_function, Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function,
-                                       on_server_init_function, deterministic_, time_system, *api_,
-                                       defer_listener_finalization_);
-}
-
 void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   listener_access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));

@@ -396,14 +396,6 @@ public:
   }
 
 protected:
-  // Create the envoy server in another thread and start it.
-  // Will not return until that server is listening.
-  virtual IntegrationTestServerPtr
-  createIntegrationTestServer(const std::string& bootstrap_path,
-                              std::function<void(IntegrationTestServer&)> on_server_ready_function,
-                              std::function<void()> on_server_init_function,
-                              Event::TestTimeSystem& time_system);
-
   bool initialized() const { return initialized_; }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
