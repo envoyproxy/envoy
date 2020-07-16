@@ -21,7 +21,7 @@ envoy_cc_library(
     tags = ["backtrace"],
     deps = [
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:version_lib",
+        "//source/common/version:version_lib",
     ],
 )
 
@@ -232,9 +232,9 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
-        "//source/common/common:version_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/version:version_lib",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
@@ -418,7 +418,6 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
-        "//source/common/common:version_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/grpc:context_lib",
@@ -437,6 +436,7 @@ envoy_cc_library(
         "//source/common/stats:thread_local_store_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",
+        "//source/common/version:version_lib",
         "//source/server:overload_manager_lib",
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

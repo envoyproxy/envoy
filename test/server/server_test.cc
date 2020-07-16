@@ -5,12 +5,12 @@
 #include "envoy/server/bootstrap_extension_config.h"
 
 #include "common/common/assert.h"
-#include "common/common/version.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/thread_local/thread_local_impl.h"
+#include "common/version/version.h"
 
 #include "server/process_context_impl.h"
 #include "server/server.h"
