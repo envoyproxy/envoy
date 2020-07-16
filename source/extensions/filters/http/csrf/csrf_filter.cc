@@ -68,7 +68,7 @@ std::string targetOriginValue(const Http::RequestHeaderMap& headers) {
   }
 
   const auto absolute_url = fmt::format(
-      "{}://{}", headers.Scheme() != nullptr ? headers.getSchemeValue() : "", host_value);
+      "{}://{}", headers.Scheme() != nullptr ? headers.getSchemeValue() : "http", host_value);
   return hostAndPort(absolute_url);
 }
 
