@@ -139,7 +139,7 @@ private:
   // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
   // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
   // This string is a type URL.
-  std::queue<std::string> request_queue_;
+  std::unique_ptr<std::queue<std::string>> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 

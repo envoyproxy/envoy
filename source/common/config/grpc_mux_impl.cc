@@ -31,11 +31,6 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
-  if (!grpc_stream_.grpcStreamAvailable()) {
-    ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);
-    return; // Drop this request; the reconnect will enqueue a new one.
-  }
-
   ApiState& api_state = api_state_[type_url];
   auto& request = api_state.request_;
   request.mutable_resource_names()->Clear();
@@ -240,6 +235,8 @@ void GrpcMuxImpl::onWriteable() { drainRequests(); }
 
 void GrpcMuxImpl::onStreamEstablished() {
   first_stream_request_ = true;
+  grpc_stream_.maybeUpdateQueueSizeStat(0);
+  request_queue_ = std::make_unique<std::queue<std::string>>();
   for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
   }
@@ -255,23 +252,27 @@ void GrpcMuxImpl::onEstablishmentFailure() {
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
+  if (!grpc_stream_.grpcStreamAvailable()) {
+    ENVOY_LOG(debug, "No stream available to queueDiscoveryRequest for {}", queue_item);
+    return; // Drop this request; the reconnect will enqueue a new one.
+  }
   ApiState& api_state = api_state_[queue_item];
   if (api_state.paused()) {
     ENVOY_LOG(trace, "API {} paused during queueDiscoveryRequest(), setting pending.", queue_item);
     api_state.pending_ = true;
     return; // Drop this request; the unpause will enqueue a new one.
   }
-  request_queue_.push(queue_item);
+  request_queue_->push(queue_item);
   drainRequests();
 }
 
 void GrpcMuxImpl::drainRequests() {
-  while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
+  while (!request_queue_->empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
     // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-    sendDiscoveryRequest(request_queue_.front());
-    request_queue_.pop();
+    sendDiscoveryRequest(request_queue_->front());
+    request_queue_->pop();
   }
-  grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
+  grpc_stream_.maybeUpdateQueueSizeStat(request_queue_->size());
 }
 
 } // namespace Config
