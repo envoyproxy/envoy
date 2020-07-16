@@ -15,6 +15,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -401,12 +402,22 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                   .override_stream_error_on_invalid_http_message()
                   .value());
 
-  // The HTTP/1 stream_error_on_invalid_http_message takes precedence over the
+  // The override_stream_error_on_invalid_http_message takes precedence over the
   // global one.
   http2_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
   EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                   .override_stream_error_on_invalid_http_message()
                   .value());
+
+  {
+    // With runtime flipped, override is ignored.
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.hcm_stream_error_on_invalid_message", "false"}});
+    EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                    .override_stream_error_on_invalid_http_message()
+                    .value());
+  }
 }
 
 TEST(HttpUtility, getLastAddressFromXFF) {
