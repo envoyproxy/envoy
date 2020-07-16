@@ -21,6 +21,7 @@
 #include "common/http/message_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -142,10 +143,29 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
 envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  auto ret = initializeAndValidateOptions(options);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+    ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
+  }
+  return ret;
+}
+
+envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
   // This will throw an exception when a custom parameter and a named parameter collide.
   validateCustomSettingsParameters(options);
+
+  if (!options.has_override_stream_error_on_invalid_http_message()) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        options.stream_error_on_invalid_http_messaging());
+  }
 
   if (!options_clone.has_hpack_table_size()) {
     options_clone.mutable_hpack_table_size()->set_value(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
