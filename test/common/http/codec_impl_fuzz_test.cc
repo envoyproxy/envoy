@@ -462,11 +462,11 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
 
+  Http1::CodecStats::AtomicPtr http1_stats;
+  Http2::CodecStats::AtomicPtr http2_stats;
   ClientConnectionPtr client;
   ServerConnectionPtr server;
   const bool http2 = http_version == HttpVersion::Http2;
-  Http1::CodecStats::AtomicPtr http1_stats;
-  Http2::CodecStats::AtomicPtr http2_stats;
 
   if (http2) {
     client = std::make_unique<Http2::ClientConnectionImpl>(
