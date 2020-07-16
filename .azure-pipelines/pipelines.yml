@@ -51,7 +51,7 @@ jobs:
           ciTarget: bazel.release
 
   - job: release_arm64
-    displayName: "Linux-arm64 release.server_only"
+    displayName: "Linux-arm64 release"
     dependsOn: ["format"]
     # For master builds, continue even if format fails
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
@@ -64,7 +64,7 @@ jobs:
           ciTarget: bazel.release
           rbe: false
           artifactSuffix: ".arm64"
-          bazelBuildExtraOptions: "--define=hot_restart=disabled --test_env=HEAPCHECK= --conlyopt=-fexceptions"
+          bazelBuildExtraOptions: "--remote_cache=$(LocalCacheProxy) --remote_timeout=300"
 
   - job: bazel
     displayName: "Linux-x64"
