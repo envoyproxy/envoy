@@ -68,7 +68,7 @@ private:
   Event::SimulatedTimeSystem time_system_;
   Stats::AllocatorImpl heap_alloc_;
   Event::DispatcherPtr dispatcher_;
-  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
+  ThreadLocal::InstanceImplPtr tls_;
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
   envoy::config::metrics::v3::StatsConfig stats_config_;
