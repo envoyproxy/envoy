@@ -145,6 +145,7 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/grpc:context_lib",
         "//source/common/http:context_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//test/integration:integration_lib",

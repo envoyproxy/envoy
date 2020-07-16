@@ -8,6 +8,7 @@
 #include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
