@@ -24,36 +24,46 @@ envoy_cc_library(
     ],
 )
 
+CODEC_LIB_DEPS = [
+    ":codec_stats_lib",
+    ":header_formatter_lib",
+    "//include/envoy/buffer:buffer_interface",
+    "//include/envoy/http:codec_interface",
+    "//include/envoy/http:header_map_interface",
+    "//include/envoy/network:connection_interface",
+    "//source/common/buffer:buffer_lib",
+    "//source/common/buffer:watermark_buffer_lib",
+    "//source/common/common:assert_lib",
+    "//source/common/common:statusor_lib",
+    "//source/common/common:utility_lib",
+    "//source/common/grpc:common_lib",
+    "//source/common/http:codec_helper_lib",
+    "//source/common/http:codes_lib",
+    "//source/common/http:exception_lib",
+    "//source/common/http:header_map_lib",
+    "//source/common/http:header_utility_lib",
+    "//source/common/http:headers_lib",
+    "//source/common/http:status_lib",
+    "//source/common/http:url_utility_lib",
+    "//source/common/http:utility_lib",
+    "//source/common/runtime:runtime_features_lib",
+    "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+]
+
 envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     external_deps = ["http_parser"],
-    deps = [
-        ":codec_stats_lib",
-        ":header_formatter_lib",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/network:connection_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/buffer:watermark_buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:statusor_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/grpc:common_lib",
-        "//source/common/http:codec_helper_lib",
-        "//source/common/http:codes_lib",
-        "//source/common/http:exception_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http:header_utility_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:status_lib",
-        "//source/common/http:url_utility_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
+    deps = CODEC_LIB_DEPS,
+)
+
+envoy_cc_library(
+    name = "codec_legacy_lib",
+    srcs = ["codec_impl_legacy.cc"],
+    hdrs = ["codec_impl_legacy.h"],
+    external_deps = ["http_parser"],
+    deps = CODEC_LIB_DEPS,
 )
 
 envoy_cc_library(

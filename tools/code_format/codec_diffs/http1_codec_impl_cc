@@ -1,0 +1,35 @@
+--- 
++++ 
+@@ -1,4 +1,4 @@
+-#include "common/http/http1/codec_impl.h"
++#include "common/http/http1/codec_impl_legacy.h"
+ 
+ #include <cstdint>
+ #include <memory>
+@@ -25,6 +25,7 @@
+ 
+ namespace Envoy {
+ namespace Http {
++namespace Legacy {
+ namespace Http1 {
+ namespace {
+ 
+@@ -48,6 +49,10 @@
+ 
+ using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
+ using Http1HeaderTypes = ConstSingleton<Http1HeaderTypesValues>;
++using Http::Http1::CodecStats;
++using Http::Http1::HeaderKeyFormatter;
++using Http::Http1::HeaderKeyFormatterPtr;
++using Http::Http1::ProperCaseHeaderKeyFormatter;
+ 
+ const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
+   CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
+@@ -1236,6 +1241,7 @@
+ }
+ 
+ } // namespace Http1
++} // namespace Legacy
+ } // namespace Http
+ } // namespace Envoy
+ 
