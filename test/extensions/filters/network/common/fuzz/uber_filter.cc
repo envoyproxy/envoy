@@ -79,12 +79,12 @@ void UberFilterFuzzer::fuzz(
       ASSERT(read_filter_ != nullptr);
       Buffer::OwnedImpl buffer(action.on_data().data());
       read_filter_->onData(buffer, action.on_data().end_stream());
-    
+
       break;
     }
     case test::extensions::filters::network::Action::kOnNewConnection: {
       ASSERT(read_filter_ != nullptr);
-        read_filter_->onNewConnection();
+      read_filter_->onNewConnection();
 
       break;
     }
