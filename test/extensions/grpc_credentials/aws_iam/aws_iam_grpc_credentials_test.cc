@@ -59,17 +59,17 @@ public:
 
     std::string config_yaml;
     switch (region_location_) {
-    case RegionLocation::kInEnvironment:
+    case RegionLocation::InEnvironment:
       TestEnvironment::setEnvVar("AWS_REGION", region_name_, 1);
       ABSL_FALLTHROUGH_INTENDED;
-    case RegionLocation::kNotProvided:
+    case RegionLocation::NotProvided:
       config_yaml = fmt::format(R"EOF(
 "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
 service_name: {}
 )EOF",
                                 service_name_);
       break;
-    case RegionLocation::kInConfig:
+    case RegionLocation::InConfig:
       config_yaml = fmt::format(R"EOF(
 "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
 service_name: {}
@@ -86,12 +86,12 @@ region: {}
   }
 
   enum class RegionLocation {
-    kNotProvided,
-    kInEnvironment,
-    kInConfig,
+    NotProvided,
+    InEnvironment,
+    InConfig,
   };
 
-  RegionLocation region_location_ = RegionLocation::kNotProvided;
+  RegionLocation region_location_ = RegionLocation::NotProvided;
   std::string service_name_{};
   std::string region_name_{};
   std::string credentials_factory_name_{};
@@ -104,7 +104,7 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_ConfigRegion) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   service_name_ = "test_service";
   region_name_ = "test_region_static";
-  region_location_ = RegionLocation::kInConfig;
+  region_location_ = RegionLocation::InConfig;
   credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
   initialize();
   auto request = createRequest(empty_metadata_);
@@ -116,7 +116,7 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_EnvRegion) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   service_name_ = "test_service";
   region_name_ = "test_region_env";
-  region_location_ = RegionLocation::kInEnvironment;
+  region_location_ = RegionLocation::InEnvironment;
   credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
   initialize();
   auto request = createRequest(empty_metadata_);
@@ -128,7 +128,7 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_NoRegion) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   service_name_ = "test_service";
   region_name_ = "test_region_env";
-  region_location_ = RegionLocation::kNotProvided;
+  region_location_ = RegionLocation::NotProvided;
   credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
   EXPECT_THROW_WITH_REGEX(initialize();, EnvoyException, "AWS region");
 }

@@ -422,6 +422,7 @@ public:
                                     testing::Matcher<absl::string_view> matcher)
       : key_(std::move(key)), matcher_(std::move(matcher)) {}
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Get all headers with matching keys.
     std::vector<absl::string_view> values;
@@ -503,7 +504,7 @@ MATCHER_P(HttpStatusIs, expected_code, "") {
 }
 
 inline HeaderMap::ConstIterateCb
-SaveHeaders(std::vector<std::pair<absl::string_view, absl::string_view>>* output) {
+saveHeaders(std::vector<std::pair<absl::string_view, absl::string_view>>* output) {
   return [output](const HeaderEntry& header) {
     output->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
     return HeaderMap::Iterate::Continue;
@@ -522,13 +523,14 @@ public:
   IsSubsetOfHeadersMatcherImpl(const IsSubsetOfHeadersMatcherImpl& other)
       : expected_headers_(other.expected_headers_) {}
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Collect header maps into vectors, to use for IsSubsetOf.
     std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
-    headers.iterate(SaveHeaders(&arg_headers_vec));
+    headers.iterate(saveHeaders(&arg_headers_vec));
 
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
-    expected_headers_.iterate(SaveHeaders(&expected_headers_vec));
+    expected_headers_.iterate(saveHeaders(&expected_headers_vec));
 
     return ExplainMatchResult(testing::IsSubsetOf(expected_headers_vec), arg_headers_vec, listener);
   }
@@ -573,13 +575,14 @@ public:
   IsSupersetOfHeadersMatcherImpl(const IsSupersetOfHeadersMatcherImpl& other)
       : expected_headers_(other.expected_headers_) {}
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
     // Collect header maps into vectors, to use for IsSupersetOf.
     std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
-    headers.iterate(SaveHeaders(&arg_headers_vec));
+    headers.iterate(saveHeaders(&arg_headers_vec));
 
     std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
-    expected_headers_.iterate(SaveHeaders(&expected_headers_vec));
+    expected_headers_.iterate(saveHeaders(&expected_headers_vec));
 
     return ExplainMatchResult(testing::IsSupersetOf(expected_headers_vec), arg_headers_vec,
                               listener);
