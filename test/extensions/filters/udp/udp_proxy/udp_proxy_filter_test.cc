@@ -1,6 +1,8 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
+#include "common/network/utility.h"
+
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/network/io_handle.h"
@@ -155,7 +157,9 @@ public:
     filter_->onData(data);
   }
 
-  void expectSessionCreate(const Network::Address::InstanceConstSharedPtr& address) {
+  Event::MockFileEvent*
+  expectSessionCreate(const Network::Address::InstanceConstSharedPtr& address) {
+    auto file_event = new Event::MockFileEvent();
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
@@ -164,7 +168,8 @@ public:
     EXPECT_CALL(*new_session.io_handle_, fd());
     EXPECT_CALL(callbacks_.udp_listener_.dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge, Event::FileReadyType::Read))
-        .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
+        .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(file_event)));
+    return file_event;
   }
 
   void checkTransferStats(uint64_t rx_bytes, uint64_t rx_datagrams, uint64_t tx_bytes,
@@ -488,7 +493,6 @@ cluster: fake_cluster
   test_sessions_[0].expectUpstreamWrite("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, callbacks_.udp_listener_.processors_.size());
-
   test_sessions_[0].idle_timer_->invokeCallback();
   EXPECT_EQ(0, callbacks_.udp_listener_.processors_.size());
 }
@@ -511,6 +515,25 @@ cluster: fake_cluster
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(Return(nullptr));
   test_sessions_[0].idle_timer_->invokeCallback();
   EXPECT_EQ(1, callbacks_.udp_listener_.processors_.size());
+}
+
+// The file event should be called with correct parameters when processor's disable and enable
+// methods are called.
+TEST_F(UdpProxyFilterTest, TogglePacketProcessors) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+)EOF");
+
+  auto file_event = expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectUpstreamWrite("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_CALL(*file_event, setEnabled(0));
+  callbacks_.udp_listener_.processors_.front()->disable();
+  EXPECT_CALL(*file_event, setEnabled(Event::FileReadyType::Read));
+  callbacks_.udp_listener_.processors_.front()->enable();
 }
 
 } // namespace
