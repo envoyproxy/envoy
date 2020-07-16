@@ -223,6 +223,8 @@ envoy_cc_library(
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/network:resolver_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
