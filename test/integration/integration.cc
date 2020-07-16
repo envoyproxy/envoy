@@ -148,11 +148,10 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, abs
   }
 }
 
-IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
-                                           Event::TestTimeSystem& time_system,
-                                           MockBufferFactory& factory, uint32_t port,
-                                           Network::Address::IpVersion version,
-                                           bool enable_half_close)
+IntegrationTcpClient::IntegrationTcpClient(
+    Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system, MockBufferFactory& factory,
+    uint32_t port, Network::Address::IpVersion version, bool enable_half_close,
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
     : time_system_(time_system), payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, create_(_, _, _))
@@ -166,7 +165,7 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options);
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
@@ -190,24 +189,28 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
-void IntegrationTcpClient::waitForData(size_t length) {
+AssertionResult IntegrationTcpClient::waitForData(size_t length,
+                                                  std::chrono::milliseconds timeout) {
   if (payload_reader_->data().size() >= length) {
-    return;
+    return AssertionSuccess();
   }
 
-  payload_reader_->setLengthToWaitFor(length);
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  return payload_reader_->waitForLength(length, timeout);
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
   if (ignore_spurious_events) {
-    while (!disconnected_) {
+    while (!disconnected_ && timeout_timer->enabled()) {
       connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
     }
   } else {
     connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-    EXPECT_TRUE(disconnected_);
   }
+  EXPECT_TRUE(disconnected_);
 }
 
 void IntegrationTcpClient::waitForHalfClose() {
@@ -401,9 +404,11 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   }
 }
 
-IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
+IntegrationTcpClientPtr
+BaseIntegrationTest::makeTcpConnection(uint32_t port,
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, time_system_, *mock_buffer_factory_,
-                                                port, version_, enable_half_close_);
+                                                port, version_, enable_half_close_, options);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {

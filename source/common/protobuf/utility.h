@@ -262,8 +262,9 @@ public:
 
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-    loadFromYaml(yaml, message, validation_visitor);
+                                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                                      bool avoid_boosting = false) {
+    loadFromYaml(yaml, message, validation_visitor, !avoid_boosting);
     validate(message, validation_visitor);
   }
 

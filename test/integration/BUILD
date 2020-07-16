@@ -127,7 +127,6 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
@@ -218,14 +217,17 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    tags = ["fails_on_windows"],
+    tags = [
+        "fails_on_windows",
+        # https://github.com/envoyproxy/envoy/issues/9784
+        "no_tsan",
+    ],
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
@@ -331,6 +333,7 @@ envoy_cc_test(
         "http2_integration_test.cc",
         "http2_integration_test.h",
     ],
+    shard_count = 4,
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -621,6 +624,7 @@ envoy_cc_test_library(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//source/server:connection_handler_lib",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -632,7 +636,7 @@ envoy_cc_test_library(
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
@@ -947,6 +951,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 2,
     tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
@@ -1093,7 +1098,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/transport_sockets/tls:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

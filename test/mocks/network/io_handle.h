@@ -29,6 +29,7 @@ public:
   MOCK_METHOD(Api::IoCallUint64Result, recvmmsg,
               (RawSliceArrays & slices, uint32_t self_port, RecvMsgOutput& output));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
+  MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(Api::SysCallIntResult, bind, (Address::InstanceConstSharedPtr address));
   MOCK_METHOD(Api::SysCallIntResult, listen, (int backlog));
   MOCK_METHOD(Api::SysCallIntResult, connect, (Address::InstanceConstSharedPtr address));

@@ -183,7 +183,7 @@ listener_filters:
 
   Api::ApiPtr api_;
   NiceMock<Stats::MockHistogram> histogram_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
   NiceMock<Stats::MockCounter> mock_record_name_overflow_;
   NiceMock<Stats::MockCounter> query_parsing_failure_;

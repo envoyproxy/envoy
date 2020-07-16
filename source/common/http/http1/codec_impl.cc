@@ -16,6 +16,7 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -173,9 +174,6 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
-
-      // Assert 1xx (may have content) OR 204 and end stream.
-      ASSERT(*status < 200 || end_stream);
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
       // https://tools.ietf.org/html/rfc7231#section-4.3.6.
@@ -455,13 +453,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
     : connection_(connection), stats_(stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
-      strict_header_validation_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")),
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
-      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
@@ -615,13 +609,11 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 
   absl::string_view header_value{data, length};
-  if (strict_header_validation_) {
-    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
-      ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
-      error_code_ = Http::Code::BadRequest;
-      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
-      throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
-    }
+  if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
+    ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
+    error_code_ = Http::Code::BadRequest;
+    sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
+    throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
@@ -693,8 +685,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   // CONNECT request has no defined semantics, and may be rejected.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if ((reject_unsupported_transfer_encodings_ &&
-         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) ||
+    if (!absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked) ||
         parser_.method == HTTP_CONNECT) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);

@@ -13,13 +13,15 @@
 #include "common/config/version_converter.h"
 #include "common/http/codec_client.h"
 
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -98,12 +100,14 @@ class IntegrationTcpClient {
 public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system,
                        MockBufferFactory& factory, uint32_t port,
-                       Network::Address::IpVersion version, bool enable_half_close = false);
+                       Network::Address::IpVersion version, bool enable_half_close,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   void close();
   void waitForData(const std::string& data, bool exact_match = true);
   // wait for at least `length` bytes to be received
-  void waitForData(size_t length);
+  ABSL_MUST_USE_RESULT AssertionResult
+  waitForData(size_t length, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
@@ -190,7 +194,9 @@ public:
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
-  IntegrationTcpClientPtr makeTcpConnection(uint32_t port);
+  IntegrationTcpClientPtr
+  makeTcpConnection(uint32_t port,
+                    const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr);
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);

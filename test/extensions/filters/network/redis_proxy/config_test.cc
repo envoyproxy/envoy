@@ -5,7 +5,7 @@
 
 #include "extensions/filters/network/redis_proxy/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -85,7 +85,7 @@ settings:
   )EOF";
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config, true);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config, true, false);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
@@ -114,7 +114,7 @@ settings:
   )EOF";
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config, true);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config, true, false);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);

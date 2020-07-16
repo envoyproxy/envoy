@@ -20,9 +20,10 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml) {
+envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
+                                                                 bool avoid_boosting = true) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(yaml, bootstrap, true);
+  TestUtility::loadFromYaml(yaml, bootstrap, true, avoid_boosting);
   return bootstrap;
 }
 
@@ -200,7 +201,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -442,7 +443,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
                 port_value: 11001
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, false)), EnvoyException,
                             "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB is not "
                             "valid for Cluster type STATIC. "
                             "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
@@ -559,7 +560,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
         - keys: [ "x" ]
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, false)), EnvoyException,
                             "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB cannot be "
                             "combined with lb_subset_config");
 }
@@ -1226,8 +1227,8 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
        connect_timeout: 0.25s
        hosts:
        - socket_address:
-           address: "127.0.0.1"
-           port_value: 11001
+          address: "127.0.0.1"
+          port_value: 11001
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -1259,8 +1260,8 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
        connect_timeout: 0.25s
        hosts:
        - socket_address:
-           address: "127.0.0.1"
-           port_value: 11002
+          address: "127.0.0.1"
+          port_value: 11002
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -2664,7 +2665,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   common_lb_config:
     update_merge_window: 3s
   )EOF";
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1"));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(yaml), "version1"));
 
   Cluster& cluster = cluster_manager_->activeClusters().find("new_cluster")->second;
   HostVectorSharedPtr hosts(
@@ -2733,7 +2734,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
                    .gauge("cluster_manager.warming_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2"));
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(yaml_updated), "version2"));
   EXPECT_EQ(2, factory_.stats_
                    .gauge("cluster_manager.active_clusters", Stats::Gauge::ImportMode::NeverImport)
                    .value());
