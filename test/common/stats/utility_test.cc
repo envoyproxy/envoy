@@ -107,6 +107,16 @@ TEST_F(StatsUtilityTest, TextReadouts) {
   EXPECT_EQ(&t3, &t4);
 }
 
+TEST_F(StatsUtilityTest, CachedReference) {
+  ScopePtr scope = store_->createScope("scope.");
+  CachedReference<Counter> ref(*scope, "scope.my.counter");
+  EXPECT_FALSE(ref.find());
+  scope->counterFromString("my.counter").inc();
+  ASSERT_TRUE(ref.find());
+  Counter* counter = *ref.find();
+  EXPECT_EQ(1, counter->value());
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy

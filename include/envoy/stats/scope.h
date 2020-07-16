@@ -28,7 +28,8 @@ using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextR
 using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
-using CounterFn = std::function<bool(const CounterSharedPtr&)>;
+template<class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
+using CounterFn = IterateFn<Counter>;
 using GaugeFn = std::function<bool(const GaugeSharedPtr&)>;
 using HistogramFn = std::function<bool(const HistogramSharedPtr&)>;
 using TextReadoutFn = std::function<bool(const TextReadoutSharedPtr&)>;

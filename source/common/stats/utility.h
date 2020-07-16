@@ -211,16 +211,18 @@ template <class StatType> class CachedReference {
 public:
   CachedReference(Scope& scope, absl::string_view name) : scope_(scope), name_(std::string(name)) {}
 
-  absl::optional<StatType> find() {
+  absl::optional<StatType*> find() {
     StatType* stat = stat_.get([this]() -> StatType* {
       StatType* stat = nullptr;
-      scope_.iterate([this, &stat](const RefcountPtr<StatType>& shared_stat) -> bool {
-        if (shared_stat->name() == name_) {
-          stat = shared_stat->get();
-          return false; // Stop iteration.
-        }
-        return true;
-      });
+      IterateFn<StatType> check_stat =
+          [this, &stat](const RefcountPtr<StatType>& shared_stat) -> bool {
+            if (shared_stat->name() == name_) {
+              stat = shared_stat.get();
+              return false; // Stop iteration.
+            }
+            return true;
+          };
+      scope_.iterate(check_stat);
       return stat;
     });
     if (stat == nullptr) {
