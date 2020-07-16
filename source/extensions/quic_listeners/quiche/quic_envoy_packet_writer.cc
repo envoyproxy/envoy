@@ -4,7 +4,7 @@
 
 namespace Envoy {
 namespace Quic {
-QuicEnvoyPacketWriter::QuicEnvoyPacketWriter(Network::UdpPacketWriterPtr& envoy_udp_packet_writer)
+QuicEnvoyPacketWriter::QuicEnvoyPacketWriter(Network::UdpPacketWriter& envoy_udp_packet_writer)
     : envoy_udp_packet_writer_(envoy_udp_packet_writer) {}
 
 quic::WriteResult QuicEnvoyPacketWriter::WritePacket(const char* buffer, size_t buf_len,
@@ -22,7 +22,7 @@ quic::WriteResult QuicEnvoyPacketWriter::WritePacket(const char* buffer, size_t 
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
 
-  Api::IoCallUint64Result result = envoy_udp_packet_writer_->writeToSocket(
+  Api::IoCallUint64Result result = envoy_udp_packet_writer_.writeToSocket(
       *buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
 
   if (result.ok()) {
@@ -38,7 +38,7 @@ quic::QuicByteCount
 QuicEnvoyPacketWriter::GetMaxPacketSize(const quic::QuicSocketAddress& peer_address) const {
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
-  return static_cast<quic::QuicByteCount>(envoy_udp_packet_writer_->getMaxPacketSize(*remote_addr));
+  return static_cast<quic::QuicByteCount>(envoy_udp_packet_writer_.getMaxPacketSize(*remote_addr));
 }
 
 quic::QuicPacketBuffer
@@ -50,13 +50,13 @@ QuicEnvoyPacketWriter::GetNextWriteLocation(const quic::QuicIpAddress& self_ip,
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
   // TODO(yugant):Change this to not only take a char* pointer here
-  char* buf = envoy_udp_packet_writer_->getNextWriteLocation(
+  char* buf = envoy_udp_packet_writer_.getNextWriteLocation(
       local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
   return quic::QuicPacketBuffer(buf, nullptr);
 }
 
 quic::WriteResult QuicEnvoyPacketWriter::Flush() {
-  Api::IoCallUint64Result result = envoy_udp_packet_writer_->flush();
+  Api::IoCallUint64Result result = envoy_udp_packet_writer_.flush();
 
   // TODO(yugant):Move the code below maybe to a single helper function
   if (result.ok()) {

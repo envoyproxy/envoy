@@ -84,14 +84,8 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     quic_dispatcher_->InitializeWithWriter(
         dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer));
   } else {
-    // TODO(yugant): We do not want to pass the ownership of the pointer.
-    // Make QuicEnvoyPacketWriter to take just UdpPacketWriter
-    Network::UdpPacketWriterPtr udp_packet_writer_ptr =
-        Network::UdpPacketWriterPtr(udp_packet_writer);
-    quic_dispatcher_->InitializeWithWriter(new QuicEnvoyPacketWriter(udp_packet_writer_ptr));
+    quic_dispatcher_->InitializeWithWriter(new QuicEnvoyPacketWriter(*udp_packet_writer));
   }
-
-  // quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
