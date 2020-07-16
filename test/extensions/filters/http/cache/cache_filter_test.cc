@@ -200,6 +200,146 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
   }
 }
 
+TEST_F(CacheFilterTest, SingleSatisfiableRange) {
+  request_headers_.setHost("SingleSatisfiableRange");
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Encode response header
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Add range info to headers
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=-2");
+
+    response_headers_.setStatus(static_cast<uint64_t>(Http::Code::PartialContent));
+    response_headers_.addReference(Http::Headers::get().ContentRange, "bytes 1-2/3");
+    response_headers_.setContentLength(2);
+
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               false));
+
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq("bc")), true));
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
+  request_headers_.setHost("MultipleSatisfiableRanges");
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Encode response header
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Add range info to headers
+    // multi-part responses are not supported, 200 expected
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=0-1,-2");
+
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               false));
+
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, NotSatisfiableRange) {
+  request_headers_.setHost("NotSatisfiableRange");
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Encode response header
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Add range info to headers
+    request_headers_.addReference(Http::Headers::get().Range, "bytes=123-");
+
+    response_headers_.setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
+    response_headers_.addReference(Http::Headers::get().ContentRange, "bytes */3");
+    response_headers_.setContentLength(0);
+
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               true));
+
+    // 416 response should not have a body, so we don't expect a call to encodeData
+    EXPECT_CALL(decoder_callbacks_,
+                encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true))
+        .Times(0);
+
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters

@@ -4,6 +4,7 @@
 
 #include "extensions/filters/http/cache/cacheability_utils.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -89,8 +90,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
   // TODO(yosrym93): Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
-  case CacheEntryStatus::NotSatisfiableRange: // TODO(#10132): create 416 response.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;          // We don't yet return or support these codes.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
   case CacheEntryStatus::RequiresValidation:
     // Cache entries that require validation are treated as unusable entries
     // until validation is implemented
@@ -104,8 +104,29 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       state_ = GetHeadersState::GetHeadersResultUnusable;
     }
     return;
-  case CacheEntryStatus::SatisfiableRange: // TODO(#10132): break response content to the ranges
-                                           // requested.
+  case CacheEntryStatus::NotSatisfiableRange:
+    result.headers_->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
+    result.headers_->setContentLength(0);
+    result.headers_->addCopy(Http::Headers::get().ContentRange,
+                             absl::StrCat("bytes */", result.content_length_));
+    result.content_length_ = 0;
+  case CacheEntryStatus::SatisfiableRange:
+    // Multi-part responses are not supported; they will be treated as usual 200 response on '::Ok'
+    // case below. A possible way to achieve that would be to move all ranges to remaining_body, and
+    // add logic inside '::onBody' to interleave the body bytes with sub-headers and separator
+    // string for each part. Would need to keep track if the current range is over or not to know
+    // when to insert the separator, and calculate the length based on length of ranges + extra
+    // headers and separators.
+    if (result.response_ranges_.size() == 1) {
+      remaining_body_ = std::move(result.response_ranges_);
+      result.headers_->setStatus(static_cast<uint64_t>(Http::Code::PartialContent));
+      result.headers_->setContentLength(remaining_body_[0].length());
+      result.headers_->addCopy(Http::Headers::get().ContentRange,
+                               absl::StrCat("bytes ", remaining_body_[0].begin(), "-",
+                                            remaining_body_[0].end() - 1, "/",
+                                            result.content_length_));
+      result.content_length_ = remaining_body_[0].length();
+    }
   case CacheEntryStatus::Ok:
     response_has_trailers_ = result.has_trailers_;
     const bool end_stream = (result.content_length_ == 0 && !response_has_trailers_);
@@ -120,7 +141,10 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       return;
     }
     if (result.content_length_ > 0) {
-      remaining_body_.emplace_back(0, result.content_length_);
+      if (remaining_body_.empty()) {
+        // no range was added to remaining_body_, will add entire body to response
+        remaining_body_.emplace_back(0, result.content_length_);
+      }
       getBody();
     } else {
       lookup_->getTrailers(
