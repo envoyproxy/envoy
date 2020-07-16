@@ -24,7 +24,7 @@ else
 fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
-  COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
+  COVERAGE_TARGETS=$(bazel query "attr("tags", "fuzz_target", ${COVERAGE_TARGETS})")
 fi
 echo "COVERAGE_TARGETS=${COVERAGE_TARGETS}"
 
