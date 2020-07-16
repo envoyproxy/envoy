@@ -19,8 +19,10 @@
 #include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns3_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_ip_cert_info.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -647,7 +649,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySdsNotReady) {
 
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
