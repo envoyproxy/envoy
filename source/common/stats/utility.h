@@ -5,6 +5,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/thread.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/container/inlined_vector.h"
@@ -204,6 +205,34 @@ public:
    */
   static TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
                                                StatNameTagVectorOptConstRef tags = absl::nullopt);
+};
+
+template <class StatType> class CachedReference {
+public:
+  CachedReference(Scope& scope, absl::string_view name) : scope_(scope), name_(std::string(name)) {}
+
+  absl::optional<StatType> find() {
+    StatType* stat = stat_.get([this]() -> StatType* {
+      StatType* stat = nullptr;
+      scope_.iterate([this, &stat](const RefcountPtr<StatType>& shared_stat) -> bool {
+        if (shared_stat->name() == name_) {
+          stat = shared_stat->get();
+          return false; // Stop iteration.
+        }
+        return true;
+      });
+      return stat;
+    });
+    if (stat == nullptr) {
+      return absl::nullopt;
+    }
+    return stat;
+  }
+
+private:
+  Scope& scope_;
+  std::string name_;
+  Thread::AtomicPtr<StatType, Thread::AtomicPtrAllocMode::DoNotDelete> stat_;
 };
 
 } // namespace Stats

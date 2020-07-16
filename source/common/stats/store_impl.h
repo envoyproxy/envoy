@@ -18,6 +18,16 @@ public:
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
+  /*CounterOptConstRef slowFindCounterByString(absl::string_view name) const override;
+  GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const override;
+  HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const override;
+  TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const override;*/
+
+  /*bool iterate(const CounterFn& fn) const override;
+  bool iterate(const GaugeFn& fn) const override;
+  bool iterate(const HistogramFn& fn) const override;
+  bool iterate(const TextReadoutFn& fn) const override;*/
+
 private:
   SymbolTable& symbol_table_;
 };

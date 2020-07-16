@@ -91,6 +91,15 @@ public:
     return vec;
   }
 
+  bool iterate(const std::function<bool(const RefcountPtr<Base>&)>& fn) const {
+    for (auto& stat : stats_) {
+      if (!fn(stat.second)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
 private:
   friend class IsolatedStoreImpl;
 
@@ -153,6 +162,18 @@ public:
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     return text_readouts_.find(name);
   }
+
+  bool iterate(const CounterFn& fn) const override { return counters_.iterate(fn); }
+  bool iterate(const GaugeFn& fn) const override { return gauges_.iterate(fn); }
+  bool iterate(const HistogramFn& fn) const override { return histograms_.iterate(fn); }
+  bool iterate(const TextReadoutFn& fn) const override { return text_readouts_.iterate(fn); }
+
+  /*
+  CounterOptConstRef slowFindCounterByString(absl::string_view name) const override;
+  GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const override;
+  HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const override;
+  TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const override;
+  */
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }

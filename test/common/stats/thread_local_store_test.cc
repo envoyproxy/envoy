@@ -1584,5 +1584,42 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
   store_->sync().signal(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
 }
 
+template <class StatType> class IteratorTestHelper {
+public:
+  using SharedPtr = RefcountPtr<StatType>;
+  using Fn = std::function<bool(const SharedPtr& stat)>;
+
+  Fn iterOnce() {
+    return [this](const SharedPtr& stat) -> bool {
+      results_.push_back(stat);
+      return false;
+    };
+  }
+
+  Fn iterAll() {
+    return [this](const SharedPtr& stat) -> bool {
+      results_.push_back(stat);
+      return true;
+    };
+  }
+
+  std::vector<SharedPtr> results_;
+};
+
+TEST_F(ThreadLocalStoreNoMocksTestBase, IterateCounters) {
+  store_->counterFromString("c1");
+  store_->counterFromString("c2");
+  {
+    IteratorTestHelper<Counter> helper;
+    EXPECT_FALSE(store_->iterate(helper.iterOnce()));
+    EXPECT_EQ(1, helper.results_.size());
+  }
+  {
+    IteratorTestHelper<Counter> helper;
+    EXPECT_TRUE(store_->iterate(helper.iterAll()));
+    EXPECT_EQ(2, helper.results_.size());
+  }
+}
+
 } // namespace Stats
 } // namespace Envoy

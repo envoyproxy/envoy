@@ -150,6 +150,32 @@ public:
   }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
+  bool iterate(const CounterFn& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const GaugeFn& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const HistogramFn& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const TextReadoutFn& fn) const override { return wrapped_scope_->iterate(fn); }
+
+  /*
+  CounterOptConstRef slowFindCounterByString(absl::string_view name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->slowFindCounterByString(name);
+  }
+
+  GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->slowFindGaugeByString(name);
+  }
+
+  HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->slowFindHistogramByString(name);
+  }
+
+  TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->slowFindTextReadoutByString(name);
+    }*/
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
@@ -332,6 +358,16 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadouts();
   }
+
+  bool iterate(const CounterFn& fn) const override { return store_.iterate(fn); }
+  bool iterate(const GaugeFn& fn) const override { return store_.iterate(fn); }
+  bool iterate(const HistogramFn& fn) const override { return store_.iterate(fn); }
+  bool iterate(const TextReadoutFn& fn) const override { return store_.iterate(fn); }
+
+  /*CounterOptConstRef slowFindCounterByString(absl::string_view name) const override;
+  GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const override;
+  HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const override;
+  TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const ovrride;*/
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}

@@ -28,6 +28,11 @@ using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextR
 using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
+using CounterFn = std::function<bool(const CounterSharedPtr&)>;
+using GaugeFn = std::function<bool(const GaugeSharedPtr&)>;
+using HistogramFn = std::function<bool(const HistogramSharedPtr&)>;
+using TextReadoutFn = std::function<bool(const TextReadoutSharedPtr&)>;
+
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
  * (for example to free/delete all of them).
@@ -194,6 +199,16 @@ public:
    */
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
+
+  /*virtual CounterOptConstRef slowFindCounterByString(absl::string_view name) const PURE;
+  virtual GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const PURE;
+  virtual HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const PURE;
+  virtual TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const PURE;*/
+
+  virtual bool iterate(const CounterFn& fn) const PURE;
+  virtual bool iterate(const GaugeFn& fn) const PURE;
+  virtual bool iterate(const HistogramFn& fn) const PURE;
+  virtual bool iterate(const TextReadoutFn& fn) const PURE;
 };
 
 } // namespace Stats

@@ -54,6 +54,18 @@ public:
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
+  /*
+CounterOptConstRef slowFindCounterByString(absl::string_view name) const override;
+  GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const override;
+  HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const override;
+  TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const override;
+  */
+
+  bool iterate(const CounterFn& fn) const override { return scope_.iterate(fn); }
+  bool iterate(const GaugeFn& fn) const override { return scope_.iterate(fn); }
+  bool iterate(const HistogramFn& fn) const override { return scope_.iterate(fn); }
+  bool iterate(const TextReadoutFn& fn) const override { return scope_.iterate(fn); }
+
 private:
   Scope& scope_;
   StatNameStorage prefix_;
