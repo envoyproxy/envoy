@@ -322,8 +322,8 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   if (!ctx.request_headers) {
     return default_value_;
   }
-  const Http::HeaderEntry* entry = ctx.request_headers->get(name_);
-  return entry ? entry->value().getStringView() : default_value_;
+  const auto entry = ctx.request_headers->get(name_);
+  return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,

@@ -38,7 +38,7 @@ public:
     EXPECT_EQ("200", response->headers().getStatusValue());
     EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
               response->headers()
-                  .get(Http::CustomHeaders::get().ContentEncoding)
+                  .get(Http::CustomHeaders::get().ContentEncoding)[0]
                   ->value()
                   .getStringView());
     EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
@@ -61,7 +61,7 @@ public:
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
-    ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding) == nullptr);
+    ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
     ASSERT_EQ(content_length, response->body().size());
     EXPECT_EQ(response->body(), std::string(content_length, 'a'));
   }
@@ -188,9 +188,10 @@ TEST_P(CompressorIntegrationTest, UpstreamResponseAlreadyEncoded) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_EQ(
-      "br",
-      response->headers().get(Http::CustomHeaders::get().ContentEncoding)->value().getStringView());
+  ASSERT_EQ("br", response->headers()
+                      .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                      ->value()
+                      .getStringView());
   EXPECT_EQ(128U, response->body().size());
 }
 
@@ -214,7 +215,7 @@ TEST_P(CompressorIntegrationTest, NotEnoughContentLength) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding) == nullptr);
+  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
   EXPECT_EQ(10U, response->body().size());
 }
 
@@ -237,7 +238,7 @@ TEST_P(CompressorIntegrationTest, EmptyResponse) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("204", response->headers().getStatusValue());
-  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding) == nullptr);
+  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
   EXPECT_EQ(0U, response->body().size());
 }
 
@@ -292,9 +293,10 @@ TEST_P(CompressorIntegrationTest, AcceptanceFullConfigChunkedResponse) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_EQ(
-      "gzip",
-      response->headers().get(Http::CustomHeaders::get().ContentEncoding)->value().getStringView());
+  ASSERT_EQ("gzip", response->headers()
+                        .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                        ->value()
+                        .getStringView());
   ASSERT_EQ("chunked", response->headers().getTransferEncodingValue());
 }
 
@@ -318,10 +320,11 @@ TEST_P(CompressorIntegrationTest, AcceptanceFullConfigVaryHeader) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_EQ(
-      "gzip",
-      response->headers().get(Http::CustomHeaders::get().ContentEncoding)->value().getStringView());
+  ASSERT_EQ("gzip", response->headers()
+                        .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                        ->value()
+                        .getStringView());
   ASSERT_EQ("Cookie, Accept-Encoding",
-            response->headers().get(Http::CustomHeaders::get().Vary)->value().getStringView());
+            response->headers().get(Http::CustomHeaders::get().Vary)[0]->value().getStringView());
 }
 } // namespace Envoy

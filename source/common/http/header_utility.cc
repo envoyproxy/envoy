@@ -82,13 +82,10 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
 
 void HeaderUtility::getAllOfHeader(const HeaderMap& headers, absl::string_view key,
                                    std::vector<absl::string_view>& out) {
-  headers.iterate([key = LowerCaseString(std::string(key)),
-                   &out](const HeaderEntry& header) -> HeaderMap::Iterate {
-    if (header.key() == key.get().c_str()) {
-      out.emplace_back(header.value().getStringView());
-    }
-    return HeaderMap::Iterate::Continue;
-  });
+  const auto all_headers = headers.get(Http::LowerCaseString(std::string(key)));
+  for (size_t i = 0; i < all_headers.size(); i++) {
+    out.emplace_back(all_headers[i]->value().getStringView());
+  }
 }
 
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
@@ -108,7 +105,7 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
 HeaderUtility::GetAllOfHeaderAsStringResult
 HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::LowerCaseString& key) {
   GetAllOfHeaderAsStringResult result;
-  const auto header_value = headers.getAll(key);
+  const auto header_value = headers.get(key);
 
   if (header_value.empty()) {
     // Empty for clarity. Avoid handling the empty case in the block below if the runtime feature

@@ -107,7 +107,7 @@ public:
     std::string expected_method(sotwOrDelta() == Grpc::SotwOrDelta::Sotw
                                     ? "/envoy.api.v2.ClusterDiscoveryService/StreamClusters"
                                     : "/envoy.api.v2.ClusterDiscoveryService/DeltaClusters");
-    EXPECT_EQ(xds_stream_->headers().get(path_string)->value(), expected_method);
+    EXPECT_EQ(xds_stream_->headers().get(path_string)[0]->value(), expected_method);
   }
 
   void acceptXdsConnection() {

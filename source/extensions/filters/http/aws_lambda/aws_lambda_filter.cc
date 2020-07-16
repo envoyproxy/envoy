@@ -198,7 +198,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   // Just the existence of this header means we have an error, so skip.
-  if (headers.get(LambdaFilterNames::get().FunctionErrorHeader)) {
+  if (!headers.get(LambdaFilterNames::get().FunctionErrorHeader).empty()) {
     skip_ = true;
     return Http::FilterHeadersStatus::Continue;
   }

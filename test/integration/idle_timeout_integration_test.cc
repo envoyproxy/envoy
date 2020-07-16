@@ -183,8 +183,8 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("408", response->headers().getStatusValue());
   auto foo = Http::LowerCaseString("foo");
-  ASSERT_TRUE(response->headers().get(foo) != nullptr);
-  EXPECT_EQ("bar", response->headers().get(foo)->value().getStringView());
+  ASSERT_FALSE(response->headers().get(foo).empty());
+  EXPECT_EQ("bar", response->headers().get(foo)[0]->value().getStringView());
   EXPECT_EQ("stream timeout", response->body());
 
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("stream_idle_timeout"));

@@ -760,7 +760,7 @@ TEST_F(HttpFilterTest, HeadersToRemoveRemovesHeadersExceptSpecialHeaders) {
   EXPECT_EQ("/users", request_headers_.get_(Http::Headers::get().Path));
   EXPECT_EQ("websocket", request_headers_.get_(Http::Headers::get().Protocol));
   EXPECT_EQ("https", request_headers_.get_(Http::Headers::get().Scheme));
-  EXPECT_EQ(nullptr, request_headers_.get(Http::LowerCaseString{"remove-me"}));
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString{"remove-me"}).empty());
 }
 
 // Verifies that the filter clears the route cache when an authorization response:

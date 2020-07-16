@@ -40,13 +40,13 @@ bool RequestHeadersAction::populateDescriptor(const RouteEntry&, RateLimit::Desc
     return true;
   }
 
-  const Http::HeaderEntry* header_value = metadata.headers().get(header_name_);
-  if (!header_value) {
+  const auto header_value = metadata.headers().get(header_name_);
+  if (header_value.empty()) {
     return false;
   }
 
   descriptor.entries_.push_back(
-      {descriptor_key_, std::string(header_value->value().getStringView())});
+      {descriptor_key_, std::string(header_value[0]->value().getStringView())});
   return true;
 }
 

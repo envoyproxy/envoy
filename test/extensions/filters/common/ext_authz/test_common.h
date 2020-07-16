@@ -121,7 +121,7 @@ MATCHER_P(AuthzOkResponse, response, "") {
 }
 
 MATCHER_P(ContainsPairAsHeader, pair, "") {
-  return arg->headers().get(pair.first)->value().getStringView() == pair.second;
+  return arg->headers().get(pair.first)[0]->value().getStringView() == pair.second;
 }
 
 } // namespace ExtAuthz

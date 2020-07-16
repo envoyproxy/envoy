@@ -1409,9 +1409,11 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
                                      {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
-        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(std::string(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie).empty());
+        served_by.insert(std::string(response.headers()
+                                         .get(Http::LowerCaseString("x-served-by"))[0]
+                                         ->value()
+                                         .getStringView()));
       });
   EXPECT_EQ(served_by.size(), num_upstreams_);
 }
@@ -1440,7 +1442,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
         std::string value(
-            response.headers().get(Http::Headers::get().SetCookie)->value().getStringView());
+            response.headers().get(Http::Headers::get().SetCookie)[0]->value().getStringView());
         set_cookies.insert(value);
         EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15; HttpOnly"));
       });
@@ -1471,7 +1473,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
         std::string value(
-            response.headers().get(Http::Headers::get().SetCookie)->value().getStringView());
+            response.headers().get(Http::Headers::get().SetCookie)[0]->value().getStringView());
         set_cookies.insert(value);
         EXPECT_THAT(value, MatchesRegex("^foo=.*$"));
       });
@@ -1501,9 +1503,11 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
                                      {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
-        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(std::string(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie).empty());
+        served_by.insert(std::string(response.headers()
+                                         .get(Http::LowerCaseString("x-served-by"))[0]
+                                         ->value()
+                                         .getStringView()));
       });
   EXPECT_EQ(served_by.size(), 1);
 }
@@ -1532,9 +1536,11 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
                                      {":authority", "host"}},
       [&](IntegrationStreamDecoder& response) {
         EXPECT_EQ("200", response.headers().getStatusValue());
-        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie) == nullptr);
-        served_by.insert(std::string(
-            response.headers().get(Http::LowerCaseString("x-served-by"))->value().getStringView()));
+        EXPECT_TRUE(response.headers().get(Http::Headers::get().SetCookie).empty());
+        served_by.insert(std::string(response.headers()
+                                         .get(Http::LowerCaseString("x-served-by"))[0]
+                                         ->value()
+                                         .getStringView()));
       });
   EXPECT_EQ(served_by.size(), 1);
 }

@@ -218,11 +218,11 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)->value(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol) == nullptr);
+    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
   } else {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)->value(),
+    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
               "bytestream");
   }
 

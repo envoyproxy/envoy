@@ -215,12 +215,13 @@ void CacheHeadersUtils::getAllMatchingHeaderNames(
 }
 
 std::vector<std::string>
-CacheHeadersUtils::parseCommaDelimitedList(const Http::HeaderEntry* entry) {
-  if (!entry) {
+CacheHeadersUtils::parseCommaDelimitedList(const Http::HeaderMap::GetResult& entry) {
+  if (entry.empty()) {
     return {};
   }
 
-  std::vector<std::string> header_values = absl::StrSplit(entry->value().getStringView(), ',');
+  // TODO(mattklein123): Consider multiple header values?
+  std::vector<std::string> header_values = absl::StrSplit(entry[0]->value().getStringView(), ',');
   for (std::string& value : header_values) {
     // TODO(cbdm): Might be able to improve the performance here by using StringUtil::trim to
     // remove whitespace.
@@ -271,8 +272,8 @@ bool VaryHeader::isAllowed(const Http::ResponseHeaderMap& headers) const {
 }
 
 bool VaryHeader::hasVary(const Http::ResponseHeaderMap& headers) {
-  const Http::HeaderEntry* vary_header = headers.get(Http::Headers::get().Vary);
-  return vary_header != nullptr && !vary_header->value().empty();
+  const auto vary_header = headers.get(Http::Headers::get().Vary);
+  return !vary_header.empty() && !vary_header[0]->value().empty();
 }
 
 namespace {
@@ -286,13 +287,13 @@ constexpr absl::string_view header_separator = "\n";
 constexpr absl::string_view in_value_separator = "\r";
 }; // namespace
 
-std::string VaryHeader::createVaryKey(const Http::HeaderEntry* vary_header,
+std::string VaryHeader::createVaryKey(const Http::HeaderMap::GetResult& vary_header,
                                       const Http::RequestHeaderMap& entry_headers) {
-  if (vary_header == nullptr) {
+  if (vary_header.empty()) {
     return "";
   }
 
-  ASSERT(vary_header->key() == "vary");
+  ASSERT(vary_header[0]->key() == "vary");
 
   std::string vary_key = "vary-key\n";
 

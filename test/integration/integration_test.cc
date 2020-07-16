@@ -179,7 +179,7 @@ TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("example-value", response->headers()
-                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))[0]
                                  ->value()
                                  .getStringView());
   EXPECT_EQ("text/html", response->headers().getContentTypeValue());
@@ -223,7 +223,7 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("example-value", response->headers()
-                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))
+                                 .get(Envoy::Http::LowerCaseString("x-additional-header"))[0]
                                  ->value()
                                  .getStringView());
   // Content-type header is removed.
@@ -709,12 +709,12 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
   EXPECT_EQ(upstream_headers->get_("User-Agent"), "public,123");
-  ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")) != nullptr);
+  ASSERT_FALSE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")).empty());
   EXPECT_EQ("bar",
-            upstream_headers->get(Envoy::Http::LowerCaseString("foo"))->value().getStringView());
-  ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("eep")) != nullptr);
+            upstream_headers->get(Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
+  ASSERT_FALSE(upstream_headers->get(Envoy::Http::LowerCaseString("eep")).empty());
   EXPECT_EQ("baz",
-            upstream_headers->get(Envoy::Http::LowerCaseString("eep"))->value().getStringView());
+            upstream_headers->get(Envoy::Http::LowerCaseString("eep"))[0]->value().getStringView());
 }
 
 // Verify for HTTP/1.0 a keep-alive header results in no connection: close.

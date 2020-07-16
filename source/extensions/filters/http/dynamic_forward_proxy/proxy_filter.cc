@@ -108,9 +108,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
     const auto& host_rewrite_header = config->hostRewriteHeader();
     if (!host_rewrite_header.get().empty()) {
-      const auto* header = headers.get(host_rewrite_header);
-      if (header != nullptr) {
-        const auto& header_value = header->value().getStringView();
+      const auto header = headers.get(host_rewrite_header);
+      if (!header.empty()) {
+        const auto& header_value = header[0]->value().getStringView();
         headers.setHost(header_value);
       }
     }

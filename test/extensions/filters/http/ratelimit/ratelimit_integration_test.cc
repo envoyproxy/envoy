@@ -237,14 +237,14 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   ratelimit_response_headers.iterate(
       [response = response_.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-        EXPECT_EQ(entry.value(), response->headers().get(lower_key)->value().getStringView());
+        EXPECT_EQ(entry.value(), response->headers().get(lower_key)[0]->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       });
 
   request_headers_to_add.iterate([upstream = upstream_request_.get()](
                                      const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
     Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-    EXPECT_EQ(entry.value(), upstream->headers().get(lower_key)->value().getStringView());
+    EXPECT_EQ(entry.value(), upstream->headers().get(lower_key)[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
 
@@ -280,7 +280,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   ratelimit_response_headers.iterate(
       [response = response_.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-        EXPECT_EQ(entry.value(), response->headers().get(lower_key)->value().getStringView());
+        EXPECT_EQ(entry.value(), response->headers().get(lower_key)[0]->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       });
 

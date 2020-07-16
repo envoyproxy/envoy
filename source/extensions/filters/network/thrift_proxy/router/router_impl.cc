@@ -63,9 +63,9 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
   const auto& cluster_header = clusterHeader();
   if (!cluster_header.get().empty()) {
     const auto& headers = metadata.headers();
-    const auto* entry = headers.get(cluster_header);
-    if (entry != nullptr) {
-      return std::make_shared<DynamicRouteEntry>(*this, entry->value().getStringView());
+    const auto entry = headers.get(cluster_header);
+    if (!entry.empty()) {
+      return std::make_shared<DynamicRouteEntry>(*this, entry[0]->value().getStringView());
     }
 
     return nullptr;

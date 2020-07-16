@@ -115,9 +115,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = request_properties->mutable_request_headers();
 
     for (const auto& header : request_headers_to_log_) {
-      const Http::HeaderEntry* entry = request_headers.get(header);
-      if (entry != nullptr) {
-        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
+      const auto entry = request_headers.get(header);
+      if (!entry.empty()) {
+        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }
   }
@@ -136,9 +136,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = response_properties->mutable_response_headers();
 
     for (const auto& header : response_headers_to_log_) {
-      const Http::HeaderEntry* entry = response_headers.get(header);
-      if (entry != nullptr) {
-        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
+      const auto entry = response_headers.get(header);
+      if (!entry.empty()) {
+        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }
   }
@@ -147,9 +147,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = response_properties->mutable_response_trailers();
 
     for (const auto& header : response_trailers_to_log_) {
-      const Http::HeaderEntry* entry = response_trailers.get(header);
-      if (entry != nullptr) {
-        logged_headers->insert({header.get(), std::string(entry->value().getStringView())});
+      const auto entry = response_trailers.get(header);
+      if (!entry.empty()) {
+        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
       }
     }
   }

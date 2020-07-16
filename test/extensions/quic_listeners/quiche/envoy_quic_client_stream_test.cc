@@ -156,8 +156,8 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
       .WillOnce(Invoke([](const Http::ResponseTrailerMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
-        EXPECT_EQ("value1", headers->get(key1)->value().getStringView());
-        EXPECT_EQ(nullptr, headers->get(key2));
+        EXPECT_EQ("value1", headers->get(key1)[0]->value().getStringView());
+        EXPECT_TRUE(headers->get(key2).empty());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/true, trailers_.uncompressed_header_bytes(), trailers_);
 }
@@ -205,8 +205,8 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
       .WillOnce(Invoke([](const Http::ResponseTrailerMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
-        EXPECT_EQ("value1", headers->get(key1)->value().getStringView());
-        EXPECT_EQ(nullptr, headers->get(key2));
+        EXPECT_EQ("value1", headers->get(key1)[0]->value().getStringView());
+        EXPECT_TRUE(headers->get(key2).empty());
       }));
   quic_stream_->OnStreamFrame(frame);
 }

@@ -265,22 +265,22 @@ TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
                    {regexFood.get(), "food"},
                    {regexFool.get(), "fool"}});
 
-  EXPECT_EQ(message_ptr->headers().get(Http::Headers::get().ContentType), nullptr);
-  const auto* x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
-  ASSERT_NE(x_squash, nullptr);
-  EXPECT_EQ(x_squash->value().getStringView(), "foo");
+  EXPECT_TRUE(message_ptr->headers().get(Http::Headers::get().ContentType).empty());
+  const auto x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
+  ASSERT_FALSE(x_squash.empty());
+  EXPECT_EQ(x_squash[0]->value().getStringView(), "foo");
 
-  const auto* x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
-  ASSERT_NE(x_content_type, nullptr);
-  EXPECT_EQ(x_content_type->value().getStringView(), "foobar");
+  const auto x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
+  ASSERT_FALSE(x_content_type.empty());
+  EXPECT_EQ(x_content_type[0]->value().getStringView(), "foobar");
 
-  const auto* food = message_ptr->headers().get(regexFood);
-  ASSERT_NE(food, nullptr);
-  EXPECT_EQ(food->value().getStringView(), "food");
+  const auto food = message_ptr->headers().get(regexFood);
+  ASSERT_FALSE(food.empty());
+  EXPECT_EQ(food[0]->value().getStringView(), "food");
 
-  const auto* fool = message_ptr->headers().get(regexFool);
-  ASSERT_NE(fool, nullptr);
-  EXPECT_EQ(fool->value().getStringView(), "fool");
+  const auto fool = message_ptr->headers().get(regexFool);
+  ASSERT_FALSE(fool.empty());
+  EXPECT_EQ(fool[0]->value().getStringView(), "fool");
 }
 
 // Verify client response when authorization server returns a 200 OK.

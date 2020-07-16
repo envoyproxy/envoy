@@ -154,7 +154,7 @@ TEST_P(ProtocolIntegrationTest, RouterRedirect) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("301", response->headers().getStatusValue());
   EXPECT_EQ("https://www.redirect.com/foo",
-            response->headers().get(Http::Headers::get().Location)->value().getStringView());
+            response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
@@ -303,7 +303,7 @@ typed_config:
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
     EXPECT_EQ("decode", upstream_request_->trailers()
-                            ->get(Http::LowerCaseString("grpc-message"))
+                            ->get(Http::LowerCaseString("grpc-message"))[0]
                             ->value()
                             .getStringView());
   }
@@ -330,7 +330,7 @@ TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("host",
-            response->headers().get(Http::LowerCaseString("host"))->value().getStringView());
+            response->headers().get(Http::LowerCaseString("host"))[0]->value().getStringView());
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10270
@@ -351,7 +351,7 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
                                      {"longrequestvalue", long_header_value_with_inner_lws}});
   waitForNextUpstreamRequest();
   EXPECT_EQ(long_header_value_with_inner_lws, upstream_request_->headers()
-                                                  .get(Http::LowerCaseString("longrequestvalue"))
+                                                  .get(Http::LowerCaseString("longrequestvalue"))[0]
                                                   ->value()
                                                   .getStringView());
   upstream_request_->encodeHeaders(
@@ -363,10 +363,12 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("host",
-            response->headers().get(Http::LowerCaseString("host"))->value().getStringView());
-  EXPECT_EQ(
-      long_header_value_with_inner_lws,
-      response->headers().get(Http::LowerCaseString("longresponsevalue"))->value().getStringView());
+            response->headers().get(Http::LowerCaseString("host"))[0]->value().getStringView());
+  EXPECT_EQ(long_header_value_with_inner_lws,
+            response->headers()
+                .get(Http::LowerCaseString("longresponsevalue"))[0]
+                ->value()
+                .getStringView());
 }
 
 TEST_P(ProtocolIntegrationTest, Retry) {
@@ -898,8 +900,8 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   EXPECT_EQ("500", response->headers().getStatusValue());
   // Regression test all sendLocalReply paths add route-requested headers.
   auto foo = Http::LowerCaseString("foo");
-  ASSERT_TRUE(response->headers().get(foo) != nullptr);
-  EXPECT_EQ("bar", response->headers().get(foo)->value().getStringView());
+  ASSERT_FALSE(response->headers().get(foo).empty());
+  EXPECT_EQ("bar", response->headers().get(foo)[0]->value().getStringView());
 
   // Regression test https://github.com/envoyproxy/envoy/issues/9881 by making
   // sure this path does standard HCM header transformations.

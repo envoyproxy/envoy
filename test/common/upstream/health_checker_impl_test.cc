@@ -1237,27 +1237,28 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
-        EXPECT_EQ(headers.get(header_ok)->value().getStringView(), value_ok);
-        EXPECT_EQ(headers.get(header_cool)->value().getStringView(), value_cool);
-        EXPECT_EQ(headers.get(header_awesome)->value().getStringView(), value_awesome);
+        EXPECT_EQ(headers.get(header_ok)[0]->value().getStringView(), value_ok);
+        EXPECT_EQ(headers.get(header_cool)[0]->value().getStringView(), value_cool);
+        EXPECT_EQ(headers.get(header_awesome)[0]->value().getStringView(), value_awesome);
 
         EXPECT_EQ(headers.getUserAgentValue(), value_user_agent);
-        EXPECT_EQ(headers.get(upstream_metadata)->value().getStringView(), value_upstream_metadata);
+        EXPECT_EQ(headers.get(upstream_metadata)[0]->value().getStringView(),
+                  value_upstream_metadata);
 
-        EXPECT_EQ(headers.get(protocol)->value().getStringView(), value_protocol);
-        EXPECT_EQ(headers.get(downstream_remote_address)->value().getStringView(),
+        EXPECT_EQ(headers.get(protocol)[0]->value().getStringView(), value_protocol);
+        EXPECT_EQ(headers.get(downstream_remote_address)[0]->value().getStringView(),
                   value_downstream_remote_address);
-        EXPECT_EQ(headers.get(downstream_remote_address_without_port)->value().getStringView(),
+        EXPECT_EQ(headers.get(downstream_remote_address_without_port)[0]->value().getStringView(),
                   value_downstream_remote_address_without_port);
-        EXPECT_EQ(headers.get(downstream_local_address)->value().getStringView(),
+        EXPECT_EQ(headers.get(downstream_local_address)[0]->value().getStringView(),
                   value_downstream_local_address);
-        EXPECT_EQ(headers.get(downstream_local_address_without_port)->value().getStringView(),
+        EXPECT_EQ(headers.get(downstream_local_address_without_port)[0]->value().getStringView(),
                   value_downstream_local_address_without_port);
 
         Envoy::DateFormatter date_formatter("%s.%9f");
         std::string current_start_time =
             date_formatter.fromTime(dispatcher_.timeSource().systemTime());
-        EXPECT_EQ(headers.get(start_time)->value().getStringView(), current_start_time);
+        EXPECT_EQ(headers.get(start_time)[0]->value().getStringView(), current_start_time);
       }));
   health_checker_->start();
 

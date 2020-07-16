@@ -71,9 +71,10 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
 
   bool equal = true;
   rhs.iterate([&lhs, &equal](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    const Http::HeaderEntry* entry =
-        lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
-    if (entry == nullptr || (entry->value() != header.value().getStringView())) {
+    // TODO(mattklein123): Handle multiple headers.
+    auto entry = lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
+    if (entry.empty() || entry.size() > 1 ||
+        (entry[0]->value() != header.value().getStringView())) {
       equal = false;
       return Http::HeaderMap::Iterate::Break;
     }

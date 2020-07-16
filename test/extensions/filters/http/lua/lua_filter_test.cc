@@ -2140,7 +2140,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_2, true));
-  EXPECT_EQ(nullptr, request_headers_2.get(Http::LowerCaseString("hello")));
+  EXPECT_FALSE(request_headers_2.has("hello"));
 }
 
 // Test whether the route can directly reuse the Lua code in the global configuration.
@@ -2204,7 +2204,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_EQ(nullptr, request_headers.get(Http::LowerCaseString("hello")));
+  EXPECT_TRUE(request_headers.get(Http::LowerCaseString("hello")).empty());
 }
 
 TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {

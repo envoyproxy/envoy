@@ -668,7 +668,7 @@ TEST(HeaderAddTest, HeaderAdd) {
 
   headers_to_add.iterate([&headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
     Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-    EXPECT_EQ(entry.value().getStringView(), headers.get(lower_key)->value().getStringView());
+    EXPECT_EQ(entry.value().getStringView(), headers.get(lower_key)[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
 }

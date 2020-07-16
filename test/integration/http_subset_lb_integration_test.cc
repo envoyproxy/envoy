@@ -159,14 +159,14 @@ public:
 
       // Expect a response from a host in the correct subset.
       EXPECT_EQ(response->headers()
-                    .get(Envoy::Http::LowerCaseString{host_type_header_})
+                    .get(Envoy::Http::LowerCaseString{host_type_header_})[0]
                     ->value()
                     .getStringView(),
                 expected_host_type);
 
       // Record the upstream address.
       hosts.emplace(response->headers()
-                        .get(Envoy::Http::LowerCaseString{host_header_})
+                        .get(Envoy::Http::LowerCaseString{host_header_})[0]
                         ->value()
                         .getStringView());
 
