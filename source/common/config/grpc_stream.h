@@ -118,7 +118,9 @@ public:
     ASSERT(drain_request_timer_ != nullptr);
     control_plane_stats_.rate_limit_enforced_.inc();
     // Enable the drain request timer.
-    drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
+    if (!drain_request_timer_->enabled()) {
+      drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
+    }
     return false;
   }
 

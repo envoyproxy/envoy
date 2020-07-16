@@ -37,12 +37,6 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 
   ApiState& api_state = api_state_[type_url];
-  if (api_state.pauses_ > 0) {
-    ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
-    api_state.pending_ = true;
-    return; // Drop this request; the unpause will enqueue a new one.
-  }
-
   auto& request = api_state.request_;
   request.mutable_resource_names()->Clear();
 
@@ -94,7 +88,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
   // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
   // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
   // only send a single RDS/EDS update after the CDS/LDS update.
-  sendDiscoveryRequest(type_url);
+  queueDiscoveryRequest(type_url);
 
   return watch;
 }
@@ -115,7 +109,7 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
       ApiState& api_state = api_state_[type_url];
       ENVOY_LOG(debug, "Resuming discovery requests for {} (previous count {})", type_url,
                 api_state.pauses_);
-      ASSERT(api_state.pauses_ > 0);
+      ASSERT(api_state.paused());
 
       if (--api_state.pauses_ == 0 && api_state.pending_ && api_state.subscribed_) {
         queueDiscoveryRequest(type_url);
@@ -130,7 +124,7 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
   if (entry == api_state_.end()) {
     return false;
   }
-  return entry->second.pauses_ > 0;
+  return entry->second.paused();
 }
 
 bool GrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
@@ -171,7 +165,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       // No watches and we have resources - this should not happen. send a NACK (by not
       // updating the version).
       ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
-      sendDiscoveryRequest(type_url);
+      queueDiscoveryRequest(type_url);
     }
     return;
   }
@@ -238,7 +232,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
-  sendDiscoveryRequest(type_url);
+  ASSERT(api_state_[type_url].paused());
+  queueDiscoveryRequest(type_url);
 }
 
 void GrpcMuxImpl::onWriteable() { drainRequests(); }
@@ -260,6 +255,12 @@ void GrpcMuxImpl::onEstablishmentFailure() {
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
+  ApiState& api_state = api_state_[queue_item];
+  if (api_state.paused()) {
+    ENVOY_LOG(trace, "API {} paused during queueDiscoveryRequest(), setting pending.", queue_item);
+    api_state.pending_ = true;
+    return; // Drop this request; the unpause will enqueue a new one.
+  }
   request_queue_.push(queue_item);
   drainRequests();
 }

@@ -515,7 +515,8 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
   custom_rate_limit_settings.enabled_ = true;
   setup(custom_rate_limit_settings);
 
-  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)).Times(AtLeast(99));
+  // Attempt to send 99 messages. One of them is rate limited (and we never drain).
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)).Times(98);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
@@ -534,7 +535,9 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
 
   // Validate that drain_request_timer is enabled when there are no tokens.
   EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(100), _));
-  onReceiveMessage(100);
+  // The drain timer enable is checked twice, once when we limit, again when the watch is destroyed.
+  EXPECT_CALL(*drain_request_timer, enabled()).Times(2);
+  onReceiveMessage(99);
   EXPECT_EQ(1, stats_.counter("control_plane.rate_limit_enforced").value());
   EXPECT_EQ(
       1,
@@ -592,13 +595,13 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   EXPECT_EQ(0, stats_.counter("control_plane.rate_limit_enforced").value());
 
   // Validate that drain_request_timer is enabled when there are no tokens.
-  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(500), _))
-      .Times(AtLeast(1));
+  EXPECT_CALL(*drain_request_timer, enableTimer(std::chrono::milliseconds(500), _));
+  EXPECT_CALL(*drain_request_timer, enabled()).Times(12);
   onReceiveMessage(160);
-  EXPECT_EQ(11, stats_.counter("control_plane.rate_limit_enforced").value());
+  EXPECT_EQ(12, stats_.counter("control_plane.rate_limit_enforced").value());
   Stats::Gauge& pending_requests =
       stats_.gauge("control_plane.pending_requests", Stats::Gauge::ImportMode::Accumulate);
-  EXPECT_EQ(11, pending_requests.value());
+  EXPECT_EQ(12, pending_requests.value());
 
   // Validate that drain requests call when there are multiple requests in queue.
   time_system_.setMonotonicTime(std::chrono::seconds(10));

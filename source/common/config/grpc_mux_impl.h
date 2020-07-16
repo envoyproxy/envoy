@@ -51,8 +51,6 @@ public:
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
 
-  void sendDiscoveryRequest(const std::string& type_url);
-
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
@@ -70,6 +68,7 @@ public:
 private:
   void drainRequests();
   void setRetryTimer();
+  void sendDiscoveryRequest(const std::string& type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
@@ -83,14 +82,14 @@ private:
     ~GrpcMuxWatchImpl() override {
       watches_.remove(this);
       if (!resources_.empty()) {
-        parent_.sendDiscoveryRequest(type_url_);
+        parent_.queueDiscoveryRequest(type_url_);
       }
     }
 
     void update(const std::set<std::string>& resources) override {
       watches_.remove(this);
       if (!resources_.empty()) {
-        parent_.sendDiscoveryRequest(type_url_);
+        parent_.queueDiscoveryRequest(type_url_);
       }
       resources_ = resources;
       // move this watch to the beginning of the list
@@ -110,6 +109,8 @@ private:
 
   // Per muxed API state.
   struct ApiState {
+    bool paused() const { return pauses_ > 0; }
+
     // Watches on the returned resources for the API;
     std::list<GrpcMuxWatchImpl*> watches_;
     // Current DiscoveryRequest for API.
