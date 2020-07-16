@@ -45,7 +45,7 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
 }
 
 UdpListenerImpl::~UdpListenerImpl() {
-  disable();
+  disableFileEvent();
   file_event_.reset();
 
   for (UdpPacketProcessor* processor : processors_) {
@@ -54,7 +54,7 @@ UdpListenerImpl::~UdpListenerImpl() {
   }
 }
 
-void UdpListenerImpl::disable() { file_event_->setEnabled(0); }
+void UdpListenerImpl::disable() { disableFileEvent(); }
 
 void UdpListenerImpl::enable() {
   file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -72,6 +72,8 @@ void UdpListenerImpl::onSocketEvent(short flags) {
     handleWriteCallback();
   }
 }
+
+void UdpListenerImpl::disableFileEvent() { file_event_->setEnabled(0); }
 
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
