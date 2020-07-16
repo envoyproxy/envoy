@@ -281,6 +281,7 @@ public:
           TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
           envoy::extensions::filters::http::router::v3::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
+          router_config.set_add_request_date_header(add_request_date_header_);
           hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
 
           const bool append = mode == HeaderMode::Append;
@@ -432,6 +433,9 @@ protected:
   template <class Headers, class ExpectedHeaders>
   void compareHeaders(Headers&& headers, ExpectedHeaders& expected_headers) {
     headers.remove(Envoy::Http::LowerCaseString{"content-length"});
+    if (add_request_date_header_) {
+      EXPECT_NE(nullptr, headers.get(Envoy::Http::LowerCaseString{"date"}));
+    }
     headers.remove(Envoy::Http::LowerCaseString{"date"});
     if (!routerSuppressEnvoyHeaders()) {
       headers.remove(Envoy::Http::LowerCaseString{"x-envoy-expected-rq-timeout-ms"});
@@ -445,6 +449,7 @@ protected:
   }
 
   bool use_eds_{false};
+  bool add_request_date_header_{false};
   bool normalize_path_{false};
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
@@ -465,11 +470,11 @@ TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
           {":path", "/"},
           {":scheme", "http"},
           {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
+          {"x-request-foo", "downstream"},
       },
       Http::TestRequestHeaderMapImpl{
           {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
+          {"x-request-foo", "downstream"},
           {":path", "/"},
           {":method", "GET"},
       },
@@ -621,6 +626,37 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
           {"server", "envoy"},
           {"x-unmodified", "upstream"},
           {"x-route-response", "route"},
+          {":status", "200"},
+      });
+}
+
+// Validates that the `date` header is added to outbound requests when configured.
+TEST_P(HeaderIntegrationTest, TestAddingRequestDateHeader) {
+  add_request_date_header_ = true;
+  initializeFilter(HeaderMode::Replace, false);
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstream"},
+      },
+      Http::TestRequestHeaderMapImpl{
+          {":authority", "no-headers.com"},
+          {"x-request-foo", "downstream"},
+          {":path", "/"},
+          {":method", "GET"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-return-foo", "upstream"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-return-foo", "upstream"},
           {":status", "200"},
       });
 }
@@ -1091,7 +1127,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
           {":path", "/"},
           {":scheme", "http"},
           {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
+          {"x-request-foo", "downstream"},
           {"connection", "te, close"},
           {"te", "trailers"},
       },
@@ -1099,7 +1135,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
           {":authority", "no-headers.com"},
           {":path", "/"},
           {":method", "GET"},
-          {"x-request-foo", "downstram"},
+          {"x-request-foo", "downstream"},
           {"te", "trailers"},
       },
       Http::TestResponseHeaderMapImpl{
@@ -1125,7 +1161,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
           {":path", "/"},
           {":scheme", "http"},
           {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
+          {"x-request-foo", "downstream"},
           {"connection", "te, mike, sam, will, close"},
           {"te", "gzip"},
           {"mike", "foo"},
@@ -1136,7 +1172,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
           {":authority", "no-headers.com"},
           {":path", "/"},
           {":method", "GET"},
-          {"x-request-foo", "downstram"},
+          {"x-request-foo", "downstream"},
       },
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},

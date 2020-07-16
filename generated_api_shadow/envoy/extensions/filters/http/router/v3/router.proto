@@ -79,7 +79,7 @@ message Router {
   // populated by egress Envoy, when deriving timeout for upstream cluster.
   bool respect_expected_rq_timeout = 6;
 
-  // Enable the addition of the `Date` header to outbound requests.
+  // Enable the addition of the `date` header to outbound requests.
   // If `true`, the header will be assigned on each request (and retry).
   bool add_request_date_header = 7;
 }

@@ -14,7 +14,7 @@ public:
   virtual ~DateProvider() = default;
 
   /**
-   * Set the `Date` header (potentially using a cached value).
+   * Set the `date` header (potentially using a cached value).
    * @param headers the headers to populate.
    */
   virtual void setDateHeader(RequestOrResponseHeaderMap& headers) PURE;
