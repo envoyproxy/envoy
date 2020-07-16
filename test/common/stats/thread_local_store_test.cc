@@ -1,7 +1,6 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
@@ -30,11 +29,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::UnorderedElementsAre;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Stats {
@@ -1587,7 +1586,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
 
 class IteratorTest : public ThreadLocalStoreNoMocksTestBase {
 public:
-  template<class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>& stat)>;
+  template <class StatType>
+  using IterateFn = std::function<bool(const RefcountPtr<StatType>& stat)>;
   using MakeStatFn = std::function<void(Scope& scope, absl::string_view name)>;
 
   IteratorTest() : scope_(store_->createScope("scope")) {}
@@ -1599,14 +1599,14 @@ public:
     make_stat(*scope_, "stat4");
   }
 
-  template<class StatType> IterateFn<StatType> iterOnce() {
+  template <class StatType> IterateFn<StatType> iterOnce() {
     return [this](const RefcountPtr<StatType>& stat) -> bool {
       results_.insert(stat->name());
       return false;
     };
   }
 
-  template<class StatType> IterateFn<StatType> iterAll() {
+  template <class StatType> IterateFn<StatType> iterAll() {
     return [this](const RefcountPtr<StatType>& stat) -> bool {
       results_.insert(stat->name());
       return true;
@@ -1614,8 +1614,7 @@ public:
   }
 
   static MakeStatFn makeCounter() {
-    return [](Scope& scope, absl::string_view name) {
-             scope.counterFromString(std::string(name)); };
+    return [](Scope& scope, absl::string_view name) { scope.counterFromString(std::string(name)); };
   }
 
   ScopePtr scope_;

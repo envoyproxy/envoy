@@ -61,10 +61,20 @@ CounterOptConstRef slowFindCounterByString(absl::string_view name) const overrid
   TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const override;
   */
 
-  bool iterate(const CounterFn& fn) const override { return scope_.iterate(fn); }
-  bool iterate(const GaugeFn& fn) const override { return scope_.iterate(fn); }
-  bool iterate(const HistogramFn& fn) const override { return scope_.iterate(fn); }
-  bool iterate(const TextReadoutFn& fn) const override { return scope_.iterate(fn); }
+  template <class SharedStatType>
+  bool iterHelper(const std::function<bool(const SharedStatType& stat)>& fn) const {
+    std::string prefix_str = scope_.symbolTable().toString(prefix_.statName());
+    std::function<bool(const SharedStatType& stat)> filter_scope =
+        [&fn, &prefix_str](const SharedStatType& stat) -> bool {
+      return !absl::StartsWith(stat->name(), prefix_str) || fn(stat);
+    };
+    return scope_.iterate(filter_scope);
+  }
+
+  bool iterate(const CounterFn& fn) const override { return iterHelper(fn); }
+  bool iterate(const GaugeFn& fn) const override { return iterHelper(fn); }
+  bool iterate(const HistogramFn& fn) const override { return iterHelper(fn); }
+  bool iterate(const TextReadoutFn& fn) const override { return iterHelper(fn); }
 
 private:
   Scope& scope_;
