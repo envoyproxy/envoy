@@ -267,6 +267,12 @@ void XdsFuzzTest::replay() {
     default:
       break;
     }
+    if (sent_listener) {
+      // wait for all of the updates to take effect
+      test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", verifier_.numWarming());
+      test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive());
+      test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", verifier_.numDraining());
+    }
     ENVOY_LOG_MISC(info, "{}", getListenersConfigDump().DebugString());
     ENVOY_LOG_MISC(
         info,
@@ -324,10 +330,6 @@ void XdsFuzzTest::verifyListeners() {
 }
 
 void XdsFuzzTest::verifyState() {
-  // wait for all of the updates to take effect
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", verifier_.numWarming());
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive());
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", verifier_.numDraining());
   verifyListeners();
   ENVOY_LOG_MISC(info, "Verified listeners");
 
