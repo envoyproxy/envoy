@@ -35,15 +35,17 @@ message TypedExtensionConfig {
   google.protobuf.Any typed_config = 2 [(validate.rules).any = {required: true}];
 }
 
-// Configuration source specifier for a late-bound
-// extension configuration. The parent resource is warmed until all the initial
-// extension configurations are received, unless the flag to apply the default
-// configuration is set. Subsequent extension updates are atomic on a per-worker
-// basis, and apply to new streams while the active streams continue using
-// the older extension configurations. If the initial delivery of the extension
-// configuration fails, due to a timeout for example, the optional default
-// configuration is applied. Without a default configuration, the extension is
-// disabled, until an extension configuration is received.
+// Configuration source specifier for a late-bound extension configuration. The
+// parent resource is warmed until all the initial extension configurations are
+// received, unless the flag to apply the default configuration is set.
+// Subsequent extension updates are atomic on a per-worker basis, and apply to
+// new streams while the active streams continue using the older extension
+// configurations. If the initial delivery of the extension configuration
+// fails, due to a timeout for example, the optional default configuration is
+// applied. Without a default configuration, the extension is disabled, until
+// an extension configuration is received. The behavior of a disabled extension
+// depends on the context. For example, a filter chain with a disabled
+// extension filter rejects all incoming streams.
 message ExtensionConfigSource {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.ExtensionConfigSource";

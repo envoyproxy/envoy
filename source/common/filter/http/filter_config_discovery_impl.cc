@@ -1,4 +1,4 @@
-#include "common/filter/filter_config_discovery_impl.h"
+#include "common/filter/http/filter_config_discovery_impl.h"
 
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/server/filter_config.h"
@@ -11,9 +11,10 @@
 
 namespace Envoy {
 namespace Filter {
+namespace Http {
 
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
-    HttpFilterConfigSubscriptionSharedPtr&& subscription,
+    FilterConfigSubscriptionSharedPtr&& subscription,
     const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)), require_type_urls_(require_type_urls),
@@ -34,7 +35,7 @@ DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
 
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
 
-absl::optional<Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
+absl::optional<Envoy::Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
@@ -47,7 +48,7 @@ void DynamicFilterConfigProviderImpl::validateConfig(
   }
 }
 
-void DynamicFilterConfigProviderImpl::onConfigUpdate(Http::FilterFactoryCb config,
+void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryCb config,
                                                      const std::string&) {
   tls_->runOnAllThreads([config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
                             -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -57,22 +58,22 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Http::FilterFactoryCb confi
   });
 }
 
-HttpFilterConfigSubscription::HttpFilterConfigSubscription(
+FilterConfigSubscription::FilterConfigSubscription(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-    const std::string& stat_prefix,
-    HttpFilterConfigProviderManagerImpl& filter_config_provider_manager,
+    const std::string& stat_prefix, FilterConfigProviderManagerImpl& filter_config_provider_manager,
     const std::string& subscription_id)
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
           envoy::config::core::v3::ApiVersion::V3,
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       filter_config_name_(filter_config_name), factory_context_(factory_context),
       validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
-      init_target_(fmt::format("HttpFilterConfigSubscription init {}", filter_config_name_),
+      init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
-      scope_(factory_context.scope().createScope(stat_prefix + "filter_config_discovery." +
+      scope_(factory_context.scope().createScope(stat_prefix + "extension_config_discovery." +
                                                  filter_config_name_ + ".")),
-      stat_prefix_(stat_prefix), stats_({ALL_FILTER_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
+      stat_prefix_(stat_prefix),
+      stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
   const auto resource_name = getResourceName();
@@ -81,14 +82,14 @@ HttpFilterConfigSubscription::HttpFilterConfigSubscription(
           config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
 }
 
-void HttpFilterConfigSubscription::start() {
+void FilterConfigSubscription::start() {
   if (!started_) {
     started_ = true;
     subscription_->start({filter_config_name_});
   }
 }
 
-void HttpFilterConfigSubscription::onConfigUpdate(
+void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& resources, const std::string& version_info) {
   // Make sure to make progress in case the control plane is temporarily inconsistent.
   init_target_.ready();
@@ -119,7 +120,7 @@ void HttpFilterConfigSubscription::onConfigUpdate(
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       filter_config.typed_config(), validator_, factory);
-  Http::FilterFactoryCb factory_callback =
+  Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
   for (auto* provider : filter_config_providers_) {
@@ -129,7 +130,7 @@ void HttpFilterConfigSubscription::onConfigUpdate(
   last_config_hash_ = new_hash;
 }
 
-void HttpFilterConfigSubscription::onConfigUpdate(
+void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
@@ -143,35 +144,34 @@ void HttpFilterConfigSubscription::onConfigUpdate(
   }
 }
 
-void HttpFilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
-                                                        const EnvoyException*) {
+void FilterConfigSubscription::onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
+                                                    const EnvoyException*) {
   ENVOY_LOG(debug, "Updating filter config {} failed due to {}", filter_config_name_, reason);
   stats_.config_fail_.inc();
   // Make sure to make progress in case the control plane is temporarily failing.
   init_target_.ready();
 }
 
-HttpFilterConfigSubscription::~HttpFilterConfigSubscription() {
+FilterConfigSubscription::~FilterConfigSubscription() {
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   init_target_.ready();
   // Remove the subscription from the provider manager.
   filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
 }
 
-std::shared_ptr<HttpFilterConfigSubscription> HttpFilterConfigProviderManagerImpl::getSubscription(
+std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSubscription(
     const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
-  // HttpFilterConfigSubscriptions are unique based on their config source and filter config name
+  // FilterConfigSubscriptions are unique based on their config source and filter config name
   // combination.
   // TODO(https://github.com/envoyproxy/envoy/issues/11967) Hash collision can cause subscription
   // aliasing.
   const std::string subscription_id = absl::StrCat(MessageUtil::hash(config_source), ".", name);
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {
-    auto subscription = std::make_shared<HttpFilterConfigSubscription>(
+    auto subscription = std::make_shared<FilterConfigSubscription>(
         config_source, name, factory_context, stat_prefix, *this, subscription_id);
-    subscriptions_.insert(
-        {subscription_id, std::weak_ptr<HttpFilterConfigSubscription>(subscription)});
+    subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
     return subscription;
   } else {
     auto existing = it->second.lock();
@@ -181,7 +181,7 @@ std::shared_ptr<HttpFilterConfigSubscription> HttpFilterConfigProviderManagerImp
   }
 }
 
-HttpFilterConfigProviderPtr HttpFilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
+FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
@@ -203,5 +203,6 @@ HttpFilterConfigProviderPtr HttpFilterConfigProviderManagerImpl::createDynamicFi
   return provider;
 }
 
+} // namespace Http
 } // namespace Filter
 } // namespace Envoy

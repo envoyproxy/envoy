@@ -24,9 +24,11 @@ public:
   virtual const std::string& name() PURE;
 
   /**
-   * @return FactoryCallback an extension factory callback to be applied on subsequent streams.
-   * Note that if the provider has not yet performed an initial configuration load and no default is
-   * provided, an empty optional will be returned.
+   * @return FactoryCallback an extension factory callback. Note that if the
+   * provider has not yet performed an initial configuration load and no
+   * default is provided, an empty optional will be returned. The factory
+   * callback is the latest version of the extension configuration, and should
+   * generally apply only to new requests and connections.
    */
   virtual absl::optional<FactoryCallback> config() PURE;
 
@@ -41,7 +43,7 @@ public:
 
   /**
    * Update the provider with a new configuration.
-   * @param config is an extension factory callback to be applied on the subsequent streams.
+   * @param config is an extension factory callback to replace the existing configuration.
    * @param version_info is the version of the new extension configuration.
    */
   virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info) PURE;

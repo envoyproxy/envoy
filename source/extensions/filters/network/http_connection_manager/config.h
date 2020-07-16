@@ -11,7 +11,7 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
-#include "envoy/filter/filter_config_provider.h"
+#include "envoy/filter/http/filter_config_provider.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -91,11 +91,11 @@ public:
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
       Tracing::HttpTracerManager& http_tracer_manager,
-      Filter::HttpFilterConfigProviderManager& filter_config_provider_manager);
+      Filter::Http::FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Filter::HttpFilterConfigProviderPtr>;
+  using FilterFactoriesList = std::list<Filter::Http::FilterConfigProviderPtr>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
@@ -213,7 +213,7 @@ private:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
-  Filter::HttpFilterConfigProviderManager& filter_config_provider_manager_;
+  Filter::Http::FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
@@ -275,7 +275,7 @@ public:
     std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
         scoped_routes_config_provider_manager_;
     Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
-    std::shared_ptr<Filter::HttpFilterConfigProviderManager> filter_config_provider_manager_;
+    std::shared_ptr<Filter::Http::FilterConfigProviderManager> filter_config_provider_manager_;
   };
 
   /**
@@ -303,7 +303,7 @@ public:
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
       Tracing::HttpTracerManager& http_tracer_manager,
-      Filter::HttpFilterConfigProviderManager& filter_config_provider_manager);
+      Filter::Http::FilterConfigProviderManager& filter_config_provider_manager);
 };
 
 } // namespace HttpConnectionManager

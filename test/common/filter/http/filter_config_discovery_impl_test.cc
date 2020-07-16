@@ -9,7 +9,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
-#include "common/filter/filter_config_discovery_impl.h"
+#include "common/filter/http/filter_config_discovery_impl.h"
 #include "common/json/json_loader.h"
 
 #include "test/mocks/init/mocks.h"
@@ -32,6 +32,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Filter {
+namespace Http {
 namespace {
 
 class FilterConfigDiscoveryTestBase : public testing::Test {
@@ -68,11 +69,11 @@ public:
 class FilterConfigDiscoveryImplTest : public FilterConfigDiscoveryTestBase {
 public:
   FilterConfigDiscoveryImplTest() {
-    filter_config_provider_manager_ = std::make_unique<HttpFilterConfigProviderManagerImpl>();
+    filter_config_provider_manager_ = std::make_unique<FilterConfigProviderManagerImpl>();
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
-  HttpFilterConfigProviderPtr createProvider(std::string name, bool warm) {
+  FilterConfigProviderPtr createProvider(std::string name, bool warm) {
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ConfigSource config_source;
     TestUtility::loadFromYaml("ads: {}", config_source);
@@ -91,8 +92,8 @@ public:
     init_manager_.initialize(init_watcher_);
   }
 
-  std::unique_ptr<HttpFilterConfigProviderManager> filter_config_provider_manager_;
-  HttpFilterConfigProviderPtr provider_;
+  std::unique_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
+  FilterConfigProviderPtr provider_;
   Config::SubscriptionCallbacks* callbacks_{};
 };
 
@@ -125,8 +126,8 @@ TEST_F(FilterConfigDiscoveryImplTest, Basic) {
     EXPECT_CALL(init_watcher_, ready());
     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
     EXPECT_NE(absl::nullopt, provider_->config());
-    EXPECT_EQ(1UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
-    EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_fail").value());
+    EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+    EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
   }
 
   // 2nd request with same response. Based on hash should not reload config.
@@ -144,8 +145,8 @@ TEST_F(FilterConfigDiscoveryImplTest, Basic) {
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
     callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
-    EXPECT_EQ(1UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
-    EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_fail").value());
+    EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+    EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
   }
 }
 
@@ -154,8 +155,8 @@ TEST_F(FilterConfigDiscoveryImplTest, ConfigFailed) {
   setup();
   EXPECT_CALL(init_watcher_, ready());
   callbacks_->onConfigUpdateFailed(Config::ConfigUpdateFailureReason::FetchTimedout, {});
-  EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
-  EXPECT_EQ(1UL, scope_.counter("xds.filter_config_discovery.foo.config_fail").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
 }
 
 TEST_F(FilterConfigDiscoveryImplTest, TooManyResources) {
@@ -181,7 +182,7 @@ TEST_F(FilterConfigDiscoveryImplTest, TooManyResources) {
   EXPECT_THROW_WITH_MESSAGE(
       callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
       EnvoyException, "Unexpected number of resources in ExtensionConfigDS response: 2");
-  EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
 TEST_F(FilterConfigDiscoveryImplTest, WrongName) {
@@ -203,7 +204,7 @@ TEST_F(FilterConfigDiscoveryImplTest, WrongName) {
   EXPECT_THROW_WITH_MESSAGE(
       callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
       EnvoyException, "Unexpected resource name in ExtensionConfigDS response: bar");
-  EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
 TEST_F(FilterConfigDiscoveryImplTest, Incremental) {
@@ -226,8 +227,8 @@ resources:
   EXPECT_CALL(init_watcher_, ready());
   callbacks_->onConfigUpdate(decoded_resources.refvec_, remove, response.version_info());
   EXPECT_NE(absl::nullopt, provider_->config());
-  EXPECT_EQ(1UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
-  EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_fail").value());
+  EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
 }
 
 TEST_F(FilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
@@ -235,8 +236,8 @@ TEST_F(FilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
   setup(false);
   EXPECT_EQ("foo", provider_->name());
   EXPECT_EQ(absl::nullopt, provider_->config());
-  EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
-  EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_fail").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
 }
 
 TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
@@ -261,7 +262,7 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
   callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info());
   EXPECT_NE(absl::nullopt, provider_->config());
   EXPECT_NE(absl::nullopt, provider2->config());
-  EXPECT_EQ(1UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
 TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
@@ -287,9 +288,10 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
       EnvoyException,
       "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
       "expect envoy.extensions.filters.http.router.v3.Router.");
-  EXPECT_EQ(0UL, scope_.counter("xds.filter_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 
 } // namespace
+} // namespace Http
 } // namespace Filter
 } // namespace Envoy

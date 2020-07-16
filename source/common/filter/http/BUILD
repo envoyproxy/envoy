@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["filter_config_discovery_impl.h"],
     deps = [
         "//include/envoy/config:subscription_interface",
-        "//include/envoy/filter:filter_config_provider_interface",
+        "//include/envoy/filter/http:filter_config_provider_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",

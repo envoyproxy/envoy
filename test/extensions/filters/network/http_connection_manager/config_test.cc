@@ -8,7 +8,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/filter/filter_config_discovery_impl.h"
+#include "common/filter/http/filter_config_discovery_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/request_id_extension_uuid_impl.h"
 
@@ -55,7 +55,7 @@ public:
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockHttpTracerManager> http_tracer_manager_;
-  Filter::HttpFilterConfigProviderManagerImpl filter_config_provider_manager_;
+  Filter::Http::FilterConfigProviderManagerImpl filter_config_provider_manager_;
   std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> http_tracer_{
       std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   void createHttpConnectionManagerConfig(const std::string& yaml) {

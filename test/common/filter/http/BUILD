@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = ["filter_config_discovery_impl_test.cc"],
     deps = [
         "//source/common/config:utility_lib",
-        "//source/common/filter:filter_config_discovery_lib",
+        "//source/common/filter/http:filter_config_discovery_lib",
         "//source/common/json:json_loader_lib",
         "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/router:config",
