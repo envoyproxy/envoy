@@ -15,6 +15,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -352,6 +353,70 @@ initial_connection_window_size: 65535
     EXPECT_EQ(2U, http2_options.max_concurrent_streams().value());
     EXPECT_EQ(65535U, http2_options.initial_stream_window_size().value());
     EXPECT_EQ(65535U, http2_options.initial_connection_window_size().value());
+  }
+}
+
+TEST(HttpUtility, ValidateStreamErrors) {
+  // Both false, the result should be false.
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                   .override_stream_error_on_invalid_http_message()
+                   .value());
+
+  // If the new value is not present, the legacy value is respected.
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  // If the new value is present, it is used.
+  http2_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  http2_options.set_stream_error_on_invalid_http_messaging(false);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  // Invert values - the new value should still be used.
+  http2_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                   .override_stream_error_on_invalid_http_message()
+                   .value());
+}
+
+TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  // If the HCM value is present it will take precedence over the old value.
+  Protobuf::BoolValue hcm_value;
+  hcm_value.set_value(false);
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                   .override_stream_error_on_invalid_http_message()
+                   .value());
+  // The HCM value will be ignored if initializeAndValidateOptions is told it is not present.
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, false, hcm_value)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  // The override_stream_error_on_invalid_http_message takes precedence over the
+  // global one.
+  http2_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  {
+    // With runtime flipped, override is ignored.
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.hcm_stream_error_on_invalid_message", "false"}});
+    EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                    .override_stream_error_on_invalid_http_message()
+                    .value());
   }
 }
 

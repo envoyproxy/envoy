@@ -159,7 +159,7 @@ message Http1ProtocolOptions {
   bool enable_trailers = 5;
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http2ProtocolOptions";
@@ -179,6 +179,10 @@ message Http2ProtocolOptions {
     // The 32 bit parameter value.
     google.protobuf.UInt32Value value = 2 [(validate.rules).message = {required: true}];
   }
+
+  reserved 12;
+
+  reserved "stream_error_on_invalid_http_messaging";
 
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
@@ -280,8 +284,11 @@ message Http2ProtocolOptions {
   // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
   // when this option is enabled, only the offending stream is terminated.
   //
+  // This overrides any HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
+  //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
-  bool stream_error_on_invalid_http_messaging = 12;
+  google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 14;
 
   // [#not-implemented-hide:]
   // Specifies SETTINGS frame parameters to be sent to the peer, with two exceptions:

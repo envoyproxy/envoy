@@ -73,6 +73,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
     "envoy.reloadable_features.preserve_upstream_date",
     "envoy.reloadable_features.stop_faking_paths",
+    "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
 };
 

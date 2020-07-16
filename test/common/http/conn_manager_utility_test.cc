@@ -135,6 +135,7 @@ public:
   MOCK_METHOD(Tracing::HttpTracerSharedPtr, tracer, ());
   MOCK_METHOD(ConnectionManagerListenerStats&, listenerStats, ());
   MOCK_METHOD(bool, proxy100Continue, (), (const));
+  MOCK_METHOD(bool, streamErrorOnInvalidHttpMessaging, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
   MOCK_METHOD(bool, shouldNormalizePath, (), (const));
   MOCK_METHOD(bool, shouldMergeSlashes, (), (const));

@@ -410,6 +410,12 @@ public:
   virtual bool proxy100Continue() const PURE;
 
   /**
+   * @return bool supplies if the HttpConnectionManager should handle invalid HTTP with a stream
+   * error or connection error.
+   */
+  virtual bool streamErrorOnInvalidHttpMessaging() const PURE;
+
+  /**
    * @return supplies the http1 settings.
    */
   virtual const Http::Http1Settings& http1Settings() const PURE;
