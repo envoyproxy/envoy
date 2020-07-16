@@ -600,8 +600,8 @@ public:
   HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 
 /**
- * All cluster load report stats. These are only use for EDS load reporting and not sent to
- * the stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
+ * All cluster load report stats. These are only use for EDS load reporting and not sent to the
+ * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
  * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
  */
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, HISTOGRAM)                                          \

@@ -25,8 +25,7 @@ public:
           Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
           const LocalInfo::LocalInfo& local_info,
           Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-          Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store,
-          bool added_via_api);
+          Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   Upstream::Cluster::InitializePhase initializePhase() const override {

@@ -32,8 +32,7 @@ envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 class AggregateClusterUpdateTest : public testing::Test {
 public:
   AggregateClusterUpdateTest()
-      : alloc_(stats_store_.symbolTable()), load_reporting_stats_(alloc_),
-        http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()) {}
+      : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()) {}
 
   void initialize(const std::string& yaml_config) {
     auto bootstrap = parseBootstrapFromV2Yaml(yaml_config);
@@ -41,14 +40,12 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *api_, http_context_, grpc_context_);
-    cluster_manager_->initializeSecondaryClusters(bootstrap, nullptr);
+    cluster_manager_->initializeSecondaryClusters(bootstrap);
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->get("aggregate_cluster");
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  Stats::AllocatorImpl alloc_;
-  Stats::ThreadLocalStoreImpl load_reporting_stats_;
   NiceMock<Server::MockAdmin> admin_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
   Upstream::ThreadLocalCluster* cluster_;
@@ -267,8 +264,7 @@ TEST_F(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
       bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
       factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_, *api_,
       http_context_, grpc_context_);
-
-  cluster_manager_->initializeSecondaryClusters(bootstrap, nullptr);
+  cluster_manager_->initializeSecondaryClusters(bootstrap);
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->get("aggregate_cluster");
   auto primary = cluster_manager_->get("primary");

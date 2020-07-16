@@ -241,7 +241,9 @@ ClusterManagerImpl::ClusterManagerImpl(
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context)
-    : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
+    : allocator_(std::make_unique<Stats::AllocatorImpl>(stats.symbolTable())), main_tls_(tls),
+      load_report_stats_store_(nullptr),
+      factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](Cluster& cluster) { onClusterInit(cluster); }),
@@ -260,6 +262,11 @@ ClusterManagerImpl::ClusterManagerImpl(
       outlier_event_logger_ = std::make_shared<Outlier::EventLoggerImpl>(
           log_manager, event_log_file_path, time_source_);
     }
+  }
+
+  if (cm_config.has_load_stats_config()) {
+    load_report_stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(*allocator_);
+    load_report_stats_store_->initializeThreading(dispatcher_, main_tls_);
   }
 
   // We need to know whether we're zone aware early on, so make sure we do this lookup
@@ -392,16 +399,17 @@ ClusterManagerImpl::ClusterManagerImpl(
 }
 
 void ClusterManagerImpl::initializeSecondaryClusters(
-    const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-    Stats::StoreRootPtr& load_report_stats_store) {
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   init_helper_.startInitializingSecondaryClusters();
 
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
 
+    ASSERT(load_report_stats_store_ != nullptr);
+
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, *this, stats_, load_report_stats_store,
+        local_info_, *this, stats_, load_report_stats_store_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
             ->create(),
@@ -1425,9 +1433,9 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
-      cluster, cm, stats_, load_report_stats_store_, tls_, dns_resolver_, ssl_context_manager_,
-      runtime_, random_, main_thread_dispatcher_, log_manager_, local_info_, admin_,
-      singleton_manager_, outlier_event_logger, added_via_api,
+      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+      main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+      outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
       api_);

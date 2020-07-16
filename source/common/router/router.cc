@@ -1363,7 +1363,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
     code_stats.chargeResponseTiming(info);
 
-    auto&& loadReportStats = cluster_->loadReportStats();
+    auto& loadReportStats = cluster_->loadReportStats();
     if (loadReportStats.has_value()) {
       loadReportStats->http_upstream_rq_time_.recordValue(info.response_time_.count());
     }

@@ -47,9 +47,8 @@ LogicalDnsCluster::LogicalDnsCluster(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_report_stats_store, bool added_via_api)
-    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                      load_report_stats_store, added_via_api),
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -172,11 +171,10 @@ LogicalDnsClusterFactory::createClusterImpl(
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
-  return std::make_pair(
-      std::make_shared<LogicalDnsCluster>(cluster, context.runtime(), selected_dns_resolver,
-                                          socket_factory_context, std::move(stats_scope),
-                                          context.loadReportingStatsStore(), context.addedViaApi()),
-      nullptr);
+  return std::make_pair(std::make_shared<LogicalDnsCluster>(
+                            cluster, context.runtime(), selected_dns_resolver,
+                            socket_factory_context, std::move(stats_scope), context.addedViaApi()),
+                        nullptr);
 }
 
 /**

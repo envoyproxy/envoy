@@ -185,11 +185,6 @@ public:
   virtual Stats::Store& stats() PURE;
 
   /**
-   * @return the server-wide load stats store.
-   */
-  virtual Stats::StoreRootPtr& loadReportingStatsStore() PURE;
-
-  /**
    * @return the server-wide grpc context.
    */
   virtual Grpc::Context& grpcContext() PURE;

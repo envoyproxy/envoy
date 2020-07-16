@@ -312,8 +312,7 @@ public:
   MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));
   MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
   MOCK_METHOD(void, initializeSecondaryClusters,
-              (const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-               Stats::StoreRootPtr& load_report_stats_store));
+              (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(ClusterInfoMap, clusters, ());
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, get, (absl::string_view cluster));
@@ -333,10 +332,12 @@ public:
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
   MOCK_METHOD(const std::string, versionInfo, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, localClusterName, (), (const));
+  MOCK_METHOD(Stats::StoreRootPtr&, loadReportStatsStore, ());
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
 
+  Stats::StoreRootPtr null_load_report_stats_store_{nullptr};
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Tcp::ConnectionPool::MockInstance> tcp_conn_pool_;

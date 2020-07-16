@@ -1,9 +1,6 @@
 #include "common/upstream/load_stats_reporter.h"
 
-#include <math.h>
-
 #include <map>
-#include <set>
 
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
@@ -226,7 +223,6 @@ void LoadStatsReporter::startLoadReportPeriod() {
       return;
     }
     auto& cluster = it->second.get();
-
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (const auto& host : host_set->hosts()) {
         host->stats().rq_success_.latch();

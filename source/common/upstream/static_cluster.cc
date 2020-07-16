@@ -10,9 +10,8 @@ namespace Upstream {
 StaticClusterImpl::StaticClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_stats_store_root, bool added_via_api)
-    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                      load_stats_store_root, added_via_api),
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
   // TODO(dio): Use by-reference when cluster.hosts() is removed.
@@ -64,8 +63,7 @@ StaticClusterFactory::createClusterImpl(
     Stats::ScopePtr&& stats_scope) {
   return std::make_pair(
       std::make_shared<StaticClusterImpl>(cluster, context.runtime(), socket_factory_context,
-                                          std::move(stats_scope), context.loadReportingStatsStore(),
-                                          context.addedViaApi()),
+                                          std::move(stats_scope), context.addedViaApi()),
       nullptr);
 }
 

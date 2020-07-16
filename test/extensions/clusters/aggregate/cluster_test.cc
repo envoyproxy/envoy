@@ -99,7 +99,7 @@ public:
         singleton_manager_, tls_, validation_visitor_, *api_);
 
     cluster_ = std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, random_,
-                                         factory_context, std::move(scope), nullptr, tls_, false);
+                                         factory_context, std::move(scope), tls_, false);
 
     thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();

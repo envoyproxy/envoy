@@ -20,10 +20,9 @@ Cluster::Cluster(
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     const LocalInfo::LocalInfo& local_info,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    Stats::ScopePtr&& stats_scope, Stats::StoreRootPtr& load_reporting_store_root,
-    bool added_via_api)
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       load_reporting_store_root, added_via_api),
+                                       added_via_api),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
@@ -215,8 +214,7 @@ ClusterFactory::createClusterWithConfig(
 
   auto new_cluster = std::make_shared<Cluster>(
       cluster_config, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
-      socket_factory_context, std::move(stats_scope), context.loadReportingStatsStore(),
-      context.addedViaApi());
+      socket_factory_context, std::move(stats_scope), context.addedViaApi());
   auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

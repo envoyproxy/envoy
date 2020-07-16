@@ -421,7 +421,6 @@ public:
   MOCK_METHOD(time_t, startTimeCurrentEpoch, ());
   MOCK_METHOD(time_t, startTimeFirstEpoch, ());
   MOCK_METHOD(Stats::Store&, stats, ());
-  MOCK_METHOD(Stats::StoreRootPtr&, loadReportingStatsStore, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Http::Context&, httpContext, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
@@ -440,7 +439,6 @@ public:
   TimeSource& timeSource() override { return time_system_; }
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  Stats::StoreRootPtr load_report_stats_store_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   std::shared_ptr<testing::NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new testing::NiceMock<Network::MockDnsResolver>()};
