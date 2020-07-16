@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 40]
+// [#next-free-field: 41]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -539,6 +539,23 @@ message HttpConnectionManager {
   // route with :ref:`domains<envoy_api_field_config.route.v4alpha.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool strip_matching_host_port = 39;
+
+  // Governs Envoy's behavior when receiving invalid HTTP from downstream.
+  // If this option is false (default), Envoy will err on the conservative side handling HTTP
+  // errors, terminating both HTTP/1.1 and HTTP/2 connections when receiving an invalid request.
+  // If this option is set to true, Envoy will be more permissive, only resetting the invalid
+  // stream in the case of HTTP/2 and leaving the connection open where possible (if the entire
+  // request is read for HTTP/1.1)
+  // In general this should be true for deployments receiving trusted traffic (L2 Envoys,
+  // company-internal mesh) and false when receiving untrusted traffic (edge deployments).
+  //
+  // If different behaviors for invalid_http_message for HTTP/1 and HTTP/2 are
+  // desired, one *must* use the new HTTP/2 option
+  // :ref:`override_stream_error_on_invalid_http_message
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>`
+  // *not* the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
+  google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
 }
 
 // The configuration to customize local reply returned by Envoy.
