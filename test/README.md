@@ -126,7 +126,7 @@ will lazy-initialize itself into a concrete `TimeSystem`. Currently this is
 Envoy uses [Google Benchmark](https://github.com/google/benchmark/) for
 microbenchmarks. There are custom bazel rules, `envoy_cc_benchmark_binary` and
 `envoy_benchmark_test`, to execute them locally and in CI environments
-respectively. `envoy_benchmark_test` rules call the bechmark binary from a
+respectively. `envoy_benchmark_test` rules call the benchmark binary from a
 [script](https://github.com/envoyproxy/envoy/blob/master/bazel/test_for_benchmark_wrapper.sh)
 which runs the test quickly instead of rigourously. In order to collect
 meaningful bechmarks, `bazel run -c opt` the benchmark binary target on a
