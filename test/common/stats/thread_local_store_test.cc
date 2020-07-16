@@ -30,6 +30,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::UnorderedElementsAre;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
@@ -1584,41 +1585,65 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
   store_->sync().signal(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
 }
 
-template <class StatType> class IteratorTestHelper {
+class IteratorTest : public ThreadLocalStoreNoMocksTestBase {
 public:
-  using SharedPtr = RefcountPtr<StatType>;
-  using Fn = std::function<bool(const SharedPtr& stat)>;
+  template<class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>& stat)>;
+  using MakeStatFn = std::function<void(Scope& scope, absl::string_view name)>;
 
-  Fn iterOnce() {
-    return [this](const SharedPtr& stat) -> bool {
-      results_.push_back(stat);
+  IteratorTest() : scope_(store_->createScope("scope")) {}
+
+  void init(MakeStatFn make_stat) {
+    make_stat(*store_, "stat1");
+    make_stat(*store_, "stat2");
+    make_stat(*scope_, "stat3");
+    make_stat(*scope_, "stat4");
+  }
+
+  template<class StatType> IterateFn<StatType> iterOnce() {
+    return [this](const RefcountPtr<StatType>& stat) -> bool {
+      results_.insert(stat->name());
       return false;
     };
   }
 
-  Fn iterAll() {
-    return [this](const SharedPtr& stat) -> bool {
-      results_.push_back(stat);
+  template<class StatType> IterateFn<StatType> iterAll() {
+    return [this](const RefcountPtr<StatType>& stat) -> bool {
+      results_.insert(stat->name());
       return true;
     };
   }
 
-  std::vector<SharedPtr> results_;
+  static MakeStatFn makeCounter() {
+    return [](Scope& scope, absl::string_view name) {
+             scope.counterFromString(std::string(name)); };
+  }
+
+  ScopePtr scope_;
+  absl::flat_hash_set<std::string> results_;
 };
 
-TEST_F(ThreadLocalStoreNoMocksTestBase, IterateCounters) {
-  store_->counterFromString("c1");
-  store_->counterFromString("c2");
-  {
-    IteratorTestHelper<Counter> helper;
-    EXPECT_FALSE(store_->iterate(helper.iterOnce()));
-    EXPECT_EQ(1, helper.results_.size());
-  }
-  {
-    IteratorTestHelper<Counter> helper;
-    EXPECT_TRUE(store_->iterate(helper.iterAll()));
-    EXPECT_EQ(2, helper.results_.size());
-  }
+TEST_F(IteratorTest, StoreCounterOnce) {
+  init(makeCounter());
+  EXPECT_FALSE(store_->iterate(iterOnce<Counter>()));
+  EXPECT_EQ(1, results_.size());
+}
+
+TEST_F(IteratorTest, StoreCounterAll) {
+  init(makeCounter());
+  EXPECT_TRUE(store_->iterate(iterAll<Counter>()));
+  EXPECT_THAT(results_, UnorderedElementsAre("stat1", "stat2", "scope.stat3", "scope.stat4"));
+}
+
+TEST_F(IteratorTest, ScopeCounterOnce) {
+  init(makeCounter());
+  EXPECT_FALSE(scope_->iterate(iterOnce<Counter>()));
+  EXPECT_EQ(1, results_.size());
+}
+
+TEST_F(IteratorTest, ScopeCounterAll) {
+  init(makeCounter());
+  EXPECT_TRUE(scope_->iterate(iterAll<Counter>()));
+  EXPECT_THAT(results_, UnorderedElementsAre("scope.stat3", "scope.stat4"));
 }
 
 } // namespace Stats
