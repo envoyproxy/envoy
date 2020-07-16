@@ -42,7 +42,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/quic_listeners/quiche:84.8"
 "source/extensions/retry:95.5"
 "source/extensions/retry/host:85.7"
-"source/extensions/retry/host/omit_canary_hosts:92.9"
 "source/extensions/stat_sinks/statsd:85.2"
 "source/extensions/tracers:96.5"
 "source/extensions/tracers/opencensus:92.4"

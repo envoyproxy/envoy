@@ -34,6 +34,7 @@ TEST(OmitCanaryHostsRetryPredicateTest, PredicateTest) {
 
   ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host1));
   ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host2));
+  predicate->onHostAttempted(host1);
 }
 
 TEST(OmitCanaryHostsRetryPredicateTest, EmptyConfig) {
