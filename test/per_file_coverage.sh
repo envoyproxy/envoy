@@ -44,6 +44,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/retry/host:85.7"
 "source/extensions/stat_sinks/statsd:85.2"
 "source/extensions/tracers:96.5"
+"source/extensions/tracers/opencensus:92.4"
 "source/extensions/tracers/xray:95.3"
 "source/extensions/transport_sockets:94.9"
 "source/extensions/transport_sockets/tap:95.6"
