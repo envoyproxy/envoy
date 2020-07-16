@@ -34,21 +34,20 @@ trap cleanup EXIT
 "${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --run_bazel_build --include_headers
 
 # Do not run clang-tidy against win32 impl
-# TODO(scw00): We should run clang-tidy against win32 impl. But currently we only have 
-# linux ci box.
+# TODO(scw00): We should run clang-tidy against win32 impl once we have clang-cl support for Windows
 function exclude_win32_impl() {
-  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32
+  grep -v source/common/filesystem/win32/ | grep -v source/common/common/win32 | grep -v source/exe/win32 | grep -v source/common/api/win32
+}
+
+# Do not run clang-tidy against macOS impl
+# TODO: We should run clang-tidy against macOS impl for completeness
+function exclude_macos_impl() {
+  grep -v source/common/filesystem/kqueue/
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
 function exclude_testdata() {
   grep -v tools/testdata/check_format/
-}
-
-# Do not run clang-tidy against Chromium URL import, this needs to largely
-# reflect the upstream structure.
-function exclude_chromium_url() {
-  grep -v source/common/chromium_url/
 }
 
 # Exclude files in third_party which are temporary forks from other OSS projects.
@@ -57,7 +56,7 @@ function exclude_third_party() {
 }
 
 function filter_excludes() {
-  exclude_testdata | exclude_chromium_url | exclude_win32_impl | exclude_third_party
+  exclude_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party
 }
 
 if [[ -z "${DIFF_REF}" && "${BUILD_REASON}" != "PullRequest" ]]; then

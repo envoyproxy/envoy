@@ -11,6 +11,7 @@
 #include "common/common/logger.h"
 #include "common/config/api_version.h"
 #include "common/config/pausable_ack_queue.h"
+#include "common/config/watch_map.h"
 
 namespace Envoy {
 namespace Config {
@@ -21,7 +22,7 @@ namespace Config {
 // being multiplexed together by ADS.
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
-  DeltaSubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
+  DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
                          const LocalInfo::LocalInfo& local_info);
 
   // Update which resources we're interested in subscribing to.
@@ -86,8 +87,7 @@ private:
   std::set<std::string> resource_names_;
 
   const std::string type_url_;
-  // callbacks_ is expected to be a WatchMap.
-  SubscriptionCallbacks& callbacks_;
+  UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   std::chrono::milliseconds init_fetch_timeout_;
 

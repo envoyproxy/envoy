@@ -133,7 +133,7 @@ public:
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_ = std::make_unique<ConnectionManagerImpl>(
         *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
-        &overload_manager_, test_time_.timeSystem());
+        overload_manager_, test_time_.timeSystem());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {
@@ -195,6 +195,7 @@ public:
     EXPECT_CALL(stream_, addCallbacks(_))
         .WillOnce(Invoke(
             [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
+    EXPECT_CALL(stream_, setFlushTimeout(_));
     EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
   }
 
@@ -392,7 +393,7 @@ public:
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
   absl::optional<std::chrono::milliseconds> max_stream_duration_{};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_connection_;
@@ -5600,11 +5601,12 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
-  setup(false, "");
+  Server::OverloadActionState stop_accepting_requests = Server::OverloadActionState::Active;
+  ON_CALL(overload_manager_.overload_state_,
+          getState(Server::OverloadActionNames::get().StopAcceptingRequests))
+      .WillByDefault(ReturnRef(stop_accepting_requests));
 
-  overload_manager_.overload_state_.setState(
-      Server::OverloadActionNames::get().StopAcceptingRequests,
-      Server::OverloadActionState::Active);
+  setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
     RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
@@ -5630,10 +5632,12 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
-  setup(false, "");
+  Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::Active;
+  ON_CALL(overload_manager_.overload_state_,
+          getState(Server::OverloadActionNames::get().DisableHttpKeepAlive))
+      .WillByDefault(ReturnRef(disable_http_keep_alive));
 
-  overload_manager_.overload_state_.setState(
-      Server::OverloadActionNames::get().DisableHttpKeepAlive, Server::OverloadActionState::Active);
+  setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -6110,6 +6114,10 @@ private:
 } // namespace
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      "connection_provided_data", std::make_shared<SimpleType>(555),
+      StreamInfo::FilterState::StateType::ReadOnly);
+
   setup(false, "envoy-custom-server", false);
 
   setupFilterChain(1, 0, /* num_requests = */ 3);
@@ -6152,6 +6160,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           EXPECT_TRUE(
               decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
+                  "connection_provided_data"));
           return FilterHeadersStatus::StopIteration;
         }));
     EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
@@ -6165,6 +6176,9 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
           EXPECT_TRUE(
               decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
+                  "connection_provided_data"));
           return FilterHeadersStatus::StopIteration;
         }));
   }
@@ -6178,6 +6192,10 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   conn_manager_->onData(fake_input, false);
   decoder_filters_[0]->callbacks_->recreateStream();
   conn_manager_->onData(fake_input, false);
+
+  // The connection life time data should have been written to the connection filter state.
+  EXPECT_TRUE(filter_callbacks_.connection_.stream_info_.filter_state_->hasData<SimpleType>(
+      "per_downstream_connection"));
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {

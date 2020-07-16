@@ -240,9 +240,10 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
-#ifndef ENVOY_CONFIG_COVERAGE
+#if !defined(ENVOY_CONFIG_COVERAGE) && !defined(GCC_COMPILER)
   // This doesn't work in coverage build because part of the stacktrace will be overwritten by
   // __llvm_coverage_mapping
+  // Stack trace under gcc with optimizations on (-c opt) doesn't include the test name
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 #endif
 }
@@ -328,7 +329,7 @@ TEST_F(QuicPlatformTest, QuicLog) {
   EXPECT_LOG_CONTAINS("info", "i=1", QUIC_VLOG(1) << "i=" << (i = 1));
   EXPECT_EQ(1, i);
 
-  errno = EINVAL;
+  errno = SOCKET_ERROR_INVAL;
   EXPECT_LOG_CONTAINS("info", "i=3:", QUIC_PLOG(INFO) << "i=" << (i = 3));
   EXPECT_EQ(3, i);
 }
@@ -686,7 +687,7 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   });
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
-      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
+      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
   EXPECT_DEATH_LOG_TO_STDERR(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
 }
 

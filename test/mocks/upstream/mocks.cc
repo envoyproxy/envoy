@@ -178,5 +178,10 @@ MockRetryHostPredicate::~MockRetryHostPredicate() = default;
 MockClusterManagerFactory::MockClusterManagerFactory() = default;
 MockClusterManagerFactory::~MockClusterManagerFactory() = default;
 
+MockBasicResourceLimit::MockBasicResourceLimit() {
+  ON_CALL(*this, canCreate()).WillByDefault(Return(true));
+}
+MockBasicResourceLimit::~MockBasicResourceLimit() = default;
+
 } // namespace Upstream
 } // namespace Envoy

@@ -44,13 +44,15 @@ public:
   std::unique_ptr<Subscription>
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
-        config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_);
+        config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
+        resource_decoder_);
   }
 
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  Random::MockRandomGenerator random_;
   MockSubscriptionCallbacks callbacks_;
+  MockOpaqueResourceDecoder resource_decoder_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -308,7 +310,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedApi) {
   EXPECT_LOG_CONTAINS(
       "warn", "xDS of version v2 has been deprecated", try {
         subscription_factory_.subscriptionFromConfigSource(
-            config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_);
+            config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
+            resource_decoder_);
       } catch (EnvoyException&){/* expected, we pass an empty configuration  */});
 }
 

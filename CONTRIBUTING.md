@@ -21,6 +21,23 @@ maximize the chances of your PR being merged.
 
 * See [STYLE.md](STYLE.md)
 
+# Inclusive language policy
+
+The Envoy community has an explicit goal to be inclusive to all. As such, all PRs must adhere to the
+following guidelines for all code, APIs, and documentation:
+
+* The following words and phrases are not allowed:
+  * *Whitelist*: use allowlist instead.
+  * *Blacklist*: use denylist or blocklist instead.
+  * *Master*: use primary instead.
+  * *Slave*: use secondary or replica instead.
+* Documentation should be written in an inclusive style. The [Google developer
+  documentation](https://developers.google.com/style/inclusive-documentation) contains an excellent
+  reference on this topic.
+* The above policy is not considered definitive and may be amended in the future as industry best
+  practices evolve. Additional comments on this topic may be provided by maintainers during code
+  review.
+
 # Breaking change policy
 
 Both API and implementation stability are important to Envoy. Since the API is consumed by clients
@@ -181,7 +198,7 @@ There are four suggested options for testing new runtime features:
    GetParam() as outlined in (1).
 3. Set up integration tests with custom runtime defaults as documented in the
    [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
-4. Run a given unit test with the new runtime value explicitly set true as done
+4. Run a given unit test with the new runtime value explicitly set true or false as done
    for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD)
 
 Runtime code is held to the same standard as regular Envoy code, so both the old
@@ -205,7 +222,7 @@ and false.
   organization specific shortcuts into the code.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
-* Please make sure that the PR title, commit message, and description are updated if the PR changes 
+* Please make sure that the PR title, commit message, and description are updated if the PR changes
   significantly during review.
 * Please **clean up the title and body** before merging. By default, GitHub fills the squash merge
   title with the original title, and the commit body with every individual commit from the PR.

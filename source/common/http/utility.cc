@@ -1,7 +1,5 @@
 #include "common/http/utility.h"
 
-#include <http_parser.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -205,43 +203,6 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 namespace Http {
 
-static const char kDefaultPath[] = "/";
-
-bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
-  struct http_parser_url u;
-  http_parser_url_init(&u);
-  const int result =
-      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
-
-  if (result != 0) {
-    return false;
-  }
-  if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
-      (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
-    return false;
-  }
-  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
-                              u.field_data[UF_SCHEMA].len);
-
-  uint16_t authority_len = u.field_data[UF_HOST].len;
-  if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
-    authority_len = authority_len + u.field_data[UF_PORT].len + 1;
-  }
-  host_and_port_ =
-      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
-
-  // RFC allows the absolute-uri to not end in /, but the absolute path form
-  // must start with
-  uint64_t path_len = absolute_url.length() - (u.field_data[UF_HOST].off + hostAndPort().length());
-  if (path_len > 0) {
-    uint64_t path_beginning = u.field_data[UF_HOST].off + hostAndPort().length();
-    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
-  } else if (!is_connect) {
-    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
-  }
-  return true;
-}
-
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
@@ -272,14 +233,26 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   }
 
   start++;
-  return parseParameters(url, start);
+  return parseParameters(url, start, /*decode_params=*/false);
+}
+
+Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
+  size_t start = url.find('?');
+  if (start == std::string::npos) {
+    QueryParams params;
+    return params;
+  }
+
+  start++;
+  return parseParameters(url, start, /*decode_params=*/true);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
-  return parseParameters(body, 0);
+  return parseParameters(body, 0, /*decode_params=*/true);
 }
 
-Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start) {
+Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start,
+                                              bool decode_params) {
   QueryParams params;
 
   while (start < data.size()) {
@@ -291,8 +264,10 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
 
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
-      params.emplace(StringUtil::subspan(data, start, start + equal),
-                     StringUtil::subspan(data, start + equal + 1, end));
+      const auto param_name = StringUtil::subspan(data, start, start + equal);
+      const auto param_value = StringUtil::subspan(data, start + equal + 1, end);
+      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
+                     decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
       params.emplace(StringUtil::subspan(data, start, end), "");
     }
@@ -833,7 +808,9 @@ void Utility::traversePerFilterConfigGeneric(
   }
 }
 
-std::string Utility::PercentEncoding::encode(absl::string_view value) {
+std::string Utility::PercentEncoding::encode(absl::string_view value,
+                                             absl::string_view reserved_chars) {
+  absl::flat_hash_set<char> reserved_char_set{reserved_chars.begin(), reserved_chars.end()};
   for (size_t i = 0; i < value.size(); ++i) {
     const char& ch = value[i];
     // The escaping characters are defined in
@@ -842,22 +819,23 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
     // We do checking for each char in the string. If the current char is included in the defined
     // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
     // to the returned string one by one) started from the current index.
-    if (ch < ' ' || ch >= '~' || ch == '%') {
-      return PercentEncoding::encode(value, i);
+    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+      return PercentEncoding::encode(value, i, reserved_char_set);
     }
   }
   return std::string(value);
 }
 
-std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index) {
+std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index,
+                                             const absl::flat_hash_set<char>& reserved_char_set) {
   std::string encoded;
   if (index > 0) {
-    absl::StrAppend(&encoded, value.substr(0, index - 1));
+    absl::StrAppend(&encoded, value.substr(0, index));
   }
 
   for (size_t i = index; i < value.size(); ++i) {
     const char& ch = value[i];
-    if (ch < ' ' || ch >= '~' || ch == '%') {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));

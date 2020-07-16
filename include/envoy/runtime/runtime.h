@@ -9,6 +9,8 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/stats/store.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
@@ -26,53 +28,10 @@ class ClusterManager;
 namespace Runtime {
 
 /**
- * Random number generator. Implementations should be thread safe.
- */
-class RandomGenerator {
-public:
-  virtual ~RandomGenerator() = default;
-
-  using result_type = uint64_t; // NOLINT(readability-identifier-naming)
-
-  /**
-   * @return uint64_t a new random number.
-   */
-  virtual result_type random() PURE;
-
-  /*
-   * @return the smallest value that `operator()` may return. The value is
-   * strictly less than `max()`.
-   */
-  constexpr static result_type min() noexcept { return std::numeric_limits<result_type>::min(); };
-
-  /*
-   * @return the largest value that `operator()` may return. The value is
-   * strictly greater than `min()`.
-   */
-  constexpr static result_type max() noexcept { return std::numeric_limits<result_type>::max(); };
-
-  /*
-   * @return a value in the closed interval `[min(), max()]`. Has amortized
-   * constant complexity.
-   */
-  result_type operator()() { return result_type(random()); };
-
-  /**
-   * @return std::string containing uuid4 of 36 char length.
-   * for example, 7c25513b-0466-4558-a64c-12c6704f37ed
-   */
-  virtual std::string uuid() PURE;
-};
-
-using RandomGeneratorPtr = std::unique_ptr<RandomGenerator>;
-
-/**
  * A snapshot of runtime data.
  */
-class Snapshot {
+class Snapshot : public ThreadLocal::ThreadLocalObject {
 public:
-  virtual ~Snapshot() = default;
-
   struct Entry {
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
@@ -301,6 +260,11 @@ public:
    * have either received and applied their responses or timed out.
    */
   virtual void startRtdsSubscriptions(ReadyCallback on_done) PURE;
+
+  /**
+   * @return Stats::Scope& the root scope.
+   */
+  virtual Stats::Scope& getRootScope() PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;

@@ -26,14 +26,36 @@ using testing::NiceMock;
 
 namespace Envoy {
 
+std::vector<TcpProxyIntegrationTestParams> getProtocolTestParams() {
+  std::vector<TcpProxyIntegrationTestParams> ret;
+
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    ret.push_back(TcpProxyIntegrationTestParams{ip_version, true});
+    ret.push_back(TcpProxyIntegrationTestParams{ip_version, false});
+  }
+  return ret;
+}
+
+std::string
+protocolTestParamsToString(const ::testing::TestParamInfo<TcpProxyIntegrationTestParams>& params) {
+  return absl::StrCat(
+      (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+      (params.param.test_original_version == true ? "OriginalConnPool" : "NewConnPool"));
+}
+
 void TcpProxyIntegrationTest::initialize() {
+  if (GetParam().test_original_version) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "false");
+  } else {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool", "true");
+  }
+
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
 
 // Test upstream writing before downstream downstream does.
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
@@ -48,20 +70,20 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   tcp_client->waitForData("ello", false);
 
   // Make sure length based wait works for the data already received
-  tcp_client->waitForData(5);
-  tcp_client->waitForData(4);
+  ASSERT_TRUE(tcp_client->waitForData(5));
+  ASSERT_TRUE(tcp_client->waitForData(4));
 
   // Drain part of the received message
   tcp_client->clearData(2);
   tcp_client->waitForData("llo");
-  tcp_client->waitForData(3);
+  ASSERT_TRUE(tcp_client->waitForData(3));
 
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   tcp_client->waitForHalfClose();
-  tcp_client->write("", true);
+  ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
@@ -71,7 +93,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
@@ -89,13 +111,13 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
 TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
-  tcp_client->write("hello", true);
+  ASSERT_TRUE(tcp_client->write("hello", true));
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
@@ -109,7 +131,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
 
   std::string data(1024 * 16, 'a');
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write(data);
+  ASSERT_TRUE(tcp_client->write(data));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
@@ -147,7 +169,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   tcp_client->readDisable(true);
-  tcp_client->write("", true);
+  ASSERT_TRUE(tcp_client->write("", true));
 
   // This ensures that readDisable(true) has been run on it's thread
   // before tcp_client starts writing.
@@ -192,7 +214,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   // before tcp_client starts writing.
   tcp_client->waitForHalfClose();
 
-  tcp_client->write(data, true);
+  ASSERT_TRUE(tcp_client->write(data, true));
 
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   ASSERT_TRUE(fake_upstream_connection->readDisable(false));
@@ -223,7 +245,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
   // before tcp_client starts writing.
   tcp_client->waitForHalfClose();
 
-  tcp_client->write(data, true);
+  ASSERT_TRUE(tcp_client->write(data, true));
 
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   test_server_.reset();
@@ -235,7 +257,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
 TEST_P(TcpProxyIntegrationTest, AccessLog) {
   std::string access_log_path = TestEnvironment::temporaryPath(
-      fmt::format("access_log{}.txt", GetParam() == Network::Address::IpVersion::v4 ? "v4" : "v6"));
+      fmt::format("access_log{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6"));
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -274,7 +296,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   tcp_client->waitForHalfClose();
-  tcp_client->write("", true);
+  ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
@@ -286,17 +308,17 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
   // Regex matching localhost:port
 #ifndef GTEST_USES_SIMPLE_RE
-  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+  const std::string ip_port_regex = (version_ == Network::Address::IpVersion::v4)
                                         ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
                                         : R"EOF(\[::1\]:[0-9]+)EOF";
 #else
-  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+  const std::string ip_port_regex = (version_ == Network::Address::IpVersion::v4)
                                         ? R"EOF(127\.0\.0\.1:\d+)EOF"
                                         : R"EOF(\[::1\]:\d+)EOF";
 #endif
 
   const std::string ip_regex =
-      (GetParam() == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
+      (version_ == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
 
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
@@ -317,13 +339,13 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
   });
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
-  tcp_client->write("hello", false);
+  ASSERT_TRUE(tcp_client->write("hello", false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
   test_server_.reset();
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
@@ -383,7 +405,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   std::string data(1024 * 16, 'a');
-  tcp_client->write(data);
+  ASSERT_TRUE(tcp_client->write(data));
   ASSERT_TRUE(fake_upstream_connection->write(data));
 
   tcp_client->waitForDisconnect(true);
@@ -423,13 +445,13 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
 
   ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
@@ -443,7 +465,7 @@ TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
   ASSERT_TRUE(fake_upstream_health_connection_reconnect->waitForData(
       FakeRawConnection::waitForInexactMatch("Ping")));
 
-  tcp_client->write("still");
+  ASSERT_TRUE(tcp_client->write("still"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(15));
   ASSERT_TRUE(fake_upstream_connection->write("here"));
   tcp_client->waitForData("here", false);
@@ -492,13 +514,13 @@ TEST_P(TcpProxyIntegrationTest, TestCloseOnHealthFailure) {
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
 
   ASSERT_TRUE(fake_upstream_health_connection->waitForData(8));
@@ -585,13 +607,13 @@ void TcpProxyMetadataMatchIntegrationTest::initialize() {
 // Verifies successful connection.
 void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute() {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
-  tcp_client->write("hello", true);
+  ASSERT_TRUE(tcp_client->write("hello", true));
   ASSERT_TRUE(fake_upstream_connection->waitForData(10));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
@@ -604,7 +626,7 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointToMatchRoute() {
 // Verifies connection failure.
 void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
 
   // TODO(yskopets): 'tcp_client->waitForDisconnect(true);' gets stuck indefinitely on Linux builds,
   // e.g. on 'envoy-linux (bazel compile_time_options)' and 'envoy-linux (bazel release)'
@@ -616,9 +638,8 @@ void TcpProxyMetadataMatchIntegrationTest::expectEndpointNotToMatchRoute() {
   tcp_client->close();
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxyMetadataMatchIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyMetadataMatchIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
 
 // Test subset load balancing for a regular cluster when endpoint selector is defined at the top
 // level.
@@ -627,9 +648,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.set_cluster("cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -645,9 +666,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
       "cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.extensions.filters.network."
                                     "tcp_proxy.v3.TcpProxy.hidden_envoy_deprecated_deprecated_v1",
@@ -665,9 +686,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest, EndpointShouldMatchWeightedClusterW
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -684,9 +705,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
-      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+      {{"role", "primary"}, {"stage", "prod"}})); // should override `stage` value at top-level
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -699,12 +720,12 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldMatchWeightedClusterWithTopLevelMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
   auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}});
 
   initialize();
 
@@ -718,7 +739,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.set_cluster("cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
@@ -736,7 +757,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
       "cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
@@ -757,7 +778,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
 
   endpoint_metadata_ = lbMetadata({{"role", "replica"}, {"version", "v1"}, {"stage", "prod"}});
 
@@ -776,9 +797,9 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
   cluster_0->mutable_metadata_match()->MergeFrom(lbMetadata(
-      {{"role", "master"}, {"stage", "prod"}})); // should override `stage` value at top-level
+      {{"role", "primary"}, {"stage", "prod"}})); // should override `stage` value at top-level
 
-  endpoint_metadata_ = lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "dev"}});
+  endpoint_metadata_ = lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "dev"}});
 
   initialize();
 
@@ -791,7 +812,7 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
        EndpointShouldNotMatchWeightedClusterWithTopLevelMetadataMatch) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
-      lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
+      lbMetadata({{"role", "primary"}, {"version", "v1"}, {"stage", "prod"}}));
   auto* cluster_0 = tcp_proxy_.mutable_weighted_clusters()->add_clusters();
   cluster_0->set_name("cluster_0");
   cluster_0->set_weight(1);
@@ -803,9 +824,8 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
   expectEndpointNotToMatchRoute();
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TcpProxySslIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTest,
+                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
@@ -842,7 +862,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                           context_->createTransportSocket(nullptr), nullptr);
 
-  // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
+  // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
   ssl_client_->addConnectionCallbacks(connect_callbacks_);
   ssl_client_->enableHalfClose(true);
