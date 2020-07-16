@@ -51,7 +51,9 @@ public:
 
   Event::DispatcherPtr dispatcher_;
   Event::SimulatedTimeSystem time_system_;
+  NiceMock<Stats::MockStore> listener_scope_;
   Api::ApiPtr api_;
+
 };
 
 } // namespace Configuration
@@ -83,7 +85,8 @@ private:
   Server::Configuration::FakeFactoryContext factory_context_;
   Network::ReadFilterSharedPtr read_filter_;
   Network::FilterFactoryCb cb_;
-  // Network::Address::InstanceConstSharedPtr addr_;
+  Network::Address::InstanceConstSharedPtr ext_authz_addr_;
+  Network::Address::InstanceConstSharedPtr http_conn_manager_addr_;
   Event::SimulatedTimeSystem& time_source_;
   std::shared_ptr<NiceMock<Network::MockReadFilterCallbacks>> read_filter_callbacks_;
   std::unique_ptr<Grpc::MockAsyncRequest> async_request_;
@@ -91,6 +94,7 @@ private:
   std::unique_ptr<Grpc::MockAsyncClientFactory> async_client_factory_;
   Tracing::MockSpan span_;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_connection_ = std::make_shared<Ssl::MockConnectionInfo>();
+  // std::unique_ptr<Stats::IsolatedStoreImpl> listener_scope_;
   int seconds_in_one_day_ = 86400;
 };
 

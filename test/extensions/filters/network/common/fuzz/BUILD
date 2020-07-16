@@ -7,7 +7,6 @@ load(
 )
 load(
     "//source/extensions:all_extensions.bzl",
-    # "envoy_all_extensions",
     "envoy_all_network_filters",
 )
 
@@ -46,6 +45,7 @@ envoy_cc_test_library(
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/extensions/filters/network/direct_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/local_ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -53,8 +53,8 @@ envoy_cc_fuzz_test(
     name = "network_filter_fuzz_test",
     srcs = ["network_filter_fuzz_test.cc"],
     corpus = "network_filter_corpus",
-    # All Envoy extensions must be linked to the test in order for the fuzzer to pick
-    # these up via the NamedHttpFilterConfigFactory.
+    # All Envoy network extensions must be linked to the test in order for the fuzzer to pick
+    # these up via the NamedNetworkFilterConfigFactory.
     deps = [
         ":uber_filter_lib",
         "//source/common/config:utility_lib",

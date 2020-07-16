@@ -31,7 +31,9 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
                      NetworkFilterNames::get().DirectResponse,
                      NetworkFilterNames::get().DubboProxy,
                      NetworkFilterNames::get().SniCluster,
-                     NetworkFilterNames::get().HttpConnectionManager};
+
+                     NetworkFilterNames::get().HttpConnectionManager,
+                     NetworkFilterNames::get().SniDynamicForwardProxy};
   }
   return filter_names_;
 }
@@ -48,7 +50,8 @@ void UberFilterFuzzer::reset() {
   // Clear the pointers inside the mock_dispatcher
   Event::MockDispatcher& mock_dispatcher = dynamic_cast<Event::MockDispatcher&>(read_filter_callbacks_->connection_.dispatcher_);
   mock_dispatcher.to_delete_.clear();
-
+  std::cout<<read_filter_.use_count();
+  read_filter_.reset();
 }
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
   std::cout<<"setup for"<<filter_name<<std::endl;
@@ -81,9 +84,9 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
                                   bool) { return std::move(async_client_factory_); }));
     read_filter_callbacks_->connection_.local_address_ =
-        std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+        ext_authz_addr_;
     read_filter_callbacks_->connection_.remote_address_ =
-        std::make_shared<Network::Address::PipeInstance>("/test/test.sock");                            
+        ext_authz_addr_;                            
   }
   else if(filter_name == NetworkFilterNames::get().HttpConnectionManager){
     // ON_CALL(read_filter_callbacks_->connection_, ssl()).WillByDefault(testing::Return(ssl_connection_));
@@ -92,10 +95,13 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
     //     .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
 
     read_filter_callbacks_->connection_.local_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+        http_conn_manager_addr_;
     read_filter_callbacks_->connection_.remote_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");  
+        http_conn_manager_addr_;  
   }
+
+  // listener_scope_ = std::make_unique<Stats::IsolatedStoreImpl>();
+  // ON_CALL(factory_context_,listenerScope()).WillByDefault(testing::ReturnRef(*listener_scope_));
 }
 void UberFilterFuzzer::fuzzerSetup() {
   // Setup process when this fuzzer object is constructed.
@@ -115,7 +121,8 @@ void UberFilterFuzzer::fuzzerSetup() {
   // Prepare time source for filters such as local_ratelimit filter
   factory_context_.prepareSimulatedSystemTime();
   // Prepare address for filters such as ext_authz filter
-  // addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+  ext_authz_addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
+  http_conn_manager_addr_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   // ON_CALL(read_filter_callbacks_->connection_, remoteAddress())
   //     .WillByDefault(testing::ReturnRef(addr_));
   // ON_CALL(read_filter_callbacks_->connection_, localAddress())
@@ -123,7 +130,7 @@ void UberFilterFuzzer::fuzzerSetup() {
 
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
   // Prepare protocol for http_connection_manager
-  read_filter_callbacks_->connection_.stream_info_.protocol_ = Http::Protocol::Http2;
+  // read_filter_callbacks_->connection_.stream_info_.protocol_ = Http::Protocol::Http2;
 }
 
 UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.simulatedTimeSystem()) {
@@ -153,6 +160,14 @@ bool UberFilterFuzzer::invalidInputForFuzzer(const std::string& filter_name,
       // reasonable.
       return true;
     }
+  }else if(filter_name == NetworkFilterNames::get().HttpConnectionManager) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& config =
+        dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&>(
+            *config_message);
+    if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::HTTP3){
+      // Quiche is not supported yet.
+      return true;
+    }
   }
   return false;
 }
@@ -174,8 +189,8 @@ void UberFilterFuzzer::fuzz(
       return;
     }
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
-    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
     perFilterSetup(proto_config.name());
+    cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
     // Add filter to connection_
     cb_(read_filter_callbacks_->connection_);
   } catch (const EnvoyException& e) {
