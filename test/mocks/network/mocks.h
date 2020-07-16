@@ -331,7 +331,7 @@ public:
 class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {
 public:
   MockUdpPacketWriterFactory() = default;
-  
+
   MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter, (Network::Socket&), ());
 };
 

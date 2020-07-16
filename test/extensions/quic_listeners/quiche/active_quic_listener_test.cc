@@ -26,6 +26,7 @@
 #include "common/common/logger.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
@@ -109,6 +110,16 @@ protected:
 
     ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
     ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
+
+    // Use UdpDefaultWriter to perform non-batched writes for the purpose of this test
+    ON_CALL(listener_config_, udpPacketWriterFactory())
+        .WillByDefault(Return(&udp_packet_writer_factory_));
+    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_))
+        .WillByDefault(Invoke([&](Network::Socket& socket) -> Network::UdpPacketWriterPtr {
+          Network::UdpPacketWriterPtr udp_packet_writer =
+              std::make_unique<Network::UdpDefaultWriter>(socket);
+          return udp_packet_writer;
+        }));
 
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager_));
@@ -247,6 +258,7 @@ protected:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   NiceMock<Network::MockListenerConfig> listener_config_;
+  NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;

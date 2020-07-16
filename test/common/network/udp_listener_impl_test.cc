@@ -44,14 +44,15 @@ public:
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
-    
+
     ON_CALL(listener_config_, udpPacketWriterFactory())
-      .WillByDefault(Return(&udp_packet_writer_factory_));
+        .WillByDefault(Return(&udp_packet_writer_factory_));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_))
-      .WillByDefault(Invoke([&](Network::Socket& socket) -> Network::UdpPacketWriterPtr {
-        UdpPacketWriterPtr udp_packet_writer = std::make_unique<Network::UdpDefaultWriter>(socket);
-        return udp_packet_writer;
-      }));
+        .WillByDefault(Invoke([&](Network::Socket& socket) -> Network::UdpPacketWriterPtr {
+          UdpPacketWriterPtr udp_packet_writer =
+              std::make_unique<Network::UdpDefaultWriter>(socket);
+          return udp_packet_writer;
+        }));
 
     listener_ =
         std::make_unique<UdpListenerImpl>(dispatcherImpl(), server_socket_, listener_callbacks_,

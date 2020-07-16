@@ -22,12 +22,12 @@ Api::IoCallUint64Result UdpDefaultWriter::writeToSocket(const Buffer::Instance& 
   if (!isWriteBlocked()) {
     Api::IoCallUint64Result result =
         Utility::writeToSocket(socket_.ioHandle(), buffer, local_ip, peer_address);
-    
+
     if (result.err_ && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       // Writer is blocked when error code received is EWOULDBLOCK/EAGAIN
       write_blocked_ = true;
     }
-    
+
     return result;
   }
   // Otherwise Return Blocked
