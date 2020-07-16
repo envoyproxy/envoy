@@ -652,9 +652,9 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
   return endpoint_config_dump;
 }
 
-ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool is_active_listeners) const {
+ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool dump_active_listeners) const {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
-  if (is_active_listeners) {
+  if (dump_active_listeners) {
     listeners = server_.listenerManager().listeners();
   } else {
     listeners = server_.listenerManager().warmingListeners();
@@ -665,7 +665,7 @@ ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool is_active_li
   for (auto& listenerConfig : listeners) {
     auto& listener_message =
         *unready_targets_config_dump->mutable_listener_unready_targets_configs()->Add();
-    listener_message.set_listener_init_manager_name(listenerConfig.get().name());
+    listener_message.set_listener_name(listenerConfig.get().name());
 
     auto& listener = dynamic_cast<ListenerImpl&>(listenerConfig.get());
     const auto& init_manager = dynamic_cast<Init::ManagerImpl&>(listener.initManager());

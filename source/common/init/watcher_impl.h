@@ -25,8 +25,12 @@ using ReadyFnSendName = std::function<void(absl::string_view)>;
 class WatcherHandleImpl : public WatcherHandle, Logger::Loggable<Logger::Id::init> {
 private:
   friend class WatcherImpl;
+
+  // Ctor with std::function<void()> callback function.
   WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
                     std::weak_ptr<ReadyFn> fn);
+
+  // Ctor with std::function<void(absl::string_view)> callback function.
   WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
                     std::weak_ptr<ReadyFnSendName> fn);
 
@@ -81,7 +85,8 @@ private:
   // The callback function, called via WatcherHandleImpl by either the target or the manager.
   const std::shared_ptr<ReadyFn> fn_;
 
-  // The callback function, called via WatcherHandleImpl by either the target or the manager.
+  // The callback function with target_name parameter, called via WatcherHandleImpl by either the
+  // target or the manager.
   const std::shared_ptr<ReadyFnSendName> fn_sn_;
 };
 
