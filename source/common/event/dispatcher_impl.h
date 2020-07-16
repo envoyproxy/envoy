@@ -105,7 +105,7 @@ private:
   const std::string name_;
   Api::Api& api_;
   std::string stats_prefix_;
-  std::unique_ptr<DispatcherStats> stats_;
+  DispatcherStatsPtr stats_;
   Thread::ThreadId run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
   LibeventScheduler base_scheduler_;

@@ -420,6 +420,8 @@ private:
   uint64_t current_global_slot_{};
 };
 
+using ThreadLocalStatePtr = std::unique_ptr<ThreadLocalState>;
+
 /**
  * An exception specific to Lua errors.
  */

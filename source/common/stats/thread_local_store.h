@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "envoy/stats/tag.h"
@@ -380,6 +381,9 @@ private:
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
+    template <class StatType>
+    using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+
     /**
      * Looks up an existing stat, populating the local cache if necessary. Does
      * not check the TLS or rejects, and does not create a stat if it does not
@@ -390,7 +394,7 @@ private:
      * @return a reference to the stat, if it exists.
      */
     template <class StatType>
-    absl::optional<std::reference_wrapper<const StatType>>
+    StatTypeOptConstRef<StatType>
     findStatLockHeld(StatName name,
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
@@ -462,6 +466,8 @@ private:
 
   StatNameSetPtr well_known_tags_;
 };
+
+using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
 
 } // namespace Stats
 } // namespace Envoy

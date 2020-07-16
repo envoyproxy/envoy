@@ -41,10 +41,14 @@ struct DispatcherStats {
   ALL_DISPATCHER_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
+using DispatcherStatsPtr = std::unique_ptr<DispatcherStats>;
+
 /**
  * Callback invoked when a dispatcher post() runs.
  */
 using PostCb = std::function<void()>;
+
+using PostCbSharedPtr = std::shared_ptr<PostCb>;
 
 /**
  * Abstract event dispatching loop.

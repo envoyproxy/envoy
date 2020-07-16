@@ -26,7 +26,7 @@ SlotPtr InstanceImpl::allocateSlot() {
   ASSERT(!shutdown_);
 
   if (free_slot_indexes_.empty()) {
-    std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, slots_.size()));
+    SlotImplPtr slot(new SlotImpl(*this, slots_.size()));
     auto wrapper = std::make_unique<Bookkeeper>(*this, std::move(slot));
     slots_.push_back(wrapper->slot_.get());
     return wrapper;
@@ -34,7 +34,7 @@ SlotPtr InstanceImpl::allocateSlot() {
   const uint32_t idx = free_slot_indexes_.front();
   free_slot_indexes_.pop_front();
   ASSERT(idx < slots_.size());
-  std::unique_ptr<SlotImpl> slot(new SlotImpl(*this, idx));
+  SlotImplPtr slot(new SlotImpl(*this, idx));
   slots_[idx] = slot.get();
   return std::make_unique<Bookkeeper>(*this, std::move(slot));
 }
@@ -56,7 +56,7 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() {
   return thread_local_data_.data_[index_];
 }
 
-InstanceImpl::Bookkeeper::Bookkeeper(InstanceImpl& parent, std::unique_ptr<SlotImpl>&& slot)
+InstanceImpl::Bookkeeper::Bookkeeper(InstanceImpl& parent, SlotImplPtr&& slot)
     : parent_(parent), slot_(std::move(slot)),
       ref_count_(/*not used.*/ nullptr,
                  [slot = slot_.get(), &parent = this->parent_](uint32_t* /* not used */) {
@@ -117,7 +117,7 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
 
 // Puts the slot into a deferred delete container, the slot will be destructed when its out-going
 // callback reference count goes to 0.
-void InstanceImpl::recycle(std::unique_ptr<SlotImpl>&& slot) {
+void InstanceImpl::recycle(SlotImplPtr&& slot) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   ASSERT(slot != nullptr);
   auto* slot_addr = slot.get();
@@ -194,11 +194,11 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_c
   // for programming simplicity here.
   cb();
 
-  std::shared_ptr<Event::PostCb> cb_guard(new Event::PostCb(cb),
-                                          [this, all_threads_complete_cb](Event::PostCb* cb) {
-                                            main_thread_dispatcher_->post(all_threads_complete_cb);
-                                            delete cb;
-                                          });
+  Event::PostCbSharedPtr cb_guard(new Event::PostCb(cb),
+                                  [this, all_threads_complete_cb](Event::PostCb* cb) {
+                                    main_thread_dispatcher_->post(all_threads_complete_cb);
+                                    delete cb;
+                                  });
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
     dispatcher.post([cb_guard]() -> void { (*cb_guard)(); });
