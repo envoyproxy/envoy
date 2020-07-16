@@ -37,7 +37,7 @@ void XdsFuzzTest::updateListener(
     const std::vector<envoy::config::listener::v3::Listener>& listeners,
     const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
     const std::vector<std::string>& removed) {
-  ENVOY_LOG_MISC(info, "Sending Listener DiscoveryResponse version {}", version_);
+  ENVOY_LOG_MISC(debug, "Sending Listener DiscoveryResponse version {}", version_);
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
                                                                listeners, added_or_updated, removed,
                                                                std::to_string(version_));
@@ -47,7 +47,7 @@ void XdsFuzzTest::updateRoute(
     const std::vector<envoy::config::route::v3::RouteConfiguration>& routes,
     const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
     const std::vector<std::string>& removed) {
-  ENVOY_LOG_MISC(info, "Sending Route DiscoveryResponse version {}", version_);
+  ENVOY_LOG_MISC(debug, "Sending Route DiscoveryResponse version {}", version_);
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, routes, added_or_updated, removed,
       std::to_string(version_));
@@ -130,7 +130,7 @@ bool XdsFuzzTest::hasRoute(const std::string& route_name) {
  * send an xDS response to add a listener and update state accordingly
  */
 void XdsFuzzTest::addListener(const std::string& listener_name, const std::string& route_name) {
-  ENVOY_LOG_MISC(info, "Adding {} with reference to {}", listener_name, route_name);
+  ENVOY_LOG_MISC(debug, "Adding {} with reference to {}", listener_name, route_name);
   bool removed = eraseListener(listener_name);
   auto listener = buildListener(listener_name, route_name);
   listeners_.push_back(listener);
@@ -151,7 +151,7 @@ void XdsFuzzTest::addListener(const std::string& listener_name, const std::strin
  * send an xDS response to remove a listener and update state accordingly
  */
 void XdsFuzzTest::removeListener(const std::string& listener_name) {
-  ENVOY_LOG_MISC(info, "Removing {}", listener_name);
+  ENVOY_LOG_MISC(debug, "Removing {}", listener_name);
   bool removed = eraseListener(listener_name);
 
   if (removed) {
@@ -165,7 +165,7 @@ void XdsFuzzTest::removeListener(const std::string& listener_name) {
  * send an xDS response to add a route and update state accordingly
  */
 void XdsFuzzTest::addRoute(const std::string& route_name) {
-  ENVOY_LOG_MISC(info, "Adding {}", route_name);
+  ENVOY_LOG_MISC(debug, "Adding {}", route_name);
   bool has_route = hasRoute(route_name);
   auto route = buildRouteConfig(route_name);
   routes_.push_back(route);
@@ -194,7 +194,7 @@ AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
     API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
-      ENVOY_LOG_MISC(info, "Received gRPC message with type {} and version {}",
+      ENVOY_LOG_MISC(debug, "Received gRPC message with type {} and version {}",
                      discovery_request.type_url(), discovery_request.version_info());
     } while (expected_type_url != discovery_request.type_url() ||
              expected_version != discovery_request.version_info());
@@ -202,7 +202,7 @@ AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
-      ENVOY_LOG_MISC(info, "Received gRPC message with type {}",
+      ENVOY_LOG_MISC(debug, "Received gRPC message with type {}",
                      delta_discovery_request.type_url());
     } while (expected_type_url != delta_discovery_request.type_url());
   }
@@ -255,7 +255,7 @@ void XdsFuzzTest::replay() {
     }
     case test::server::config_validation::Action::kAddRoute: {
       if (!sent_listener) {
-        ENVOY_LOG_MISC(info, "Ignoring request to add route_{}",
+        ENVOY_LOG_MISC(debug, "Ignoring request to add route_{}",
                        action.add_route().route_num() % RoutesMax);
         break;
       }
@@ -269,20 +269,21 @@ void XdsFuzzTest::replay() {
     }
     if (sent_listener) {
       // wait for all of the updates to take effect
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", verifier_.numWarming());
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive());
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", verifier_.numDraining());
+      test_server_->waitForGaugeEq("listener_manager.total_listeners_warming",
+                                   verifier_.numWarming());
+      test_server_->waitForGaugeEq("listener_manager.total_listeners_active",
+                                   verifier_.numActive());
+      test_server_->waitForGaugeEq("listener_manager.total_listeners_draining",
+                                   verifier_.numDraining());
     }
-    ENVOY_LOG_MISC(info, "{}", getListenersConfigDump().DebugString());
-    ENVOY_LOG_MISC(
-        info,
-        "warming {} ({}), active {} ({}), draining {} ({})",
-        verifier_.numWarming(),
-        test_server_->gauge("listener_manager.total_listeners_warming")->value(),
-        verifier_.numActive(),
-        test_server_->gauge("listener_manager.total_listeners_active")->value(),
-        verifier_.numDraining(),
-        test_server_->gauge("listener_manager.total_listeners_draining")->value());
+    ENVOY_LOG_MISC(debug, "{}", getListenersConfigDump().DebugString());
+    ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})",
+                   verifier_.numWarming(),
+                   test_server_->gauge("listener_manager.total_listeners_warming")->value(),
+                   verifier_.numActive(),
+                   test_server_->gauge("listener_manager.total_listeners_active")->value(),
+                   verifier_.numDraining(),
+                   test_server_->gauge("listener_manager.total_listeners_draining")->value());
   }
 
   verifyState();
@@ -293,13 +294,13 @@ void XdsFuzzTest::replay() {
  * verify that each listener in the verifier has a matching listener in the config dump
  */
 void XdsFuzzTest::verifyListeners() {
-  ENVOY_LOG_MISC(info, "Verifying listeners");
+  ENVOY_LOG_MISC(debug, "Verifying listeners");
   const auto& abstract_rep = verifier_.listeners();
   Protobuf::RepeatedPtrField<envoy::admin::v3::ListenersConfigDump::DynamicListener> dump =
       getListenersConfigDump().dynamic_listeners();
 
   for (auto& rep : abstract_rep) {
-    ENVOY_LOG_MISC(info, "Verifying {} with state {}", rep.listener.name(), rep.state);
+    ENVOY_LOG_MISC(debug, "Verifying {} with state {}", rep.listener.name(), rep.state);
 
     auto listener_dump = std::find_if(dump.begin(), dump.end(), [&](auto& listener) {
       return listener.name() == rep.listener.name();
@@ -310,7 +311,7 @@ void XdsFuzzTest::verifyListeners() {
       throw EnvoyException(fmt::format("Expected to find {} in config dump", rep.listener.name()));
     }
 
-    ENVOY_LOG_MISC(info, "warm {}, active {}, drain: {}", listener_dump->has_warming_state(),
+    ENVOY_LOG_MISC(debug, "warm {}, active {}, drain: {}", listener_dump->has_warming_state(),
                    listener_dump->has_active_state(), listener_dump->has_draining_state());
     // the state should match
     switch (rep.state) {
@@ -331,7 +332,7 @@ void XdsFuzzTest::verifyListeners() {
 
 void XdsFuzzTest::verifyState() {
   verifyListeners();
-  ENVOY_LOG_MISC(info, "Verified listeners");
+  ENVOY_LOG_MISC(debug, "Verified listeners");
 
   EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_draining")->value(),
             verifier_.numDraining());
@@ -339,16 +340,13 @@ void XdsFuzzTest::verifyState() {
             verifier_.numWarming());
   EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_active")->value(),
             verifier_.numActive());
-  ENVOY_LOG_MISC(info, "Verified stats");
-  ENVOY_LOG_MISC(
-      info,
-      "warming {} ({}), active {} ({}), draining {} ({})",
-      verifier_.numWarming(),
-      test_server_->gauge("listener_manager.total_listeners_warming")->value(),
-      verifier_.numActive(),
-      test_server_->gauge("listener_manager.total_listeners_active")->value(),
-      verifier_.numDraining(),
-      test_server_->gauge("listener_manager.total_listeners_draining")->value());
+  ENVOY_LOG_MISC(debug, "Verified stats");
+  ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})", verifier_.numWarming(),
+                 test_server_->gauge("listener_manager.total_listeners_warming")->value(),
+                 verifier_.numActive(),
+                 test_server_->gauge("listener_manager.total_listeners_active")->value(),
+                 verifier_.numDraining(),
+                 test_server_->gauge("listener_manager.total_listeners_draining")->value());
 }
 
 envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {

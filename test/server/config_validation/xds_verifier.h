@@ -6,10 +6,11 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 
+#include "common/common/assert.h"
+
 #include "test/server/config_validation/xds_fuzz.pb.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "common/common/assert.h"
 
 namespace Envoy {
 
