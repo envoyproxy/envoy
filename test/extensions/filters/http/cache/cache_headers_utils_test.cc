@@ -18,10 +18,6 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-#define DURATION(s) std::chrono::seconds(s)
-#define UNSET_DURATION absl::optional<SystemTime::duration>()
-#define MAX_DURATION SystemTime::duration::max()
-
 struct TestRequestCacheControl : public RequestCacheControl {
   TestRequestCacheControl(bool must_validate, bool no_store, bool no_transform, bool only_if_cached,
                           OptionalDuration max_age, OptionalDuration min_fresh,
@@ -62,76 +58,90 @@ class RequestCacheControlTest : public testing::TestWithParam<RequestCacheContro
 public:
   static auto getTestCases() {
     // clang-format off
-    // RequestCacheControl = {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
     static const RequestCacheControlTestCase test_cases[] = {
         // Empty header
         {
-          "", 
-          {false, false, false, false, UNSET_DURATION, UNSET_DURATION, UNSET_DURATION}
+          "",
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
         },
         // Valid cache-control headers
         {
           "max-age=3600, min-fresh=10, no-transform, only-if-cached, no-store",
-          {false, true, true, true, DURATION(3600), DURATION(10), UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, true, true, true, std::chrono::seconds(3600), std::chrono::seconds(10), absl::nullopt}
         },
         {
           "min-fresh=100, max-stale, no-cache",
-          {true, false, false, false, UNSET_DURATION, DURATION(100), MAX_DURATION}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {true, false, false, false, absl::nullopt, std::chrono::seconds(100), SystemTime::duration::max()}
         },
         {
           "max-age=10, max-stale=50",
-          {false, false, false, false, DURATION(10), UNSET_DURATION, DURATION(50)}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
         },
         // Quoted arguments are interpreted correctly
         {
           "max-age=\"3600\", min-fresh=\"10\", no-transform, only-if-cached, no-store",
-          {false, true, true, true, DURATION(3600), DURATION(10), UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, true, true, true, std::chrono::seconds(3600), std::chrono::seconds(10), absl::nullopt}
         },
         {
           "max-age=\"10\", max-stale=\"50\", only-if-cached",
-          {false, false, false, true, DURATION(10), UNSET_DURATION, DURATION(50)}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, true, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
         },
         // Unknown directives are ignored
         {
           "max-age=10, max-stale=50, unknown-directive",
-          {false, false, false, false, DURATION(10), UNSET_DURATION, DURATION(50)}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive-with-arg=arg1",
-          {false, false, false, false, DURATION(10), UNSET_DURATION, DURATION(50)}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive-with-quoted-arg=\"arg1\"",
-          {false, false, false, false, DURATION(10), UNSET_DURATION, DURATION(50)}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive, unknown-directive-with-quoted-arg=\"arg1\"",
-          {false, false, false, false, DURATION(10), UNSET_DURATION, DURATION(50)}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, false, std::chrono::seconds(10), absl::nullopt, std::chrono::seconds(50)}
         },
         // Invalid durations are ignored
         {
           "max-age=five, min-fresh=30, no-store",
-          {false, true, false, false, UNSET_DURATION, DURATION(30), UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, true, false, false, absl::nullopt, std::chrono::seconds(30), absl::nullopt}
         },
         {
           "max-age=five, min-fresh=30s, max-stale=-2",
-          {false, false, false, false, UNSET_DURATION, UNSET_DURATION, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
         },
         {
           "max-age=\"", 
-          {false, false, false, false, UNSET_DURATION, UNSET_DURATION, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
         },
         // Invalid parts of the header are ignored
         {
           "no-cache, ,,,fjfwioen3298, max-age=20, min-fresh=30=40",
-          {true, false, false, false, DURATION(20), UNSET_DURATION, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {true, false, false, false, std::chrono::seconds(20), absl::nullopt, absl::nullopt}
         },
         // If a directive argument contains a comma by mistake
         // the part before the comma will be interpreted as the argument
         // and the part after it will be ignored
         {
           "no-cache, max-age=10,0, no-store",
-          {true, true, false, false, DURATION(10), UNSET_DURATION, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
+          {true, true, false, false, std::chrono::seconds(10), absl::nullopt, absl::nullopt}
         },
     };
     // clang-format on
@@ -144,96 +154,115 @@ class ResponseCacheControlTest : public testing::TestWithParam<ResponseCacheCont
 public:
   static auto getTestCases() {
     // clang-format off
-    // ResponseCacheControl = {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
     static const ResponseCacheControlTestCase test_cases[] = {
         // Empty header
         {
           "", 
-          {false, false, false, false, false, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, false, false, false, false, absl::nullopt}
         },
         // Valid cache-control headers
         {
           "s-maxage=1000, max-age=2000, proxy-revalidate, no-store",
-          {false, true, false, true, false, DURATION(1000)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, true, false, true, false, std::chrono::seconds(1000)}
         },
         {
           "max-age=500, must-revalidate, no-cache, no-transform",
-          {true, false, true, true, false, DURATION(500)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, false, true, true, false, std::chrono::seconds(500)}
         },
         {
           "s-maxage=10, private=content-length, no-cache=content-encoding",
-          {true, true, false, false, false, DURATION(10)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, true, false, false, false, std::chrono::seconds(10)}
         },
         {
-          "private", 
-          {false, true, false, false, false, UNSET_DURATION}
+          "private",
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, true, false, false, false, absl::nullopt}
         },
         {
-          "public, max-age=0", 
-          {false, false, false, false, true, DURATION(0)}
+          "public, max-age=0",
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, false, false, false, true, std::chrono::seconds(0)}
         },
         // Quoted arguments are interpreted correctly
         {
-          "s-maxage=\"20\", max-age=\"10\", public", 
-          {false, false, false, false, true, DURATION(20)}
+          "s-maxage=\"20\", max-age=\"10\", public",
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, false, false, false, true, std::chrono::seconds(20)}
         },
         {
-          "max-age=\"50\", private", 
-          {false, true, false, false, false, DURATION(50)}
+          "max-age=\"50\", private",
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, true, false, false, false, std::chrono::seconds(50)}
         },
         {
           "s-maxage=\"0\"", 
-          {false, false, false, false, false, DURATION(0)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, false, false, false, false, std::chrono::seconds(0)}
         },
         // Unknown directives are ignored
         {
           "private, no-cache, max-age=30, unknown-directive",
-          {true, true, false, false, false, DURATION(30)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, true, false, false, false, std::chrono::seconds(30)}
         },
         {
           "private, no-cache, max-age=30, unknown-directive-with-arg=arg",
-          {true, true, false, false, false, DURATION(30)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, true, false, false, false, std::chrono::seconds(30)}
         },
         {
           "private, no-cache, max-age=30, unknown-directive-with-quoted-arg=\"arg\"",
-          {true, true, false, false, false, DURATION(30)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, true, false, false, false, std::chrono::seconds(30)}
         },
         {
           "private, no-cache, max-age=30, unknown-directive, unknown-directive-with-quoted-arg=\"arg\"",
-          {true, true, false, false, false, DURATION(30)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, true, false, false, false, std::chrono::seconds(30)}
         },
         // Invalid durations are ignored
         {
           "max-age=five", 
-          {false, false, false, false, false, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, false, false, false, false, absl::nullopt}
         },
         {
           "max-age=10s, private", 
-          {false, true, false, false, false, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, true, false, false, false, absl::nullopt}
         },
         {
           "s-maxage=\"50s\", max-age=\"zero\", no-cache",
-          {true, false, false, false, false, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, false, false, false, false, absl::nullopt}
         },
         {
           "s-maxage=five, max-age=10, no-transform", 
-          {false, false, true, false, false, DURATION(10)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, false, true, false, false, std::chrono::seconds(10)}
         },
         {
           "max-age=\"", 
-          {false, false, false, false, false, UNSET_DURATION}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {false, false, false, false, false, absl::nullopt}
         },
         // Invalid parts of the header are ignored
         {
           "no-cache, ,,,fjfwioen3298, max-age=20", 
-          {true, false, false, false, false, DURATION(20)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, false, false, false, false, std::chrono::seconds(20)}
         },
         // If a directive argument contains a comma by mistake
         // the part before the comma will be interpreted as the argument
         // and the part after it will be ignored
         {
           "no-cache, max-age=10,0, no-store", 
-          {true, true, false, false, false, DURATION(10)}
+          // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
+          {true, true, false, false, false, std::chrono::seconds(10)}
         },
     };
     // clang-format on
