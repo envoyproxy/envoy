@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "ff890c70d60e51c7ee80874f85c3905718b7f6929a6c367c850cdd0b9c01d44d",
-        strip_prefix = "envoy-build-tools-efaecf11d76b86551cf42e2354274ac2acd7042f",
-        # 2020-06-16
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/efaecf11d76b86551cf42e2354274ac2acd7042f.tar.gz"],
+        sha256 = "dd5cc89bb69544659b20b88b28e642da0174739b68c82f029617b9749d61ab1d",
+        strip_prefix = "envoy-build-tools-289a5ca65aefd5a76f18f103d1425cfec5591417",
+        # 2020-07-15
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/289a5ca65aefd5a76f18f103d1425cfec5591417.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -168,12 +168,9 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     com_github_gperftools_gperftools = dict(
-        # TODO(cmluciano): Bump to release 2.8
-        # The currently used version is specifically chosen to fix ppc64le builds that require inclusion
-        # of asm/ptrace.h, and also s390x builds that require special handling of mmap syscall.
-        sha256 = "97f0bc2b389c29305f5d1d8cc4d95e9212c33b55827ae65476fc761d78e3ec5d",
-        strip_prefix = "gperftools-gperftools-2.7.90",
-        urls = ["https://github.com/gperftools/gperftools/archive/gperftools-2.7.90.tar.gz"],
+        sha256 = "240deacdd628b6459671b83eb0c4db8e97baadf659f25b92e9a078d536bd513e",
+        strip_prefix = "gperftools-2.8",
+        urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-2.8/gperftools-2.8.tar.gz"],
         use_category = ["test"],
     ),
     com_github_grpc_grpc = dict(
@@ -425,10 +422,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
-        sha256 = "1b283f93619b130504880d2f400bd449de9ab6be94ef26ecd2bb96921f48dd6c",
-        strip_prefix = "cel-cpp-50196761917300bbd47b59bd162e84817b67b7ab",
-        # 2020-06-08
-        urls = ["https://github.com/google/cel-cpp/archive/50196761917300bbd47b59bd162e84817b67b7ab.tar.gz"],
+        sha256 = "cad7d01139947d78e413d112cb8f7431fbb33cf66b0adf9c280824803fc2a72e",
+        strip_prefix = "cel-cpp-b9453a09b28a1531c4917e8792b3ea61f6b1a447",
+        # 2020-07-14
+        urls = ["https://github.com/google/cel-cpp/archive/b9453a09b28a1531c4917e8792b3ea61f6b1a447.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
