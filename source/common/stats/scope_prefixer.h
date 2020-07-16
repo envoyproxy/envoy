@@ -54,13 +54,6 @@ public:
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
-  /*
-CounterOptConstRef slowFindCounterByString(absl::string_view name) const override;
-  GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const override;
-  HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const override;
-  TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const override;
-  */
-
   template <class SharedStatType>
   bool iterHelper(const std::function<bool(const SharedStatType& stat)>& fn) const {
     std::string prefix_str = scope_.symbolTable().toString(prefix_.statName());

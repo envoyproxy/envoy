@@ -256,11 +256,6 @@ public:
   bool iterate(const HistogramFn& fn) const override { return iterHelper(fn); }
   bool iterate(const TextReadoutFn& fn) const override { return iterHelper(fn); }
 
-  /*CounterOptConstRef slowFindCounterByString(absl::string_view name) const override;
-  GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const override;
-  HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const override;
-  TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const override;*/
-
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
@@ -397,46 +392,6 @@ private:
     bool iterate(const TextReadoutFn& fn) const override {
       return iterHelper(fn, central_cache_->text_readouts_);
     }
-
-    /*template<class Stat, class StatMap>
-        absl::optional<std::reference_wrapper<const Stat>>
-        slowFindStatByString(absl::string_view name, const StatMap& map) const {
-      // Most stat names are fully symbolic, so we can encode the name and
-      // do a fast lookup. The downside is that we'll be doing extra symbolization,
-      // taking symbol table locks, without knowing whether this will help avoid
-      // the loop below or not.
-      StatNameManagedStorage stat_name(name, const_cast<SymbolTable&>(constSymbolTable()));
-      auto iter = map.find(stat_name.statName());
-      if (iter != map.end()) {
-        return *iter->second;
-      }
-
-      std::string full_name = fullName(name);
-      Thread::LockGuard lock(parent_.lock_);
-      for (auto& iter : map) {
-        auto& stat = iter.second;
-        if (full_name == stat->name()) {
-          return *stat;
-        }
-      }
-      return absl::nullopt;
-    }
-
-    CounterOptConstRef slowFindCounterByString(absl::string_view name) const override {
-      return slowFindStatByString<Counter>(name, central_cache_->counters_);
-    }
-
-    GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const override {
-      return slowFindStatByString<Gauge>(name, central_cache_->gauges_);
-    }
-
-    HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const override {
-      return slowFindStatByString<Histogram>(name, central_cache_->histograms_);
-    }
-
-    TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const override {
-      return slowFindStatByString<TextReadout>(name, central_cache_->text_readouts_);
-      }*/
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.

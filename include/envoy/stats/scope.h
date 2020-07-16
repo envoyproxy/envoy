@@ -200,11 +200,6 @@ public:
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
-  /*virtual CounterOptConstRef slowFindCounterByString(absl::string_view name) const PURE;
-  virtual GaugeOptConstRef slowFindGaugeByString(absl::string_view name) const PURE;
-  virtual HistogramOptConstRef slowFindHistogramByString(absl::string_view name) const PURE;
-  virtual TextReadoutOptConstRef slowFindTextReadoutByString(absl::string_view name) const PURE;*/
-
   virtual bool iterate(const CounterFn& fn) const PURE;
   virtual bool iterate(const GaugeFn& fn) const PURE;
   virtual bool iterate(const HistogramFn& fn) const PURE;
