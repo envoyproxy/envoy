@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/network:network_mocks",

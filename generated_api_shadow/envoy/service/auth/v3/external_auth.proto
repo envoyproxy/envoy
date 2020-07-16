@@ -6,6 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/service/auth/v3/attribute_context.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "google/protobuf/struct.proto";
 import "google/rpc/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -57,7 +58,7 @@ message DeniedHttpResponse {
   string body = 3;
 }
 
-// HTTP attributes for an ok response.
+// HTTP attributes for an OK response.
 message OkHttpResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.OkHttpResponse";
@@ -69,6 +70,14 @@ message OkHttpResponse {
   // by Leaving `append` as false, the filter will either add a new header, or override an existing
   // one if there is a match.
   repeated config.core.v3.HeaderValueOption headers = 2;
+
+  // Optional response metadata that will be emitted as dynamic metadata to be consumed by the next
+  // filter. This metadata lives in a namespace specified by the canonical name of extension filter
+  // that requires it:
+  //
+  // - :ref:`envoy.filters.http.ext_authz <config_http_filters_ext_authz_dynamic_metadata>` for HTTP filter.
+  // - :ref:`envoy.filters.network.ext_authz <config_network_filters_ext_authz_dynamic_metadata>` for network filter.
+  google.protobuf.Struct dynamic_metadata = 3;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.

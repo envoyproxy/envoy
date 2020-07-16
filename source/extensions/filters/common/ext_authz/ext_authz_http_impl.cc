@@ -33,7 +33,8 @@ const Http::HeaderMap& lengthZeroHeader() {
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response,
                          Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{},
-                                  Http::HeaderVector{}, EMPTY_STRING, Http::Code::Forbidden});
+                                  Http::HeaderVector{}, EMPTY_STRING, Http::Code::Forbidden,
+                                  ProtobufWkt::Struct{}});
 }
 
 // SuccessResponse used for creating either DENIED or OK authorization responses.
@@ -317,7 +318,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
     SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
                        config_->upstreamHeaderToAppendMatchers(),
                        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
-                                Http::HeaderVector{}, EMPTY_STRING, Http::Code::OK}};
+                                Http::HeaderVector{}, EMPTY_STRING, Http::Code::OK,
+                                ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
@@ -326,7 +328,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          config_->upstreamHeaderToAppendMatchers(),
                          Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{},
                                   Http::HeaderVector{}, message->bodyAsString(),
-                                  static_cast<Http::Code>(status_code)}};
+                                  static_cast<Http::Code>(status_code), ProtobufWkt::Struct{}}};
   return std::move(denied.response_);
 }
 

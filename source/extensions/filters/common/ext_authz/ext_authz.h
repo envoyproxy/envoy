@@ -62,6 +62,10 @@ struct Response {
   std::string body;
   // Optional http status used only on denied response.
   Http::Code status_code{};
+
+  // A set of metadata returned by the authorization server, that will be emitted as filter's
+  // dynamic metadata that other filters can leverage.
+  ProtobufWkt::Struct dynamic_metadata;
 };
 
 using ResponsePtr = std::unique_ptr<Response>;

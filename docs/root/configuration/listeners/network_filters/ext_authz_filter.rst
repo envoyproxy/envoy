@@ -65,9 +65,19 @@ The network filter outputs statistics in the *config.ext_authz.* namespace.
 
   total, Counter, Total responses from the filter.
   error, Counter, Total errors contacting the external service.
-  denied, Counter, Total responses from the authorizations service that were to deny the traffic. 
+  denied, Counter, Total responses from the authorizations service that were to deny the traffic.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through
   because of failure_mode_allow set to true."
   ok, Counter, Total responses from the authorization service that were to allow the traffic.
   cx_closed, Counter, Total connections that were closed.
   active, Gauge, Total currently active requests in transit to the authorization service.
+
+Dynamic Metadata
+----------------
+.. _config_network_filters_ext_authz_dynamic_metadata:
+
+The External Authorization filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
+*only* when the gRPC authorization server returns an :ref:`OK
+<envoy_v3_api_msg_service.auth.v3.OkHttpResponse>` :ref:`CheckResponse
+<envoy_v3_api_msg_service.auth.v3.CheckResponse>` with a filled :ref:`dynamic_metadata
+<envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field.

@@ -12,6 +12,7 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -37,19 +38,11 @@ namespace ExtAuthz {
 
 class ExtAuthzFilterTest : public testing::Test {
 public:
-  ExtAuthzFilterTest() {
-    std::string json = R"EOF(
-    {
-      "grpc_service": {
-          "envoy_grpc": { "cluster_name": "ext_authz_server" }
-      },
-      "failure_mode_allow": true,
-      "stat_prefix": "name"
-    }
-    )EOF";
+  ExtAuthzFilterTest() { initialize(); }
 
+  void initialize() {
     envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
-    TestUtility::loadFromJson(json, proto_config);
+    TestUtility::loadFromYaml(default_yaml_string_, proto_config);
     config_ = std::make_shared<Config>(proto_config, stats_store_);
     client_ = new Filters::Common::ExtAuthz::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
@@ -82,18 +75,24 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
+  const std::string default_yaml_string_ = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: ext_authz_server
+
+failure_mode_allow: true
+stat_prefix: name
+  )EOF";
 };
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "grpc_service": {}
-  }
+  std::string yaml_string = R"EOF(
+grpc_service: {}
+stat_prefix: name
   )EOF";
 
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
-  TestUtility::loadFromJson(json_string, proto_config);
+  TestUtility::loadFromYaml(yaml_string, proto_config);
 
   EXPECT_THROW(
       TestUtility::downcastAndValidate<
@@ -102,8 +101,6 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
 }
 
 TEST_F(ExtAuthzFilterTest, OKWithOnData) {
-  InSequence s;
-
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
@@ -126,8 +123,23 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
       1U,
       stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+
+  auto* fields = response.dynamic_metadata.mutable_fields();
+  (*fields)["foo"] = ValueUtil::stringValue("ok");
+  (*fields)["bar"] = ValueUtil::numberValue(1);
+
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&response](const std::string& ns,
+                                   const ProtobufWkt::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+        EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+      }));
+
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -314,7 +326,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
           })));
-
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
