@@ -19,7 +19,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         // Replaying a corpus through the fuzzer will not be affected by the
         // post-processor mutation.
 
-        // After extending to cover all the filters, we can use `Registry::FactoryRegistry<
+        // TODO(jianwendong): After extending to cover all the filters, we can use
+        // `Registry::FactoryRegistry<
         // Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames()`
         // to get all the filter names instead of calling `UberFilterFuzzer::filter_names()`.
         static const auto filter_names = UberFilterFuzzer::filterNames();
@@ -42,6 +43,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
     TestUtility::validate(input);
     // Check the filter's name in case some filters are not supported yet.
     static const auto filter_names = UberFilterFuzzer::filterNames();
+    // TODO(jianwendong): remove this if block after covering all the filters.
     if (std::find(filter_names.begin(), filter_names.end(), input.config().name()) ==
         std::end(filter_names)) {
       ENVOY_LOG_MISC(debug, "Test case with unsupported filter type: {}", input.config().name());

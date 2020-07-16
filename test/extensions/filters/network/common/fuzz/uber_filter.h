@@ -69,7 +69,8 @@ public:
   // Get the name of filters which has been covered by this fuzzer.
   static std::vector<absl::string_view> filterNames();
   // Check whether the filter's config is invalid for fuzzer(e.g. system call).
-  bool invalidInputForFuzzer(const std::string& filter_name, Protobuf::Message* config_message);
+  void checkInvalidInputForFuzzer(const std::string& filter_name,
+                                  Protobuf::Message* config_message);
 
 protected:
   // Set-up filter specific mock expectations in constructor.

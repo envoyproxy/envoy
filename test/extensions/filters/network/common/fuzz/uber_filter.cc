@@ -1,5 +1,6 @@
 #include "test/extensions/filters/network/common/fuzz/uber_filter.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 
@@ -19,7 +20,7 @@ namespace Extensions {
 namespace NetworkFilters {
 
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
-  // This filters that have already been covered by this fuzzer.
+  // These filters have already been covered by this fuzzer.
   // Will extend to cover other network filters one by one.
   static ::std::vector<absl::string_view> filter_names_;
   if (filter_names_.empty()) {
@@ -44,14 +45,17 @@ void UberFilterFuzzer::reset() {
   read_filter_callbacks_->connection_.callbacks_.clear();
   read_filter_callbacks_->connection_.bytes_sent_callbacks_.clear();
   read_filter_callbacks_->connection_.state_ = Network::Connection::State::Open;
+  read_filter_.reset();
 }
+
+// TODO(jianwendong): seperate the methods for per filter processing to a different file.
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
   // Set up response for ext_authz filter
   if (filter_name == NetworkFilterNames::get().ExtAuthorization) {
 
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
-
+    // TODO(jianwendong): consider testing on different kinds of responses.
     ON_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
         .WillByDefault(testing::WithArgs<3>(Invoke([&](Grpc::RawAsyncRequestCallbacks& callbacks) {
           Filters::Common::ExtAuthz::GrpcClientImpl* grpc_client_impl =
@@ -104,8 +108,8 @@ void UberFilterFuzzer::fuzzerSetup() {
 UberFilterFuzzer::UberFilterFuzzer() : time_source_(factory_context_.simulatedTimeSystem()) {
   fuzzerSetup();
 }
-bool UberFilterFuzzer::invalidInputForFuzzer(const std::string& filter_name,
-                                             Protobuf::Message* config_message) {
+void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name,
+                                                  Protobuf::Message* config_message) {
   // System calls such as reading files are prohibited in this fuzzer. Some input that crashes the
   // mock/fake objects are also prohibited.
   const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
@@ -116,7 +120,8 @@ bool UberFilterFuzzer::invalidInputForFuzzer(const std::string& filter_name,
             *config_message);
     if (config.response().specifier_case() ==
         envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
-      return true;
+      throw EnvoyException(
+          fmt::format("direct_response trying to open a file. Config:\n{}", config.DebugString()));
     }
   } else if (filter_name == NetworkFilterNames::get().LocalRateLimit) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& config =
@@ -126,10 +131,11 @@ bool UberFilterFuzzer::invalidInputForFuzzer(const std::string& filter_name,
       // Too large fill_interval may cause "c++/v1/chrono" overflow when simulated_time_system_ is
       // converting it to a smaller unit. Constraining fill_interval to no greater than one day is
       // reasonable.
-      return true;
+      throw EnvoyException(
+          fmt::format("local_ratelimit trying to set a large fill_interval. Config:\n{}",
+                      config.DebugString()));
     }
   }
-  return false;
 }
 
 void UberFilterFuzzer::fuzz(
@@ -144,20 +150,18 @@ void UberFilterFuzzer::fuzz(
         Server::Configuration::NamedNetworkFilterConfigFactory>(filter_name);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
-    if (invalidInputForFuzzer(filter_name, message.get())) {
-      // Make sure no invalid system calls are executed in fuzzer.
-      return;
-    }
+    // Make sure no invalid system calls are executed in fuzzer.
+    checkInvalidInputForFuzzer(filter_name, message.get());
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
-    perFilterSetup(proto_config.name());
-    // Add filter to connection_.
-    cb_(read_filter_callbacks_->connection_);
+
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup{}", e.what());
     return;
   }
-
+  perFilterSetup(proto_config.name());
+  // Add filter to connection_.
+  cb_(read_filter_callbacks_->connection_);
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
