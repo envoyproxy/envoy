@@ -51,6 +51,19 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
 
 MockTimer::~MockTimer() = default;
 
+MockRangeTimer::MockRangeTimer() {
+  ON_CALL(*this, enableTimer(_, _, _))
+      .WillByDefault(Invoke([&](const std::chrono::milliseconds&, const std::chrono::milliseconds&,
+                                const ScopeTrackedObject* scope) {
+        enabled_ = true;
+        scope_ = scope;
+      }));
+  ON_CALL(*this, disableTimer()).WillByDefault(Assign(&enabled_, false));
+  ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
+}
+
+MockRangeTimer::~MockRangeTimer() = default;
+
 MockSchedulableCallback::~MockSchedulableCallback() = default;
 
 MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher)

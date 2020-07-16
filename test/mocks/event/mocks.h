@@ -174,6 +174,38 @@ private:
   Event::TimerCb callback_;
 };
 
+class MockRangeTimer : public RangeTimer {
+public:
+  MockRangeTimer();
+  ~MockRangeTimer() override;
+
+  void invokeCallback() {
+    EXPECT_TRUE(enabled_);
+    enabled_ = false;
+    if (scope_ == nullptr) {
+      callback_();
+      return;
+    }
+    ScopeTrackerScopeState scope(scope_, *dispatcher_);
+    scope_ = nullptr;
+    callback_();
+  }
+
+  // RangeTimer
+  MOCK_METHOD(void, disableTimer, ());
+  MOCK_METHOD(void, enableTimer,
+              (const std::chrono::milliseconds& min, const std::chrono::milliseconds& max,
+               const ScopeTrackedObject* scope));
+  MOCK_METHOD(bool, enabled, ());
+
+  MockDispatcher* dispatcher_{};
+  const ScopeTrackedObject* scope_{};
+  bool enabled_{};
+
+private:
+  Event::TimerCb callback_;
+};
+
 class MockSchedulableCallback : public SchedulableCallback {
 public:
   MockSchedulableCallback(MockDispatcher* dispatcher);

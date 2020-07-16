@@ -61,8 +61,7 @@ public:
 using TimerPtr = std::unique_ptr<Timer>;
 
 /**
- * An abstract event timer that can be scheduled for a timeout within a range. The actual timeout
- * used is left up to individual implementations.
+ * An abstract event timer that can be scheduled for a timeout within a range.
  */
 class RangeTimer {
 public:
@@ -74,8 +73,9 @@ public:
   virtual void disableTimer() PURE;
 
   /**
-   * Enable a pending timeout within the given range. If a timeout is already pending, it will be
-   * reset to the new timeout.
+   * Enable a pending timeout within the given range. Unless disabled, the timer will fire exactly
+   * once, after min_ms has elapsed and before max_ms has elapsed. If a timeout is already pending,
+   * it will be reset to the new timeout.
    *
    * @param min_ms supplies the minimum duration of the alarm in milliseconds.
    * @param max_ms supplies the maximum duration of the alarm in milliseconds.
