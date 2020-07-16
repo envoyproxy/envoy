@@ -230,7 +230,6 @@ private:
 };
 
 /**
-<<<<<<< HEAD
   * Filters requests based on dynamic metadata
   */
 class MetadataFilter : public Filter {
@@ -243,16 +242,6 @@ public:
 
 private:
   const Envoy::Matchers::MetadataMatcher matcher_;
-
-  
-=======
-  * Filters requests based on value of 'access_log_policy' key
-  */
-class LogKeyFilter : public Filter {
-    bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-                const Http::ResponseHeaderMap& response_headers,
-                const Http::ResponseTrailerMap& response_trailers) const override;
->>>>>>> c7e38e439... rbac log action for network filter + log key access log filter
 };
 
 /**

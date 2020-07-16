@@ -92,9 +92,6 @@ message AccessLogFilter {
     // gRPC status filter.
     GrpcStatusFilter grpc_status_filter = 10;
 
-    // Log key filter
-    LogKeyFilter log_key_filter = 11;
-
     // Extension filter.
     ExtensionFilter extension_filter = 11;
 
