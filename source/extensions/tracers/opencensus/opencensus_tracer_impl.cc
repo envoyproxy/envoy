@@ -87,36 +87,33 @@ startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderM
   for (const auto& incoming : oc_config.incoming_trace_context()) {
     bool found = false;
     switch (incoming) {
-    case OpenCensusConfig::TRACE_CONTEXT: {
-      const Http::HeaderEntry* header = request_headers.get(Constants::get().TRACEPARENT);
-      if (header != nullptr) {
+    case OpenCensusConfig::TRACE_CONTEXT:
+      const Http::HeaderEntry* parent_header;
+      parent_header = request_headers.get(Constants::get().TRACEPARENT);
+      if (parent_header != nullptr) {
         found = true;
         parent_ctx = ::opencensus::trace::propagation::FromTraceParentHeader(
-            header->value().getStringView());
+            parent_header->value().getStringView());
       }
       break;
-    }
-
-    case OpenCensusConfig::GRPC_TRACE_BIN: {
-      const Http::HeaderEntry* header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
-      if (header != nullptr) {
+    case OpenCensusConfig::GRPC_TRACE_BIN:
+      const Http::HeaderEntry* bin_header;
+      bin_header = request_headers.get(Constants::get().GRPC_TRACE_BIN);
+      if (bin_header != nullptr) {
         found = true;
         parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(
-            Base64::decodeWithoutPadding(header->value().getStringView()));
+            Base64::decodeWithoutPadding(bin_header->value().getStringView()));
       }
       break;
-    }
-
-    case OpenCensusConfig::CLOUD_TRACE_CONTEXT: {
-      const Http::HeaderEntry* header = request_headers.get(Constants::get().X_CLOUD_TRACE_CONTEXT);
-      if (header != nullptr) {
+    case OpenCensusConfig::CLOUD_TRACE_CONTEXT:
+      const Http::HeaderEntry* context_header;
+      context_header = request_headers.get(Constants::get().X_CLOUD_TRACE_CONTEXT);
+      if (context_header != nullptr) {
         found = true;
         parent_ctx = ::opencensus::trace::propagation::FromCloudTraceContextHeader(
-            header->value().getStringView());
+            context_header->value().getStringView());
       }
       break;
-    }
-
     case OpenCensusConfig::B3: {
       absl::string_view b3_trace_id;
       absl::string_view b3_span_id;
