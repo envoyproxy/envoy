@@ -58,25 +58,25 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
 
     std::string config_yaml;
-    switch(region_location_) {
-      case RegionLocation::kInEnvironment:
+    switch (region_location_) {
+    case RegionLocation::kInEnvironment:
       TestEnvironment::setEnvVar("AWS_REGION", region_name_, 1);
       ABSL_FALLTHROUGH_INTENDED;
-      case RegionLocation::kNotProvided:
+    case RegionLocation::kNotProvided:
       config_yaml = fmt::format(R"EOF(
 "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
 service_name: {}
 )EOF",
                                 service_name_);
-break;
-case RegionLocation::kInConfig:
+      break;
+    case RegionLocation::kInConfig:
       config_yaml = fmt::format(R"EOF(
 "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
 service_name: {}
 region: {}
 )EOF",
                                 service_name_, region_name_);
-    break;
+      break;
     }
 
     auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
