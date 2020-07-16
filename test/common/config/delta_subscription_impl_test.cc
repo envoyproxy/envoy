@@ -5,7 +5,6 @@
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/config/api_version.h"
-#include "common/config/resource_name.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"
 

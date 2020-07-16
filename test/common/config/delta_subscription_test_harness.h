@@ -9,6 +9,7 @@
 
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/new_grpc_mux_impl.h"
+#include "common/config/resource_name.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/common.h"
 
