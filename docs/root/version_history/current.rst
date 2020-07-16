@@ -28,6 +28,7 @@ Removed Config or Runtime
 
 * http: removed legacy header sanitization and the runtime guard `envoy.reloadable_features.strict_header_validation`.
 * http: removed legacy transfer-encoding enforcement and runtime guard `envoy.reloadable_features.reject_unsupported_transfer_encodings`.
+* http: removed configurable strict host validation and runtime guard `envoy.reloadable_features.strict_authority_validation`.
 
 New Features
 ------------
