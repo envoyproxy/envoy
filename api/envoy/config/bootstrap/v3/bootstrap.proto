@@ -312,13 +312,14 @@ message Watchdog {
   // kill behavior. If not specified the default is 0 (disabled).
   google.protobuf.Duration kill_timeout = 3;
 
-  // If at least two watched threads have been nonresponsive for at least this
-  // duration assume a true deadlock and kill the entire Envoy process. Set to 0
-  // to disable this behavior. If not specified the default is 0 (disabled).
+  // If max(2, ceil(registered_threads * Fraction(multikill_threshold)))
+  // threads have been nonresponsive for at least this duration kill the entire
+  // Envoy process. Set to 0 to disable this behavior. If not specified the
+  // default is 0 (disabled).
   google.protobuf.Duration multikill_timeout = 4;
 
-  // Sets threshold for multikill timeout in terms of the percentage of
-  // Watchdogs being nonresponsive for at least the multikill_timeout.
+  // Sets the threshold for multikill timeout in terms of the percentage of
+  // nonresponsive threads required for the multikill_timeout.
   // If not specified the default is 0.
   type.v3.Percent multikill_threshold = 5;
 }

@@ -66,9 +66,11 @@ public:
   virtual std::chrono::milliseconds wdMultiKillTimeout() const PURE;
 
   /**
-   * @return double the percentage of threads that needs to meet the MultiKillTimeout before we
-   *         kill the process. If it is zero, then it'll fallback to the default behavior of
-   *         killing the process if two threads hit the multikill timeout.
+   * @return double the percentage of threads that need to meet the MultiKillTimeout before we
+   *         kill the process. This is used in the calcuation below
+   *         Max(2, ceil(registered_threads * Fraction(MultiKillThreshold)))
+   *         which computes the number of threads that need to be be nonresponsive
+   *         for at least MultiKillTimeout before we kill the process.
    */
   virtual double wdMultiKillThreshold() const PURE;
 };

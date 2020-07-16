@@ -221,7 +221,7 @@ TEST_P(GuardDogDeathTest, MultiKillThresholdDeathTest) {
 }
 
 TEST_P(GuardDogAlmostDeadTest, MultiKillUnderThreshold) {
-  // This does everything the death test does not except it pets an additional watchdog
+  // This does everything the death test does except it pets an additional watchdog
   // that causes us to be under the threshold (60%) of multikill death.
   auto die_function = [&]() -> void {
     setupForMultiDeathThreshold();
