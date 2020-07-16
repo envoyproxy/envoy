@@ -22,15 +22,17 @@ Api::IoCallUint64Result UdpDefaultWriter::writeToSocket(const Buffer::Instance& 
   if (!isWriteBlocked()) {
     Api::IoCallUint64Result result =
         Utility::writeToSocket(socket_.ioHandle(), buffer, local_ip, peer_address);
-    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-      // writer is blocked when error code received is EWOULDBLOCK/EAGAIN
+    
+    if (result.err_ && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      // Writer is blocked when error code received is EWOULDBLOCK/EAGAIN
       write_blocked_ = true;
     }
+    
     return result;
   }
-
   // Otherwise Return Blocked
   // TODO(yugant) see a better way to create EAGAIN error here
+  ENVOY_LOG_MISC(trace, "Udp Writer is blocked, skip sending");
   return Api::IoCallUint64Result(/*rc=*/0,
                                  /*err=*/Api::IoErrorPtr(new Network::IoSocketError(EAGAIN),
                                                          Network::IoSocketError::deleteIoError));

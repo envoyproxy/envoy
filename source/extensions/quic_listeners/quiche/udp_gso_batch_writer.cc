@@ -38,8 +38,11 @@ UdpGsoBatchWriter::writeToSocket(const Buffer::Instance& buffer,
   if (quic_result.status == quic::WRITE_STATUS_OK) {
     // Write Successful
     if (quic_result.bytes_written == 0) {
+      // TODO(yugant): Add bytes buffered stats, +bytesLen
       ENVOY_LOG_MISC(trace, "sendmsg successful, message buffered to send");
     } else {
+      // TODO(yugant): Use current Bytes Buffered
+      // Add bytes sent stats, +bytesSent
       ENVOY_LOG_MISC(trace, "sendmsg successful, flushed bytes {}", quic_result.bytes_written);
     }
     // Return bytes_written as rc & nullptr as error on success

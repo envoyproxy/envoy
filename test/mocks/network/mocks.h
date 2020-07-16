@@ -328,6 +328,13 @@ public:
   MOCK_METHOD(SocketOptRef, sharedSocket, (), (const));
 };
 
+class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {
+public:
+  MockUdpPacketWriterFactory() = default;
+  
+  MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter, (Network::Socket&), ());
+};
+
 class MockListenerConfig : public ListenerConfig {
 public:
   MockListenerConfig();

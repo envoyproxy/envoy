@@ -9,6 +9,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/network/utility.h"
 
 #include "test/common/network/listener_impl_test_base.h"
@@ -43,6 +44,14 @@ public:
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
+    
+    ON_CALL(listener_config_, udpPacketWriterFactory())
+      .WillByDefault(Return(&udp_packet_writer_factory_));
+    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_))
+      .WillByDefault(Invoke([&](Network::Socket& socket) -> Network::UdpPacketWriterPtr {
+        UdpPacketWriterPtr udp_packet_writer = std::make_unique<Network::UdpDefaultWriter>(socket);
+        return udp_packet_writer;
+      }));
 
     listener_ =
         std::make_unique<UdpListenerImpl>(dispatcherImpl(), server_socket_, listener_callbacks_,
@@ -101,7 +110,8 @@ protected:
   Network::Test::UdpSyncPeer client_{GetParam()};
   Address::InstanceConstSharedPtr send_to_addr_;
   MockUdpListenerCallbacks listener_callbacks_;
-  MockListenerConfig listener_config_;
+  NiceMock<MockListenerConfig> listener_config_;
+  NiceMock<MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   std::unique_ptr<UdpListenerImpl> listener_;
   size_t num_packets_received_by_listener_{0};
 };
@@ -113,7 +123,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
 // Test that socket options are set after the listener is setup.
 TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   MockUdpListenerCallbacks listener_callbacks;
-  MockListenerConfig listener_config;
   auto socket = std::make_shared<Network::UdpListenSocket>(Network::Test::getAnyAddress(version_),
                                                            nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
@@ -121,7 +130,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
-                           dispatcherImpl().timeSource(), listener_config);
+                           dispatcherImpl().timeSource(), listener_config_);
 
 #ifdef SO_RXQ_OVFL
   // Verify that overflow detection is enabled.
