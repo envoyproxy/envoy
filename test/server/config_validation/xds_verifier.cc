@@ -4,9 +4,16 @@
 
 namespace Envoy {
 
-XdsVerifier::XdsVerifier()
+XdsVerifier::XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta)
     : num_warming_(0), num_active_(0), num_draining_(0), num_added_(0), num_modified_(0),
-      num_removed_(0) {}
+      num_removed_(0) {
+  if (sotw_or_delta == test::server::config_validation::Config::SOTW) {
+    sotw_or_delta_ = SOTW;
+  } else {
+    sotw_or_delta_ = DELTA;
+  }
+  ENVOY_LOG_MISC(info, "sotw_or_delta_ = {}", sotw_or_delta_);
+}
 
 /**
  * get the route referenced by a listener
@@ -19,10 +26,14 @@ std::string XdsVerifier::getRoute(const envoy::config::listener::v3::Listener& l
 }
 
 /**
- * @return true iff the route listener refers to is in routes_
+ * @return true iff the route listener refers to is in all_routes_
  */
 bool XdsVerifier::hasRoute(const envoy::config::listener::v3::Listener& listener) {
-  return routes_.contains(getRoute(listener));
+  return all_routes_.contains(getRoute(listener));
+}
+
+bool XdsVerifier::hasActiveRoute(const envoy::config::listener::v3::Listener& listener) {
+  return active_routes_.contains(getRoute(listener));
 }
 
 /**
@@ -75,7 +86,7 @@ void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener
     auto& rep = listeners_[i];
     if (rep.listener.name() == listener.name()) {
       if (rep.state == ACTIVE) {
-        if (hasRoute(listener)) {
+        if (hasActiveRoute(listener)) {
           // if the new listener is ready to take traffic, the old listener will be removed
           // it seems to be directly removed without being added to the config dump as draining
           ENVOY_LOG_MISC(info, "Removing {} after update", listener.name());
@@ -109,6 +120,7 @@ void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener
  */
 void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update) {
   // if the same listener being added is already draining, it will be moved back to active
+  //
   for (auto& rep : listeners_) {
     if (rep.listener.name() == listener.name() && getRoute(rep.listener) == getRoute(listener) &&
         rep.state == DRAINING) {
@@ -125,7 +137,7 @@ void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener, 
     num_added_++;
   }
 
-  if (hasRoute(listener)) {
+  if (hasActiveRoute(listener)) {
     ENVOY_LOG_MISC(info, "Adding {} to listeners_ as ACTIVE", listener.name());
     listeners_.push_back({listener, ACTIVE});
     num_active_++;
@@ -168,42 +180,29 @@ void XdsVerifier::listenerRemoved(const std::string& name) {
 }
 
 /**
- * update a route
- * might be redundant, not sure if its possible to update a route
+ * after a SOTW update, see if any listeners that are currently warming can become active
  */
-void XdsVerifier::routeUpdated(envoy::config::route::v3::RouteConfiguration route) {
-  ENVOY_LOG_MISC(info, "Tried to update {}", route.name());
-  return;
-}
-
-/**
- * add a new route and update any listeners that refer to this route
- */
-void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route) {
-  routes_.insert({route.name(), route});
-  /* bool added = false; */
+void XdsVerifier::updateSotwListeners() {
+  ASSERT(sotw_or_delta_ == SOTW);
   for (auto& rep : listeners_) {
-    if (getRoute(rep.listener) == route.name() && rep.state == WARMING) {
+    // check all_routes_, not active_routes_ since this is SOTW, so any inactive routes will become
+    // active if this listener refers to them
+    if (hasRoute(rep.listener) && rep.state == WARMING) {
       // it should successfully warm now
-      /* if (!added) { */
-      /*   routes_.insert({route.name(), route}); */
-      /*   added = true; */
-      /* } */
       ENVOY_LOG_MISC(info, "Moving {} to ACTIVE state", rep.listener.name());
+
+      // if the route was not originally added as active, change it now
+      if (!hasActiveRoute(rep.listener)) {
+        std::string route_name = getRoute(rep.listener);
+        auto it = all_routes_.find(route_name);
+        // all added routes should be in all_routes_ in SOTW
+        ASSERT(it != all_routes_.end());
+        active_routes_.insert({route_name, it->second});
+      }
 
       // if there were any active listeners that were waiting to be updated, they will now be
       // removed and the warming listener will take their place
-      for (unsigned long i = 0; i < listeners_.size(); ++i) {
-        auto& old_listener = listeners_[i];
-        if (old_listener.listener.name() == rep.listener.name() &&
-            getRoute(old_listener.listener) != route.name() && old_listener.state == ACTIVE) {
-          // mark it as removed to remove it after the loop so as not to invalidate the first
-          // iterator
-          old_listener.state = REMOVED;
-          num_active_--;
-          num_modified_++;
-        }
-      }
+      markForRemoval(rep);
       num_warming_--;
       num_active_++;
       rep.state = ACTIVE;
@@ -212,6 +211,97 @@ void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route)
   listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
                                   [&](auto& listener) { return listener.state == REMOVED; }),
                    listeners_.end());
+}
+
+/**
+ * @param listener a warming listener that has a corresponding active listener of the same name
+ * called after listener receives its route, so it will be moved to active and the old listener will
+ * be removed
+ */
+void XdsVerifier::markForRemoval(ListenerRepresentation& rep) {
+  ASSERT(rep.state == WARMING);
+  // find the old listener and mark it for removal
+  for (unsigned long i = 0; i < listeners_.size(); ++i) {
+    auto& old_listener = listeners_[i];
+    if (old_listener.listener.name() == rep.listener.name() &&
+        getRoute(old_listener.listener) != getRoute(rep.listener) &&
+        old_listener.state == ACTIVE) {
+      // mark it as removed to remove it after the loop so as not to invalidate the iterator in
+      // the caller function
+      old_listener.state = REMOVED;
+      num_active_--;
+      num_modified_++;
+    }
+  }
+
+}
+
+/**
+ * called when a route that was previously added is re-added
+ * the original route might have been ignored if no resources refer to it, so we can add it here
+ */
+void XdsVerifier::routeUpdated(envoy::config::route::v3::RouteConfiguration route) {
+  if (!all_routes_.contains(route.name()) &&
+      std::any_of(listeners_.begin(), listeners_.end(),
+                  [&](auto& rep) { return getRoute(rep.listener) == route.name(); })) {
+    all_routes_.insert({route.name(), route});
+    active_routes_.insert({route.name(), route});
+  }
+  if (sotw_or_delta_ == DELTA) {
+    // sending a new RDS update with the same route name that was sent before and ignored in delta
+    // does not seem to apply updates to any listeners
+    // TODO(samflattery): investigate this
+    ENVOY_LOG_MISC(info, "Tried to update {}", route.name());
+  } else {
+    // more routes might have been sent and updates not applied to listeners, so update them
+    ENVOY_LOG_MISC(info, "Updating {}", route.name());
+    updateSotwListeners();
+  }
+}
+
+/**
+ * add a new route and update any listeners that refer to this route
+ */
+void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route) {
+  // routes that are not referenced by any resource are ignored, so this creates a distinction
+  // between SOTW and delta
+  // if an unreferenced route is sent in delta, it is ignored forever as it will not be sent in
+  // future RDS updates, whereas in SOTW it will be present in all future RDS updates, so if a
+  // listener that refers to it is added in the meantime, it will become active
+
+  // in delta, active_routes_ and all_routes_ should be the same as we only send one route at a
+  // time, so it either becomes active or not
+  if (sotw_or_delta_ == DELTA && std::any_of(listeners_.begin(), listeners_.end(), [&](auto& rep) {
+        return getRoute(rep.listener) == route.name();
+      })) {
+    active_routes_.insert({route.name(), route});
+    all_routes_.insert({route.name(), route});
+  } else if (sotw_or_delta_ == SOTW) {
+    all_routes_.insert({route.name(), route});
+  }
+
+  // find any listeners that reference this route and update them
+  if (sotw_or_delta_ == DELTA) {
+    for (auto& rep : listeners_) {
+      if (getRoute(rep.listener) == route.name() && rep.state == WARMING) {
+        // it should successfully warm now
+        ENVOY_LOG_MISC(info, "Moving {} to ACTIVE state", rep.listener.name());
+
+        // if there were any active listeners that were waiting to be updated, they will now be
+        // removed and the warming listener will take their place
+        markForRemoval(rep);
+        num_warming_--;
+        num_active_++;
+        rep.state = ACTIVE;
+      }
+    }
+    // erase any active listeners that were replaced
+    listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
+                                    [&](auto& listener) { return listener.state == REMOVED; }),
+                     listeners_.end());
+  } else {
+    updateSotwListeners();
+  }
 }
 
 /**

@@ -118,6 +118,8 @@ envoy_cc_test_library(
     srcs = ["xds_verifier.cc"],
     hdrs = ["xds_verifier.h"],
     deps = [
+        ":xds_fuzz_proto_cc_proto",
+        "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

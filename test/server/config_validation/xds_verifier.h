@@ -6,13 +6,16 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 
+#include "test/server/config_validation/xds_fuzz.pb.h"
+
 #include "absl/container/flat_hash_map.h"
+#include "common/common/assert.h"
 
 namespace Envoy {
 
 class XdsVerifier {
 public:
-  XdsVerifier();
+  XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta);
   void listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update = false);
   void listenerUpdated(envoy::config::listener::v3::Listener listener);
   void listenerRemoved(const std::string& name);
@@ -40,10 +43,21 @@ public:
   void dumpState();
 
 private:
+  enum SotwOrDelta { SOTW, DELTA };
+
   std::string getRoute(const envoy::config::listener::v3::Listener& listener);
   bool hasRoute(const envoy::config::listener::v3::Listener& listener);
+  bool hasActiveRoute(const envoy::config::listener::v3::Listener& listener);
+  void updateSotwListeners();
+  void markForRemoval(ListenerRepresentation& rep);
   std::vector<ListenerRepresentation> listeners_;
-  absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration> routes_;
+
+  // envoy ignores routes that are not referenced by any resources
+  // all_routes_ is used for SOTW, as every previous route is sent in each request
+  // active_routes_ holds the routes that envoy knows about, i.e. the routes that are/were
+  // referenced by a listener
+  absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration> all_routes_;
+  absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration> active_routes_;
 
   uint32_t num_warming_;
   uint32_t num_active_;
@@ -52,6 +66,8 @@ private:
   uint32_t num_added_;
   uint32_t num_modified_;
   uint32_t num_removed_;
+
+  SotwOrDelta sotw_or_delta_;
 };
 
 } // namespace Envoy
