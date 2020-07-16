@@ -91,6 +91,8 @@ private:
                 ::envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_RedisFault>
                     faults);
 
+  uint64_t getIntegerNumeratorOfFractionalPercent(
+      absl::string_view key, const envoy::type::v3::FractionalPercent& default_value) const;
   const Fault* getFaultForCommandInternal(const std::string& command) const;
   const FaultMap fault_map_;
 

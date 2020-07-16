@@ -85,6 +85,19 @@ FaultMap FaultManagerImpl::buildFaultMap(
   return fault_map;
 }
 
+uint64_t FaultManagerImpl::getIntegerNumeratorOfFractionalPercent(
+    absl::string_view key, const envoy::type::v3::FractionalPercent& default_value) const {
+  uint64_t numerator;
+  if (default_value.denominator() == envoy::type::v3::FractionalPercent::HUNDRED) {
+    numerator = default_value.numerator();
+  } else {
+    int denominator =
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
+    numerator = (default_value.numerator() * 100) / denominator;
+  }
+  return runtime_.snapshot().getInteger(key, numerator);
+}
+
 // Fault checking algorithm:
 //
 // For example, if we have an ERROR fault at 5% for all commands, and a DELAY fault at 10% for GET,
@@ -103,9 +116,8 @@ const Fault* FaultManagerImpl::getFaultForCommandInternal(const std::string& com
     int amortized_fault = 0;
 
     for (const FaultSharedPtr& fault_ptr : it_outer->second) {
-      uint64_t fault_injection_percentage =
-          runtime_.snapshot().getIntegerNumeratorOfFractionalPercent(
-              fault_ptr->runtimeKey().value(), fault_ptr->defaultValue());
+      uint64_t fault_injection_percentage = getIntegerNumeratorOfFractionalPercent(
+          fault_ptr->runtimeKey().value(), fault_ptr->defaultValue());
       if (random_number < (fault_injection_percentage + amortized_fault)) {
         return fault_ptr.get();
       } else {

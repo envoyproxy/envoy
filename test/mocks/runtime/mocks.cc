@@ -11,7 +11,6 @@ namespace Envoy {
 namespace Runtime {
 
 MockSnapshot::MockSnapshot() {
-  ON_CALL(*this, getIntegerNumeratorOfFractionalPercent(_, _)).WillByDefault(Return(0));
   ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getDouble(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getBoolean(_, _)).WillByDefault(ReturnArg<1>());
