@@ -7,7 +7,7 @@
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 #include "extensions/stat_sinks/well_known_names.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"

@@ -68,7 +68,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:options_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
@@ -98,7 +98,8 @@ envoy_cc_fuzz_test(
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:options_mocks",
+        "//test/test_common:environment_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
