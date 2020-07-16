@@ -17,6 +17,8 @@ namespace Cache {
 
 // Utility functions used in RequestCacheControl & ResponseCacheControl
 namespace {
+// A directive with an invalid duration is ignored, the RFC does not specify a behavior:
+// https://httpwg.org/specs/rfc7234.html#delta-seconds
 OptionalDuration parseDuration(absl::string_view s) {
   OptionalDuration duration;
   // Strip quotation marks if any

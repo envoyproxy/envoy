@@ -4,6 +4,7 @@
 
 #include "envoy/common/time.h"
 
+#include "common/common/macros.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
@@ -56,9 +57,9 @@ struct ResponseCacheControlTestCase {
 
 class RequestCacheControlTest : public testing::TestWithParam<RequestCacheControlTestCase> {
 public:
-  static auto getTestCases() {
+  static const std::vector<RequestCacheControlTestCase>& getTestCases() {
     // clang-format off
-    static const RequestCacheControlTestCase test_cases[] = {
+    CONSTRUCT_ON_FIRST_USE(std::vector<RequestCacheControlTestCase>,
         // Empty header
         {
           "",
@@ -143,18 +144,16 @@ public:
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
           {true, true, false, false, std::chrono::seconds(10), absl::nullopt, absl::nullopt}
         },
-    };
+    );
     // clang-format on
-
-    return &test_cases;
   }
 };
 
 class ResponseCacheControlTest : public testing::TestWithParam<ResponseCacheControlTestCase> {
 public:
-  static auto getTestCases() {
+  static const std::vector<ResponseCacheControlTestCase>& getTestCases() {
     // clang-format off
-    static const ResponseCacheControlTestCase test_cases[] = {
+    CONSTRUCT_ON_FIRST_USE(std::vector<ResponseCacheControlTestCase>,
         // Empty header
         {
           "", 
@@ -264,28 +263,27 @@ public:
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
           {true, true, false, false, false, std::chrono::seconds(10)}
         },
-    };
+    );
     // clang-format on
-
-    return &test_cases;
   }
 };
 
 // TODO(#9872): More tests for httpTime
 class HttpTimeTest : public testing::TestWithParam<std::string> {
 public:
-  static auto getOkTestCases() {
-    const static std::string ok_times[] = {
+  static const std::vector<std::string>& getOkTestCases() {
+    // clang-format off
+    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>,
         "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate
         "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format
         "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format
-    };
-    return &ok_times;
+    );
+    // clang-format on
   }
 };
 
 INSTANTIATE_TEST_SUITE_P(RequestCacheControlTest, RequestCacheControlTest,
-                         testing::ValuesIn(*RequestCacheControlTest::getTestCases()));
+                         testing::ValuesIn(RequestCacheControlTest::getTestCases()));
 
 TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
   absl::string_view cache_control_header = GetParam().cache_control_header;
@@ -294,7 +292,7 @@ TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(ResponseCacheControlTest, ResponseCacheControlTest,
-                         testing::ValuesIn(*ResponseCacheControlTest::getTestCases()));
+                         testing::ValuesIn(ResponseCacheControlTest::getTestCases()));
 
 TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
   absl::string_view cache_control_header = GetParam().cache_control_header;
@@ -302,7 +300,7 @@ TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
   EXPECT_EQ(expected_response_cache_control, ResponseCacheControl(cache_control_header));
 }
 
-INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(*HttpTimeTest::getOkTestCases()));
+INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(HttpTimeTest::getOkTestCases()));
 
 TEST_P(HttpTimeTest, Ok) {
   Http::TestResponseHeaderMapImpl response_headers{{"date", GetParam()}};
