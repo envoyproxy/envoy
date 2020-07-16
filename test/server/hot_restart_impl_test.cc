@@ -8,7 +8,7 @@
 
 #include "test/mocks/api/hot_restart.h"
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/hot_restart.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
