@@ -321,7 +321,7 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
 }
 
 std::pair<HostSet&, LoadBalancerBase::HostAvailability>
-LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
+LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) const {
   if (context) {
     const auto priority_loads = context->determinePriorityLoad(
         priority_set_, per_priority_load_, Upstream::RetryPriority::defaultPriorityMapping);
@@ -525,7 +525,7 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   return host;
 }
 
-bool LoadBalancerBase::isHostSetInPanic(const HostSet& host_set) {
+bool LoadBalancerBase::isHostSetInPanic(const HostSet& host_set) const {
   uint64_t global_panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
   const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
@@ -557,7 +557,7 @@ void ZoneAwareLoadBalancerBase::calculateLocalityPercentage(
   }
 }
 
-uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& host_set) {
+uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& host_set) const {
   PerPriorityState& state = *per_priority_state_[host_set.priority()];
   ASSERT(state.locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
 
@@ -608,7 +608,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 }
 
 absl::optional<ZoneAwareLoadBalancerBase::HostsSource>
-ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
+ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) const {
   auto host_set_and_source = chooseHostSet(context);
 
   // The second argument tells us which availability we should target from the selected host set.
@@ -674,7 +674,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   return hosts_source;
 }
 
-const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts_source) {
+const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts_source) const {
   const HostSet& host_set = *priority_set_.hostSetsPerPriority()[hosts_source.priority_];
   switch (hosts_source.source_type_) {
   case HostsSource::SourceType::AllHosts:
@@ -775,6 +775,32 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
 }
 
+HostConstSharedPtr EdfLoadBalancerBase::peekHostOnce(LoadBalancerContext* context) const {
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  if (!hosts_source) {
+    return nullptr;
+  }
+  auto scheduler_it = scheduler_.find(*hosts_source);
+  // We should always have a scheduler for any return value from
+  // hostSourceToUse() via the construction in refresh();
+  ASSERT(scheduler_it != scheduler_.end());
+  auto& scheduler = scheduler_it->second;
+
+  // As has been commented in both EdfLoadBalancerBase::refresh and
+  // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
+  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
+  // of 2 or more hosts differ.
+  if (scheduler.edf_ != nullptr) {
+    return scheduler.edf_->pick();
+  } else {
+    const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
+    if (hosts_to_use.empty()) {
+      return nullptr;
+    }
+    return unweightedHostPeek(hosts_to_use, *hosts_source);
+  }
+}
+
 HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
   if (!hosts_source) {
@@ -805,6 +831,14 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   }
 }
 
+HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector&,
+                                                                const HostsSource&) const {
+  // LeastRequestLoadBalancer can not do deterministic prefetching, because
+  // any other thread might select the least-requested-host between prefetch and
+  // host-pick, and change the rq_active checks.
+  return nullptr;
+}
+
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
                                                                 const HostsSource&) {
   HostSharedPtr candidate_host = nullptr;
@@ -828,6 +862,24 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   return candidate_host;
 }
 
+HostConstSharedPtr RandomLoadBalancer::peekHostOnce(LoadBalancerContext* context) const {//FIXME stash random
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  if (!hosts_source) {
+    return nullptr;
+  }
+
+  const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
+  if (hosts_to_use.empty()) {
+    return nullptr;
+  }
+
+  if (!stashed_random_.has_value()) {
+    *const_cast<absl::optional<uint64_t>*>(&stashed_random_) = random_.random();
+  }
+
+  return hosts_to_use[stashed_random_.value() % hosts_to_use.size()];
+}
+
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
   if (!hosts_source) {
@@ -839,7 +891,15 @@ HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* conte
     return nullptr;
   }
 
-  return hosts_to_use[random_.random() % hosts_to_use.size()];
+  uint64_t random;
+  if (stashed_random_.has_value()) {
+    random = stashed_random_.value();
+    stashed_random_ = absl::nullopt;
+  } else {
+    random = random_.random();
+  }
+
+  return hosts_to_use[random % hosts_to_use.size()];
 }
 
 SubsetSelectorImpl::SubsetSelectorImpl(

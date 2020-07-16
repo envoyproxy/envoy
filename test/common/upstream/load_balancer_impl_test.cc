@@ -68,6 +68,9 @@ public:
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  HostConstSharedPtr peekHostOnce(LoadBalancerContext*) const override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {

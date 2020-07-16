@@ -25,6 +25,23 @@ namespace Upstream {
 // weights and an O(log n) pick time.
 template <class C> class EdfScheduler {
 public:
+  // Peek is not technically const because it will pop expired entries. We use a const cast
+  // so we can generally ensure that PeekBackend operations do not affect the
+  // next pick. Popping the expired entries does not affect the next pick as
+  // entires can not transition from expired to not expired.
+  std::shared_ptr<C> peek() const {
+    while (!queue_.empty()) {
+      if (queue_.top().entry_.expired()) {
+        std::priority_queue<EdfEntry>* const_casted_queue =
+            const_cast<std::priority_queue<EdfEntry>*>(&queue_);
+        const_casted_queue->pop();
+      } else {
+        return std::shared_ptr<C>{queue_.top().entry_};
+      }
+    }
+    return nullptr;
+  }
+
   /**
    * Pick queue entry with closest deadline.
    * @return std::shared_ptr<C> to the queue entry if a valid entry exists in the queue, nullptr

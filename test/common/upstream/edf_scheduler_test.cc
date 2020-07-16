@@ -8,6 +8,7 @@ namespace {
 
 TEST(EdfSchedulerTest, Empty) {
   EdfScheduler<uint32_t> sched;
+  EXPECT_EQ(nullptr, sched.peek());
   EXPECT_EQ(nullptr, sched.pick());
 }
 
@@ -24,8 +25,10 @@ TEST(EdfSchedulerTest, Unweighted) {
 
   for (uint32_t rounds = 0; rounds < 128; ++rounds) {
     for (uint32_t i = 0; i < num_entries; ++i) {
+      auto peek = sched.peek();
       auto p = sched.pick();
       EXPECT_EQ(i, *p);
+      EXPECT_EQ(*peek, *p);
       sched.add(1, p);
     }
   }
@@ -45,7 +48,9 @@ TEST(EdfSchedulerTest, Weighted) {
   }
 
   for (uint32_t i = 0; i < (num_entries * (1 + num_entries)) / 2; ++i) {
+    auto peek = sched.peek();
     auto p = sched.pick();
+    EXPECT_EQ(*p, *peek);
     ++pick_count[*p];
     sched.add(*p + 1, p);
   }
@@ -66,8 +71,11 @@ TEST(EdfSchedulerTest, Expired) {
     sched.add(1, second_entry);
   }
 
+  auto peek = sched.peek();
   auto p = sched.pick();
+  EXPECT_EQ(*peek, *p);
   EXPECT_EQ(*second_entry, *p);
+  EXPECT_EQ(nullptr, sched.peek());
   EXPECT_EQ(nullptr, sched.pick());
 }
 

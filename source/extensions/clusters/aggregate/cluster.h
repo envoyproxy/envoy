@@ -97,6 +97,9 @@ private:
     Upstream::HostConstSharedPtr chooseHostOnce(Upstream::LoadBalancerContext*) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
+    Upstream::HostConstSharedPtr peekHostOnce(Upstream::LoadBalancerContext*) const override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
 
     absl::optional<uint32_t> hostToLinearizedPriority(const Upstream::HostDescription& host) const;
 

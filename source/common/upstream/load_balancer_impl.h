@@ -56,13 +56,15 @@ protected:
    * retrying host selection.
    */
   virtual HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) PURE;
+  // FIXME Comment
+  virtual HostConstSharedPtr peekHostOnce(LoadBalancerContext* context) const PURE;
 
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
    * requests to hosts regardless of whether they are healthy or not.
    */
-  bool isHostSetInPanic(const HostSet& host_set);
+  bool isHostSetInPanic(const HostSet& host_set) const;
 
   /**
    * Method is called when all host sets are in panic mode.
@@ -81,7 +83,7 @@ protected:
   // degraded_per_priority_load_, only degraded hosts should be selected from that host set.
   //
   // @return host set to use and which availability to target.
-  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context);
+  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context) const;
 
   uint32_t percentageLoad(uint32_t priority) const {
     return per_priority_load_.healthy_priority_load_.get()[priority];
@@ -240,12 +242,12 @@ protected:
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
    * If no host is chosen (due to fail_traffic_on_panic being set), return absl::nullopt.
    */
-  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context);
+  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context) const;
 
   /**
    * Index into priority_set via hosts source descriptor.
    */
-  const HostVector& hostSourceToHosts(HostsSource hosts_source);
+  const HostVector& hostSourceToHosts(HostsSource hosts_source) const;
 
 private:
   enum class LocalityRoutingState {
@@ -273,7 +275,7 @@ private:
    * Try to select upstream hosts from the same locality.
    * @param host_set the last host set returned by chooseHostSet()
    */
-  uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set);
+  uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set) const;
 
   /**
    * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
@@ -359,6 +361,7 @@ public:
                       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancerBase
+  HostConstSharedPtr peekHostOnce(LoadBalancerContext* context) const override;
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
 protected:
@@ -383,6 +386,8 @@ protected:
 private:
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) PURE;
+  virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
+                                                const HostsSource& source) const PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
 
@@ -413,6 +418,17 @@ private:
     rr_indexes_.insert({source, seed_});
   }
   double hostWeight(const Host& host) override { return host.weight(); }
+  HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
+                                        const HostsSource& source) const override {
+    // To avoid storing the RR index in the base class, we end up using a second map here with
+    // host source as the key. This means that each LB decision will require two map lookups in
+    // the unweighted case. We might consider trying to optimize this in the future.
+    if (rr_indexes_.find(source) == rr_indexes_.end()) {
+      return nullptr;
+    }
+    const uint64_t val = rr_indexes_.find(source)->second;
+    return hosts_to_use[val % hosts_to_use.size()];
+  }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override {
     // To avoid storing the RR index in the base class, we end up using a second map here with
@@ -510,6 +526,8 @@ private:
     return static_cast<double>(host.weight()) /
            std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
   }
+  HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
+                                        const HostsSource& source) const override;
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
 
@@ -536,6 +554,10 @@ public:
 
   // Upstream::LoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
+  HostConstSharedPtr peekHostOnce(LoadBalancerContext* context) const override;
+
+protected:
+  absl::optional<uint64_t> stashed_random_;
 };
 
 /**
