@@ -18,14 +18,20 @@ Example configuration
 
    http_filters:
    - name: oauth2
-     config:
-       credentials:
-         client_id: a
-         client_secret: b
-         token_secret: c
-       secrets_cluster: local_sds
-       cluster: auth
-       hostname: auth.example.com
+     typed_config:
+       "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+       cluster: oauth
+      hostname: oauth.com
+      callback_path: /callback
+      signout_path: /signout
+      token_path: /token
+      credentials:
+        client_id: foo
+        token_secret:
+          name: token
+        hmac_secret:
+          name: hmac
+      timeout: 3s
    - name: envoy.router
 
   clusters:
