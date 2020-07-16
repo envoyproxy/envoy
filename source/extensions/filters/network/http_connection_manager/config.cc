@@ -521,8 +521,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
     const std::string& name, const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
     FilterFactoriesList& filter_factories, const char* filter_chain_type,
     bool last_filter_in_current_config) {
-  ENVOY_LOG(debug, "      name: {}", name);
-  ENVOY_LOG(debug, " discovery: {}", MessageUtil::getJsonStringFromMessage(config_discovery));
+  ENVOY_LOG(debug, "      dynamic filter name: {}", name);
   if (config_discovery.apply_default_config_without_warming() &&
       !config_discovery.has_default_config()) {
     throw EnvoyException(fmt::format(

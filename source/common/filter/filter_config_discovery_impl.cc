@@ -112,6 +112,8 @@ void HttpFilterConfigSubscription::onConfigUpdate(
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           filter_config);
   // Ensure that the filter config is valid in the filter chain context once the proto is processed.
+  // Validation happens before updating to prevent a partial update application. It might be
+  // possible that the providers have distinct type URL constraints.
   for (auto* provider : filter_config_providers_) {
     provider->validateConfig(filter_config.typed_config(), factory);
   }
