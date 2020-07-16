@@ -36,7 +36,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionImplTest, DeltaSubscriptionImplTest,
-                         ::testing::Combine(SUPPORTED_API_VERSIONS));
+                         ::testing::Combine(SUPPORTED_MAJOR_API_VERSION));
 
 TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   startSubscription({"name1", "name2", "name3"});
@@ -89,7 +89,7 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version1A");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version1A"));
     message->set_nonce(nonce);
-    message->set_type_url(type_url_);
+    message->set_type_url(cluster_load_assignment_type_url_);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message), control_plane_stats_);
@@ -103,7 +103,7 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version2A");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version2A"));
     message->set_nonce(nonce);
-    message->set_type_url(type_url_);
+    message->set_type_url(cluster_load_assignment_type_url_);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message), control_plane_stats_);
@@ -117,17 +117,14 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version1B");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version1B"));
     message->set_nonce(nonce);
-    message->set_type_url(type_url_);
+    message->set_type_url(cluster_load_assignment_type_url_);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // All ACK sendMessage()s will happen upon calling resume()
-  if (isMajorVersion()) {
-    expectSendRawMessage<envoy::service::discovery::v3::DeltaDiscoveryRequest>();
-  } else {
-    expectSendRawMessage<envoy::api::v2::DeltaDiscoveryRequest>();
-  }
+  ASSERT(isV3MajorVersion());
+  expectSendRawMessage<envoy::service::discovery::v3::DeltaDiscoveryRequest>();
 
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.

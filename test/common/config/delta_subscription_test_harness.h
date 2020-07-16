@@ -47,9 +47,9 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
         local_info_);
-    subscription_ =
-        std::make_unique<GrpcSubscriptionImpl>(xds_context_, callbacks_, resource_decoder_, stats_,
-                                               type_url_, dispatcher_, init_fetch_timeout, false);
+    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
+        xds_context_, callbacks_, resource_decoder_, stats_, cluster_load_assignment_type_url_,
+        dispatcher_, init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
@@ -120,7 +120,7 @@ public:
       nonce_acks_required_.push(last_response_nonce_);
       last_response_nonce_ = "";
     }
-    expected_request.set_type_url(type_url_);
+    expected_request.set_type_url(cluster_load_assignment_type_url_);
 
     for (auto const& resource : initial_resource_versions) {
       (*expected_request.mutable_initial_resource_versions())[resource.first] = resource.second;
@@ -132,13 +132,11 @@ public:
       error_detail->set_message(error_message);
     }
 
-    if (isMajorVersion()) {
-      expectSendRawMessage<envoy::service::discovery::v3::DeltaDiscoveryRequest>(expected_request);
-    } else {
-      envoy::api::v2::DeltaDiscoveryRequest downgraded_request;
-      downgraded_request.CopyFrom(API_DOWNGRADE(expected_request));
-      expectSendRawMessage<envoy::api::v2::DeltaDiscoveryRequest>(downgraded_request);
-    }
+    // Ensure this test is executed only V3 majorly supported api version.
+    // We can switch the knob for the previous transport API version testing by using
+    // VersionedSubscriptionTestHarness.
+    ASSERT(isV3MajorVersion());
+    expectSendRawMessage<envoy::service::discovery::v3::DeltaDiscoveryRequest>(expected_request);
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -147,7 +145,7 @@ public:
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_system_version_info(version);
-    response->set_type_url(type_url_);
+    response->set_type_url(cluster_load_assignment_type_url_);
 
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
@@ -158,8 +156,8 @@ public:
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(isMajorVersion() ? *load_assignment
-                                                                : API_DOWNGRADE(*load_assignment));
+        ASSERT(isV3MajorVersion());
+        resource->mutable_resource()->PackFrom(*load_assignment);
       }
     }
     Protobuf::RepeatedPtrField<std::string> removed_resources;
@@ -171,10 +169,8 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
-
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(response), control_plane_stats_);
-
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -209,7 +205,7 @@ public:
   void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
   std::string versionedStreamEndpointResourceName() {
-    if (isMajorVersion()) {
+    if (isV3MajorVersion()) {
       return "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints";
     } else {
       return "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints";
@@ -235,6 +231,9 @@ public:
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};
+  const std::string cluster_load_assignment_type_url_{
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          std::get<0>(GetParam()))};
 };
 
 } // namespace
