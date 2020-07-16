@@ -890,8 +890,8 @@ ClusterImplBase::ClusterImplBase(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
   info_ = std::make_unique<ClusterInfoImpl>(
       cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_matcher),
-      std::move(stats_scope), factory_context.clusterManager().loadReportStatsStore(), added_via_api,
-      factory_context.messageValidationVisitor(), factory_context);
+      std::move(stats_scope), factory_context.clusterManager().loadReportStatsStore(),
+      added_via_api, factory_context.messageValidationVisitor(), factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);

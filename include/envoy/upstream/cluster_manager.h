@@ -241,7 +241,8 @@ public:
   virtual const absl::optional<std::string>& localClusterName() const PURE;
 
   /**
-   * @return Pointer to the load report stats store. The pointer is nullptr if store is not initialized
+   * @return Pointer to the load report stats store. The pointer is nullptr if store is not
+   * initialized
    */
   virtual Stats::StoreRootPtr& loadReportStatsStore() PURE;
 
