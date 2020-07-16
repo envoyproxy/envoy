@@ -66,6 +66,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
                                                      bool end_stream) {
   // If lookup_ is null, the request wasn't cacheable, so the response isn't either.
   if (lookup_ && request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers)) {
+    // TODO(yosrym93): Add date internal header or metadata to cached responses and use it instead
+    // of the date header
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);

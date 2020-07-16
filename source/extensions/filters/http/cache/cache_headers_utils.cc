@@ -154,8 +154,9 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   // Sun, 06 Nov 1994 08:49:37 GMT    ; IMF-fixdate
   // Sunday, 06-Nov-94 08:49:37 GMT   ; obsolete RFC 850 format
   // Sun Nov  6 08:49:37 1994         ; ANSI C's asctime() format
-  static const auto& rfc7231_date_formats = *new std::array<std::string, 3>{
-      "%a, %d %b %Y %H:%M:%S GMT", "%A, %d-%b-%y %H:%M:%S GMT", "%a %b %e %H:%M:%S %Y"};
+  static const char* rfc7231_date_formats[] = {"%a, %d %b %Y %H:%M:%S GMT",
+                                               "%A, %d-%b-%y %H:%M:%S GMT", "%a %b %e %H:%M:%S %Y"};
+
   for (const std::string& format : rfc7231_date_formats) {
     if (absl::ParseTime(format, input, &time, nullptr)) {
       return ToChronoTime(time);

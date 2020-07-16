@@ -81,10 +81,13 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
   const ResponseCacheControl response_cache_control(cache_control);
 
   SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
+
+  if (timestamp_ < response_time) {
+    // Response time is in the future, validate response
+    return true;
+  }
+
   SystemTime::duration response_age = timestamp_ - response_time;
-
-  ASSERT(response_age >= std::chrono::seconds(0), "Response time is in the future.");
-
   bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
                                   request_cache_control_.max_age_.value() < response_age;
   if (response_cache_control.must_validate_ || request_cache_control_.must_validate_ ||

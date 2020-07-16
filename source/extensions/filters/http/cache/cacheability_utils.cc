@@ -1,5 +1,6 @@
 #include "extensions/filters/http/cache/cacheability_utils.h"
 
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 
 namespace Envoy {
@@ -8,18 +9,15 @@ namespace HttpFilters {
 namespace Cache {
 
 namespace {
-
-bool static isCacheableStatusCode(absl::string_view status_code) {
+const absl::flat_hash_set<absl::string_view>& cacheableStatusCodes() {
   // As defined by:
   // https://tools.ietf.org/html/rfc7231#section-6.1,
   // https://tools.ietf.org/html/rfc7538#section-3,
   // https://tools.ietf.org/html/rfc7725#section-3
   // TODO(yosrym93): the list of cacheable status codes should be configurable
-  static const auto& cacheable_status_codes = *new absl::flat_hash_set<absl::string_view>{
-      "200", "203", "204", "206", "300", "301", "308", "404", "405", "410", "414", "451", "501"};
-  return cacheable_status_codes.contains(status_code);
+  CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<absl::string_view>, "200", "203", "204", "206", "300",
+                         "301", "308", "404", "405", "410", "414", "451", "501");
 }
-
 } // namespace
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -46,12 +44,11 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   // Only cache responses with explicit validation data, either:
   //    max-age or s-maxage cache-control directives with date header
   //    expires header
-  // TODO(yosrym93): If the response has no date header inject date metadata
   bool has_validation_data = (headers.Date() && response_cache_control.max_age_.has_value()) ||
                              headers.get(Http::Headers::get().Expires);
 
-  return !response_cache_control.no_store_ && isCacheableStatusCode(headers.getStatusValue()) &&
-         has_validation_data;
+  return !response_cache_control.no_store_ &&
+         cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data;
 }
 
 } // namespace Cache

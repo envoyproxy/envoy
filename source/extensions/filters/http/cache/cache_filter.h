@@ -55,9 +55,11 @@ private:
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
-  bool response_has_trailers_;
+  bool response_has_trailers_ = false;
 
-  bool request_allows_inserts_;
+  // True if a request allows cache inserts according to:
+  // https://httpwg.org/specs/rfc7234.html#response.cacheability
+  bool request_allows_inserts_ = false;
 
   // Used for coordinating between decodeHeaders and onHeaders.
   enum class GetHeadersState { Initial, FinishedGetHeadersCall, GetHeadersResultUnusable };
