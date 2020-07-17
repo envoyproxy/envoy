@@ -222,12 +222,11 @@ private:
       // away with just resetting it to the HCM filter_state_.
       if (filter_manager_.streamInfo().filterState()->hasDataAtOrAboveLifeSpan(
               StreamInfo::FilterState::LifeSpan::Request)) {
-        // TODO something needs to be done here so we can reset the FilterState
-        // (*connection_manager_.streams_.begin())->filter_manager_.streamInfo().stream_info_.filter_state_
-        // =
-        //     std::make_shared<StreamInfo::FilterStateImpl>(
-        //         parent_.stream_info_.filter_state_->parent(),
-        //         StreamInfo::FilterState::LifeSpan::FilterChain);
+        // TODO(snowp): Remove direct access to stream info?
+        (*connection_manager_.streams_.begin())->filter_manager_.stream_info_.filter_state_ =
+            std::make_shared<StreamInfo::FilterStateImpl>(
+                filter_manager_.stream_info_.filter_state_->parent(),
+                StreamInfo::FilterState::LifeSpan::FilterChain);
       }
 
       new_stream.decodeHeaders(std::move(request_headers), true);

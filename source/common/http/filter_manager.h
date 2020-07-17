@@ -70,12 +70,6 @@ public:
         proxy_100_continue_(proxy_100_continue) {}
 
   ~FilterManager() {
-    // TODO(snowp): Add all these access loggers to access_log_handlers_
-    // for (const AccessLog::InstanceSharedPtr& access_log :
-    //      connection_manager_.config_.accessLogs()) {
-    //   access_log->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-    //                   stream_info_);
-    // }
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                        stream_info_);
@@ -721,8 +715,9 @@ private:
 public:
   const std::string* decorated_operation_{nullptr};
 
-private:
   StreamInfo::StreamInfoImpl stream_info_;
+
+private:
   FilterManagerCallbacks& callbacks_;
 
 public:
