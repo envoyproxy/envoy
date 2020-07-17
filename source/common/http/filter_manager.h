@@ -51,6 +51,8 @@ public:
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 
   virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
+  virtual void onFilterAboveWriteBufferHighWatermark() PURE;
+  virtual void onFilterBelowWriteBufferLowWatermark() PURE;
 };
 
 // Manages an iteration of a set of HTTP decoder/encoder filters.

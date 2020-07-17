@@ -175,6 +175,20 @@ private:
     }
     void finalize100ContinueHeaders(ResponseHeaderMap& headers) override;
     Tracing::Config& tracingConfig() override { return *this; }
+    void onFilterAboveWriteBufferHighWatermark() override {
+      ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
+      response_encoder_->getStream().readDisable(true);
+      connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
+    }
+    void onFilterBelowWriteBufferLowWatermark() override {
+      ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", *this);
+      // If the state is destroyed, the codec's stream is already torn down. On
+      // teardown the codec will unwind any remaining read disable calls.
+      if (!filter_manager_.state_.destroyed_) {
+        response_encoder_->getStream().readDisable(false);
+      }
+      connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
+    }
 
     virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> cachedClusterInfo() override {
       return cached_cluster_info_;
