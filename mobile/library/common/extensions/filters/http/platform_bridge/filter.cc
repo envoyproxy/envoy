@@ -49,17 +49,14 @@ Http::FilterHeadersStatus PlatformBridgeFilter::onHeaders(Http::HeaderMap& heade
   envoy_filter_headers_status result =
       on_headers(in_headers, end_stream, platform_filter_->context);
   Http::FilterHeadersStatus status = mapStatus(result.status);
-  // Current platform implementations expose immutable headers, thus any modification necessitates a
-  // full copy. If the returned pointer is identical, we assume no modification was made and elide
-  // the copy here. See also https://github.com/lyft/envoy-mobile/issues/949 for potential future
-  // optimization.
-  if (in_headers.headers != result.headers.headers) {
-    headers.clear();
-    for (envoy_header_size_t i = 0; i < result.headers.length; i++) {
-      headers.addCopy(
-          Http::LowerCaseString(Http::Utility::convertToString(result.headers.headers[i].key)),
-          Http::Utility::convertToString(result.headers.headers[i].value));
-    }
+  // TODO(goaway): Current platform implementations expose immutable headers, thus any modification
+  // necessitates a full copy. Add 'modified' bit to determine when we can elide the copy. See also
+  // https://github.com/lyft/envoy-mobile/issues/949 for potential future optimization.
+  headers.clear();
+  for (envoy_header_size_t i = 0; i < result.headers.length; i++) {
+    headers.addCopy(
+        Http::LowerCaseString(Http::Utility::convertToString(result.headers.headers[i].key)),
+        Http::Utility::convertToString(result.headers.headers[i].value));
   }
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(result.headers);
