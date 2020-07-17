@@ -229,9 +229,6 @@ public:
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
 
-  // Set legacy codecs to use for upstream and downstream codecs.
-  void setLegacyCodecs();
-
 private:
   static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
     return api_version == envoy::config::core::v3::ApiVersion::V2;
