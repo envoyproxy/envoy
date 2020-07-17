@@ -223,8 +223,7 @@ void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listen
 absl::optional<std::reference_wrapper<const absl::string_view>>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
-      headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
+  if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
   }
   return absl::nullopt;
