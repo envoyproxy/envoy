@@ -67,7 +67,7 @@ public:
 
   /**
    * @return double the percentage of threads that need to meet the MultiKillTimeout before we
-   *         kill the process. This is used in the calcuation below
+   *         kill the process. This is used in the calculation below
    *         Max(2, ceil(registered_threads * Fraction(MultiKillThreshold)))
    *         which computes the number of threads that need to be be nonresponsive
    *         for at least MultiKillTimeout before we kill the process.
