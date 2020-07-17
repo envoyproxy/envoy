@@ -208,7 +208,7 @@ void XdsVerifier::updateSotwListeners() {
 void XdsVerifier::markForRemoval(ListenerRepresentation& rep) {
   ASSERT(rep.state == WARMING);
   // find the old listener and mark it for removal
-  for (auto& old_rep : listeners) {
+  for (auto& old_rep : listeners_) {
     if (old_rep.listener.name() == rep.listener.name() &&
         getRoute(old_rep.listener) != getRoute(rep.listener) && old_rep.state == ACTIVE) {
       // mark it as removed to remove it after the loop so as not to invalidate the iterator in
