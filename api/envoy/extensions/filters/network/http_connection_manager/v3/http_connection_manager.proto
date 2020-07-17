@@ -613,7 +613,7 @@ message ResponseMapper {
   google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
   // The new local reply body text if specified. It will be used in the `%LOCAL_REPLY_BODY%`
-  // command operator in the `body_foramt`.
+  // command operator in the `body_format`.
   config.core.v3.DataSource body = 3;
 
   // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
