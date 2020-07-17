@@ -295,7 +295,7 @@ envoy_cc_test(
         "abseil_strings",
     ],
     deps = [
-        "//source/common/common:version_lib",
+        "//source/common/version:version_lib",
     ],
 )
 
