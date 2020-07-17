@@ -35,7 +35,7 @@ private:
                     std::weak_ptr<ReadyFnSendName> fn);
 
 public:
-  // Init::WatcherHandle
+  // Init::WatcherHandle.
   bool ready() const override;
 
 private:
@@ -71,7 +71,7 @@ public:
   WatcherImpl(absl::string_view name, ReadyFnSendName fn);
   ~WatcherImpl() override;
 
-  // Init::Watcher
+  // Init::Watcher.
   absl::string_view name() const override;
   WatcherHandlePtr createHandle(absl::string_view handle_name) const override;
 
