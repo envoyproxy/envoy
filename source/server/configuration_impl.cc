@@ -97,7 +97,6 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
 
   // Adjust kill timeout if we have skew enabled.
   if (kill_timeout > 0 && max_kill_timeout_jitter > 0) {
-
     // Increments the kill timeout with a random value in (0, max_skew].
     // We shouldn't have overflow issues due to the range of Duration.
     // This won't be entirely uniform, depending on how large max_skew
