@@ -904,9 +904,6 @@ def checkApiShadowStarlarkFiles(api_shadow_root, file_path, error_messages):
   api_shadow_starlark_path = api_shadow_root + re.sub(r"\./api/", '', file_path)
   command += api_shadow_starlark_path
 
-  if not os.path.exists(api_shadow_starlark_path):
-    return error_messages
-
   error_message = executeCommand(command, "invalid .bzl in generated_api_shadow", file_path)
   if operation_type == "check":
     error_messages += error_message
