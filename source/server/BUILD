@@ -114,6 +114,7 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
+        "//include/envoy/server:guarddog_config_interface",
         "//include/envoy/server:guarddog_interface",
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
@@ -121,8 +122,10 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/config:utility_lib",
         "//source/common/event:libevent_lib",
         "//source/common/stats:symbol_table_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 

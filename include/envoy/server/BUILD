@@ -71,6 +71,18 @@ envoy_cc_library(
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread:thread_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "guarddog_config_interface",
+    hdrs = ["guarddog_config.h"],
+    deps = [
+        ":guarddog_interface",
+        "//include/envoy/api:api_interface",
+        "//include/envoy/protobuf:message_validator_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 

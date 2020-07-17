@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
@@ -124,6 +125,9 @@ private:
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
+  using WatchDogEvent = envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent;
+  using EventToCallbackMap = std::unordered_map<WatchDogEvent, std::vector<GuardDogActionCb>>;
+  EventToCallbackMap event_to_callbacks_;
   std::vector<WatchedDogPtr> watched_dogs_ ABSL_GUARDED_BY(wd_lock_);
   Thread::MutexBasicLockable wd_lock_;
   Thread::ThreadPtr thread_;
