@@ -128,13 +128,10 @@ static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& he
 void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_headers,
                                               const HeaderMap& headers) {
   final_headers.reserve(headers.size());
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        std::vector<nghttp2_nv>* final_headers = static_cast<std::vector<nghttp2_nv>*>(context);
-        insertHeader(*final_headers, header);
-        return HeaderMap::Iterate::Continue;
-      },
-      &final_headers);
+  headers.iterate([&final_headers](const HeaderEntry& header) -> HeaderMap::Iterate {
+    insertHeader(final_headers, header);
+    return HeaderMap::Iterate::Continue;
+  });
 }
 
 void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
@@ -492,7 +489,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
-          http2_options.stream_error_on_invalid_http_messaging()),
+          http2_options.override_stream_error_on_invalid_http_message().value()),
       flood_detected_(false), max_outbound_frames_(http2_options.max_outbound_frames().value()),
       frame_buffer_releasor_([this]() { releaseOutboundFrame(); }),
       max_outbound_control_frames_(http2_options.max_outbound_control_frames().value()),
@@ -756,6 +753,11 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   }
   }
 
+  return 0;
+}
+
+int ConnectionImpl::onError(absl::string_view error) {
+  ENVOY_CONN_LOG(debug, "invalid http2: {}", connection_, error);
   return 0;
 }
 
@@ -1170,6 +1172,11 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
          void* user_data) -> ssize_t {
         ASSERT(frame->hd.length <= len);
         return static_cast<ConnectionImpl*>(user_data)->packMetadata(frame->hd.stream_id, buf, len);
+      });
+
+  nghttp2_session_callbacks_set_error_callback2(
+      callbacks_, [](nghttp2_session*, int, const char* msg, size_t len, void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onError(absl::string_view(msg, len));
       });
 }
 

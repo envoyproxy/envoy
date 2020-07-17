@@ -58,30 +58,40 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
 
     std::string config_yaml;
-    if (region_in_env_) {
+    switch (region_location_) {
+    case RegionLocation::InEnvironment:
       TestEnvironment::setEnvVar("AWS_REGION", region_name_, 1);
+      ABSL_FALLTHROUGH_INTENDED;
+    case RegionLocation::NotProvided:
       config_yaml = fmt::format(R"EOF(
 "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
 service_name: {}
 )EOF",
                                 service_name_);
-    } else {
+      break;
+    case RegionLocation::InConfig:
       config_yaml = fmt::format(R"EOF(
 "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
 service_name: {}
 region: {}
 )EOF",
                                 service_name_, region_name_);
+      break;
     }
 
     auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
     plugin_config->set_name(credentials_factory_name_);
-    envoy::config::grpc_credential::v3::AwsIamConfig metadata_config;
     Envoy::TestUtility::loadFromYaml(config_yaml, *plugin_config->mutable_typed_config());
     return config;
   }
 
-  bool region_in_env_{};
+  enum class RegionLocation {
+    NotProvided,
+    InEnvironment,
+    InConfig,
+  };
+
+  RegionLocation region_location_ = RegionLocation::NotProvided;
   std::string service_name_{};
   std::string region_name_{};
   std::string credentials_factory_name_{};
@@ -94,6 +104,7 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_ConfigRegion) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   service_name_ = "test_service";
   region_name_ = "test_region_static";
+  region_location_ = RegionLocation::InConfig;
   credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
   initialize();
   auto request = createRequest(empty_metadata_);
@@ -105,12 +116,21 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_EnvRegion) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   service_name_ = "test_service";
   region_name_ = "test_region_env";
-  region_in_env_ = true;
+  region_location_ = RegionLocation::InEnvironment;
   credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
+}
+
+TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_NoRegion) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  service_name_ = "test_service";
+  region_name_ = "test_region_env";
+  region_location_ = RegionLocation::NotProvided;
+  credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
+  EXPECT_THROW_WITH_REGEX(initialize();, EnvoyException, "AWS region");
 }
 
 } // namespace

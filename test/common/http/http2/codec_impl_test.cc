@@ -17,6 +17,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
@@ -181,7 +182,8 @@ public:
         (tp.has_value()) ? ::testing::get<SettingsTupleIndex::InitialConnectionWindowSize>(*tp)
                          : CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
     options.set_allow_metadata(allow_metadata_);
-    options.set_stream_error_on_invalid_http_messaging(stream_error_on_invalid_http_messaging_);
+    options.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        stream_error_on_invalid_http_messaging_);
     options.mutable_max_outbound_frames()->set_value(max_outbound_frames_);
     options.mutable_max_outbound_control_frames()->set_value(max_outbound_control_frames_);
     options.mutable_max_consecutive_inbound_frames_with_empty_payload()->set_value(
@@ -494,7 +496,11 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
     response_headers.addCopy(std::to_string(i), std::to_string(i));
   }
 
-  EXPECT_THROW(response_encoder_->encodeHeaders(response_headers, false), ClientCodecError);
+  EXPECT_LOG_CONTAINS(
+      "debug",
+      "Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], "
+      "value: [3]",
+      EXPECT_THROW(response_encoder_->encodeHeaders(response_headers, false), ClientCodecError));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
 };
 

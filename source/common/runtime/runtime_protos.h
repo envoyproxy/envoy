@@ -38,6 +38,8 @@ public:
       : runtime_key_(runtime_key), default_value_(default_value), runtime_(runtime) {}
   virtual ~Double() = default;
 
+  const std::string& runtimeKey() const { return runtime_key_; }
+
   virtual double value() const {
     return runtime_.snapshot().getDouble(runtime_key_, default_value_);
   }
