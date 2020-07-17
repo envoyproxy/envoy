@@ -151,6 +151,10 @@ void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener) 
 void XdsVerifier::listenerRemoved(const std::string& name) {
   for (unsigned long i = 0; i < listeners_.size(); ++i) {
     auto& rep = listeners_[i];
+    if (rep[i].name() != name) {
+      continue;
+    }
+
     if (rep.state == ACTIVE) {
       // the listener will be drained before being removed
       ENVOY_LOG_MISC(debug, "Changing {} to DRAINING", name);
