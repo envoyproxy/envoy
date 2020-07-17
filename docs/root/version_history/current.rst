@@ -22,6 +22,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* csrf: fixed issues with regards to origin and host header parsing.
 * fault: fixed an issue with `active_faults` gauge not being decremented for when abort faults were injected.
 
 Removed Config or Runtime
