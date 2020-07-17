@@ -14,7 +14,6 @@
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/strings/strip.h"
 #include "absl/time/time.h"
 
 namespace Envoy {
@@ -176,7 +175,7 @@ bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
 }
 
 std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMap& request_headers,
-                                                     int byte_range_parse_limit) {
+                                                     uint64_t max_byte_range_specs) {
   // Makes sure we have a GET request, as Range headers are only valid with this type of request.
   const absl::string_view method = request_headers.getMethodValue();
   ASSERT(method == Http::Headers::get().MethodValues.Get);
@@ -203,12 +202,13 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
     return {};
   }
 
-  std::vector<absl::string_view> ranges = absl::StrSplit(header_value, ',');
-  if (ranges.size() > static_cast<uint64_t>(byte_range_parse_limit)) {
+  std::vector<absl::string_view> ranges =
+      absl::StrSplit(header_value, absl::MaxSplits(',', max_byte_range_specs));
+  if (ranges.size() > max_byte_range_specs) {
     ENVOY_LOG(debug,
               "There are more ranges than allowed by the byte range parse limit ({}). Ignoring "
               "range header.",
-              byte_range_parse_limit);
+              max_byte_range_specs);
     return {};
   }
 
@@ -220,8 +220,7 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
     if (!absl::ConsumePrefix(&cur_range, "-")) {
       ENVOY_LOG(debug,
                 "Invalid format for range header: missing range-end. Ignoring range header.");
-      parsed_ranges.clear();
-      break;
+      return {};
     }
 
     absl::optional<uint64_t> last = HttpCacheUtils::readAndRemoveLeadingDigits(cur_range);
@@ -229,15 +228,13 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
     if (!cur_range.empty()) {
       ENVOY_LOG(debug,
                 "Unexpected characters after byte range in range header. Ignoring range header.");
-      parsed_ranges.clear();
-      break;
+      return {};
     }
 
     if (!first && !last) {
       ENVOY_LOG(debug, "Invalid format for range header: missing first-byte-pos AND last-byte-pos; "
                        "at least one of them is required. Ignoring range header.");
-      parsed_ranges.clear();
-      break;
+      return {};
     }
 
     // Handle suffix range (e.g., -123).
@@ -253,8 +250,7 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
     if (first != UINT64_MAX && first > last) {
       ENVOY_LOG(debug, "Invalid format for range header: range-start and range-end out of order. "
                        "Ignoring range header.");
-      parsed_ranges.clear();
-      break;
+      return {};
     }
 
     parsed_ranges.push_back(RawByteRange(first.value(), last.value()));

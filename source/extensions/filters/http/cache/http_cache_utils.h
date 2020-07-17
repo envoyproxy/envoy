@@ -23,7 +23,7 @@ public:
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
   /**
-   * Read a leading positive decimal integer value and advance "*s" past the
+   * Read a leading positive decimal integer value and advance "*str" past the
    * digits read. If overflow occurs, or no digits exist, return
    * absl::nullopt without advancing "*str".
    */

@@ -305,22 +305,22 @@ Http::TestRequestHeaderMapImpl makeTestHeaderMap(std::string range_value) {
 } // namespace
 
 TEST(ParseRangesTest, NoRangeHeader) {
-  auto headers = Http::TestRequestHeaderMapImpl{{":method", "GET"}};
-  auto result_vector = RangeRequests::parseRanges(headers, 5);
+  Http::TestRequestHeaderMapImpl headers = Http::TestRequestHeaderMapImpl{{":method", "GET"}};
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
 
   ASSERT_EQ(0, result_vector.size());
 }
 
 TEST(ParseRangesTest, InvalidUnit) {
-  auto headers = makeTestHeaderMap("bits=3-4");
-  auto result_vector = RangeRequests::parseRanges(headers, 5);
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bits=3-4");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
 
   ASSERT_EQ(0, result_vector.size());
 }
 
 TEST(ParseRangesTest, SingleRange) {
-  auto headers = makeTestHeaderMap("bytes=3-4");
-  auto result_vector = RangeRequests::parseRanges(headers, 5);
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=3-4");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
 
   ASSERT_EQ(1, result_vector.size());
 
@@ -329,8 +329,8 @@ TEST(ParseRangesTest, SingleRange) {
 }
 
 TEST(ParseRangesTest, MissingFirstBytePos) {
-  auto headers = makeTestHeaderMap("bytes=-5");
-  auto result_vector = RangeRequests::parseRanges(headers, 5);
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=-5");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
 
   ASSERT_EQ(1, result_vector.size());
 
@@ -339,8 +339,8 @@ TEST(ParseRangesTest, MissingFirstBytePos) {
 }
 
 TEST(ParseRangesTest, MissingLastBytePos) {
-  auto headers = makeTestHeaderMap("bytes=6-");
-  auto result_vector = RangeRequests::parseRanges(headers, 5);
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=6-");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
 
   ASSERT_EQ(1, result_vector.size());
 
@@ -349,8 +349,8 @@ TEST(ParseRangesTest, MissingLastBytePos) {
 }
 
 TEST(ParseRangesTest, MultipleRanges) {
-  auto headers = makeTestHeaderMap("bytes=345-456,-567,6789-");
-  auto result_vector = RangeRequests::parseRanges(headers, 5);
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=345-456,-567,6789-");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
 
   ASSERT_EQ(3, result_vector.size());
 
@@ -365,23 +365,24 @@ TEST(ParseRangesTest, MultipleRanges) {
 }
 
 TEST(ParseRangesTest, LongRangeHeaderValue) {
-  auto headers = makeTestHeaderMap("bytes=1000-1000,1001-1001,1002-1002,1003-1003,1004-1004,1005-"
-                                   "1005,1006-1006,1007-1007,1008-1008,100-");
-  auto result_vector = RangeRequests::parseRanges(headers, 10);
+  Http::TestRequestHeaderMapImpl headers =
+      makeTestHeaderMap("bytes=1000-1000,1001-1001,1002-1002,1003-1003,1004-1004,1005-"
+                        "1005,1006-1006,1007-1007,1008-1008,100-");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 10);
 
   ASSERT_EQ(10, result_vector.size());
 }
 
 TEST(ParseRangesTest, ZeroRangeLimit) {
-  auto headers = makeTestHeaderMap("bytes=1000-1000");
-  auto result_vector = RangeRequests::parseRanges(headers, 0);
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=1000-1000");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 0);
 
   ASSERT_EQ(0, result_vector.size());
 }
 
 TEST(ParseRangesTest, OverRangeLimit) {
-  auto headers = makeTestHeaderMap("bytes=1000-1000,1001-1001");
-  auto result_vector = RangeRequests::parseRanges(headers, 1);
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=1000-1000,1001-1001");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 1);
 
   ASSERT_EQ(0, result_vector.size());
 }
@@ -389,7 +390,7 @@ TEST(ParseRangesTest, OverRangeLimit) {
 class ParseInvalidRangeHeaderTest : public testing::Test,
                                     public testing::WithParamInterface<std::string> {
 protected:
-  auto range() { return makeTestHeaderMap(GetParam()); }
+  Http::TestRequestHeaderMapImpl range() { return makeTestHeaderMap(GetParam()); }
 };
 
 // clang-format off
@@ -433,7 +434,7 @@ INSTANTIATE_TEST_SUITE_P(
 // clang-format on
 
 TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
-  auto result_vector = RangeRequests::parseRanges(range(), 5);
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(range(), 5);
   ASSERT_EQ(0, result_vector.size());
 }
 

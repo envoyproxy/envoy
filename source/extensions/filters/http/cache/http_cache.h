@@ -79,7 +79,7 @@ public:
   // If there is no range header, multiple range headers, the header value is malformed, or there
   // are more ranges than byte_range_parse_limit, returns an empty vector.
   static std::vector<RawByteRange> parseRanges(const Http::RequestHeaderMap& request_headers,
-                                               int byte_range_parse_limit);
+                                               uint64_t max_byte_range_specs);
 };
 
 // Byte range from an HTTP request, adjusted for a known response body size, and converted from an
