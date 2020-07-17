@@ -89,13 +89,13 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                                                                       context.threadLocal());
           });
 
-  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
+  Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
-  std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager =
+  Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager =
       context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
           [&context, route_config_provider_manager] {

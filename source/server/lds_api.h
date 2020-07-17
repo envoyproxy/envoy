@@ -43,7 +43,7 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
-  std::unique_ptr<Config::Subscription> subscription_;
+  Config::SubscriptionPtr subscription_;
   std::string system_version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopePtr scope_;

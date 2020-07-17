@@ -190,10 +190,10 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
   return any_applied;
 }
 
-std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
 ScopedRdsConfigSubscription::removeScopes(
     const Protobuf::RepeatedPtrField<std::string>& scope_names, const std::string& version_info) {
-  std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+  std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers;
   for (const auto& scope_name : scope_names) {
     auto iter = scoped_route_map_.find(scope_name);
@@ -266,7 +266,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   std::vector<std::string> exception_msgs;
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
   // be reused by some to be added scopes.
-  std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+  std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers = removeScopes(removed_resources, version_info);
   bool any_applied =
       addOrUpdateScopes(added_resources,

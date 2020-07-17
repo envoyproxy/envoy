@@ -101,8 +101,8 @@ protected:
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   // server_factory_context_ is used by rds
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  std::unique_ptr<RouteConfigProviderManager> route_config_provider_manager_;
-  std::unique_ptr<ScopedRoutesConfigProviderManager> config_provider_manager_;
+  RouteConfigProviderManagerPtr route_config_provider_manager_;
+  ScopedRoutesConfigProviderManagerPtr config_provider_manager_;
 
   Event::SimulatedTimeSystem time_system_;
 };

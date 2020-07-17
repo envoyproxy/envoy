@@ -120,7 +120,7 @@ http_filters:
   }
 
   NiceMock<Server::MockInstance> server_;
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
   RouteConfigProviderSharedPtr rds_;
 };
 
@@ -290,7 +290,7 @@ public:
     server_factory_context_.thread_local_.shutdownThread();
   }
 
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
 };
 
 // Verifies that maybeCreateInitManager() creates a noop init manager if the main init manager is in
@@ -353,7 +353,7 @@ public:
   }
 
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds_;
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
 };
 

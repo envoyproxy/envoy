@@ -148,7 +148,7 @@ public:
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::shared_ptr<EdsClusterImpl> cluster_;
+  EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
   Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{validation_visitor_, "cluster_name"};
