@@ -27,11 +27,20 @@ constexpr static const char* kDefaultStaticClusterTmpl = R"EOF(
     "connect_timeout": "0.250s",
     "type": "static",
     "lb_policy": "round_robin",
-    "hosts": [
+    "load_assignment": {
+    "endpoints": [
       {
-        %s,
+        "lb_endpoints": [
+          {
+            "endpoint": {
+              "address": {
+            %s,              }
+            }
+          }
+        ]
       }
     ]
+  }
   }
   )EOF";
 
@@ -44,15 +53,16 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
 }
 
 inline envoy::config::bootstrap::v3::Bootstrap
-parseBootstrapFromV2Json(const std::string& json_string) {
+parseBootstrapFromV3Json(const std::string& json_string, bool avoid_boosting = true) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromJson(json_string, bootstrap, true);
+  TestUtility::loadFromJson(json_string, bootstrap, true, avoid_boosting);
   return bootstrap;
 }
 
-inline envoy::config::cluster::v3::Cluster parseClusterFromV2Json(const std::string& json_string) {
+inline envoy::config::cluster::v3::Cluster parseClusterFromV3Json(const std::string& json_string,
+                                                                  bool avoid_boosting = true) {
   envoy::config::cluster::v3::Cluster cluster;
-  TestUtility::loadFromJson(json_string, cluster, true);
+  TestUtility::loadFromJson(json_string, cluster, true, avoid_boosting);
   return cluster;
 }
 
@@ -64,7 +74,7 @@ inline envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::str
 }
 
 inline envoy::config::cluster::v3::Cluster defaultStaticCluster(const std::string& name) {
-  return parseClusterFromV2Json(defaultStaticClusterJson(name));
+  return parseClusterFromV3Json(defaultStaticClusterJson(name));
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
