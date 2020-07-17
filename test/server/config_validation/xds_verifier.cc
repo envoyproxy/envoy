@@ -40,7 +40,7 @@ bool XdsVerifier::hasActiveRoute(const envoy::config::listener::v3::Listener& li
  */
 void XdsVerifier::dumpState() {
   ENVOY_LOG_MISC(debug, "Listener Dump:");
-  for (auto rep : listeners_) {
+  for (const auto& rep : listeners_) {
     ENVOY_LOG_MISC(debug, "Name: {}, Route {}, State: {}", rep.listener.name(),
                    getRoute(rep.listener), rep.state);
   }
@@ -48,21 +48,22 @@ void XdsVerifier::dumpState() {
 
 /*
  * if you add a new listener that is not being updated, there are two cases:
- * 1. the listener is draining
- *    - if the routes match, this route will be added back to active
+ * 1. the listener has not been added before
+ *    - if envoy knows about the listener's route, it will be added as active, else warming
+ * 1. a listener of the same name has been added before but it now draining
+ *    - if the routes match, the old listener will be added back to active
  *    - if the routes don't match, the listener will be added as active/warming as relevant
- * 2. the listener has not been added before
- *    - the listener will be added as active/warming as relevant
  *
- * if a listener is being updated, there are 3 cases:
+ * if a listener is updated (i.e. there is a already a listener by this name), there are 3 cases:
  * 1. the old listener is active and the new is warming:
- *    - the old listener will remain active and the new will be added as warming
+ *    - old will remain active
+ *    - new will be added as warming, to replace the old when it gets its route
  * 2. the old listener is active and new is active:
- *    - the old listener is moved to draining and the new is added as active
- *    - listener_manager.listener_modified++
+ *    - old's filter chain is drained (seemingly instantaneously)
+ *    - new is added as active
  * 3. the old listener is warming and new is active/warming:
  *    - old is completely removed
- *    - normal listenerAdded behaviour after
+ *    - new is added as warming/active as normal
  */
 
 /**
@@ -148,20 +149,17 @@ void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener) 
  * @param name the name of the listener to be removed
  */
 void XdsVerifier::listenerRemoved(const std::string& name) {
-  bool found = false;
   for (unsigned long i = 0; i < listeners_.size(); ++i) {
     auto& rep = listeners_[i];
     if (rep.state == ACTIVE) {
       // the listener will be drained before being removed
       ENVOY_LOG_MISC(debug, "Changing {} to DRAINING", name);
-      found = true;
       num_active_--;
       num_draining_++;
       rep.state = DRAINING;
     } else if (rep.state == WARMING) {
       // the listener will be removed immediately
       ENVOY_LOG_MISC(debug, "Removed warming listener {}", name);
-      found = true;
       listeners_.erase(listeners_.begin() + i);
       num_warming_--;
     }
@@ -210,13 +208,12 @@ void XdsVerifier::updateSotwListeners() {
 void XdsVerifier::markForRemoval(ListenerRepresentation& rep) {
   ASSERT(rep.state == WARMING);
   // find the old listener and mark it for removal
-  for (unsigned long i = 0; i < listeners_.size(); ++i) {
-    auto& old_listener = listeners_[i];
-    if (old_listener.listener.name() == rep.listener.name() &&
-        getRoute(old_listener.listener) != getRoute(rep.listener) && old_listener.state == ACTIVE) {
+  for (auto& old_rep : listeners) {
+    if (old_rep.listener.name() == rep.listener.name() &&
+        getRoute(old_rep.listener) != getRoute(rep.listener) && old_rep.state == ACTIVE) {
       // mark it as removed to remove it after the loop so as not to invalidate the iterator in
       // the caller function
-      old_listener.state = REMOVED;
+      old_rep.state = REMOVED;
       num_active_--;
     }
   }
