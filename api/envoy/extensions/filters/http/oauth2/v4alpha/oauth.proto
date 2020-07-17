@@ -24,10 +24,10 @@ message OAuth2Credentials {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.oauth2.v3.OAuth2Credentials";
 
-  // The client_id to be used in the authorize calls.
+  // The client_id to be used in the authorize calls. This value will be URL encoded when sent to the OAuth server.
   string client_id = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The secret used to retrieve the access token.
+  // The secret used to retrieve the access token. This value will be URL encoded when sent to the OAuth server.
   transport_sockets.tls.v4alpha.SdsSecretConfig token_secret = 2
       [(validate.rules).message = {required: true}];
 
