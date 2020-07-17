@@ -433,29 +433,25 @@ key:
     - string_key: x-foo-key
 )EOF";
   const auto resource_2 = parseScopedRouteConfigurationFromYaml(config_yaml2);
-  init_watcher_.expectReady(); // Partial success gets the subscription ready.
+  init_watcher_.expectReady().Times(0); // The onConfigUpdate will simply throw an exception.
   context_init_manager_.initialize(init_watcher_);
 
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
   EXPECT_THROW_WITH_REGEX(
-      srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "2"), EnvoyException,
+      srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"), EnvoyException,
       ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
   EXPECT_EQ(
-      // Partially reject.
-      1UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+      // Fully rejected.
+      0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
-  // foo_scope update is applied.
-  EXPECT_EQ(getScopedRouteMap().size(), 1UL);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
-  // Scope key "x-foo-key" points to foo_routes due to partial rejection.
-  pushRdsConfig({"foo_routes"}, "111"); // Push some real route configuration.
-  EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value());
-  EXPECT_EQ(getScopedRdsProvider()
-                ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
-                ->name(),
-            "foo_routes");
+  // Scope key "x-foo-key" points to nowhere.
+  EXPECT_NE(getScopedRdsProvider(), nullptr);
+  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+              IsNull());
+  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+            0UL);
 }
 
 // Tests that scope-key conflict resources in different config updates are handled correctly.
@@ -596,7 +592,8 @@ key:
   const auto decoded_resources = TestUtility::decodeResources({resource, resource});
   EXPECT_THROW_WITH_MESSAGE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"),
                             EnvoyException,
-                            "duplicate scoped route configuration 'foo_scope' found");
+                            "Error adding/updating scoped route(s): duplicate scoped route "
+                            "configuration 'foo_scope' found");
 }
 
 // Tests that only one resource is provided during a config update.
@@ -619,12 +616,17 @@ key:
       "Error adding/updating scoped route(s): duplicate scoped route configuration 'foo_scope' "
       "found");
   EXPECT_EQ(
-      // Partially reject.
-      1UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+      // Fully rejected.
+      0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
-  // foo_scope update is applied.
-  EXPECT_EQ(getScopedRouteMap().size(), 1UL);
-  EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
+  // Scope key "x-foo-key" points to nowhere.
+  EXPECT_NE(getScopedRdsProvider(), nullptr);
+  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+              IsNull());
+  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+            0UL);
 }
 
 // Tests a config update failure.

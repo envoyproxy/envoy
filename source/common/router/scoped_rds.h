@@ -145,12 +145,14 @@ private:
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
+  Protobuf::RepeatedPtrField<std::string> detectUpdateConflictAndCleanupRemoved(
+      const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources);
+
   // Envoy::Config::SubscriptionCallbacks
 
-  // NOTE: state-of-the-world form onConfigUpdate(resources, version_info) will throw an
-  // EnvoyException on any error and essentially reject an update. While the Delta form
-  // onConfigUpdate(added_resources, removed_resources, version_info) by design will partially
-  // accept correct RouteConfiguration from management server.
+  // NOTE: both delta form and state-of-the-world form onConfigUpdate(resources, version_info) will
+  // throw an EnvoyException on any error and essentially reject an update.
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
