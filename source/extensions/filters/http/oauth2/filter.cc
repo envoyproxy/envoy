@@ -94,9 +94,8 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
 
 bool OAuth2CookieValidator::hmacIsValid() const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const std::string hmac_payload = absl::StrCat(host_, expires_, token_);
-  const std::string pre_encoded_hmac =
-      Hex::encode(crypto_util.getSha256Hmac(secret_, hmac_payload));
+  const auto hmac_payload = absl::StrCat(host_, expires_, token_);
+  const auto pre_encoded_hmac = Hex::encode(crypto_util.getSha256Hmac(secret_, hmac_payload));
   std::string encoded_hmac;
   absl::Base64Escape(pre_encoded_hmac, &encoded_hmac);
 
@@ -104,13 +103,12 @@ bool OAuth2CookieValidator::hmacIsValid() const {
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
-  auto current_epoch = time_source_.systemTime().time_since_epoch();
-
   uint64_t expires;
   if (!absl::SimpleAtoi(expires_, &expires)) {
     return false;
   }
 
+  const auto current_epoch = time_source_.systemTime().time_since_epoch();
   return std::chrono::seconds(expires) > current_epoch;
 }
 
@@ -263,7 +261,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // At this point, we *are* on /_oauth. We believe this request comes from the authorization
   // server and we expect the query strings to contain the information required to get the access
   // token
-  Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
+  const auto query_parameters = Http::Utility::parseQueryString(path_str);
   if (query_parameters.find(queryParamsError()) != query_parameters.end()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
@@ -345,9 +343,9 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
 void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
                                            std::chrono::seconds expires_in) {
-  SystemTime new_epoch = time_source_.systemTime() + expires_in;
-
   access_token_ = access_code;
+
+  const auto new_epoch = time_source_.systemTime() + expires_in;
   new_expires_ = std::to_string(
       std::chrono::duration_cast<std::chrono::seconds>(new_epoch.time_since_epoch()).count());
 
