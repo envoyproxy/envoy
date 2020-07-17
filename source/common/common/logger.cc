@@ -115,9 +115,9 @@ void Context::activate(LoggerMode mode) {
   Registry::setLogFormat(log_format_);
 
   if (mode == LoggerMode::Fancy) {
+    FancyContext::setDefaultFancyLevelFormat(log_level_, log_format_);
     fancy_default_level_ = log_level_;
     fancy_log_format_ = log_format_;
-    FancyContext::setDefaultFancyLevelFormat(log_level_, log_format_);
   }
 }
 
