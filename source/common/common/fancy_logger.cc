@@ -71,6 +71,7 @@ std::string FancyContext::listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_
   for (const auto& it : *fancy_log_map_) {
     info += fmt::format("   {}: {}\n", it.first, it.second);
   }
+  info += "\n";
   return info;
 }
 

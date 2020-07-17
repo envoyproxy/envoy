@@ -207,20 +207,23 @@ enum class LoggerMode { Envoy, Fancy };
 class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape);
+          Thread::BasicLockable& lock, bool should_escape, LoggerMode mode = LoggerMode::Envoy);
   ~Context();
 
+  static LoggerMode getLoggerMode();
   static std::string getFancyLogFormat();
   static spdlog::level::level_enum getFancyDefaultLevel();
 
 private:
-  void activate(LoggerMode mode = LoggerMode::Envoy);
+  void activate();
 
   const spdlog::level::level_enum log_level_;
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
   Context* const save_context_;
+
+  LoggerMode logger_mode_;
 
   static std::string fancy_log_format_;
   static spdlog::level::level_enum fancy_default_level_;
