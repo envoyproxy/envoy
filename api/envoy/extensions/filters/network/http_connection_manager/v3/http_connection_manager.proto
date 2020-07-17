@@ -605,6 +605,7 @@ message LocalReplyConfig {
 }
 
 // The configuration to filter and change local response.
+// [#next-free-field: 6]
 message ResponseMapper {
   // Filter to determine if this mapper should apply.
   config.accesslog.v3.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
@@ -619,6 +620,11 @@ message ResponseMapper {
   // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
   // It will be used when this mapper is matched.
   config.core.v3.SubstitutionFormatString body_format_override = 4;
+
+  // HTTP headers to add to a local reply. This allows the response mapper to append, to add
+  // or to override headers of any local reply before it is sent to a downstream client.
+  repeated config.core.v3.HeaderValueOption headers_to_add = 5
+      [(validate.rules).repeated = {max_items: 1000}];
 }
 
 message Rds {
