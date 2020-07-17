@@ -3089,6 +3089,8 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   init_helper_.startInitializingSecondaryClusters();
 }
 
+using NameVals = std::vector<std::pair<Network::SocketOptionName, int>>;
+
 // Validate that when options are set in the ClusterManager and/or Cluster, we see the socket option
 // propagated to setsockopt(). This is as close to an end-to-end test as we have for this feature,
 // due to the complexity of creating an integration test involving the network stack. We only test
@@ -3101,7 +3103,7 @@ public:
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
   // TODO(tschroed): Extend this to support socket state as well.
-  void expectSetsockopts(const std::vector<std::pair<Network::SocketOptionName, int>>& names_vals) {
+  void expectSetsockopts(const NameVals& names_vals) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     NiceMock<Network::MockConnectionSocket> socket;
@@ -3144,15 +3146,30 @@ public:
   }
 
   void expectSetsockoptFreebind() {
-    std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-        {ENVOY_SOCKET_SO_NOSIGPIPE, 1}, {ENVOY_SOCKET_IP_FREEBIND, 1}};
+    NameVals names_vals{{ENVOY_SOCKET_IP_FREEBIND, 1}};
+    if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+      names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+    }
     expectSetsockopts(names_vals);
   }
 
   void expectOnlyNoSigpipeOptions() {
-    std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-        {ENVOY_SOCKET_SO_NOSIGPIPE, 1}};
+    NameVals names_vals{{std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1)}};
     expectSetsockopts(names_vals);
+  }
+
+  void expectNoSocketOptions() {
+    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+        .WillOnce(
+            Invoke([this](Network::Address::InstanceConstSharedPtr,
+                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                          const Network::ConnectionSocket::OptionsSharedPtr& options)
+                       -> Network::ClientConnection* {
+              EXPECT_EQ(nullptr, options.get());
+              return connection_;
+            }));
+    auto conn_data = cluster_manager_->tcpConnForCluster("SockoptsCluster", nullptr);
+    EXPECT_EQ(connection_, conn_data.connection_.get());
   }
 
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
@@ -3177,7 +3194,11 @@ TEST_F(SockoptsTest, SockoptsUnset) {
                     port_value: 11001
   )EOF";
   initialize(yaml);
-  expectOnlyNoSigpipeOptions();
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    expectOnlyNoSigpipeOptions();
+  } else {
+    expectNoSocketOptions();
+  }
 }
 
 TEST_F(SockoptsTest, FreebindClusterOnly) {
@@ -3280,10 +3301,11 @@ TEST_F(SockoptsTest, SockoptsClusterOnly) {
 
   )EOF";
   initialize(yaml);
-  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {ENVOY_SOCKET_SO_NOSIGPIPE, 1},
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
   expectSetsockopts(names_vals);
 }
 
@@ -3311,10 +3333,11 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
         { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
   )EOF";
   initialize(yaml);
-  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {ENVOY_SOCKET_SO_NOSIGPIPE, 1},
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
   expectSetsockopts(names_vals);
 }
 
@@ -3344,10 +3367,11 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
       socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
   )EOF";
   initialize(yaml);
-  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {ENVOY_SOCKET_SO_NOSIGPIPE, 1},
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
   expectSetsockopts(names_vals);
 }
 
@@ -3396,12 +3420,14 @@ public:
               options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           return connection_;
         }));
-    EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_NOSIGPIPE.level(),
-                                        ENVOY_SOCKET_SO_NOSIGPIPE.option(), _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
-          EXPECT_EQ(1, *static_cast<const int*>(optval));
-          return {0, 0};
-        }));
+    if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+      EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_NOSIGPIPE.level(),
+                                          ENVOY_SOCKET_SO_NOSIGPIPE.option(), _, sizeof(int)))
+          .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+            EXPECT_EQ(1, *static_cast<const int*>(optval));
+            return {0, 0};
+          }));
+    }
     EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_KEEPALIVE.level(),
                                         ENVOY_SOCKET_SO_KEEPALIVE.option(), _, sizeof(int)))
         .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
@@ -3462,6 +3488,20 @@ public:
     EXPECT_EQ(connection_, conn_data.connection_.get());
   }
 
+  void expectNoSocketOptions() {
+    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+        .WillOnce(
+            Invoke([this](Network::Address::InstanceConstSharedPtr,
+                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                          const Network::ConnectionSocket::OptionsSharedPtr& options)
+                       -> Network::ClientConnection* {
+              EXPECT_EQ(nullptr, options.get());
+              return connection_;
+            }));
+    auto conn_data = cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
+    EXPECT_EQ(connection_, conn_data.connection_.get());
+  }
+
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
 };
 
@@ -3484,7 +3524,11 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
                     port_value: 11001
   )EOF";
   initialize(yaml);
-  expectOnlyNoSigpipeOptions();
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    expectOnlyNoSigpipeOptions();
+  } else {
+    expectNoSocketOptions();
+  }
 }
 
 TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {

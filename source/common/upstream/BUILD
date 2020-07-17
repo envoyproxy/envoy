@@ -1,10 +1,10 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -438,6 +438,7 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
+        "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",

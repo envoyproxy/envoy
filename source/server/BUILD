@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -5,8 +7,6 @@ load(
     "envoy_proto_library",
     "envoy_select_hot_restart",
 )
-
-licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
+        "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
