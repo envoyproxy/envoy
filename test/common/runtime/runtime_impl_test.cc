@@ -864,6 +864,7 @@ public:
 // Empty resource lists are rejected.
 TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
   setup();
+
   EXPECT_CALL(rtds_init_callback_, Call());
   EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate({}, ""), EnvoyException,
                             "Unexpected RTDS resource length: 0");
