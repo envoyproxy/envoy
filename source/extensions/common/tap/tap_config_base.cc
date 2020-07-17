@@ -69,9 +69,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::config::tap::v3::TapConfig&& proto_c
     sink_to_use_ = sink_.get();
     break;
   default:
-    ASSERT(1 == 0);
-    break;
-    /* NOT_REACHED_GCOVR_EXCL_LINE; */
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   buildMatcher(proto_config.match_config(), matchers_);
