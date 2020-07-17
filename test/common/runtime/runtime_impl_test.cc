@@ -690,12 +690,14 @@ TEST_F(StaticLoaderImplTest, InvalidNumerator) {
 
   // Numerator > denominator -> exception
   EXPECT_CALL(generator_, random()).WillOnce(Return(500000));
-  // Exception is thrown only on debug mode
+  // Exception is thrown only on debug mode, otherwise ignored
 #if !defined(NDEBUG)
   EXPECT_THROW_WITH_MESSAGE(
       loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent), EnvoyException,
       "runtime key 'invalid_numerator': numerator (111) > denominator (100), condition "
       "always evaluates to true");
+#else
+  loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent);
 #endif
 }
 
