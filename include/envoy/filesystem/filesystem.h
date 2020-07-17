@@ -130,6 +130,8 @@ public:
   virtual bool illegalPath(const std::string& path) PURE;
 };
 
+using InstancePtr = std::unique_ptr<Instance>;
+
 enum class FileType { Regular, Directory, Other };
 
 struct DirectoryEntry {

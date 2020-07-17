@@ -81,6 +81,8 @@ public:
   virtual ThreadId currentThreadId() PURE;
 };
 
+using ThreadFactoryPtr = std::unique_ptr<ThreadFactory>;
+
 /**
  * Like the C++11 "basic lockable concept" but a pure virtual interface vs. a template, and
  * with thread annotations.
