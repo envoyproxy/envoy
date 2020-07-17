@@ -8,7 +8,6 @@ load(
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_hot_restart",
-    "envoy_select_legacy_codecs_in_integration_tests",
     "envoy_sh_test",
 )
 
@@ -577,10 +576,6 @@ envoy_cc_test_library(
         "ssl_utility.h",
         "utility.h",
     ],
-    copts = envoy_select_legacy_codecs_in_integration_tests(
-        ["-DENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS"],
-        "@envoy",
-    ),
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
@@ -612,9 +607,7 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",

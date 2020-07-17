@@ -54,16 +54,14 @@ class ConnectionImpl;
 // Abstract nghttp2_session factory. Used to enable injection of factories for testing.
 class Nghttp2SessionFactory {
 public:
-  using ConnectionImplType = ConnectionImpl;
   virtual ~Nghttp2SessionFactory() = default;
 
   // Returns a new nghttp2_session to be used with |connection|.
   virtual nghttp2_session* create(const nghttp2_session_callbacks* callbacks,
-                                  ConnectionImplType* connection,
-                                  const nghttp2_option* options) PURE;
+                                  ConnectionImpl* connection, const nghttp2_option* options) PURE;
 
   // Initializes the |session|.
-  virtual void init(nghttp2_session* session, ConnectionImplType* connection,
+  virtual void init(nghttp2_session* session, ConnectionImpl* connection,
                     const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
 };
 
@@ -258,7 +256,7 @@ protected:
     // Callback function for MetadataDecoder.
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
-    bool buffersOverrun() const { return read_disable_count_ > 0; }
+    bool buffers_overrun() const { return read_disable_count_ > 0; }
 
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
@@ -520,13 +518,12 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
-  using SessionFactory = Nghttp2SessionFactory;
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
-                       SessionFactory& http2_session_factory);
+                       Nghttp2SessionFactory& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
