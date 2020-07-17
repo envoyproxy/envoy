@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -213,6 +213,10 @@ message Bootstrap {
   // other resolution fails.
   // [#not-implemented-hide:]
   core.v4alpha.ConfigSource default_config_source = 23;
+
+  // Optional overriding of default socket interface. The value must be the name of one of the
+  // socket interface factories initialized through a bootstrap extension
+  string default_socket_interface = 24;
 }
 
 // Administration interface :ref:`operations documentation
