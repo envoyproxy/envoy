@@ -123,30 +123,22 @@ public:
 
     // verify headers
     expected_response_headers.iterate(
-        [](const Http::HeaderEntry& expected_entry, void* ctx) {
-          const auto* actual_headers = static_cast<const Http::ResponseHeaderMap*>(ctx);
+        [actual_headers = &response->headers()](const Http::HeaderEntry& expected_entry) {
           const auto* actual_entry = actual_headers->get(
               Http::LowerCaseString(std::string(expected_entry.key().getStringView())));
           EXPECT_EQ(actual_entry->value().getStringView(), expected_entry.value().getStringView());
           return Http::HeaderMap::Iterate::Continue;
-        },
-        // Because headers() returns a pointer to const we have to cast it
-        // away to match the callback signature. This is safe because we do
-        // not call any non-const functions on the headers in the callback.
-        const_cast<Http::ResponseHeaderMap*>(&response->headers()));
+        });
 
     // verify cookies if we have any
     if (!expected_response_cookies.empty()) {
       std::vector<std::string> actual_cookies;
-      response->headers().iterate(
-          [](const Http::HeaderEntry& entry, void* ctx) {
-            auto* list = static_cast<std::vector<std::string>*>(ctx);
-            if (entry.key().getStringView() == Http::Headers::get().SetCookie.get()) {
-              list->emplace_back(entry.value().getStringView());
-            }
-            return Http::HeaderMap::Iterate::Continue;
-          },
-          &actual_cookies);
+      response->headers().iterate([&actual_cookies](const Http::HeaderEntry& entry) {
+        if (entry.key().getStringView() == Http::Headers::get().SetCookie.get()) {
+          actual_cookies.emplace_back(entry.value().getStringView());
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      });
 
       EXPECT_EQ(expected_response_cookies, actual_cookies);
     }

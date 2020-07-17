@@ -907,11 +907,9 @@ public:
   const HeaderEntry* get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }
-  void iterate(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_->iterate(cb, context);
-  }
-  void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_->iterateReverse(cb, context);
+  void iterate(HeaderMap::ConstIterateCb cb) const override { header_map_->iterate(cb); }
+  void iterateReverse(HeaderMap::ConstIterateCb cb) const override {
+    header_map_->iterateReverse(cb);
   }
   void clear() override {
     header_map_->clear();

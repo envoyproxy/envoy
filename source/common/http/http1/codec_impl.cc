@@ -110,27 +110,24 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           absl::optional<uint64_t> status, bool end_stream) {
   bool saw_content_length = false;
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        absl::string_view key_to_use = header.key().getStringView();
-        uint32_t key_size_to_use = header.key().size();
-        // Translate :authority -> host so that upper layers do not need to deal with this.
-        if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
-          key_size_to_use = Headers::get().HostLegacy.get().size();
-        }
+  headers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+    absl::string_view key_to_use = header.key().getStringView();
+    uint32_t key_size_to_use = header.key().size();
+    // Translate :authority -> host so that upper layers do not need to deal with this.
+    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+      key_to_use = absl::string_view(Headers::get().HostLegacy.get());
+      key_size_to_use = Headers::get().HostLegacy.get().size();
+    }
 
-        // Skip all headers starting with ':' that make it here.
-        if (key_to_use[0] == ':') {
-          return HeaderMap::Iterate::Continue;
-        }
+    // Skip all headers starting with ':' that make it here.
+    if (key_to_use[0] == ':') {
+      return HeaderMap::Iterate::Continue;
+    }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
-            key_to_use, header.value().getStringView());
+    encodeFormattedHeader(key_to_use, header.value().getStringView());
 
-        return HeaderMap::Iterate::Continue;
-      },
-      this);
+    return HeaderMap::Iterate::Continue;
+  });
 
   if (headers.ContentLength()) {
     saw_content_length = true;
@@ -234,13 +231,10 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // Finalize the body
     connection_.buffer().add(LAST_CHUNK);
 
-    trailers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
-              header.key().getStringView(), header.value().getStringView());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
+    trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+      encodeFormattedHeader(header.key().getStringView(), header.value().getStringView());
+      return HeaderMap::Iterate::Continue;
+    });
 
     connection_.flushOutput();
     connection_.buffer().add(CRLF);

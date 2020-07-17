@@ -58,25 +58,26 @@ public:
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {
-    request_headers_.iterate(headerMapCallback, static_cast<void*>(&f));
+    request_headers_.iterate(headerMapCallback(f));
     return {};
   }
 
 private:
   const Http::RequestHeaderMap& request_headers_;
 
-  static Http::HeaderMap::Iterate headerMapCallback(const Http::HeaderEntry& header,
-                                                    void* context) {
-    auto* callback = static_cast<OpenTracingCb*>(context);
-    opentracing::string_view key{header.key().getStringView().data(),
-                                 header.key().getStringView().length()};
-    opentracing::string_view value{header.value().getStringView().data(),
-                                   header.value().getStringView().length()};
-    if ((*callback)(key, value)) {
-      return Http::HeaderMap::Iterate::Continue;
-    } else {
-      return Http::HeaderMap::Iterate::Break;
-    }
+  static Http::HeaderMap::ConstIterateCb headerMapCallback(OpenTracingCb callback) {
+    return [callback =
+                std::move(callback)](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      opentracing::string_view key{header.key().getStringView().data(),
+                                   header.key().getStringView().length()};
+      opentracing::string_view value{header.value().getStringView().data(),
+                                     header.value().getStringView().length()};
+      if (callback(key, value)) {
+        return Http::HeaderMap::Iterate::Continue;
+      } else {
+        return Http::HeaderMap::Iterate::Break;
+      }
+    };
   }
 };
 } // namespace

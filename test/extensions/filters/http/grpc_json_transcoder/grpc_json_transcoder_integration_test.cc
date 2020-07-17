@@ -130,8 +130,7 @@ protected:
     }
 
     response_headers.iterate(
-        [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-          auto* response = static_cast<IntegrationStreamDecoder*>(context);
+        [response = response.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
           Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
           if (entry.value() == UnexpectedHeaderValue) {
             EXPECT_FALSE(response->headers().get(lower_key));
@@ -140,8 +139,7 @@ protected:
                       response->headers().get(lower_key)->value().getStringView());
           }
           return Http::HeaderMap::Iterate::Continue;
-        },
-        response.get());
+        });
     if (!response_body.empty()) {
       if (full_response) {
         EXPECT_EQ(response_body, response->body());

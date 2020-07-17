@@ -768,15 +768,12 @@ TEST_F(RouterTest, AddMultipleCookies) {
         EXPECT_CALL(cb, Call("foo=\"" + foo_c + "\"; Max-Age=1337; Path=/path; HttpOnly"));
         EXPECT_CALL(cb, Call("choco=\"" + choco_c + "\"; Max-Age=15; HttpOnly"));
 
-        headers.iterate(
-            [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-              if (header.key() == Http::Headers::get().SetCookie.get()) {
-                static_cast<MockFunction<void(const std::string&)>*>(context)->Call(
-                    std::string(header.value().getStringView()));
-              }
-              return Http::HeaderMap::Iterate::Continue;
-            },
-            &cb);
+        headers.iterate([&cb](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          if (header.key() == Http::Headers::get().SetCookie.get()) {
+            cb.Call(std::string(header.value().getStringView()));
+          }
+          return Http::HeaderMap::Iterate::Continue;
+        });
       }));
   expectResponseTimerCreate();
 
