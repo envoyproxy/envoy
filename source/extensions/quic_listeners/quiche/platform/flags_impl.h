@@ -5,13 +5,16 @@
 // This file is part of the QUICHE platform implementation, and is not to be
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
-
 #include <string>
+
+#include "common/runtime/runtime_protos.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 
 namespace quiche {
+
+using RuntimeFlagPtr = std::unique_ptr<Envoy::Runtime::FeatureFlag>;
 
 class Flag;
 
@@ -44,7 +47,7 @@ private:
 class Flag {
 public:
   // Construct Flag with the given name and help string.
-  Flag(const char* name, const char* help) : name_(name), help_(help) {}
+  Flag(const char* name, const char* help) : name_(name), help_(help), runtime_value_(nullptr) {}
   virtual ~Flag() = default;
 
   // Set flag value from given string, returning true iff successful.
@@ -62,6 +65,9 @@ public:
 private:
   std::string name_;
   std::string help_;
+
+protected:
+  RuntimeFlagPtr runtime_value_;
 };
 
 // Concrete class for QUICHE protocol and feature flags, templated by flag type.
@@ -86,7 +92,11 @@ public:
   // Return flag value.
   T value() const {
     absl::MutexLock lock(&mutex_);
-    return value_;
+    if (runtime_value_ != nullptr) {
+      return runtime_value_->enabled();
+    } else {
+      return value_;
+    }
   }
 
 private:
