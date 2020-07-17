@@ -219,8 +219,6 @@ envoy_cc_test(
     ],
     tags = [
         "fails_on_windows",
-        # https://github.com/envoyproxy/envoy/issues/9784
-        "no_tsan",
     ],
     deps = [
         ":http_integration_lib",
