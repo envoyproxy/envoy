@@ -223,19 +223,16 @@ TEST_P(GuardDogDeathTest, MultiKillThresholdDeathTest) {
 TEST_P(GuardDogAlmostDeadTest, MultiKillUnderThreshold) {
   // This does everything the death test does except it pets an additional watchdog
   // that causes us to be under the threshold (60%) of multikill death.
-  auto die_function = [&]() -> void {
-    setupForMultiDeathThreshold();
+  setupForMultiDeathThreshold();
 
-    // Pet the last three dogs so we're just under the threshold that causes death.
-    dogs_.at(4)->touch();
-    dogs_.at(3)->touch();
-    dogs_.at(2)->touch();
+  // Pet the last three dogs so we're just under the threshold that causes death.
+  dogs_.at(4)->touch();
+  dogs_.at(3)->touch();
+  dogs_.at(2)->touch();
 
-    time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
-    guard_dog_->forceCheckForTest();
-  };
+  time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
+  guard_dog_->forceCheckForTest();
 
-  die_function();
 }
 
 TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
