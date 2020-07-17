@@ -32,7 +32,7 @@ Android requirements
 --------------------
 
 - Android SDK Platform 29
-- Android NDK 19.2.5345600
+- Android NDK 21
 
 ----------------
 iOS requirements
