@@ -818,7 +818,8 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(absl::optional<bool>(true)));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
+      .WillOnce(Return(absl::optional<bool>(true)));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
@@ -4859,7 +4860,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(absl::optional<bool>(false)));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
+      .WillOnce(Return(absl::optional<bool>(false)));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
   expectOnDestroy();
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
@@ -4900,7 +4902,8 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
         EXPECT_EQ("11", headers.getContentLengthValue());
         return FilterHeadersStatus::Continue;
       }));
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(absl::optional<bool>(false)));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
+      .WillOnce(Return(absl::optional<bool>(false)));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {

@@ -1702,8 +1702,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
   if (Utility::getResponseStatus(headers) == enumToInt(Http::Code::BadRequest) &&
       connection_manager_.codec_->protocol() < Protocol::Http2 &&
       !Utility::streamErrorOnInvalidHttpMessageForHttp1(
-        connection_manager_.config_.streamErrorOnInvalidHttpMessaging(),
-        response_encoder_->streamErrorOnInvalidHttpMessage())) {
+          connection_manager_.config_.streamErrorOnInvalidHttpMessaging(),
+          response_encoder_->streamErrorOnInvalidHttpMessage())) {
     state_.saw_connection_close_ = true;
   }
 
