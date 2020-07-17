@@ -115,7 +115,7 @@ message LocalityEndpointsHealth {
   repeated EndpointHealth endpoints_health = 2;
 }
 
-// The health status of endpoints in a cluster. The cluster name and locality 
+// The health status of endpoints in a cluster. The cluster name and locality
 // should match the corresponding fields in ClusterHealthCheck message.
 message ClusterEndpointsHealth {
   string cluster_name = 1;
