@@ -132,6 +132,8 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 bool AdmissionControlFilter::shouldRejectRequest() const {
+  // This formula is documented in the admission control filter documentation:
+  // https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/admission_control_filter.html
   const auto request_counts = config_->getController().requestCounts();
   const double total_requests = request_counts.requests;
   const double successful_requests = request_counts.successes;

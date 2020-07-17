@@ -7,8 +7,6 @@ Admission Control
 
   The admission control filter is experimental and is currently under active development.
 
-This filter should be configured with the name `envoy.filters.http.admission_control`.
-
 See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>` for details on each configuration parameter.
 
 Overview
@@ -44,8 +42,10 @@ where,
   detailed explanation.
 
 .. note::
-  The success rate calculations are performed on a per-thread basis for decreased performance
-  overhead, so the rejection probability may vary between worker threads.
+   The success rate calculations are performed on a per-thread basis for increased performance. In
+   addition, the per-thread isolation prevents decreases the blast radius of a single bad connection
+   with an anomalous success rate. Therefore, the rejection probability may vary between worker
+   threads.
 
 See the :ref:`v3 API reference
 <envoy_v3_api_msg_extensions.filters.http.admission_control.v3alpha.AdmissionControl>` for more
@@ -58,14 +58,17 @@ for both HTTP and gRPC requests.
 Aggression
 ~~~~~~~~~~
 
-The aggression value affects the rejection probabilities as shown in the following figure:
+The aggression value affects the rejection probabilities as shown in the following figures:
 
 .. image:: images/aggression_graph.png
 
-Since the success rate threshold is set to 95%, the rejection probability remains 0 until then. As
-success rate drops to 0%, the rejection probability approaches a value just under 100%. The
-aggression values dictate how high the rejection probability will be at a given request success
-rate, so it will shed load more *aggressively*.
+.. image:: images/aggression_graph_50.png
+
+Since the success rate threshold in the first figure is set to 95%, the rejection probability
+remains 0 until then. In the second figure, ther rejection probability remains 0 until the success
+rate reaches 50%. In both cases, as success rate drops to 0%, the rejection probability approaches a
+value just under 100%. The aggression values dictate how high the rejection probability will be at a
+given request success rate, so it will shed load more *aggressively*.
 
 Example Configuration
 ---------------------
