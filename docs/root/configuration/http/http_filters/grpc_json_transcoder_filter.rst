@@ -85,7 +85,7 @@ as its output message type. The implementation needs to set
 Multiple `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
 can be send by the gRPC server in the server streaming case.
 In this case, HTTP response header `Content-Type` will use the `content-type` from the first
-`google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`.
+`google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 
 Headers
 --------
