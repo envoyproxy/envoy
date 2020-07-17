@@ -147,7 +147,7 @@ public:
    * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection
    * error.
    */
-  virtual absl::optional<bool> streamErrorOnInvalidHttpMessage() PURE;
+  virtual absl::optional<bool> streamErrorOnInvalidHttpMessage() const PURE;
 };
 
 /**
