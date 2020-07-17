@@ -1,4 +1,4 @@
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 
 #include <cstdint>
 #include <memory>
@@ -25,6 +25,7 @@
 
 namespace Envoy {
 namespace Http {
+namespace Legacy {
 namespace Http2 {
 
 class Http2ResponseCodeDetailValues {
@@ -52,6 +53,9 @@ public:
 };
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
+using Http::Http2::CodecStats;
+using Http::Http2::MetadataDecoder;
+using Http::Http2::MetadataEncoder;
 
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
                                           HeaderString& cookies) {
@@ -492,7 +496,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
-          http2_options.override_stream_error_on_invalid_http_message().value()),
+          http2_options.stream_error_on_invalid_http_messaging()),
       flood_detected_(false), max_outbound_frames_(http2_options.max_outbound_frames().value()),
       frame_buffer_releasor_([this]() { releaseOutboundFrame(); }),
       max_outbound_control_frames_(http2_options.max_outbound_control_frames().value()),
@@ -1464,5 +1468,6 @@ ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_nam
 }
 
 } // namespace Http2
+} // namespace Legacy
 } // namespace Http
 } // namespace Envoy
