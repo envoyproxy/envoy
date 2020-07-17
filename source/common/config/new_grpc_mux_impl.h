@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/v2/discovery.pb.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -30,7 +31,7 @@ public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                  const Protobuf::MethodDescriptor& service_method,
                  envoy::config::core::v3::ApiVersion transport_api_version,
-                 Runtime::RandomGenerator& random, Stats::Scope& scope,
+                 Random::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 

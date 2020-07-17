@@ -11,6 +11,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/access_log/access_log_impl.h"
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/config/utility.h"
 #include "common/network/connection_balancer_impl.h"
@@ -168,7 +169,7 @@ Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.ht
 const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
   return server_.localInfo();
 }
-Envoy::Runtime::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
+Envoy::Random::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
   return server_.random();
 }
 Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
@@ -389,6 +390,11 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
     addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    // TODO(yugant) : Add a config option for UDP_GRO
+    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+      // Needed to receive gso_size option
+      addListenSocketOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+    }
   }
 }
 
@@ -538,7 +544,7 @@ Http::Context& PerListenerFactoryContextImpl::httpContext() {
 const LocalInfo::LocalInfo& PerListenerFactoryContextImpl::localInfo() const {
   return listener_factory_context_base_->localInfo();
 }
-Envoy::Runtime::RandomGenerator& PerListenerFactoryContextImpl::random() {
+Envoy::Random::RandomGenerator& PerListenerFactoryContextImpl::random() {
   return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& PerListenerFactoryContextImpl::runtime() {

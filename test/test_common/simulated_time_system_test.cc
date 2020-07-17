@@ -86,7 +86,7 @@ TEST_P(SimulatedTimeSystemTest, AdvanceTimeAsync) {
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), time_system_.systemTime());
 }
 
-TEST_P(SimulatedTimeSystemTest, TimerOrdering) {
+TEST_P(SimulatedTimeSystemTest, TimerTotalOrdering) {
   trackPrepareCalls();
 
   addTask(0, '0');
@@ -98,6 +98,57 @@ TEST_P(SimulatedTimeSystemTest, TimerOrdering) {
 
   // Verify order.
   EXPECT_EQ("p012", output_);
+}
+
+TEST_P(SimulatedTimeSystemTest, TimerPartialOrdering) {
+  trackPrepareCalls();
+
+  std::set<std::string> outputs;
+  for (int i = 0; i < 100; ++i) {
+    addTask(0, '0');
+    addTask(1, '1');
+    addTask(1, '2');
+    addTask(3, '3');
+    EXPECT_EQ(4, timers_.size());
+
+    advanceMsAndLoop(5);
+
+    outputs.insert(output_);
+
+    // Cleanup before the next iteration.
+    output_.clear();
+    timers_.clear();
+  }
+
+  // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
+  // for the same time. Verify that both orderings were observed.
+  EXPECT_THAT(outputs, testing::ElementsAre("p0123", "p0213"));
+}
+
+TEST_P(SimulatedTimeSystemTest, TimerPartialOrdering2) {
+  trackPrepareCalls();
+
+  std::set<std::string> outputs;
+  for (int i = 0; i < 100; ++i) {
+    addTask(0, '0');
+    addTask(15, '1');
+    advanceMsAndLoop(10);
+
+    // Timer 1 has 5ms remaining, so timer 2 ends up scheduled at the same monotonic time as 1.
+    addTask(5, '2');
+    addTask(6, '3');
+    advanceMsAndLoop(10);
+
+    outputs.insert(output_);
+
+    // Cleanup before the next iteration.
+    output_.clear();
+    timers_.clear();
+  }
+
+  // Execution order of timers 1 and 2 is non-deterministic because the two timers were scheduled
+  // for the same time. Verify that both orderings were observed.
+  EXPECT_THAT(outputs, testing::ElementsAre("p0p123", "p0p213"));
 }
 
 // Timers that are scheduled to execute and but are disabled first do not trigger.

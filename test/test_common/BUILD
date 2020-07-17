@@ -268,6 +268,7 @@ envoy_cc_test_library(
     deps = [
         ":only_one_thread_lib",
         ":test_time_system_interface",
+        ":utility_lib",
         "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
         "//source/common/event:timer_lib",

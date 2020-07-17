@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/api/v2/discovery.pb.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -30,7 +31,7 @@ public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               envoy::config::core::v3::ApiVersion transport_api_version,
-              Runtime::RandomGenerator& random, Stats::Scope& scope,
+              Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
   ~GrpcMuxImpl() override = default;
 

@@ -21,6 +21,7 @@
 #include "common/http/message_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -142,10 +143,29 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
 envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  auto ret = initializeAndValidateOptions(options);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+    ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
+  }
+  return ret;
+}
+
+envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
   // This will throw an exception when a custom parameter and a named parameter collide.
   validateCustomSettingsParameters(options);
+
+  if (!options.has_override_stream_error_on_invalid_http_message()) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        options.stream_error_on_invalid_http_messaging());
+  }
 
   if (!options_clone.has_hpack_table_size()) {
     options_clone.mutable_hpack_table_size()->set_value(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
@@ -233,14 +253,26 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   }
 
   start++;
-  return parseParameters(url, start);
+  return parseParameters(url, start, /*decode_params=*/false);
+}
+
+Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
+  size_t start = url.find('?');
+  if (start == std::string::npos) {
+    QueryParams params;
+    return params;
+  }
+
+  start++;
+  return parseParameters(url, start, /*decode_params=*/true);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
-  return parseParameters(body, 0);
+  return parseParameters(body, 0, /*decode_params=*/true);
 }
 
-Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start) {
+Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start,
+                                              bool decode_params) {
   QueryParams params;
 
   while (start < data.size()) {
@@ -252,8 +284,10 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
 
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
-      params.emplace(StringUtil::subspan(data, start, start + equal),
-                     StringUtil::subspan(data, start + equal + 1, end));
+      const auto param_name = StringUtil::subspan(data, start, start + equal);
+      const auto param_value = StringUtil::subspan(data, start + equal + 1, end);
+      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
+                     decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
       params.emplace(StringUtil::subspan(data, start, end), "");
     }

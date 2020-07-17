@@ -3,8 +3,6 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/router/router.h"
 
-#include "test/mocks/server/mocks.h"
-
 namespace Envoy {
 class RouteCoverage : Logger::Loggable<Logger::Id::testing> {
 public:
