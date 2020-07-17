@@ -348,6 +348,9 @@ public:
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
+  bool streamErrorOnInvalidHttpMessaging() const override {
+    return stream_error_on_invalid_http_messaging_;
+  }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
@@ -410,6 +413,7 @@ public:
   Stats::IsolatedStoreImpl fake_listener_stats_;
   ConnectionManagerListenerStats listener_stats_;
   bool proxy_100_continue_ = false;
+  bool stream_error_on_invalid_http_messaging_ = false;
   bool preserve_external_request_id_ = false;
   Http::Http1Settings http1_settings_;
   bool normalize_path_ = false;
@@ -814,6 +818,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(absl::optional<bool>(true)));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
@@ -4854,6 +4859,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterHeadReply) {
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(absl::optional<bool>(false)));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
   expectOnDestroy();
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
@@ -4894,6 +4900,7 @@ TEST_F(HttpConnectionManagerImplTest, ResetWithStoppedFilter) {
         EXPECT_EQ("11", headers.getContentLengthValue());
         return FilterHeadersStatus::Continue;
       }));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(absl::optional<bool>(false)));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {

@@ -1699,6 +1699,14 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
   }
 
+  if (Utility::getResponseStatus(headers) == enumToInt(Http::Code::BadRequest) &&
+      connection_manager_.codec_->protocol() < Protocol::Http2 &&
+      !Utility::streamErrorOnInvalidHttpMessageForHttp1(
+        connection_manager_.config_.streamErrorOnInvalidHttpMessaging(),
+        response_encoder_->streamErrorOnInvalidHttpMessage())) {
+    state_.saw_connection_close_ = true;
+  }
+
   if (connection_manager_.codec_->protocol() == Protocol::Http10) {
     // As HTTP/1.0 and below can not do chunked encoding, if there is no content
     // length the response will be framed by connection close.
