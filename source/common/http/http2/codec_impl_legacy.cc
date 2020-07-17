@@ -1,4 +1,4 @@
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 
 #include <cstdint>
 #include <memory>
@@ -25,6 +25,7 @@
 
 namespace Envoy {
 namespace Http {
+namespace Legacy {
 namespace Http2 {
 
 class Http2ResponseCodeDetailValues {
@@ -52,6 +53,9 @@ public:
 };
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
+using Http::Http2::CodecStats;
+using Http::Http2::MetadataDecoder;
+using Http::Http2::MetadataEncoder;
 
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
                                           HeaderString& cookies) {
@@ -1461,5 +1465,6 @@ ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_nam
 }
 
 } // namespace Http2
+} // namespace Legacy
 } // namespace Http
 } // namespace Envoy
