@@ -16,7 +16,7 @@ The admission control filter probabilistically rejects requests based on the suc
 previous requests in a configurable sliding time window. It is based on `client-side
 throttling <https://landing.google.com/sre/sre-book/chapters/handling-overload/>`_ from the `Google SRE handbook <https://landing.google.com/sre/sre-book/toc/index.html>`_. The only notable difference between the admission control
 filter's load shedding and load shedding defined in client-side throttling is that users may
-configure how aggressively load shedding starts at a target request success-rate. Users may also
+configure how aggressively load shedding starts at a target request success rate. Users may also
 configure the definition of a successful request for the purposes of the rejection probability
 calculation.
 
