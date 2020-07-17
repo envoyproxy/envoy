@@ -237,6 +237,16 @@ private:
 
     absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
 
+    void onResponseDataTooLarge() override {
+      connection_manager_.stats_.named_.rs_too_large_.inc();
+    }
+    void onStreamReset() override {
+      connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
+    }
+    void onDownstreamRequestTooLarge() override {
+      connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
+    }
+
     void chargeStats(const ResponseHeaderMap& headers);
 
     // Http::StreamCallbacks

@@ -51,6 +51,9 @@ public:
   virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
   virtual void onFilterAboveWriteBufferHighWatermark() PURE;
   virtual void onFilterBelowWriteBufferLowWatermark() PURE;
+  virtual void onResponseDataTooLarge() PURE;
+  virtual void onStreamReset() PURE;
+  virtual void onDownstreamRequestTooLarge() PURE;
 };
 
 // Manages an iteration of a set of HTTP decoder/encoder filters.

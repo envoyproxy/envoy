@@ -40,6 +40,7 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 }
 
 } // namespace
+
 void FilterManager::addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
                                                  bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
@@ -1109,7 +1110,7 @@ void FilterManager::ActiveStreamDecoderFilter::requestDataTooLarge() {
   if (parent_.state_.decoder_filters_streaming_) {
     onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
-    // parent_.connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
+    parent_.callbacks_.onDownstreamRequestTooLarge();
     sendLocalReply(Code::PayloadTooLarge, CodeUtility::toString(Code::PayloadTooLarge), nullptr,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestPayloadTooLarge);
   }
@@ -1223,7 +1224,7 @@ void FilterManager::ActiveStreamEncoderFilter::responseDataTooLarge() {
   if (parent_.state_.encoder_filters_streaming_) {
     onEncoderFilterAboveWriteBufferHighWatermark();
   } else {
-    // parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
+    parent_.callbacks_.onResponseDataTooLarge();
 
     // If headers have not been sent to the user, send a 500.
     if (!headers_continued_) {
@@ -1270,7 +1271,7 @@ void FilterManager::ActiveStreamEncoderFilter::responseDataDrained() {
 }
 
 void FilterManager::ActiveStreamFilterBase::resetStream() {
-  //   parent_.connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
+  parent_.callbacks_.onStreamReset();
   parent_.callbacks_.endStream();
 }
 
