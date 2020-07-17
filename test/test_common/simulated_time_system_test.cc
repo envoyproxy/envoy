@@ -239,14 +239,14 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
     // to pick up next iteration callbacks.
     advanceMsAndLoop(0);
 #endif
-    EXPECT_EQ("p03p14", output_);
+    EXPECT_THAT(output_, testing::AnyOf("p03p14", "p03p41"));
   } else {
     EXPECT_EQ("p0314", output_);
   }
 
   advanceMsAndLoop(100);
   if (activateTimersNextEventLoop()) {
-    EXPECT_EQ("p03p14p2", output_);
+    EXPECT_THAT(output_, testing::AnyOf("p03p14p2", "p03p41p2"));
   } else {
     EXPECT_EQ("p0314p2", output_);
   }

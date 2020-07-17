@@ -54,7 +54,8 @@ public:
   Alarm(SimulatedScheduler& simulated_scheduler, SimulatedTimeSystemHelper& time_system,
         CallbackScheduler& cb_scheduler, TimerCb cb)
       : cb_(cb_scheduler.createSchedulableCallback([this, cb] { runAlarm(cb); })),
-        simulated_scheduler_(simulated_scheduler), time_system_(time_system), armed_(false), pending_(false) {}
+        simulated_scheduler_(simulated_scheduler), time_system_(time_system), armed_(false),
+        pending_(false) {}
 
   ~Alarm() override;
 
