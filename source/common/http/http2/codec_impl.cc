@@ -87,7 +87,7 @@ void ProdNghttp2SessionFactory::init(nghttp2_session*, ConnectionImpl* connectio
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
  * it copies them.
  */
-template <typename T> static T* remove_const(const void* object) {
+template <typename T> static T* removeConst(const void* object) {
   return const_cast<T*>(reinterpret_cast<const T*>(object));
 }
 
@@ -120,8 +120,8 @@ static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& he
   }
   const absl::string_view header_key = header.key().getStringView();
   const absl::string_view header_value = header.value().getStringView();
-  headers.push_back({remove_const<uint8_t>(header_key.data()),
-                     remove_const<uint8_t>(header_value.data()), header_key.size(),
+  headers.push_back({removeConst<uint8_t>(header_key.data()),
+                     removeConst<uint8_t>(header_value.data()), header_key.size(),
                      header_value.size(), flags});
 }
 
@@ -244,7 +244,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
   } else {
     ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
-    if (!buffers_overrun()) {
+    if (!buffersOverrun()) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
       parent_.sendPendingFrames();
@@ -492,7 +492,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
-          http2_options.stream_error_on_invalid_http_messaging()),
+          http2_options.override_stream_error_on_invalid_http_message().value()),
       flood_detected_(false), max_outbound_frames_(http2_options.max_outbound_frames().value()),
       frame_buffer_releasor_([this]() { releaseOutboundFrame(); }),
       max_outbound_control_frames_(http2_options.max_outbound_control_frames().value()),
@@ -560,7 +560,7 @@ int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
   stream->pending_recv_data_.add(data, len);
   // Update the window to the peer unless some consumer of this stream's data has hit a flow control
   // limit and disabled reads on this stream
-  if (!stream->buffers_overrun()) {
+  if (!stream->buffersOverrun()) {
     nghttp2_session_consume(session_, stream_id, len);
   } else {
     stream->unconsumed_bytes_ += len;
