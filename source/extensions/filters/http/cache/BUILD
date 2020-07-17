@@ -67,7 +67,7 @@ envoy_cc_library(
     name = "http_cache_utils_lib",
     srcs = ["http_cache_utils.cc"],
     hdrs = ["http_cache_utils.h"],
-    external_deps = ["abseil_optional"],    
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",

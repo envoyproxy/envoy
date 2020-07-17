@@ -304,6 +304,13 @@ Http::TestRequestHeaderMapImpl makeTestHeaderMap(std::string range_value) {
 }
 } // namespace
 
+TEST(ParseRangesTest, NoRangeHeader) {
+  auto headers = Http::TestRequestHeaderMapImpl{{":method", "GET"}};
+  auto result_vector = RangeRequests::parseRanges(headers, 5);
+
+  ASSERT_EQ(0, result_vector.size());
+}
+
 TEST(ParseRangesTest, InvalidUnit) {
   auto headers = makeTestHeaderMap("bits=3-4");
   auto result_vector = RangeRequests::parseRanges(headers, 5);

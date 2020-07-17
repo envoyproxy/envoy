@@ -75,6 +75,9 @@ private:
 class RangeRequests : Logger::Loggable<Logger::Id::cache_filter> {
 public:
   // Parses the ranges from the request headers into a vector<RawByteRange>.
+  // byte_range_parse_limit defines how many byte ranges can be parsed from the header value.
+  // If there is no range header, multiple range headers, the header value is malformed, or there
+  // are more ranges than byte_range_parse_limit, returns an empty vector.
   static std::vector<RawByteRange> parseRanges(const Http::RequestHeaderMap& request_headers,
                                                int byte_range_parse_limit);
 };

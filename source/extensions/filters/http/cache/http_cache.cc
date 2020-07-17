@@ -187,48 +187,56 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
   Http::HeaderUtility::getAllOfHeader(request_headers, Http::Headers::get().Range.get(),
                                       range_headers);
 
-  absl::string_view range;
+  absl::string_view header_value;
   if (range_headers.size() == 1) {
-    range = range_headers.front();
+    header_value = range_headers.front();
   } else {
-    ENVOY_LOG(debug, "Multiple range headers provided in request. Ignoring all range headers.");
+    if (range_headers.size() > 1) {
+      ENVOY_LOG(debug, "Multiple range headers provided in request. Ignoring all range headers.");
+    }
     return {};
   }
 
-  if (!absl::ConsumePrefix(&range, "bytes=")) {
+  if (!absl::ConsumePrefix(&header_value, "bytes=")) {
     ENVOY_LOG(debug, "Invalid range header. range-unit not correctly specified, only 'bytes' "
                      "supported. Ignoring range header.");
     return {};
   }
 
-  std::vector<RawByteRange> ranges;
-  int byte_ranges_parsed = 0;
+  std::vector<absl::string_view> ranges = absl::StrSplit(header_value, ',');
+  if (ranges.size() > static_cast<uint64_t>(byte_range_parse_limit)) {
+    ENVOY_LOG(debug,
+              "There are more ranges than allowed by the byte range parse limit ({}). Ignoring "
+              "range header.",
+              byte_range_parse_limit);
+    return {};
+  }
 
-  while (!range.empty()) {
-    if (byte_ranges_parsed >= byte_range_parse_limit) {
-      ENVOY_LOG(debug,
-                "Reached the configured byte range parse limit ({}), but there are still byte "
-                "ranges remaining. Ignoring range header.",
-                byte_range_parse_limit);
-      ranges.clear();
-      break;
-    }
+  std::vector<RawByteRange> parsed_ranges;
+  for (absl::string_view cur_range : ranges) {
 
-    absl::optional<uint64_t> first = HttpCacheUtils::readAndRemoveLeadingDigits(range);
+    absl::optional<uint64_t> first = HttpCacheUtils::readAndRemoveLeadingDigits(cur_range);
 
-    if (!absl::ConsumePrefix(&range, "-")) {
+    if (!absl::ConsumePrefix(&cur_range, "-")) {
       ENVOY_LOG(debug,
                 "Invalid format for range header: missing range-end. Ignoring range header.");
-      ranges.clear();
+      parsed_ranges.clear();
       break;
     }
 
-    absl::optional<uint64_t> last = HttpCacheUtils::readAndRemoveLeadingDigits(range);
+    absl::optional<uint64_t> last = HttpCacheUtils::readAndRemoveLeadingDigits(cur_range);
+
+    if (!cur_range.empty()) {
+      ENVOY_LOG(debug,
+                "Unexpected characters after byte range in range header. Ignoring range header.");
+      parsed_ranges.clear();
+      break;
+    }
 
     if (!first && !last) {
       ENVOY_LOG(debug, "Invalid format for range header: missing first-byte-pos AND last-byte-pos; "
                        "at least one of them is required. Ignoring range header.");
-      ranges.clear();
+      parsed_ranges.clear();
       break;
     }
 
@@ -245,22 +253,14 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
     if (first != UINT64_MAX && first > last) {
       ENVOY_LOG(debug, "Invalid format for range header: range-start and range-end out of order. "
                        "Ignoring range header.");
-      ranges.clear();
+      parsed_ranges.clear();
       break;
     }
 
-    if (!range.empty() && !absl::ConsumePrefix(&range, ",")) {
-      ENVOY_LOG(debug,
-                "Unexpected characters after byte range in range header. Ignoring range header.");
-      ranges.clear();
-      break;
-    }
-
-    ranges.push_back(RawByteRange(first.value(), last.value()));
-    ++byte_ranges_parsed;
+    parsed_ranges.push_back(RawByteRange(first.value(), last.value()));
   }
 
-  return ranges;
+  return parsed_ranges;
 }
 } // namespace Cache
 } // namespace HttpFilters
