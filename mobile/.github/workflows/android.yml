@@ -23,16 +23,16 @@ jobs:
           export CC=clang
           export CXX=clang++
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          bazel build --fat_apk_cpu=x86 //:android_dist_ci
+          bazelisk build --fat_apk_cpu=x86 //:android_dist_ci
     # TODO: parallelize these two jobs
       - name: 'Build Java app'
         run: |
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+          bazelisk build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
       - name: 'Build kotlin app'
         run: |
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+          bazelisk build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
   macdist:
     name: mac_dist
     runs-on: macOS-latest
@@ -49,7 +49,7 @@ jobs:
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
-        run: bazel build --fat_apk_cpu=x86 //:android_dist_ci
+        run: bazelisk build --fat_apk_cpu=x86 //:android_dist_ci
       - uses: actions/upload-artifact@v1
         with:
           name: envoy.aar
@@ -78,10 +78,10 @@ jobs:
       - name: start simulator
         run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
+      #   bazelisk mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
       # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
       - run: |
-          bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+          bazelisk build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
           adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
         name: 'Start java app'
@@ -111,10 +111,10 @@ jobs:
       - name: start simulator
         run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      #   bazelisk mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
       - run: |
-          bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+          bazelisk build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
         name: 'Start kotlin app'
@@ -130,7 +130,7 @@ jobs:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/linux_ci_setup.sh
-      - run: bazel test --test_output=all --build_tests_only //library/kotlin/test/...
+      - run: bazelisk test --test_output=all --build_tests_only //library/kotlin/test/...
         name: 'Run Kotlin library tests'
   javatests:
     name: java_tests
@@ -142,5 +142,5 @@ jobs:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/linux_ci_setup.sh
-      - run: bazel test --test_output=all --build_tests_only //library/java/test/...
+      - run: bazelisk test --test_output=all --build_tests_only //library/java/test/...
         name: 'Run Java library tests'

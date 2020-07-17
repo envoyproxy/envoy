@@ -57,9 +57,9 @@ jobs:
         run: ./ci/linux_ci_setup.sh
       - name: 'Run Kotlin Lint (Detekt)'
         run: |
-          bazel build \
+          bazelisk build \
             //library/kotlin/src/io/envoyproxy/envoymobile:envoy_lib_lint \
             //examples/kotlin/hello_world:hello_envoy_kt_lint
       - name: 'Run Kotlin Formatter (ktlint)'
         run: |
-          bazel build kotlin_format
+          bazelisk build kotlin_format
