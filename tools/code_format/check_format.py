@@ -2,7 +2,6 @@
 
 import argparse
 import common
-import difflib
 import functools
 import multiprocessing
 import os
@@ -83,22 +82,7 @@ STD_REGEX_ALLOWLIST = (
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
     "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
-    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
-
-# These triples (file1, file2, diff) represent two files, file1 and file2 that should maintain
-# the diff diff. This is meant to keep these two files in sync.
-CODEC_DIFFS = (("./source/common/http/http1/codec_impl.h",
-                "./source/common/http/http1/codec_impl_legacy.h",
-                "./tools/code_format/codec_diffs/http1_codec_impl_h"),
-               ("./source/common/http/http1/codec_impl.cc",
-                "./source/common/http/http1/codec_impl_legacy.cc",
-                "./tools/code_format/codec_diffs/http1_codec_impl_cc"),
-               ("./source/common/http/http2/codec_impl.h",
-                "./source/common/http/http2/codec_impl_legacy.h",
-                "./tools/code_format/codec_diffs/http2_codec_impl_h"),
-               ("./source/common/http/http2/codec_impl.cc",
-                "./source/common/http/http2/codec_impl_legacy.cc",
-                "./tools/code_format/codec_diffs/http2_codec_impl_cc"))
+    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -548,38 +532,6 @@ def fixSourceLine(line, line_number):
   return line
 
 
-def codecDiffHelper(file1, file2, diff):
-  f1 = readLines(file1)
-  f2 = readLines(file2)
-
-  # Create diff between two files
-  code_diff = list(difflib.unified_diff(f1, f2, lineterm=""))
-  # Compare with golden diff.
-  golden_diff = readLines(diff)
-  # It is fairly ugly to diff a diff, so return a warning to sync codec changes
-  # and/or update golden_diff.
-  if code_diff != golden_diff:
-    error_message = "Codecs are not synced: %s does not match %s. Update codec implementations to sync and/or update the diff manually to:\n%s" % (
-        file1, file2, '\n'.join(code_diff))
-    # The following line will write the diff to the file diff if it does not match.
-    # Do not uncomment unless you know the change is safe!
-    # new_diff = pathlib.Path(diff)
-    #new_diff.open('w')
-    # new_diff.write_text('\n'.join(code_diff), encoding='utf-8')
-    return error_message
-
-
-def checkCodecDiffs(error_messages):
-  try:
-    for triple in CODEC_DIFFS:
-      codec_diff = codecDiffHelper(*triple)
-      if codec_diff != None:
-        error_messages.append(codecDiffHelper(*triple))
-    return error_messages
-  except IOError:  # for check format tests
-    return error_messages
-
-
 # We want to look for a call to condvar.waitFor, but there's no strong pattern
 # to the variable name of the condvar. If we just look for ".waitFor" we'll also
 # pick up time_system_.waitFor(...), and we don't want to return true for that
@@ -946,6 +898,21 @@ def checkOwners(dir_name, owned_directories, error_messages):
     error_messages.append("New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
 
+def checkApiShadowStarlarkFiles(api_shadow_root, file_path, error_messages):
+  command = "diff -u "
+  command += file_path + " "
+  api_shadow_starlark_path = api_shadow_root + re.sub(r"\./api/", '', file_path)
+  command += api_shadow_starlark_path
+
+  error_message = executeCommand(command, "invalid .bzl in generated_api_shadow", file_path)
+  if operation_type == "check":
+    error_messages += error_message
+  elif operation_type == "fix" and len(error_message) != 0:
+    shutil.copy(file_path, api_shadow_starlark_path)
+
+  return error_messages
+
+
 def checkFormatVisitor(arg, dir_name, names):
   """Run checkFormat in parallel for the given files.
 
@@ -962,7 +929,7 @@ def checkFormatVisitor(arg, dir_name, names):
   # python lists are passed as references, this is used to collect the list of
   # async results (futures) from running checkFormat and passing them back to
   # the caller.
-  pool, result_list, owned_directories, error_messages = arg
+  pool, result_list, owned_directories, api_shadow_root, error_messages = arg
 
   # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
   # manner as it is a small and limited list.
@@ -975,6 +942,10 @@ def checkFormatVisitor(arg, dir_name, names):
     checkOwners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
   for file_name in names:
+    if dir_name.startswith("./api") and isSkylarkFile(file_name):
+      result = pool.apply_async(checkApiShadowStarlarkFiles,
+                                args=(api_shadow_root, dir_name + "/" + file_name, error_messages))
+      result_list.append(result)
     result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))
     result_list.append(result)
 
@@ -1041,6 +1012,7 @@ if __name__ == "__main__":
 
   operation_type = args.operation_type
   target_path = args.target_path
+  api_shadow_root = args.api_shadow_prefix
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
@@ -1096,9 +1068,6 @@ if __name__ == "__main__":
   error_messages = []
   owned_directories = ownedDirectories(error_messages)
 
-  # Check codec synchronization once per run.
-  checkCodecDiffs(error_messages)
-
   if os.path.isfile(target_path):
     error_messages += checkFormat("./" + target_path)
   else:
@@ -1109,8 +1078,8 @@ if __name__ == "__main__":
       # For each file in target_path, start a new task in the pool and collect the
       # results (results is passed by reference, and is used as an output).
       for root, _, files in os.walk(target_path):
-        checkFormatVisitor((pool, results, owned_directories, error_messages), root,
-                           [f for f in files if path_predicate(f)])
+        checkFormatVisitor((pool, results, owned_directories, api_shadow_root, error_messages),
+                           root, [f for f in files if path_predicate(f)])
 
       # Close the pool to new tasks, wait for all of the running tasks to finish,
       # then collect the error messages.
