@@ -46,6 +46,7 @@ envoy_cc_library(
         "//source/common/config:runtime_utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
+        "//source/common/network:socket_interface_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
