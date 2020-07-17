@@ -4,15 +4,6 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/scope_tracker.h"
-#include "envoy/http/filter.h"
-
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
-#include "common/grpc/common.h"
-#include "common/local_reply/local_reply.h"
-#include "common/stream_info/stream_info_impl.h"
-
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codec.h"
@@ -20,6 +11,13 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
+
+#include "common/buffer/watermark_buffer.h"
+#include "common/common/dump_state_utils.h"
+#include "common/common/linked_object.h"
+#include "common/grpc/common.h"
+#include "common/local_reply/local_reply.h"
+#include "common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Http {

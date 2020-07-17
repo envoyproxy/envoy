@@ -222,7 +222,7 @@ private:
       // away with just resetting it to the HCM filter_state_.
       if (filter_manager_.streamInfo().filterState()->hasDataAtOrAboveLifeSpan(
               StreamInfo::FilterState::LifeSpan::Request)) {
-        // TODO something needs to be done here so we can reset the FS
+        // TODO something needs to be done here so we can reset the FilterState
         // (*connection_manager_.streams_.begin())->filter_manager_.streamInfo().stream_info_.filter_state_
         // =
         //     std::make_shared<StreamInfo::FilterStateImpl>(

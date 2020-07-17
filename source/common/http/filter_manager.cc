@@ -648,13 +648,6 @@ void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
   }
 
   callbacks_.finalize100ContinueHeaders(headers);
-  // TOODOOOO
-  //   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to
-  //   the
-  //   // continuation headers.
-  //   ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
-  //                                                   connection_manager_.config_, EMPTY_STRING);
-
   ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", callbacks_, headers);
 
   // Now actually encode via the codec.
