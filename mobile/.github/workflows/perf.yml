@@ -22,7 +22,7 @@ jobs:
           export PATH=/usr/lib/llvm-8/bin:$PATH
           export CC=clang
           export CXX=clang++
-          bazel build //test/performance:test_binary_size --config=sizeopt
+          bazelisk build //test/performance:test_binary_size --config=sizeopt
       - uses: actions/upload-artifact@v1
         with:
           name: sizecurrent
@@ -43,7 +43,7 @@ jobs:
           export PATH=/usr/lib/llvm-8/bin:$PATH
           export CC=clang
           export CXX=clang++
-          bazel build //test/performance:test_binary_size --config=sizeopt
+          bazelisk build //test/performance:test_binary_size --config=sizeopt
       - uses: actions/upload-artifact@v1
         with:
           name: sizemain
