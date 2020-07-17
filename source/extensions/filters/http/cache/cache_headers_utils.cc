@@ -52,7 +52,6 @@ separateDirectiveAndArgument(absl::string_view full_directive) {
 // VCHAR           =  %x21-7E  ; visible (printing) characters
 
 RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header) {
-  must_validate_ = no_store_ = no_transform_ = only_if_cached_ = false;
   std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {
@@ -78,7 +77,6 @@ RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header)
 }
 
 ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_header) {
-  must_validate_ = no_store_ = no_transform_ = no_stale_ = is_public_ = false;
   std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {
