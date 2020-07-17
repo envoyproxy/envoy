@@ -14,7 +14,7 @@ namespace {
 
 void Replay(const Frame& frame, ServerCodecFrameInjector& codec) {
   // Create the server connection containing the nghttp2 session.
-  TestServerConnectionImpl connection(
+  TestServerConnectionImplNew connection(
       codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
       envoy::config::core::v3::HttpProtocolOptions::ALLOW);
