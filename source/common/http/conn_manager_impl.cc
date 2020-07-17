@@ -1074,14 +1074,6 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
   connection_manager_.doDeferredStreamDestroy(*this);
-
-  // If the codec sets its responseDetails(), impute a
-  // DownstreamProtocolError and propagate the details upwards.
-  const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
-  if (!encoder_details.empty()) {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
-    filter_manager_.streamInfo().setResponseCodeDetails(encoder_details);
-  }
 }
 
 void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {

@@ -41,7 +41,7 @@ public:
   MOCK_METHOD(void, testPrint, (const std::string&));
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<ThreadLocalState> state_;
+  ThreadLocalStatePtr state_;
   std::function<void()> yield_callback_;
   CoroutinePtr coroutine_;
 };
