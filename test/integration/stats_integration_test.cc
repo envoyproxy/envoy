@@ -284,7 +284,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   //                                          in callback manager.
   // 2020/07/07  11252    44971       46000   Introduce Least Request LB active request bias config
   // 2020/07/15  11748    45003       46000   Stream error on invalid messaging
-  // 2020/07/16  12035    45115       46000   Init manager store unready targets in hash map.
+  // 2020/07/16  12035    45114       46000   Init manager store unready targets in hash map.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -302,7 +302,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 45115);
+    EXPECT_MEMORY_EQ(m_per_cluster, 45114);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
