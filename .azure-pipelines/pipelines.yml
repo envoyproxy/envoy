@@ -149,6 +149,7 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
+          BAZEL_BUILD_EXTRA_OPTIONS: --remote_download_toplevel
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

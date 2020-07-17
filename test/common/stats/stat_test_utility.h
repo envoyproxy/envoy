@@ -91,6 +91,11 @@ private:
 class TestStore : public IsolatedStoreImpl {
 public:
   TestStore() = default;
+  ~TestStore() {
+    counter_map_.clear();
+    gauge_map_.clear();
+    histogram_map_.clear();
+  }
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
   explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
