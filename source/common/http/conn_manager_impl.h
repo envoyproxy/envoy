@@ -305,6 +305,7 @@ private:
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     const uint64_t stream_id_;
+    std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
     FilterManager filter_manager_;
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
@@ -317,7 +318,6 @@ private:
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     ResponseEncoder* response_encoder_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
-    std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
