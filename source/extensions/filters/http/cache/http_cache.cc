@@ -6,7 +6,6 @@
 
 #include "envoy/http/codes.h"
 
-#include "common/common/utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
@@ -215,7 +214,7 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
       break;
     }
 
-    absl::optional<uint64_t> first = StringUtil::readAndRemoveLeadingDigits(range);
+    absl::optional<uint64_t> first = HttpCacheUtils::readAndRemoveLeadingDigits(range);
 
     if (!absl::ConsumePrefix(&range, "-")) {
       ENVOY_LOG(debug,
@@ -224,7 +223,7 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
       break;
     }
 
-    absl::optional<uint64_t> last = StringUtil::readAndRemoveLeadingDigits(range);
+    absl::optional<uint64_t> last = HttpCacheUtils::readAndRemoveLeadingDigits(range);
 
     if (!first && !last) {
       ENVOY_LOG(debug, "Invalid format for range header: missing first-byte-pos AND last-byte-pos; "

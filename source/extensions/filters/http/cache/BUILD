@@ -56,7 +56,6 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:header_map_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
@@ -68,6 +67,7 @@ envoy_cc_library(
     name = "http_cache_utils_lib",
     srcs = ["http_cache_utils.cc"],
     hdrs = ["http_cache_utils.h"],
+    external_deps = ["abseil_optional"],    
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",

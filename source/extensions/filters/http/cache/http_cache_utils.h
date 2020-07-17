@@ -22,6 +22,13 @@ public:
   // header_entry is null or malformed.
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
+  /**
+   * Read a leading positive decimal integer value and advance "*s" past the
+   * digits read. If overflow occurs, or no digits exist, return
+   * absl::nullopt without advancing "*str".
+   */
+  static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
+
 private:
   static bool tchar(char c);
   static bool eatToken(absl::string_view& s);

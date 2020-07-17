@@ -380,13 +380,6 @@ public:
    */
   static std::string removeCharacters(const absl::string_view& str,
                                       const IntervalSet<size_t>& remove_characters);
-
-  /**
-   * Read a leading positive decimal integer value and advance "*s" past the
-   * digits read. If overflow occurs, or no digits exist, return
-   * absl::nullopt without advancing "*s".
-   */
-  static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
 };
 
 /**
