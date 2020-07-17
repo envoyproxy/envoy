@@ -132,6 +132,8 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, config);
     config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
                                                      config);
+
+    ON_CALL(callbacks_.udp_listener_, udpPacketWriter()).WillByDefault(Return(&udp_packet_writer_));
     EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -157,6 +159,16 @@ public:
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+
+    ON_CALL(udp_packet_writer_, writeToSocket(_, _, _))
+        .WillByDefault(
+            Invoke([&](const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
+                       const Network::Address::Instance& peer_address) -> Api::IoCallUint64Result {
+              Buffer::RawSliceVector slices = buffer.getRawSlices();
+              return Network::Utility::writeToSocket(*new_session.io_handle_, slices.data(),
+                                                     slices.size(), local_ip, peer_address);
+            }));
+
     EXPECT_CALL(*filter_, createIoHandle(_))
         .WillOnce(Return(ByMove(Network::IoHandlePtr{test_sessions_.back().io_handle_})));
     EXPECT_CALL(*new_session.io_handle_, fd());
@@ -178,6 +190,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   UdpProxyFilterConfigSharedPtr config_;
   Network::MockUdpReadFilterCallbacks callbacks_;
+  NiceMock<Network::MockUdpPacketWriter> udp_packet_writer_;
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;
