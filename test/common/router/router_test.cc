@@ -3216,7 +3216,6 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
-      .Times(1);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
 
@@ -3248,7 +3247,6 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
-      .Times(1);
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -3304,7 +3302,6 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
   // First is reset
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
-      .Times(1);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
@@ -3390,7 +3387,6 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
-      .Times(1);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -6574,7 +6570,7 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestHeaders) {
 
   EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _));
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:02 GMT");
+  EXPECT_EQ(headers.Date()->value().getStringView(), "Thu, 01 Jan 1970 00:00:02 GMT");
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
@@ -6603,7 +6599,7 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestRetryHeaders) {
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_EQ(nullptr, headers.Date());
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:02 GMT");
+  EXPECT_EQ(headers.Date()->value().getStringView(), "Thu, 01 Jan 1970 00:00:02 GMT");
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
@@ -6614,7 +6610,6 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestRetryHeaders) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)))
-      .Times(1);
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(500));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -6635,7 +6630,7 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestRetryHeaders) {
   router_.retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_EQ(headers.Date()->value(), "Thu, 01 Jan 1970 00:00:04 GMT");
+  EXPECT_EQ(headers.Date()->value().getStringView(), "Thu, 01 Jan 1970 00:00:04 GMT");
 
   router_.onDestroy();
 }
