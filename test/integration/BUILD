@@ -219,8 +219,6 @@ envoy_cc_test(
     ],
     tags = [
         "fails_on_windows",
-        # https://github.com/envoyproxy/envoy/issues/9784
-        "no_tsan",
     ],
     deps = [
         ":http_integration_lib",
@@ -743,6 +741,17 @@ envoy_cc_test(
         "//source/extensions/filters/network/echo:config",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "socket_interface_integration_test",
+    srcs = ["socket_interface_integration_test.cc"],
+    tags = ["fails_on_windows"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/network:socket_interface_lib",
+        "//source/extensions/filters/network/echo:config",
     ],
 )
 

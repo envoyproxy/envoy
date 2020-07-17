@@ -258,7 +258,7 @@ protected:
   testing::NiceMock<MockOptions> options_;
   DefaultListenerHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
-  std::unique_ptr<ThreadLocal::InstanceImpl> thread_local_;
+  ThreadLocal::InstanceImplPtr thread_local_;
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;

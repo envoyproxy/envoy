@@ -37,6 +37,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/socket_option_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_utility.h"
@@ -102,6 +103,12 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
                           const envoy::config::core::v3::BindConfig bind_config) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options =
       std::make_shared<Network::ConnectionSocket::Options>();
+  // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
+  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    Network::Socket::appendOptions(cluster_options,
+                                   Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
+  }
   // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
   if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
       config.upstream_bind_config().freebind().value()) {
