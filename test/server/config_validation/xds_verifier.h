@@ -46,6 +46,7 @@ private:
   bool hasRoute(const envoy::config::listener::v3::Listener& listener);
   bool hasActiveRoute(const envoy::config::listener::v3::Listener& listener);
   void updateSotwListeners();
+  void updateDeltaListeners(const envoy::config::route::v3::RouteConfiguration& route);
   void markForRemoval(ListenerRepresentation& rep);
   std::vector<ListenerRepresentation> listeners_;
 

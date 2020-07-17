@@ -201,6 +201,29 @@ void XdsVerifier::updateSotwListeners() {
 }
 
 /**
+ * after a delta update, update any listeners that refer to the added route
+ */
+void XdsVerifier::updateDeltaListeners(const envoy::config::route::v3::RouteConfiguration& route) {
+  for (auto& rep : listeners_) {
+    if (getRoute(rep.listener) == route.name() && rep.state == WARMING) {
+      // it should successfully warm now
+      ENVOY_LOG_MISC(debug, "Moving {} to ACTIVE state", rep.listener.name());
+
+      // if there were any active listeners that were waiting to be updated, they will now be
+      // removed and the warming listener will take their place
+      markForRemoval(rep);
+      num_warming_--;
+      num_active_++;
+      rep.state = ACTIVE;
+    }
+  }
+  // erase any active listeners that were replaced
+  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
+                                  [&](auto& listener) { return listener.state == REMOVED; }),
+                   listeners_.end());
+}
+
+/**
  * @param listener a warming listener that has a corresponding active listener of the same name
  * called after listener receives its route, so it will be moved to active and the old listener will
  * be removed
@@ -230,14 +253,11 @@ void XdsVerifier::routeUpdated(envoy::config::route::v3::RouteConfiguration rout
     all_routes_.insert({route.name(), route});
     active_routes_.insert({route.name(), route});
   }
+
+  ENVOY_LOG_MISC(debug, "Updating {}", route.name());
   if (sotw_or_delta_ == DELTA) {
-    // sending a new RDS update with the same route name that was sent before and ignored in delta
-    // does not seem to apply updates to any listeners
-    // TODO(samflattery): investigate this
-    ENVOY_LOG_MISC(debug, "Tried to update {}", route.name());
+    updateDeltaListeners(route);
   } else {
-    // more routes might have been sent and updates not applied to listeners, so update them
-    ENVOY_LOG_MISC(debug, "Updating {}", route.name());
     updateSotwListeners();
   }
 }
@@ -259,30 +279,9 @@ void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route)
       })) {
     active_routes_.insert({route.name(), route});
     all_routes_.insert({route.name(), route});
+    updateDeltaListeners(route);
   } else if (sotw_or_delta_ == SOTW) {
     all_routes_.insert({route.name(), route});
-  }
-
-  // find any listeners that reference this route and update them
-  if (sotw_or_delta_ == DELTA) {
-    for (auto& rep : listeners_) {
-      if (getRoute(rep.listener) == route.name() && rep.state == WARMING) {
-        // it should successfully warm now
-        ENVOY_LOG_MISC(debug, "Moving {} to ACTIVE state", rep.listener.name());
-
-        // if there were any active listeners that were waiting to be updated, they will now be
-        // removed and the warming listener will take their place
-        markForRemoval(rep);
-        num_warming_--;
-        num_active_++;
-        rep.state = ACTIVE;
-      }
-    }
-    // erase any active listeners that were replaced
-    listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                    [&](auto& listener) { return listener.state == REMOVED; }),
-                     listeners_.end());
-  } else {
     updateSotwListeners();
   }
 }
