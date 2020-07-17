@@ -161,7 +161,7 @@ TEST_F(FaultTest, MultipleFaults) {
   const Fault* fault_ptr;
 
   // Get command - should have a fault 50% of time
-  // For the first call we mock the random percentage to be 1%, which will give us the first fault
+  // For the first call we mock the random percentage to be 10%, which will give us the first fault
   // with 0s delay.
   EXPECT_CALL(random_, random()).WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger(_, 25)).WillOnce(Return(10));
