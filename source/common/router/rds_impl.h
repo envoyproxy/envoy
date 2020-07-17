@@ -149,7 +149,7 @@ private:
 
   bool validateUpdateSize(int num_resources);
 
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  Envoy::Config::SubscriptionPtr subscription_;
   const std::string route_config_name_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 

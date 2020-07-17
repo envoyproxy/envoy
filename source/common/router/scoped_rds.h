@@ -176,7 +176,7 @@ private:
   // For creating RDS subscriptions.
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  Envoy::Config::SubscriptionPtr subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ScopeKeyBuilder scope_key_builder_;
   Stats::ScopePtr scope_;
