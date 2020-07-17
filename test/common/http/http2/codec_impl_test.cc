@@ -182,7 +182,8 @@ public:
         (tp.has_value()) ? ::testing::get<SettingsTupleIndex::InitialConnectionWindowSize>(*tp)
                          : CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
     options.set_allow_metadata(allow_metadata_);
-    options.set_stream_error_on_invalid_http_messaging(stream_error_on_invalid_http_messaging_);
+    options.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        stream_error_on_invalid_http_messaging_);
     options.mutable_max_outbound_frames()->set_value(max_outbound_frames_);
     options.mutable_max_outbound_control_frames()->set_value(max_outbound_control_frames_);
     options.mutable_max_consecutive_inbound_frames_with_empty_payload()->set_value(
