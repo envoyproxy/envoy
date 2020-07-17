@@ -26,6 +26,7 @@ public:
   static std::unique_ptr<Socket::Options> buildIpFreebindOptions();
   static std::unique_ptr<Socket::Options> buildIpTransparentOptions();
   static std::unique_ptr<Socket::Options> buildSocketMarkOptions(uint32_t mark);
+  static std::unique_ptr<Socket::Options> buildSocketNoSigpipeOptions();
   static std::unique_ptr<Socket::Options> buildTcpFastOpenOptions(uint32_t queue_length);
   static std::unique_ptr<Socket::Options> buildLiteralOptions(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>& socket_options);
