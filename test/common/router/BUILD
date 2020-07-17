@@ -222,7 +222,7 @@ filegroup(
 envoy_cc_fuzz_test(
     name = "route_fuzz_test",
     srcs = ["route_fuzz_test.cc"],
-    corpus = ":bug_corpus",
+    corpus = ":route_corpus",
     # The corpus_from_config_impl currently does not work, the tests it runs do not pass
     tags = ["skip_on_windows"],
     deps = [
