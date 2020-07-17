@@ -281,7 +281,17 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
         stackdriver_service.mutable_google_grpc()->set_target_uri(GoogleStackdriverTraceAddress);
       }
       auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
+      // TODO(bianpengyuan): add tests for trace_service_stub and initial_metadata options with mock
+      // stubs.
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
+      const auto& initial_metadata = stackdriver_service.initial_metadata();
+      if (!initial_metadata.empty()) {
+        opts.prepare_client_context = [initial_metadata](grpc::ClientContext* ctx) {
+          for (const auto& metadata : initial_metadata) {
+            ctx->AddMetadata(metadata.key(), metadata.value());
+          }
+        };
+      }
 #else
       throw EnvoyException("Opencensus tracer: cannot handle stackdriver google grpc service, "
                            "google grpc is not built in.");
