@@ -60,3 +60,16 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "fault_test",
+    srcs = ["fault_test.cc"],
+    deps = [
+        ":redis_mocks",
+        "//source/common/common:assert_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

@@ -34,10 +34,11 @@ ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Sc
 }
 
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
-                         Common::Redis::EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
+                         Common::Redis::EncoderPtr&& encoder,
+                         CommandSplitter::CommandSplitterFactory& splitter_factory,
                          ProxyFilterConfigSharedPtr config)
-    : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
-      config_(config) {
+    : decoder_(factory.create(*this)), encoder_(std::move(encoder)),
+      splitter_factory_(splitter_factory), config_(config) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ =
@@ -57,12 +58,13 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
                                                config_->stats_.downstream_cx_tx_bytes_total_,
                                                config_->stats_.downstream_cx_tx_bytes_buffered_,
                                                nullptr, nullptr});
+  splitter_ = splitter_factory_.create(callbacks_->connection().dispatcher());
 }
 
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
-  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(std::move(value), request);
+  CommandSplitter::SplitRequestPtr split = splitter_->makeRequest(std::move(value), request);
   if (split) {
     // The splitter can immediately respond and destroy the pending request. Only store the handle
     // if the request is still alive.

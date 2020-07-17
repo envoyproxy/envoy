@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 
 #include "extensions/filters/network/common/redis/codec.h"
 
@@ -79,6 +80,27 @@ public:
   virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                                       SplitCallbacks& callbacks) PURE;
 };
+
+using CommandSplitterPtr = std::unique_ptr<Instance>;
+
+/**
+ * A command splitter factory that allows creation of the command splitter when
+ * we have access to the dispatcher parameter. This supports fault injection,
+ * specifically delay faults, which rely on the dispatcher for creating delay timers.
+ */
+class CommandSplitterFactory {
+public:
+  virtual ~CommandSplitterFactory() = default;
+
+  /**
+   * Create a command splitter.
+   * @param dispatcher supplies the dispatcher .
+   * @return CommandSplitterPtr a handle to a newly created command splitter.
+   */
+  virtual CommandSplitterPtr create(Event::Dispatcher& dispatcher) PURE;
+};
+
+using CommandSplitterFactorySharedPtr = std::shared_ptr<CommandSplitterFactory>;
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

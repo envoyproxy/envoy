@@ -100,3 +100,25 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "fault_interface",
+    hdrs = ["fault.h"],
+    deps = [
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "fault_lib",
+    srcs = ["fault_impl.cc"],
+    hdrs = ["fault_impl.h"],
+    deps = [
+        ":codec_lib",
+        ":fault_interface",
+        "//include/envoy/common:random_generator_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+    ],
+)
