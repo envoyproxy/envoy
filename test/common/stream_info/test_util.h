@@ -34,6 +34,7 @@ public:
   uint64_t bytesReceived() const override { return 1; }
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
+  void setResponseCode(uint32_t response_code) override { response_code_ = response_code; }
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
   const absl::optional<std::string>& responseCodeDetails() const override {
     return response_code_details_;
@@ -111,6 +112,7 @@ public:
   }
   const std::string& getRouteName() const override { return route_name_; }
 
+  void routeEntry(const Router::RouteEntry* route_entry) override { route_entry_ = route_entry; }
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
   absl::optional<std::chrono::nanoseconds>

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
+
 #include <chrono>
 #include <cstdint>
 
@@ -7,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
@@ -111,6 +114,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
+  void setResponseCode(uint32_t code) override { response_code_ = code; }
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
 
   const absl::optional<std::string>& responseCodeDetails() const override {
@@ -205,6 +209,8 @@ struct StreamInfoImpl : public StreamInfo {
   Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
     return upstream_ssl_info_;
   }
+
+  void routeEntry(const Router::RouteEntry* route_entry) override { route_entry_ = route_entry; }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 

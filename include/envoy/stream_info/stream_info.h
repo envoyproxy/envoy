@@ -260,6 +260,11 @@ public:
   virtual void protocol(Http::Protocol protocol) PURE;
 
   /**
+   * @param code the response code.
+   */
+  virtual void setResponseCode(uint32_t code) PURE;
+
+  /**
    * @return the response code.
    */
   virtual absl::optional<uint32_t> responseCode() const PURE;
@@ -471,6 +476,11 @@ public:
    * connection does not use SSL.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
+
+  /**
+   * @param route_entry the updated route entry.
+   */
+  virtual void routeEntry(const Router::RouteEntry* route_entry) PURE;
 
   /**
    * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this

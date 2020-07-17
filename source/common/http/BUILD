@@ -9,6 +9,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "filter_manager_lib",
+    srcs = ["filter_manager.cc"],
+    hdrs = ["filter_manager.h"],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/common:linked_object",
+        "//source/common/local_reply:local_reply_lib",
+        "//source/common/stream_info:stream_info_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "async_client_lib",
     srcs = ["async_client_impl.cc"],
     hdrs = ["async_client_impl.h"],
@@ -166,6 +179,7 @@ envoy_cc_library(
         ":codes_lib",
         ":conn_manager_config_interface",
         ":exception_lib",
+        ":filter_manager_lib",
         ":header_map_lib",
         ":header_utility_lib",
         ":headers_lib",

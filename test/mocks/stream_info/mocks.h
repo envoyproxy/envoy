@@ -49,6 +49,7 @@ public:
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
+  MOCK_METHOD(void, setResponseCode, (uint32_t));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, responseCodeDetails, (), (const));
   MOCK_METHOD(void, addBytesSent, (uint64_t));
@@ -75,6 +76,7 @@ public:
   MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, upstreamSslConnection, (), (const));
   MOCK_METHOD(const Router::RouteEntry*, routeEntry, (), (const));
+  MOCK_METHOD(void, routeEntry, (const Router::RouteEntry*), ());
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
