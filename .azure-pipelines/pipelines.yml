@@ -91,7 +91,7 @@ jobs:
 
   - job: coverage
     displayName: "Linux-x64"
-    dependsOn: ["format"]
+    dependsOn: ["release"]
     timeoutInMinutes: 360
     pool: "x64-large"
     strategy:
