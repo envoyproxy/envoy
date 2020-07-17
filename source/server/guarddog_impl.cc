@@ -2,7 +2,10 @@
 
 #include <chrono>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include "envoy/common/time.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -58,8 +61,11 @@ void GuardDogImpl::step() {
   }
 
   const auto now = time_source_.monotonicTime();
+  std::vector<std::pair<Thread::ThreadId, MonotonicTime>> miss_threads;
+  std::vector<std::pair<Thread::ThreadId, MonotonicTime>> mega_miss_threads;
 
   {
+    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> multi_kill_threads;
     bool seen_one_multi_timeout(false);
     Thread::LockGuard guard(wd_lock_);
     for (auto& watched_dog : watched_dogs_) {
@@ -75,6 +81,7 @@ void GuardDogImpl::step() {
           watched_dog->miss_counter_.inc();
           watched_dog->last_alert_time_ = ltt;
           watched_dog->miss_alerted_ = true;
+          miss_threads.emplace_back(watched_dog->dog_->threadId(), ltt);
         }
       }
       if (delta > megamiss_timeout_) {
@@ -83,15 +90,17 @@ void GuardDogImpl::step() {
           watched_dog->megamiss_counter_.inc();
           watched_dog->last_alert_time_ = ltt;
           watched_dog->megamiss_alerted_ = true;
+          mega_miss_threads.emplace_back(watched_dog->dog_->threadId(), ltt);
         }
       }
       if (killEnabled() && delta > kill_timeout_) {
+        // TODO(kbaichoo): make a call to the kill event handlers.
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
                           watched_dog->dog_->threadId().debugString()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
+        // TODO(kbaichoo): merge in changes from other PRs? Do a multikill / add to arr
         if (seen_one_multi_timeout) {
-
           PANIC(fmt::format(
               "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
               watched_dog->dog_->threadId().debugString()));
@@ -101,6 +110,8 @@ void GuardDogImpl::step() {
       }
     }
   }
+  
+  // TODO(kbaichoo): run handlers 
 
   {
     Thread::LockGuard guard(mutex_);

@@ -1,10 +1,17 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/server/watchdog.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Server {
+
+using WatchDogEvent = 
+using GuardDogActionCb = ::std::function<void(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent, ::std::vector<::std::pair<Thread::ThreadId, MonotonicTime>>, MonotonicTime)>;
+
 
 /**
  * The GuardDog runs a background thread which scans a number of shared WatchDog
