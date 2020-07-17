@@ -32,6 +32,7 @@ envoy_cc_library(
         "//include/envoy/http:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/filters/http/oauth2:oauth_callback_interface",
     ],

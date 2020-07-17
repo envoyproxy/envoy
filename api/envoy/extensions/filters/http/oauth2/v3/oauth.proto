@@ -21,10 +21,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 
 message OAuth2Credentials {
-  // The client_id to be used in the authorize calls.
+  // The client_id to be used in the authorize calls. This value will be URL encoded when sent to the OAuth server.
   string client_id = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The secret used to retrieve the access token.
+  // The secret used to retrieve the access token. This value will be URL encoded when sent to the OAuth server.
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2
       [(validate.rules).message = {required: true}];
 

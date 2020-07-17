@@ -9,6 +9,7 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
+#include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
@@ -30,10 +31,14 @@ constexpr const char* GetAccessTokenBodyFormatString =
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
                                            const std::string& cb_url) {
+  const auto encoded_client_id = Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
+  const auto encoded_secret = Http::Utility::PercentEncoding::encode(secret, ":/=&?");
+  const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
+
   Http::RequestMessagePtr request = createPostRequest();
   request->headers().setPath(oauth_token_path_);
   const std::string body =
-      fmt::format(GetAccessTokenBodyFormatString, auth_code, client_id, secret, cb_url);
+      fmt::format(GetAccessTokenBodyFormatString, auth_code, encoded_client_id, encoded_secret, encoded_cb_url);
   request->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
   ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
