@@ -5,12 +5,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "common/common/utility.h"
-#include "common/common/version.h"
 #include "common/config/utility.h"
 #include "common/event/real_time_system.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
+#include "common/version/version.h"
 
 #include "server/ssl_context_manager.h"
 

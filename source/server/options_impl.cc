@@ -10,8 +10,8 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
-#include "common/common/version.h"
 #include "common/protobuf/utility.h"
+#include "common/version/version.h"
 
 #include "server/options_impl_platform.h"
 

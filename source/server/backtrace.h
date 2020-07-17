@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "common/common/logger.h"
-#include "common/common/version.h"
+#include "common/version/version.h"
 
 #include "absl/debugging/stacktrace.h"
 #include "absl/debugging/symbolize.h"

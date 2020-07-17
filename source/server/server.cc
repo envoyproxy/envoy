@@ -27,7 +27,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
-#include "common/common/version.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/http/codes.h"
@@ -44,6 +43,7 @@
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
+#include "common/version/version.h"
 
 #include "server/admin/utils.h"
 #include "server/configuration_impl.h"

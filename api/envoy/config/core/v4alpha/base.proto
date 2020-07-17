@@ -94,7 +94,7 @@ message BuildVersion {
   type.v3.SemanticVersion version = 1;
 
   // Free-form build information.
-  // Envoy defines several well known keys in the source/common/common/version.h file
+  // Envoy defines several well known keys in the source/common/version/version.h file
   google.protobuf.Struct metadata = 2;
 }
 
