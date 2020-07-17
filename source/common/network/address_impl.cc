@@ -10,7 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/network/socket_interface_impl.h"
+#include "common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {

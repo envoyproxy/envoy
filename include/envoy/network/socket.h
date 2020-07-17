@@ -271,5 +271,7 @@ public:
   virtual bool ipFamilySupported(int domain) PURE;
 };
 
+using SocketInterfacePtr = std::unique_ptr<SocketInterface>;
+
 } // namespace Network
 } // namespace Envoy
