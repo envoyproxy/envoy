@@ -584,7 +584,7 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::finalize100ContinueHeaders(ResponseHeaderMap& headers) {
+void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(ResponseHeaderMap& headers) {
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(headers, filter_manager_.request_headers_.get(),
@@ -592,6 +592,9 @@ void ConnectionManagerImpl::ActiveStream::finalize100ContinueHeaders(ResponseHea
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
+
+  ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", *this, headers);
+  response_encoder_->encode100ContinueHeaders(headers);
 }
 
 void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
@@ -1102,8 +1105,8 @@ uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
   return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
 }
 
-void ConnectionManagerImpl::ActiveStream::finalizeHeaders(ResponseHeaderMap& headers,
-                                                          bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& headers,
+                                                        bool end_stream) {
   // Base headers.
 
   // By default, always preserve the upstream date response header if present. If we choose to

@@ -18,6 +18,7 @@
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -163,7 +164,6 @@ private:
     const Network::Connection* connection() const override;
     uint64_t streamId() const override { return stream_id_; }
     void refreshIdleTimeout() override { resetIdleTimer(); }
-    void finalizeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
     absl::optional<Router::RouteConstSharedPtr> cachedRoute() override { return cached_route_; }
     void upgradeFilterChainCreated() override {
       connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
@@ -173,7 +173,6 @@ private:
       request_response_timespan_->complete();
       connection_manager_.doEndStream(*this);
     }
-    void finalize100ContinueHeaders(ResponseHeaderMap& headers) override;
     Tracing::Config& tracingConfig() override { return *this; }
     void onFilterAboveWriteBufferHighWatermark() override {
       ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
@@ -245,6 +244,21 @@ private:
     }
     void onDownstreamRequestTooLarge() override {
       connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
+    }
+    void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
+    void encode100ContinueHeaders(ResponseHeaderMap& headers) override;
+    void encodeData(Buffer::Instance& data, bool end_stream) override {
+      response_encoder_->encodeData(data, end_stream);
+    }
+    void encodeTrailers(ResponseTrailerMap& trailers) override {
+      ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
+
+      response_encoder_->encodeTrailers(trailers);
+    }
+    void encodeMetadata(MetadataMapVector& metadata) override {
+
+      ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
+      response_encoder_->encodeMetadata(metadata);
     }
 
     void chargeStats(const ResponseHeaderMap& headers);

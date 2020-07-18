@@ -239,7 +239,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
   const bool modified_end_stream = state_.encoding_headers_only_ ||
                                    (end_stream && continue_data_entry == encoder_filters_.end());
-  callbacks_.finalizeHeaders(headers, modified_end_stream);
+  callbacks_.encodeHeaders(headers, modified_end_stream);
 
   if (!modified_end_stream) {
     maybeContinueEncoding(continue_data_entry);
@@ -404,7 +404,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     // One way to solve this problem is to mark end_stream_ for each filter.
     // If a filter is already marked as end_stream_ when decodeData() is called, bails out the
     // whole function. If just skip the filter, the codes after the loop will be called with
-    // wrong data. For encodeData, the response_encoder->encode() will be called.
+    // wrong data. For encodeData, the callbacks_.encodeData() will be called.
     if ((*entry)->end_stream_) {
       return;
     }
@@ -502,7 +502,7 @@ void FilterManager::encodeDataInternal(Buffer::Instance& data, bool end_stream) 
                    data.length(), end_stream);
 
   stream_info_.addBytesSent(data.length());
-  response_encoder_->encodeData(data, end_stream);
+  callbacks_.encodeData(data, end_stream);
   maybeEndEncode(end_stream);
 }
 
@@ -585,9 +585,7 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
     }
   }
 
-  ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", callbacks_, trailers);
-
-  response_encoder_->encodeTrailers(trailers);
+  callbacks_.encodeTrailers(trailers);
   maybeEndEncode(true);
 }
 
@@ -648,11 +646,7 @@ void FilterManager::encode100ContinueHeaders(ActiveStreamEncoderFilter* filter,
     }
   }
 
-  callbacks_.finalize100ContinueHeaders(headers);
-  ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", callbacks_, headers);
-
-  // Now actually encode via the codec.
-  response_encoder_->encode100ContinueHeaders(headers);
+  callbacks_.encode100ContinueHeaders(headers);
 }
 
 void FilterManager::maybeContinueEncoding(
@@ -795,10 +789,8 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
 
   // Now encode metadata via the codec.
   if (!metadata_map_ptr->empty()) {
-    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", callbacks_, *metadata_map_ptr);
     MetadataMapVector metadata_map_vector;
     metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
-    response_encoder_->encodeMetadata(metadata_map_vector);
   }
 }
 
@@ -1247,7 +1239,7 @@ void FilterManager::ActiveStreamEncoderFilter::responseDataTooLarge() {
               },
               [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
                 parent_.response_headers_ = std::move(response_headers);
-                parent_.callbacks_.finalizeHeaders(*parent_.response_headers_, end_stream);
+                parent_.callbacks_.encodeHeaders(*parent_.response_headers_, end_stream);
               },
               [&](Buffer::Instance& data, bool end_stream) -> void {
                 parent_.encodeDataInternal(data, end_stream);

@@ -9,6 +9,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -26,34 +27,48 @@ class FilterManagerCallbacks {
 public:
   virtual ~FilterManagerCallbacks() = default;
 
+  // Allows adding additional information to the span based on HCM configuration.
   virtual void onSpanFinalized(Tracing::Span& span, Http::RequestHeaderMap* request_headers,
                                Http::ResponseHeaderMap* response_headers,
                                Http::ResponseTrailerMap* response_trailers) PURE;
 
+  // The following two functions allows passing through stream information, useful for logging.
   virtual const Network::Connection* connection() const PURE;
   virtual uint64_t streamId() const PURE;
+
   virtual void refreshIdleTimeout() PURE;
-  virtual void finalizeHeaders(Http::ResponseHeaderMap& response_headers, bool end_stream) PURE;
-  virtual void finalize100ContinueHeaders(Http::ResponseHeaderMap& response_headers) PURE;
-  virtual absl::optional<Router::RouteConstSharedPtr> cachedRoute() PURE;
-  virtual void upgradeFilterChainCreated() PURE;
-  virtual void endStream() PURE;
   virtual Tracing::Config& tracingConfig() PURE;
+
+  // TODO(reviewers): Should route resolution etc. belong in the FilterManager? Or should we trim
+  // down on these callbacks so there is less caching logic exposed?
+  virtual absl::optional<Router::RouteConstSharedPtr> cachedRoute() PURE;
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> cachedClusterInfo() PURE;
   virtual void refreshCachedRoute() PURE;
   virtual void refreshCachedRoute(const Router::RouteCallback& cb) PURE;
   virtual void clearRouteCache() PURE;
-  virtual void recreateStream(RequestHeaderMapPtr request_headers) PURE;
   virtual void
   requestRouteConfigUpdate(Event::Dispatcher& dispatcher,
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
-
   virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
+
+  virtual void endStream() PURE;
+  virtual void recreateStream(RequestHeaderMapPtr request_headers) PURE;
+
+  // TODO(snowp): These only exist for the purpose of incrementing HCM stats, there might be a
+  // better way (pluggable metric objects?).
+  virtual void upgradeFilterChainCreated() PURE;
   virtual void onFilterAboveWriteBufferHighWatermark() PURE;
   virtual void onFilterBelowWriteBufferLowWatermark() PURE;
   virtual void onResponseDataTooLarge() PURE;
   virtual void onStreamReset() PURE;
   virtual void onDownstreamRequestTooLarge() PURE;
+
+  // The resulting data will be provided through the following callbacks.
+  virtual void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) PURE;
+  virtual void encode100ContinueHeaders(ResponseHeaderMap& response_headers) PURE;
+  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void encodeTrailers(ResponseTrailerMap& trailers) PURE;
+  virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
 };
 
 // Manages an iteration of a set of HTTP decoder/encoder filters.
@@ -149,6 +164,9 @@ public:
     // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
     // explicitly nulls out response_encoder to avoid the downstream being notified of the
     // Envoy-internal stream instance being ended.
+    // TODO(snowp): This is currently the only reason why we need to care about the
+    // response_encoder_. This could be replaced with just another state bit, but leaving this like
+    // it is for now.
     if (response_encoder_ != nullptr &&
         (!state_.remote_complete_ || !state_.codec_saw_local_complete_)) {
       // Indicate local is complete at this point so that if we reset during a continuation, we
