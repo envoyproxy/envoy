@@ -110,7 +110,7 @@ message EndpointHealth {
 
 // Group endpoint health by locality under each cluster.
 message LocalityEndpointsHealth {
-  api.v3.core.Locality locality = 1;
+  config.core.v3.Locality locality = 1;
 
   repeated EndpointHealth endpoints_health = 2;
 }
