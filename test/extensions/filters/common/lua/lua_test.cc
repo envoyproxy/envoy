@@ -48,7 +48,7 @@ public:
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<ThreadLocalState> state_;
+  ThreadLocalStatePtr state_;
   std::function<void()> yield_callback_;
   ReadyWatcher on_yield_;
 };

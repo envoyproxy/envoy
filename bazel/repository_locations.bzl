@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "ff890c70d60e51c7ee80874f85c3905718b7f6929a6c367c850cdd0b9c01d44d",
-        strip_prefix = "envoy-build-tools-efaecf11d76b86551cf42e2354274ac2acd7042f",
-        # 2020-06-16
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/efaecf11d76b86551cf42e2354274ac2acd7042f.tar.gz"],
+        sha256 = "dd5cc89bb69544659b20b88b28e642da0174739b68c82f029617b9749d61ab1d",
+        strip_prefix = "envoy-build-tools-289a5ca65aefd5a76f18f103d1425cfec5591417",
+        # 2020-07-15
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/289a5ca65aefd5a76f18f103d1425cfec5591417.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -385,10 +385,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["other"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "193ffb4e13bd7886757fd22b61b7f7a400634412ad8e7e1071e73f57bedd7fc6",
-        strip_prefix = "opencensus-cpp-04ed0211931f12b03c1a76b3907248ca4db7bc90",
-        # 2020-03-24
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/04ed0211931f12b03c1a76b3907248ca4db7bc90.tar.gz"],
+        sha256 = "12ff300fa804f97bd07e2ff071d969e09d5f3d7bbffeac438c725fa52a51a212",
+        strip_prefix = "opencensus-cpp-7877337633466358ed680f9b26967da5b310d7aa",
+        # 2020-06-01
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/7877337633466358ed680f9b26967da5b310d7aa.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),

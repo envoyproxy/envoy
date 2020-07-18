@@ -173,14 +173,11 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   // copy headers here.
   auto initial_metadata = Http::RequestHeaderMapImpl::create();
   callbacks_.onCreateInitialMetadata(*initial_metadata);
-  initial_metadata->iterate(
-      [](const Http::HeaderEntry& header, void* ctxt) {
-        auto* client_context = static_cast<grpc::ClientContext*>(ctxt);
-        client_context->AddMetadata(std::string(header.key().getStringView()),
-                                    std::string(header.value().getStringView()));
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &ctxt_);
+  initial_metadata->iterate([this](const Http::HeaderEntry& header) {
+    ctxt_.AddMetadata(std::string(header.key().getStringView()),
+                      std::string(header.value().getStringView()));
+    return Http::HeaderMap::Iterate::Continue;
+  });
   // Invoke stub call.
   rw_ = parent_.stub_->PrepareCall(&ctxt_, "/" + service_full_name_ + "/" + method_name_,
                                    &parent_.tls_.completionQueue());

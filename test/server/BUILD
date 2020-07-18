@@ -356,7 +356,7 @@ envoy_cc_test(
     ],
     tags = ["fails_on_windows"],
     deps = [
-        "//source/common/common:version_lib",
+        "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
