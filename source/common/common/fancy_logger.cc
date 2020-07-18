@@ -58,12 +58,14 @@ bool FancyContext::setFancyLogger(std::string key, level_enum log_level)
 
 void FancyContext::setDefaultFancyLevelFormat(spdlog::level::level_enum level, std::string format)
     ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  if (level == Logger::Context::getFancyDefaultLevel() && format == Logger::Context::getFancyLogFormat()) {
+  if (level == Logger::Context::getFancyDefaultLevel() &&
+      format == Logger::Context::getFancyLogFormat()) {
     return;
   }
   absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
   for (const auto& it : *fancy_log_map_) {
-    if (it.second->level() == Logger::Context::getFancyDefaultLevel()) {  // if logger is default level now
+    if (it.second->level() == Logger::Context::getFancyDefaultLevel()) {
+      // if logger is default level now
       it.second->set_level(level);
     }
     it.second->set_pattern(format);
