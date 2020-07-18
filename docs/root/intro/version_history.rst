@@ -1,6 +1,9 @@
 Version history
 ---------------
 
+1.14.5 (Pending)
+================
+
 1.14.4 (July 7, 2020)
 =====================
 * tls: fixed a bug where wilcard matching for "\*.foo.com" also matched domains of the form "a.b.foo.com". This behavior can be temporarily reverted by setting runtime feature `envoy.reloadable_features.fix_wildcard_matching` to false.
