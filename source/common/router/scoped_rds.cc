@@ -321,8 +321,9 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
   absl::flat_hash_set<std::string> removed_scopes;
   // all the scope names to be removed.
-  for (const std::string& removed_resource : removed_resources)
+  for (const std::string& removed_resource : removed_resources) {
     removed_scopes.insert(removed_resource);
+  }
   absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>
       scoped_routes;
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_key_hash;
@@ -358,8 +359,9 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
   // only remove resources that is not going to be updated.
   for (const std::string& removed_resource : removed_resources) {
-    if (scoped_routes.find(removed_resource) == scoped_routes.end())
+    if (scoped_routes.find(removed_resource) == scoped_routes.end()) {
       *clean_removed_resources.Add() = removed_resource;
+    }
   }
   return clean_removed_resources;
 }
