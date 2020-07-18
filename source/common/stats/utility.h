@@ -214,14 +214,14 @@ public:
   absl::optional<StatType*> find() {
     StatType* stat = stat_.get([this]() -> StatType* {
       StatType* stat = nullptr;
-      IterateFn<StatType> check_stat =
-          [this, &stat](const RefcountPtr<StatType>& shared_stat) -> bool {
-            if (shared_stat->name() == name_) {
-              stat = shared_stat.get();
-              return false; // Stop iteration.
-            }
-            return true;
-          };
+      IterateFn<StatType> check_stat = [this,
+                                        &stat](const RefcountPtr<StatType>& shared_stat) -> bool {
+        if (shared_stat->name() == name_) {
+          stat = shared_stat.get();
+          return false; // Stop iteration.
+        }
+        return true;
+      };
       scope_.iterate(check_stat);
       return stat;
     });
