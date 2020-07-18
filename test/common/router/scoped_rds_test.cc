@@ -596,7 +596,7 @@ key:
                             "configuration 'foo_scope' found");
 }
 
-// Tests that only one resource is provided during a config update.
+// Tests duplicate resources in the same update, should be fully rejected.
 TEST_F(ScopedRdsTest, InvalidDuplicateResourceDelta) {
   setup();
   init_watcher_.expectReady().Times(0);
