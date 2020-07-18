@@ -1,4 +1,7 @@
 # Fix FIPS build (from BoringSSL commit 4ca15d5dcbe6e8051a4654df7c971ea8307abfe0).
+#
+# The modulewrapper is not a part of the FIPS module, so it can be patched without
+# concern about breaking the FIPS validation.
 --- boringssl/util/fipstools/acvp/modulewrapper/modulewrapper.cc
 +++ boringssl/util/fipstools/acvp/modulewrapper/modulewrapper.cc
 @@ -12,9 +12,11 @@
