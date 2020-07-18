@@ -18,7 +18,7 @@ TEST_P(AdminInstanceTest, ReopenLogs) {
   EXPECT_EQ(Http::Code::OK, postCallback("/reopen_logs", header_map, response));
 }
 
-TEST_P(AdminIntanceTest, LogLevelSetting) {
+TEST_P(AdminInstanceTest, LogLevelSetting) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
