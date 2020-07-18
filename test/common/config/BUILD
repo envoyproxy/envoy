@@ -414,7 +414,7 @@ envoy_cc_test(
         ":dummy_config_proto_cc_proto",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",

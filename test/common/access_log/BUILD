@@ -22,7 +22,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",

@@ -23,7 +23,7 @@ envoy_cc_test(
         "//source/common/memory:stats_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
