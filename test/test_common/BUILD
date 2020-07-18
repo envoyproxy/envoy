@@ -295,3 +295,8 @@ envoy_cc_test(
         ":utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "test_version_linkstamp",
+    srcs = ["test_version_linkstamp.cc"],
+)
