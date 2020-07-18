@@ -164,6 +164,16 @@ TEST(Fancy, SetLevel) {
   FANCY_LOG(warn, "Warning: you shouldn't see this message!");
 }
 
+TEST(Fancy, Default) {
+  FancyContext::setFancyLogger(__FILE__, spdlog::level::info); // revert to default
+  std::string fmt = "[%t][%l][%n] %v";
+  FancyContext::setDefaultFancyLevelFormat(spdlog::level::warn, fmt);
+  FANCY_LOG(info, "Info: you shouldn't see this message!");
+  FANCY_LOG(warn, "Warning: warning at default log level!");
+  EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] %v");
+  EXPECT_EQ(Logger::Context::getFancyDefaultLevel(), spdlog::level::info);
+}
+
 TEST(Fancy, FastPath) {
   FancyContext::setFancyLogger(__FILE__, spdlog::level::info);
   for (int i = 0; i < 10; i++) {
