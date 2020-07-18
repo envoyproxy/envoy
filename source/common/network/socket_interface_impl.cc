@@ -1,6 +1,7 @@
 #include "common/network/socket_interface_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
 #include "envoy/network/socket.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -80,6 +81,19 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   }
   return SOCKET_VALID(result.rc_);
 }
+
+Server::BootstrapExtensionPtr
+SocketInterfaceImpl::createBootstrapExtension(const Protobuf::Message&,
+                                              Server::Configuration::ServerFactoryContext&) {
+  return std::make_unique<SocketInterfaceExtension>(*this);
+}
+
+ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {
+  return std::make_unique<
+      envoy::extensions::network::socket_interface::v3::DefaultSocketInterface>();
+}
+
+REGISTER_FACTORY(SocketInterfaceImpl, Server::Configuration::BootstrapExtensionFactory);
 
 static SocketInterfaceLoader* socket_interface_ =
     new SocketInterfaceLoader(std::make_unique<SocketInterfaceImpl>());
