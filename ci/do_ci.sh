@@ -111,7 +111,6 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
   [[ "$(uname -m)" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
-  [[ "$(uname -m)" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --define=hot_restart=disabled --test_env=HEAPCHECK="
 
   setup_clang_toolchain
   echo "bazel release build with tests..."
