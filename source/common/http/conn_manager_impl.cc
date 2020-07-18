@@ -104,7 +104,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Http::Context& http_context, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
-                                             Server::OverloadManager* overload_manager,
+                                             Server::OverloadManager& overload_manager,
                                              TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
@@ -113,14 +113,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
       local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
-      overload_stop_accepting_requests_ref_(
-          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 Server::OverloadActionNames::get().StopAcceptingRequests)
-                           : Server::OverloadManager::getInactiveState()),
-      overload_disable_keepalive_ref_(
-          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 Server::OverloadActionNames::get().DisableHttpKeepAlive)
-                           : Server::OverloadManager::getInactiveState()),
+      overload_stop_accepting_requests_ref_(overload_manager.getThreadLocalOverloadState().getState(
+          Server::OverloadActionNames::get().StopAcceptingRequests)),
+      overload_disable_keepalive_ref_(overload_manager.getThreadLocalOverloadState().getState(
+          Server::OverloadActionNames::get().DisableHttpKeepAlive)),
       time_source_(time_source) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -1558,6 +1554,14 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   // to ensure access logging. If the filter chain already exists this will be
   // a no-op.
   createFilterChain();
+
+  // The BadRequest error code indicates there has been a messaging error.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      !connection_manager_.config_.streamErrorOnInvalidHttpMessaging() &&
+      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2) {
+    state_.saw_connection_close_ = true;
+  }
 
   stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(

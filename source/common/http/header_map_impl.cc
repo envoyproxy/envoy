@@ -264,28 +264,27 @@ void HeaderMapImpl::subtractSize(uint64_t size) {
 }
 
 void HeaderMapImpl::copyFrom(HeaderMap& lhs, const HeaderMap& header_map) {
-  header_map.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        // TODO(mattklein123) PERF: Avoid copying here if not necessary.
-        HeaderString key_string;
-        key_string.setCopy(header.key().getStringView());
-        HeaderString value_string;
-        value_string.setCopy(header.value().getStringView());
+  header_map.iterate([&lhs](const HeaderEntry& header) -> HeaderMap::Iterate {
+    // TODO(mattklein123) PERF: Avoid copying here if not necessary.
+    HeaderString key_string;
+    key_string.setCopy(header.key().getStringView());
+    HeaderString value_string;
+    value_string.setCopy(header.value().getStringView());
 
-        static_cast<HeaderMap*>(context)->addViaMove(std::move(key_string),
-                                                     std::move(value_string));
-        return HeaderMap::Iterate::Continue;
-      },
-      &lhs);
+    lhs.addViaMove(std::move(key_string), std::move(value_string));
+    return HeaderMap::Iterate::Continue;
+  });
 }
 
 namespace {
 
 // This is currently only used in tests and is not optimized for performance.
-HeaderMap::Iterate collectAllHeaders(const HeaderEntry& header, void* headers) {
-  static_cast<std::vector<std::pair<absl::string_view, absl::string_view>>*>(headers)->push_back(
-      std::make_pair(header.key().getStringView(), header.value().getStringView()));
-  return HeaderMap::Iterate::Continue;
+HeaderMap::ConstIterateCb
+collectAllHeaders(std::vector<std::pair<absl::string_view, absl::string_view>>* dest) {
+  return [dest](const HeaderEntry& header) -> HeaderMap::Iterate {
+    dest->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
+    return HeaderMap::Iterate::Continue;
+  };
 };
 
 } // namespace
@@ -298,7 +297,7 @@ bool HeaderMapImpl::operator==(const HeaderMap& rhs) const {
 
   std::vector<std::pair<absl::string_view, absl::string_view>> rhs_headers;
   rhs_headers.reserve(rhs.size());
-  rhs.iterate(collectAllHeaders, &rhs_headers);
+  rhs.iterate(collectAllHeaders(&rhs_headers));
 
   auto i = headers_.begin();
   auto j = rhs_headers.begin();
@@ -462,17 +461,17 @@ HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
   return nullptr;
 }
 
-void HeaderMapImpl::iterate(HeaderMap::ConstIterateCb cb, void* context) const {
+void HeaderMapImpl::iterate(HeaderMap::ConstIterateCb cb) const {
   for (const HeaderEntryImpl& header : headers_) {
-    if (cb(header, context) == HeaderMap::Iterate::Break) {
+    if (cb(header) == HeaderMap::Iterate::Break) {
       break;
     }
   }
 }
 
-void HeaderMapImpl::iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const {
+void HeaderMapImpl::iterateReverse(HeaderMap::ConstIterateCb cb) const {
   for (auto it = headers_.rbegin(); it != headers_.rend(); it++) {
-    if (cb(*it, context) == HeaderMap::Iterate::Break) {
+    if (cb(*it) == HeaderMap::Iterate::Break) {
       break;
     }
   }
@@ -527,17 +526,12 @@ size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
 }
 
 void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
-  using IterateData = std::pair<std::ostream*, const char*>;
-  const char* spaces = spacesForLevel(indent_level);
-  IterateData iterate_data = std::make_pair(&os, spaces);
-  iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        auto* data = static_cast<IterateData*>(context);
-        *data->first << data->second << "'" << header.key().getStringView() << "', '"
-                     << header.value().getStringView() << "'\n";
-        return HeaderMap::Iterate::Continue;
-      },
-      &iterate_data);
+  iterate([&os,
+           spaces = spacesForLevel(indent_level)](const HeaderEntry& header) -> HeaderMap::Iterate {
+    os << spaces << "'" << header.key().getStringView() << "', '" << header.value().getStringView()
+       << "'\n";
+    return HeaderMap::Iterate::Continue;
+  });
 }
 
 HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl** entry,
