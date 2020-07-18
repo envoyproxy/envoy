@@ -22,7 +22,7 @@ quic::WriteResult QuicEnvoyPacketWriter::WritePacket(const char* buffer, size_t 
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
 
-  Api::IoCallUint64Result result = envoy_udp_packet_writer_.writeToSocket(
+  Api::IoCallUint64Result result = envoy_udp_packet_writer_.writePacket(
       *buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
 
   if (result.ok()) {

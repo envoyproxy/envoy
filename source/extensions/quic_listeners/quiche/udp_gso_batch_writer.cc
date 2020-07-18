@@ -10,15 +10,23 @@ namespace Quic {
 // Initialize QuicGsoBatchWriter, and set socket_
 UdpGsoBatchWriter::UdpGsoBatchWriter(Network::Socket& socket)
     : quic::QuicGsoBatchWriter(std::make_unique<quic::QuicBatchWriterBuffer>(),
-                               socket.ioHandle().fd()) {}
+                               socket.ioHandle().fd()),
+      socket_(socket) {}
 
 // Do Nothing in the Destructor For now
 UdpGsoBatchWriter::~UdpGsoBatchWriter() {}
 
 Api::IoCallUint64Result
-UdpGsoBatchWriter::writeToSocket(const Buffer::Instance& buffer,
+UdpGsoBatchWriter::writeToSocket(Network::IoHandle& io_handle, const Buffer::Instance& buffer,
                                  const Network::Address::Ip* local_ip,
                                  const Network::Address::Instance& peer_address) {
+  // Write to socket tied to the socket's ioHandle
+  return writePacket(buffer, local_ip, peer_address);
+}
+
+Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& buffer,
+                                                      const Address::Ip* local_ip,
+                                                      const Address::Instance& peer_address) {
   // Convert received parameters to relevant forms
   // TODO(yugant): Is there a better way to create it? Use common function that uses Instance.
   Network::Address::InstanceConstSharedPtr enpr =
@@ -137,6 +145,8 @@ Api::IoCallUint64Result UdpGsoBatchWriter::flush() {
       /*err=*/Api::IoErrorPtr(new Network::IoSocketError(quic_result.error_code),
                               Network::IoSocketError::deleteIoError));
 }
+
+Network::IoHandle& UdpGsoBatchWriter::getWriterIoHandle() const { return socket_.ioHandle(); }
 
 UdpGsoBatchWriterFactory::UdpGsoBatchWriterFactory() {}
 

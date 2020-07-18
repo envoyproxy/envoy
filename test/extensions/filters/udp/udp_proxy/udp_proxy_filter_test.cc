@@ -160,13 +160,14 @@ public:
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
 
-    ON_CALL(udp_packet_writer_, writeToSocket(_, _, _))
+    ON_CALL(udp_packet_writer_, writeToSocket(_, _, _, _))
         .WillByDefault(
-            Invoke([&](const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
+            Invoke([&](Network::IoHandle& io_handle, const Buffer::Instance& buffer,
+                       const Network::Address::Ip* local_ip,
                        const Network::Address::Instance& peer_address) -> Api::IoCallUint64Result {
               Buffer::RawSliceVector slices = buffer.getRawSlices();
-              return Network::Utility::writeToSocket(*new_session.io_handle_, slices.data(),
-                                                     slices.size(), local_ip, peer_address);
+              return Network::Utility::writeToSocket(io_handle, slices.data(), slices.size(),
+                                                     local_ip, peer_address);
             }));
 
     EXPECT_CALL(*filter_, createIoHandle(_))

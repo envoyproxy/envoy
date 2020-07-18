@@ -33,11 +33,10 @@ public:
 
   // writeToSocket perform batched sends based on QuicGsoBatchWriter::WritePacket
   // implementation
-  Api::IoCallUint64Result writeToSocket(const Buffer::Instance& buffer,
+  Api::IoCallUint64Result writeToSocket(Network::IoHandle& io_handle,
+                                        const Buffer::Instance& buffer,
                                         const Network::Address::Ip* local_ip,
                                         const Network::Address::Instance& peer_address) override;
-
-  std::string name() const override { return GsoBatchWriterName; }
 
   bool isWriteBlocked() const override { return IsWriteBlocked(); }
   void setWritable() override { return SetWritable(); }
@@ -47,6 +46,12 @@ public:
   char* getNextWriteLocation(const Network::Address::Ip* local_ip,
                              const Network::Address::Instance& peer_address) override;
   Api::IoCallUint64Result flush() override;
+
+  std::string name() const override { return GsoBatchWriterName; }
+  Network::IoHandle& getWriterIoHandle const override;
+
+private:
+  Network::Socket& socket_;
 };
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {

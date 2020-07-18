@@ -466,6 +466,9 @@ public:
   MockUdpPacketWriter() = default;
 
   MOCK_METHOD(Api::IoCallUint64Result, writeToSocket,
+              (Network::IoHandle & io_handle, const Buffer::Instance& buffer,
+               const Address::Ip* local_ip, const Address::Instance& peer_address));
+  MOCK_METHOD(Api::IoCallUint64Result, writePacket,
               (const Buffer::Instance& buffer, const Address::Ip* local_ip,
                const Address::Instance& peer_address));
   MOCK_METHOD(bool, isWriteBlocked, (), (const));
@@ -476,6 +479,7 @@ public:
               (const Address::Ip* local_ip, const Address::Instance& peer_address));
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
   MOCK_METHOD(std::string, name, (), (const));
+  MOCK_METHOD(Network::IoHandle&, getWriterIoHandle, (), (const));
 };
 
 class MockUdpListener : public UdpListener {

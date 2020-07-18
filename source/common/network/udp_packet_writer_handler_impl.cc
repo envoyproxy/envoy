@@ -15,13 +15,14 @@ UdpDefaultWriter::UdpDefaultWriter(Network::Socket& socket)
 // Destructor does nothing for now
 UdpDefaultWriter::~UdpDefaultWriter() {}
 
-Api::IoCallUint64Result UdpDefaultWriter::writeToSocket(const Buffer::Instance& buffer,
+Api::IoCallUint64Result UdpDefaultWriter::writeToSocket(Network::IoHandle& io_handle,
+                                                        const Buffer::Instance& buffer,
                                                         const Address::Ip* local_ip,
                                                         const Address::Instance& peer_address) {
   // Simple call to Utility::writeToSocket
   if (!isWriteBlocked()) {
     Api::IoCallUint64Result result =
-        Utility::writeToSocket(socket_.ioHandle(), buffer, local_ip, peer_address);
+        Utility::writeToSocket(io_handle, buffer, local_ip, peer_address);
 
     if (result.err_ && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       // Writer is blocked when error code received is EWOULDBLOCK/EAGAIN
@@ -38,7 +39,16 @@ Api::IoCallUint64Result UdpDefaultWriter::writeToSocket(const Buffer::Instance& 
                                                          Network::IoSocketError::deleteIoError));
 }
 
+Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& buffer,
+                                                      const Address::Ip* local_ip,
+                                                      const Address::Instance& peer_address) {
+  // Write to socket tied to the socket's ioHandle
+  return writeToSocket(socket_.ioHandle(), buffer, local_ip, peer_address);
+}
+
 std::string UdpDefaultWriter::name() const { return UdpWriterNames::get().DefaultWriter; }
+
+Network::IoHandle& UdpDefaultWriter::getWriterIoHandle() const { return socket_.ioHandle(); }
 
 } // namespace Network
 } // namespace Envoy

@@ -16,9 +16,12 @@ public:
   ~UdpDefaultWriter() override;
 
   // following writeToSocket() utilizes the Utility::writeToSocket implementation
-  Api::IoCallUint64Result writeToSocket(const Buffer::Instance& buffer, const Address::Ip* local_ip,
+  Api::IoCallUint64Result writeToSocket(Network::IoHandle& io_handle,
+                                        const Buffer::Instance& buffer, const Address::Ip* local_ip,
                                         const Address::Instance& peer_address) override;
 
+  Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer, const Address::Ip* local_ip,
+                                      const Address::Instance& peer_address) override;
   bool isWriteBlocked() const override { return write_blocked_; }
   void setWritable() override { write_blocked_ = false; }
   uint64_t getMaxPacketSize(const Address::Instance& /*peer_address*/) const override {
@@ -38,6 +41,7 @@ public:
   }
 
   std::string name() const override;
+  Network::IoHandle& getWriterIoHandle() const override;
 
 private:
   bool write_blocked_;

@@ -32,6 +32,7 @@
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/udp_default_writer_config.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "server/active_raw_udp_listener_config.h"
@@ -696,7 +697,8 @@ private:
   public:
     FakeListener(FakeUpstream& parent)
         : parent_(parent), name_("fake_upstream"),
-          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()) {}
+          udp_listener_factory_(std::make_unique<Server::ActiveRawUdpListenerFactory>()),
+          udp_writer_factory_(std::make_unique<Network::UdpDefaultWriterFactory>()) {}
 
   private:
     // Network::ListenerConfig

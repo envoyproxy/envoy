@@ -224,7 +224,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   //       the right IP based on outbound routing rules.
   Api::IoCallUint64Result rc =
       cluster_.filter_.read_callbacks_->udpListener().udpPacketWriter()->writeToSocket(
-          buffer, nullptr, *host_->address());
+          *io_handle_, buffer, nullptr, *host_->address());
   // Api::IoCallUint64Result rc =
   //     Network::Utility::writeToSocket(*io_handle_, buffer, nullptr, *host_->address());
 
