@@ -46,6 +46,11 @@ public:
    */
   static std::string listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
+  /**
+   * Sets the levels of all loggers.
+   */
+  static void setAllFancyLoggers(spdlog::level::level_enum level) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+
 private:
   /**
    * Initializes sink for the initialization of loggers, needed only in benchmark test.

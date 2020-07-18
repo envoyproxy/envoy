@@ -34,7 +34,7 @@ SpdLoggerPtr FancyContext::getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED
 
 void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
     ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  absl::WriterMutexLock l(&FancyContext::fancy_log_lock_);
+  absl::WriterMutexLock l(&fancy_log_lock_);
   auto it = fancy_log_map_->find(key);
   spdlog::logger* target;
   if (it == fancy_log_map_->end()) {
@@ -47,7 +47,7 @@ void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>
 
 bool FancyContext::setFancyLogger(std::string key, level_enum log_level)
     ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
+  absl::ReaderMutexLock l(&fancy_log_lock_);
   auto it = fancy_log_map_->find(key);
   if (it != fancy_log_map_->end()) {
     it->second->set_level(log_level);
@@ -62,7 +62,7 @@ void FancyContext::setDefaultFancyLevelFormat(spdlog::level::level_enum level, s
       format == Logger::Context::getFancyLogFormat()) {
     return;
   }
-  absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
+  absl::ReaderMutexLock l(&fancy_log_lock_);
   for (const auto& it : *fancy_log_map_) {
     if (it.second->level() == Logger::Context::getFancyDefaultLevel()) {
       // if logger is default level now
@@ -74,12 +74,20 @@ void FancyContext::setDefaultFancyLevelFormat(spdlog::level::level_enum level, s
 
 std::string FancyContext::listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
   std::string info = "";
-  absl::ReaderMutexLock l(&FancyContext::fancy_log_lock_);
+  absl::ReaderMutexLock l(&fancy_log_lock_);
   for (const auto& it : *fancy_log_map_) {
     info += fmt::format("   {}: {}\n", it.first, it.second);
   }
   info += "\n";
   return info;
+}
+
+void FancyContext::setAllFancyLoggers(spdlog::level::level_enum level)
+    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  absl::ReaderMutexLock l(&fancy_log_lock_);
+  for (const auto& it : *fancy_log_map_) {
+    it.second->set_level(level);
+  }
 }
 
 void FancyContext::initSink() {
