@@ -3215,7 +3215,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        absl::optional<uint64_t>(absl::nullopt)));
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
 
@@ -3246,7 +3246,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
           }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        absl::optional<uint64_t>(absl::nullopt)));
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -3304,7 +3304,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        absl::optional<uint64_t>(absl::nullopt)));
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
