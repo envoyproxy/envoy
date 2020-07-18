@@ -13,7 +13,7 @@ using FancyMapPtr = std::shared_ptr<FancyMap>;
 using SpdLoggerPtr = std::shared_ptr<spdlog::logger>;
 
 /**
- * Stores the lock and functions used by Fancy Logger's macro so that we don't need to declaring
+ * Stores the lock and functions used by Fancy Logger's macro so that we don't need to declare
  * them globally. Functions are provided to initialize a logger, set log level, flush a logger.
  */
 class FancyContext {
@@ -84,13 +84,10 @@ private:
     spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
     if (!local_flogger) {                                                                          \
       FancyContext::initFancyLogger(FANCY_KEY, flogger);                                           \
-      flogger.load(std::memory_order_relaxed)                                                      \
-          ->log(spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),       \
-                __VA_ARGS__);                                                                      \
-    } else {                                                                                       \
-      local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                         \
-                         ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                  \
+      local_flogger = flogger.load(std::memory_order_relaxed);                                     \
     }                                                                                              \
+    local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                           \
+                       ENVOY_SPDLOG_LEVEL(LEVEL), __VA_ARGS__);                                    \
   } while (0)
 
 /**
