@@ -865,11 +865,10 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   span->setSampled(true);
   span->injectContext(request_headers_);
   request_headers_.iterate(
-      [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
-        EXPECT_FALSE(static_cast<DupCallback*>(cb)->operator()(header.key().getStringView()));
+      [&dup_callback](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+        dup_callback(header.key().getStringView());
         return Http::HeaderMap::Iterate::Continue;
-      },
-      &dup_callback);
+      });
 }
 
 } // namespace

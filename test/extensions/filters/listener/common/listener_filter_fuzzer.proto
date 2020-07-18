@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package test.extensions.filters.listener;
+
+message Socket {
+  string local_address = 1;
+  string remote_address = 2;
+}
+
+message FilterFuzzTestCase {
+  Socket sock = 1;
+}

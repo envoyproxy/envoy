@@ -50,10 +50,12 @@ udp_listener_config:
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV2Yaml(yaml);
   EXPECT_CALL(server_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 3, // SO_REUSEPORT is on as configured
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
 #else
-                           /* expected_num_options */ 2,
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
 #endif
                            /* expected_creation_params */ {true, false});
 
@@ -67,11 +69,18 @@ udp_listener_config:
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #endif
-
   expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
                    /* expected_sockopt_name */ SO_REUSEPORT,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
+#ifdef UDP_GRO
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
+                     /* expected_sockopt_name */ UDP_GRO,
+                     /* expected_value */ 1,
+                     /* expected_num_calls */ 1);
+  }
+#endif
 
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());

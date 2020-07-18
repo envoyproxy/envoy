@@ -22,6 +22,7 @@ build --enable_platform_specific_config
 
 # Enable position independent code, this option is not supported on Windows and default on on macOS.
 build:linux --copt=-fPIC
+build:linux --cxxopt=-std=c++17
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -65,6 +66,7 @@ build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
+build:macos --cxxopt=-std=c++17
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
@@ -159,6 +161,10 @@ build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --config=clang-msan
 
+build:rbe-toolchain-tsan --linkopt=-L/opt/libcxx_tsan/lib
+build:rbe-toolchain-tsan --linkopt=-Wl,-rpath,/opt/libcxx_tsan/lib
+build:rbe-toolchain-tsan --config=clang-tsan
+
 build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --platforms=@rbe_ubuntu_gcc//config:platform
 build:rbe-toolchain-gcc --host_platform=@rbe_ubuntu_gcc//config:platform
@@ -205,7 +211,7 @@ build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:f21773ab398a879f976936f72c78c9dd3718ca1e
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:736b8db2e1f0b55edb50719d2f8ddf383f46030b
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -226,6 +232,10 @@ build:docker-gcc --config=rbe-toolchain-gcc
 build:docker-msan --config=docker-sandbox
 build:docker-msan --config=rbe-toolchain-clang-libc++
 build:docker-msan --config=rbe-toolchain-msan
+
+build:docker-tsan --config=docker-sandbox
+build:docker-tsan --config=rbe-toolchain-clang-libc++
+build:docker-tsan --config=rbe-toolchain-tsan
 
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
@@ -265,6 +275,7 @@ build:windows --define manual_stamp=manual_stamp
 build:windows --copt="-DCARES_STATICLIB"
 build:windows --copt="-DNGHTTP2_STATICLIB"
 build:windows --copt="-DCURL_STATICLIB"
+build:windows --cxxopt="/std:c++17"
 
 # Required to work around build defects on Windows MSVC cl
 # Unguarded gcc pragmas in quiche are not recognized by MSVC
