@@ -1264,6 +1264,47 @@ typed_config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 }
 
+TEST_F(AccessLogImplTest, MetadataFilter) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  metadata_filter:
+    matcher:
+      filter: "envoy.common"
+      path:
+        - key: "a"
+        - key: "b"
+        - key: "c"
+      value:
+        bool_match: true
+
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  TestStreamInfo stream_info;
+  ProtobufWkt::Struct metadata_val;
+  auto& fields_a = *metadata_val.mutable_fields();
+  auto& struct_b = *fields_a["a"].mutable_struct_value();
+  auto& fields_b = *struct_b.mutable_fields();
+  auto& struct_c = *fields_b["b"].mutable_struct_value();
+  auto& fields_c = *struct_c.mutable_fields();
+  fields_c["c"].set_bool_value(true);
+
+  stream_info.setDynamicMetadata("envoy.common", metadata_val);
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(1);
+
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+  fields_c["c"].set_bool_value(false);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+}
+
 class TestHeaderFilterFactory : public ExtensionFilterFactory {
 public:
   ~TestHeaderFilterFactory() override = default;

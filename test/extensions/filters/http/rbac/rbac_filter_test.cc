@@ -26,7 +26,8 @@ namespace {
 
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
-  RoleBasedAccessControlFilterConfigSharedPtr setupConfig(envoy::config::rbac::v3::RBAC::Action action) {
+  RoleBasedAccessControlFilterConfigSharedPtr
+  setupConfig(envoy::config::rbac::v3::RBAC::Action action) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
     envoy::config::rbac::v3::Policy policy;
@@ -50,8 +51,9 @@ public:
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
   }
 
-  RoleBasedAccessControlFilterTest() : config_(setupConfig(envoy::config::rbac::v3::RBAC::ALLOW)), filter_(config_),
-                                       log_config_(setupConfig(envoy::config::rbac::v3::RBAC::LOG)), log_filter_(log_config_) {}
+  RoleBasedAccessControlFilterTest()
+      : config_(setupConfig(envoy::config::rbac::v3::RBAC::ALLOW)), filter_(config_),
+        log_config_(setupConfig(envoy::config::rbac::v3::RBAC::LOG)), log_filter_(log_config_) {}
 
   void SetUp() override {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
@@ -75,6 +77,13 @@ public:
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, ProtobufWkt::Struct>(HttpFilterNames::get().Rbac,
+                                                                  obj));
+        }));
+
+    ON_CALL(req_info_, setDynamicMetadata("envoy.common", _))
+        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+          req_info_.metadata_.mutable_filter_metadata()->insert(
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>("envoy.common",
                                                                   obj));
         }));
   }
@@ -135,10 +144,10 @@ TEST_F(RoleBasedAccessControlFilterTest, Path) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
 
   headers = Http::TestRequestHeaderMapImpl{
-    {":method", "GET"},
-    {":path", "prefix/suffix/next"},
-    {":scheme", "http"},
-    {":authority", "host"},
+      {":method", "GET"},
+      {":path", "prefix/suffix/next"},
+      {":scheme", "http"},
+      {":authority", "host"},
   };
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 }
@@ -182,7 +191,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));
 }
 
-//Log Tests
+// Log Tests
 TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   setDestinationPort(123);
   setMetadata();
@@ -195,8 +204,8 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  EXPECT_EQ("yes", filter_meta.fields().at("envoy.log").string_value());
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.common");
+  EXPECT_EQ(true, filter_meta.fields().at("access_log_hint").bool_value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
@@ -211,8 +220,8 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  EXPECT_EQ("no", filter_meta.fields().at("envoy.log").string_value());
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.common");
+  EXPECT_EQ(false, filter_meta.fields().at("access_log_hint").bool_value());
 }
 
 } // namespace

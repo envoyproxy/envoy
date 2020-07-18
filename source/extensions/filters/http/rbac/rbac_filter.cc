@@ -73,15 +73,14 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
           : "none",
       headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 
-  ProtobufWkt::Struct metrics;
-  auto& fields = *metrics.mutable_fields();
-  Http::FilterHeadersStatus result = Http::FilterHeadersStatus::Continue;
-
   std::string effective_policy_id;
   const auto shadow_engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
 
   if (shadow_engine != nullptr) {
+    ProtobufWkt::Struct metrics;
+    auto& fields = *metrics.mutable_fields();
+
     std::string shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
     if (shadow_engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(),
@@ -95,7 +94,6 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
     }
 
-
     if (!effective_policy_id.empty()) {
       *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()
                   .ShadowEffectivePolicyIdField]
@@ -104,32 +102,36 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
 
     *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField]
          .mutable_string_value() = shadow_resp_code;
+
+    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
 
   const auto engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
-    //Set kRbacShouldLog to true if shouldLog; false otherwise
-    bool log_decision = engine->shouldLog(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr);
-    // callbacks_->streamInfo().filterState()->setData("envoy.log", std::make_shared<RBACShouldLogState>(log_decision ? "yes" : "no"),
-    //       StreamInfo::FilterState::StateType::Mutable);
-    *fields["envoy.log"].mutable_string_value() = log_decision ? "yes": "no";
+    ProtobufWkt::Struct log_metadata;
+    auto& log_fields = *log_metadata.mutable_fields();
+    // Set kRbacShouldLog to true if shouldLog; false otherwise
+    bool log_decision =
+        engine->shouldLog(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr);
+    log_fields["access_log_hint"].set_bool_value(log_decision);
+    callbacks_->streamInfo().setDynamicMetadata("envoy.common", log_metadata);
 
     if (engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
+      return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied");
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
                                  absl::nullopt, RcDetails::get().RbacAccessDenied);
       config_->stats().denied_.inc();
-      result = Http::FilterHeadersStatus::StopIteration;
+      return Http::FilterHeadersStatus::StopIteration;
     }
   }
 
-  callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   ENVOY_LOG(debug, "no engine, allowed by default");
-  return result;
+  return Http::FilterHeadersStatus::Continue;
 }
 
 } // namespace RBACFilter

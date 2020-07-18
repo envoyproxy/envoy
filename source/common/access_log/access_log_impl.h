@@ -15,6 +15,7 @@
 #include "common/grpc/status.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/common/matchers.h"
 
 #include "absl/hash/hash.h"
 
@@ -226,6 +227,23 @@ private:
    */
   Grpc::Status::GrpcStatus
   protoToGrpcStatus(envoy::config::accesslog::v3::GrpcStatusFilter::Status status) const;
+};
+
+/**
+  * Filters requests based on dynamic metadata
+  */
+class MetadataFilter : public Filter {
+public:
+  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& config);
+
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+              const Http::ResponseHeaderMap& response_headers,
+              const Http::ResponseTrailerMap& response_trailers) const override;
+
+private:
+  const Envoy::Matchers::MetadataMatcher matcher_;
+
+  
 };
 
 /**
