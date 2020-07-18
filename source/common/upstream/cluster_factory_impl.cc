@@ -105,7 +105,9 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
+
   auto stats_scope = generateStatsScope(cluster, context.stats());
+
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
       context.localInfo(), context.dispatcher(), context.random(), context.stats(),

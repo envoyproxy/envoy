@@ -567,6 +567,8 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                             const std::string& version_info) {
+  auto start = std::chrono::high_resolution_clock::now();
+
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
@@ -575,6 +577,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   const uint64_t new_hash = MessageUtil::hash(cluster);
+
   if ((existing_active_cluster != active_clusters_.end() &&
        existing_active_cluster->second->blockUpdate(new_hash)) ||
       (existing_warming_cluster != warming_clusters_.end() &&
@@ -646,6 +649,12 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   }
 
   updateClusterCounts();
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+  // To get the value of duration use the count()
+  // member function on the duration object
+  std::cout << "Time taken for cluster initialization:" << duration.count() << "\n";
   return true;
 }
 
@@ -714,8 +723,10 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                      const std::string& version_info, bool added_via_api,
                                      ClusterMap& cluster_map) {
+
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
+
   auto& new_cluster = new_cluster_pair.first;
   Cluster& cluster_reference = *new_cluster;
 
