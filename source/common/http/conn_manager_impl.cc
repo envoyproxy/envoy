@@ -614,9 +614,7 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
         upstream_host->cluster().requestResponseSizeStats();
     if (req_resp_stats.has_value()) {
-      // record request body size
       req_resp_stats->get().upstream_rq_body_size_.recordValue(stream_info_.bytesReceived());
-      // record response body size
       req_resp_stats->get().upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
     }
   }
