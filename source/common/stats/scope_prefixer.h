@@ -54,8 +54,7 @@ public:
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
-  template <class SharedStatType>
-  bool iterHelper(const std::function<bool(const SharedStatType& stat)>& fn) const {
+  template <class StatType> bool iterHelper(const IterateFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name
     // prefixes. Strictly speaking this is not correct, as a stat name can be in
     // different scopes. But there is no data in `ScopePrefixer` to resurrect
@@ -67,8 +66,8 @@ public:
     // faster to match on the StatName prefix. This would be possible if
     // SymbolTable exposed a split() method.
     std::string prefix_str = scope_.symbolTable().toString(prefix_.statName());
-    std::function<bool(const SharedStatType& stat)> filter_scope =
-        [&fn, &prefix_str](const SharedStatType& stat) -> bool {
+    IterateFn<StatType> filter_scope = [&fn,
+                                        &prefix_str](const RefcountPtr<StatType>& stat) -> bool {
       return !absl::StartsWith(stat->name(), prefix_str) || fn(stat);
     };
     return scope_.iterate(filter_scope);
