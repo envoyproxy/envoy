@@ -1,10 +1,40 @@
 #include "extensions/filters/common/lua/wrappers.h"
 
+#include <lua.h>
+
+#include "common/common/hex.h"
+
+#include "absl/time/time.h"
+
+// Obtain a value from a connection_info_ when the connection_info_ is not nullptr. Otherwise
+// return the default value.
+#define CONNECTION_INFO_GET_VALUE_OR_DEFAULT(getter, default_value)                                \
+  state, connection_info_ == nullptr ? default_value : connection_info_->getter
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Lua {
+
+namespace {
+
+// Builds a Lua table from a list of strings.
+template <typename List> void createLuaTableFromStringList(lua_State* state, const List& list) {
+  lua_createtable(state, list.size(), 0);
+  for (size_t i = 0; i < list.size(); i++) {
+    lua_pushstring(state, list[i].c_str());
+    lua_rawseti(state, -2, i + 1);
+  }
+}
+
+// Format time since epoch as RFC 3339. It is safer to return string to Lua instead of returning
+// unsigned long.
+const std::string formatAsRFC3339(const SystemTime& system_time) {
+  return absl::FormatTime(absl::RFC3339_full, absl::FromChrono(system_time), absl::UTCTimeZone());
+}
+
+} // namespace
 
 int BufferWrapper::luaLength(lua_State* state) {
   lua_pushnumber(state, data_.length());
@@ -214,6 +244,132 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
 
   iterator_.reset(MetadataMapIterator::create(state, *this), true);
   lua_pushcclosure(state, MetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int SslConnectionWrapper::luaPeerCertificatePresented(lua_State* state) {
+  lua_pushboolean(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(peerCertificatePresented(), false));
+  return 1;
+}
+
+int SslConnectionWrapper::luaPeerCertificateValidated(lua_State* state) {
+  lua_pushboolean(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(peerCertificateValidated(), false));
+  return 1;
+}
+
+int SslConnectionWrapper::luaUriSanLocalCertificate(lua_State* state) {
+  if (connection_info_ == nullptr) {
+    lua_createtable(state, 0, 0);
+  } else {
+    createLuaTableFromStringList(state, connection_info_->uriSanLocalCertificate());
+  }
+  return 1;
+}
+
+int SslConnectionWrapper::luaSha256PeerCertificateDigest(lua_State* state) {
+  lua_pushstring(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(sha256PeerCertificateDigest().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaSerialNumberPeerCertificate(lua_State* state) {
+  lua_pushstring(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(serialNumberPeerCertificate().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaIssuerPeerCertificate(lua_State* state) {
+  lua_pushstring(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(issuerPeerCertificate().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaSubjectPeerCertificate(lua_State* state) {
+  lua_pushstring(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(subjectPeerCertificate().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaUriSanPeerCertificate(lua_State* state) {
+  if (connection_info_ == nullptr) {
+    lua_createtable(state, 0, 0);
+  } else {
+    createLuaTableFromStringList(state, connection_info_->uriSanPeerCertificate());
+  }
+  return 1;
+}
+
+int SslConnectionWrapper::luaSubjectLocalCertificate(lua_State* state) {
+  lua_pushstring(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(subjectLocalCertificate().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaDnsSansPeerCertificate(lua_State* state) {
+  if (connection_info_ == nullptr) {
+    lua_createtable(state, 0, 0);
+  } else {
+    createLuaTableFromStringList(state, connection_info_->dnsSansPeerCertificate());
+  }
+  return 1;
+}
+
+int SslConnectionWrapper::luaDnsSansLocalCertificate(lua_State* state) {
+  if (connection_info_ == nullptr) {
+    lua_createtable(state, 0, 0);
+  } else {
+    createLuaTableFromStringList(state, connection_info_->dnsSansLocalCertificate());
+  }
+  return 1;
+}
+
+int SslConnectionWrapper::luaValidFromPeerCertificate(lua_State* state) {
+  if (connection_info_ == nullptr || !connection_info_->validFromPeerCertificate().has_value()) {
+    lua_pushstring(state, "");
+  } else {
+    lua_pushstring(state,
+                   formatAsRFC3339(connection_info_->validFromPeerCertificate().value()).c_str());
+  }
+  return 1;
+}
+
+int SslConnectionWrapper::luaExpirationPeerCertificate(lua_State* state) {
+  if (connection_info_ == nullptr || !connection_info_->expirationPeerCertificate().has_value()) {
+    lua_pushstring(state, "");
+  } else {
+    lua_pushstring(state,
+                   formatAsRFC3339(connection_info_->expirationPeerCertificate().value()).c_str());
+  }
+  return 1;
+}
+
+int SslConnectionWrapper::luaSessionId(lua_State* state) {
+  lua_pushstring(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(sessionId().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaCiphersuiteId(lua_State* state) {
+  lua_pushstring(
+      state, connection_info_ == nullptr
+                 ? "0xffff"
+                 : absl::StrCat("0x", Hex::uint16ToHex(connection_info_->ciphersuiteId())).c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaCiphersuiteString(lua_State* state) {
+  lua_pushstring(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(ciphersuiteString().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaUrlEncodedPemEncodedPeerCertificate(lua_State* state) {
+  lua_pushstring(
+      CONNECTION_INFO_GET_VALUE_OR_DEFAULT(urlEncodedPemEncodedPeerCertificate().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaUrlEncodedPemEncodedPeerCertificateChain(lua_State* state) {
+  lua_pushstring(
+      CONNECTION_INFO_GET_VALUE_OR_DEFAULT(urlEncodedPemEncodedPeerCertificateChain().c_str(), ""));
+  return 1;
+}
+
+int SslConnectionWrapper::luaTlsVersion(lua_State* state) {
+  lua_pushstring(CONNECTION_INFO_GET_VALUE_OR_DEFAULT(tlsVersion().c_str(), ""));
   return 1;
 }
 
