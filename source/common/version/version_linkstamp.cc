@@ -1,5 +1,6 @@
 #ifdef ENVOY_MANUAL_STAMP
 #include "common/version/version_linkstamp.h"
+
 #endif
 
 // NOLINT(namespace-envoy)
