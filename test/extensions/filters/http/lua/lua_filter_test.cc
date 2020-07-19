@@ -26,7 +26,6 @@ using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
-using testing::Mock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrEq;
