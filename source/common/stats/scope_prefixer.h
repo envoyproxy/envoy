@@ -54,6 +54,12 @@ public:
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
+
+private:
   template <class StatType> bool iterHelper(const IterateFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name
     // prefixes. Strictly speaking this is not correct, as a stat name can be in
@@ -62,10 +68,13 @@ public:
     // that `ScopePrefixer` is not used in `ThreadLocalStore`, which has
     // accurate maps describing which stats are in which scopes.
     //
-    // TODO(jarantz): In the scope of this limited implementation, it would be
+    // TODO(jmarantz): In the scope of this limited implementation, it would be
     // faster to match on the StatName prefix. This would be possible if
     // SymbolTable exposed a split() method.
     std::string prefix_str = scope_.symbolTable().toString(prefix_.statName());
+    if (!prefix_str.empty() && !absl::EndsWith(prefix_str, ".")) {
+      prefix_str += ".";
+    }
     IterateFn<StatType> filter_scope = [&fn,
                                         &prefix_str](const RefcountPtr<StatType>& stat) -> bool {
       return !absl::StartsWith(stat->name(), prefix_str) || fn(stat);
@@ -73,12 +82,6 @@ public:
     return scope_.iterate(filter_scope);
   }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
-
-private:
   Scope& scope_;
   StatNameStorage prefix_;
 };
