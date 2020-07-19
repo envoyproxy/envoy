@@ -207,11 +207,31 @@ public:
                                                StatNameTagVectorOptConstRef tags = absl::nullopt);
 };
 
+/**
+ * Holds a reference to a stat by name. Note that the stat may not be created
+ * yet at the tome CachedReference is created. Calling find() then does a lazy
+ * lookup, potentially returning absl::nullopt if the stat doesn't exist yet.
+ * StatReference works whether the name was constructed symbolically, or with
+ * StatNameDynamicStorage.
+ *
+ * Lookups are very slow, taking time proportional to the size of the scope,
+ * holding mutexes during the lookup. However once the lookup succeeds, the
+ * result is cached atomically, and further calls to find() are thus fast and
+ * mutex-free. The implementation may be faster for stats that are named
+ * symbolically.
+ *
+ * CachedReference is valid for the lifetime of the Scope. When the Scope
+ * becomes invalid, CachedReferences must also be dropped as they will hold
+ * pointers into the scope.
+ */
 template <class StatType> class CachedReference {
 public:
   CachedReference(Scope& scope, absl::string_view name) : scope_(scope), name_(std::string(name)) {}
 
-  absl::optional<StatType*> find() {
+  /**
+   * Finds the named stat, if it exists, returning it as an optional.
+   */
+  absl::optional<std::reference_wrapper<StatType>> find() {
     StatType* stat = stat_.get([this]() -> StatType* {
       StatType* stat = nullptr;
       IterateFn<StatType> check_stat = [this,
@@ -228,7 +248,7 @@ public:
     if (stat == nullptr) {
       return absl::nullopt;
     }
-    return stat;
+    return *stat;
   }
 
 private:

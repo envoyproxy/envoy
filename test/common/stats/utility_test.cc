@@ -30,7 +30,6 @@ protected:
   template <class StatType>
   using IterateFn = std::function<bool(const RefcountPtr<StatType>& stat)>;
   using MakeStatFn = std::function<void(Scope& scope, const ElementVec& elements)>;
-  template <class StatType> using TestStatFn = std::function<bool(const StatType&)>;
 
   StatsUtilityTest()
       : symbol_table_(SymbolTableCreator::makeSymbolTable()), pool_(*symbol_table_),
@@ -124,8 +123,8 @@ protected:
     ASSERT_TRUE(dynamic1_ref.find());
     EXPECT_FALSE(store_->iterate(iterOnce<StatType>()));
     EXPECT_EQ(1, results_.size());
-    EXPECT_TRUE(checkValue(**symbolic1_ref.find()));
-    EXPECT_TRUE(checkValue(**dynamic1_ref.find()));
+    EXPECT_TRUE(checkValue(*symbolic1_ref.find()));
+    EXPECT_TRUE(checkValue(*dynamic1_ref.find()));
   }
 
   template <class StatType> void storeAll(const MakeStatFn make_stat) {
@@ -147,8 +146,8 @@ protected:
     ASSERT_TRUE(dynamic2_ref.find());
     EXPECT_FALSE(scope_->iterate(iterOnce<StatType>()));
     EXPECT_EQ(1, results_.size());
-    EXPECT_TRUE(checkValue(**symbolic2_ref.find()));
-    EXPECT_TRUE(checkValue(**dynamic2_ref.find()));
+    EXPECT_TRUE(checkValue(*symbolic2_ref.find()));
+    EXPECT_TRUE(checkValue(*dynamic2_ref.find()));
   }
 
   template <class StatType> void scopeAll(const MakeStatFn make_stat) {
@@ -239,16 +238,6 @@ TEST_P(StatsUtilityTest, TextReadouts) {
   EXPECT_EQ("scope.token.suffix", t3.name());
   TextReadout& t4 = Utility::textReadoutFromStatNames(*scope, {token, suffix});
   EXPECT_EQ(&t3, &t4);
-}
-
-TEST_P(StatsUtilityTest, CachedReference) {
-  ScopePtr scope = store_->createScope("scope.");
-  CachedReference<Counter> ref(*scope, "scope.my.counter");
-  EXPECT_FALSE(ref.find());
-  scope->counterFromString("my.counter").inc();
-  ASSERT_TRUE(ref.find());
-  Counter* counter = *ref.find();
-  EXPECT_EQ(1, counter->value());
 }
 
 TEST_P(StatsUtilityTest, StoreCounterOnce) { storeOnce<Counter>(makeCounter()); }
