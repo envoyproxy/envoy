@@ -322,7 +322,6 @@ envoy_cc_fuzz_test(
         "//test/integration:integration_lib",
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:hot_restart_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
