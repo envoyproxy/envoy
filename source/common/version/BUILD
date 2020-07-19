@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_basic_library",
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_boringssl",
@@ -59,7 +60,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_basic_library(
     name = "manual_version_linkstamp",
     srcs = ["version_linkstamp.cc"],
     hdrs = [":generate_version_linkstamp"],
@@ -67,7 +68,7 @@ envoy_cc_library(
     visibility = ["//visibility:private"],
 )
 
-envoy_cc_library(
+envoy_cc_basic_library(
     name = "version_linkstamp",
     linkstamp = select({
         "//bazel:manual_stamp": None,
