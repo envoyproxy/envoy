@@ -122,10 +122,7 @@ def envoy_cc_library(
         include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
-        linkstamp = select({
-            repository + "//bazel:windows_x86_64": None,
-            "//conditions:default": linkstamp,
-        }),
+        linkstamp = linkstamp,
         strip_include_prefix = strip_include_prefix,
     )
 
