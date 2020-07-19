@@ -20,7 +20,7 @@ genrule(
 
 genrule(
     name = "generate_version_linkstamp",
-    outs = ["version_linkstamp.h"],
+    outs = ["manual_linkstamp.cc"],
     cmd = select({
         # Only iOS builds typically follow this logic, OS/X is built as a normal binary
         "//bazel:apple": "$(location :generate_version_linkstamp.sh) Library >> $@",
@@ -62,8 +62,7 @@ envoy_cc_library(
 
 envoy_basic_cc_library(
     name = "manual_version_linkstamp",
-    srcs = ["version_linkstamp.cc"],
-    hdrs = [":generate_version_linkstamp"],
+    srcs = [":generate_version_linkstamp"],
     copts = ["-DENVOY_MANUAL_STAMP=1"],
     visibility = ["//visibility:private"],
 )
