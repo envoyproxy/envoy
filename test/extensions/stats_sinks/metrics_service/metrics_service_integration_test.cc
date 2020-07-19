@@ -2,10 +2,10 @@
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 
-#include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/stats/histogram_impl.h"
+#include "common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"

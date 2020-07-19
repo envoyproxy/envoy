@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -149,7 +150,7 @@ private:
 
   bool validateUpdateSize(int num_resources);
 
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  Envoy::Config::SubscriptionPtr subscription_;
   const std::string route_config_name_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
@@ -227,6 +228,8 @@ private:
   friend class RouteConfigProviderManagerImpl;
 };
 
+using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
+
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {
 public:
@@ -257,6 +260,8 @@ private:
   friend class RdsRouteConfigSubscription;
   friend class StaticRouteConfigProviderImpl;
 };
+
+using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;
 
 } // namespace Router
 } // namespace Envoy
