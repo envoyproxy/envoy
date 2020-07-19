@@ -64,7 +64,7 @@ jobs:
           ciTarget: bazel.release
           rbe: false
           artifactSuffix: ".arm64"
-          bazelBuildExtraOptions: "--config=docker-sandbox --remote_cache=$(LocalCacheProxy) --remote_timeout=300 --sandbox_base=/tmp/sandbox_base"
+          bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: bazel
     displayName: "Linux-x64"
