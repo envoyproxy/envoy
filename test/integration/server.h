@@ -150,10 +150,14 @@ public:
   }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
-  bool iterate(const CounterFn& fn) const override { return wrapped_scope_->iterate(fn); }
-  bool iterate(const GaugeFn& fn) const override { return wrapped_scope_->iterate(fn); }
-  bool iterate(const HistogramFn& fn) const override { return wrapped_scope_->iterate(fn); }
-  bool iterate(const TextReadoutFn& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    return wrapped_scope_->iterate(fn);
+  }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return wrapped_scope_->iterate(fn);
+  }
 
 private:
   Thread::MutexBasicLockable& lock_;
@@ -338,10 +342,10 @@ public:
     return store_.textReadouts();
   }
 
-  bool iterate(const CounterFn& fn) const override { return store_.iterate(fn); }
-  bool iterate(const GaugeFn& fn) const override { return store_.iterate(fn); }
-  bool iterate(const HistogramFn& fn) const override { return store_.iterate(fn); }
-  bool iterate(const TextReadoutFn& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
 
   // Stats::StoreRoot
   void addSink(Sink&) override {}
