@@ -175,29 +175,14 @@ private:
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override {
-    auto start = std::chrono::high_resolution_clock::now();
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     Config::Utility::translateOpaqueConfig(
         cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(),
         socket_factory_context.messageValidationVisitor(), *config);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-    // To get the value of duration use the count()
-    // member function on the duration object
-    std::cout << "Time taken for opaque config:" << duration.count() << "\n";
-    start = std::chrono::high_resolution_clock::now();
-
-    auto cluster1 = MessageUtil::downcastAndValidate<const ConfigProto&>(
-        *config, context.messageValidationVisitor());
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-    // To get the value of duration use the count()
-    // member function on the duration object
-    std::cout << "Time taken for downcastAndValidate:" << duration.count() << "\n";
-    return createClusterWithConfig(cluster, cluster1, context, socket_factory_context,
-                                   std::move(stats_scope));
+    return createClusterWithConfig(cluster,
+                                   MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                       *config, context.messageValidationVisitor()),
+                                   context, socket_factory_context, std::move(stats_scope));
   }
 
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterWithConfig(

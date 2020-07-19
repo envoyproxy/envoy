@@ -28,7 +28,6 @@ EdsClusterImpl::EdsClusterImpl(
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
-  auto start = std::chrono::high_resolution_clock::now();
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -43,12 +42,6 @@ EdsClusterImpl::EdsClusterImpl(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
           resource_decoder_);
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-  // To get the value of duration use the count()
-  // member function on the duration object
-  std::cout << "Time taken for eds cluster constructor:" << duration.count() << "\n";
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -289,24 +282,14 @@ EdsClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
-
-  auto start = std::chrono::high_resolution_clock::now();
-
   if (!cluster.has_eds_cluster_config()) {
     throw EnvoyException("cannot create an EDS cluster without an EDS config");
   }
 
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> cluster_pair = std::make_pair(
+  return std::make_pair(
       std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
                                        std::move(stats_scope), context.addedViaApi()),
       nullptr);
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-  // To get the value of duration use the count()
-  // member function on the duration object
-  std::cout << "Time taken for eds:" << duration.count() << "\n";
-  return cluster_pair;
 }
 
 /**
