@@ -296,7 +296,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_library(
+envoy_basic_cc_library(
     name = "test_version_linkstamp",
     srcs = ["test_version_linkstamp.cc"],
 )
