@@ -6269,20 +6269,6 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamRequestResponseSizesNoHost) {
   filter_callbacks_.upstreamHost(nullptr);
   // Histograms should not record value when upstream host is not configured.
   // So, deliverHistogramToSinks is not expected unlike other tests.
-  EXPECT_CALL(
-      host_->cluster_.request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), _))
-      .Times(0);
-  EXPECT_CALL(
-      host_->cluster_.request_response_size_stats_store_,
-      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), _))
-      .Times(0);
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), _))
-      .Times(0);
-  EXPECT_CALL(host_->cluster_.request_response_size_stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), _))
-      .Times(0);
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
