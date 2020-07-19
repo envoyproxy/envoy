@@ -28,7 +28,7 @@ EdsClusterImpl::EdsClusterImpl(
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
-                          auto start = std::chrono::high_resolution_clock::now();
+  auto start = std::chrono::high_resolution_clock::now();
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -43,12 +43,12 @@ EdsClusterImpl::EdsClusterImpl(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
           resource_decoder_);
-              auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    // To get the value of duration use the count()
-    // member function on the duration object
-    std::cout << "Time taken for eds cluster constructor:" << duration.count() << "\n";
+  // To get the value of duration use the count()
+  // member function on the duration object
+  std::cout << "Time taken for eds cluster constructor:" << duration.count() << "\n";
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }

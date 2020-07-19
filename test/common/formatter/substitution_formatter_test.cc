@@ -759,6 +759,41 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
+    EXPECT_CALL(*connection_info, sha1PeerCertificateDigest())
+        .WillRepeatedly(ReturnRef(expected_sha));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(expected_sha, upstream_format.format(request_headers, response_headers,
+                                                   response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue(expected_sha)));
+  }
+  {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_sha;
+    EXPECT_CALL(*connection_info, sha1PeerCertificateDigest())
+        .WillRepeatedly(ReturnRef(expected_sha));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ("-", upstream_format.format(request_headers, response_headers, response_trailers,
+                                          stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
+    EXPECT_EQ("-", upstream_format.format(request_headers, response_headers, response_trailers,
+                                          stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string serial_number = "b8b5ecc898f2124a";
