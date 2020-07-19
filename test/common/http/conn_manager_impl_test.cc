@@ -2092,6 +2092,84 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestConnectionTerminatedIfNotStreamError) {
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+        // These request headers are missing the necessary ":host"
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+        data.drain(0);
+        return Http::okStatus();
+      }));
+
+  auto* filter = new MockStreamFilter();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+      }));
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+
+  EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
+      .WillOnce(Return(absl::optional<bool>(false)));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        EXPECT_EQ("missing_host_header",
+                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
+        EXPECT_EQ("close", headers.getConnectionValue());
+      }));
+  EXPECT_CALL(*filter, onDestroy());
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestConnectionIsLeftOpenIfStreamError) {
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+        // These request headers are missing the necessary ":host"
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
+        decoder->decodeHeaders(std::move(headers), true);
+        data.drain(0);
+        return Http::okStatus();
+      }));
+
+  auto* filter = new MockStreamFilter();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+      }));
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+
+  EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
+      .WillOnce(Return(absl::optional<bool>(false)));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        EXPECT_EQ("missing_host_header",
+                  filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
+        EXPECT_EQ(nullptr, headers.getConnectionValue());
+      }));
+  EXPECT_CALL(*filter, onDestroy());
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
   setup(true, "");
 
