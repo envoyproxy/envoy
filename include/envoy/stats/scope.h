@@ -201,9 +201,29 @@ public:
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
+  /**
+   * @param fn Function to be run for every counter, or until fn return false.
+   * @return false if fn(counter) return false during iteration, true if every counter was hit.
+   */
   virtual bool iterate(const CounterFn& fn) const PURE;
+
+  /**
+   * @param fn Function to be run for every gauge, or until fn return false.
+   * @return false if fn(gauge) return false during iteration, true if every gauge was hit.
+   */
   virtual bool iterate(const GaugeFn& fn) const PURE;
+
+  /**
+   * @param fn Function to be run for every histogram, or until fn return false.
+   * @return false if fn(histogram) return false during iteration, true if every histogram was hit.
+   */
   virtual bool iterate(const HistogramFn& fn) const PURE;
+
+  /**
+   * @param fn Function to be run for every text readout, or until fn return false.
+   * @return false if fn(text_readout) return false during iteration, true if every text readout
+   *         was hit.
+   */
   virtual bool iterate(const TextReadoutFn& fn) const PURE;
 };
 

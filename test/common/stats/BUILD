@@ -34,16 +34,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "scope_iterate_test",
-    srcs = ["scope_iterate_test.cc"],
-    deps = [
-        "//source/common/stats:isolated_store_lib",
-        "//source/common/stats:symbol_table_creator_lib",
-        "//source/common/stats:thread_local_store_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "metric_impl_test",
     srcs = ["metric_impl_test.cc"],
     deps = [
@@ -278,6 +268,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     deps = [
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/stats:utility_lib",
     ],
 )
