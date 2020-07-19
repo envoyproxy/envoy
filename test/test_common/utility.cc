@@ -68,26 +68,18 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
     return false;
   }
 
-  struct State {
-    const Http::HeaderMap& lhs;
-    bool equal;
-  };
+  bool equal = true;
+  rhs.iterate([&lhs, &equal](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const Http::HeaderEntry* entry =
+        lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
+    if (entry == nullptr || (entry->value() != header.value().getStringView())) {
+      equal = false;
+      return Http::HeaderMap::Iterate::Break;
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
-  State state{lhs, true};
-  rhs.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        State* state = static_cast<State*>(context);
-        const Http::HeaderEntry* entry =
-            state->lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
-        if (entry == nullptr || (entry->value() != header.value().getStringView())) {
-          state->equal = false;
-          return Http::HeaderMap::Iterate::Break;
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &state);
-
-  return state.equal;
+  return equal;
 }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {

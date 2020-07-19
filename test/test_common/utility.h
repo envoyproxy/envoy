@@ -550,8 +550,9 @@ public:
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           bool preserve_original_type = false) {
-    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+                           bool preserve_original_type = false, bool avoid_boosting = false) {
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor(),
+                              !avoid_boosting);
     if (!preserve_original_type) {
       Config::VersionConverter::eraseOriginalTypeInformation(message);
     }
@@ -918,11 +919,9 @@ public:
   const HeaderEntry* get(const LowerCaseString& key) const override {
     return header_map_->get(key);
   }
-  void iterate(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_->iterate(cb, context);
-  }
-  void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_->iterateReverse(cb, context);
+  void iterate(HeaderMap::ConstIterateCb cb) const override { header_map_->iterate(cb); }
+  void iterateReverse(HeaderMap::ConstIterateCb cb) const override {
+    header_map_->iterateReverse(cb);
   }
   void clear() override {
     header_map_->clear();

@@ -342,16 +342,14 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
                                          const std::string& expected_body) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response_code, response->headers().getStatusValue());
-  expected_headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        auto response_headers = static_cast<Http::ResponseHeaderMap*>(context);
-        const Http::HeaderEntry* entry =
-            response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
-        EXPECT_NE(entry, nullptr);
-        EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      const_cast<void*>(static_cast<const void*>(&response->headers())));
+  expected_headers.iterate([response_headers = &response->headers()](
+                               const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const Http::HeaderEntry* entry =
+        response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
+    EXPECT_NE(entry, nullptr);
+    EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   EXPECT_EQ(response->body(), expected_body);
 }
