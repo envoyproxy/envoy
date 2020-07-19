@@ -80,4 +80,5 @@ envoy_basic_cc_library(
         "//bazel:manual_stamp": [":manual_version_linkstamp"],
         "//conditions:default": [],
     }),
+    alwayslink = 1,
 )
