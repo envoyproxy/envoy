@@ -1,0 +1,138 @@
+node {
+  client_features: "&"
+}
+static_resources {
+  listeners {
+    name: "          "
+    address {
+      pipe {
+        path: "aa\000"
+      }
+    }
+    transparent {
+    }
+  }
+}
+stats_sinks {
+  typed_config {
+    [type.googleapis.com/envoy.api.v2.route.Route] {
+      route {
+        retry_policy {
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 97
+          retriable_status_codes: 116
+          retriable_status_codes: 101
+          retriable_status_codes: 113
+          retriable_status_codes: 32
+          retriable_status_codes: 123
+          retriable_status_codes: 40
+          retriable_status_codes: 36
+          retriable_status_codes: 32
+          retriable_status_codes: 42
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 97
+          retriable_status_codes: 116
+          retriable_status_codes: 101
+          retriable_status_codes: 113
+          retriable_status_codes: 32
+          retriable_status_codes: 123
+          retriable_status_codes: 40
+          retriable_status_codes: 36
+          retriable_status_codes: 32
+          retriable_status_codes: 32
+          retriable_status_codes: 99
+          retriable_status_codes: 108
+          retriable_status_codes: 117
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 101
+          retriable_status_codes: 114
+          retriable_status_codes: 123
+          retriable_status_codes: 115
+        }
+      }
+    }
+  }
+}
+stats_sinks {
+  typed_config {
+    [type.googleapis.com/envoy.api.v2.route.Route] {
+      route {
+        retry_policy {
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 97
+          retriable_status_codes: 116
+          retriable_status_codes: 105
+          retriable_status_codes: 99
+          retriable_status_codes: 95
+          retriable_status_codes: 114
+          retriable_status_codes: 101
+          retriable_status_codes: 115
+          retriable_status_codes: 111
+          retriable_status_codes: 117
+          retriable_status_codes: 114
+          retriable_status_codes: 99
+          retriable_status_codes: 65
+          retriable_status_codes: 101
+          retriable_status_codes: 32
+          retriable_status_codes: 99
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 97
+          retriable_status_codes: 32
+          retriable_status_codes: 32
+          retriable_status_codes: 99
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 97
+        }
+      }
+    }
+  }
+}
+stats_sinks {
+  typed_config {
+    [type.googleapis.com/envoy.api.v2.route.Route] {
+      route {
+        retry_policy {
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 97
+          retriable_status_codes: 116
+          retriable_status_codes: 101
+          retriable_status_codes: 113
+          retriable_status_codes: 32
+          retriable_status_codes: 123
+          retriable_status_codes: 40
+          retriable_status_codes: 36
+          retriable_status_codes: 32
+          retriable_status_codes: 42
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 97
+          retriable_status_codes: 116
+          retriable_status_codes: 101
+          retriable_status_codes: 113
+          retriable_status_codes: 32
+          retriable_status_codes: 123
+          retriable_status_codes: 40
+          retriable_status_codes: 36
+          retriable_status_codes: 32
+          retriable_status_codes: 32
+          retriable_status_codes: 99
+          retriable_status_codes: 108
+          retriable_status_codes: 117
+          retriable_status_codes: 115
+          retriable_status_codes: 116
+          retriable_status_codes: 101
+          retriable_status_codes: 114
+          retriable_status_codes: 123
+          retriable_status_codes: 115
+        }
+      }
+    }
+  }
+}

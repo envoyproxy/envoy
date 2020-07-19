@@ -274,6 +274,13 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
   exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
+  setup_clang_toolchain
+  echo "bazel coverage build with fuzz tests ${COVERAGE_TEST_TARGETS}"
+
+  FUZZ_COVERAGE=true test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
+  collect_build_profile coverage
+  exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
   NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh
