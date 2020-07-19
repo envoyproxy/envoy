@@ -29,10 +29,6 @@ using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
-using CounterFn = IterateFn<Counter>;
-using GaugeFn = std::function<bool(const GaugeSharedPtr&)>;
-using HistogramFn = std::function<bool(const HistogramSharedPtr&)>;
-using TextReadoutFn = std::function<bool(const TextReadoutSharedPtr&)>;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
@@ -202,29 +198,45 @@ public:
   virtual SymbolTable& symbolTable() PURE;
 
   /**
+   * Calls 'fn' for every counter. Note that in the case of overlapping scopes,
+   * the implementation may call fn more than one time for each counter. Iteration
+   * stops if `fn` returns false;
+   *
    * @param fn Function to be run for every counter, or until fn return false.
    * @return false if fn(counter) return false during iteration, true if every counter was hit.
    */
-  virtual bool iterate(const CounterFn& fn) const PURE;
+  virtual bool iterate(const IterateFn<Counter>& fn) const PURE;
 
   /**
+   * Calls 'fn' for every gauge. Note that in the case of overlapping scopes,
+   * the implementation may call fn more than one time for each gauge. Iteration
+   * stops if `fn` returns false;
+   *
    * @param fn Function to be run for every gauge, or until fn return false.
    * @return false if fn(gauge) return false during iteration, true if every gauge was hit.
    */
-  virtual bool iterate(const GaugeFn& fn) const PURE;
+  virtual bool iterate(const IterateFn<Gauge>& fn) const PURE;
 
   /**
+   * Calls 'fn' for every histogram. Note that in the case of overlapping
+   * scopes, the implementation may call fn more than one time for each
+   * histogram. Iteration stops if `fn` returns false;
+   *
    * @param fn Function to be run for every histogram, or until fn return false.
    * @return false if fn(histogram) return false during iteration, true if every histogram was hit.
    */
-  virtual bool iterate(const HistogramFn& fn) const PURE;
+  virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
 
   /**
+   * Calls 'fn' for every text readout. Note that in the case of overlapping
+   * scopes, the implementation may call fn more than one time for each
+   * text readout. Iteration stops if `fn` returns false;
+   *
    * @param fn Function to be run for every text readout, or until fn return false.
    * @return false if fn(text_readout) return false during iteration, true if every text readout
    *         was hit.
    */
-  virtual bool iterate(const TextReadoutFn& fn) const PURE;
+  virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 };
 
 } // namespace Stats

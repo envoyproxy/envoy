@@ -33,10 +33,9 @@ protected:
   template <class StatType> using TestStatFn = std::function<bool(const StatType&)>;
 
   StatsUtilityTest()
-      : symbol_table_(SymbolTableCreator::makeSymbolTable()),
-        pool_(*symbol_table_),
-        tags_({{pool_.add("tag1"), pool_.add("value1")},
-               {pool_.add("tag2"), pool_.add("value2")}}) {
+      : symbol_table_(SymbolTableCreator::makeSymbolTable()), pool_(*symbol_table_),
+        tags_(
+            {{pool_.add("tag1"), pool_.add("value1")}, {pool_.add("tag2"), pool_.add("value2")}}) {
     switch (GetParam()) {
     case StoreType::ThreadLocal:
       alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_),
@@ -79,13 +78,11 @@ protected:
 
   static MakeStatFn makeCounter() {
     return [](Scope& scope, const ElementVec& elements) {
-             Utility::counterFromElements(scope, elements).inc();
+      Utility::counterFromElements(scope, elements).inc();
     };
   }
 
-  static bool checkValue(const Counter& counter) {
-    return counter.value() == 1;
-  }
+  static bool checkValue(const Counter& counter) { return counter.value() == 1; }
 
   static MakeStatFn makeGauge() {
     return [](Scope& scope, const ElementVec& elements) {
@@ -93,9 +90,7 @@ protected:
     };
   }
 
-  static bool checkValue(const Gauge& gauge) {
-    return gauge.value() == 1;
-  }
+  static bool checkValue(const Gauge& gauge) { return gauge.value() == 1; }
 
   static MakeStatFn makeHistogram() {
     return [](Scope& scope, const ElementVec& elements) {

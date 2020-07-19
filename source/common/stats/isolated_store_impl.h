@@ -91,7 +91,7 @@ public:
     return vec;
   }
 
-  bool iterate(const std::function<bool(const RefcountPtr<Base>&)>& fn) const {
+  bool iterate(const IterateFn<Base>& fn) const {
     for (auto& stat : stats_) {
       if (!fn(stat.second)) {
         return false;
@@ -163,10 +163,12 @@ public:
     return text_readouts_.find(name);
   }
 
-  bool iterate(const CounterFn& fn) const override { return counters_.iterate(fn); }
-  bool iterate(const GaugeFn& fn) const override { return gauges_.iterate(fn); }
-  bool iterate(const HistogramFn& fn) const override { return histograms_.iterate(fn); }
-  bool iterate(const TextReadoutFn& fn) const override { return text_readouts_.iterate(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override { return counters_.iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return gauges_.iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return histograms_.iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return text_readouts_.iterate(fn);
+  }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }

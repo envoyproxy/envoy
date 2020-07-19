@@ -56,6 +56,16 @@ public:
 
   template <class SharedStatType>
   bool iterHelper(const std::function<bool(const SharedStatType& stat)>& fn) const {
+    // We determine here what's in the scope by looking at name
+    // prefixes. Strictly speaking this is not correct, as a stat name can be in
+    // different scopes. But there is no data in `ScopePrefixer` to resurrect
+    // actual membership of a stat in a scope, so we go by name matching. Note
+    // that `ScopePrefixer` is not used in `ThreadLocalStore`, which has
+    // accurate maps describing which stats are in which scopes.
+    //
+    // TODO(jarantz): In the scope of this limited implementation, it would be
+    // faster to match on the StatName prefix. This would be possible if
+    // SymbolTable exposed a split() method.
     std::string prefix_str = scope_.symbolTable().toString(prefix_.statName());
     std::function<bool(const SharedStatType& stat)> filter_scope =
         [&fn, &prefix_str](const SharedStatType& stat) -> bool {
@@ -64,10 +74,10 @@ public:
     return scope_.iterate(filter_scope);
   }
 
-  bool iterate(const CounterFn& fn) const override { return iterHelper(fn); }
-  bool iterate(const GaugeFn& fn) const override { return iterHelper(fn); }
-  bool iterate(const HistogramFn& fn) const override { return iterHelper(fn); }
-  bool iterate(const TextReadoutFn& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
 
 private:
   Scope& scope_;

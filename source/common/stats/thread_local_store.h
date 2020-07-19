@@ -251,10 +251,10 @@ public:
     return true;
   }
 
-  bool iterate(const CounterFn& fn) const override { return iterHelper(fn); }
-  bool iterate(const GaugeFn& fn) const override { return iterHelper(fn); }
-  bool iterate(const HistogramFn& fn) const override { return iterHelper(fn); }
-  bool iterate(const TextReadoutFn& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
@@ -380,16 +380,16 @@ private:
       return true;
     }
 
-    bool iterate(const CounterFn& fn) const override {
+    bool iterate(const IterateFn<Counter>& fn) const override {
       return iterHelper(fn, central_cache_->counters_);
     }
-    bool iterate(const GaugeFn& fn) const override {
+    bool iterate(const IterateFn<Gauge>& fn) const override {
       return iterHelper(fn, central_cache_->gauges_);
     }
-    bool iterate(const HistogramFn& fn) const override {
+    bool iterate(const IterateFn<Histogram>& fn) const override {
       return iterHelper(fn, central_cache_->histograms_);
     }
-    bool iterate(const TextReadoutFn& fn) const override {
+    bool iterate(const IterateFn<TextReadout>& fn) const override {
       return iterHelper(fn, central_cache_->text_readouts_);
     }
 
