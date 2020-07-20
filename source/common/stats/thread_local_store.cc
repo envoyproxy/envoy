@@ -25,7 +25,7 @@ namespace Stats {
 const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
-    : alloc_(alloc), default_scope_(createScope("")),
+    : alloc_(alloc), default_scope_(ThreadLocalStoreImpl::createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       histogram_settings_(std::make_unique<HistogramSettingsImpl>()),
@@ -285,8 +285,8 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
 
 ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
     : scope_id_(parent.next_scope_id_++), parent_(parent),
-      prefix_(Utility::sanitizeStatsName(prefix), parent.symbolTable()),
-      central_cache_(new CentralCacheEntry(parent.symbolTable())) {}
+      prefix_(Utility::sanitizeStatsName(prefix), parent.alloc_.symbolTable()),
+      central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   parent_.releaseScopeCrossThread(this);
@@ -710,7 +710,7 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, St
       cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
-  MetricImpl::clear(symbolTable());
+  MetricImpl::clear(parent_.symbolTable());
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }
