@@ -15,7 +15,7 @@ namespace Tls {
 // response enums, among other things.
 class HandshakerImpl : public Envoy::Ssl::Handshaker {
 public:
-  void initialize(SSL*) override {}
+  void initialize(SSL&) override {}
 
   Network::PostIoAction doHandshake(Envoy::Ssl::SocketState& state, SSL* ssl,
                                     Ssl::HandshakerCallbacks& callbacks) override;
