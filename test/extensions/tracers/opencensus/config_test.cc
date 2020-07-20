@@ -5,7 +5,8 @@
 
 #include "extensions/tracers/opencensus/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/tracer_factory.h"
+#include "test/mocks/server/tracer_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -322,6 +323,9 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverGrpc) {
         google_grpc:
           target_uri: 127.0.0.1:55678
           stat_prefix: test
+        initial_metadata:
+        - key: foo
+          value: bar
   )EOF";
 
   envoy::config::trace::v3::Tracing configuration;

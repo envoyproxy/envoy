@@ -18,6 +18,36 @@ envoy_cc_library(
     ],
 )
 
+CODEC_LIB_DEPS = [
+    ":codec_stats_lib",
+    ":metadata_decoder_lib",
+    ":metadata_encoder_lib",
+    "//include/envoy/event:deferred_deletable",
+    "//include/envoy/event:dispatcher_interface",
+    "//include/envoy/http:codec_interface",
+    "//include/envoy/http:codes_interface",
+    "//include/envoy/http:header_map_interface",
+    "//include/envoy/network:connection_interface",
+    "//include/envoy/stats:stats_interface",
+    "//source/common/buffer:buffer_lib",
+    "//source/common/buffer:watermark_buffer_lib",
+    "//source/common/common:assert_lib",
+    "//source/common/common:enum_to_int",
+    "//source/common/common:linked_object",
+    "//source/common/common:minimal_logger_lib",
+    "//source/common/common:utility_lib",
+    "//source/common/http:codec_helper_lib",
+    "//source/common/http:codes_lib",
+    "//source/common/http:exception_lib",
+    "//source/common/http:header_map_lib",
+    "//source/common/http:header_utility_lib",
+    "//source/common/http:headers_lib",
+    "//source/common/http:status_lib",
+    "//source/common/http:utility_lib",
+    "//source/common/runtime:runtime_features_lib",
+    "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+]
+
 envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
@@ -28,35 +58,23 @@ envoy_cc_library(
         "abseil_inlined_vector",
         "abseil_algorithm",
     ],
-    deps = [
-        ":codec_stats_lib",
-        ":metadata_decoder_lib",
-        ":metadata_encoder_lib",
-        "//include/envoy/event:deferred_deletable",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/stats:stats_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/buffer:watermark_buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:enum_to_int",
-        "//source/common/common:linked_object",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/http:codec_helper_lib",
-        "//source/common/http:codes_lib",
-        "//source/common/http:exception_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http:header_utility_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:status_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    deps = CODEC_LIB_DEPS,
+)
+
+envoy_cc_library(
+    name = "codec_legacy_lib",
+    srcs = ["codec_impl_legacy.cc"],
+    hdrs = [
+        "codec_impl.h",
+        "codec_impl_legacy.h",
     ],
+    external_deps = [
+        "nghttp2",
+        "abseil_optional",
+        "abseil_inlined_vector",
+        "abseil_algorithm",
+    ],
+    deps = CODEC_LIB_DEPS,
 )
 
 # Separate library for some nghttp2 setup stuff to avoid having tests take a

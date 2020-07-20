@@ -58,7 +58,9 @@ changed to microseconds by setting the configuration parameter :ref:`latency_in_
   total, Counter, Number of commands
   success, Counter, Number of commands that were successful
   error, Counter, Number of commands that returned a partial or complete error response
-  latency, Histogram, Command execution time in milliseconds
+  latency, Histogram, Command execution time in milliseconds (including delay faults)
+  error_fault, Counter, Number of commands that had an error fault injected
+  delay_fault, Counter, Number of commands that had a delay fault injected
   
 .. _config_network_filters_redis_proxy_per_command_stats:
 
@@ -70,3 +72,51 @@ The Redis proxy filter supports the following runtime settings:
 redis.drain_close_enabled
   % of connections that will be drain closed if the server is draining and would otherwise
   attempt a drain close. Defaults to 100.
+
+.. _config_network_filters_redis_proxy_fault_injection:
+
+Fault Injection
+---------------
+
+The Redis filter can perform fault injection. Currently, Delay and Error faults are supported.
+Delay faults delay a request, and Error faults respond with an error. Moreover, errors can be delayed.
+
+Note that the Redis filter does not check for correctness in your configuration - it is the user's
+responsibility to make sure both the default and runtime percentages are correct! This is because
+percentages can be changed during runtime, and validating correctness at request time is expensive.
+If multiple faults are specified, the fault injection percentage should not exceed 100% for a given 
+fault and Redis command combination. For example, if two faults are specified; one applying to GET at 60
+%, and one applying to all commands at 50%, that is a bad configuration as GET now has 110% chance of
+applying a fault. This means that every request will have a fault.
+
+If a delay is injected, the delay is additive - if the request took 400ms and a delay of 100ms
+is injected, then the total request latency is 500ms. Also, due to implementation of the redis protocol,
+a delayed request will delay everything that comes in after it, due to the proxy's need to respect the 
+order of commands it receives.
+
+Note that faults must have a `fault_enabled` field, and are not enabled by default (if no default value
+or runtime key are set).
+
+Example configuration:
+
+.. code-block:: yaml
+
+  faults:
+  - fault_type: ERROR
+    fault_enabled:
+      default_value:
+        numerator: 10
+        denominator: HUNDRED
+      runtime_key: "bogus_key"
+      commands:
+      - GET
+    - fault_type: DELAY
+      fault_enabled:
+        default_value:
+          numerator: 10
+          denominator: HUNDRED
+        runtime_key: "bogus_key"
+      delay: 2s
+
+This creates two faults- an error, applying only to GET commands at 10%, and a delay, applying to all
+commands at 10%. This means that 20% of GET commands will have a fault applied, as discussed earlier.
