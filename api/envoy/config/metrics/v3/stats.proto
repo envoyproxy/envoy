@@ -264,11 +264,12 @@ message TagSpecifier {
 
 // Specifies a matcher for stats and the buckets that matching stats should use.
 message HistogramBucketSettings {
-  // The stats that this rule applies to.
+  // The stats that this rule applies to. The match is applied to the original stat name
+  // before tag-extraction, for example `cluster.exampleclustername.upstream_cx_length_ms`.
   type.matcher.v3.StringMatcher match = 1 [(validate.rules).message = {required: true}];
 
   // Each value is the upper bound of a successive bucket.
-  repeated double buckets = 2 [(validate.rules).repeated = {min_items: 2}];
+  repeated double buckets = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Settings for how histograms are emitted.
