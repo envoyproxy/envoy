@@ -499,6 +499,37 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST(MatchHeadersTest, HeaderNameGetter) {
+  TestRequestHeaderMapImpl matching_headers{{"match-header", "value"}};
+  const std::string yaml = R"EOF(
+name: match-header
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+
+  const LowerCaseString* header_name = header_data[0]->name();
+  EXPECT_EQ("match-header", header_name->get());
+}
+
+TEST(MatchHeadersTest, HeaderNameGetterInverse) {
+  TestRequestHeaderMapImpl unmatching_headers{{"other-header", "value"}};
+  const std::string yaml = R"EOF(
+name: match-header
+invert_match: true
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderDataPtr> header_data;
+  header_data.push_back(
+      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+
+  const LowerCaseString* header_name = header_data[0]->name();
+  EXPECT_EQ(nullptr, header_name);
+}
+
 TEST(HeaderIsValidTest, InvalidHeaderValuesAreRejected) {
   // ASCII values 1-31 are control characters (with the exception of ASCII
   // values 9, 10, and 13 which are a horizontal tab, line feed, and carriage

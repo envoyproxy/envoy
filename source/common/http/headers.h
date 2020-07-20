@@ -157,6 +157,10 @@ public:
   const LowerCaseString EnvoyOriginalPath{absl::StrCat(prefix(), "-original-path")};
   const LowerCaseString EnvoyOverloaded{absl::StrCat(prefix(), "-overloaded")};
   const LowerCaseString EnvoyRateLimited{absl::StrCat(prefix(), "-ratelimited")};
+  const LowerCaseString EnvoyRateLimitedResetHeaders{
+      absl::StrCat(prefix(), "-ratelimited-reset-headers")};
+  const LowerCaseString EnvoyRateLimitedResetMaxIntervalMs{
+      absl::StrCat(prefix(), "-ratelimited-reset-max-interval-ms")};
   const LowerCaseString EnvoyRetryOn{absl::StrCat(prefix(), "-retry-on")};
   const LowerCaseString EnvoyRetryGrpcOn{absl::StrCat(prefix(), "-retry-grpc-on")};
   const LowerCaseString EnvoyRetriableStatusCodes{

@@ -119,6 +119,12 @@ public:
 
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
+  absl::optional<std::chrono::milliseconds> rateLimitedResetMaxInterval() const override {
+    return ratelimited_reset_max_interval_;
+  }
+  const std::vector<Http::HeaderMatcherSharedPtr>& rateLimitedResetHeaders() const override {
+    return ratelimited_reset_headers_;
+  }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
@@ -129,6 +135,8 @@ public:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_{};
   absl::optional<std::chrono::milliseconds> max_interval_{};
+  std::vector<Http::HeaderMatcherSharedPtr> ratelimited_reset_headers_;
+  absl::optional<std::chrono::milliseconds> ratelimited_reset_max_interval_{};
 };
 
 class MockInternalRedirectPolicy : public InternalRedirectPolicy {
@@ -157,6 +165,8 @@ public:
   void expectResetRetry();
 
   MOCK_METHOD(bool, enabled, ());
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, parseRateLimitedResetInterval,
+              (const Http::ResponseHeaderMap& response_headers), (const));
   MOCK_METHOD(RetryStatus, shouldRetryHeaders,
               (const Http::ResponseHeaderMap& response_headers, DoRetryCallback callback));
   MOCK_METHOD(bool, wouldRetryFromHeaders, (const Http::ResponseHeaderMap& response_headers));
@@ -169,6 +179,9 @@ public:
               (const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&,
                const Upstream::RetryPriority::PriorityMappingFunc&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
+  MOCK_METHOD(const std::vector<Http::HeaderMatcherSharedPtr>&, rateLimitedResetHeaders, (),
+              (const));
+  MOCK_METHOD(std::chrono::milliseconds, rateLimitedResetMaxInterval, (), (const));
 
   DoRetryCallback callback_;
 };

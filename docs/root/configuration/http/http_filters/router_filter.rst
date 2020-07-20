@@ -257,6 +257,18 @@ in flight.
 
 The value of the header should be "true" or "false", and is ignored if invalid.
 
+x-envoy-ratelimited-reset-headers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Setting this header will extend the list of rate limited reset headers specified in the :ref:`route configuration rate limited retry back off
+<envoy_v3_api_field_config.route.v3.RetryPolicy.RateLimitedRetryBackOff.reset_headers>`.
+
+x-envoy-ratelimited-reset-max-interval-ms
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Setting this header will override the rate limited reset max interval specified in the :ref:`route configuration rate limited retry back off
+<envoy_v3_api_field_config.route.v3.RetryPolicy.RateLimitedRetryBackOff.reset_max_interval>`.
+
 .. _config_http_filters_router_x-envoy-decorator-operation:
 
 x-envoy-decorator-operation
@@ -413,6 +425,8 @@ statistics:
   upstream_rq_<\*xx>, Counter, "Aggregate HTTP response codes (e.g., 2xx, 3xx, etc.)"
   upstream_rq_<\*>, Counter, "Specific HTTP response codes (e.g., 201, 302, etc.)"
   upstream_rq_retry, Counter, Total request retries
+  upstream_rq_retry_backoff_exponential, Counter, Total retries using the exponential backoff strategy
+  upstream_rq_retry_backoff_ratelimited, Counter, Total retries using the ratelimited backoff strategy
   upstream_rq_retry_limit_exceeded, Counter, Total requests not retried due to exceeding :ref:`the configured number of maximum retries <config_http_filters_router_x-envoy-max-retries>`
   upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>`
   upstream_rq_retry_success, Counter, Total request retry successes

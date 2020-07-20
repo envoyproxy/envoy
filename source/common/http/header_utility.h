@@ -47,6 +47,13 @@ public:
     const bool invert_match_;
 
     // HeaderMatcher
+    const LowerCaseString* name() const override {
+      if (invert_match_) {
+        return nullptr;
+      }
+      return &name_;
+    }
+
     bool matchesHeaders(const HeaderMap& headers) const override {
       return HeaderUtility::matchHeaders(headers, *this);
     };

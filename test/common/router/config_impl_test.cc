@@ -3553,6 +3553,88 @@ virtual_hosts:
       "retry_policy.max_interval must greater than or equal to the base_interval");
 }
 
+TEST_F(RouteMatcherTest, RateLimitedRetryBackOff) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/no-backoff"
+    route:
+      cluster: www
+  - match:
+      prefix: "/empty-backoff"
+    route:
+      cluster: www
+      retry_policy:
+        rate_limited_retry_back_off: {}
+  - match:
+      prefix: "/sub-ms-interval"
+    route:
+      cluster: www
+      retry_policy:
+        rate_limited_retry_back_off:
+          reset_max_interval: 0.0001s # < 1 ms
+  - match:
+      prefix: "/typical-backoff"
+    route:
+      cluster: www
+      retry_policy:
+        rate_limited_retry_back_off:
+          reset_headers:
+          - name: Retry-After
+          - name: RateLimit-Reset
+          reset_max_interval: 0.050s
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // has no ratelimit retry back off
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
+                               ->routeEntry()
+                               ->retryPolicy()
+                               .rateLimitedResetMaxInterval());
+  EXPECT_EQ(0, config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
+                   ->routeEntry()
+                   ->retryPolicy()
+                   .rateLimitedResetHeaders()
+                   .size());
+
+  // has empty ratelimit retry back off
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/empty-backoff", "GET"), 0)
+                               ->routeEntry()
+                               ->retryPolicy()
+                               .rateLimitedResetMaxInterval());
+  EXPECT_EQ(0, config.route(genHeaders("www.lyft.com", "/empty-backoff", "GET"), 0)
+                   ->routeEntry()
+                   ->retryPolicy()
+                   .rateLimitedResetHeaders()
+                   .size());
+
+  // has sub millisecond interval
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
+            config.route(genHeaders("www.lyft.com", "/sub-ms-interval", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .rateLimitedResetMaxInterval());
+
+  // has a ratelimit retry back off
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/typical-backoff", "GET");
+  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  EXPECT_EQ(2, retry_policy.rateLimitedResetHeaders().size());
+
+  Http::TestResponseHeaderMapImpl expected_0{{"Retry-After", "not-used"}};
+  Http::TestResponseHeaderMapImpl expected_1{{"RateLimit-Reset", "not-used"}};
+
+  EXPECT_TRUE(retry_policy.rateLimitedResetHeaders()[0]->matchesHeaders(expected_0));
+  EXPECT_TRUE(retry_policy.rateLimitedResetHeaders()[1]->matchesHeaders(expected_1));
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(50),
+            retry_policy.rateLimitedResetMaxInterval());
+}
+
 TEST_F(RouteMatcherTest, HedgeRouteLevel) {
   const std::string yaml = R"EOF(
 virtual_hosts:

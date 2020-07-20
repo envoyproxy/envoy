@@ -428,7 +428,8 @@ public:
         throw EnvoyException("dns_failure_refresh_rate must have max_interval greater than "
                              "or equal to the base_interval");
       }
-      return std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
+      return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
+                                                                  random);
     }
     return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
   }

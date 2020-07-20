@@ -120,6 +120,17 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
       }
     }
   }
+
+  if (retry_policy.has_rate_limited_retry_back_off()) {
+    ratelimited_reset_headers_ = Http::HeaderUtility::buildHeaderMatcherVector(
+        retry_policy.rate_limited_retry_back_off().reset_headers());
+
+    ratelimited_reset_max_interval_ =
+        PROTOBUF_GET_OPTIONAL_MS(retry_policy.rate_limited_retry_back_off(), reset_max_interval);
+    if (ratelimited_reset_max_interval_ && ((*ratelimited_reset_max_interval_).count()) < 1) {
+      ratelimited_reset_max_interval_ = std::chrono::milliseconds(1);
+    }
+  }
 }
 
 std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {

@@ -235,6 +235,18 @@ public:
    * @return absl::optional<std::chrono::milliseconds> maximum retry interval
    */
   virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
+
+  /**
+   * @return std::vector<Http::HeaderMatcherSharedPt>& list of response header
+   * matchers that will be attempted to extract a rate limited maximum retry interval.
+   */
+  virtual const std::vector<Http::HeaderMatcherSharedPtr>& rateLimitedResetHeaders() const PURE;
+
+  /**
+   * @return absl::optional<std::chrono::milliseconds> limit placed on a rate limited retry
+   * interval.
+   */
+  virtual absl::optional<std::chrono::milliseconds> rateLimitedResetMaxInterval() const PURE;
 };
 
 /**
@@ -293,6 +305,14 @@ public:
    * @return true if a policy is in place for the active request that allows retries.
    */
   virtual bool enabled() PURE;
+
+  /**
+   * Attempts to parse any matching rate limited reset headers (RFC 7231), either in the form of an
+   * interval directly, or in the form of a unix timestamp relative to the current system time.
+   * @return the interval if parsing was successful.
+   */
+  virtual absl::optional<std::chrono::milliseconds>
+  parseRateLimitedResetInterval(const Http::ResponseHeaderMap& response_headers) const PURE;
 
   /**
    * Determine whether a request should be retried based on the response headers.
@@ -369,10 +389,21 @@ public:
       const Upstream::PrioritySet& priority_set,
       const Upstream::HealthyAndDegradedLoad& original_priority_load,
       const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
+
   /**
    * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /**
+   * @return the rate limited reset headers used to match against rate limited responses.
+   */
+  virtual const std::vector<Http::HeaderMatcherSharedPtr>& rateLimitedResetHeaders() const PURE;
+
+  /**
+   * @return the upper limit placed on an interval parsed from a rate limited reset header.
+   */
+  virtual std::chrono::milliseconds rateLimitedResetMaxInterval() const PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;
@@ -417,6 +448,8 @@ using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
  */
 #define ALL_VIRTUAL_CLUSTER_STATS(COUNTER)                                                         \
   COUNTER(upstream_rq_retry)                                                                       \
+  COUNTER(upstream_rq_retry_backoff_exponential)                                                   \
+  COUNTER(upstream_rq_retry_backoff_ratelimited)                                                   \
   COUNTER(upstream_rq_retry_limit_exceeded)                                                        \
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
