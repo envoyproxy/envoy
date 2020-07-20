@@ -185,8 +185,8 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   TestRandomGenerator generator;
   const uint64_t generated_parent_id = generator.random();
-  SpanContext modified_root_span_context(root_span_context.trace_id_high(),
-                                         root_span_context.trace_id(), root_span_context.id(),
+  SpanContext modified_root_span_context(root_span_context.traceIdHigh(),
+                                         root_span_context.traceId(), root_span_context.id(),
                                          generated_parent_id, root_span_context.sampled());
   SpanPtr new_shared_context_span =
       tracer.startSpan(config, "new_shared_context_span", timestamp, modified_root_span_context);
@@ -202,7 +202,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 
   // The parent should be the same as in the CS side
   EXPECT_TRUE(new_shared_context_span->isSetParentId());
-  EXPECT_EQ(modified_root_span_context.parent_id(), new_shared_context_span->parentId());
+  EXPECT_EQ(modified_root_span_context.parentId(), new_shared_context_span->parentId());
 
   // span timestamp should not be set (it was set in the CS side)
   EXPECT_FALSE(new_shared_context_span->isSetTimestamp());
