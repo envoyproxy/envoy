@@ -42,6 +42,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
   try {
     TestUtility::validate(input);
     // Check the filter's name in case some filters are not supported yet.
+    // TODO(jianwendong): remove this check after all filters are supported.
     static const auto filter_names = UberFilterFuzzer::filterNames();
     if (std::find(filter_names.begin(), filter_names.end(), input.config().name()) ==
         std::end(filter_names)) {
