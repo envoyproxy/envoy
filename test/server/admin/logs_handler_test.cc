@@ -1,4 +1,5 @@
 #include "common/common/fancy_logger.h"
+#include "common/common/logger.h"
 #include "test/server/admin/admin_instance.h"
 
 namespace Envoy {
@@ -23,10 +24,14 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   Buffer::OwnedImpl response;
 
   // now for Envoy, w/o setting the mode
-  postCallback("/logging?level=warn", header_map, response);
+  FANCY_LOG(info, "Build the logger for this file.");
+  Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
+  postCallback("/logging?level=warning", header_map, response);
+  FANCY_LOG(warn, "After post 1: all level is warning now!");
   EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
   std::string query = fmt::format("/logging?{}=info", __FILE__);
   postCallback(query, header_map, response);
+  FANCY_LOG(info ,"After post 2: level for this file is info now!");
   EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
 }
 

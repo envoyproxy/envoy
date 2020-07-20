@@ -100,10 +100,10 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
     // Level setting with Fancy Logger.
     spdlog::level::level_enum lv = static_cast<spdlog::level::level_enum>(level_to_use);
     if (name == "level") {
-      FANCY_LOG(debug, "change all log levels: level='{}'", level);
+      FANCY_LOG(info, "change all log levels: level='{}'", level);
       FancyContext::setAllFancyLoggers(lv);
     } else {
-      FANCY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
+      FANCY_LOG(info, "change log level: name='{}' level='{}'", name, level);
       bool res = FancyContext::setFancyLogger(name, lv);
       return res;
     }

@@ -91,6 +91,7 @@ envoy_cc_test(
     srcs = ["logs_handler_test.cc"],
     deps = [
         ":admin_instance_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 

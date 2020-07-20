@@ -49,7 +49,8 @@ public:
   /**
    * Sets the levels of all loggers.
    */
-  static void setAllFancyLoggers(spdlog::level::level_enum level) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+  static void setAllFancyLoggers(spdlog::level::level_enum level)
+      ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
 private:
   /**
@@ -112,6 +113,10 @@ private:
  * Convenient macro for log flush.
  */
 #define FANCY_FLUSH_LOG()                                                                          \
-  { FancyContext::getFancyLogEntry(FANCY_KEY)->flush(); }
+  { SpdLoggerPtr p = FancyContext::getFancyLogEntry(FANCY_KEY);                                   \
+    if (p) {                                                                                       \
+      p->flush();                                                                                  \
+    }                                                                                              \
+  }
 
 } // namespace Envoy

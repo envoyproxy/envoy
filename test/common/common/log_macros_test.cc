@@ -155,20 +155,53 @@ TEST(Fancy, Global) {
   FANCY_FLUSH_LOG();
 }
 
-TEST(Fancy, SetLevel) {
-  const char* file = "P=NP_file";
-  FancyContext::setFancyLogger(file, spdlog::level::trace);
-
-  FancyContext::setFancyLogger(__FILE__, spdlog::level::err);
-  FANCY_LOG(error, "Fancy Error! Here's a test for level.");
-  FANCY_LOG(warn, "Warning: you shouldn't see this message!");
-}
-
 TEST(Fancy, FastPath) {
   FancyContext::setFancyLogger(__FILE__, spdlog::level::info);
   for (int i = 0; i < 10; i++) {
     FANCY_LOG(warn, "Fake warning No. {}", i);
   }
+}
+
+TEST(Fancy, SetLevel) {
+  const char* file = "P=NP_file";
+  bool res = FancyContext::setFancyLogger(file, spdlog::level::trace);
+  EXPECT_EQ(res, false);
+  SpdLoggerPtr p = FancyContext::getFancyLogEntry(file);
+  EXPECT_EQ(p, nullptr);
+
+  res = FancyContext::setFancyLogger(__FILE__, spdlog::level::err);
+  EXPECT_EQ(res, true);
+  FANCY_LOG(error, "Fancy Error! Here's a test for level.");
+  FANCY_LOG(warn, "Warning: you shouldn't see this message!");
+  p = FancyContext::getFancyLogEntry(__FILE__);
+  EXPECT_NE(p, nullptr);
+  EXPECT_EQ(p->level(), spdlog::level::err);
+
+  FancyContext::setAllFancyLoggers(spdlog::level::info);
+  FANCY_LOG(info, "Info: all loggers back to info.");
+  FANCY_LOG(debug, "Debug: you shouldn't see this message!");
+  EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
+}
+
+TEST(Fancy, Iteration) {
+  FANCY_LOG(info, "Info: iteration test begins.");
+  FANCY_LOG(info, FancyContext::listFancyLoggers());
+  std::string log_format = "[%T.%e][%t][%l][%n] %v";
+  FancyContext::setDefaultFancyLevelFormat(spdlog::level::warn, log_format);
+  FANCY_LOG(warn, "Warning: now level is warn, format changed (Date removed).");
+  FANCY_LOG(warn, FancyContext::listFancyLoggers());
+  EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
+}
+
+TEST(Fancy, Context) {
+  FANCY_LOG(info, "Info: context API needs test.");
+  Logger::LoggerMode mode = Logger::Context::getLoggerMode();
+  EXPECT_EQ(mode, Logger::LoggerMode::Envoy);
+  Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
+  EXPECT_EQ(Logger::Context::getLoggerMode(), Logger::LoggerMode::Fancy);
+  EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
+  EXPECT_EQ(Logger::Context::getFancyDefaultLevel(),
+            spdlog::level::err); // default is error in test environment
 }
 
 } // namespace Envoy

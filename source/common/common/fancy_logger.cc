@@ -29,7 +29,11 @@ private:
 
 SpdLoggerPtr FancyContext::getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
   absl::ReaderMutexLock l(&fancy_log_lock_);
-  return fancy_log_map_->find(key)->second;
+  auto it = fancy_log_map_->find(key);
+  if (it != fancy_log_map_->end()) {
+    return it->second;
+  }
+  return nullptr;
 }
 
 void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
@@ -76,7 +80,7 @@ std::string FancyContext::listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_
   std::string info = "";
   absl::ReaderMutexLock l(&fancy_log_lock_);
   for (const auto& it : *fancy_log_map_) {
-    info += fmt::format("   {}: {}\n", it.first, it.second);
+    info += fmt::format("   {}: {}\n", it.first, static_cast<int>(it.second->level()));
   }
   info += "\n";
   return info;

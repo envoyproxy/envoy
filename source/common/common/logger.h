@@ -211,6 +211,7 @@ public:
   ~Context();
 
   static LoggerMode getLoggerMode();
+  static void setLoggerMode(LoggerMode mode);
   static std::string getFancyLogFormat();
   static spdlog::level::level_enum getFancyDefaultLevel();
 

@@ -123,6 +123,16 @@ void Context::activate() {
 
 LoggerMode Context::getLoggerMode() { return current_context->logger_mode_; }
 
+void Context::setLoggerMode(LoggerMode mode) {
+  current_context->logger_mode_ = mode;
+  if (mode == LoggerMode::Fancy) {
+    FancyContext::setDefaultFancyLevelFormat(current_context->log_level_,
+                                             current_context->log_format_);
+    fancy_default_level_ = current_context->log_level_;
+    fancy_log_format_ = current_context->log_format_;
+  }
+}
+
 std::string Context::getFancyLogFormat() { return fancy_log_format_; }
 
 spdlog::level::level_enum Context::getFancyDefaultLevel() { return fancy_default_level_; }
