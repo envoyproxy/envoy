@@ -51,6 +51,9 @@ separateDirectiveAndArgument(absl::string_view full_directive) {
 // quoted-pair     = "\" ( HTAB / SP / VCHAR / obs-text )
 // VCHAR           =  %x21-7E  ; visible (printing) characters
 
+// Multiple directives are comma separated according to:
+// https://httpwg.org/specs/rfc7234.html#collected.abnf
+
 RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header) {
   std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 

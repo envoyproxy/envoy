@@ -87,7 +87,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
     return true;
   }
 
-  SystemTime::duration response_age = timestamp_ - response_time;
+  const SystemTime::duration response_age = timestamp_ - response_time;
   bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
                                   request_cache_control_.max_age_.value() < response_age;
   if (response_cache_control.must_validate_ || request_cache_control_.must_validate_ ||
@@ -97,6 +97,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
     return true;
   }
 
+  // CacheabilityUtils::isCacheableResponse(..) guarantees that any cached response satisfies this
   // When date metadata injection for responses with no date
   // is implemented, this ASSERT will need to be updated
   ASSERT((response_headers.Date() && response_cache_control.max_age_.has_value()) ||
