@@ -61,7 +61,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
     v6only = addr->ip()->ipv6()->v6only();
   }
 
-  IoHandlePtr io_handle = 
+  IoHandlePtr io_handle =
       SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only);
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.

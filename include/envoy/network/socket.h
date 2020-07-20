@@ -245,7 +245,7 @@ public:
    * @param socket_v6only if the socket is ipv6 version only
    * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
-  virtual IoHandlePtr socket(Socket::Type type, Address::Type addr_type, Address::IpVersion version, 
+  virtual IoHandlePtr socket(Socket::Type type, Address::Type addr_type, Address::IpVersion version,
                              int socket_v6only) PURE;
 
   /**
