@@ -51,8 +51,9 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(certs[0]);
   ASSERT(cert_view != nullptr);
+  std::string wildcard = absl::StrCat("*", hostname.substr(hostname.find_first_of('.')));
   for (const absl::string_view config_san : cert_view->subject_alt_name_domains()) {
-    if (config_san == hostname) {
+    if (config_san == hostname || config_san == wildcard) {
       return quic::QUIC_SUCCESS;
     }
   }
