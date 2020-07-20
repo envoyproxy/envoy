@@ -17,7 +17,7 @@ namespace Envoy {
 class XdsVerifier {
 public:
   XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta);
-  void listenerAdded(envoy::config::listener::v3::Listener listener);
+  void listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update = false);
   void listenerUpdated(envoy::config::listener::v3::Listener listener);
   void listenerRemoved(const std::string& name);
   void drainedListener(const std::string& name);
@@ -36,6 +36,10 @@ public:
   uint32_t numWarming() { return num_warming_; }
   uint32_t numActive() { return num_active_; }
   uint32_t numDraining() { return num_draining_; }
+
+  uint32_t numAdded() { return num_added_; }
+  uint32_t numModified() { return num_modified_; }
+  uint32_t numRemoved() { return num_removed_; }
 
   void dumpState();
 
@@ -60,6 +64,10 @@ private:
   uint32_t num_warming_;
   uint32_t num_active_;
   uint32_t num_draining_;
+
+  uint32_t num_added_;
+  uint32_t num_modified_;
+  uint32_t num_removed_;
 
   SotwOrDelta sotw_or_delta_;
 };

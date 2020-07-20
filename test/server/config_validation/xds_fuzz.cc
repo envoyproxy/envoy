@@ -275,8 +275,10 @@ void XdsFuzzTest::replay() {
                                    verifier_.numActive());
       test_server_->waitForGaugeEq("listener_manager.total_listeners_draining",
                                    verifier_.numDraining());
+      test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified());
+      test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded());
+      test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved());
     }
-    ENVOY_LOG_MISC(debug, "{}", getListenersConfigDump().DebugString());
     ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})",
                    verifier_.numWarming(),
                    test_server_->gauge("listener_manager.total_listeners_warming")->value(),
@@ -284,6 +286,12 @@ void XdsFuzzTest::replay() {
                    test_server_->gauge("listener_manager.total_listeners_active")->value(),
                    verifier_.numDraining(),
                    test_server_->gauge("listener_manager.total_listeners_draining")->value());
+    ENVOY_LOG_MISC(debug, "added {} ({}), modified {} ({}), removed {} ({})", verifier_.numAdded(),
+                   test_server_->counter("listener_manager.listener_added")->value(),
+                   verifier_.numModified(),
+                   test_server_->counter("listener_manager.listener_modified")->value(),
+                   verifier_.numRemoved(),
+                   test_server_->counter("listener_manager.listener_removed")->value());
   }
 
   verifyState();
