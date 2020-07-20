@@ -11,12 +11,24 @@
 namespace Envoy {
 namespace Network {
 
+static IoHandlePtr ioHandleForAddr(Socket::Type type, const Address::InstanceConstSharedPtr addr) {
+  auto sock_interface_name = addr->socketInterface();
+  if (!sock_interface_name.empty()) {
+    auto sock_interface = const_cast<SocketInterface*>(socketInterface(sock_interface_name));
+    if (sock_interface != nullptr) {
+      return sock_interface->socket(type, addr);
+    }
+    return nullptr;
+  }
+  return SocketInterfaceSingleton::get().socket(type, addr);
+}
+
 SocketImpl::SocketImpl(Socket::Type type, Address::Type addr_type, Address::IpVersion version)
     : io_handle_(SocketInterfaceSingleton::get().socket(type, addr_type, version)),
       sock_type_(type), addr_type_(addr_type) {}
 
 SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
-    : io_handle_(SocketInterfaceSingleton::get().socket(sock_type, addr)), sock_type_(sock_type),
+    : io_handle_(ioHandleForAddr(sock_type, addr)), sock_type_(sock_type),
       addr_type_(addr->type()) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
