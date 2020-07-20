@@ -798,8 +798,10 @@ validFromPeerCertificate()
 
   downstreamSslConnection:validFromPeerCertificate()
 
-Returns the time that the peer certificate was issued and should be considered valid from. Returns
-``0`` if there is no peer certificate.
+Returns the time (timestamp-since-epoch in seconds) that the peer certificate was issued and should
+be considered valid from. Returns ``0`` if there is no peer certificate.
+
+In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
 
 expirationPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -808,8 +810,10 @@ expirationPeerCertificate()
 
   downstreamSslConnection:validFromPeerCertificate()
 
-Returns the time that the peer certificate expires and should not be considered valid after. Returns
-``0`` if there is no peer certificate.
+Returns the time (timestamp-since-epoch in seconds) that the peer certificate expires and should not
+be considered valid after. Returns ``0`` if there is no peer certificate.
+
+In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
 
 sessionId()
 ^^^^^^^^^^^
