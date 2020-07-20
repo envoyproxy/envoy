@@ -72,7 +72,7 @@ private:
   RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopePtr scope_;
   VhdsStats stats_;
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
 };
