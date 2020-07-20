@@ -291,28 +291,40 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
   }
 }
 
-// TEST_P(RBACIntegrationTest, LogConnectionAllow) {
-//   config_helper_.addFilter(RBAC_CONFIG_WITH_LOG_ACTION);
-//   initialize();
+std::string getRBACFilterConfig(const std::string& config_str) {
+  envoy::extensions::filters::http::rbac::v3::RBAC rbac_config;
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter http_filter;
 
-//   codec_client_ = makeHttpConnection(lookupPort("http"));
+  TestUtility::loadFromYaml(config_str, rbac_config);
 
-//   auto response = codec_client_->makeRequestWithBody(
-//       Http::TestRequestHeaderMapImpl{
-//           {":method", "GET"},
-//           {":path", "/"},
-//           {":scheme", "http"},
-//           {":authority", "host"},
-//           {"x-forwarded-for", "10.0.0.1"},
-//       },
-//       1024);
-//   response->waitForEndStream();
-//   ASSERT_TRUE(response->complete());
-//   EXPECT_EQ("200", response->headers().getStatusValue());
-//   ASSERT_TRUE(response->headers().ContentLength());
-//   EXPECT_NE("0", response->headers().getContentLengthValue());
-//   EXPECT_THAT(response->body(), ::testing::IsEmpty());
-// }
+  http_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().Rbac);
+  http_filter.mutable_typed_config()->PackFrom(rbac_config);
+
+  return MessageUtil::getJsonStringFromMessage(http_filter);
+}
+
+TEST_P(RBACIntegrationTest, LogConnectionAllow) {
+  config_helper_.addFilter(getRBACFilterConfig(RBAC_CONFIG_WITH_LOG_ACTION));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
 
 } // namespace
 } // namespace Envoy

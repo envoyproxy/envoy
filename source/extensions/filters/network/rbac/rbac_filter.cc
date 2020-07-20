@@ -8,8 +8,6 @@
 
 #include "absl/strings/str_join.h"
 
-#include <iostream>
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

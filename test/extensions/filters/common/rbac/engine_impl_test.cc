@@ -438,11 +438,9 @@ TEST(RoleBasedAccessControlEngineImpl, LogAllowUndecided) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  // EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
   checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  // EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
   checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers, info);
 }
 
@@ -461,11 +459,9 @@ TEST(RoleBasedAccessControlEngineImpl, LogDenyUndecided) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  // EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
   checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  // EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
   checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers, info);
 }
 
@@ -484,11 +480,9 @@ TEST(RoleBasedAccessControlEngineImpl, LogAllowAll) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  // EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
   checkEngine(engine, true, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  // EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
   checkEngine(engine, true, conn, headers, info);
 }
 

@@ -78,9 +78,6 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
 
   if (shadow_engine != nullptr) {
-    ProtobufWkt::Struct metrics;
-    auto& fields = *metrics.mutable_fields();
-
     std::string shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
     if (shadow_engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(),
@@ -94,6 +91,8 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultDenied;
     }
 
+    ProtobufWkt::Struct metrics;
+    auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
       *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()
                   .ShadowEffectivePolicyIdField]
