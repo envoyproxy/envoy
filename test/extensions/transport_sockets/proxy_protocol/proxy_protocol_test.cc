@@ -18,7 +18,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -35,8 +34,6 @@ constexpr uint64_t MaxSlices = 16;
 
 class ProxyProtocolTest : public testing::Test {
 public:
-  ProxyProtocolTest() {}
-
   void initialize(ProxyProtocolConfig_Version version,
                   Network::TransportSocketOptionsSharedPtr socket_options) {
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();

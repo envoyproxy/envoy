@@ -7,7 +7,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -17,8 +16,6 @@ namespace {
 
 class PassthroughTest : public testing::Test {
 protected:
-  PassthroughTest() {}
-
   void SetUp() override {
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
     inner_socket_ = inner_socket.get();

@@ -11,18 +11,6 @@
 #include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_AF_INET;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_AF_INET6;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_INET;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_INET6;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_AF_INET;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_AF_INET6;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ONBEHALF_OF;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_TRANSPORT_STREAM;
-using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_VERSION;
 
 namespace Envoy {
 namespace Extensions {
@@ -110,20 +98,6 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
   } while (true);
 
   return {action, bytes_written, false};
-}
-
-UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
-    Network::TransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config)
-    : transport_socket_factory_(std::move(transport_socket_factory)), config_(config) {}
-
-Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsSharedPtr options) const {
-  return std::make_unique<UpstreamProxyProtocolSocket>(
-      transport_socket_factory_->createTransportSocket(options), options, config_.version());
-}
-
-bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
-  return transport_socket_factory_->implementsSecureTransport();
 }
 
 } // namespace ProxyProtocol
