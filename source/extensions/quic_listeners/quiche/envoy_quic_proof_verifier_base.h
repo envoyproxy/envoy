@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Quic {
 
 // A partial implementation of quic::ProofVerifier which does signature
-// verification using SSL_SIGN_RSA_PSS_RSAE_SHA256.
+// verification.
 class EnvoyQuicProofVerifierBase : public quic::ProofVerifier,
                                    protected Logger::Loggable<Logger::Id::quic> {
 public:
