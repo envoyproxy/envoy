@@ -44,11 +44,12 @@ public:
   /**
    * Do the handshake.
    *
-   * NB: This method may be called with |ssl| == nullptr, for example during a
-   * reentrant call to doHandshake() during a period when the handshaker has
-   * handed off the SSL*.
-   *
-   * NB: |state| is mutable.
+   *  * |state| is a mutable reference.
+   *  * |ssl| is a pointer, and this method may be called with |ssl| == nullptr,
+   *    for example during a reentrant call to doHandshake() during a period
+   *    when the handshaker has handed off the SSL*.
+   *  * |callbacks| may not exist throughout the lifetime of the Handshaker, and
+   *    should not be stored in an implementation.
    */
   virtual Network::PostIoAction doHandshake(SocketState& state, SSL* ssl,
                                             HandshakerCallbacks& callbacks) PURE;
@@ -61,7 +62,7 @@ public:
   virtual void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) PURE;
 
   /**
-   * Subclasses should return true if the tls context accompanying this
+   * Implementations should return true if the tls context accompanying this
    * handshaker expects certificates.
    */
   virtual bool requireCertificates() PURE;
