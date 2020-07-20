@@ -1,5 +1,3 @@
-#include "common/http/utility.h"
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -19,6 +17,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
@@ -418,7 +417,7 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
   return ret;
 }
 
-bool Utility::streamErrorOnInvalidHttpMessageForHttp1(
+bool Utility::streamErrorOnInvalidHttpMessage(
     bool hcm_stream_error_on_invalid_http_message,
     const absl::optional<bool>& override_stream_error_on_invalid_http_message) {
   if (override_stream_error_on_invalid_http_message.has_value()) {

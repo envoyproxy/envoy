@@ -231,11 +231,7 @@ private:
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
   const bool proxy_100_continue_;
-<<<<<<< HEAD
-  bool stream_error_on_invalid_http_messaging_;
-=======
   const bool stream_error_on_invalid_http_messaging_;
->>>>>>> master
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;

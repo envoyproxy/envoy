@@ -1,5 +1,3 @@
-#include "common/http/conn_manager_impl.h"
-
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -27,6 +25,7 @@
 #include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
+#include "common/http/conn_manager_impl.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
@@ -1524,8 +1523,10 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   // The BadRequest error code indicates there has been a messaging error.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      !connection_manager_.config_.streamErrorOnInvalidHttpMessaging() &&
-      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2) {
+      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
+      !Utility::streamErrorOnInvalidHttpMessage(
+          connection_manager_.config_.streamErrorOnInvalidHttpMessaging(),
+          response_encoder_->streamErrorOnInvalidHttpMessage())) {
     state_.saw_connection_close_ = true;
   }
 
@@ -1701,14 +1702,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     connection_manager_.startDrainSequence();
     connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
     ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
-  }
-
-  if (Utility::getResponseStatus(headers) == enumToInt(Http::Code::BadRequest) &&
-      connection_manager_.codec_->protocol() < Protocol::Http2 &&
-      !Utility::streamErrorOnInvalidHttpMessageForHttp1(
-          connection_manager_.config_.streamErrorOnInvalidHttpMessaging(),
-          response_encoder_->streamErrorOnInvalidHttpMessage())) {
-    state_.saw_connection_close_ = true;
   }
 
   if (connection_manager_.codec_->protocol() == Protocol::Http10) {
