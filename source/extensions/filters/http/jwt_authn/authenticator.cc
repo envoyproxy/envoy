@@ -130,19 +130,6 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Tracing::Span& parent_s
     return;
   }
 
-  // By default, this filter extracts JWT token from Authorization header and
-  // access_token query parameter. A request may have multiple JWT tokens, and will be
-  // forwarded to the backend if one of the tokens is good. It poses a security risk:
-  // a hacker can put a good token in the query parameter and an invalid one in
-  // the Authorization header. Envoy will forward the request to the backend,
-  // and the backend will use the bad token in Authorization header.
-  // This check will patch such security hole.
-  if (tokens_.size() > 1 && provider_ && !is_allow_failed_) {
-    tokens_.clear();
-    doneWithStatus(Status::JwtMultipleTokens);
-    return;
-  }
-
   startVerify();
 }
 
@@ -278,8 +265,13 @@ void AuthenticatorImpl::verifyKey() {
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
-  // if on allow missing or failed this should verify all tokens, otherwise stop on ok.
-  if ((Status::Ok == status && !is_allow_failed_ && !is_allow_missing_) || tokens_.empty()) {
+
+  // If a request has multiple tokens, all of them must be valid. Otherwise it may have
+  // following security hole: a request has a good token and a bad one, it will pass
+  // verifification, forwarded to the backend, and the backend will use the bad
+  // token for authorization.
+  // Unless allowing failed or missing, all tokens must be varified successfully.
+  if ((Status::Ok != status && !is_allow_failed_ && !is_allow_missing_) || tokens_.empty()) {
     tokens_.clear();
     if (is_allow_failed_) {
       callback_(Status::Ok);

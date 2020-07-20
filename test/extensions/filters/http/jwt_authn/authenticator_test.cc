@@ -39,15 +39,17 @@ public:
     CreateAuthenticator();
   }
 
-  void CreateAuthenticator(::google::jwt_verify::CheckAudience* check_audience = nullptr,
-                           const absl::optional<std::string>& provider =
-                               absl::make_optional<std::string>(ProviderName)) {
+  void CreateAuthenticator(
+      ::google::jwt_verify::CheckAudience* check_audience = nullptr,
+      const absl::optional<std::string>& provider = absl::make_optional<std::string>(ProviderName),
+      bool allow_failed = false, bool allow_missing = false) {
     filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
     raw_fetcher_ = new MockJwksFetcher;
     fetcher_.reset(raw_fetcher_);
     auth_ = Authenticator::create(
-        check_audience, provider, !provider, !provider, filter_config_->getCache().getJwksCache(),
-        filter_config_->cm(), [this](Upstream::ClusterManager&) { return std::move(fetcher_); },
+        check_audience, provider, allow_failed, allow_missing,
+        filter_config_->getCache().getJwksCache(), filter_config_->cm(),
+        [this](Upstream::ClusterManager&) { return std::move(fetcher_); },
         filter_config_->timeSource());
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
@@ -185,17 +187,57 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
   expectVerifyStatus(Status::JwtMissed, headers);
 }
 
-// This test verifies a request with multiple tokens is rejected.
-TEST_F(AuthenticatorTest, TestMultipleJWT) {
-  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
+// Test multiple tokens; one of them is bad, verification is ok.
+TEST_F(AuthenticatorTest, TestMultipleJWTOneBad) {
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
 
-  // headers with multiple tokens
+  // headers with multiple tokens: one good, one bad
   auto headers = Http::TestRequestHeaderMapImpl{
-      {"Authorization", "Bearer " + std::string(NonExistKidToken)},
-      {":path", "/foo?access_token=invalid-token"},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {":path", "/foo?access_token=" + std::string(NonExistKidToken)},
   };
 
-  expectVerifyStatus(Status::JwtMultipleTokens, headers);
+  expectVerifyStatus(Status::JwtVerificationFail, headers);
+}
+
+// Test multiple tokens; all are good, verification is ok.
+TEST_F(AuthenticatorTest, TestMultipleJWTAllGood) {
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
+
+  // headers with multiple tokens: all are good
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {":path", "/foo?access_token=" + std::string(GoodToken)},
+  };
+
+  expectVerifyStatus(Status::Ok, headers);
+}
+
+// Test multiple tokens; one of them is bad and allow_failed, verification is ok.
+TEST_F(AuthenticatorTest, TestMultipleJWTOneBadAllowFails) {
+  CreateAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+                      /*allow_failed=*/true, /*all_missing=*/false);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
+
+  // headers with multiple tokens: one good, one bad
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {":path", "/foo?access_token=" + std::string(NonExistKidToken)},
+  };
+
+  expectVerifyStatus(Status::Ok, headers);
+}
+
+// Test empty header and allow_missing, verification is ok.
+TEST_F(AuthenticatorTest, TestAllowMissingWithEmptyHeader) {
+  CreateAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+                      /*allow_failed=*/false, /*all_missing=*/true);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
+
+  // Empty headers
+  auto headers = Http::TestRequestHeaderMapImpl{};
+
+  expectVerifyStatus(Status::Ok, headers);
 }
 
 // This test verifies if Jwt is invalid, JwtBadFormat status is returned.
@@ -347,7 +389,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
     header->set_value_prefix("Bearer ");
   }
 
-  CreateAuthenticator(nullptr, absl::nullopt);
+  CreateAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
@@ -394,7 +436,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   header->set_name("other-auth");
   header->set_value_prefix("Bearer ");
 
-  CreateAuthenticator(nullptr, absl::nullopt);
+  CreateAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .Times(2)
       .WillRepeatedly(Invoke([](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
