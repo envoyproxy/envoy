@@ -88,9 +88,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     boringssl_fips = dict(
-        sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
-        # fips-20180730
-        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
+        sha256 = "3b5fdf23274d4179c2077b5e8fa625d9debd7a390aac1d165b7e47234f648bb8",
+        # fips-20190808
+        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-ae223d6138807a13006342edfeef32e813246b39.tar.xz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
