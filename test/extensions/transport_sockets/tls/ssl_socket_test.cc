@@ -345,8 +345,13 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedDigest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
       }
+      // Assert twice to ensure a cached value is returned and still valid.
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+
       if (!options.expectedLocalUri().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
       }
       EXPECT_EQ(options.expectedSerialNumber(),
@@ -653,6 +658,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
           dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
       SSL* client_ssl_socket = ssl_socket->ssl();
       if (!options.expectedProtocolVersion().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
         EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
       }
       if (!options.expectedCiphersuite().empty()) {
