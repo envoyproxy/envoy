@@ -43,6 +43,9 @@ New Features
 * redis: added fault injection support :ref:`fault injection for redis proxy <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.faults>`, described further in :ref:`configuration documentation <config_network_filters_redis_proxy>`.
 * stats: added optional histograms to :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`
   that track headers and body sizes of requests and responses.
+* router: added new
+  :ref:`envoy-ratelimited<config_http_filters_router_retry_policy-envoy-ratelimited>`
+  retry policy, which allows retrying envoy's own rate limited responses.
 * tap: added :ref:`generic body matcher<envoy_v3_api_msg_config.tap.v3.HttpGenericBodyMatch>` to scan http requests and responses for text or hex patterns.
 
 Deprecated
