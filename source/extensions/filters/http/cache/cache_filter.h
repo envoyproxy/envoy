@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
 
@@ -48,6 +49,10 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
+  // Precondition: lookup_result_ points to a cache lookup result that requires validation
+  // Checks if a cached entry should be updated with a 304 response
+  bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
+
   // Precondition: request_headers_ points to the RequestHeadersMap of the current request
   //               lookup_result_ points to a cache lookup result that requires validation
   // Should only be called during onHeaders as it modifies RequestHeaderMap
@@ -61,7 +66,7 @@ private:
   // or during encoding if a cache entry was validated successfully
   void encodeCachedResponse();
 
-  // Precondition: finished adding a response from cache to the response encdoing stream
+  // Precondition: finished adding a response from cache to the response encoding stream
   // Updates the encode_cached_response_state_ and continue encoding filter iteration if necessary
   void finishedEncodingCachedResponse();
 

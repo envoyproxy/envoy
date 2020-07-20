@@ -94,13 +94,16 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   }
 
   if (validating_cache_entry_ && isResponseNotModified(headers)) {
-    ASSERT(lookup_result_, "CacheFilter is validating an invalid lookup result");
+    ASSERT(lookup_result_, "CacheFilter trying to validate a non-existent lookup result");
+
+    // Check whether the cached entry should be updated before modifying the 304 response
+    bool should_update_cached_entry = shouldUpdateCachedEntry(headers);
 
     // Update the 304 response status code and content-length
     headers.setStatus(lookup_result_->headers_->getStatusValue());
     headers.setContentLength(lookup_result_->headers_->getContentLengthValue());
 
-    // A cache entry was successfuly validated; encode cached body and trailers
+    // A cache entry was successfully validated; encode cached body and trailers
     // encodeCachedResponse also adds the age header to lookup_result_
     // so it should be called before headers are merged
     encodeCachedResponse();
@@ -117,7 +120,10 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
           return Http::HeaderMap::Iterate::Continue;
         });
 
-    cache_.updateHeaders(*lookup_, headers);
+    if (should_update_cached_entry) {
+      // TODO(yosrym93): else the cached entry should be deleted
+      cache_.updateHeaders(*lookup_, headers);
+    }
 
     if (encode_cached_response_state_ == EncodeCachedResponseState::FinishedEncoding) {
       // Cached body (and trailers) already encoded -- continue iteration
@@ -185,7 +191,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
   case CacheEntryStatus::UnsatisfiableRange:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
   case CacheEntryStatus::RequiresValidation:
-    // If a cache entry requires validation inject validadation headers in the request and let it
+    // If a cache entry requires validation inject validation headers in the request and let it
     // pass through as if no cache entry was found. If the cache entry was valid the response
     // status should be 304 (unmodified), and the cache entry will be injected in the response body
     validating_cache_entry_ = true;
@@ -256,9 +262,31 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   finishedEncodingCachedResponse();
 }
 
+bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const {
+  ASSERT(isResponseNotModified(response_headers),
+         "shouldUpdateCachedEntry must only be called with 304 responses");
+  ASSERT(lookup_result_, "shouldUpdateCachedEntry precondition unsatisfied: lookup_result_ "
+                         "does not point to a cache lookup result");
+  ASSERT(validating_cache_entry_, "shouldUpdateCachedEntry precondition unsatisfied: the "
+                                  "CacheFilter is not validating a cache lookup result");
+
+  // According to: https://httpwg.org/specs/rfc7234.html#freshening.responses,
+  // and assuming a single cached response per key:
+  // If the 304 response contains a strong validator (etag) that does not match the cached response
+  // the cached response should not be updated
+  const auto response_etag_ptr = response_headers.get(Http::CustomHeaders::get().Etag);
+  const auto cached_etag_ptr = lookup_result_->headers_->get(Http::CustomHeaders::get().Etag);
+  return !response_etag_ptr || (cached_etag_ptr && cached_etag_ptr->value().getStringView() ==
+                                                       response_etag_ptr->value().getStringView());
+}
+
 void CacheFilter::injectValidationHeaders() {
-  ASSERT(request_headers_,
-         "CacheFilter must set request_headers_ in decodeHeaders before onHeaders is called.");
+  ASSERT(lookup_result_, "injectValidationHeaders precondition unsatisfied: lookup_result_ "
+                         "does not point to a cache lookup result");
+  ASSERT(validating_cache_entry_, "injectValidationHeaders precondition unsatisfied: the "
+                                  "CacheFilter is not validating a cache lookup result");
+  ASSERT(request_headers_, "injectValidationHeaders precondition unsatisfied: request_headers_ "
+                           "does not point to the RequestHeadersMap of the current request");
   const Http::HeaderEntry* etag_header =
       lookup_result_->headers_->get(Http::CustomHeaders::get().Etag);
   const Http::HeaderEntry* last_modified_header =
@@ -275,6 +303,9 @@ void CacheFilter::injectValidationHeaders() {
 }
 
 void CacheFilter::encodeCachedResponse() {
+  ASSERT(lookup_result_, "encodeCachedResponse precondition unsatisfied: lookup_result_ "
+                         "does not point to a cache lookup result");
+
   response_has_trailers_ = lookup_result_->has_trailers_;
   const bool end_stream = (lookup_result_->content_length_ == 0 && !response_has_trailers_);
   // TODO(toddmgreer): Calculate age per https://httpwg.org/specs/rfc7234.html#age.calculations
