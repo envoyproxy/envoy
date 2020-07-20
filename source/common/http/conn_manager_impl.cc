@@ -1562,7 +1562,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     maybeEndEncode(state_.local_complete_);
   } else {
     stream_info_.setResponseCodeDetails(details);
-    // If we land in this branch, response headers have already beeen sent to the client.
+    // If we land in this branch, response headers have already been sent to the client.
     // All we can do at this point is reset the stream.
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. Prior headers have already been sent",
                      *this, details);
