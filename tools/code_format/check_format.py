@@ -82,7 +82,7 @@ STD_REGEX_ALLOWLIST = (
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
     "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
-    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
+    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -898,6 +898,21 @@ def checkOwners(dir_name, owned_directories, error_messages):
     error_messages.append("New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
 
+def checkApiShadowStarlarkFiles(api_shadow_root, file_path, error_messages):
+  command = "diff -u "
+  command += file_path + " "
+  api_shadow_starlark_path = api_shadow_root + re.sub(r"\./api/", '', file_path)
+  command += api_shadow_starlark_path
+
+  error_message = executeCommand(command, "invalid .bzl in generated_api_shadow", file_path)
+  if operation_type == "check":
+    error_messages += error_message
+  elif operation_type == "fix" and len(error_message) != 0:
+    shutil.copy(file_path, api_shadow_starlark_path)
+
+  return error_messages
+
+
 def checkFormatVisitor(arg, dir_name, names):
   """Run checkFormat in parallel for the given files.
 
@@ -914,7 +929,7 @@ def checkFormatVisitor(arg, dir_name, names):
   # python lists are passed as references, this is used to collect the list of
   # async results (futures) from running checkFormat and passing them back to
   # the caller.
-  pool, result_list, owned_directories, error_messages = arg
+  pool, result_list, owned_directories, api_shadow_root, error_messages = arg
 
   # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
   # manner as it is a small and limited list.
@@ -927,6 +942,10 @@ def checkFormatVisitor(arg, dir_name, names):
     checkOwners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
   for file_name in names:
+    if dir_name.startswith("./api") and isSkylarkFile(file_name):
+      result = pool.apply_async(checkApiShadowStarlarkFiles,
+                                args=(api_shadow_root, dir_name + "/" + file_name, error_messages))
+      result_list.append(result)
     result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))
     result_list.append(result)
 
@@ -993,6 +1012,7 @@ if __name__ == "__main__":
 
   operation_type = args.operation_type
   target_path = args.target_path
+  api_shadow_root = args.api_shadow_prefix
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
@@ -1058,8 +1078,8 @@ if __name__ == "__main__":
       # For each file in target_path, start a new task in the pool and collect the
       # results (results is passed by reference, and is used as an output).
       for root, _, files in os.walk(target_path):
-        checkFormatVisitor((pool, results, owned_directories, error_messages), root,
-                           [f for f in files if path_predicate(f)])
+        checkFormatVisitor((pool, results, owned_directories, api_shadow_root, error_messages),
+                           root, [f for f in files if path_predicate(f)])
 
       # Close the pool to new tasks, wait for all of the running tasks to finish,
       # then collect the error messages.

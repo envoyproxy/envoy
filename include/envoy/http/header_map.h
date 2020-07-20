@@ -519,24 +519,21 @@ public:
   /**
    * Callback when calling iterate() over a const header map.
    * @param header supplies the header entry.
-   * @param context supplies the context passed to iterate().
-   * @return Iterate::Continue to continue iteration.
+   * @return Iterate::Continue to continue iteration, or Iterate::Break to stop;
    */
-  using ConstIterateCb = Iterate (*)(const HeaderEntry&, void*);
+  using ConstIterateCb = std::function<Iterate(const HeaderEntry&)>;
 
   /**
    * Iterate over a constant header map.
    * @param cb supplies the iteration callback.
-   * @param context supplies the context that will be passed to the callback.
    */
-  virtual void iterate(ConstIterateCb cb, void* context) const PURE;
+  virtual void iterate(ConstIterateCb cb) const PURE;
 
   /**
    * Iterate over a constant header map in reverse order.
    * @param cb supplies the iteration callback.
-   * @param context supplies the context that will be passed to the callback.
    */
-  virtual void iterateReverse(ConstIterateCb cb, void* context) const PURE;
+  virtual void iterateReverse(ConstIterateCb cb) const PURE;
 
   /**
    * Clears the headers in the map.
@@ -549,6 +546,14 @@ public:
    * @return the number of headers removed.
    */
   virtual size_t remove(const LowerCaseString& key) PURE;
+
+  /**
+   * Remove all instances of headers where the header matches the predicate.
+   * @param predicate supplies the predicate to match headers against.
+   * @return the number of headers removed.
+   */
+  using HeaderMatchPredicate = std::function<bool(const HeaderEntry&)>;
+  virtual size_t removeIf(const HeaderMatchPredicate& predicate) PURE;
 
   /**
    * Remove all instances of headers where the key begins with the supplied prefix.

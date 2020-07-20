@@ -1,6 +1,6 @@
 #include "envoy/network/filter.h"
 
-#include "test/extensions/filters/listener/common/listener_filter_fuzzer.pb.validate.h"
+#include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
 #include "test/mocks/network/fakes.h"
 #include "test/mocks/network/mocks.h"
 

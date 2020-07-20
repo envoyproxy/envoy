@@ -220,6 +220,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
+    --define use_legacy_codecs_in_integration_tests=true \
     --define --cxxopt=-std=c++14 \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
@@ -236,6 +237,10 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   echo "Building and testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
+
+  # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
+  # integration tests with asan.
+  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
@@ -267,6 +272,13 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
   test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
+  collect_build_profile coverage
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
+  setup_clang_toolchain
+  echo "bazel coverage build with fuzz tests ${COVERAGE_TEST_TARGETS}"
+
+  FUZZ_COVERAGE=true test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
