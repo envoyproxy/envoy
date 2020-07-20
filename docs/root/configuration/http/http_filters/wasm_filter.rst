@@ -8,7 +8,7 @@ Wasm
 
 .. attention::
 
-  The Wasm filter is experimental and is currently under active development.  Capabilities will
+  The Wasm filter is experimental and is currently under active development. Capabilities will
   be expanded over time and the configuration structures are likely to change.
 
 The HTTP Wasm filter is used implement an HTTP filter with a Wasm plugin.
@@ -34,4 +34,4 @@ Example filter configuration:
           allow_precompiled: true
  
 
-The previous snippet configures a filter from a Wasm binary on local disk.
+The preceeding snippet configures a filter from a Wasm binary on local disk.

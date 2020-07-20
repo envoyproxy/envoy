@@ -5,3 +5,4 @@ Other features
   :maxdepth: 2
 
   rate_limit
+  wasm
