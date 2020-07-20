@@ -18,7 +18,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -1617,6 +1617,66 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   auto request_id_extension =
       dynamic_cast<Http::UUIDRequestIDExtension*>(config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, LegacyH1Codecs) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+      proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, runtimeFeatureEnabled(_)).WillOnce(Return(false));
+  auto http_connection_manager_factory =
+      HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
+          proto_config, context_, filter_callbacks);
+  http_connection_manager_factory();
+}
+
+TEST_F(HttpConnectionManagerConfigTest, LegacyH2Codecs) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+      proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, runtimeFeatureEnabled(_)).WillOnce(Return(false));
+  auto http_connection_manager_factory =
+      HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
+          proto_config, context_, filter_callbacks);
+  http_connection_manager_factory();
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {

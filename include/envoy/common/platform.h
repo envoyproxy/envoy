@@ -150,6 +150,7 @@ struct msghdr {
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h> // for UDP_GRO
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
 #include <sys/socket.h>
@@ -248,19 +249,15 @@ struct mmsghdr {
 #endif // __ANDROID_API__ < 24
 #endif // ifdef __ANDROID_API__
 
-#ifdef __linux__
-#define SUPPORTS_PTHREAD_GETNAME_NP 1
-#endif
-
 // https://android.googlesource.com/platform/bionic/+/master/docs/status.md
 // ``pthread_getname_np`` is introduced in API 26
-#ifdef __ANDROID_API__
-#if __ANDROID_API__ > 26
-#define SUPPORTS_PTHREAD_GETNAME_NP 1
-#endif // __ANDROID_API__ > 26
-#endif // ifdef __ANDROID_API__
-
-// Ensure `SUPPORTS_PTHREAD_GETNAME_NP` is set
-#ifndef SUPPORTS_PTHREAD_GETNAME_NP
-#define SUPPORTS_PTHREAD_GETNAME_NP 0
-#endif
+#define SUPPORTS_PTHREAD_NAMING 0
+#if defined(__ANDROID_API__)
+#if __ANDROID_API__ >= 26
+#undef SUPPORTS_PTHREAD_NAMING
+#define SUPPORTS_PTHREAD_NAMING 1
+#endif // __ANDROID_API__ >= 26
+#elif defined(__linux__)
+#undef SUPPORTS_PTHREAD_NAMING
+#define SUPPORTS_PTHREAD_NAMING 1
+#endif // defined(__ANDROID_API__)
