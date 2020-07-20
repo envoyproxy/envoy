@@ -32,6 +32,8 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
                      NetworkFilterNames::get().DubboProxy,
                      NetworkFilterNames::get().SniCluster,
 
+                     NetworkFilterNames::get().ThriftProxy,
+                     NetworkFilterNames::get().ZooKeeperProxy,
                      NetworkFilterNames::get().HttpConnectionManager,
                      NetworkFilterNames::get().SniDynamicForwardProxy};
   }
@@ -50,7 +52,7 @@ void UberFilterFuzzer::reset() {
   // Clear the pointers inside the mock_dispatcher
   Event::MockDispatcher& mock_dispatcher = dynamic_cast<Event::MockDispatcher&>(read_filter_callbacks_->connection_.dispatcher_);
   mock_dispatcher.to_delete_.clear();
-  std::cout<<read_filter_.use_count();
+  // std::cout<<read_filter_.use_count();
   read_filter_.reset();
 }
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
