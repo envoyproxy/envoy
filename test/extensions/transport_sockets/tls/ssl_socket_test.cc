@@ -345,8 +345,13 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedDigest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
       }
+      // Assert twice to ensure a cached value is returned and still valid.
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+
       if (!options.expectedLocalUri().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
       }
       EXPECT_EQ(options.expectedSerialNumber(),
@@ -653,6 +658,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
           dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
       SSL* client_ssl_socket = ssl_socket->ssl();
       if (!options.expectedProtocolVersion().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
         EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
       }
       if (!options.expectedCiphersuite().empty()) {
@@ -3642,7 +3649,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
 
-  // Connection using TLSv1.3 (client) and defaults (server) succeeds (non-FIPS) or fails (FIPS).
+  // Connection using TLSv1.3 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   client_params->set_tls_maximum_protocol_version(
@@ -3652,11 +3659,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   TestUtilOptionsV2 error_test_options(listener, client, false, GetParam());
   error_test_options.setExpectedServerStats("ssl.connection_error")
       .setExpectedTransportFailureReasonContains("TLSV1_ALERT_PROTOCOL_VERSION");
-#ifndef BORINGSSL_FIPS
   testUtilV2(tls_v1_3_test_options);
-#else // BoringSSL FIPS
-  testUtilV2(error_test_options);
-#endif
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
 
@@ -3665,11 +3668,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   client_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-#ifndef BORINGSSL_FIPS
   testUtilV2(tls_v1_3_test_options);
-#else // BoringSSL FIPS
-  testUtilV2(tls_v1_2_test_options);
-#endif
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
 
