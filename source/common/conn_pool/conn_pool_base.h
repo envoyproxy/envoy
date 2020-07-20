@@ -151,13 +151,6 @@ public:
 
   virtual ConnectionPool::Cancellable* newPendingRequest(AttachContext& context) PURE;
 
-  // Creates up to 3 connections, based on the prefetch ratio.
-  void tryCreateNewConnections();
-
-  // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
-  // to avoid starving this pool.
-  bool tryCreateNewConnection();
-
   void attachRequestToClient(Envoy::ConnectionPool::ActiveClient& client, AttachContext& context);
 
   virtual void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
@@ -177,6 +170,13 @@ public:
   }
 
 protected:
+  // Creates up to 3 connections, based on the prefetch ratio.
+  void tryCreateNewConnections();
+
+  // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
+  // to avoid starving this pool.
+  bool tryCreateNewConnection();
+
   // A helper function which determines if a canceled pending connection should
   // be closed as excess or not.
   bool connectingConnectionIsExcess() const;
