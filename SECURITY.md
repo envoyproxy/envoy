@@ -172,7 +172,8 @@ patches, understand exact mitigation steps, etc.
   should be reserved for remotely exploitable or privilege escalation issues. Otherwise, this
   process can be skipped.
 - The Fix Lead will email the patches to cncf-envoy-distributors-announce@lists.cncf.io so
-  distributors can prepare builds to be available to users on the day of the issue's announcement.
+  distributors can prepare builds to be available to users on the day of the issue's announcement. Any 
+  patches against main will be updated and resent weekly.
   Distributors should read about the [Private Distributors List](#private-distributors-list) to find
   out the requirements for being added to this list.
 - **What if a vendor breaks embargo?** The PST will assess the damage. The Fix Lead will make the
@@ -326,7 +327,7 @@ use of Envoy should:
    have a way to privately stage and validate your updates that does not violate
    the embargo.
 7. Be willing to [contribute back](#contributing-back) as outlined above.
-8. Be able to perform a security release of your product within a two week window from candidate fix
+8. Be able to perform a security release of your product within a three week window from candidate fix
    patch availability.
 9. Have someone already on the list vouch for the person requesting membership
    on behalf of your distribution.
@@ -406,7 +407,7 @@ We accept.
 
 We are definitely willing to help!
 
-> 8. Be able to perform a security release of your product within a two week window from candidate fix
+> 8. Be able to perform a security release of your product within a three week window from candidate fix
      patch availability.
 
 We affirm we can spin out new security releases within a 2 week window.
