@@ -22,7 +22,7 @@ using ::testing::StrictMock;
 
 // A callback shaped like pem_password_cb.
 // See https://www.openssl.org/docs/man1.1.0/man3/pem_password_cb.html.
-int PemPasswordCallback(char* buf, int buf_size, int /*rwflag*/, void* u) {
+int PemPasswordCallback(char* buf, int buf_size, int rwflag, void* u) {
   if (u == nullptr) {
     return 0;
   }
