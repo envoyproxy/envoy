@@ -137,7 +137,7 @@ TEST_F(HandshakerTest, NormalOperation) {
 }
 
 // We induce some kind of BIO mismatch and force the SSL_do_handshake to
-// return an error code without error handline, i.e. not SSL_ERROR_WANT_READ
+// return an error code without error handling, i.e. not SSL_ERROR_WANT_READ
 // or _WRITE or _PRIVATE_KEY_OPERATION.
 TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   // We make a new BIO, set it as the rbio/wbio for the client SSL object, and
