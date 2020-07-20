@@ -1019,8 +1019,8 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
 void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                              absl::string_view transport_failure_reason,
                              UpstreamRequest& upstream_request) {
-  ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
-                   Http::Utility::resetReasonToString(reset_reason));
+  ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {} transport failure reason {}", *callbacks_,
+                   Http::Utility::resetReasonToString(reset_reason), transport_failure_reason);
 
   // TODO: The reset may also come from upstream over the wire. In this case it should be
   // treated as external origin error and distinguished from local origin error.
@@ -1046,7 +1046,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
   const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
-                   Http::Utility::resetReasonToString(reset_reason));
+                   Http::Utility::resetReasonToString(reset_reason), " transport failure reason: ", transport_failure_reason);
 
   callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure_reason);
   const std::string& basic_details =
