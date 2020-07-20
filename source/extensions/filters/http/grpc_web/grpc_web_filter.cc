@@ -211,9 +211,8 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
     return Http::HeaderMap::Iterate::Continue;
   });
 
-  // Due to https://github.com/envoyproxy/envoy/issues/10514 (and
-  // https://bugs.webkit.org/show_bug.cgi?id=210108) we need to skip clearing response trailer
-  // when the downstream protocol is HTTP/2.
+  // Due to https://github.com/envoyproxy/envoy/issues/10514 we need to skip clearing response
+  // trailer when the downstream protocol is HTTP/2.
   if (encoder_callbacks_->streamInfo().protocol() != Http::Protocol::Http2) {
     // Clear out the trailers so they don't get added since it is now in the body
     trailers.clear();
