@@ -179,9 +179,7 @@ void SslSocket::HandBack(bssl::UniquePtr<SSL> ssl) { info_->handbackSsl(std::mov
 void SslSocket::OnSuccessCb(SSL* ssl) { ctx_->logHandshake(ssl); }
 void SslSocket::OnFailureCb() { drainErrorQueue(); }
 
-PostIoAction SslSocket::doHandshake() {
-  return handshaker_->doHandshake(state_, rawSsl(), *this);
-}
+PostIoAction SslSocket::doHandshake() { return handshaker_->doHandshake(state_, rawSsl(), *this); }
 
 void SslSocket::drainErrorQueue() {
   bool saw_error = false;
