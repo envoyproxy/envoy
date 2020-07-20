@@ -9,9 +9,9 @@
 namespace Envoy {
 namespace Server {
 
-using WatchDogEvent = 
-using GuardDogActionCb = ::std::function<void(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent, ::std::vector<::std::pair<Thread::ThreadId, MonotonicTime>>, MonotonicTime)>;
-
+using GuardDogActionCb = ::std::function<void(
+    envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent,
+    ::std::vector<::std::pair<Thread::ThreadId, MonotonicTime>>, MonotonicTime)>;
 
 /**
  * The GuardDog runs a background thread which scans a number of shared WatchDog

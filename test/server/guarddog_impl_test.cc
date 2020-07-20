@@ -232,7 +232,6 @@ TEST_P(GuardDogAlmostDeadTest, MultiKillUnderThreshold) {
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
   guard_dog_->forceCheckForTest();
-
 }
 
 TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {

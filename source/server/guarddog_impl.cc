@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "envoy/common/time.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/server/guarddog.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -44,6 +46,12 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_megamiss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
               .statName())),
+      event_to_callbacks_({
+        {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL, {}},
+        {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL, {}},
+        {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS, {}},
+        {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS, {}},
+      }),
       dispatcher_(api.allocateDispatcher("guarddog_thread")),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
   start(api);
@@ -69,7 +77,6 @@ void GuardDogImpl::step() {
 
   {
     std::vector<std::pair<Thread::ThreadId, MonotonicTime>> multi_kill_threads;
-    size_t multi_kill_count = 0;
     Thread::LockGuard guard(wd_lock_);
 
     // Compute the multikill threshold
@@ -79,6 +86,7 @@ void GuardDogImpl::step() {
 
     for (auto& watched_dog : watched_dogs_) {
       const auto ltt = watched_dog->dog_->lastTouchTime();
+      const auto tid = watched_dog->dog_->threadId();
       const auto delta = now - ltt;
       if (watched_dog->last_alert_time_ && watched_dog->last_alert_time_.value() < ltt) {
         watched_dog->miss_alerted_ = false;
@@ -90,7 +98,7 @@ void GuardDogImpl::step() {
           watched_dog->miss_counter_.inc();
           watched_dog->last_alert_time_ = ltt;
           watched_dog->miss_alerted_ = true;
-          miss_threads.emplace_back(watched_dog->dog_->threadId(), ltt);
+          miss_threads.emplace_back(tid, ltt);
         }
       }
       if (delta > megamiss_timeout_) {
@@ -99,26 +107,46 @@ void GuardDogImpl::step() {
           watched_dog->megamiss_counter_.inc();
           watched_dog->last_alert_time_ = ltt;
           watched_dog->megamiss_alerted_ = true;
-          mega_miss_threads.emplace_back(watched_dog->dog_->threadId(), ltt);
+          mega_miss_threads.emplace_back(tid, ltt);
         }
       }
       if (killEnabled() && delta > kill_timeout_) {
-        // TODO(kbaichoo): make a call to the kill event handlers.
+        // Runs all of the registered kill callbacks the order thery were registered.
+        for(GuardDogActionCb& cb : event_to_callbacks_[WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL]) {
+          cb(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL, {{tid, ltt}}, now);
+        }
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
                           watched_dog->dog_->threadId().debugString()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
-        // TODO(kbaichoo): merge in changes from other PRs? Do a multikill / add to arr
-        if (++multi_kill_count >= required_for_multi_kill) {
+        multi_kill_threads.emplace_back(tid, ltt);
+
+        if (multi_kill_threads.size() >= required_for_multi_kill) {
+          // Runs all of the registered multikill callbacks the order thery were registered.
+          for(GuardDogActionCb& cb : event_to_callbacks_[WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL]) {
+            cb(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL, multi_kill_threads, now);
+          }
+
           PANIC(fmt::format("GuardDog: At least {} threads ({},...) stuck for more than "
                             "watchdog_multikill_timeout",
-                            multi_kill_count, watched_dog->dog_->threadId().debugString()));
+                            multi_kill_threads.size(), tid.debugString()));
         }
       }
     }
   }
-  
-  // TODO(kbaichoo): run handlers 
+
+  // Run megamiss and miss handlers 
+  if(!mega_miss_threads.empty()) {
+    for(GuardDogActionCb& cb : event_to_callbacks_[WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS]) {
+      cb(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS, mega_miss_threads, now);
+    }
+  }
+
+  if(!miss_threads.empty()) {
+    for(GuardDogActionCb& cb : event_to_callbacks_[WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS]) {
+      cb(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS, miss_threads, now);
+    }
+  }
 
   {
     Thread::LockGuard guard(mutex_);

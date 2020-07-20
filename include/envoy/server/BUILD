@@ -71,6 +71,7 @@ envoy_cc_library(
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread:thread_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
