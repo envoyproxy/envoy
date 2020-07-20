@@ -46,6 +46,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/extensions/filters/network/direct_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/local_ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 

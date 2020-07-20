@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
@@ -170,6 +171,10 @@ bool UberFilterFuzzer::invalidInputForFuzzer(const std::string& filter_name,
       // Quiche is not supported yet.
       return true;
     }
+  }else if(filter_name ==NetworkFilterNames::get().ThriftProxy){
+    envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config =
+    dynamic_cast<envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy&>(
+        *config_message);
   }
   return false;
 }
@@ -191,17 +196,20 @@ void UberFilterFuzzer::fuzz(
       return;
     }
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
-    perFilterSetup(proto_config.name());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
-    // Add filter to connection_
-    cb_(read_filter_callbacks_->connection_);
+
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup{}", e.what());
     return;
   }
-//  if (actions.size() > 5) {
-//    PANIC("A case is found!");
-//  }
+  perFilterSetup(proto_config.name());
+  
+  // Add filter to connection_
+  cb_(read_filter_callbacks_->connection_);
+  std::cout<<"pass validation"<<std::endl;
+ if (actions.size() > 1) {
+   PANIC("A case is found!");
+ }
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
