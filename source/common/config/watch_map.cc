@@ -76,6 +76,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   }
 
   // Track any removals triggered by earlier watch updates.
+  ASSERT(deferred_removed_during_update_ == nullptr);
   deferred_removed_during_update_ = std::make_unique<absl::flat_hash_set<Watch*>>();
   Cleanup cleanup([this] { removeDeferredWatches(); });
   // Build a map from watches, to the set of updated resources that each watch cares about. Each
@@ -150,6 +151,7 @@ void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   // Track any removals triggered by earlier watch updates.
+  ASSERT(deferred_removed_during_update_ == nullptr);
   deferred_removed_during_update_ = std::make_unique<absl::flat_hash_set<Watch*>>();
   Cleanup cleanup([this] { removeDeferredWatches(); });
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
