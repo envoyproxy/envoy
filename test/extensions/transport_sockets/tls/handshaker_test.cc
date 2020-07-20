@@ -52,8 +52,6 @@ protected:
     auto cert = MakeCert();
     auto chain = std::vector<CRYPTO_BUFFER*>{cert.get()};
 
-    SSL_CTX_set_max_proto_version(server_ctx_.get(), TLS1_2_VERSION);
-
     server_ssl_ = bssl::UniquePtr<SSL>(SSL_new(server_ctx_.get()));
     SSL_set_accept_state(server_ssl_.get());
     ASSERT(
