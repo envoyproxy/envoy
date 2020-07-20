@@ -103,6 +103,19 @@ void cleanTapConfig(Protobuf::Message* message) {
     config.mutable_common_config()->mutable_static_config()->mutable_match_config()->set_any_match(
         true);
   }
+  // TODO(samflattery): remove once StreamingGrpcSink is implemented
+  else if (config.common_config().config_type_case() ==
+               envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
+                   kStaticConfig &&
+           config.common_config()
+                   .static_config()
+                   .output_config()
+                   .sinks(0)
+                   .output_sink_type_case() ==
+               envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
+    // will be caught in UberFilterFuzzer::fuzz
+    throw EnvoyException("received input with not implemented output_sink_type StreamingGrpcSink");
+  }
 }
 
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,

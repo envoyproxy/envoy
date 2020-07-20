@@ -233,6 +233,7 @@ message OutputSink {
 
     // [#not-implemented-hide:]
     // GrpcService to stream data to. The format argument must be PROTO_BINARY.
+    // [#comment: TODO(samflattery): remove cleanup in uber_per_filter.cc once implemented]
     StreamingGrpcSink streaming_grpc = 4;
   }
 }
