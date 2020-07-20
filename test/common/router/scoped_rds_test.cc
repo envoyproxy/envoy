@@ -827,6 +827,59 @@ key:
                ".*");
 }
 
+// Tests whether scope key conflict with updated scopes is ignore.
+TEST_F(ScopedRdsTest, IgnoreConflictWithUpdatedScopeDelta) {
+  setup();
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  const std::string config_yaml2 = R"EOF(
+name: bar_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource_2 = parseScopedRouteConfigurationFromYaml(config_yaml2);
+
+  // Delta API.
+  const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
+  context_init_manager_.initialize(init_watcher_);
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  EXPECT_EQ(1UL,
+            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(getScopedRouteMap().size(), 2);
+
+  const std::string config_yaml3 = R"EOF(
+name: bar_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto resource_3 = parseScopedRouteConfigurationFromYaml(config_yaml);
+  const std::string config_yaml4 = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource_4 = parseScopedRouteConfigurationFromYaml(config_yaml2);
+  const auto decoded_resources_2 = TestUtility::decodeResources({resource_3, resource_4});
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, {}, "2"));
+  EXPECT_EQ(2UL,
+            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(getScopedRouteMap().size(), 2);
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

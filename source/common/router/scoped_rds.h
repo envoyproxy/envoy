@@ -136,8 +136,7 @@ private:
   // during updating, the exception message is collected via the exception messages vector.
   // Returns true if any scope updated, false otherwise.
   bool addOrUpdateScopes(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-                         Init::Manager& init_manager, const std::string& version_info,
-                         std::vector<std::string>& exception_msgs);
+                         Init::Manager& init_manager, const std::string& version_info);
   // Removes given scopes from the managed set of scopes.
   // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
   // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.

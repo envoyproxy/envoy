@@ -137,8 +137,7 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
 
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
-    const std::string& version_info, std::vector<std::string>& exception_msgs) {
-  ASSERT(exception_msgs.empty());
+    const std::string& version_info) {
   bool any_applied = false;
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
@@ -156,13 +155,12 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
         std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
     auto scoped_route_info = std::make_shared<ScopedRouteInfo>(
         std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
-    // NOTE: delete previous route provider if any.
     route_provider_by_scope_.insert({scope_name, std::move(rds_config_provider_helper)});
     scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
     scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
     updated_scopes.push_back(scoped_route_info);
     any_applied = true;
-    ENVOY_LOG(debug, "srds: add/update scoped_route '{}', version: {}",
+    ENVOY_LOG(debug, "srds: queueing add/update of scoped_route '{}', version: {}",
               scoped_route_info->scopeName(), version_info);
   }
 
@@ -176,7 +174,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
     });
   }
   return any_applied;
-} // namespace Router
+}
 
 std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
 ScopedRdsConfigSubscription::removeScopes(
@@ -196,7 +194,8 @@ ScopedRdsConfigSubscription::removeScopes(
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
       removed_scope_names.push_back(scope_name);
-      ENVOY_LOG(debug, "srds: remove scoped route '{}', version: {}", scope_name, version_info);
+      ENVOY_LOG(debug, "srds: queueing removal of scoped route '{}', version: {}", scope_name,
+                version_info);
     }
   }
   if (!removed_scope_names.empty()) {
@@ -260,22 +259,20 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     clean_removed_resources =
         detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources);
   } catch (const EnvoyException& e) {
-    exception_msgs.emplace_back(absl::StrCat("", e.what()));
-  }
-  if (!exception_msgs.empty()) {
+    exception_msgs.push_back(e.what());
     throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}",
                                      absl::StrJoin(exception_msgs, ", ")));
   }
+
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
   // be reused by some to be added scopes.
-
   std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
       to_be_removed_rds_providers = removeScopes(clean_removed_resources, version_info);
 
   bool any_applied =
       addOrUpdateScopes(added_resources,
                         (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
-                        version_info, exception_msgs) ||
+                        version_info) ||
       !to_be_removed_rds_providers.empty();
   ConfigSubscriptionCommonBase::onConfigUpdate();
   if (any_applied) {
@@ -332,6 +329,13 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const auto& scoped_route =
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
+    removed_scopes.insert(scoped_route.name());
+  }
+  for (const auto& resource : resources) {
+    // Throws (thus rejects all) on any error.
+    const auto& scoped_route =
+        dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
+            resource.get().resource());
     const std::string& scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
@@ -347,9 +351,9 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
                       scope_name_by_key_hash[key_fingerprint], scope_name));
     }
     // if new scope have key conflict with scope that is not going to be removed
-    if (scope_name_by_hash_.find(key_fingerprint) != scope_name_by_hash_.end() &&
-        scope_name_by_hash_[key_fingerprint] != scope_name &&
-        removed_scopes.find(scope_name_by_hash_[key_fingerprint]) == removed_scopes.end()) {
+    auto it = scope_name_by_hash_.find(key_fingerprint);
+    if (it != scope_name_by_hash_.end() && it->second != scope_name &&
+        !removed_scopes.contains(it->second)) {
       throw EnvoyException(
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
                       scope_name_by_hash_[key_fingerprint], scope_name));
