@@ -6242,43 +6242,6 @@ TEST_F(HttpConnectionManagerImplTest, TestUpstreamResponseBodySize) {
   decoder_filters_[0]->callbacks_->encodeData(fake_response, true);
 }
 
-TEST_F(HttpConnectionManagerImplTest, TestUpstreamRequestResponseSizesNoHost) {
-  setup(false, "");
-
-  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
-    RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-    RequestHeaderMapPtr headers{
-        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-    decoder->decodeHeaders(std::move(headers), false);
-
-    Buffer::OwnedImpl fake_data("1234");
-    decoder->decodeData(fake_data, true);
-
-    return Http::okStatus();
-  }));
-
-  setupFilterChain(1, 0);
-
-  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
-  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
-
-  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
-
-  filter_callbacks_.upstreamHost(nullptr);
-  // Histograms should not record value when upstream host is not configured.
-  // So, deliverHistogramToSinks is not expected unlike other tests.
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  EXPECT_CALL(response_encoder_, encodeData(_, true));
-  expectOnDestroy();
-
-  Buffer::OwnedImpl fake_response("hello-world");
-  decoder_filters_[0]->callbacks_->encodeData(fake_response, true);
-}
-
 TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
   setup(false, "envoy-custom-server", false);
 
