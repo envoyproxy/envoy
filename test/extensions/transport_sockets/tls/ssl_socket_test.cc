@@ -342,7 +342,6 @@ void testUtil(const TestUtilOptions& options) {
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
-  EXPECT_EQ("", client_connection->ssl()->sha1PeerCertificateDigest());
 
   size_t connect_count = 0;
   auto connect_second_time = [&]() {
@@ -409,6 +408,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_FALSE(server_connection->ssl()->validFromPeerCertificate().has_value());
         EXPECT_FALSE(server_connection->ssl()->expirationPeerCertificate().has_value());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha1PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
