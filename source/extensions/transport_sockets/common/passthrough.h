@@ -11,7 +11,7 @@ namespace TransportSockets {
 
 class PassthroughSocket : public Network::TransportSocket {
 public:
-  PassthroughSocket(Network::TransportSocketPtr transport_socket);
+  PassthroughSocket(Network::TransportSocketPtr&& transport_socket);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;

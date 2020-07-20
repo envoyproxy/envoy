@@ -26,7 +26,6 @@ public:
 private:
   SocketTapConfigSharedPtr config_;
   PerSocketTapperPtr tapper_;
-  Network::TransportSocketPtr transport_socket_;
 };
 
 class TapSocketFactory : public Network::TransportSocketFactory,

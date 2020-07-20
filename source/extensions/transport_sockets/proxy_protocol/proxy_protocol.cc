@@ -30,8 +30,8 @@ namespace TransportSockets {
 namespace ProxyProtocol {
 
 UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
-    Network::TransportSocketPtr transport_socket, Network::TransportSocketOptionsSharedPtr options,
-    ProxyProtocolConfig_Version version)
+    Network::TransportSocketPtr&& transport_socket,
+    Network::TransportSocketOptionsSharedPtr options, ProxyProtocolConfig_Version version)
     : PassthroughSocket(std::move(transport_socket)), options_(options), version_(version) {}
 
 void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(

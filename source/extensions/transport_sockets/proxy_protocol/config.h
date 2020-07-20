@@ -10,7 +10,7 @@ namespace TransportSockets {
 namespace ProxyProtocol {
 
 /**
- * Config registration for the tap wrapper for transport socket factory.
+ * Config registration for the proxy protocol wrapper for transport socket factory.
  * @see TransportSocketConfigFactory.
  */
 class UpstreamProxyProtocolSocketConfigFactory

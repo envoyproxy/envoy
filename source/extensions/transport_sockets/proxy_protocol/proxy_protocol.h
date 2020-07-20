@@ -20,7 +20,7 @@ namespace ProxyProtocol {
 class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
-  UpstreamProxyProtocolSocket(Network::TransportSocketPtr transport_socket,
+  UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsSharedPtr options,
                               ProxyProtocolConfig_Version version);
 

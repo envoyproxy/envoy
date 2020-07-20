@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 
-PassthroughSocket::PassthroughSocket(Network::TransportSocketPtr transport_socket)
+PassthroughSocket::PassthroughSocket(Network::TransportSocketPtr&& transport_socket)
     : transport_socket_(std::move(transport_socket)) {}
 
 void PassthroughSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
