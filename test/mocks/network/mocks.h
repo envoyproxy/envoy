@@ -332,7 +332,7 @@ class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {
 public:
   MockUdpPacketWriterFactory() = default;
 
-  MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter, (Network::Socket&), ());
+  MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter, (Network::IoHandle&), ());
 };
 
 class MockListenerConfig : public ListenerConfig {
@@ -465,9 +465,6 @@ class MockUdpPacketWriter : public UdpPacketWriter {
 public:
   MockUdpPacketWriter() = default;
 
-  MOCK_METHOD(Api::IoCallUint64Result, writeToSocket,
-              (Network::IoHandle & io_handle, const Buffer::Instance& buffer,
-               const Address::Ip* local_ip, const Address::Instance& peer_address));
   MOCK_METHOD(Api::IoCallUint64Result, writePacket,
               (const Buffer::Instance& buffer, const Address::Ip* local_ip,
                const Address::Instance& peer_address));
@@ -494,6 +491,7 @@ public:
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
   MOCK_METHOD(Network::UdpPacketWriter*, udpPacketWriter, ());
+  MOCK_METHOD(Network::UdpPacketWriterFactory*, udpPacketWriterFactory, ());
 
   Event::MockDispatcher dispatcher_;
 };

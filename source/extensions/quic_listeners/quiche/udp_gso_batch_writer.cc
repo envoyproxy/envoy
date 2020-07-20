@@ -8,21 +8,12 @@ namespace Envoy {
 namespace Quic {
 
 // Initialize QuicGsoBatchWriter, and set socket_
-UdpGsoBatchWriter::UdpGsoBatchWriter(Network::Socket& socket)
-    : quic::QuicGsoBatchWriter(std::make_unique<quic::QuicBatchWriterBuffer>(),
-                               socket.ioHandle().fd()),
-      socket_(socket) {}
+UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle)
+    : quic::QuicGsoBatchWriter(std::make_unique<quic::QuicBatchWriterBuffer>(), io_handle.fd()),
+      io_handle_(io_handle) {}
 
 // Do Nothing in the Destructor For now
 UdpGsoBatchWriter::~UdpGsoBatchWriter() {}
-
-Api::IoCallUint64Result
-UdpGsoBatchWriter::writeToSocket(Network::IoHandle& io_handle, const Buffer::Instance& buffer,
-                                 const Network::Address::Ip* local_ip,
-                                 const Network::Address::Instance& peer_address) {
-  // Write to socket tied to the socket's ioHandle
-  return writePacket(buffer, local_ip, peer_address);
-}
 
 Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& buffer,
                                                       const Address::Ip* local_ip,
@@ -146,14 +137,14 @@ Api::IoCallUint64Result UdpGsoBatchWriter::flush() {
                               Network::IoSocketError::deleteIoError));
 }
 
-Network::IoHandle& UdpGsoBatchWriter::getWriterIoHandle() const { return socket_.ioHandle(); }
+Network::IoHandle& UdpGsoBatchWriter::getWriterIoHandle() const { return io_handle_; }
 
 UdpGsoBatchWriterFactory::UdpGsoBatchWriterFactory() {}
 
 Network::UdpPacketWriterPtr
-UdpGsoBatchWriterFactory::createUdpPacketWriter(Network::Socket& socket) {
+UdpGsoBatchWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle) {
   // Keep It Simple for now
-  return std::make_unique<UdpGsoBatchWriter>(socket);
+  return std::make_unique<UdpGsoBatchWriter>(io_handle);
 }
 
 } // namespace Quic

@@ -118,6 +118,7 @@ private:
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     const Upstream::Host& host() const { return *host_; }
     void write(const Buffer::Instance& buffer);
+    Network::UdpPacketWriter* udpPacketWriter() { return udp_packet_writer_.get(); }
 
   private:
     void onIdleTimer();
@@ -148,6 +149,7 @@ private:
     // write to the upstream host.
     const Network::IoHandlePtr io_handle_;
     const Event::FileEventPtr socket_event_;
+    Network::UdpPacketWriterPtr udp_packet_writer_;
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;

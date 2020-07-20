@@ -9,7 +9,7 @@ namespace Network {
 
 class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
 public:
-  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::Socket& socket) override;
+  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle) override;
 };
 
 // This class uses a protobuf config to create a UDP packet writer factory which

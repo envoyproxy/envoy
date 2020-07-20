@@ -7,22 +7,21 @@
 namespace Envoy {
 namespace Network {
 
-UdpDefaultWriter::UdpDefaultWriter(Network::Socket& socket)
-    : write_blocked_(false), socket_(socket) {
+UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle)
+    : write_blocked_(false), io_handle_(io_handle) {
   // Just set the socket and write_blocked_ in the constructor
 }
 
 // Destructor does nothing for now
 UdpDefaultWriter::~UdpDefaultWriter() {}
 
-Api::IoCallUint64Result UdpDefaultWriter::writeToSocket(Network::IoHandle& io_handle,
-                                                        const Buffer::Instance& buffer,
-                                                        const Address::Ip* local_ip,
-                                                        const Address::Instance& peer_address) {
+Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& buffer,
+                                                      const Address::Ip* local_ip,
+                                                      const Address::Instance& peer_address) {
   // Simple call to Utility::writeToSocket
   if (!isWriteBlocked()) {
     Api::IoCallUint64Result result =
-        Utility::writeToSocket(io_handle, buffer, local_ip, peer_address);
+        Utility::writeToSocket(io_handle_, buffer, local_ip, peer_address);
 
     if (result.err_ && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       // Writer is blocked when error code received is EWOULDBLOCK/EAGAIN
@@ -39,16 +38,9 @@ Api::IoCallUint64Result UdpDefaultWriter::writeToSocket(Network::IoHandle& io_ha
                                                          Network::IoSocketError::deleteIoError));
 }
 
-Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& buffer,
-                                                      const Address::Ip* local_ip,
-                                                      const Address::Instance& peer_address) {
-  // Write to socket tied to the socket's ioHandle
-  return writeToSocket(socket_.ioHandle(), buffer, local_ip, peer_address);
-}
-
 std::string UdpDefaultWriter::name() const { return UdpWriterNames::get().DefaultWriter; }
 
-Network::IoHandle& UdpDefaultWriter::getWriterIoHandle() const { return socket_.ioHandle(); }
+Network::IoHandle& UdpDefaultWriter::getWriterIoHandle() const { return io_handle_; }
 
 } // namespace Network
 } // namespace Envoy

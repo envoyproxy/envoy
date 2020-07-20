@@ -17,18 +17,10 @@ public:
 
   /**
    * Sends a packet via given UDP socket with specific source address.
-   * @param io_handle specify a io_handle to perform write on
    * @param buffer points to the buffer containing the packet
    * @param local_ip is the source address to be used to send.
    * @param peer_address is the destination address to send to.
    */
-  virtual Api::IoCallUint64Result writeToSocket(Network::IoHandle& io_handle,
-                                                const Buffer::Instance& buffer,
-                                                const Address::Ip* local_ip,
-                                                const Address::Instance& peer_address) PURE;
-
-  // TODO(yugant): Change the comments below in proper format
-  // Writes to the socket tied to the UdpPacket Writer
   virtual Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
                                               const Address::Ip* local_ip,
                                               const Address::Instance& peer_address) PURE;
@@ -88,7 +80,7 @@ public:
    * @param socket UDP socket used to send packets.
    * @return the UdpPacketWriter created.
    */
-  virtual UdpPacketWriterPtr createUdpPacketWriter(Network::Socket& socket) PURE;
+  virtual UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle) PURE;
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;

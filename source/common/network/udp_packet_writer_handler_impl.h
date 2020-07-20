@@ -11,15 +11,11 @@ namespace Network {
 
 class UdpDefaultWriter : public UdpPacketWriter {
 public:
-  UdpDefaultWriter(Network::Socket& socket);
+  UdpDefaultWriter(Network::IoHandle& io_handle);
 
   ~UdpDefaultWriter() override;
 
-  // following writeToSocket() utilizes the Utility::writeToSocket implementation
-  Api::IoCallUint64Result writeToSocket(Network::IoHandle& io_handle,
-                                        const Buffer::Instance& buffer, const Address::Ip* local_ip,
-                                        const Address::Instance& peer_address) override;
-
+  // Following writePacket utilizes Utility::writeToSocket() implementation
   Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer, const Address::Ip* local_ip,
                                       const Address::Instance& peer_address) override;
   bool isWriteBlocked() const override { return write_blocked_; }
@@ -45,7 +41,7 @@ public:
 
 private:
   bool write_blocked_;
-  Network::Socket& socket_;
+  Network::IoHandle& io_handle_;
 };
 
 } // namespace Network

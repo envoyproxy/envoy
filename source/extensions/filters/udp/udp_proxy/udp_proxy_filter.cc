@@ -170,6 +170,9 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       ->resourceManager(Upstream::ResourcePriority::Default)
       .connections()
       .inc();
+  udp_packet_writer_ = cluster.filter_.read_callbacks_->udpListener()
+                           .udpPacketWriterFactory()
+                           ->createUdpPacketWriter(*io_handle_);
 
   // TODO(mattklein123): Enable dropped packets socket option. In general the Socket abstraction
   // does not work well right now for client sockets. It's too heavy weight and is aimed at listener
@@ -222,9 +225,12 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   //       port exhaustion.
   // NOTE: We do not specify the local IP to use for the sendmsg call. We allow the OS to select
   //       the right IP based on outbound routing rules.
-  Api::IoCallUint64Result rc =
-      cluster_.filter_.read_callbacks_->udpListener().udpPacketWriter()->writeToSocket(
-          *io_handle_, buffer, nullptr, *host_->address());
+  Api::IoCallUint64Result rc = udpPacketWriter()->writePacket(buffer, nullptr, *host_->address());
+  
+  // TODO(yugant): Remove these alternates
+  // Api::IoCallUint64Result rc =
+  //     cluster_.filter_.read_callbacks_->udpListener().udpPacketWriter()->writeToSocket(
+  //         *io_handle_, buffer, nullptr, *host_->address());
   // Api::IoCallUint64Result rc =
   //     Network::Utility::writeToSocket(*io_handle_, buffer, nullptr, *host_->address());
 

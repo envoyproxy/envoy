@@ -32,7 +32,8 @@ namespace Network {
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                                  UdpListenerCallbacks& cb, TimeSource& time_source,
                                  ListenerConfig& config)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source),
+      listener_config_(config) {
   file_event_ = dispatcher_.createFileEvent(
       socket_->ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -46,7 +47,7 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
   }
 
   // Create udp_packet_writer
-  udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(*socket_);
+  udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(socket_->ioHandle());
 }
 
 UdpListenerImpl::~UdpListenerImpl() {
@@ -114,8 +115,12 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   ENVOY_UDP_LOG(trace, "send");
   Buffer::Instance& buffer = send_data.buffer_;
 
-  Api::IoCallUint64Result send_result = udpPacketWriter()->writeToSocket(
-      socket_->ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);
+  Api::IoCallUint64Result send_result =
+      udpPacketWriter()->writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
+
+  // TODO(yugant): Remove these alternates
+  // Api::IoCallUint64Result send_result = udpPacketWriter()->writeToSocket(
+  //     socket_->ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);
 
   // Api::IoCallUint64Result send_result = Utility::writeToSocket(
   //     socket_->ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);

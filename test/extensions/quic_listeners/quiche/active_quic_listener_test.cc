@@ -115,9 +115,9 @@ protected:
     ON_CALL(listener_config_, udpPacketWriterFactory())
         .WillByDefault(Return(&udp_packet_writer_factory_));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_))
-        .WillByDefault(Invoke([&](Network::Socket& socket) -> Network::UdpPacketWriterPtr {
+        .WillByDefault(Invoke([&](Network::IoHandle& io_handle) -> Network::UdpPacketWriterPtr {
           Network::UdpPacketWriterPtr udp_packet_writer =
-              std::make_unique<Network::UdpDefaultWriter>(socket);
+              std::make_unique<Network::UdpDefaultWriter>(io_handle);
           return udp_packet_writer;
         }));
 

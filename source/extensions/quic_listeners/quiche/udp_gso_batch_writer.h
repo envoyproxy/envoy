@@ -15,7 +15,6 @@
 
 #include "envoy/config/listener/v3/udp_writer_config.pb.h"
 #include "envoy/network/udp_packet_writer_handler.h"
-#include "envoy/network/socket.h"
 
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_protos.h"
@@ -27,16 +26,15 @@ const std::string GsoBatchWriterName{"udp_gso_batch_writer"};
 
 class UdpGsoBatchWriter : public quic::QuicGsoBatchWriter, public Network::UdpPacketWriter {
 public:
-  UdpGsoBatchWriter(Network::Socket& socket);
+  UdpGsoBatchWriter(Network::IoHandle& io_handle);
 
   ~UdpGsoBatchWriter() override;
 
-  // writeToSocket perform batched sends based on QuicGsoBatchWriter::WritePacket
+  // writePacket perform batched sends based on QuicGsoBatchWriter::WritePacket
   // implementation
-  Api::IoCallUint64Result writeToSocket(Network::IoHandle& io_handle,
-                                        const Buffer::Instance& buffer,
-                                        const Network::Address::Ip* local_ip,
-                                        const Network::Address::Instance& peer_address) override;
+  Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
+                                      const Network::Address::Ip* local_ip,
+                                      const Network::Address::Instance& peer_address) override;
 
   bool isWriteBlocked() const override { return IsWriteBlocked(); }
   void setWritable() override { return SetWritable(); }
@@ -51,14 +49,14 @@ public:
   Network::IoHandle& getWriterIoHandle const override;
 
 private:
-  Network::Socket& socket_;
+  Network::IoHandle& io_handle_;
 };
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {
 public:
   UdpGsoBatchWriterFactory();
 
-  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::Socket& socket);
+  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle);
 
 private:
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
