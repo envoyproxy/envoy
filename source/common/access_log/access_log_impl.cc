@@ -21,7 +21,6 @@
 #include "common/protobuf/utility.h"
 #include "common/stream_info/utility.h"
 #include "common/tracing/http_tracer_impl.h"
-
 #include "absl/types/optional.h"
 
 namespace Envoy {
