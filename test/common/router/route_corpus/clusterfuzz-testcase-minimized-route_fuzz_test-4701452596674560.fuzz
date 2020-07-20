@@ -1,0 +1,79 @@
+config {
+  virtual_hosts {
+    name: "&\006\000\000\000"
+    domains: "-"
+    require_tls: ALL
+    response_headers_to_remove: "\0Ï3\022\362\211\245\247V\036"
+    request_headers_to_remove: "\003\022\360\234\254\265V\036"
+    typed_per_filter_config {
+      key: ""
+      value {
+      }
+    }
+    typed_per_filter_config {
+      key: "\000config {\n  virtual_hosts {\n    name: \"o\"\n    routes {\n      route {\n        hidden_envoy_deprecated_request_mirror_policy {\n          cluster: \"valacidate/validate.proto\"          hidden_envoy_deprecated_runtime_key: \"test/common/router/route_fuzz.\"\n        }\n        request_mirror_policies {\n          runtime_fraction {\n          }\n        }\n      }\n    }\n    routes {\n      route {\n        auto_host_rewrite {\n          value: true\n    google_grpc       }\n        hidden_envoy_deprecated_request_mirror_policy {\n          cluster: \"validate/validate.proto\"\n          hidden_envoy_deprecated_runtime_key: \",\"\n        }\n        internal_redirect_action: HANDLE_INTERNAL_REDIRECT\n        request_mirror_policies {\n        }\n      }\n    }\n  }\n  virtual_hosts {\n    name: \"o\"\n    routes {\n      route {\n        hidden_envoy_deprecated_request_mirror_policy {\n          cluster: \"validate/validate.proto\"\n          hidden_envoy_deprecated_runtime_key: \"test/common/router/route_fuzz.\"\n        }\n        request_mirror_policies {\n        }\n      }\n    }\n    routes {\n      route {\n        hidden_envoy_deprecated_request_mirror_policy {\n          cluster: \"validate/validate.proto\"\n          hidden_envoy_decated_runtime_key: \"test/common/router/route_fuzz.\"\n        }\n        request_mirror_policies {\n        }\n      }\n      response_headers_to_remove: \"test/common/router/route_fuzz.\"\n    }\n    hedge_policy {\n    }\n    per_request_buffer_limit_bytes {\n      value: 2105325\n    }\n  }\n}\n"
+      value {
+        value: "*"
+      }
+    }
+    typed_per_filter_config {
+      key: "\000r32767^keY"
+      value {
+      }
+    }
+    typed_per_filter_config {
+      key: "\000~"
+      value {
+      }
+    }
+    typed_per_filter_config {
+      key: " "
+      value {
+      }
+    }
+    typed_per_filter_config {
+      key: " \000 "
+      value {
+      }
+    }
+    typed_per_filter_config {
+      key: "0"
+      value {
+        type_url: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+      }
+    }
+    typed_per_filter_config {
+      key: "?_~"
+      value {
+      }
+    }
+    typed_per_filter_config {
+      key: "^/users/\\d+/chargeaccounts/(?!val+/chargeac"
+      value {
+      }
+    }
+    typed_per_filter_config {
+      key: "p1p"
+      value {
+        type_url: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+        value: "@\000\000\000\000\000\000\000"
+      }
+    }
+    typed_per_filter_config {
+      key: "p1p"
+      value {
+        type_url: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+      }
+    }
+    typed_per_filter_config {
+      key: "|x|"
+      value {
+      }
+    }
+    retry_policy_typed_config {
+      type_url: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+    }
+  }
+  internal_only_headers: "&"
+}
+random_value: 67070975
