@@ -27,22 +27,18 @@ envoy_cc_test_library(
     name = "uber_filter_lib",
     srcs = [
         "uber_filter.cc",
+        "uber_per_filter.cc",
     ],
     hdrs = ["uber_filter.h"],
     deps = [
         ":network_filter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:utility_lib",
-        "//source/extensions/filters/network/ext_authz",
-        "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
+        "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
         "//test/fuzz:utility_lib",
-        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/extensions/filters/network/direct_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/local_ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -54,12 +50,11 @@ envoy_cc_fuzz_test(
     name = "network_filter_fuzz_test",
     srcs = ["network_filter_fuzz_test.cc"],
     corpus = "network_filter_corpus",
-    # All Envoy network extensions must be linked to the test in order for the fuzzer to pick
+    # All Envoy network filters must be linked to the test in order for the fuzzer to pick
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [
         ":uber_filter_lib",
         "//source/common/config:utility_lib",
-        "//source/common/protobuf:utility_lib",
         "//test/config:utility_lib",
     ] + envoy_all_network_filters(),
 )
