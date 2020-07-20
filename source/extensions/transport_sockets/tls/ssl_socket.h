@@ -125,8 +125,8 @@ public:
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakerCallbacks
-  bssl::UniquePtr<SSL> Handoff() override;
-  void Handback(bssl::UniquePtr<SSL> ssl) override;
+  bssl::UniquePtr<SSL> HandOff() override;
+  void HandBack(bssl::UniquePtr<SSL> ssl) override;
   void OnSuccessCb(SSL* ssl) override;
   void OnFailureCb() override;
 

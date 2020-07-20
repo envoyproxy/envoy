@@ -18,11 +18,11 @@ public:
   /**
    * Hands off the internally-held SSL object for external manipulation.
    */
-  virtual bssl::UniquePtr<SSL> Handoff() PURE;
+  virtual bssl::UniquePtr<SSL> HandOff() PURE;
   /**
    * Accepts an SSL object for internal storage.
    */
-  virtual void Handback(bssl::UniquePtr<SSL> ssl) PURE;
+  virtual void HandBack(bssl::UniquePtr<SSL> ssl) PURE;
   /**
    * Called when a handshake is successfully performed.
    */

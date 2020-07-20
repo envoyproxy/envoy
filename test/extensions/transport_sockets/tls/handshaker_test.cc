@@ -35,8 +35,8 @@ int PemPasswordCallback(char* buf, int buf_size, int /*rwflag*/, void* u) {
 class MockHandshakerCallbacks : public Ssl::HandshakerCallbacks {
 public:
   ~MockHandshakerCallbacks() override{};
-  MOCK_METHOD(bssl::UniquePtr<SSL>, Handoff, (), (override));
-  MOCK_METHOD(void, Handback, (bssl::UniquePtr<SSL>), (override));
+  MOCK_METHOD(bssl::UniquePtr<SSL>, HandOff, (), (override));
+  MOCK_METHOD(void, HandBack, (bssl::UniquePtr<SSL>), (override));
   MOCK_METHOD(void, OnSuccessCb, (SSL*), (override));
   MOCK_METHOD(void, OnFailureCb, (), (override));
 };

@@ -174,8 +174,8 @@ void SslSocket::onPrivateKeyMethodComplete() {
   }
 }
 
-bssl::UniquePtr<SSL> SslSocket::Handoff() { return info_->handoffSsl(); }
-void SslSocket::Handback(bssl::UniquePtr<SSL> ssl) { info_->handbackSsl(std::move(ssl)); }
+bssl::UniquePtr<SSL> SslSocket::HandOff() { return info_->handoffSsl(); }
+void SslSocket::HandBack(bssl::UniquePtr<SSL> ssl) { info_->handbackSsl(std::move(ssl)); }
 void SslSocket::OnSuccessCb(SSL* ssl) { ctx_->logHandshake(ssl); }
 void SslSocket::OnFailureCb() { drainErrorQueue(); }
 
