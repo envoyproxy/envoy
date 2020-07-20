@@ -83,7 +83,7 @@ public:
    * Attach a HistogramSettings to this StoreRoot to generate histogram configurations
    * according to some ruleset.
    */
-  virtual void setHistogramSettings(HistogramSettingsPtr&& histogram_settings) PURE;
+  virtual void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have

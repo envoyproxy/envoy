@@ -222,7 +222,7 @@ Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& boots
   return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
 }
 
-Stats::HistogramSettingsPtr
+Stats::HistogramSettingsConstPtr
 Utility::createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return std::make_unique<Stats::HistogramSettingsImpl>(bootstrap.stats_config());
 }

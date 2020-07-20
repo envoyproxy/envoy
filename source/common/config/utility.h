@@ -334,7 +334,7 @@ public:
   /**
    * Create HistogramSettings instance.
    */
-  static Stats::HistogramSettingsPtr
+  static Stats::HistogramSettingsConstPtr
   createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   /**

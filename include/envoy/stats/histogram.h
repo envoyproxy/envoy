@@ -26,7 +26,7 @@ public:
   virtual ConstSupportedBuckets& buckets(absl::string_view stat_name) const PURE;
 };
 
-using HistogramSettingsPtr = std::unique_ptr<const HistogramSettings>;
+using HistogramSettingsConstPtr = std::unique_ptr<const HistogramSettings>;
 
 /**
  * Holds the computed statistics for a histogram.

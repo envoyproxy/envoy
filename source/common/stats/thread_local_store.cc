@@ -44,7 +44,7 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(scopes_.empty());
 }
 
-void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsPtr&& histogram_settings) {
+void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     ASSERT(scope->central_cache_->histograms_.empty());
