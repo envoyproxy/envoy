@@ -15,7 +15,10 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:modules",
     ],
     # wasm (wee v8 etc) will not compile on Windows
-    tags = ["skip_on_windows"],
+    tags = [
+        "manual",
+        "skip_on_windows",
+    ],
     deps = [
         "//source/extensions/common/wasm:wasm_vm_lib",
         "//test/test_common:environment_lib",
