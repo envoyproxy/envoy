@@ -419,6 +419,7 @@ protected:
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
   uint32_t per_stream_buffer_limit_;
+  uint32_t max_concurrent_streams_;
   bool allow_metadata_;
   const bool stream_error_on_invalid_http_messaging_;
   bool flood_detected_;
