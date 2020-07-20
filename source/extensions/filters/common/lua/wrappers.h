@@ -149,7 +149,7 @@ private:
 
   /**
    * Returns the URIs in the SAN field of the local certificate. Returns empty table if there is no
-   * local certificate, or no SAN field, or no URI.
+   * local certificate, or no SAN field, or no URI in SAN.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaUriSanLocalCertificate);
 
@@ -203,25 +203,25 @@ private:
 
   /**
    * Returns the DNS entries in the SAN field of the peer certificate. Returns an empty table if
-   * there is no peer certificate, or no SAN field, or no DNS.
+   * there is no peer certificate, or no SAN field, or no DNS entries in SAN.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaDnsSansPeerCertificate);
 
   /**
    * Returns the DNS entries in the SAN field of the local certificate. Returns an empty table if
-   * there is no local certificate, or no SAN field, or no DNS.
+   * there is no local certificate, or no SAN field, or no DNS entries in SAN.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaDnsSansLocalCertificate);
 
   /**
-   * Returns the time (in RFC 3339 format) that the peer certificate was issued and should be
-   * considered valid from. Returns empty string if there is no peer certificate.
+   * Returns the timestamp-since-epoch (in seconds) that the peer certificate was issued and should
+   * be considered valid from. Returns empty string if there is no peer certificate.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaValidFromPeerCertificate);
 
   /**
-   * Returns the time that the peer certificate expires and should not be considered valid after.
-   * Returns empty string if there is no peer certificate.
+   * Returns the timestamp-since-epoch (in seconds) that the peer certificate expires and should not
+   * be considered valid after. Returns empty string if there is no peer certificate.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaExpirationPeerCertificate);
 

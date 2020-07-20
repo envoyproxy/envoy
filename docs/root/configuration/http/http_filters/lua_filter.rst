@@ -689,7 +689,7 @@ uriSanLocalCertificate()
   handle:logTrace(table.concat(certs, ","))
 
 Returns the URIs (as a table) in the SAN field of the local certificate. Returns an empty table if
-there is no local certificate, or no SAN field, or no URI.
+there is no local certificate, or no SAN field, or no URI SAN entries.
 
 sha256PeerCertificateDigest()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -698,8 +698,8 @@ sha256PeerCertificateDigest()
 
   downstreamSslConnection:sha256PeerCertificateDigest()
 
-Returns the SHA256 digest of the peer certificate. Returns ``""`` if there is no peer certificate which
-can happen in TLS (non mTLS) connections.
+Returns the SHA256 digest of the peer certificate. Returns ``""`` if there is no peer certificate
+which can happen in TLS (non-mTLS) connections.
 
 serialNumberPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -708,8 +708,8 @@ serialNumberPeerCertificate()
 
   downstreamSslConnection:serialNumberPeerCertificate()
 
-Returns the serial number field of the peer certificate. Returns ``""`` if there is no peer certificate,
-or no serial number.
+Returns the serial number field of the peer certificate. Returns ``""`` if there is no peer
+certificate, or no serial number.
 
 issuerPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -718,8 +718,8 @@ issuerPeerCertificate()
 
   downstreamSslConnection:issuerPeerCertificate()
 
-Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no peer
-certificate, or no issuer.
+Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
+peer certificate, or no issuer.
 
 subjectPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -728,8 +728,8 @@ subjectPeerCertificate()
 
   downstreamSslConnection:subjectPeerCertificate()
 
-Return the subject field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no peer
-certificate, or no subject.
+Return the subject field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
+peer certificate, or no subject.
 
 uriSanPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -739,7 +739,7 @@ uriSanPeerCertificate()
   downstreamSslConnection:uriSanPeerCertificate()
 
 Returns the URIs (as a table) in the SAN field of the peer certificate. Returns en empty table if
-there is no peer certificate, or no SAN field, or no URI.
+there is no peer certificate, or no SAN field, or no URI SAN entries.
 
 subjectLocalCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -758,8 +758,8 @@ urlEncodedPemEncodedPeerCertificate()
 
   downstreamSslConnection:urlEncodedPemEncodedPeerCertificate()
 
-Returns the URL-encoded PEM-encoded representation of the peer certificate. Returns ``""`` if there is
-no peer certificate or encoding fails.
+Returns the URL-encoded PEM-encoded representation of the peer certificate. Returns ``""`` if there
+is no peer certificate or encoding fails.
 
 urlEncodedPemEncodedPeerCertificateChain()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -779,7 +779,7 @@ dnsSansPeerCertificate()
   downstreamSslConnection:dnsSansPeerCertificate()
 
 Returns the DNS entries (as a table) in the SAN field of the peer certificate. Returns an empty
-table if there is no peer certificate, or no SAN field, or no DNS.
+table if there is no peer certificate, or no SAN field, or no DNS SAN entries.
 
 dnsSansLocalCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -789,7 +789,7 @@ dnsSansLocalCertificate()
   downstreamSslConnection:dnsSansLocalCertificate()
 
 Returns the DNS entries (as a table) in the SAN field of the local certificate. Returns an empty
-table if there is no local certificate, or no SAN field, or no DNS.
+table if there is no local certificate, or no SAN field, or no DNS SAN entries.
 
 validFromPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -798,8 +798,8 @@ validFromPeerCertificate()
 
   downstreamSslConnection:validFromPeerCertificate()
 
-Returns the time (in RFC 3339 format) that the peer certificate was issued and should be considered
-valid from. Returns empty if there is no peer certificate.
+Returns the time that the peer certificate was issued and should be considered valid from. Returns
+``0`` if there is no peer certificate.
 
 expirationPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -808,8 +808,8 @@ expirationPeerCertificate()
 
   downstreamSslConnection:validFromPeerCertificate()
 
-Returns the time (in RFC 3339 format) that the peer certificate expires and should not be considered
-valid after. Returns empty if there is no peer certificate.
+Returns the time that the peer certificate expires and should not be considered valid after. Returns
+``0`` if there is no peer certificate.
 
 sessionId()
 ^^^^^^^^^^^
@@ -837,8 +837,8 @@ ciphersuiteString()
 
   downstreamSslConnection:ciphersuiteString()
 
-Returns the OpenSSL name for the set of ciphers used in the established TLS connection. Returns ``""``
-if there is no current negotiated ciphersuite.
+Returns the OpenSSL name for the set of ciphers used in the established TLS connection. Returns
+``""`` if there is no current negotiated ciphersuite.
 
 tlsVersion()
 ^^^^^^^^^^^^

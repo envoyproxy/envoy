@@ -2,6 +2,8 @@
 
 #include <lua.h>
 
+#include <cstdint>
+
 #include "common/common/assert.h"
 #include "common/common/hex.h"
 
@@ -21,13 +23,24 @@ void createLuaTableFromStringList(lua_State* state, const StringList& list) {
   lua_createtable(state, list.size(), 0);
   for (size_t i = 0; i < list.size(); i++) {
     lua_pushstring(state, list[i].c_str());
+    // After the list[i].c_str() is pushed to the stack, we need to set the "current element" with
+    // that value. The lua_rawseti(state, t, i) helps us to set the value of table t with key i.
+    // Given the index of the current element/table in the stack is below the pushed value i.e. -2
+    // and the key (refers to where the element is in the table) is i + 1 (note that in Lua index
+    // starts from 1), hence we have:
     lua_rawseti(state, -2, i + 1);
   }
 }
 
-// Format time as RFC 3339. It is safer to return string to Lua instead of returning unsigned long.
-const std::string formatTimeAsRFC3339(const SystemTime& system_time) {
-  return absl::FormatTime(absl::RFC3339_full, absl::FromChrono(system_time), absl::UTCTimeZone());
+// By default, LUA_INTEGER is ptrdiff_t
+// (https://github.com/LuaJIT/LuaJIT/blob/8271c643c21d1b2f344e339f559f2de6f3663191/src/luaconf.h#L104),
+// which is large enough to hold timestamp-since-epoch in seconds. Note: In Lua, we usually use
+// os.time(os.date("!*t")) to get current timestamp-since-epoch in seconds.
+int64_t timestampInSeconds(const absl::optional<SystemTime>& system_time) {
+  return system_time.has_value() ? std::chrono::duration_cast<std::chrono::seconds>(
+                                       system_time.value().time_since_epoch())
+                                       .count()
+                                 : 0;
 }
 
 } // namespace
@@ -323,22 +336,14 @@ int SslConnectionWrapper::luaDnsSansLocalCertificate(lua_State* state) {
 int SslConnectionWrapper::luaValidFromPeerCertificate(lua_State* state) {
   ASSERT(connection_info_ != nullptr);
 
-  lua_pushstring(
-      state, connection_info_->validFromPeerCertificate().has_value()
-                 ? formatTimeAsRFC3339(connection_info_->validFromPeerCertificate().value()).c_str()
-                 : "");
-
+  lua_pushinteger(state, timestampInSeconds(connection_info_->validFromPeerCertificate()));
   return 1;
 }
 
 int SslConnectionWrapper::luaExpirationPeerCertificate(lua_State* state) {
   ASSERT(connection_info_ != nullptr);
 
-  lua_pushstring(
-      state,
-      connection_info_->expirationPeerCertificate().has_value()
-          ? formatTimeAsRFC3339(connection_info_->expirationPeerCertificate().value()).c_str()
-          : "");
+  lua_pushinteger(state, timestampInSeconds(connection_info_->expirationPeerCertificate()));
   return 1;
 }
 

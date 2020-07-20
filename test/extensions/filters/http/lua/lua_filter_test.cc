@@ -1906,11 +1906,11 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
 
   const SystemTime validity(std::chrono::seconds(1522796777));
   EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(validity));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("2018-04-03T23:06:16+00:00")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1522796777")));
 
   const SystemTime expiry(std::chrono::seconds(1522796776));
   EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(expiry));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("2018-04-03T23:06:17+00:00")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1522796776")));
 
   const std::string peer_cert_digest = "peer-cert-digest";
   EXPECT_CALL(*connection_info, sha256PeerCertificateDigest())
