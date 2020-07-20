@@ -74,7 +74,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
 
 std::string AwsIamGrpcCredentialsFactory::getRegion(
     const envoy::config::grpc_credential::v3::AwsIamConfig& config) {
-  std::unique_ptr<Common::Aws::RegionProvider> region_provider;
+  Common::Aws::RegionProviderPtr region_provider;
   if (!config.region().empty()) {
     region_provider = std::make_unique<Common::Aws::StaticRegionProvider>(config.region());
   } else {

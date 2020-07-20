@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <queue>
 #include <unordered_map>
 
@@ -140,6 +141,9 @@ private:
   std::queue<std::string> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
+
+using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;
+using GrpcMuxImplSharedPtr = std::shared_ptr<GrpcMuxImpl>;
 
 class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {

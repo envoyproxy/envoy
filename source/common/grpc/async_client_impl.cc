@@ -31,7 +31,7 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
                                        const Http::AsyncClient::RequestOptions& options) {
   auto* const async_request = new AsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
-  std::unique_ptr<AsyncStreamImpl> grpc_stream{async_request};
+  AsyncStreamImplPtr grpc_stream{async_request};
 
   grpc_stream->initialize(true);
   if (grpc_stream->hasResetStream()) {

@@ -98,7 +98,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
-  std::unique_ptr<GrpcMuxImpl> grpc_mux_;
+  GrpcMuxImplPtr grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
   NiceMock<MockOpaqueResourceDecoder> resource_decoder_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

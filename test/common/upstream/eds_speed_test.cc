@@ -162,8 +162,8 @@ public:
   Api::ApiPtr api_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  std::shared_ptr<Config::GrpcMuxImpl> grpc_mux_;
-  std::unique_ptr<Config::GrpcSubscriptionImpl> subscription_;
+  Config::GrpcMuxImplSharedPtr grpc_mux_;
+  Config::GrpcSubscriptionImplPtr subscription_;
 };
 
 } // namespace Upstream

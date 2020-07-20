@@ -49,7 +49,7 @@ public:
   LocalInfo::MockLocalInfo local_info_;
   Grpc::MockAsyncClient* async_client_{new NiceMock<Grpc::MockAsyncClient>};
   Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
-  std::unique_ptr<GrpcMetricsStreamerImpl> streamer_;
+  GrpcMetricsStreamerImplPtr streamer_;
 };
 
 // Test basic metrics streaming flow.

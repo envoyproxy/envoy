@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -129,6 +130,8 @@ private:
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
+using GrpcAccessLoggerImplPtr = std::unique_ptr<GrpcAccessLoggerImpl>;
+
 class GrpcAccessLoggerCacheImpl : public Singleton::Instance, public GrpcAccessLoggerCache {
 public:
   GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
@@ -157,6 +160,8 @@ private:
   ThreadLocal::SlotPtr tls_slot_;
   const LocalInfo::LocalInfo& local_info_;
 };
+
+using GrpcAccessLoggerCacheImplPtr = std::unique_ptr<GrpcAccessLoggerCacheImpl>;
 
 } // namespace GrpcCommon
 } // namespace AccessLoggers

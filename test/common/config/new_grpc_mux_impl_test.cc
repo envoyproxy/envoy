@@ -59,7 +59,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  std::unique_ptr<NewGrpcMuxImpl> grpc_mux_;
+  NewGrpcMuxImplPtr grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{"cluster_name"};
