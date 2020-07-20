@@ -8,6 +8,7 @@ load(
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_hot_restart",
+    "envoy_select_legacy_codecs_in_integration_tests",
     "envoy_sh_test",
 )
 
@@ -29,10 +30,10 @@ envoy_cc_test_library(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/common:version_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/version:version_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
@@ -219,8 +220,6 @@ envoy_cc_test(
     ],
     tags = [
         "fails_on_windows",
-        # https://github.com/envoyproxy/envoy/issues/9784
-        "no_tsan",
     ],
     deps = [
         ":http_integration_lib",
@@ -576,6 +575,10 @@ envoy_cc_test_library(
         "ssl_utility.h",
         "utility.h",
     ],
+    copts = envoy_select_legacy_codecs_in_integration_tests(
+        ["-DENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS"],
+        "@envoy",
+    ),
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
         ":server_stats_interface",
@@ -607,7 +610,9 @@ envoy_cc_test_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/common/http/http2:codec_legacy_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/local_info:local_info_lib",
         "//source/common/network:filter_lib",
@@ -624,6 +629,7 @@ envoy_cc_test_library(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//source/server:connection_handler_lib",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -635,7 +641,7 @@ envoy_cc_test_library(
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
@@ -742,6 +748,17 @@ envoy_cc_test(
         "//source/extensions/filters/network/echo:config",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "socket_interface_integration_test",
+    srcs = ["socket_interface_integration_test.cc"],
+    tags = ["fails_on_windows"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/network:socket_interface_lib",
+        "//source/extensions/filters/network/echo:config",
     ],
 )
 
@@ -1097,7 +1114,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/transport_sockets/tls:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
