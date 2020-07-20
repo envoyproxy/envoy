@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +40,7 @@ TEST_F(DirectResponseFilterTest, OnNewConnection) {
 // Test the filter's onNewConnection() with an empty response
 TEST_F(DirectResponseFilterTest, OnNewConnectionEmptyResponse) {
   initialize("");
-  EXPECT_CALL(read_filter_callbacks_.connection_, write(testing::_, testing::_)).Times(0);
+  EXPECT_CALL(read_filter_callbacks_.connection_, write(_, _)).Times(0);
   EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(read_filter_callbacks_.connection_.stream_info_,
               setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().DirectResponse));
@@ -50,6 +51,7 @@ TEST_F(DirectResponseFilterTest, OnNewConnectionEmptyResponse) {
 TEST_F(DirectResponseFilterTest, OnData) {
   initialize("hello");
   Buffer::OwnedImpl data("data");
+  EXPECT_CALL(read_filter_callbacks_.connection_, write(_, _)).Times(0);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 }
 
