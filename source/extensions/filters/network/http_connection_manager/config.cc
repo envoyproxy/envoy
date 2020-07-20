@@ -622,6 +622,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 
 void HttpConnectionManagerConfig::createFilterChainForFactories(
     Http::FilterChainFactoryCallbacks& callbacks, const FilterFactoriesList& filter_factories) {
+  bool added_missing_config_filter = false;
   for (const auto& filter_config_provider : filter_factories) {
     auto config = filter_config_provider->config();
     if (config.has_value()) {
@@ -630,9 +631,14 @@ void HttpConnectionManagerConfig::createFilterChainForFactories(
     }
 
     // If a filter config is missing after warming, inject a local reply with status 500.
-    ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
-    callbacks.addStreamDecoderFilter(
-        Http::StreamDecoderFilterSharedPtr{std::make_shared<MissingConfigFilter>()});
+    if (!added_missing_config_filter) {
+      ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
+      callbacks.addStreamDecoderFilter(
+          Http::StreamDecoderFilterSharedPtr{std::make_shared<MissingConfigFilter>()});
+      added_missing_config_filter = true;
+    } else {
+      ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider->name());
+    }
   }
 }
 

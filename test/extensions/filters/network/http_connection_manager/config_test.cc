@@ -1936,7 +1936,6 @@ http_filters:
   createHttpConnectionManagerConfig(yaml_string);
 }
 
-
 class FilterChainTest : public HttpConnectionManagerConfigTest {
 public:
   const std::string basic_config_ = R"EOF(
@@ -1992,6 +1991,11 @@ http_filters:
     config_source: { ads: {} }
     type_urls:
     - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+- name: bar
+  config_discovery:
+    config_source: { ads: {} }
+    type_urls:
+    - type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
 - name: envoy.filters.http.router
   )EOF";
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -2004,7 +2008,7 @@ http_filters:
   EXPECT_CALL(callbacks, addStreamDecoderFilter(_))
       .Times(2)
       .WillOnce(testing::SaveArg<0>(&missing_config_filter))
-      .WillOnce(Return()); // MissingConfigFilter and router
+      .WillOnce(Return()); // MissingConfigFilter (only once) and router
   config.createFilterChain(callbacks);
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
