@@ -90,7 +90,7 @@ public:
   void iterateReverse(HeaderMap::ConstIterateCb cb) const;
   void clear();
   size_t remove(const LowerCaseString& key);
-  size_t removeIf(const std::function<bool(const HeaderEntry&)>& predicate);
+  size_t removeIf(const HeaderMap::HeaderMatchPredicate& predicate);
   size_t removePrefix(const LowerCaseString& key);
   size_t size() const { return headers_.size(); }
   bool empty() const { return headers_.empty(); }
@@ -305,7 +305,7 @@ public:
   }
   void clear() override { HeaderMapImpl::clear(); }
   size_t remove(const LowerCaseString& key) override { return HeaderMapImpl::remove(key); }
-  size_t removeIf(const std::function<bool(const HeaderEntry&)>& predicate) override {
+  size_t removeIf(const HeaderMap::HeaderMatchPredicate& predicate) override {
     return HeaderMapImpl::removeIf(predicate);
   }
   size_t removePrefix(const LowerCaseString& key) override {

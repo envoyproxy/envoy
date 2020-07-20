@@ -552,7 +552,8 @@ public:
    * @param predicate supplies the predicate to match headers against.
    * @return the number of headers removed.
    */
-  virtual size_t removeIf(const std::function<bool(const HeaderEntry&)>& predicate) PURE;
+  using HeaderMatchPredicate = std::function<bool(const HeaderEntry&)>;
+  virtual size_t removeIf(const HeaderMatchPredicate& predicate) PURE;
 
   /**
    * Remove all instances of headers where the key begins with the supplied prefix.

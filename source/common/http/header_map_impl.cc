@@ -483,7 +483,7 @@ void HeaderMapImpl::clear() {
   cached_byte_size_ = 0;
 }
 
-size_t HeaderMapImpl::removeIf(const std::function<bool(const HeaderEntry&)>& predicate) {
+size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate) {
   const size_t old_size = headers_.size();
   headers_.remove_if([&predicate, this](const HeaderEntryImpl& entry) {
     const bool to_remove = predicate(entry);
@@ -508,6 +508,7 @@ size_t HeaderMapImpl::removeIf(const std::function<bool(const HeaderEntry&)>& pr
 }
 
 size_t HeaderMapImpl::remove(const LowerCaseString& key) {
+  // TODO(mattklein123): When the lazy map is implemented we can stop using removeIf() here.
   return HeaderMapImpl::removeIf([&key](const HeaderEntry& entry) -> bool {
     return key.get() == entry.key().getStringView();
   });
