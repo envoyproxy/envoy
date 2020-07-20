@@ -8,7 +8,7 @@ namespace Envoy {
 // platforms are needed.
 // from
 // (https://gcc.gnu.org/git/?p=gcc.git;a=blob_plain;f=libstdc%2b%2b-v3/libsupc%2b%2b/hash_bytes.cc)
-uint64_t MurmurHash::murmurHash2_64(absl::string_view key, uint64_t seed) {
+uint64_t MurmurHash::murmurHash2(absl::string_view key, uint64_t seed) {
   static const uint64_t mul = 0xc6a4a7935bd1e995UL;
   const char* const buf = static_cast<const char*>(key.data());
   uint64_t len = key.size();
