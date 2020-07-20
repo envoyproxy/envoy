@@ -91,6 +91,7 @@ private:
 
     // ProtocolConverter
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus messageEnd() override;
     FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
                             int16_t& field_id) override;
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
