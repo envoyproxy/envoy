@@ -42,6 +42,8 @@ private:
   std::unique_ptr<Grpc::MockAsyncClient> async_client_;
   std::unique_ptr<Grpc::MockAsyncClientFactory> async_client_factory_;
   Tracing::MockSpan span_;
+  // Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
+  // std::chrono::time_point.
   int seconds_in_one_day_ = 86400;
 };
 
