@@ -298,7 +298,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsVersionNoTls) {
   testFormatting(stream_info, "DOWNSTREAM_TLS_VERSION", EMPTY_STRING);
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint256) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha256Fingerprint) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
@@ -308,7 +308,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint256
                  "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f");
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint256Empty) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha256FingerprintEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha;
@@ -317,13 +317,13 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint256
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_256", EMPTY_STRING);
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint256NoTls) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha256FingerprintNoTls) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_256", EMPTY_STRING);
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint1) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha1Fingerprint) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
@@ -333,7 +333,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint1) 
                  "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f");
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint1Empty) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha1FingerprintEmpty) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::string expected_sha;
@@ -342,7 +342,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint1Em
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_1", EMPTY_STRING);
 }
 
-TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerFingerprint1NoTls) {
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha1FingerprintNoTls) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
   testFormatting(stream_info, "DOWNSTREAM_PEER_FINGERPRINT_1", EMPTY_STRING);
