@@ -86,8 +86,8 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
     // Initialize the shared context for the new span
     span_ptr->setId(previous_context.id());
-    if (previous_context.parent_id()) {
-      span_ptr->setParentId(previous_context.parent_id());
+    if (previous_context.parentId()) {
+      span_ptr->setParentId(previous_context.parentId());
     }
 
     // Set the SR annotation value
@@ -105,9 +105,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   span_ptr->addAnnotation(std::move(annotation));
 
   // Keep the same trace id
-  span_ptr->setTraceId(previous_context.trace_id());
+  span_ptr->setTraceId(previous_context.traceId());
   if (previous_context.is128BitTraceId()) {
-    span_ptr->setTraceIdHigh(previous_context.trace_id_high());
+    span_ptr->setTraceIdHigh(previous_context.traceIdHigh());
   }
 
   // Keep the same sampled flag

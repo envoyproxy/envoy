@@ -38,7 +38,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
     if (stopped_) {
       ASSERT(!active_message_list_.empty());
       auto metadata = (*active_message_list_.begin())->metadata();
-      if (metadata && metadata->message_type() == MessageType::Oneway) {
+      if (metadata && metadata->messageType() == MessageType::Oneway) {
         ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
         half_closed_ = true;
         return Network::FilterStatus::StopIteration;

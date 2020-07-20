@@ -78,7 +78,7 @@ public:
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
-  Network::Socket& mutable_socket() { return *socket_; }
+  Network::Socket& mutableSocket() { return *socket_; }
 
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.

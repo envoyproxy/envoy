@@ -105,7 +105,7 @@ Context::~Context() {
 
 void Context::activate() {
   Registry::getSink()->setLock(lock_);
-  Registry::getSink()->set_should_escape(should_escape_);
+  Registry::getSink()->setShouldEscape(should_escape_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
 }

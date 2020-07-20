@@ -406,7 +406,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                 typed_optarg.scope_key_builder_, factory_context, stat_prefix,
                 typed_optarg.rds_config_source_,
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager)
-                    .route_config_provider_manager(),
+                    .routeConfigProviderPanager(),
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager));
           });
 

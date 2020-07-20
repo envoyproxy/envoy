@@ -134,7 +134,7 @@ public:
     EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
         .WillOnce(
             Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
               EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
               EXPECT_EQ(context->downstreamConnection(), nullptr);
               return this->cm_.thread_local_cluster_.lb_.host_;
@@ -230,7 +230,7 @@ public:
     EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
         .WillOnce(
             Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+              EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
               EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
               EXPECT_EQ(context->downstreamConnection(), nullptr);
               auto redis_context =
@@ -306,7 +306,7 @@ TEST_F(RedisConnPoolImplTest, Basic) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;
@@ -337,7 +337,7 @@ TEST_F(RedisConnPoolImplTest, BasicRespVariant) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;
@@ -367,7 +367,7 @@ TEST_F(RedisConnPoolImplTest, ClientRequestFailed) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return cm_.thread_local_cluster_.lb_.host_;
@@ -410,7 +410,7 @@ TEST_F(RedisConnPoolImplTest, Hashtagging) {
 
   auto expectHashKey = [](const std::string& s) {
     return [s](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64(s));
+      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2(s));
       return nullptr;
     };
   };
@@ -441,7 +441,7 @@ TEST_F(RedisConnPoolImplTest, HashtaggingNotEnabled) {
 
   auto expectHashKey = [](const std::string& s) {
     return [s](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64(s));
+      EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2(s));
       return nullptr;
     };
   };
@@ -1186,7 +1186,7 @@ TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   MockPoolCallbacks callbacks;
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2_64("hash_key"));
+        EXPECT_EQ(context->computeHashKey().value(), MurmurHash::murmurHash2("hash_key"));
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->downstreamConnection(), nullptr);
         return this->cm_.thread_local_cluster_.lb_.host_;

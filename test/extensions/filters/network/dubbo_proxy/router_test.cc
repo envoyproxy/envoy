@@ -380,7 +380,7 @@ TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
   buffer.add("test");                                  // Body
 
   auto ctx = static_cast<ContextImpl*>(message_context_.get());
-  ctx->message_origin_data().move(buffer, buffer.length());
+  ctx->messageOriginData().move(buffer, buffer.length());
   startRequest(MessageType::Request);
   connectUpstream();
   destroyRouter();

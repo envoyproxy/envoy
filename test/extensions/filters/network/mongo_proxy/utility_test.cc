@@ -137,7 +137,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create());
     QueryMessageInfo info(q);
-    EXPECT_EQ(0, info.max_time());
+    EXPECT_EQ(0, info.maxTime());
   }
 
   {
@@ -145,7 +145,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addInt32("$maxTimeMS", 1212));
     QueryMessageInfo info(q);
-    EXPECT_EQ(1212, info.max_time());
+    EXPECT_EQ(1212, info.maxTime());
   }
 
   {
@@ -153,7 +153,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addInt64("$maxTimeMS", 1212));
     QueryMessageInfo info(q);
-    EXPECT_EQ(1212, info.max_time());
+    EXPECT_EQ(1212, info.maxTime());
   }
 
   {
@@ -161,7 +161,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     q.fullCollectionName("db.foo");
     q.query(Bson::DocumentImpl::create()->addInt64("maxTimeMS", 2400));
     QueryMessageInfo info(q);
-    EXPECT_EQ(2400, info.max_time());
+    EXPECT_EQ(2400, info.maxTime());
   }
 }
 

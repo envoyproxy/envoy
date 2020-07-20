@@ -29,9 +29,9 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
   std::string method_name = HessianUtils::peekString(buffer, &size, total_size);
   total_size += size;
 
-  if (static_cast<uint64_t>(context->body_size()) < total_size) {
+  if (static_cast<uint64_t>(context->bodySize()) < total_size) {
     throw EnvoyException(fmt::format("RpcInvocation size({}) large than body size({})", total_size,
-                                     context->body_size()));
+                                     context->bodySize()));
   }
 
   auto invo = std::make_shared<RpcInvocationImpl>();
@@ -45,7 +45,7 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
 std::pair<RpcResultSharedPtr, bool>
 DubboHessian2SerializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
                                                   ContextSharedPtr context) {
-  ASSERT(buffer.length() >= context->body_size());
+  ASSERT(buffer.length() >= context->bodySize());
   size_t total_size = 0;
   bool has_value = true;
 
@@ -69,15 +69,15 @@ DubboHessian2SerializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
     throw EnvoyException(fmt::format("not supported return type {}", static_cast<uint8_t>(type)));
   }
 
-  if (context->body_size() < total_size) {
+  if (context->bodySize() < total_size) {
     throw EnvoyException(fmt::format("RpcResult size({}) large than body size({})", total_size,
-                                     context->body_size()));
+                                     context->bodySize()));
   }
 
-  if (!has_value && context->body_size() != total_size) {
+  if (!has_value && context->bodySize() != total_size) {
     throw EnvoyException(
         fmt::format("RpcResult is no value, but the rest of the body size({}) not equal 0",
-                    (context->body_size() - total_size)));
+                    (context->bodySize() - total_size)));
   }
 
   return std::pair<RpcResultSharedPtr, bool>(result, true);

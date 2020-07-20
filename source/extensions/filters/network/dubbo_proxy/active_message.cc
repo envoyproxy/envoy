@@ -31,8 +31,8 @@ DubboFilters::UpstreamResponseStatus ActiveResponseDecoder::onData(Buffer::Insta
 
 void ActiveResponseDecoder::onStreamDecoded(MessageMetadataSharedPtr metadata,
                                             ContextSharedPtr ctx) {
-  ASSERT(metadata->message_type() == MessageType::Response ||
-         metadata->message_type() == MessageType::Exception);
+  ASSERT(metadata->messageType() == MessageType::Response ||
+         metadata->messageType() == MessageType::Exception);
   ASSERT(metadata->hasResponseStatus());
 
   metadata_ = metadata;
@@ -45,24 +45,23 @@ void ActiveResponseDecoder::onStreamDecoded(MessageMetadataSharedPtr metadata,
     throw DownstreamConnectionCloseException("Downstream has closed or closing");
   }
 
-  response_connection_.write(ctx->message_origin_data(), false);
+  response_connection_.write(ctx->messageOriginData(), false);
   ENVOY_LOG(debug,
             "dubbo response: the upstream response message has been forwarded to the downstream");
 
   stats_.response_.inc();
   stats_.response_decoding_success_.inc();
-  if (metadata->message_type() == MessageType::Exception) {
+  if (metadata->messageType() == MessageType::Exception) {
     stats_.response_business_exception_.inc();
   }
 
-  switch (metadata->response_status()) {
+  switch (metadata->responseStatus()) {
   case ResponseStatus::Ok:
     stats_.response_success_.inc();
     break;
   default:
     stats_.response_error_.inc();
-    ENVOY_LOG(error, "dubbo response status: {}",
-              static_cast<uint8_t>(metadata->response_status()));
+    ENVOY_LOG(error, "dubbo response status: {}", static_cast<uint8_t>(metadata->responseStatus()));
     break;
   }
 
@@ -70,7 +69,7 @@ void ActiveResponseDecoder::onStreamDecoded(MessageMetadataSharedPtr metadata,
   response_status_ = DubboFilters::UpstreamResponseStatus::Complete;
 
   ENVOY_LOG(debug, "dubbo response: complete processing of upstream response messages, id is {}",
-            metadata->request_id());
+            metadata->requestId());
 }
 
 FilterStatus ActiveResponseDecoder::applyMessageEncodedFilters(MessageMetadataSharedPtr metadata,
@@ -129,7 +128,7 @@ ActiveMessageDecoderFilter::ActiveMessageDecoderFilter(ActiveMessage& parent,
 void ActiveMessageDecoderFilter::continueDecoding() {
   ASSERT(parent_.context());
   auto state = ActiveMessage::FilterIterationStartState::AlwaysStartFromNext;
-  if (0 != parent_.context()->message_origin_data().length()) {
+  if (0 != parent_.context()->messageOriginData().length()) {
     state = ActiveMessage::FilterIterationStartState::CanStartFromCurrent;
     ENVOY_LOG(warn, "The original message data is not consumed, triggering the decoder filter from "
                     "the current location");
@@ -138,7 +137,7 @@ void ActiveMessageDecoderFilter::continueDecoding() {
   if (status == FilterStatus::Continue) {
     ENVOY_LOG(debug, "dubbo response: start upstream");
     // All filters have been executed for the current decoder state.
-    if (parent_.pending_stream_decoded()) {
+    if (parent_.pendingStreamDecoded()) {
       // If the filter stack was paused during messageEnd, handle end-of-request details.
       parent_.finalizeRequest();
     }
@@ -171,7 +170,7 @@ ActiveMessageEncoderFilter::ActiveMessageEncoderFilter(ActiveMessage& parent,
 void ActiveMessageEncoderFilter::continueEncoding() {
   ASSERT(parent_.context());
   auto state = ActiveMessage::FilterIterationStartState::AlwaysStartFromNext;
-  if (0 != parent_.context()->message_origin_data().length()) {
+  if (0 != parent_.context()->messageOriginData().length()) {
     state = ActiveMessage::FilterIterationStartState::CanStartFromCurrent;
     ENVOY_LOG(warn, "The original message data is not consumed, triggering the encoder filter from "
                     "the current location");
@@ -256,8 +255,7 @@ void ActiveMessage::onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSh
 
   auto status = applyDecoderFilters(nullptr, FilterIterationStartState::CanStartFromCurrent);
   if (status == FilterStatus::StopIteration) {
-    ENVOY_LOG(debug, "dubbo request: stop calling decoder filter, id is {}",
-              metadata->request_id());
+    ENVOY_LOG(debug, "dubbo request: stop calling decoder filter, id is {}", metadata->requestId());
     pending_stream_decoded_ = true;
     return;
   }
@@ -265,14 +263,14 @@ void ActiveMessage::onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSh
   finalizeRequest();
 
   ENVOY_LOG(debug, "dubbo request: complete processing of downstream request messages, id is {}",
-            metadata->request_id());
+            metadata->requestId());
 }
 
 void ActiveMessage::finalizeRequest() {
   pending_stream_decoded_ = false;
   parent_.stats().request_.inc();
   bool is_one_way = false;
-  switch (metadata_->message_type()) {
+  switch (metadata_->messageType()) {
   case MessageType::Request:
     parent_.stats().request_twoway_.inc();
     break;
@@ -415,7 +413,7 @@ void ActiveMessage::resetDownstreamConnection() {
 void ActiveMessage::resetStream() { parent_.deferredMessage(*this); }
 
 uint64_t ActiveMessage::requestId() const {
-  return metadata_ != nullptr ? metadata_->request_id() : 0;
+  return metadata_ != nullptr ? metadata_->requestId() : 0;
 }
 
 uint64_t ActiveMessage::streamId() const { return stream_id_; }
