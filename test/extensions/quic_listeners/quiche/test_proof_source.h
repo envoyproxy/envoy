@@ -31,17 +31,17 @@ public:
     return cert_chain_;
   }
 
-  void
-  ComputeTlsSignature(const quic::QuicSocketAddress& /*server_address*/,
-                      const quic::QuicSocketAddress& /*client_address*/,
-                      const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
-                      quiche::QuicheStringPiece in,
-                      std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
+  const Network::MockFilterChain& filterChain() const { return filter_chain_; }
+
+protected:
+  void signPayload(const quic::QuicSocketAddress& /*server_address*/,
+                   const quic::QuicSocketAddress& /*client_address*/,
+                   const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
+                   quiche::QuicheStringPiece in,
+                   std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
     callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"),
                   std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain_));
   }
-
-  const Network::MockFilterChain& filterChain() const { return filter_chain_; }
 
 private:
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> cert_chain_{

@@ -56,11 +56,19 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& server_ad
     return;
   }
 
-  // TODO(danzh) Get the signature algorithm from leaf cert.
   auto signature_callback = std::make_unique<SignatureCallback>(std::move(callback), chain);
-  ComputeTlsSignature(server_address, client_address, hostname, sign_alg,
-                      quiche::QuicheStringPiece(payload.get(), payload_size),
-                      std::move(signature_callback));
+
+  signPayload(server_address, client_address, hostname, sign_alg,
+              quiche::QuicheStringPiece(payload.get(), payload_size),
+              std::move(signature_callback));
+}
+
+void EnvoyQuicProofSourceBase::ComputeTlsSignature(
+    const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
+    const std::string& hostname, uint16_t signature_algorithm, quiche::QuicheStringPiece in,
+    std::unique_ptr<quic::ProofSource::SignatureCallback> callback) {
+  signPayload(server_address, client_address, hostname, signature_algorithm, in,
+              std::move(callback));
 }
 
 } // namespace Quic

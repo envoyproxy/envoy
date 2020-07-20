@@ -40,7 +40,7 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
       new quic::ProofSource::Chain(chain));
 }
 
-void EnvoyQuicProofSource::ComputeTlsSignature(
+void EnvoyQuicProofSource::signPayload(
     const quic::QuicSocketAddress& server_address, const quic::QuicSocketAddress& client_address,
     const std::string& hostname, uint16_t signature_algorithm, quiche::QuicheStringPiece in,
     std::unique_ptr<quic::ProofSource::SignatureCallback> callback) {

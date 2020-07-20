@@ -57,6 +57,19 @@ public:
 
   TicketCrypter* GetTicketCrypter() override { return nullptr; }
 
+  void ComputeTlsSignature(const quic::QuicSocketAddress& server_address,
+                           const quic::QuicSocketAddress& client_address,
+                           const std::string& hostname, uint16_t signature_algorithm,
+                           quiche::QuicheStringPiece in,
+                           std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
+
+protected:
+  virtual void signPayload(const quic::QuicSocketAddress& server_address,
+                           const quic::QuicSocketAddress& client_address,
+                           const std::string& hostname, uint16_t signature_algorithm,
+                           quiche::QuicheStringPiece in,
+                           std::unique_ptr<quic::ProofSource::SignatureCallback> callback) = 0;
+
 private:
   // Used by GetProof() to get signature.
   class SignatureCallback : public quic::ProofSource::SignatureCallback {
