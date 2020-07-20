@@ -16,7 +16,8 @@ namespace Network {
  */
 class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
 public:
-  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, int socket_v6only = 0) : fd_(fd), socket_v6only_(socket_v6only) {}
+  explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, int socket_v6only = 0)
+      : fd_(fd), socket_v6only_(socket_v6only) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
