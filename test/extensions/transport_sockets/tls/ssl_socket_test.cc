@@ -342,6 +342,7 @@ void testUtil(const TestUtilOptions& options) {
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   client_connection->connect();
+  EXPECT_EQ("", client_connection->ssl()->sha1PeerCertificateDigest());
 
   size_t connect_count = 0;
   auto connect_second_time = [&]() {
@@ -832,6 +833,30 @@ TEST_P(SslSocketTest, GetCertDigest) {
   testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
                .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
+}
+
+TEST_P(SslSocketTest, GetCertDigestInvalidFiles) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
+  testUtil(
+      test_options.setExpectedSha256Digest("").setExpectedSha1Digest("").setExpectedSerialNumber(
+          ""));
 }
 
 TEST_P(SslSocketTest, GetCertDigestInline) {
