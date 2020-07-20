@@ -185,7 +185,7 @@ SystemTime HttpCacheUtils::httpTime(const Http::HeaderEntry* header_entry) {
 
 absl::optional<uint64_t> HttpCacheUtils::readAndRemoveLeadingDigits(absl::string_view& str) {
   const char* ptr = str.data();
-  const char* limit = str.end();
+  const char* limit = ptr + str.size();
   uint64_t val = 0;
 
   while (ptr < limit) {
