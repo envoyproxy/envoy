@@ -1,6 +1,6 @@
 #include "extensions/filters/listener/original_src/original_src.h"
 
-#include "test/extensions/filters/listener/common/listener_filter_fuzzer.h"
+#include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/original_src/original_src_fuzz_test.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 
