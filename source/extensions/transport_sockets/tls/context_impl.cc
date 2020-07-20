@@ -19,6 +19,7 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stats/utility.h"
 
 #include "extensions/transport_sockets/tls/utility.h"
@@ -710,7 +711,12 @@ bool ContextImpl::dnsNameMatch(const std::string& dns_name, const char* pattern)
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
     if (dns_name.length() > pattern_len - 1) {
       const size_t off = dns_name.length() - pattern_len + 1;
-      return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_wildcard_matching")) {
+        return dns_name.substr(0, off).find('.') == std::string::npos &&
+               dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+      } else {
+        return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+      }
     }
   }
 
@@ -865,6 +871,18 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   }
 }
 
+bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl) {
+  std::vector<uint8_t> parsed_alpn = parseAlpnProtocols(absl::StrJoin(alpn, ","));
+  if (!parsed_alpn.empty()) {
+    const int rc = SSL_set_alpn_protos(&ssl, parsed_alpn.data(), parsed_alpn.size());
+    // This should only if memory allocation fails, e.g. OOM.
+    RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
+    return true;
+  }
+
+  return false;
+}
+
 bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOptions* options) {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(options));
 
@@ -882,14 +900,23 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
-  if (options && !options->applicationProtocolListOverride().empty()) {
-    std::vector<uint8_t> parsed_override_alpn =
-        parseAlpnProtocols(absl::StrJoin(options->applicationProtocolListOverride(), ","));
-    if (!parsed_override_alpn.empty()) {
-      const int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
-                                         parsed_override_alpn.size());
-      RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
-    }
+  // We determine what ALPN using the following precedence:
+  // 1. Option-provided ALPN override.
+  // 2. ALPN statically configured in the upstream TLS context.
+  // 3. Option-provided ALPN fallback.
+
+  // At this point in the code the ALPN has already been set (if present) to the value specified in
+  // the TLS context. We've stored this value in parsed_alpn_protocols_ so we can check that to see
+  // if it's already been set.
+  bool has_alpn_defined = !parsed_alpn_protocols_.empty();
+  if (options) {
+    // ALPN override takes precedence over TLS context specified, so blindly overwrite it.
+    has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con);
+  }
+
+  if (options && !has_alpn_defined && options->applicationProtocolFallback().has_value()) {
+    // If ALPN hasn't already been set (either through TLS context or override), use the fallback.
+    parseAndSetAlpn({*options->applicationProtocolFallback()}, *ssl_con);
   }
 
   if (allow_renegotiation_) {

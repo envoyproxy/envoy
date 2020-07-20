@@ -47,14 +47,11 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
 
 spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {
   spdy::SpdyHeaderBlock header_block;
-  headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        auto spdy_headers = static_cast<spdy::SpdyHeaderBlock*>(context);
-        // The key-value pairs are copied.
-        spdy_headers->insert({header.key().getStringView(), header.value().getStringView()});
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &header_block);
+  headers.iterate([&header_block](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    // The key-value pairs are copied.
+    header_block.insert({header.key().getStringView(), header.value().getStringView()});
+    return Http::HeaderMap::Iterate::Continue;
+  });
   return header_block;
 }
 
@@ -90,12 +87,21 @@ Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode erro
   }
 }
 
+Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept {
+  switch (error) {
+  case quic::QUIC_NO_ERROR:
+    return Http::GoAwayErrorCode::NoError;
+  default:
+    return Http::GoAwayErrorCode::Other;
+  }
+}
+
 Network::ConnectionSocketPtr
 createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Address::SocketType::Datagram, local_addr, peer_addr);
+      Network::Socket::Type::Datagram, local_addr, peer_addr);
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   if (options != nullptr) {
@@ -109,12 +115,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   }
   connection_socket->bind(local_addr);
   ASSERT(local_addr->ip());
-  // TODO(fcoras) maybe move to SocketImpl?
-  if (local_addr->ip()->port() == 0) {
-    // Get ephemeral port number.
-    local_addr =
-        Network::SocketInterfaceSingleton::get().addressFromFd(connection_socket->ioHandle().fd());
-  }
+  local_addr = connection_socket->localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");

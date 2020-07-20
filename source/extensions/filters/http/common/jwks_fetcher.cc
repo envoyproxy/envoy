@@ -102,6 +102,8 @@ public:
     reset();
   }
 
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
+
 private:
   Upstream::ClusterManager& cm_;
   bool complete_{};

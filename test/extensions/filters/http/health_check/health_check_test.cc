@@ -9,7 +9,7 @@
 
 #include "extensions/filters/http/health_check/health_check.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -249,9 +249,9 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
-  Http::TestResponseHeaderMapImpl service_hc_respnose{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
-  EXPECT_EQ("cluster_name", service_hc_respnose.getEnvoyUpstreamHealthCheckedClusterValue());
+  Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_response, true));
+  EXPECT_EQ("cluster_name", service_hc_response.getEnvoyUpstreamHealthCheckedClusterValue());
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
@@ -268,9 +268,9 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
             filter_->encode100ContinueHeaders(continue_response));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
-  Http::TestResponseHeaderMapImpl service_hc_respnose{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
-  EXPECT_EQ("cluster_name", service_hc_respnose.getEnvoyUpstreamHealthCheckedClusterValue());
+  Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_response, true));
+  EXPECT_EQ("cluster_name", service_hc_response.getEnvoyUpstreamHealthCheckedClusterValue());
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Failed) {

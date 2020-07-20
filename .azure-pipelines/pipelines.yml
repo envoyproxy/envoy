@@ -60,8 +60,8 @@ jobs:
         parameters:
           managedAgent: false
           ciTarget: bazel.release.server_only
-          rbe: ""
-          bazelBuildExtraOptions: "--curses=no"
+          rbe: false
+          artifactSuffix: ".arm64"
 
   - job: bazel
     displayName: "Linux-x64"
@@ -90,20 +90,28 @@ jobs:
           ciTarget: $(CI_TARGET)
 
   - job: coverage
-    displayName: "Linux-x64 coverage"
-    dependsOn: ["format"]
+    displayName: "Linux-x64"
+    dependsOn: ["release"]
     timeoutInMinutes: 360
     pool: "x64-large"
+    strategy:
+      maxParallel: 2
+      matrix:
+        coverage:
+          CI_TARGET: "coverage"
+        fuzz_coverage:
+          CI_TARGET: "fuzz_coverage"
     steps:
       - template: bazel.yml
         parameters:
           managedAgent: false
-          ciTarget: bazel.coverage
-          rbe: ""
-          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --curses=no"
+          ciTarget: bazel.$(CI_TARGET)
+          rbe: false
+          # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
+          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
 
-      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /build/envoy/generated/coverage coverage'
-        displayName: "Upload Report to GCS"
+      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
+        displayName: "Upload $(CI_TARGET) Report to GCS"
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -148,6 +156,7 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
+          BAZEL_BUILD_EXTRA_OPTIONS: --remote_download_toplevel
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -167,6 +176,8 @@ jobs:
       - bash: ci/run_envoy_docker_windows.sh ci/windows_ci_steps.sh
         displayName: "Run Windows CI"
         env:
+          ENVOY_RBE: "true"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

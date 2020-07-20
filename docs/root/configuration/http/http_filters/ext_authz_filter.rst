@@ -3,7 +3,7 @@
 External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
-* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
+* :ref:`HTTP filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
 * This filter should be configured with the name *envoy.filters.http.ext_authz*.
 
 The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
@@ -137,6 +137,21 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."
+
+Dynamic Metadata
+----------------
+.. _config_http_filters_ext_authz_dynamic_metadata:
+
+.. note::
+
+  The External Authorization filter emits dynamic metadata only when it is configured to use
+  gRPC service as the authorization server.
+
+The External Authorization filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
+*only* when the gRPC authorization server returns an :ref:`OK
+<envoy_v3_api_msg_service.auth.v3.OkHttpResponse>` :ref:`CheckResponse
+<envoy_v3_api_msg_service.auth.v3.CheckResponse>` with a filled :ref:`dynamic_metadata
+<envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field.
 
 Runtime
 -------

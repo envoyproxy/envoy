@@ -40,7 +40,10 @@ envoy_cc_test_library(
         "//source/server:configuration_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:worker_factory_mocks",
+        "//test/mocks/server:listener_component_factory_mocks",
+        "//test/mocks/server:worker_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -49,4 +52,20 @@ envoy_cc_test_library(
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
+)
+
+envoy_cc_test(
+    name = "deprecated_configs_test",
+    srcs = [
+        "deprecated_configs_test.cc",
+    ],
+    deps = [
+        ":config_test_lib",
+        "//source/common/config:api_version_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
 )

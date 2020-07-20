@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 
+#include "envoy/network/exception.h"
+
 #if defined(__linux__)
 #include <linux/filter.h>
 #endif
@@ -9,7 +11,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
@@ -42,7 +44,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     if (!ok) {
       ENVOY_LOG(warn, "Failed to apply socket options to socket {} on listener {} after binding",
                 listen_socket_.ioHandle().fd(), listener_config.name());
-      throw EnvoyException("Failed to apply socket options.");
+      throw Network::CreateListenerException("Failed to apply socket options.");
     }
     listen_socket_.addOptions(options);
   }
@@ -51,7 +53,9 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       quiche::QuicheStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
-      quic::QuicRandom::GetInstance(), std::make_unique<EnvoyQuicFakeProofSource>(),
+      quic::QuicRandom::GetInstance(),
+      std::make_unique<EnvoyQuicProofSource>(listen_socket_, listener_config.filterChainManager(),
+                                             stats_),
       quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
@@ -122,7 +126,6 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
   quic_config_.SetIdleNetworkTimeout(
-      quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms),
       quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
   int32_t max_time_before_crypto_handshake_ms =
       config.has_crypto_handshake_timeout()

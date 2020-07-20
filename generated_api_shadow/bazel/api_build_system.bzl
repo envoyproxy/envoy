@@ -80,6 +80,10 @@ def py_proto_library(name, deps = [], plugin = None):
     if name == "annotations_py_proto":
         proto_deps = proto_deps + [":http_py_proto"]
 
+    # checked.proto depends on syntax.proto, we have to add this dependency manually as well.
+    if name == "checked_py_proto":
+        proto_deps = proto_deps + [":syntax_py_proto"]
+
     # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
     # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.
     # plugin should also be passed in here when gRPC version is greater than v1.25.x.
@@ -172,13 +176,16 @@ def api_proto_package(
     if has_services:
         compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
 
+    # Because RBAC proro depends on googleapis syntax.proto and checked.proto,
+    # which share the same go proto library, it causes duplicative dependencies.
+    # Thus, we use depset().to_list() to remove duplicated depenencies.
     go_proto_library(
         name = name + _GO_PROTO_SUFFIX,
         compilers = compilers,
         importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
         proto = name,
         visibility = ["//visibility:public"],
-        deps = [_go_proto_mapping(dep) for dep in deps] + [
+        deps = depset([_go_proto_mapping(dep) for dep in deps] + [
             "@com_github_golang_protobuf//ptypes:go_default_library",
             "@com_github_golang_protobuf//ptypes/any:go_default_library",
             "@com_github_golang_protobuf//ptypes/duration:go_default_library",
@@ -188,5 +195,5 @@ def api_proto_package(
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@com_google_googleapis//google/api:annotations_go_proto",
             "@com_google_googleapis//google/rpc:status_go_proto",
-        ],
+        ]).to_list(),
     )

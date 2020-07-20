@@ -13,10 +13,10 @@ services:
     networks:
       - envoymesh
     expose:
-      - "80"
+      - "8000"
       - "8001"
     ports:
-      - "8000:80"
+      - "8000:8000"
       - "8001:8001"
     dns:
       - 8.8.8.8
@@ -38,7 +38,7 @@ services:
     environment:
       - SERVICE_NAME=1
     expose:
-      - "80"
+      - "8000"
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -59,7 +59,7 @@ services:
     environment:
       - SERVICE_NAME=2
     expose:
-      - "80"
+      - "8000"
     dns:
       - 8.8.8.8
       - 8.8.4.4

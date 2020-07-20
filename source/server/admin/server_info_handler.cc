@@ -2,8 +2,8 @@
 
 #include "envoy/admin/v3/memory.pb.h"
 
-#include "common/common/version.h"
 #include "common/memory/stats.h"
+#include "common/version/version.h"
 
 #include "server/admin/utils.h"
 

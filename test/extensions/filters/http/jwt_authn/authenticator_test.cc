@@ -11,7 +11,7 @@
 #include "test/extensions/filters/http/common/mock.h"
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -106,7 +106,7 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
 
     EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"), ExpectedPayloadValue);
     // Verify the token is removed.
-    EXPECT_FALSE(headers.Authorization());
+    EXPECT_FALSE(headers.has(Http::CustomHeaders::get().Authorization));
   }
 }
 
@@ -128,7 +128,7 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   expectVerifyStatus(Status::Ok, headers);
 
   // Verify the token is NOT removed.
-  EXPECT_TRUE(headers.Authorization());
+  EXPECT_TRUE(headers.has(Http::CustomHeaders::get().Authorization));
 
   // Payload not set by default
   EXPECT_EQ(out_name_, "");

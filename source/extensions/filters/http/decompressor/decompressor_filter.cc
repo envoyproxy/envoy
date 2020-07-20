@@ -3,12 +3,22 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/macros.h"
-#include "common/http/headers.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Decompressor {
+
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    accept_encoding_handle(Http::CustomHeaders::get().AcceptEncoding);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    cache_control_request_handle(Http::CustomHeaders::get().CacheControl);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    content_encoding_request_handle(Http::CustomHeaders::get().ContentEncoding);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    cache_control_response_handle(Http::CustomHeaders::get().CacheControl);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    content_encoding_response_handle(Http::CustomHeaders::get().ContentEncoding);
 
 DecompressorFilterConfig::DecompressorFilterConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
@@ -17,6 +27,7 @@ DecompressorFilterConfig::DecompressorFilterConfig(
     : stats_prefix_(fmt::format("{}decompressor.{}.{}", stats_prefix,
                                 proto_config.decompressor_library().name(),
                                 decompressor_factory->statsPrefix())),
+      decompressor_stats_prefix_(stats_prefix_ + "decompressor_library"),
       decompressor_factory_(std::move(decompressor_factory)),
       request_direction_config_(proto_config.request_direction_config(), stats_prefix_, scope,
                                 runtime),
@@ -60,10 +71,10 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
   //      the upstream that this hop is able to decompress responses via the Accept-Encoding header.
   if (config_->responseDirectionConfig().decompressionEnabled() &&
       config_->requestDirectionConfig().advertiseAcceptEncoding()) {
-    headers.appendAcceptEncoding(config_->contentEncoding(), ",");
+    headers.appendInline(accept_encoding_handle.handle(), config_->contentEncoding(), ",");
     ENVOY_STREAM_LOG(debug,
                      "DecompressorFilter::decodeHeaders advertise Accept-Encoding with value '{}'",
-                     *decoder_callbacks_, headers.AcceptEncoding()->value().getStringView());
+                     *decoder_callbacks_, headers.getInlineValue(accept_encoding_handle.handle()));
   }
 
   //   2. If request decompression is enabled, then decompress the request.
@@ -93,30 +104,6 @@ Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bo
                          *encoder_callbacks_, data);
 }
 
-Http::FilterHeadersStatus DecompressorFilter::maybeInitDecompress(
-    const DecompressorFilterConfig::DirectionConfig& direction_config,
-    Compression::Decompressor::DecompressorPtr& decompressor,
-    Http::StreamFilterCallbacks& callbacks, Http::RequestOrResponseHeaderMap& headers) {
-  if (direction_config.decompressionEnabled() && !hasCacheControlNoTransform(headers) &&
-      contentEncodingMatches(headers)) {
-    direction_config.stats().decompressed_.inc();
-    decompressor = config_->makeDecompressor();
-
-    // Update headers.
-    headers.removeContentLength();
-    modifyContentEncoding(headers);
-
-    ENVOY_STREAM_LOG(debug, "do decompress {}: {}", callbacks, direction_config.logString(),
-                     headers);
-  } else {
-    direction_config.stats().not_decompressed_.inc();
-    ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks, direction_config.logString(),
-                     headers);
-  }
-
-  return Http::FilterHeadersStatus::Continue;
-}
-
 Http::FilterDataStatus DecompressorFilter::maybeDecompress(
     const DecompressorFilterConfig::DirectionConfig& direction_config,
     const Compression::Decompressor::DecompressorPtr& decompressor,
@@ -137,36 +124,28 @@ Http::FilterDataStatus DecompressorFilter::maybeDecompress(
   return Http::FilterDataStatus::Continue;
 }
 
-bool DecompressorFilter::hasCacheControlNoTransform(
-    Http::RequestOrResponseHeaderMap& headers) const {
-  return headers.CacheControl()
-             ? StringUtil::caseFindToken(headers.CacheControl()->value().getStringView(), ",",
-                                         Http::Headers::get().CacheControlValues.NoTransform)
-             : false;
+template <>
+Http::CustomInlineHeaderRegistry::Handle<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+DecompressorFilter::getCacheControlHandle() {
+  return cache_control_request_handle.handle();
 }
 
-/**
- * Content-Encoding matches if the configured encoding is the first value in the comma-delimited
- * Content-Encoding header, regardless of spacing and casing.
- */
-bool DecompressorFilter::contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const {
-  if (headers.ContentEncoding()) {
-    absl::string_view coding = StringUtil::trim(
-        StringUtil::cropRight(headers.ContentEncoding()->value().getStringView(), ","));
-    return StringUtil::CaseInsensitiveCompare()(config_->contentEncoding(), coding);
-  }
-  return false;
+template <>
+Http::CustomInlineHeaderRegistry::Handle<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+DecompressorFilter::getCacheControlHandle() {
+  return cache_control_response_handle.handle();
 }
 
-void DecompressorFilter::modifyContentEncoding(Http::RequestOrResponseHeaderMap& headers) const {
-  const auto all_codings = StringUtil::trim(headers.ContentEncoding()->value().getStringView());
-  const auto remaining_codings = StringUtil::trim(StringUtil::cropLeft(all_codings, ","));
+template <>
+Http::CustomInlineHeaderRegistry::Handle<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+DecompressorFilter::getContentEncodingHandle() {
+  return content_encoding_request_handle.handle();
+}
 
-  if (remaining_codings != all_codings) {
-    headers.setContentEncoding(remaining_codings);
-  } else {
-    headers.removeContentEncoding();
-  }
+template <>
+Http::CustomInlineHeaderRegistry::Handle<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+DecompressorFilter::getContentEncodingHandle() {
+  return content_encoding_response_handle.handle();
 }
 
 } // namespace Decompressor

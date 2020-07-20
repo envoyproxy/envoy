@@ -9,11 +9,15 @@
 #include "common/config/utility.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/status.h"
 #include "common/http/utility.h"
+#include "common/runtime/runtime_features.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -21,7 +25,7 @@ namespace Http {
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
-    : type_(type), connection_(std::move(connection)), host_(host),
+    : type_(type), host_(host), connection_(std::move(connection)),
       idle_timeout_(host_->cluster().idleTimeout()) {
   if (type_ != Type::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing
@@ -150,16 +154,29 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
 
   switch (type) {
   case Type::HTTP1: {
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+          *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
+          host->cluster().maxResponseHeadersCount());
+    } else {
+      codec_ = std::make_unique<Legacy::Http1::ClientConnectionImpl>(
+          *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
+          host->cluster().maxResponseHeadersCount());
+    }
     break;
   }
   case Type::HTTP2: {
-    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-        *connection_, *this, host->cluster().http2CodecStats(), host->cluster().http2Options(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
-        Http2::ProdNghttp2SessionFactory::get());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")) {
+      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+          *connection_, *this, host->cluster().http2CodecStats(), host->cluster().http2Options(),
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
+          Http2::ProdNghttp2SessionFactory::get());
+    } else {
+      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+          *connection_, *this, host->cluster().http2CodecStats(), host->cluster().http2Options(),
+          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount(),
+          Http2::ProdNghttp2SessionFactory::get());
+    }
     break;
   }
   case Type::HTTP3: {
@@ -167,6 +184,7 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
         Config::Utility::getAndCheckFactoryByName<Http::QuicHttpClientConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
             .createQuicClientConnection(*connection_, *this));
+    break;
   }
   }
 }

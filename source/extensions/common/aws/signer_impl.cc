@@ -24,8 +24,7 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers) {
-  // S3 payloads require special treatment.
-  if (service_name_ == "s3") {
+  if (require_content_hash_) {
     headers.setReference(SignatureHeaders::get().ContentSha256,
                          SignatureConstants::get().UnsignedPayload);
     sign(headers, SignatureConstants::get().UnsignedPayload);
@@ -75,7 +74,7 @@ void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& conten
   const auto authorization_header = createAuthorizationHeader(
       credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
   ENVOY_LOG(debug, "Signing request with: {}", authorization_header);
-  headers.addCopy(Http::Headers::get().Authorization, authorization_header);
+  headers.addCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 }
 
 std::string SignerImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {

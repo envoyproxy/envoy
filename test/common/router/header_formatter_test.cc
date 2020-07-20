@@ -34,9 +34,10 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-static envoy::config::route::v3::Route parseRouteFromV2Yaml(const std::string& yaml) {
+static envoy::config::route::v3::Route parseRouteFromV3Yaml(const std::string& yaml,
+                                                            bool avoid_boosting = true) {
   envoy::config::route::v3::Route route;
-  TestUtility::loadFromYaml(yaml, route);
+  TestUtility::loadFromYaml(yaml, route, false, avoid_boosting);
   return route;
 }
 
@@ -848,7 +849,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
-  Http::RequestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
 
@@ -898,7 +899,7 @@ TEST(HeaderParserTest, TestParseInternal) {
 
     HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
 
-    Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+    Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
     req_header_parser->evaluateHeaders(header_map, stream_info);
 
     std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
@@ -931,8 +932,8 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+      HeaderParser::configure(parseRouteFromV3Yaml(ymal).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
@@ -953,8 +954,8 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+      HeaderParser::configure(parseRouteFromV3Yaml(ymal).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -979,8 +980,8 @@ request_headers_to_add:
 )EOF";
 
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV2Yaml(ymal).request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+      HeaderParser::configure(parseRouteFromV3Yaml(ymal).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("static-header"));
@@ -1023,10 +1024,11 @@ request_headers_to_add:
 request_headers_to_remove: ["x-nope"]
   )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml);
+  const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
+  Http::TestRequestHeaderMapImpl header_map{
+      {":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
@@ -1117,14 +1119,14 @@ request_headers_to_add:
 )EOF";
 
   // Disable append mode.
-  envoy::config::route::v3::Route route = parseRouteFromV2Yaml(ymal);
+  envoy::config::route::v3::Route route = parseRouteFromV3Yaml(ymal);
   route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route.request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{
+  Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -1146,19 +1148,16 @@ request_headers_to_add:
 
   using CountMap = absl::flat_hash_map<std::string, int>;
   CountMap counts;
-  header_map.iterate(
-      [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
-        CountMap* m = static_cast<CountMap*>(cb_v);
-        absl::string_view key = header.key().getStringView();
-        CountMap::iterator i = m->find(key);
-        if (i == m->end()) {
-          m->insert({std::string(key), 1});
-        } else {
-          i->second++;
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &counts);
+  header_map.iterate([&counts](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    absl::string_view key = header.key().getStringView();
+    CountMap::iterator i = counts.find(key);
+    if (i == counts.end()) {
+      counts.insert({std::string(key), 1});
+    } else {
+      i->second++;
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   EXPECT_EQ(1, counts["static-header"]);
   EXPECT_EQ(1, counts["x-client-ip"]);
@@ -1210,10 +1209,11 @@ response_headers_to_add:
 response_headers_to_remove: ["x-nope"]
 )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml);
+  const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
+  Http::TestRequestHeaderMapImpl header_map{
+      {":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
@@ -1260,10 +1260,10 @@ request_headers_to_add:
 request_headers_to_remove: ["x-foo-header"]
 )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml);
+  const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
-  Http::TestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
+  Http::TestRequestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -1282,10 +1282,10 @@ response_headers_to_add:
 response_headers_to_remove: ["x-foo-header"]
 )EOF";
 
-  const auto route = parseRouteFromV2Yaml(yaml);
+  const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
-  Http::TestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
+  Http::TestResponseHeaderMapImpl header_map{{"x-foo-header", "foo"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   resp_header_parser->evaluateHeaders(header_map, stream_info);

@@ -9,8 +9,32 @@ _required_extensions = {
 }
 
 # Return all extensions to be compiled into Envoy.
-def envoy_all_extensions(blacklist = []):
+def envoy_all_extensions(denylist = []):
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
     # These extensions can be removed on a site specific basis.
-    return [v for k, v in all_extensions.items() if not k in blacklist]
+    return [v for k, v in all_extensions.items() if not k in denylist]
+
+# Core extensions needed to run Envoy's integration tests.
+_core_extensions = [
+    "envoy.access_loggers.file",
+    "envoy.filters.http.router",
+    "envoy.filters.http.health_check",
+    "envoy.filters.network.http_connection_manager",
+    "envoy.stat_sinks.statsd",
+    "envoy.transport_sockets.raw_buffer",
+]
+
+# Return all core extensions to be compiled into Envoy.
+def envoy_all_core_extensions():
+    all_extensions = dicts.add(_required_extensions, EXTENSIONS)
+
+    # These extensions can be removed on a site specific basis.
+    return [v for k, v in all_extensions.items() if k in _core_extensions]
+
+_http_filter_prefix = "envoy.filters.http"
+
+def envoy_all_http_filters():
+    all_extensions = dicts.add(_required_extensions, EXTENSIONS)
+
+    return [v for k, v in all_extensions.items() if k.startswith(_http_filter_prefix)]

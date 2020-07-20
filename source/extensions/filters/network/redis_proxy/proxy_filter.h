@@ -57,6 +57,7 @@ public:
   const std::string stat_prefix_;
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
+  const std::string downstream_auth_username_;
   const std::string downstream_auth_password_;
 
 private:
@@ -74,7 +75,8 @@ class ProxyFilter : public Network::ReadFilter,
                     public Network::ConnectionCallbacks {
 public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
-              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config);
+              CommandSplitter::CommandSplitterFactory& splitter_factory,
+              ProxyFilterConfigSharedPtr config);
   ~ProxyFilter() override;
 
   // Network::ReadFilter
@@ -93,6 +95,8 @@ public:
   bool connectionAllowed() { return connection_allowed_; }
 
 private:
+  friend class RedisProxyFilterTest;
+
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
     PendingRequest(ProxyFilter& parent);
     ~PendingRequest() override;
@@ -100,6 +104,9 @@ private:
     // RedisProxy::CommandSplitter::SplitCallbacks
     bool connectionAllowed() override { return parent_.connectionAllowed(); }
     void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
+    void onAuth(const std::string& username, const std::string& password) override {
+      parent_.onAuth(*this, username, password);
+    }
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onResponse(*this, std::move(value));
     }
@@ -110,11 +117,13 @@ private:
   };
 
   void onAuth(PendingRequest& request, const std::string& password);
+  void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
-  CommandSplitter::Instance& splitter_;
+  CommandSplitter::CommandSplitterFactory& splitter_factory_;
+  CommandSplitter::CommandSplitterPtr splitter_;
   ProxyFilterConfigSharedPtr config_;
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};
