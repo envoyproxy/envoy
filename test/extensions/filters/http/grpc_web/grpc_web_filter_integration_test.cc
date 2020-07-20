@@ -6,25 +6,41 @@
 
 #include "gtest/gtest.h"
 
+using Envoy::Http::HeaderValueOf;
+
 namespace Envoy {
 namespace {
 
-class GrpcWebFilterIntegrationTest : public ::testing::TestWithParam<Network::Address::IpVersion>,
+using TestParams = std::tuple<Network::Address::IpVersion, Http::CodecClient::Type>;
+
+class GrpcWebFilterIntegrationTest : public testing::TestWithParam<TestParams>,
                                      public HttpIntegrationTest {
 public:
   GrpcWebFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(std::get<1>(GetParam()), std::get<0>(GetParam())) {}
 
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     config_helper_.addFilter("name: envoy.filters.http.grpc_web");
   }
-};
-INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcWebFilterIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
-TEST_P(GrpcWebFilterIntegrationTest, GRPCWebTrailersNotDuplicated) {
+  static std::string testParamsToString(const testing::TestParamInfo<TestParams> params) {
+    return fmt::format(
+        "{}_{}",
+        TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
+            std::get<0>(params.param), params.index)),
+        (std::get<1>(params.param) == Http::CodecClient::Type::HTTP2 ? "Http2" : "Http"));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    Params, GrpcWebFilterIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(Http::CodecClient::Type::HTTP1,
+                                     Http::CodecClient::Type::HTTP2)),
+    GrpcWebFilterIntegrationTest::testParamsToString);
+
+TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
@@ -59,8 +75,16 @@ TEST_P(GrpcWebFilterIntegrationTest, GRPCWebTrailersNotDuplicated) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_TRUE(absl::StrContains(response->body(), "response1:trailer1"));
   EXPECT_TRUE(absl::StrContains(response->body(), "response2:trailer2"));
-  // Expect that the trailers be in the response-body instead
-  EXPECT_EQ(response->trailers(), nullptr);
+
+  // We expect to have response trailers when the downstream is HTTP/2
+  // (https://github.com/envoyproxy/envoy/issues/10514).
+  if (std::get<1>(GetParam()) == Http::CodecClient::Type::HTTP2) {
+    EXPECT_THAT(*response->trailers(), HeaderValueOf("response1", "trailer1"));
+    EXPECT_THAT(*response->trailers(), HeaderValueOf("response2", "trailer2"));
+  } else {
+    // Expect that the trailers be in the response-body instead.
+    EXPECT_EQ(nullptr, response->trailers());
+  }
 }
 
 } // namespace
