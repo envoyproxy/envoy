@@ -89,7 +89,7 @@ public:
   virtual HandshakerPtr createHandshaker(const Protobuf::Message& config,
                                          HandshakerFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.handshakers"; }
+  std::string category() const override { return "envoy.tls_handshakers"; }
 };
 
 } // namespace Ssl
