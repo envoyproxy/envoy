@@ -137,9 +137,13 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel test ${BAZEL_BUILD_OPTIONS} --config=sizeopt ${TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HEAPCHECK="	
   setup_gcc_toolchain
   echo "bazel fastbuild build..."
-  bazel_binary_build fastbuild
+  bazel_binary_build release
+
+  echo "Testing ${TEST_TARGETS}"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
@@ -169,23 +173,15 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
   echo "Validating integration test traffic tapping..."
-  TAP_TMP=/tmp/tap/
-  rm -rf "${TAP_TMP}"
-  mkdir -p "${TAP_TMP}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
-    --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
-    --test_env=PATH="/usr/sbin:${PATH}" \
+    --run_under=@envoy//bazel/test:verify_tap_test.sh \
     //test/extensions/transport_sockets/tls/integration:ssl_integration_test
-  # Verify that some pb_text files have been created. We can't check for pcap,
-  # since tcpdump is not available in general due to CircleCI lack of support
-  # for privileged Docker executors.
-  ls -l "${TAP_TMP}"/tap_*.pb_text > /dev/null
   exit 0
 elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan --build_tests_only ${TEST_TARGETS}
+  bazel_with_collection test --config=rbe-toolchain-tsan ${BAZEL_BUILD_OPTIONS} -c dbg --build_tests_only ${TEST_TARGETS}
   if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
     echo "Building and testing envoy-filter-example tests..."
     pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
@@ -224,6 +220,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
+    --define use_legacy_codecs_in_integration_tests=true \
+    --define --cxxopt=-std=c++14 \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
@@ -239,6 +237,10 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   echo "Building and testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
+
+  # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
+  # integration tests with asan.
+  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
@@ -270,6 +272,13 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
   test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
+  collect_build_profile coverage
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
+  setup_clang_toolchain
+  echo "bazel coverage build with fuzz tests ${COVERAGE_TEST_TARGETS}"
+
+  FUZZ_COVERAGE=true test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then

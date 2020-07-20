@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_binary",
@@ -226,7 +228,7 @@ envoy_cc_test(
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
@@ -236,7 +238,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "thread_local_store_speed_test",
     srcs = ["thread_local_store_speed_test.cc"],
     external_deps = [
@@ -254,6 +256,11 @@ envoy_cc_test_binary(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
+)
+
+envoy_benchmark_test(
+    name = "thread_local_store_speed_test_benchmark_test",
+    benchmark_binary = "thread_local_store_speed_test",
 )
 
 envoy_cc_test(

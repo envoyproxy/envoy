@@ -18,6 +18,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
@@ -33,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 40]
+// [#next-free-field: 41]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -537,6 +539,23 @@ message HttpConnectionManager {
   // route with :ref:`domains<envoy_api_field_config.route.v4alpha.VirtualHost.domains>` match set to `example`. Defaults to `false`. Note that port removal is not part
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool strip_matching_host_port = 39;
+
+  // Governs Envoy's behavior when receiving invalid HTTP from downstream.
+  // If this option is false (default), Envoy will err on the conservative side handling HTTP
+  // errors, terminating both HTTP/1.1 and HTTP/2 connections when receiving an invalid request.
+  // If this option is set to true, Envoy will be more permissive, only resetting the invalid
+  // stream in the case of HTTP/2 and leaving the connection open where possible (if the entire
+  // request is read for HTTP/1.1)
+  // In general this should be true for deployments receiving trusted traffic (L2 Envoys,
+  // company-internal mesh) and false when receiving untrusted traffic (edge deployments).
+  //
+  // If different behaviors for invalid_http_message for HTTP/1 and HTTP/2 are
+  // desired, one *must* use the new HTTP/2 option
+  // :ref:`override_stream_error_on_invalid_http_message
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>`
+  // *not* the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
+  google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
 }
 
 // The configuration to customize local reply returned by Envoy.
@@ -588,6 +607,7 @@ message LocalReplyConfig {
 }
 
 // The configuration to filter and change local response.
+// [#next-free-field: 6]
 message ResponseMapper {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.ResponseMapper";
@@ -599,12 +619,17 @@ message ResponseMapper {
   google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
   // The new local reply body text if specified. It will be used in the `%LOCAL_REPLY_BODY%`
-  // command operator in the `body_foramt`.
+  // command operator in the `body_format`.
   config.core.v4alpha.DataSource body = 3;
 
   // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
   // It will be used when this mapper is matched.
   config.core.v4alpha.SubstitutionFormatString body_format_override = 4;
+
+  // HTTP headers to add to a local reply. This allows the response mapper to append, to add
+  // or to override headers of any local reply before it is sent to a downstream client.
+  repeated config.core.v4alpha.HeaderValueOption headers_to_add = 5
+      [(validate.rules).repeated = {max_items: 1000}];
 }
 
 message Rds {
@@ -614,11 +639,17 @@ message Rds {
   // Configuration source specifier for RDS.
   config.core.v4alpha.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
-  // The name of the route configuration. This name will be passed to the RDS
-  // API. This allows an Envoy configuration with multiple HTTP listeners (and
-  // associated HTTP connection manager filters) to use different route
-  // configurations.
-  string route_config_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  oneof name_specifier {
+    // The name of the route configuration. This name will be passed to the RDS
+    // API. This allows an Envoy configuration with multiple HTTP listeners (and
+    // associated HTTP connection manager filters) to use different route
+    // configurations.
+    string route_config_name = 2;
+
+    // Resource locator for RDS. This is mutually exclusive to *route_config_name*.
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator rds_resource_locator = 3;
+  }
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.

@@ -16,7 +16,7 @@ namespace Config {
 
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-    Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
+    Upstream::ClusterManager& cm, Random::RandomGenerator& random,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api, Runtime::Loader& runtime)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm), random_(random),
       validation_visitor_(validation_visitor), api_(api), runtime_(runtime) {}
@@ -59,7 +59,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       return std::make_unique<HttpSubscriptionImpl>(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_, random_,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
-          Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
+          Utility::apiConfigSourceRequestTimeout(api_config_source),
+          restMethod(type_url, api_config_source.transport_api_version()), type_url,
           api_config_source.transport_api_version(), callbacks, resource_decoder, stats,
           Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC:
@@ -69,8 +70,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                      api_config_source, scope, true)
                   ->create(),
-              dispatcher_, sotwGrpcMethod(type_url), api_config_source.transport_api_version(),
-              random_, scope, Utility::parseRateLimitSettings(api_config_source),
+              dispatcher_, sotwGrpcMethod(type_url, api_config_source.transport_api_version()),
+              api_config_source.transport_api_version(), random_, scope,
+              Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
@@ -81,8 +83,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
                   ->create(),
-              dispatcher_, deltaGrpcMethod(type_url), api_config_source.transport_api_version(),
-              random_, scope, Utility::parseRateLimitSettings(api_config_source), local_info_),
+              dispatcher_, deltaGrpcMethod(type_url, api_config_source.transport_api_version()),
+              api_config_source.transport_api_version(), random_, scope,
+              Utility::parseRateLimitSettings(api_config_source), local_info_),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), false);
     }

@@ -95,7 +95,7 @@ public:
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
@@ -178,21 +178,27 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
 TEST_F(GrpcMuxImplTest, PauseResume) {
   setup();
   InSequence s;
-  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_);
-  grpc_mux_->pause("foo");
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  grpc_mux_->start();
-  expectSendMessage("foo", {"x", "y"}, "", true);
-  grpc_mux_->resume("foo");
-  grpc_mux_->pause("bar");
-  expectSendMessage("foo", {"z", "x", "y"}, "");
-  auto foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_);
-  grpc_mux_->resume("bar");
-  grpc_mux_->pause("foo");
-  auto foo_zz_sub = grpc_mux_->addWatch("foo", {"zz"}, callbacks_, resource_decoder_);
-  expectSendMessage("foo", {"zz", "z", "x", "y"}, "");
-  grpc_mux_->resume("foo");
-  grpc_mux_->pause("foo");
+  GrpcMuxWatchPtr foo_sub;
+  GrpcMuxWatchPtr foo_z_sub;
+  GrpcMuxWatchPtr foo_zz_sub;
+  foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_);
+  {
+    ScopedResume a = grpc_mux_->pause("foo");
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    grpc_mux_->start();
+    expectSendMessage("foo", {"x", "y"}, "", true);
+  }
+  {
+    ScopedResume a = grpc_mux_->pause("bar");
+    expectSendMessage("foo", {"z", "x", "y"}, "");
+    foo_z_sub = grpc_mux_->addWatch("foo", {"z"}, callbacks_, resource_decoder_);
+  }
+  {
+    ScopedResume a = grpc_mux_->pause("foo");
+    foo_zz_sub = grpc_mux_->addWatch("foo", {"zz"}, callbacks_, resource_decoder_);
+    expectSendMessage("foo", {"zz", "z", "x", "y"}, "");
+  }
+  grpc_mux_->pause("foo")->cancel();
 }
 
 // Validate behavior when type URL mismatches occur.

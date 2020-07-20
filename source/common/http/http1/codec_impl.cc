@@ -18,6 +18,7 @@
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/header_formatter.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -111,27 +112,24 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           absl::optional<uint64_t> status, bool end_stream) {
   bool saw_content_length = false;
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        absl::string_view key_to_use = header.key().getStringView();
-        uint32_t key_size_to_use = header.key().size();
-        // Translate :authority -> host so that upper layers do not need to deal with this.
-        if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
-          key_size_to_use = Headers::get().HostLegacy.get().size();
-        }
+  headers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+    absl::string_view key_to_use = header.key().getStringView();
+    uint32_t key_size_to_use = header.key().size();
+    // Translate :authority -> host so that upper layers do not need to deal with this.
+    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+      key_to_use = absl::string_view(Headers::get().HostLegacy.get());
+      key_size_to_use = Headers::get().HostLegacy.get().size();
+    }
 
-        // Skip all headers starting with ':' that make it here.
-        if (key_to_use[0] == ':') {
-          return HeaderMap::Iterate::Continue;
-        }
+    // Skip all headers starting with ':' that make it here.
+    if (key_to_use[0] == ':') {
+      return HeaderMap::Iterate::Continue;
+    }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
-            key_to_use, header.value().getStringView());
+    encodeFormattedHeader(key_to_use, header.value().getStringView());
 
-        return HeaderMap::Iterate::Continue;
-      },
-      this);
+    return HeaderMap::Iterate::Continue;
+  });
 
   if (headers.ContentLength()) {
     saw_content_length = true;
@@ -175,9 +173,6 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
-
-      // Assert 1xx (may have content) OR 204 and end stream.
-      ASSERT(*status < 200 || end_stream);
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
       // https://tools.ietf.org/html/rfc7231#section-4.3.6.
@@ -238,13 +233,10 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // Finalize the body
     connection_.buffer().add(LAST_CHUNK);
 
-    trailers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
-              header.key().getStringView(), header.value().getStringView());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
+    trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+      encodeFormattedHeader(header.key().getStringView(), header.value().getStringView());
+      return HeaderMap::Iterate::Continue;
+    });
 
     connection_.flushOutput();
     connection_.buffer().add(CRLF);
@@ -484,13 +476,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
     : connection_(connection), stats_(stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
-      strict_header_validation_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")),
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
       enable_trailers_(enable_trailers),
-      reject_unsupported_transfer_encodings_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reject_unsupported_transfer_encodings")),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       dispatching_(false),
@@ -670,13 +658,11 @@ Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 
   absl::string_view header_value{data, length};
-  if (strict_header_validation_) {
-    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
-      ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
-      error_code_ = Http::Code::BadRequest;
-      RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters));
-      return codecProtocolError("http/1.1 protocol error: header value contains invalid chars");
-    }
+  if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
+    ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
+    error_code_ = Http::Code::BadRequest;
+    RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters));
+    return codecProtocolError("http/1.1 protocol error: header value contains invalid chars");
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
@@ -749,8 +735,7 @@ Envoy::StatusOr<int> ConnectionImpl::onHeadersCompleteBase() {
   // CONNECT request has no defined semantics, and may be rejected.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if ((reject_unsupported_transfer_encodings_ &&
-         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) ||
+    if (!absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked) ||
         parser_.method == HTTP_CONNECT) {
       error_code_ = Http::Code::NotImplemented;
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding));

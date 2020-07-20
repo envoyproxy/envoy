@@ -342,16 +342,14 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
                                          const std::string& expected_body) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response_code, response->headers().getStatusValue());
-  expected_headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        auto response_headers = static_cast<Http::ResponseHeaderMap*>(context);
-        const Http::HeaderEntry* entry =
-            response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
-        EXPECT_NE(entry, nullptr);
-        EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      const_cast<void*>(static_cast<const void*>(&response->headers())));
+  expected_headers.iterate([response_headers = &response->headers()](
+                               const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const Http::HeaderEntry* entry =
+        response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
+    EXPECT_NE(entry, nullptr);
+    EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   EXPECT_EQ(response->body(), expected_body);
 }
@@ -1096,7 +1094,7 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
   // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
   // time-consuming asserts when using a large number of headers.
   max_request_headers_kb_ = 96;
-  max_request_headers_count_ = 20005;
+  max_request_headers_count_ = 10005;
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1112,7 +1110,7 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
        {Http::Headers::get().Scheme, "http"},
        {Http::Headers::get().Host, "host"}});
 
-  for (int i = 0; i < 20000; i++) {
+  for (int i = 0; i < 10000; i++) {
     big_headers->addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
   }
   initialize();
