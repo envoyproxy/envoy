@@ -63,7 +63,6 @@ envoy_cc_library(
 envoy_basic_cc_library(
     name = "manual_version_linkstamp",
     srcs = [":generate_version_linkstamp"],
-    copts = ["-DENVOY_MANUAL_STAMP=1"],
     visibility = ["//visibility:private"],
 )
 
