@@ -19,7 +19,6 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":opencensus_tracer_impl",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
