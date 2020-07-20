@@ -17,7 +17,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
@@ -58,7 +58,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   AllocatorImpl alloc_;
   MockSink sink_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  ThreadLocalStoreImplPtr store_;
 };
 
 class HistogramWrapper {
@@ -176,7 +176,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   AllocatorImpl alloc_;
   MockSink sink_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  ThreadLocalStoreImplPtr store_;
   InSequence s;
   std::vector<uint64_t> h1_cumulative_values_, h2_cumulative_values_, h1_interval_values_,
       h2_interval_values_;
@@ -587,7 +587,7 @@ public:
 
   SymbolTablePtr symbol_table_;
   AllocatorImpl alloc_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  ThreadLocalStoreImplPtr store_;
   StatNamePool pool_;
 };
 
@@ -1080,7 +1080,7 @@ protected:
   MockSink sink_;
   SymbolTablePtr symbol_table_;
   std::unique_ptr<AllocatorImpl> alloc_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  ThreadLocalStoreImplPtr store_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
@@ -1514,7 +1514,7 @@ public:
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;
   Thread::ThreadFactory& thread_factory_;
-  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
+  ThreadLocal::InstanceImplPtr tls_;
   Thread::ThreadPtr main_thread_;
   std::vector<Thread::ThreadPtr> threads_;
   StatNamePool pool_;
