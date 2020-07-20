@@ -150,7 +150,7 @@ private:
   void detectUpdateConflictAndCleanupRemoved(
       const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      Protobuf::RepeatedPtrField<std::string>& clean_removed_resources);
+      Protobuf::RepeatedPtrField<std::string>& clean_removed_resources, std::string& exception_msg);
 
   // Envoy::Config::SubscriptionCallbacks
 

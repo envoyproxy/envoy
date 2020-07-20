@@ -253,15 +253,12 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
         });
   }
 
-  std::vector<std::string> exception_msgs;
+  std::string exception_msg;
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
-  try {
-    detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources,
-                                          clean_removed_resources);
-  } catch (const EnvoyException& e) {
-    exception_msgs.push_back(e.what());
-    throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}",
-                                     absl::StrJoin(exception_msgs, ", ")));
+  detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources, clean_removed_resources,
+                                        exception_msg);
+  if (!exception_msg.empty()) {
+    throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
   }
 
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
@@ -315,7 +312,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
 void ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    Protobuf::RepeatedPtrField<std::string>& clean_removed_resources) {
+    Protobuf::RepeatedPtrField<std::string>& clean_removed_resources, std::string& exception_msg) {
   // all the scope names to be removed or updated.
   absl::flat_hash_set<std::string> updated_or_removed_scopes;
   for (const std::string& removed_resource : removed_resources) {
@@ -344,16 +341,17 @@ void ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const std::string& scope_name = scoped_route.name();
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
-      throw EnvoyException(
-          fmt::format("duplicate scoped route configuration '{}' found", scope_name));
+      exception_msg = fmt::format("duplicate scoped route configuration '{}' found", scope_name);
+      return;
     }
     const envoy::config::route::v3::ScopedRouteConfiguration& scoped_route_config =
         scope_config_inserted.first->second;
     const uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
     if (!scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
-      throw EnvoyException(
+      exception_msg =
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
-                      scope_name_by_hash[key_fingerprint], scope_name));
+                      scope_name_by_hash[key_fingerprint], scope_name);
+      return;
     }
   }
 
