@@ -157,8 +157,16 @@ void HdsDelegate::processMessage(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
-    auto* endpoints = cluster_config.mutable_load_assignment()->add_endpoints();
     for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
+      // add endpoint group by locality to config
+      auto* endpoints = cluster_config.mutable_load_assignment()->add_endpoints();
+      // if this group contains locality information, save it.
+      if (locality_endpoints.has_locality()) {
+        endpoints->mutable_locality()->set_region(locality_endpoints.locality().region());
+        endpoints->mutable_locality()->set_zone(locality_endpoints.locality().zone());
+        endpoints->mutable_locality()->set_sub_zone(locality_endpoints.locality().sub_zone());
+      }
+      // add all endpoints for this locality group to the config
       for (const auto& endpoint : locality_endpoints.endpoints()) {
         endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address()->MergeFrom(
             endpoint.address());
@@ -211,7 +219,7 @@ void HdsDelegate::onReceiveMessage(
   // Set response
   auto server_response_ms = PROTOBUF_GET_MS_OR_DEFAULT(*message, interval, 1000);
 
-  // Process the HealthCheckSpecifier message.
+  // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
   if (server_response_ms_ != server_response_ms) {
@@ -251,12 +259,14 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
-  for (const auto& host : cluster.load_assignment().endpoints(0).lb_endpoints()) {
-    initial_hosts_->emplace_back(
-        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()),
-                     nullptr, 1, envoy::config::core::v3::Locality().default_instance(),
-                     envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
-                     0, envoy::config::core::v3::UNKNOWN));
+  for (const auto& locality_endpoints : cluster.load_assignment().endpoints()) {
+    for (const auto& host : locality_endpoints.lb_endpoints()) {
+      initial_hosts_->emplace_back(new HostImpl(
+          info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
+          envoy::config::core::v3::Locality().default_instance(),
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+          envoy::config::core::v3::UNKNOWN));
+    }
   }
 }
 
