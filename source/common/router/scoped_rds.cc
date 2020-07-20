@@ -256,8 +256,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   std::vector<std::string> exception_msgs;
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
   try {
-    clean_removed_resources =
-        detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources);
+    detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources,
+                                          clean_removed_resources);
   } catch (const EnvoyException& e) {
     exception_msgs.push_back(e.what());
     throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}",
@@ -266,7 +266,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
 
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
   // be reused by some to be added scopes.
-  std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+  std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers = removeScopes(clean_removed_resources, version_info);
 
   bool any_applied =
@@ -312,25 +312,30 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
-Protobuf::RepeatedPtrField<std::string>
-ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
+void ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
-  absl::flat_hash_set<std::string> removed_scopes;
-  // all the scope names to be removed.
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    Protobuf::RepeatedPtrField<std::string>& clean_removed_resources) {
+  // all the scope names to be removed or updated.
+  absl::flat_hash_set<std::string> updated_or_removed_scopes;
   for (const std::string& removed_resource : removed_resources) {
-    removed_scopes.insert(removed_resource);
+    updated_or_removed_scopes.insert(removed_resource);
   }
-  absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>
-      scoped_routes;
-  absl::flat_hash_map<uint64_t, std::string> scope_name_by_key_hash;
   for (const auto& resource : resources) {
-    // Throws (thus rejects all) on any error.
     const auto& scoped_route =
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
-    removed_scopes.insert(scoped_route.name());
+    updated_or_removed_scopes.insert(scoped_route.name());
   }
+
+  absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash = scope_name_by_hash_;
+  // don't check key conflict with scopes to be updated or removed
+  absl::erase_if(scope_name_by_hash, [&updated_or_removed_scopes](const auto& key_name) {
+    auto const& [key, name] = key_name;
+    return (updated_or_removed_scopes.contains(name));
+  });
+  absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>
+      scoped_routes;
   for (const auto& resource : resources) {
     // Throws (thus rejects all) on any error.
     const auto& scoped_route =
@@ -345,29 +350,19 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const envoy::config::route::v3::ScopedRouteConfiguration& scoped_route_config =
         scope_config_inserted.first->second;
     const uint64_t key_fingerprint = MessageUtil::hash(scoped_route_config.key());
-    if (!scope_name_by_key_hash.try_emplace(key_fingerprint, scope_name).second) {
+    if (!scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
       throw EnvoyException(
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
-                      scope_name_by_key_hash[key_fingerprint], scope_name));
-    }
-    // if new scope have key conflict with scope that is not going to be removed
-    auto it = scope_name_by_hash_.find(key_fingerprint);
-    if (it != scope_name_by_hash_.end() && it->second != scope_name &&
-        !removed_scopes.contains(it->second)) {
-      throw EnvoyException(
-          fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
-                      scope_name_by_hash_[key_fingerprint], scope_name));
+                      scope_name_by_hash[key_fingerprint], scope_name));
     }
   }
 
-  Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
   // only remove resources that is not going to be updated.
   for (const std::string& removed_resource : removed_resources) {
-    if (scoped_routes.find(removed_resource) == scoped_routes.end()) {
+    if (!scoped_routes.contains(removed_resource)) {
       *clean_removed_resources.Add() = removed_resource;
     }
   }
-  return clean_removed_resources;
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(

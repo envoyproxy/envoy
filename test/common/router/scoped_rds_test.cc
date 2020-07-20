@@ -251,8 +251,8 @@ key:
 
   // Verify the config is a ScopedConfigImpl instance, both scopes point to "" as RDS hasn't kicked
   // in yet(NullConfigImpl returned).
-  EXPECT_NE(getScopedRdsProvider(), nullptr);
-  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -327,8 +327,8 @@ key:
 
   // Verify the config is a ScopedConfigImpl instance, both scopes point to "" as RDS hasn't kicked
   // in yet(NullConfigImpl returned).
-  EXPECT_NE(getScopedRdsProvider(), nullptr);
-  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -404,8 +404,8 @@ key:
       0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
-  EXPECT_NE(getScopedRdsProvider(), nullptr);
-  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
@@ -445,8 +445,8 @@ key:
       0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
-  EXPECT_NE(getScopedRdsProvider(), nullptr);
-  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
@@ -482,8 +482,8 @@ key:
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   // Scope key "x-foo-key" points to nowhere.
-  EXPECT_NE(getScopedRdsProvider(), nullptr);
-  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   // No RDS "foo_routes" config push happened yet, Router::NullConfig is returned.
   EXPECT_THAT(getScopedRdsProvider()
                   ->config<ScopedConfigImpl>()
@@ -620,8 +620,8 @@ key:
       0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
-  EXPECT_NE(getScopedRdsProvider(), nullptr);
-  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
@@ -827,7 +827,7 @@ key:
                ".*");
 }
 
-// Tests whether scope key conflict with updated scopes is ignore.
+// Tests whether scope key conflict with updated scopes is ignored.
 TEST_F(ScopedRdsTest, IgnoreConflictWithUpdatedScopeDelta) {
   setup();
   const std::string config_yaml = R"EOF(

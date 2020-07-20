@@ -147,9 +147,10 @@ private:
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
-  Protobuf::RepeatedPtrField<std::string> detectUpdateConflictAndCleanupRemoved(
+  void detectUpdateConflictAndCleanupRemoved(
       const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources);
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      Protobuf::RepeatedPtrField<std::string>& clean_removed_resources);
 
   // Envoy::Config::SubscriptionCallbacks
 
