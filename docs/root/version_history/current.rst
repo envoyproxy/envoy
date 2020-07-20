@@ -24,6 +24,7 @@ Bug Fixes
 
 * csrf: fixed issues with regards to origin and host header parsing.
 * fault: fixed an issue with `active_faults` gauge not being decremented for when abort faults were injected.
+* grpc-web: fixed an issue on failing HTTP/2 requests on WebKit-based browsers (https://bugs.webkit.org/show_bug.cgi?id=210108).
 
 Removed Config or Runtime
 -------------------------
