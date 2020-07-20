@@ -9,7 +9,6 @@
 
 #include "extensions/transport_sockets/common/passthrough.h"
 
-using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 
 namespace Envoy {
