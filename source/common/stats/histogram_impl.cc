@@ -11,14 +11,14 @@ namespace Envoy {
 namespace Stats {
 
 namespace {
-const SupportedBuckets default_buckets{};
+const ConstSupportedBuckets default_buckets{};
 }
 
 HistogramStatisticsImpl::HistogramStatisticsImpl()
     : supported_buckets_(default_buckets), computed_quantiles_(supportedQuantiles().size(), 0.0) {}
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr,
-                                                 SupportedBuckets& supported_buckets)
+                                                 ConstSupportedBuckets& supported_buckets)
     : supported_buckets_(supported_buckets),
       computed_quantiles_(HistogramStatisticsImpl::supportedQuantiles().size(), 0.0) {
   hist_approx_quantile(histogram_ptr, supportedQuantiles().data(),
@@ -52,7 +52,7 @@ std::string HistogramStatisticsImpl::quantileSummary() const {
 
 std::string HistogramStatisticsImpl::bucketSummary() const {
   std::vector<std::string> bucket_summary;
-  SupportedBuckets& supported_buckets = supportedBuckets();
+  ConstSupportedBuckets& supported_buckets = supportedBuckets();
   bucket_summary.reserve(supported_buckets.size());
   for (size_t i = 0; i < supported_buckets.size(); ++i) {
     bucket_summary.push_back(fmt::format("B{:g}: {}", supported_buckets[i], computed_buckets_[i]));
@@ -74,7 +74,7 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
 
   ASSERT(supportedBuckets().size() == computed_buckets_.size());
   computed_buckets_.clear();
-  SupportedBuckets& supported_buckets = supportedBuckets();
+  ConstSupportedBuckets& supported_buckets = supportedBuckets();
   computed_buckets_.reserve(supported_buckets.size());
   for (const auto bucket : supported_buckets) {
     computed_buckets_.emplace_back(hist_approx_count_below(new_histogram_ptr, bucket));
@@ -85,14 +85,14 @@ HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::S
     : configs_([&config]() {
         std::vector<Config> configs;
         for (const auto& matcher : config.histogram_settings().bucket_settings()) {
-          configs.emplace_back(matcher.match(), SupportedBuckets{matcher.buckets().begin(),
-                                                                 matcher.buckets().end()});
+          configs.emplace_back(matcher.match(), ConstSupportedBuckets{matcher.buckets().begin(),
+                                                                      matcher.buckets().end()});
         }
 
         return configs;
       }()) {}
 
-const SupportedBuckets& HistogramSettingsImpl::buckets(absl::string_view stat_name) const {
+const ConstSupportedBuckets& HistogramSettingsImpl::buckets(absl::string_view stat_name) const {
   for (const auto& config : configs_) {
     if (config.first.match(stat_name)) {
       return config.second;
@@ -101,9 +101,10 @@ const SupportedBuckets& HistogramSettingsImpl::buckets(absl::string_view stat_na
   return defaultBuckets();
 }
 
-const SupportedBuckets& HistogramSettingsImpl::defaultBuckets() {
-  CONSTRUCT_ON_FIRST_USE(SupportedBuckets, {0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000,
-                                            10000, 30000, 60000, 300000, 600000, 1800000, 3600000});
+const ConstSupportedBuckets& HistogramSettingsImpl::defaultBuckets() {
+  CONSTRUCT_ON_FIRST_USE(ConstSupportedBuckets,
+                         {0.5, 1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000,
+                          60000, 300000, 600000, 1800000, 3600000});
 }
 
 } // namespace Stats

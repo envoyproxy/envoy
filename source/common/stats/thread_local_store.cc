@@ -561,7 +561,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   } else {
     StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), stat_name_tags);
 
-    SupportedBuckets* buckets = nullptr;
+    ConstSupportedBuckets* buckets = nullptr;
     symbolTable().callWithStringView(final_stat_name,
                                      [&buckets, this](absl::string_view stat_name) {
                                        buckets = &parent_.histogram_settings_->buckets(stat_name);
@@ -702,7 +702,7 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent,
                                          TlsScope& tls_scope, StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags,
-                                         SupportedBuckets& supported_buckets)
+                                         ConstSupportedBuckets& supported_buckets)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, parent.symbolTable()), unit_(unit),
       parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()),
@@ -767,7 +767,7 @@ const std::string ParentHistogramImpl::quantileSummary() const {
 const std::string ParentHistogramImpl::bucketSummary() const {
   if (used()) {
     std::vector<std::string> bucket_summary;
-    SupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();
+    ConstSupportedBuckets& supported_buckets = interval_statistics_.supportedBuckets();
     bucket_summary.reserve(supported_buckets.size());
     for (size_t i = 0; i < supported_buckets.size(); ++i) {
       bucket_summary.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],

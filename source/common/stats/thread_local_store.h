@@ -83,7 +83,7 @@ class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent, TlsScope& tls_scope,
                       StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
-                      SupportedBuckets& supported_buckets);
+                      ConstSupportedBuckets& supported_buckets);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);

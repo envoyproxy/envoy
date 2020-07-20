@@ -35,7 +35,7 @@ TEST_F(HistogramSettingsImplTest, Basic) {
 
   initialize();
   EXPECT_EQ(settings_->buckets("test"), settings_->defaultBuckets());
-  EXPECT_EQ(settings_->buckets("abcd"), SupportedBuckets({0.1, 2}));
+  EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({0.1, 2}));
 }
 
 // Test that only matching configurations are applied.
@@ -57,8 +57,8 @@ TEST_F(HistogramSettingsImplTest, Matching) {
   }
 
   initialize();
-  EXPECT_EQ(settings_->buckets("abcd"), SupportedBuckets({1, 2}));
-  EXPECT_EQ(settings_->buckets("bcde"), SupportedBuckets({3, 4}));
+  EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({1, 2}));
+  EXPECT_EQ(settings_->buckets("bcde"), ConstSupportedBuckets({3, 4}));
 }
 
 // Test that earlier configs take precedence over later configs when both match.
@@ -79,7 +79,7 @@ TEST_F(HistogramSettingsImplTest, Priority) {
   }
 
   initialize();
-  EXPECT_EQ(settings_->buckets("abcd"), SupportedBuckets({1, 2}));
+  EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({1, 2}));
 }
 
 } // namespace Stats

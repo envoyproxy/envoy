@@ -23,12 +23,12 @@ public:
   HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config);
 
   // HistogramSettings
-  const SupportedBuckets& buckets(absl::string_view stat_name) const override;
+  const ConstSupportedBuckets& buckets(absl::string_view stat_name) const override;
 
-  static const SupportedBuckets& defaultBuckets();
+  static ConstSupportedBuckets& defaultBuckets();
 
 private:
-  using Config = std::pair<Matchers::StringMatcherImpl, SupportedBuckets>;
+  using Config = std::pair<Matchers::StringMatcherImpl, ConstSupportedBuckets>;
   const std::vector<Config> configs_;
 };
 
@@ -46,9 +46,9 @@ public:
    */
   HistogramStatisticsImpl(
       const histogram_t* histogram_ptr,
-      SupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
+      ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
 
-  static SupportedBuckets& defaultSupportedBuckets();
+  static ConstSupportedBuckets& defaultSupportedBuckets();
 
   void refresh(const histogram_t* new_histogram_ptr);
 
@@ -57,13 +57,13 @@ public:
   std::string bucketSummary() const override;
   const std::vector<double>& supportedQuantiles() const final;
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
-  SupportedBuckets& supportedBuckets() const override { return supported_buckets_; }
+  ConstSupportedBuckets& supportedBuckets() const override { return supported_buckets_; }
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
   uint64_t sampleCount() const override { return sample_count_; }
   double sampleSum() const override { return sample_sum_; }
 
 private:
-  SupportedBuckets& supported_buckets_;
+  ConstSupportedBuckets& supported_buckets_;
   std::vector<double> computed_quantiles_;
   std::vector<uint64_t> computed_buckets_;
   uint64_t sample_count_;

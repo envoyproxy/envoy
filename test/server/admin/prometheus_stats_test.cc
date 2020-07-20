@@ -236,7 +236,7 @@ envoy_histogram1_count{} 0
 TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
   HistogramWrapper h1_cumulative;
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
-  Stats::SupportedBuckets buckets{10, 20};
+  Stats::ConstSupportedBuckets buckets{10, 20};
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram(), buckets);
 
   auto histogram = makeHistogram("histogram1", {});
