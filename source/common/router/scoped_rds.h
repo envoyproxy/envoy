@@ -234,7 +234,7 @@ public:
       Server::Configuration::ServerFactoryContext& factory_context,
       const Envoy::Config::ConfigProviderManager::OptionalArg& optarg) override;
 
-  RouteConfigProviderManager& route_config_provider_manager() {
+  RouteConfigProviderManager& routeConfigProviderPanager() {
     return route_config_provider_manager_;
   }
 
