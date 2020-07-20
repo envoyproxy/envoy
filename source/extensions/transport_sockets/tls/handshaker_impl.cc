@@ -21,7 +21,6 @@ PostIoAction HandshakerImpl::doHandshake(SocketState& state, SSL* ssl,
   if (rc == 1) {
     state = SocketState::HandshakeComplete;
     callbacks.OnSuccessCb(ssl);
-    transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
     return transport_socket_callbacks_->connection().state() == Network::Connection::State::Open

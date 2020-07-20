@@ -110,7 +110,6 @@ protected:
 TEST_F(HandshakerTest, NormalOperation) {
   Network::MockTransportSocketCallbacks transport_socket_callbacks;
   transport_socket_callbacks.connection_.state_ = Network::Connection::State::Closed;
-  EXPECT_CALL(transport_socket_callbacks, raiseEvent(Network::ConnectionEvent::Connected)).Times(1);
   EXPECT_CALL(transport_socket_callbacks, connection).Times(1);
 
   HandshakerImpl handshaker;
