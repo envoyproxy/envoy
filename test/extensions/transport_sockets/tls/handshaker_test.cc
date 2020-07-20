@@ -37,8 +37,8 @@ public:
   ~MockHandshakerCallbacks() override{};
   MOCK_METHOD(bssl::UniquePtr<SSL>, Handoff, (), (override));
   MOCK_METHOD(void, Handback, (bssl::UniquePtr<SSL>), (override));
-  MOCK_METHOD(void, LogHandshake, (SSL*), (override));
-  MOCK_METHOD(void, ErrorCb, (), (override));
+  MOCK_METHOD(void, OnSuccessCb, (SSL*), (override));
+  MOCK_METHOD(void, OnFailureCb, (), (override));
 };
 
 class HandshakerTest : public SslCertsTest {
@@ -119,7 +119,7 @@ TEST_F(HandshakerTest, NormalOperation) {
   handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
 
   StrictMock<MockHandshakerCallbacks> callbacks;
-  EXPECT_CALL(callbacks, LogHandshake).Times(1);
+  EXPECT_CALL(callbacks, OnSuccessCb).Times(1);
 
   auto socket_state = Ssl::SocketState::PreHandshake;
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
@@ -152,7 +152,7 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
 
   StrictMock<MockHandshakerCallbacks> callbacks;
-  EXPECT_CALL(callbacks, ErrorCb).Times(1);
+  EXPECT_CALL(callbacks, OnFailureCb).Times(1);
 
   auto socket_state = Ssl::SocketState::PreHandshake;
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum

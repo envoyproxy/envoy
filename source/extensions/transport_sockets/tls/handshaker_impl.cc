@@ -20,7 +20,7 @@ PostIoAction HandshakerImpl::doHandshake(SocketState& state, SSL* ssl,
   int rc = SSL_do_handshake(ssl);
   if (rc == 1) {
     state = SocketState::HandshakeComplete;
-    callbacks.LogHandshake(ssl);
+    callbacks.OnSuccessCb(ssl);
     transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
@@ -28,8 +28,7 @@ PostIoAction HandshakerImpl::doHandshake(SocketState& state, SSL* ssl,
                ? PostIoAction::KeepOpen
                : PostIoAction::Close;
   } else {
-    int err = SSL_get_error(ssl, rc);
-    switch (err) {
+    switch (SSL_get_error(ssl, rc)) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
       return PostIoAction::KeepOpen;
@@ -37,7 +36,7 @@ PostIoAction HandshakerImpl::doHandshake(SocketState& state, SSL* ssl,
       state = SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     default:
-      callbacks.ErrorCb();
+      callbacks.OnFailureCb();
       return PostIoAction::Close;
     }
   }

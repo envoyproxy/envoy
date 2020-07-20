@@ -127,8 +127,8 @@ public:
   // Ssl::HandshakerCallbacks
   bssl::UniquePtr<SSL> Handoff() override;
   void Handback(bssl::UniquePtr<SSL> ssl) override;
-  void LogHandshake(SSL* ssl) override;
-  void ErrorCb() override;
+  void OnSuccessCb(SSL* ssl) override;
+  void OnFailureCb() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 

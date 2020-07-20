@@ -26,11 +26,11 @@ public:
   /**
    * Called when a handshake is successfully performed.
    */
-  virtual void LogHandshake(SSL* ssl) PURE;
+  virtual void OnSuccessCb(SSL* ssl) PURE;
   /**
    * Called when a handshake fails.
    */
-  virtual void ErrorCb() PURE;
+  virtual void OnFailureCb() PURE;
 };
 
 class Handshaker {
