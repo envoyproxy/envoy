@@ -7,7 +7,8 @@ if [[ -z "${GCS_ARTIFACT_BUCKET}" ]]; then
   exit 0
 fi
 
-$(dirname "$0")/activate_gcp_key.sh
+# Fail when service account key is not specified
+bash -c 'echo ${GCP_SERVICE_ACCOUNT_KEY}' | base64 --decode | gcloud auth activate-service-account --key-file=-
 
 SOURCE_DIRECTORY="$1"
 TARGET_SUFFIX="$2"
