@@ -61,8 +61,10 @@ public:
     // Endpoint connections
     host_upstream_ =
         std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
+    host_upstream_->set_allow_unexpected_disconnects(true);
     host2_upstream_ =
         std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
+    host2_upstream_->set_allow_unexpected_disconnects(true);
   }
 
   // Sets up a connection between Envoy and the management server.
@@ -80,7 +82,6 @@ public:
     ASSERT_TRUE(host_fake_connection_->waitForNewStream(*dispatcher_, host_stream_));
     ASSERT_TRUE(host_stream_->waitForEndStream(*dispatcher_));
 
-    host_upstream_->set_allow_unexpected_disconnects(true);
     EXPECT_EQ(host_stream_->headers().getPathValue(), "/healthcheck");
     EXPECT_EQ(host_stream_->headers().getMethodValue(), "GET");
     EXPECT_EQ(host_stream_->headers().getHostValue(), "anna");
@@ -90,7 +91,6 @@ public:
       ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
       ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
 
-      host2_upstream_->set_allow_unexpected_disconnects(true);
       EXPECT_EQ(host2_stream_->headers().getPathValue(), "/healthcheck");
       EXPECT_EQ(host2_stream_->headers().getMethodValue(), "GET");
       EXPECT_EQ(host2_stream_->headers().getHostValue(), cluster2);
@@ -314,9 +314,10 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoy sends a health check message to an endpoint
-  healthcheckEndpoints();
+  ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
 
   // Endpoint doesn't respond to the health check
+  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect(true));
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::TIMEOUT);
@@ -380,19 +381,17 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->mutable_timeout()
-      ->set_nanos(500000000); // 0.5 seconds
+      ->set_nanos(100000000); // 0.1 seconds
 
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoys asks the endpoint if it's healthy
-  host_upstream_->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
-  ASSERT_TRUE(
-      host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
 
   // No response from the endpoint
+  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect(true));
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::TIMEOUT);
@@ -418,7 +417,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoy asks the endpoint if it's healthy
-  host_upstream_->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
@@ -453,7 +451,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoy asks the endpoint if it's healthy
-  host_upstream_->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
@@ -691,7 +688,6 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoy sends a health check message to an endpoint
-  host2_upstream_->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
   ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
   ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
