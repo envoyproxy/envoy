@@ -61,7 +61,7 @@ void removeFatalErrorHandler(const FatalErrorHandlerInterface& handler) {
 
 void callFatalErrorHandlers(std::ostream& os) {
   FailureFunctionList* list = fatal_error_handlers.exchange(nullptr, std::memory_order_relaxed);
-  if (list) {
+  if (list != nullptr) {
     for (const auto* handler : *list) {
       handler->onFatalError(os);
     }
