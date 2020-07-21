@@ -11,7 +11,8 @@ message OnData {
 }
 
 message AdvanceTime {
-  uint32 milliseconds = 1 [(validate.rules).uint32 = {gt: 0}];
+  // Advance the system time by (0,24] hours.
+  uint32 milliseconds = 1 [(validate.rules).uint32 = {gt: 0 lt: 86400000}];
 }
 
 message Action {
