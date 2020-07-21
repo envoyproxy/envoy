@@ -114,17 +114,17 @@ protected:
   template <class StatType> void storeOnce(const MakeStatFn make_stat) {
     CachedReference<StatType> symbolic1_ref(*store_, "symbolic1");
     CachedReference<StatType> dynamic1_ref(*store_, "dynamic1");
-    EXPECT_FALSE(symbolic1_ref.find());
-    EXPECT_FALSE(dynamic1_ref.find());
+    EXPECT_FALSE(symbolic1_ref.get());
+    EXPECT_FALSE(dynamic1_ref.get());
 
     init(make_stat);
 
-    ASSERT_TRUE(symbolic1_ref.find());
-    ASSERT_TRUE(dynamic1_ref.find());
+    ASSERT_TRUE(symbolic1_ref.get());
+    ASSERT_TRUE(dynamic1_ref.get());
     EXPECT_FALSE(store_->iterate(iterOnce<StatType>()));
     EXPECT_EQ(1, results_.size());
-    EXPECT_TRUE(checkValue(*symbolic1_ref.find()));
-    EXPECT_TRUE(checkValue(*dynamic1_ref.find()));
+    EXPECT_TRUE(checkValue(*symbolic1_ref.get()));
+    EXPECT_TRUE(checkValue(*dynamic1_ref.get()));
   }
 
   template <class StatType> void storeAll(const MakeStatFn make_stat) {
@@ -137,17 +137,17 @@ protected:
   template <class StatType> void scopeOnce(const MakeStatFn make_stat) {
     CachedReference<StatType> symbolic2_ref(*store_, "scope.symbolic2");
     CachedReference<StatType> dynamic2_ref(*store_, "scope.dynamic2");
-    EXPECT_FALSE(symbolic2_ref.find());
-    EXPECT_FALSE(dynamic2_ref.find());
+    EXPECT_FALSE(symbolic2_ref.get());
+    EXPECT_FALSE(dynamic2_ref.get());
 
     init(make_stat);
 
-    ASSERT_TRUE(symbolic2_ref.find());
-    ASSERT_TRUE(dynamic2_ref.find());
+    ASSERT_TRUE(symbolic2_ref.get());
+    ASSERT_TRUE(dynamic2_ref.get());
     EXPECT_FALSE(scope_->iterate(iterOnce<StatType>()));
     EXPECT_EQ(1, results_.size());
-    EXPECT_TRUE(checkValue(*symbolic2_ref.find()));
-    EXPECT_TRUE(checkValue(*dynamic2_ref.find()));
+    EXPECT_TRUE(checkValue(*symbolic2_ref.get()));
+    EXPECT_TRUE(checkValue(*dynamic2_ref.get()));
   }
 
   template <class StatType> void scopeAll(const MakeStatFn make_stat) {

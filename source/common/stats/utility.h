@@ -209,14 +209,14 @@ public:
 
 /**
  * Holds a reference to a stat by name. Note that the stat may not be created
- * yet at the tome CachedReference is created. Calling find() then does a lazy
+ * yet at the time CachedReference is created. Calling get() then does a lazy
  * lookup, potentially returning absl::nullopt if the stat doesn't exist yet.
  * StatReference works whether the name was constructed symbolically, or with
  * StatNameDynamicStorage.
  *
  * Lookups are very slow, taking time proportional to the size of the scope,
  * holding mutexes during the lookup. However once the lookup succeeds, the
- * result is cached atomically, and further calls to find() are thus fast and
+ * result is cached atomically, and further calls to get() are thus fast and
  * mutex-free. The implementation may be faster for stats that are named
  * symbolically.
  *
@@ -231,7 +231,7 @@ public:
   /**
    * Finds the named stat, if it exists, returning it as an optional.
    */
-  absl::optional<std::reference_wrapper<StatType>> find() {
+  absl::optional<std::reference_wrapper<StatType>> get() {
     StatType* stat = stat_.get([this]() -> StatType* {
       StatType* stat = nullptr;
       IterateFn<StatType> check_stat = [this,
@@ -253,7 +253,7 @@ public:
 
 private:
   Scope& scope_;
-  std::string name_;
+  const std::string name_;
   Thread::AtomicPtr<StatType, Thread::AtomicPtrAllocMode::DoNotDelete> stat_;
 };
 
