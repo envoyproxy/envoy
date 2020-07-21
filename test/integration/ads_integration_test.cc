@@ -375,16 +375,12 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
 
-  EXPECT_FALSE(
-      test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
   // Send the first warming cluster.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {buildCluster("warming_cluster_1")},
       {buildCluster("warming_cluster_1")}, {"cluster_0"}, "2");
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  EXPECT_TRUE(
-      test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"warming_cluster_1"}, {"warming_cluster_1"}, {"cluster_0"}));
@@ -400,8 +396,6 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
                                       {"warming_cluster_2", "warming_cluster_1"},
                                       {"warming_cluster_2"}, {}));
 
-  EXPECT_TRUE(
-      test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
   // Finish warming the clusters.
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
@@ -413,8 +407,6 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
 
   // Validate that clusters are warmed.
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_FALSE(
-      test_server_->server().clusterManager().adsMux()->paused(Config::TypeUrl::get().Cluster));
 
   // CDS is resumed and EDS response was acknowledged.
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
@@ -1088,14 +1080,12 @@ TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
 
-  EXPECT_FALSE(test_server_->server().clusterManager().adsMux()->paused(cds_type_url));
   // Send the first warming cluster.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("warming_cluster_1")}, {buildCluster("warming_cluster_1")},
       {"cluster_0"}, "2", false);
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
-  EXPECT_TRUE(test_server_->server().clusterManager().adsMux()->paused(cds_type_url));
 
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {"warming_cluster_1"},
                                       {"warming_cluster_1"}, {"cluster_0"}));
@@ -1110,7 +1100,6 @@ TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {"warming_cluster_2", "warming_cluster_1"},
                                       {"warming_cluster_2"}, {}));
 
-  EXPECT_TRUE(test_server_->server().clusterManager().adsMux()->paused(cds_type_url));
   // Finish warming the clusters.
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url,
@@ -1122,7 +1111,6 @@ TEST_P(AdsClusterV3Test, CdsPausedDuringWarming) {
 
   // Validate that clusters are warmed.
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_FALSE(test_server_->server().clusterManager().adsMux()->paused(cds_type_url));
 
   // CDS is resumed and EDS response was acknowledged.
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
