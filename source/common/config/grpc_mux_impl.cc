@@ -114,23 +114,6 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   });
 }
 
-bool GrpcMuxImpl::paused(const std::string& type_url) const {
-  auto entry = api_state_.find(type_url);
-  if (entry == api_state_.end()) {
-    return false;
-  }
-  return entry->second.paused();
-}
-
-bool GrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
-  for (const auto& type_url : type_urls) {
-    if (paused(type_url)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {

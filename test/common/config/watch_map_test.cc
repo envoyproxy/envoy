@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 
 using ::testing::_;
+using ::testing::AtMost;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
@@ -251,8 +252,8 @@ public:
   }
 
   void removeAllInterest() {
-    EXPECT_CALL(callbacks1_, onConfigUpdate(_, _)).Times(0);
-    EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _)).Times(0);
+    ASSERT_FALSE(watch_cb_invoked_);
+    watch_cb_invoked_ = true;
     watch_map_.removeWatch(watch1_);
     watch_map_.removeWatch(watch2_);
   }
@@ -265,12 +266,16 @@ public:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources_;
   Watch* watch1_;
   Watch* watch2_;
+  bool watch_cb_invoked_{};
 };
 
 TEST_F(SameWatchRemoval, SameWatchRemovalSotw) {
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, "version1")).WillOnce(InvokeWithoutArgs([this] {
-    removeAllInterest();
-  }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
   watch_map_.onConfigUpdate(updated_resources_, "version1");
 }
 
@@ -279,18 +284,24 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
       wrapInResource(updated_resources_, "version1");
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
 
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _)).WillOnce(InvokeWithoutArgs([this] {
-    removeAllInterest();
-  }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
   watch_map_.onConfigUpdate(delta_resources, removed_names_proto, "version1");
 }
 
 TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
   *removed_names_proto.Add() = "alice";
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _)).WillOnce(InvokeWithoutArgs([this] {
-    removeAllInterest();
-  }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
   watch_map_.onConfigUpdate({}, removed_names_proto, "version1");
 }
 

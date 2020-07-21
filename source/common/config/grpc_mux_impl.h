@@ -42,8 +42,6 @@ public:
   // GrpcMux
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
-  bool paused(const std::string& type_url) const override;
-  bool paused(const std::vector<std::string> type_urls) const override;
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
@@ -157,8 +155,6 @@ public:
   ScopedResume pause(const std::vector<std::string>) override {
     return std::make_unique<Cleanup>([] {});
   }
-  bool paused(const std::string&) const override { return false; }
-  bool paused(const std::vector<std::string>) const override { return false; }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
                            OpaqueResourceDecoder&) override {
