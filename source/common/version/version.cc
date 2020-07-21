@@ -7,7 +7,6 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/protobuf/utility.h"
-#include "common/version/version_linkstamp.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
