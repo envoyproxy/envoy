@@ -331,8 +331,8 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (which should only happen if this is called by the router
-   * filter) this will either ship the reply directly to the downstream codec, or reset the stream.
+   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
    * @param body_text supplies the optional body text which is sent using the text/plain content

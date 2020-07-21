@@ -1528,7 +1528,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     // If the response has not started at all, send the response through the filter chain.
     sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                  grpc_status, details);
-  } else if (!response_headers_encoded_) {
+  } else if (!state_.non_100_response_headers_encoded_) {
     ENVOY_STREAM_LOG(debug, "Sending local reply with details {} directly to the encoder", *this,
                      details);
     // In this case, at least the header and possibly the body has started
@@ -1827,10 +1827,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     }
   }
 
-  // stream_info_.response_code_ is used by trySendLocalResponse to determine if non-informational
-  // headers have been sent to the codec. Make sure a non-informational status code is only set once
-  // and is set here.
-  response_headers_encoded_ = true;
+  // 100-continue headers are handled via encode100ContinueHeaders.
+  state_.non_100_response_headers_encoded_ = true;
   chargeStats(headers);
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
