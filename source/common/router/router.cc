@@ -36,6 +36,7 @@
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
 #include "common/router/upstream_request.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -902,13 +903,15 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.removeFromList(upstream_requests_);
   cleanup();
 
-  if (downstream_response_started_) {
+  if (downstream_response_started_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     callbacks_->streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
     callbacks_->resetStream();
   } else {
     callbacks_->streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
@@ -963,7 +966,8 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
                              absl::string_view body, bool dropped, absl::string_view details) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
-  if (downstream_response_started_) {
+  if (downstream_response_started_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     // This will destroy any created retry timers.
     callbacks_->streamInfo().setResponseCodeDetails(details);
     cleanup();
@@ -974,6 +978,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
+    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         code, body,
         [dropped, this](Http::ResponseHeaderMap& headers) {
