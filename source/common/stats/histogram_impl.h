@@ -29,7 +29,7 @@ public:
 
 private:
   using Config = std::pair<Matchers::StringMatcherImpl, ConstSupportedBuckets>;
-  const std::vector<Config> configs_;
+  const std::vector<Config> configs_{};
 };
 
 /**
