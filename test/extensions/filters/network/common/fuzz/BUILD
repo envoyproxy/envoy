@@ -50,6 +50,7 @@ envoy_cc_fuzz_test(
     name = "network_filter_fuzz_test",
     srcs = ["network_filter_fuzz_test.cc"],
     corpus = "network_filter_corpus",
+    dictionaries = ["network_filter_fuzz_test.dict"],
     # All Envoy network filters must be linked to the test in order for the fuzzer to pick
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [
