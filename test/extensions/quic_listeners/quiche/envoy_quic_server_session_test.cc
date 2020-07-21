@@ -724,7 +724,7 @@ TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
           /*reset_flag*/ false, /*packet_number=*/1, packet_content));
 
   quic::QuicSocketAddress self_address(
-      envoyAddressInstanceToQuicSocketAddress(listener_config_.socket_->localAddress()));
+      envoyAddressInstancePtrToQuicSocketAddress(listener_config_.socket_->localAddress()));
   auto packet = std::unique_ptr<quic::QuicReceivedPacket>(
       quic::test::ConstructReceivedPacket(*encrypted_packet, connection_helper_.GetClock()->Now()));
 

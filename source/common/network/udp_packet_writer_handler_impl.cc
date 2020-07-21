@@ -33,8 +33,7 @@ Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& bu
 
     return result;
   }
-  // Otherwise Return Blocked
-  // TODO(yugant) see a better way to create EAGAIN error here
+  // Otherwise Writer Blocked, return EAGAIN
   ENVOY_LOG_MISC(trace, "Udp Writer is blocked, skip sending");
   return Api::IoCallUint64Result(/*rc=*/0,
                                  /*err=*/Api::IoErrorPtr(new Network::IoSocketError(EAGAIN),

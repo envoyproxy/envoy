@@ -195,8 +195,8 @@ protected:
     client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
     Buffer::OwnedImpl payload = generateChloPacketToSend(
         quic_version_, quic_config_, ActiveQuicListenerPeer::cryptoConfig(*quic_listener_),
-        connection_id, clock_, envoyAddressInstanceToQuicSocketAddress(local_address_),
-        envoyAddressInstanceToQuicSocketAddress(local_address_), "test.example.org");
+        connection_id, clock_, envoyAddressInstancePtrToQuicSocketAddress(local_address_),
+        envoyAddressInstancePtrToQuicSocketAddress(local_address_), "test.example.org");
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
     // Send a full CHLO to finish 0-RTT handshake.

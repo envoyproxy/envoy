@@ -137,36 +137,8 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
     }
   }
 
-  // TODO(yugant):Test External Flush
+  // TODO(yugant): Add Test External Flush
 }
-
-// /** TODO(yugant): Clean this up or use it
-//  * The send fails because the server_socket is created with bind=false.
-//  */
-// TEST_P(UdpListenerImplBatchWriterTest, SendDataError) {
-//   Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
-//   const std::string payload("hello world");
-//   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
-//   buffer->add(payload);
-//   // send data to itself
-//   UdpSendData send_data{send_to_addr_->ip(), *server_socket_->localAddress(), *buffer};
-
-//   // Inject mocked OsSysCalls implementation to mock a write failure.
-//   Api::MockOsSysCalls os_sys_calls;
-//   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-//   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
-//       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
-//   auto send_result = listener_->send(send_data);
-//   EXPECT_FALSE(send_result.ok());
-//   EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
-//   // Failed write shouldn't drain the data.
-//   EXPECT_EQ(payload.length(), buffer->length());
-
-//   ON_CALL(os_sys_calls, sendmsg(_, _, _))
-//       .WillByDefault(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
-//   // EINVAL should cause RELEASE_ASSERT.
-//   EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
-// }
 
 } // namespace
 } // namespace Network

@@ -428,6 +428,7 @@ bools
 borks
 broadcasted
 buf
+buflen
 bugprone
 builtin
 builtins

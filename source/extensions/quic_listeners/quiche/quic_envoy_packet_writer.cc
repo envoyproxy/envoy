@@ -4,6 +4,21 @@
 
 namespace Envoy {
 namespace Quic {
+
+namespace {
+
+quic::WriteResult convertToQuicWriteResult(Api::IoCallUint64Result& result) {
+  if (result.ok()) {
+    return {quic::WRITE_STATUS_OK, static_cast<int>(result.rc_)};
+  }
+  quic::WriteStatus status = result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again
+                                 ? quic::WRITE_STATUS_BLOCKED
+                                 : quic::WRITE_STATUS_ERROR;
+  return {status, static_cast<int>(result.err_->getErrorCode())};
+}
+
+} // namespace
+
 QuicEnvoyPacketWriter::QuicEnvoyPacketWriter(Network::UdpPacketWriter& envoy_udp_packet_writer)
     : envoy_udp_packet_writer_(envoy_udp_packet_writer) {}
 
@@ -25,13 +40,7 @@ quic::WriteResult QuicEnvoyPacketWriter::WritePacket(const char* buffer, size_t 
   Api::IoCallUint64Result result = envoy_udp_packet_writer_.writePacket(
       *buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
 
-  if (result.ok()) {
-    return {quic::WRITE_STATUS_OK, static_cast<int>(result.rc_)};
-  }
-  quic::WriteStatus status = result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again
-                                 ? quic::WRITE_STATUS_BLOCKED
-                                 : quic::WRITE_STATUS_ERROR;
-  return {status, static_cast<int>(result.err_->getErrorCode())};
+  return convertToQuicWriteResult(result);
 }
 
 quic::QuicByteCount
@@ -57,15 +66,7 @@ QuicEnvoyPacketWriter::GetNextWriteLocation(const quic::QuicIpAddress& self_ip,
 
 quic::WriteResult QuicEnvoyPacketWriter::Flush() {
   Api::IoCallUint64Result result = envoy_udp_packet_writer_.flush();
-
-  // TODO(yugant):Move the code below maybe to a single helper function
-  if (result.ok()) {
-    return {quic::WRITE_STATUS_OK, static_cast<int>(result.rc_)};
-  }
-  quic::WriteStatus status = result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again
-                                 ? quic::WRITE_STATUS_BLOCKED
-                                 : quic::WRITE_STATUS_ERROR;
-  return {status, static_cast<int>(result.err_->getErrorCode())};
+  return convertToQuicWriteResult(result);
 }
 
 } // namespace Quic

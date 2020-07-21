@@ -11,7 +11,6 @@ ProtobufTypes::MessagePtr UdpGsoBatchWriterConfigFactory::createEmptyConfigProto
   return std::make_unique<envoy::config::listener::v3::UdpWriterConfig>();
 }
 
-// TODO(yugant) : Maybe you would want to use message here!
 Network::UdpPacketWriterFactoryPtr
 UdpGsoBatchWriterConfigFactory::createUdpPacketWriterFactory(const Protobuf::Message& /*message*/) {
   return std::make_unique<UdpGsoBatchWriterFactory>();
