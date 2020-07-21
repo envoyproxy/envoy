@@ -79,6 +79,12 @@ public:
    * @return the handshaker to use for TLS handshakes.
    */
   virtual Ssl::HandshakerPtr createHandshaker() const PURE;
+
+
+  /**
+   * @return the handshaker factory for attribute evaluation.
+   */
+  virtual const Ssl::HandshakerFactory& handshakerFactory() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

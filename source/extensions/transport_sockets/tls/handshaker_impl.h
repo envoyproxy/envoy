@@ -24,11 +24,6 @@ public:
     transport_socket_callbacks_ = &callbacks;
   }
 
-  bool requireCertificates() override {
-    // The default HandshakerImpl does require certificates.
-    return true;
-  }
-
 private:
   Network::TransportSocketCallbacks* transport_socket_callbacks_{};
 };
@@ -60,6 +55,11 @@ public:
   }
 
   void setConfig(ProtobufTypes::MessagePtr) override {}
+
+  bool requireCertificates() const override {
+    // The default HandshakerImpl does require certificates.
+    return true;
+  }
 
   static HandshakerFactory* getDefaultHandshakerFactory() {
     static HandshakerFactoryImpl default_handshaker_factory;

@@ -64,6 +64,10 @@ public:
 
   Ssl::HandshakerPtr createHandshaker() const override;
 
+  const Ssl::HandshakerFactory& handshakerFactory() const override {
+    return handshaker_factory_;
+  }
+
 protected:
   ContextConfigImpl(const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
                     const unsigned default_min_protocol_version,

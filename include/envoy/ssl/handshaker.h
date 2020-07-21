@@ -60,12 +60,6 @@ public:
    * state, raise connection events, etc.
    */
   virtual void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) PURE;
-
-  /**
-   * Implementations should return true if the tls context accompanying this
-   * handshaker expects certificates.
-   */
-  virtual bool requireCertificates() PURE;
 };
 
 using HandshakerPtr = std::unique_ptr<Handshaker>;
@@ -95,6 +89,12 @@ public:
    * Set a config for use when creating handshakers.
    */
   virtual void setConfig(ProtobufTypes::MessagePtr message) PURE;
+
+  /**
+   * Implementations should return true if the tls context accompanying this
+   * handshaker expects certificates.
+   */
+  virtual bool requireCertificates() const PURE;
 };
 
 } // namespace Ssl
