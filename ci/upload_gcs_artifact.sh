@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Do not ever set -x here, it is a security hazard as it will place the credentials below in the
-# CI logs.
 set -e -o pipefail
 
 if [[ -z "${GCS_ARTIFACT_BUCKET}" ]]; then
@@ -9,8 +7,7 @@ if [[ -z "${GCS_ARTIFACT_BUCKET}" ]]; then
   exit 0
 fi
 
-# Fail when service account key is not specified
-echo ${GCP_SERVICE_ACCOUNT_KEY} | base64 --decode | gcloud auth activate-service-account --key-file=-
+$(dirname "$0")/activate_gcp_key.sh
 
 SOURCE_DIRECTORY="$1"
 TARGET_SUFFIX="$2"
