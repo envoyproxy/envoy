@@ -104,23 +104,27 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
   for (const auto& cluster : hds_clusters_) {
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
-      for (const auto& host : hosts->hosts()) {
-        auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
-        Network::Utility::addressToProtobufAddress(
-            *host->address(), *endpoint->mutable_endpoint()->mutable_address());
-        // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
-        if (host->health() == Host::Health::Healthy) {
-          endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
-        } else {
-          if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
-            endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
-          } else if (host->getActiveHealthFailureType() ==
-                     Host::ActiveHealthFailureType::UNHEALTHY) {
-            endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
-          } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
-            endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+      const auto& hostsPerLocality = hosts->hostsPerLocality();
+      for (const auto& hostsPerLocalitySet : hostsPerLocality.get()) {
+        for (const auto& host : hostsPerLocalitySet) {
+          ENVOY_LOG(debug, "locality = {}", hostsPerLocality.hasLocalLocality());
+          auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
+          Network::Utility::addressToProtobufAddress(
+              *host->address(), *endpoint->mutable_endpoint()->mutable_address());
+          // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
+          if (host->health() == Host::Health::Healthy) {
+            endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
-            NOT_REACHED_GCOVR_EXCL_LINE;
+            if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
+              endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
+            } else if (host->getActiveHealthFailureType() ==
+                      Host::ActiveHealthFailureType::UNHEALTHY) {
+              endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+            } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
+              endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+            } else {
+              NOT_REACHED_GCOVR_EXCL_LINE;
+            }
           }
         }
       }
@@ -263,7 +267,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
     for (const auto& host : locality_endpoints.lb_endpoints()) {
       initial_hosts_->emplace_back(new HostImpl(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
-          envoy::config::core::v3::Locality().default_instance(),
+          locality_endpoints.locality(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
           envoy::config::core::v3::UNKNOWN));
     }

@@ -95,7 +95,11 @@ protected:
         envoy::type::v3::HTTP1);
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
-    auto* socket_address = health_check->add_locality_endpoints()
+    auto* locality_endpoints = health_check->add_locality_endpoints();
+    locality_endpoints->mutable_locality()->set_region("middle_earth");
+    locality_endpoints->mutable_locality()->set_zone("shire");
+    locality_endpoints->mutable_locality()->set_sub_zone("hobbiton");
+    auto* socket_address = locality_endpoints
                                ->add_endpoints()
                                ->mutable_address()
                                ->mutable_socket_address();
