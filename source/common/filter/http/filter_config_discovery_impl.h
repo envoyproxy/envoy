@@ -1,8 +1,5 @@
 #pragma once
 
-#include <unordered_map>
-#include <unordered_set>
-
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/subscription.h"
@@ -16,6 +13,9 @@
 #include "common/config/subscription_base.h"
 #include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Filter {
@@ -123,7 +123,7 @@ private:
   // FilterConfigProviderManagerImpl maintains active subscriptions in a map.
   FilterConfigProviderManagerImpl& filter_config_provider_manager_;
   const std::string subscription_id_;
-  std::unordered_set<DynamicFilterConfigProviderImpl*> filter_config_providers_;
+  absl::flat_hash_set<DynamicFilterConfigProviderImpl*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImpl;
 };
 
@@ -175,7 +175,7 @@ private:
   getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
                   const std::string& name, Server::Configuration::FactoryContext& factory_context,
                   const std::string& stat_prefix);
-  std::unordered_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
+  absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
   friend class FilterConfigSubscription;
 };
 

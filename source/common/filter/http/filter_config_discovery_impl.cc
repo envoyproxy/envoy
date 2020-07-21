@@ -21,6 +21,9 @@ DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
       tls_(factory_context.threadLocal().allocateSlot()),
       init_target_("DynamicFilterConfigProviderImpl", [this]() {
         subscription_->start();
+        // This init target is used to activate the subscription but not wait
+        // for a response. It is used whenever a default config is provided to be
+        // used while waiting for a response.
         init_target_.ready();
       }) {
   subscription_->filter_config_providers_.insert(this);
@@ -175,8 +178,8 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSu
     return subscription;
   } else {
     auto existing = it->second.lock();
-    RELEASE_ASSERT(existing != nullptr,
-                   absl::StrCat("Cannot find subscribed filter config resource ", name));
+    ASSERT(existing != nullptr,
+           absl::StrCat("Cannot find subscribed filter config resource ", name));
     return existing;
   }
 }

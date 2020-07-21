@@ -37,6 +37,8 @@
 #include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
 
+#include "extensions/filters/http/common/pass_through_filter.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -77,29 +79,14 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
-class MissingConfigFilter : public Http::StreamDecoderFilter {
+class MissingConfigFilter : public Http::PassThroughDecoderFilter {
 public:
-  // Http::StreamFilterBase
-  void onDestroy() override {}
-  // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
-    callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
-                               absl::nullopt, EMPTY_STRING);
+    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
+                                       absl::nullopt, EMPTY_STRING);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    return Http::FilterDataStatus::Continue;
-  }
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
-    return Http::FilterTrailersStatus::Continue;
-  }
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-  }
-
-private:
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
 
 } // namespace

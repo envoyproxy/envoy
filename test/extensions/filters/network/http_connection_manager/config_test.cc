@@ -2020,10 +2020,6 @@ http_filters:
   missing_config_filter->setDecoderFilterCallbacks(decoder_callbacks);
   missing_config_filter->decodeHeaders(headers, false);
   EXPECT_TRUE(stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound));
-  Buffer::OwnedImpl data;
-  EXPECT_EQ(Http::FilterDataStatus::Continue, missing_config_filter->decodeData(data, true));
-  Http::TestRequestTrailerMapImpl trailers;
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, missing_config_filter->decodeTrailers(trailers));
 }
 
 // Tests where upgrades are configured on via the HCM.
