@@ -41,12 +41,25 @@ bool ConnPoolImplBase::shouldCreateNewConnection() const {
   //
   // If prefetch ratio is not set, it defaults to 1, and this simplifies to the
   // legacy value of pending_requests_.size() > connecting_request_capacity_
-  return (pending_requests_.size() + num_active_requests_) * host_->cluster().prefetchRatio() >
+  return (pending_requests_.size() + num_active_requests_) * prefetchRatio() >
          (connecting_request_capacity_ + num_active_requests_);
 }
 
+float ConnPoolImplBase::prefetchRatio() const {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_prefetch")) {
+    return host_->cluster().prefetchRatio();
+  } else {
+    return 1.0;
+  }
+}
+
 void ConnPoolImplBase::tryCreateNewConnections() {
-  // Prefetch ratio is capped at 3, so we should never need to fetch more than 3 at a time.
+  // Somewhat arbitrarily cap the number of connections prefetched due to new
+  // incoming connections.  The prefetch ratio is capped at 3, so in steady
+  // state, no more than 3 connections should be prefetched. If hosts go
+  // unhealthy, and connections are not immediately prefetched, it could be that
+  // many connections are desired when the host becomes healthy again, but
+  // overwhelming it with connections is not desirable.
   for (int i = 0; i < 3; ++i) {
     if (!tryCreateNewConnection()) {
       return;
@@ -382,7 +395,7 @@ bool ConnPoolImplBase::connectingConnectionIsExcess() const {
   // If prefetch ratio is set, it also factors in the anticipated load based on both queued requests
   // and active requests, and makes sure the connecting capacity would still be sufficient to serve
   // that even with the most recent client removed.
-  return (pending_requests_.size() + num_active_requests_) * host_->cluster().prefetchRatio() <=
+  return (pending_requests_.size() + num_active_requests_) * prefetchRatio() <=
          (connecting_request_capacity_ -
           connecting_clients_.front()->effectiveConcurrentRequestLimit() + num_active_requests_);
 }

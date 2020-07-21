@@ -185,6 +185,8 @@ protected:
   // connection prefetch.
   bool shouldCreateNewConnection() const;
 
+  float prefetchRatio() const;
+
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
 

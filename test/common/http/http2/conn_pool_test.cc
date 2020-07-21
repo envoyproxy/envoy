@@ -16,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -1338,6 +1339,24 @@ TEST_F(Http2ConnPoolImplTest, PrefetchWithoutMultiplexing) {
   r3.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
   pool_->drainConnections();
 
+  closeAllClients();
+}
+
+TEST_F(Http2ConnPoolImplTest, PrefetchOff) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.allow_prefetch", "false"}});
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+
+  // Despite the prefetch ratio, no prefetch will happen due to the runtime
+  // disable.
+  expectClientsCreate(1);
+  ActiveTestRequest r1(*this, 0, false);
+
+  // Clean up.
+  r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  pool_->drainConnections();
   closeAllClients();
 }
 
