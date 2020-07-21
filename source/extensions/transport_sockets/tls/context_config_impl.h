@@ -101,7 +101,6 @@ private:
 
   // Ptr to HandshakerFactory. If nullptr, uses default Handshaker impl.
   Ssl::HandshakerFactory* handshaker_factory_{};
-  ProtobufTypes::MessagePtr handshaker_config_message_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

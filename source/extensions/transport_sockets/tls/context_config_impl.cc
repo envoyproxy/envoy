@@ -218,9 +218,10 @@ ContextConfigImpl::ContextConfigImpl(
     auto& handshaker_config = config.custom_listener_handshaker().typed_config();
     handshaker_factory_ =
         &Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
-    handshaker_config_message_ = Config::Utility::translateAnyToFactoryConfig(
-        handshaker_config.typed_config(), factory_context.messageValidationVisitor(),
-        *handshaker_factory_);
+    handshaker_factory_->setConfig(
+        Config::Utility::translateAnyToFactoryConfig(
+            handshaker_config.typed_config(), factory_context.messageValidationVisitor(),
+            *handshaker_factory_));
   }
 }
 
@@ -238,7 +239,7 @@ Ssl::HandshakerPtr ContextConfigImpl::createHandshaker() const {
     return std::make_unique<HandshakerImpl>();
   } else {
     HandshakerFactoryContextImpl context(api_, alpnProtocols());
-    return handshaker_factory_->createHandshaker(*handshaker_config_message_, context);
+    return handshaker_factory_->createHandshaker(context);
   }
 }
 

@@ -87,10 +87,14 @@ public:
 
 class HandshakerFactory : public Config::TypedFactory {
 public:
-  virtual HandshakerPtr createHandshaker(const Protobuf::Message& config,
-                                         HandshakerFactoryContext& context) PURE;
+  virtual HandshakerPtr createHandshaker(HandshakerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tls_handshakers"; }
+
+  /**
+   * Set a config for use when creating handshakers.
+   */
+  virtual void setConfig(ProtobufTypes::MessagePtr message) PURE;
 };
 
 } // namespace Ssl
