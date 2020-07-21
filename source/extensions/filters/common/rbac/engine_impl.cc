@@ -14,7 +14,8 @@ using LogDecision = RoleBasedAccessControlEngine::LogDecision;
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v3::RBAC& rules)
-    : allowed_if_matched_(rules.action() == envoy::config::rbac::v3::RBAC::ALLOW), action_log_(rules.action() == envoy::config::rbac::v3::RBAC::LOG) {
+    : allowed_if_matched_(rules.action() == envoy::config::rbac::v3::RBAC::ALLOW),
+      action_log_(rules.action() == envoy::config::rbac::v3::RBAC::LOG) {
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
@@ -32,8 +33,8 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
                                                const Envoy::Http::RequestHeaderMap& headers,
                                                const StreamInfo::StreamInfo& info,
                                                std::string* effective_policy_id) const {
-  // Automatically allow if LOG action                                             
-  if(action_log_) {
+  // Automatically allow if LOG action
+  if (action_log_) {
     return true;
   }
 
@@ -63,11 +64,10 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
                  effective_policy_id);
 }
 
-LogDecision RoleBasedAccessControlEngineImpl::shouldLog(const Network::Connection& connection,
-                                               const Envoy::Http::RequestHeaderMap& headers,
-                                               const StreamInfo::StreamInfo& info,
-                                               std::string* effective_policy_id) const {
-  if(!action_log_) {
+LogDecision RoleBasedAccessControlEngineImpl::shouldLog(
+    const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+    const StreamInfo::StreamInfo& info, std::string* effective_policy_id) const {
+  if (!action_log_) {
     return LogDecision::Undecided;
   }
 
@@ -88,9 +88,10 @@ LogDecision RoleBasedAccessControlEngineImpl::shouldLog(const Network::Connectio
 }
 
 LogDecision RoleBasedAccessControlEngineImpl::shouldLog(const Network::Connection& connection,
-                                               const StreamInfo::StreamInfo& info,
-                                               std::string* effective_policy_id) const {
-  return shouldLog(connection, *Http::StaticEmptyHeaders::get().request_headers, info, effective_policy_id);
+                                                        const StreamInfo::StreamInfo& info,
+                                                        std::string* effective_policy_id) const {
+  return shouldLog(connection, *Http::StaticEmptyHeaders::get().request_headers, info,
+                   effective_policy_id);
 }
 
 } // namespace RBAC

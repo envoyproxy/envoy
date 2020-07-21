@@ -21,6 +21,7 @@
 #include "common/protobuf/utility.h"
 #include "common/stream_info/utility.h"
 #include "common/tracing/http_tracer_impl.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -275,7 +276,7 @@ bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
   auto present_matcher = Matchers::MetadataMatcher(present_matcher_config);
 
   // If the key does not exist, return default_res_
-  if(!present_matcher.match(info.dynamicMetadata())) {
+  if (!present_matcher.match(info.dynamicMetadata())) {
     return default_res_;
   }
 

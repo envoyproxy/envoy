@@ -129,7 +129,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
         config_->stats().not_logged_.inc();
       }
     }
-    
+
     // Check authorization decision
     if (engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");

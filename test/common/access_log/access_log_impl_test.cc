@@ -1326,7 +1326,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-    const std::string default_false_yaml = R"EOF(
+  const std::string default_false_yaml = R"EOF(
 name: accesslog
 filter:
   metadata_filter:

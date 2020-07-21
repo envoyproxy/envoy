@@ -272,7 +272,8 @@ TEST(RoleBasedAccessControlEngineImpl, ErrorCondition) {
 
   rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
   RBAC::RoleBasedAccessControlEngineImpl engine_log(rbac);
-  checkEngineLog(engine_log, RBAC::RoleBasedAccessControlEngine::LogDecision::No, Envoy::Network::MockConnection());
+  checkEngineLog(engine_log, RBAC::RoleBasedAccessControlEngine::LogDecision::No,
+                 Envoy::Network::MockConnection());
 }
 
 TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
@@ -312,7 +313,8 @@ TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
 
   rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
   RBAC::RoleBasedAccessControlEngineImpl engine_log(rbac);
-  checkEngineLog(engine_log, RBAC::RoleBasedAccessControlEngine::LogDecision::Yes, Envoy::Network::MockConnection(), headers);
+  checkEngineLog(engine_log, RBAC::RoleBasedAccessControlEngine::LogDecision::Yes,
+                 Envoy::Network::MockConnection(), headers);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
@@ -361,7 +363,8 @@ TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
 
   rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
   RBAC::RoleBasedAccessControlEngineImpl engine_log(rbac);
-  checkEngineLog(engine_log, RBAC::RoleBasedAccessControlEngine::LogDecision::Yes, Envoy::Network::MockConnection(), headers, info);
+  checkEngineLog(engine_log, RBAC::RoleBasedAccessControlEngine::LogDecision::Yes,
+                 Envoy::Network::MockConnection(), headers, info);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
@@ -389,7 +392,8 @@ TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
 
   rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
   RBAC::RoleBasedAccessControlEngineImpl engine_log(rbac);
-  checkEngineLog(engine_log, RBAC::RoleBasedAccessControlEngine::LogDecision::No, conn, headers, info);
+  checkEngineLog(engine_log, RBAC::RoleBasedAccessControlEngine::LogDecision::No, conn, headers,
+                 info);
 }
 
 // Log tests tests
@@ -438,10 +442,12 @@ TEST(RoleBasedAccessControlEngineImpl, LogAllowUndecided) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers, info);
+  checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers,
+                 info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers, info);
+  checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers,
+                 info);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, LogDenyUndecided) {
@@ -459,10 +465,12 @@ TEST(RoleBasedAccessControlEngineImpl, LogDenyUndecided) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers, info);
+  checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers,
+                 info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers, info);
+  checkEngineLog(engine, RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided, conn, headers,
+                 info);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, LogAllowAll) {

@@ -13,10 +13,10 @@
 #include "envoy/server/access_log_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/common/matchers.h"
 #include "common/grpc/status.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
-#include "common/common/matchers.h"
 
 #include "absl/hash/hash.h"
 
@@ -230,15 +230,15 @@ private:
 };
 
 /**
-  * Filters requests based on dynamic metadata
-  */
+ * Filters requests based on dynamic metadata
+ */
 class MetadataFilter : public Filter {
 public:
   MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config);
 
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
-              const Http::ResponseHeaderMap& response_headers,
-              const Http::ResponseTrailerMap& response_trailers) const override;
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) const override;
 
 private:
   const envoy::type::matcher::v3::MetadataMatcher matcher_config_;
