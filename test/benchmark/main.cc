@@ -41,7 +41,8 @@ int main(int argc, char** argv) {
 
 bool Envoy::benchmark::skipExpensiveBenchmarks() {
   if (skip_expensive_benchmarks) {
-    ENVOY_LOG_MISC(warn, "Expensive benchmarks are being skipped; see test/README.md for more information");
+    ENVOY_LOG_MISC(
+        warn, "Expensive benchmarks are being skipped; see test/README.md for more information");
   }
 
   return skip_expensive_benchmarks;
