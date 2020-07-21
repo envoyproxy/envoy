@@ -32,7 +32,7 @@ void createLuaTableFromStringList(lua_State* state, const StringList& list) {
   }
 }
 
-// By default, LUA_INTEGER is ptrdiff_t
+// By default, LUA_INTEGER is https://en.cppreference.com/w/cpp/types/ptrdiff_t
 // (https://github.com/LuaJIT/LuaJIT/blob/8271c643c21d1b2f344e339f559f2de6f3663191/src/luaconf.h#L104),
 // which is large enough to hold timestamp-since-epoch in seconds. Note: In Lua, we usually use
 // os.time(os.date("!*t")) to get current timestamp-since-epoch in seconds.
