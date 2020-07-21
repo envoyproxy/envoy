@@ -1,8 +1,25 @@
 #!/bin/bash
 
 # directory:coverage_percent
-# for existing extensions with low coverage.
+# for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
+"source/common/network:94.0"
+"source/common/http/http3:50.0"
+"source/common/tracing:94.9"
+"source/common/protobuf:94.9"
+"source/common/secret:95.2"
+"source/common/singleton:95.1"
+"source/common/api:92.1"
+"source/common/api/posix:92.1"
+"source/common/json:90.6"
+"source/common/filesystem:96.1"
+"source/common/filesystem/posix:93.7"
+"source/common/thread_local:95.7"
+"source/common/crypto:0.0"
+"source/common/common/posix:94.1"
+"source/common/signal:85.1"
+"source/exe:93.7"
+"source/extensions:96.3"
 "source/extensions/common:94.4"
 "source/extensions/common/crypto:91.5"
 "source/extensions/common/wasm:85.4"
@@ -48,6 +65,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tap:95.6"
 "source/extensions/transport_sockets/tls:94.2"
 "source/extensions/transport_sockets/tls/private_key:76.9"
+"source/server:94.7"
+"source/server/config_validation:77.2"
+"source/server/admin:95.6"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
@@ -58,7 +78,7 @@ FAILED=0
 DEFAULT_COVERAGE_THRESHOLD=96.6
 DIRECTORY_THRESHOLD=$DEFAULT_COVERAGE_THRESHOLD
 
-# Unfortunately we have a bunch of preexisting extensions with low coverage.
+# Unfortunately we have a bunch of preexisting directory with low coverage.
 # Set their low bar as their current coverage level.
 get_coverage_target() {
   DIRECTORY_THRESHOLD=$DEFAULT_COVERAGE_THRESHOLD
@@ -71,9 +91,9 @@ get_coverage_target() {
   done
 }
 
-# Make sure that for each extension directory with code, coverage doesn't dip
+# Make sure that for each directory with code, coverage doesn't dip
 # below the default coverage threshold.
-for DIRECTORY in $(find source/extensions/* -type d)
+for DIRECTORY in $(find source/* -type d)
 do
   get_coverage_target $DIRECTORY
   COVERAGE_VALUE=$(lcov -e $COVERAGE_DATA  "$DIRECTORY/*" -o /dev/null | grep line |  cut -d ' ' -f 4)
@@ -90,7 +110,7 @@ do
   fi;
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${DIRECTORY_THRESHOLD}" | bc)
   if test ${COVERAGE_FAILED} -eq 1; then
-    echo Code coverage for extension ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} \(${COVERAGE_VALUE}\)
+    echo Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} \(${COVERAGE_VALUE}\)
     FAILED=1
   fi
 done
