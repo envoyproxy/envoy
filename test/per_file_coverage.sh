@@ -73,7 +73,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
-COVERAGE_DATA="/usr/local/google/home/alyssar/git/envoy/coverage.dat"
+COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 
 FAILED=0
 DEFAULT_COVERAGE_THRESHOLD=96.6
