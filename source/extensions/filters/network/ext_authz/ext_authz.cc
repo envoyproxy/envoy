@@ -8,6 +8,8 @@
 #include "common/common/assert.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/filters/network/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -90,6 +92,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.
       config_->stats().failure_mode_allowed_.inc();
     }
+
+    if (!response->dynamic_metadata.fields().empty()) {
+      filter_callbacks_->connection().streamInfo().setDynamicMetadata(
+          NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
+    }
+
     // We can get completion inline, so only call continue if that isn't happening.
     if (!calling_check_) {
       filter_callbacks_->continueReading();

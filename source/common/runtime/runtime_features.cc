@@ -56,7 +56,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http1_flood_protection",
     "envoy.reloadable_features.test_feature_true",
     "envoy.reloadable_features.connection_header_sanitization",
-    "envoy.reloadable_features.strict_authority_validation",
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.activate_fds_next_event_loop",
     "envoy.deprecated_features.allow_deprecated_extension_names",
@@ -71,9 +70,11 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.fixed_connection_close",
     "envoy.reloadable_features.http_default_alpn",
     "envoy.reloadable_features.listener_in_place_filterchain_update",
+    "envoy.reloadable_features.new_codec_behavior",
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
     "envoy.reloadable_features.preserve_upstream_date",
     "envoy.reloadable_features.stop_faking_paths",
+    "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
 };
 
@@ -86,10 +87,10 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
-    // Sentinel and test flag.
-    "envoy.reloadable_features.test_feature_false",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
+    // Sentinel and test flag.
+    "envoy.reloadable_features.test_feature_false",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

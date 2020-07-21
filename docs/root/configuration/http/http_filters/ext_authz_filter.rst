@@ -138,6 +138,21 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."
 
+Dynamic Metadata
+----------------
+.. _config_http_filters_ext_authz_dynamic_metadata:
+
+.. note::
+
+  The External Authorization filter emits dynamic metadata only when it is configured to use
+  gRPC service as the authorization server.
+
+The External Authorization filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
+*only* when the gRPC authorization server returns an :ref:`OK
+<envoy_v3_api_msg_service.auth.v3.OkHttpResponse>` :ref:`CheckResponse
+<envoy_v3_api_msg_service.auth.v3.CheckResponse>` with a filled :ref:`dynamic_metadata
+<envoy_v3_api_field_service.auth.v3.OkHttpResponse.dynamic_metadata>` field.
+
 Runtime
 -------
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key

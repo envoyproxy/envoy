@@ -236,6 +236,7 @@ def _boringssl_fips():
         sha256 = location["sha256"],
         genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
+        patches = ["@envoy//bazel/external:boringssl_fips.patch"],
     )
 
 def _com_github_circonus_labs_libcircllhist():
@@ -814,7 +815,6 @@ def _com_github_gperftools_gperftools():
     http_archive(
         name = "com_github_gperftools_gperftools",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_cmds = ["./autogen.sh"],
         **location
     )
 

@@ -1,6 +1,6 @@
 #include "extensions/filters/http/compressor/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gtest/gtest.h"
 

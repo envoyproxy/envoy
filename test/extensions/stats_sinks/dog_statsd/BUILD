@@ -19,7 +19,7 @@ envoy_extension_cc_test(
         "//include/envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/stat_sinks/dog_statsd:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
