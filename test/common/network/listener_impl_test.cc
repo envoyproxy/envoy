@@ -1,14 +1,16 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/exception.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "test/common/network/listener_impl_test_base.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -138,6 +140,72 @@ TEST_P(ListenerImplTest, UseActualDst) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(ListenerImplTest, GlobalConnectionLimitEnforcement) {
+  // Required to manipulate runtime values when there is no test server.
+  TestScopedRuntime scoped_runtime;
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"overload.global_downstream_max_connections", "2"}});
+  auto socket = std::make_shared<Network::TcpListenSocket>(
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+  Network::ListenerPtr listener = dispatcher_->createListener(socket, listener_callbacks, true);
+
+  std::vector<Network::ClientConnectionPtr> client_connections;
+  std::vector<Network::ConnectionPtr> server_connections;
+  StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource());
+  EXPECT_CALL(listener_callbacks, onAccept_(_))
+      .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
+        server_connections.emplace_back(dispatcher_->createServerConnection(
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
+        dispatcher_->exit();
+      }));
+
+  auto initiate_connections = [&](const int count) {
+    for (int i = 0; i < count; ++i) {
+      client_connections.emplace_back(dispatcher_->createClientConnection(
+          socket->localAddress(), Network::Address::InstanceConstSharedPtr(),
+          Network::Test::createRawBufferSocket(), nullptr));
+      client_connections.back()->connect();
+    }
+  };
+
+  initiate_connections(5);
+  EXPECT_CALL(listener_callbacks, onReject()).Times(3);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // We expect any server-side connections that get created to populate 'server_connections'.
+  EXPECT_EQ(2, server_connections.size());
+
+  // Let's increase the allowed connections and try sending more connections.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"overload.global_downstream_max_connections", "3"}});
+  initiate_connections(5);
+  EXPECT_CALL(listener_callbacks, onReject()).Times(4);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(3, server_connections.size());
+
+  // Clear the limit and verify there's no longer a limit.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"overload.global_downstream_max_connections", ""}});
+  initiate_connections(10);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(13, server_connections.size());
+
+  for (const auto& conn : client_connections) {
+    conn->close(ConnectionCloseType::NoFlush);
+  }
+  for (const auto& conn : server_connections) {
+    conn->close(ConnectionCloseType::NoFlush);
+  }
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"overload.global_downstream_max_connections", ""}});
+}
+
 TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   auto socket =
       std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
@@ -152,8 +220,6 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
-
-  EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));
 
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource());
   EXPECT_CALL(listener_callbacks, onAccept_(_))
@@ -198,11 +264,6 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr);
   client_connection->connect();
-
-  EXPECT_CALL(listener, getLocalAddress(_))
-      .WillOnce(Invoke([](os_fd_t fd) -> Address::InstanceConstSharedPtr {
-        return SocketInterfaceSingleton::get().addressFromFd(fd);
-      }));
 
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource());
   EXPECT_CALL(listener_callbacks, onAccept_(_))
@@ -249,10 +310,6 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   // When the listener is re-enabled, the pending connection should be accepted.
   listener.enable();
 
-  EXPECT_CALL(listener, getLocalAddress(_))
-      .WillOnce(Invoke([](os_fd_t fd) -> Address::InstanceConstSharedPtr {
-        return SocketInterfaceSingleton::get().addressFromFd(fd);
-      }));
   EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce(Invoke([&](ConnectionSocketPtr&) -> void {
     client_connection->close(ConnectionCloseType::NoFlush);
   }));

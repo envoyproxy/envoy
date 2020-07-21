@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/event/timer.h"
@@ -94,7 +95,7 @@ protected:
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
@@ -108,7 +109,7 @@ protected:
   const uint32_t healthy_threshold_;
   HealthCheckerStats stats_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   const bool reuse_connection_;
   HealthCheckEventLoggerPtr event_logger_;
 
@@ -135,7 +136,6 @@ private:
   std::chrono::milliseconds intervalWithJitter(uint64_t base_time_ms,
                                                std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
-  void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
   static std::shared_ptr<const Network::TransportSocketOptionsImpl>
@@ -155,8 +155,6 @@ private:
   const std::chrono::milliseconds unhealthy_edge_interval_;
   const std::chrono::milliseconds healthy_edge_interval_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
-  uint64_t local_process_healthy_{};
-  uint64_t local_process_degraded_{};
   const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
   const MetadataConstSharedPtr transport_socket_match_metadata_;
 };

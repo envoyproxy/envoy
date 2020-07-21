@@ -10,7 +10,6 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -140,11 +139,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
@@ -242,11 +237,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   std::string virtualHostYaml(const std::string& name, const std::string& domain) {
     return fmt::format(VhostTemplate, name, domain);
@@ -376,7 +367,7 @@ public:
     resource->set_version("4");
     resource->mutable_resource()->PackFrom(
         API_DOWNGRADE(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-            virtualHostYaml("vhost_1", "vhost_1, vhost.first"))));
+            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first"))));
     resource->add_aliases("my_route/vhost.first");
     ret.set_nonce("test-nonce-0");
 

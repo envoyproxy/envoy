@@ -19,6 +19,8 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/empty_string.h"
 #include "common/common/thread.h"
+#include "common/config/decoded_resource_impl.h"
+#include "common/config/opaque_resource_decoder_impl.h"
 #include "common/config/version_converter.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -300,6 +302,20 @@ public:
   }
 
   /**
+   * Compare two decoded resources for equality.
+   *
+   * @param lhs decoded resource on LHS.
+   * @param rhs decoded resource on RHS.
+   * @return bool indicating whether the decoded resources are equal.
+   */
+  static bool decodedResourceEq(const Config::DecodedResource& lhs,
+                                const Config::DecodedResource& rhs) {
+    return lhs.name() == rhs.name() && lhs.aliases() == rhs.aliases() &&
+           lhs.version() == rhs.version() && lhs.hasResource() == rhs.hasResource() &&
+           (!lhs.hasResource() || protoEqual(lhs.resource(), rhs.resource()));
+  }
+
+  /**
    * Compare two JSON strings serialized from ProtobufWkt::Struct for equality. When two identical
    * ProtobufWkt::Struct are serialized into JSON strings, the results have the same set of
    * properties (values), but the positions may be different.
@@ -522,8 +538,9 @@ public:
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           bool preserve_original_type = false) {
-    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+                           bool preserve_original_type = false, bool avoid_boosting = false) {
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor(),
+                              !avoid_boosting);
     if (!preserve_original_type) {
       Config::VersionConverter::eraseOriginalTypeInformation(message);
     }
@@ -534,8 +551,9 @@ public:
   }
 
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           bool preserve_original_type = false) {
-    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+                           bool preserve_original_type = false, bool avoid_boosting = false) {
+    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor(),
+                              !avoid_boosting);
     if (!preserve_original_type) {
       Config::VersionConverter::eraseOriginalTypeInformation(message);
     }
@@ -555,10 +573,14 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
-    MessageUtil::loadFromYamlAndValidate(yaml, message,
-                                         ProtobufMessage::getStrictValidationVisitor());
-    Config::VersionConverter::eraseOriginalTypeInformation(message);
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
+                                      bool preserve_original_type = false,
+                                      bool avoid_boosting = false) {
+    MessageUtil::loadFromYamlAndValidate(
+        yaml, message, ProtobufMessage::getStrictValidationVisitor(), avoid_boosting);
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
   template <class MessageType> static void validate(const MessageType& message) {
@@ -583,6 +605,139 @@ public:
     ProtobufWkt::Struct message;
     MessageUtil::loadFromJson(json, message);
     return message;
+  }
+
+  /**
+   * Extract the Protobuf binary format of a google.protobuf.Message as a string.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @return std::string of the Protobuf binary object.
+   */
+  static std::string getProtobufBinaryStringFromMessage(const Protobuf::Message& message) {
+    std::string pb_binary_str;
+    pb_binary_str.reserve(message.ByteSizeLong());
+    message.SerializeToString(&pb_binary_str);
+    return pb_binary_str;
+  }
+
+  template <class MessageType>
+  static Config::DecodedResourcesWrapper
+  decodeResources(std::initializer_list<MessageType> resources,
+                  const std::string& name_field = "name") {
+    Config::DecodedResourcesWrapper decoded_resources;
+    for (const auto& resource : resources) {
+      auto owned_resource = std::make_unique<MessageType>(resource);
+      decoded_resources.owned_resources_.emplace_back(new Config::DecodedResourceImpl(
+          std::move(owned_resource), MessageUtil::getStringField(resource, name_field), {}, ""));
+      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
+    }
+    return decoded_resources;
+  }
+
+  template <class MessageType>
+  static Config::DecodedResourcesWrapper
+  decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                  const std::string& version, const std::string& name_field = "name") {
+    TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
+    return Config::DecodedResourcesWrapper(resource_decoder, resources, version);
+  }
+
+  template <class MessageType>
+  static Config::DecodedResourcesWrapper
+  decodeResources(const envoy::service::discovery::v3::DiscoveryResponse& resources,
+                  const std::string& name_field = "name") {
+    return decodeResources<MessageType>(resources.resources(), resources.version_info(),
+                                        name_field);
+  }
+
+  template <class MessageType>
+  static Config::DecodedResourcesWrapper decodeResources(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
+      const std::string& name_field = "name") {
+    Config::DecodedResourcesWrapper decoded_resources;
+    TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
+    for (const auto& resource : resources) {
+      decoded_resources.owned_resources_.emplace_back(
+          new Config::DecodedResourceImpl(resource_decoder, resource));
+      decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
+    }
+    return decoded_resources;
+  }
+
+  template <typename Current>
+  class TestOpaqueResourceDecoderImpl : public Config::OpaqueResourceDecoderImpl<Current> {
+  public:
+    TestOpaqueResourceDecoderImpl(absl::string_view name_field)
+        : Config::OpaqueResourceDecoderImpl<Current>(ProtobufMessage::getStrictValidationVisitor(),
+                                                     name_field) {}
+  };
+
+  /**
+   * Returns the string representation of a envoy::config::core::v3::ApiVersion.
+   *
+   * @param api_version to be converted.
+   * @return std::string representation of envoy::config::core::v3::ApiVersion.
+   */
+  static std::string
+  getVersionStringFromApiVersion(envoy::config::core::v3::ApiVersion api_version) {
+    switch (api_version) {
+    case envoy::config::core::v3::ApiVersion::AUTO:
+      return "AUTO";
+    case envoy::config::core::v3::ApiVersion::V2:
+      return "V2";
+    case envoy::config::core::v3::ApiVersion::V3:
+      return "V3";
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
+  /**
+   * Returns the fully-qualified name of a service, rendered from service_full_name_template.
+   *
+   * @param service_full_name_template the service fully-qualified name template.
+   * @param api_version version of a service.
+   * @param use_alpha if the alpha version is preferred.
+   * @param service_namespace to override the service namespace.
+   * @return std::string full path of a service method.
+   */
+  static std::string
+  getVersionedServiceFullName(const std::string& service_full_name_template,
+                              envoy::config::core::v3::ApiVersion api_version,
+                              bool use_alpha = false,
+                              const std::string& service_namespace = EMPTY_STRING) {
+    switch (api_version) {
+    case envoy::config::core::v3::ApiVersion::AUTO:
+      FALLTHRU;
+    case envoy::config::core::v3::ApiVersion::V2:
+      return fmt::format(service_full_name_template, use_alpha ? "v2alpha" : "v2",
+                         service_namespace);
+
+    case envoy::config::core::v3::ApiVersion::V3:
+      return fmt::format(service_full_name_template, "v3", service_namespace);
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
+  /**
+   * Returns the full path of a service method.
+   *
+   * @param service_full_name_template the service fully-qualified name template.
+   * @param method_name the method name.
+   * @param api_version version of a service method.
+   * @param use_alpha if the alpha version is preferred.
+   * @param service_namespace to override the service namespace.
+   * @return std::string full path of a service method.
+   */
+  static std::string getVersionedMethodPath(const std::string& service_full_name_template,
+                                            absl::string_view method_name,
+                                            envoy::config::core::v3::ApiVersion api_version,
+                                            bool use_alpha = false,
+                                            const std::string& service_namespace = EMPTY_STRING) {
+    return absl::StrCat("/",
+                        getVersionedServiceFullName(service_full_name_template, api_version,
+                                                    use_alpha, service_namespace),
+                        "/", method_name);
   }
 };
 
@@ -633,28 +788,29 @@ namespace Http {
  */
 #define DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                      \
 public:                                                                                            \
-  const HeaderEntry* name() const override { return header_map_.name(); }                          \
+  const HeaderEntry* name() const override { return header_map_->name(); }                         \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
-    header_map_.append##name(data, delimiter);                                                     \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    header_map_->append##name(data, delimiter);                                                    \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
-    header_map_.setReference##name(value);                                                         \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    header_map_->setReference##name(value);                                                        \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
   }                                                                                                \
   void set##name(absl::string_view value) override {                                               \
-    header_map_.set##name(value);                                                                  \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    header_map_->set##name(value);                                                                 \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
   }                                                                                                \
   void set##name(uint64_t value) override {                                                        \
-    header_map_.set##name(value);                                                                  \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    header_map_->set##name(value);                                                                 \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
   }                                                                                                \
   size_t remove##name() override {                                                                 \
-    size_t headers_removed = header_map_.remove##name();                                           \
-    header_map_.verifyByteSizeInternalForTest();                                                   \
+    const size_t headers_removed = header_map_->remove##name();                                    \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
     return headers_removed;                                                                        \
-  }
+  }                                                                                                \
+  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }
 
 /**
  * Base class for all test header map types. This class wraps an underlying real header map
@@ -668,23 +824,23 @@ public:
   TestHeaderMapImplBase() = default;
   TestHeaderMapImplBase(const std::initializer_list<std::pair<std::string, std::string>>& values) {
     for (auto& value : values) {
-      header_map_.addCopy(LowerCaseString(value.first), value.second);
+      header_map_->addCopy(LowerCaseString(value.first), value.second);
     }
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->verifyByteSizeInternalForTest();
   }
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
-      : TestHeaderMapImplBase(rhs.header_map_) {}
+      : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
-    HeaderMapImpl::copyFrom(header_map_, rhs);
-    header_map_.verifyByteSizeInternalForTest();
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
   }
   TestHeaderMapImplBase& operator=(const TestHeaderMapImplBase& rhs) {
     if (this == &rhs) {
       return *this;
     }
     clear();
-    HeaderMapImpl::copyFrom(header_map_, rhs);
-    header_map_.verifyByteSizeInternalForTest();
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
     return *this;
   }
 
@@ -706,86 +862,112 @@ public:
   size_t remove(const std::string& key) { return remove(LowerCaseString(key)); }
 
   // HeaderMap
-  bool operator==(const HeaderMap& rhs) const override { return header_map_.operator==(rhs); }
-  bool operator!=(const HeaderMap& rhs) const override { return header_map_.operator!=(rhs); }
+  bool operator==(const HeaderMap& rhs) const override { return header_map_->operator==(rhs); }
+  bool operator!=(const HeaderMap& rhs) const override { return header_map_->operator!=(rhs); }
   void addViaMove(HeaderString&& key, HeaderString&& value) override {
-    header_map_.addViaMove(std::move(key), std::move(value));
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addViaMove(std::move(key), std::move(value));
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addReference(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.addReference(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addReference(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addReferenceKey(const LowerCaseString& key, uint64_t value) override {
-    header_map_.addReferenceKey(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addReferenceKey(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addReferenceKey(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.addReferenceKey(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addReferenceKey(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addCopy(const LowerCaseString& key, uint64_t value) override {
-    header_map_.addCopy(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addCopy(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void addCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.addCopy(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->addCopy(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void appendCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.appendCopy(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->appendCopy(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void setReference(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.setReference(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->setReference(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
   void setReferenceKey(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.setReferenceKey(key, value);
+    header_map_->setReferenceKey(key, value);
   }
   void setCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_.setCopy(key, value);
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->setCopy(key, value);
+    header_map_->verifyByteSizeInternalForTest();
   }
-  uint64_t byteSize() const override { return header_map_.byteSize(); }
-  const HeaderEntry* get(const LowerCaseString& key) const override { return header_map_.get(key); }
-  void iterate(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_.iterate(cb, context);
+  uint64_t byteSize() const override { return header_map_->byteSize(); }
+  const HeaderEntry* get(const LowerCaseString& key) const override {
+    return header_map_->get(key);
   }
-  void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_.iterateReverse(cb, context);
-  }
-  HeaderMap::Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override {
-    return header_map_.lookup(key, entry);
+  void iterate(HeaderMap::ConstIterateCb cb) const override { header_map_->iterate(cb); }
+  void iterateReverse(HeaderMap::ConstIterateCb cb) const override {
+    header_map_->iterateReverse(cb);
   }
   void clear() override {
-    header_map_.clear();
-    header_map_.verifyByteSizeInternalForTest();
+    header_map_->clear();
+    header_map_->verifyByteSizeInternalForTest();
   }
   size_t remove(const LowerCaseString& key) override {
-    size_t headers_removed = header_map_.remove(key);
-    header_map_.verifyByteSizeInternalForTest();
+    size_t headers_removed = header_map_->remove(key);
+    header_map_->verifyByteSizeInternalForTest();
+    return headers_removed;
+  }
+  size_t removeIf(const HeaderMap::HeaderMatchPredicate& predicate) override {
+    size_t headers_removed = header_map_->removeIf(predicate);
+    header_map_->verifyByteSizeInternalForTest();
     return headers_removed;
   }
   size_t removePrefix(const LowerCaseString& key) override {
-    size_t headers_removed = header_map_.removePrefix(key);
-    header_map_.verifyByteSizeInternalForTest();
+    size_t headers_removed = header_map_->removePrefix(key);
+    header_map_->verifyByteSizeInternalForTest();
     return headers_removed;
   }
-  size_t size() const override { return header_map_.size(); }
-  bool empty() const override { return header_map_.empty(); }
+  size_t size() const override { return header_map_->size(); }
+  bool empty() const override { return header_map_->empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override {
-    header_map_.dumpState(os, indent_level);
+    header_map_->dumpState(os, indent_level);
   }
 
-  Impl header_map_;
+  using Handle = typename CustomInlineHeaderRegistry::Handle<Interface::header_map_type>;
+  const HeaderEntry* getInline(Handle handle) const override {
+    return header_map_->getInline(handle);
+  }
+  void appendInline(Handle handle, absl::string_view data, absl::string_view delimiter) override {
+    header_map_->appendInline(handle, data, delimiter);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  void setReferenceInline(Handle handle, absl::string_view value) override {
+    header_map_->setReferenceInline(handle, value);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  void setInline(Handle handle, absl::string_view value) override {
+    header_map_->setInline(handle, value);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  void setInline(Handle handle, uint64_t value) override {
+    header_map_->setInline(handle, value);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  size_t removeInline(Handle handle) override {
+    const size_t rc = header_map_->removeInline(handle);
+    header_map_->verifyByteSizeInternalForTest();
+    return rc;
+  }
+
+  std::unique_ptr<Impl> header_map_{Impl::create()};
 };
 
 /**
  * Typed test implementations for all of the concrete header types.
  */
-using TestHeaderMapImpl = TestHeaderMapImplBase<HeaderMap, HeaderMapImpl>;
-
 class TestRequestHeaderMapImpl
     : public TestHeaderMapImplBase<RequestHeaderMap, RequestHeaderMapImpl> {
 public:
@@ -901,6 +1083,35 @@ MATCHER_P(RepeatedProtoEq, expected, "") {
                      << TestUtility::addLeftAndRightPadding("is not equal to actual repeated:")
                      << "\n"
                      << RepeatedPtrUtil::debugString(arg) << "\n"
+                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
+
+MATCHER_P(DecodedResourcesEq, expected, "") {
+  const bool equal = std::equal(arg.begin(), arg.end(), expected.begin(), expected.end(),
+                                TestUtility::decodedResourceEq);
+  if (!equal) {
+    const auto format_resources =
+        [](const std::vector<Config::DecodedResourceRef>& resources) -> std::string {
+      std::vector<std::string> resource_strs;
+      std::transform(
+          resources.begin(), resources.end(), std::back_inserter(resource_strs),
+          [](const Config::DecodedResourceRef& resource) -> std::string {
+            return fmt::format(
+                "<name: {}, aliases: {}, version: {}, resource: {}>", resource.get().name(),
+                absl::StrJoin(resource.get().aliases(), ","), resource.get().version(),
+                resource.get().hasResource() ? resource.get().resource().DebugString() : "(none)");
+          });
+      return absl::StrJoin(resource_strs, ", ");
+    };
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("Expected resources:") << "\n"
+                     << format_resources(expected) << "\n"
+                     << TestUtility::addLeftAndRightPadding("are not equal to actual resources:")
+                     << "\n"
+                     << format_resources(arg) << "\n"
                      << TestUtility::addLeftAndRightPadding("") // line full of padding
                      << "\n";
   }

@@ -1,9 +1,11 @@
 #include "common/network/socket_interface_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
 #include "envoy/network/socket.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
@@ -39,7 +41,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
   RELEASE_ASSERT(SOCKET_VALID(result.rc_),
-                 fmt::format("socket(2) failed, got error: {}", strerror(result.errno_)));
+                 fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_);
 
 #if defined(__APPLE__) || defined(WIN32)
@@ -66,74 +68,32 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
   return io_handle;
 }
 
+IoHandlePtr SocketInterfaceImpl::socket(os_fd_t fd) {
+  return std::make_unique<IoSocketHandleImpl>(fd);
+}
+
 bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSocketResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
   if (SOCKET_VALID(result.rc_)) {
     RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0,
-                   fmt::format("Fail to close fd: response code {}", strerror(result.rc_)));
+                   fmt::format("Fail to close fd: response code {}", errorDetails(result.rc_)));
   }
   return SOCKET_VALID(result.rc_);
 }
 
-Address::InstanceConstSharedPtr SocketInterfaceImpl::addressFromFd(os_fd_t fd) {
-  sockaddr_storage ss;
-  socklen_t ss_len = sizeof ss;
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult result =
-      os_sys_calls.getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-  if (result.rc_ != 0) {
-    throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd, result.errno_,
-                                     strerror(result.errno_)));
-  }
-  int socket_v6only = 0;
-  if (ss.ss_family == AF_INET6) {
-    socklen_t size_int = sizeof(socket_v6only);
-    result = os_sys_calls.getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int);
-#ifdef WIN32
-    // On Windows, it is possible for this getsockopt() call to fail.
-    // This can happen if the address we are trying to connect to has nothing
-    // listening. So we can't use RELEASE_ASSERT and instead must throw an
-    // exception
-    if (SOCKET_FAILURE(result.rc_)) {
-      throw EnvoyException(fmt::format("getsockopt failed for '{}': ({}) {}", fd, result.errno_,
-                                       strerror(result.errno_)));
-    }
-#else
-    RELEASE_ASSERT(result.rc_ == 0, "");
-#endif
-  }
-  return Address::addressFromSockAddr(ss, ss_len, socket_v6only);
+Server::BootstrapExtensionPtr
+SocketInterfaceImpl::createBootstrapExtension(const Protobuf::Message&,
+                                              Server::Configuration::ServerFactoryContext&) {
+  return std::make_unique<SocketInterfaceExtension>(*this);
 }
 
-Address::InstanceConstSharedPtr SocketInterfaceImpl::peerAddressFromFd(os_fd_t fd) {
-  sockaddr_storage ss;
-  socklen_t ss_len = sizeof ss;
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  Api::SysCallIntResult result =
-      os_sys_calls.getpeername(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-  if (result.rc_ != 0) {
-    throw EnvoyException(
-        fmt::format("getpeername failed for '{}': {}", fd, strerror(result.errno_)));
-  }
-#ifdef __APPLE__
-  if (ss_len == sizeof(sockaddr) && ss.ss_family == AF_UNIX)
-#else
-  if (ss_len == sizeof(sa_family_t) && ss.ss_family == AF_UNIX)
-#endif
-  {
-    // For Unix domain sockets, can't find out the peer name, but it should match our own
-    // name for the socket (i.e. the path should match, barring any namespace or other
-    // mechanisms to hide things, of which there are many).
-    ss_len = sizeof ss;
-    result = os_sys_calls.getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-    if (result.rc_ != 0) {
-      throw EnvoyException(
-          fmt::format("getsockname failed for '{}': {}", fd, strerror(result.errno_)));
-    }
-  }
-  return Address::addressFromSockAddr(ss, ss_len);
+ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {
+  return std::make_unique<
+      envoy::extensions::network::socket_interface::v3::DefaultSocketInterface>();
 }
+
+REGISTER_FACTORY(SocketInterfaceImpl, Server::Configuration::BootstrapExtensionFactory);
 
 static SocketInterfaceLoader* socket_interface_ =
     new SocketInterfaceLoader(std::make_unique<SocketInterfaceImpl>());

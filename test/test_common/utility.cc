@@ -25,6 +25,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
+#include "common/config/resource_name.h"
 #include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
@@ -67,26 +68,18 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
     return false;
   }
 
-  struct State {
-    const Http::HeaderMap& lhs;
-    bool equal;
-  };
+  bool equal = true;
+  rhs.iterate([&lhs, &equal](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const Http::HeaderEntry* entry =
+        lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
+    if (entry == nullptr || (entry->value() != header.value().getStringView())) {
+      equal = false;
+      return Http::HeaderMap::Iterate::Break;
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
-  State state{lhs, true};
-  rhs.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        State* state = static_cast<State*>(context);
-        const Http::HeaderEntry* entry =
-            state->lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
-        if (entry == nullptr || (entry->value() != header.value().getStringView())) {
-          state->equal = false;
-          return Http::HeaderMap::Iterate::Break;
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &state);
-
-  return state.equal;
+  return equal;
 }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
@@ -219,6 +212,31 @@ std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
     return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Runtime) {
+    return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
+  }
+  if (resource.type_url() == Config::getTypeUrl<envoy::config::listener::v3::Listener>(
+                                 envoy::config::core::v3::ApiVersion::V3)) {
+    return TestUtility::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
+  }
+  if (resource.type_url() == Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
+                                 envoy::config::core::v3::ApiVersion::V3)) {
+    return TestUtility::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
+  }
+  if (resource.type_url() == Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
+                                 envoy::config::core::v3::ApiVersion::V3)) {
+    return TestUtility::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
+  }
+  if (resource.type_url() == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+                                 envoy::config::core::v3::ApiVersion::V3)) {
+    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
+        .cluster_name();
+  }
+  if (resource.type_url() == Config::getTypeUrl<envoy::config::route::v3::VirtualHost>(
+                                 envoy::config::core::v3::ApiVersion::V3)) {
+    return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
+  }
+  if (resource.type_url() == Config::getTypeUrl<envoy::service::runtime::v3::Runtime>(
+                                 envoy::config::core::v3::ApiVersion::V3)) {
     return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
   }
   throw EnvoyException(

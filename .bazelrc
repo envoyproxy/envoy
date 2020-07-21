@@ -22,6 +22,7 @@ build --enable_platform_specific_config
 
 # Enable position independent code, this option is not supported on Windows and default on on macOS.
 build:linux --copt=-fPIC
+build:linux --cxxopt=-std=c++17
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -65,6 +66,7 @@ build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
+build:macos --cxxopt=-std=c++17
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
@@ -81,6 +83,8 @@ build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --linkopt -fuse-ld=lld
+build:clang-tsan --build_tag_filters=-no_san,-no_tsan
+build:clang-tsan --test_tag_filters=-no_san,-no_tsan
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
@@ -115,7 +119,8 @@ coverage --config=coverage
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
-build:coverage --test_timeout=900
+# 1.5x original timeout + 300s for trace merger in all categories
+build:coverage --test_timeout=390,750,1500,5700
 build:coverage --define=ENVOY_CONFIG_COVERAGE=1
 build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
 build:coverage --coverage_support=@envoy//bazel/coverage:coverage_support
@@ -127,23 +132,24 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/common/chromium_url|/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
-coverage:test-coverage --test_arg="--log-path /dev/null"
+build:coverage --instrumentation_filter="//source(?!/extensions/quic_listeners/quiche/platform)[/:],//include[/:]"
 coverage:test-coverage --test_arg="-l trace"
-coverage:fuzz-coverage --config=asan-fuzzer
+coverage:fuzz-coverage --config=plain-fuzzer
 coverage:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 
 # Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
-build:rbe-toolchain --host_platform=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
-build:rbe-toolchain --platforms=@envoy_build_tools//toolchains:rbe_ubuntu_clang_platform
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 build:rbe-toolchain-clang --config=rbe-toolchain
+build:rbe-toolchain-clang --platforms=@rbe_ubuntu_clang//config:platform
+build:rbe-toolchain-clang --host_platform=@rbe_ubuntu_clang//config:platform
 build:rbe-toolchain-clang --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
 build:rbe-toolchain-clang --extra_toolchains=@rbe_ubuntu_clang//config:cc-toolchain
 build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
 
 build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
+build:rbe-toolchain-clang-libc++ --platforms=@rbe_ubuntu_clang_libcxx//config:platform
+build:rbe-toolchain-clang-libc++ --host_platform=@rbe_ubuntu_clang_libcxx//config:platform
 build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
@@ -155,9 +161,20 @@ build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --config=clang-msan
 
+build:rbe-toolchain-tsan --linkopt=-L/opt/libcxx_tsan/lib
+build:rbe-toolchain-tsan --linkopt=-Wl,-rpath,/opt/libcxx_tsan/lib
+build:rbe-toolchain-tsan --config=clang-tsan
+
 build:rbe-toolchain-gcc --config=rbe-toolchain
+build:rbe-toolchain-gcc --platforms=@rbe_ubuntu_gcc//config:platform
+build:rbe-toolchain-gcc --host_platform=@rbe_ubuntu_gcc//config:platform
 build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
 build:rbe-toolchain-gcc --extra_toolchains=@rbe_ubuntu_gcc//config:cc-toolchain
+
+build:rbe-toolchain-msvc-cl --host_platform=@rbe_windows_msvc_cl//config:platform
+build:rbe-toolchain-msvc-cl --platforms=@rbe_windows_msvc_cl//config:platform
+build:rbe-toolchain-msvc-cl --crosstool_top=@rbe_windows_msvc_cl//cc:toolchain
+build:rbe-toolchain-msvc-cl --extra_toolchains=@rbe_windows_msvc_cl//config:cc-toolchain
 
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
@@ -166,6 +183,15 @@ build:remote --strategy=Genrule=remote,sandboxed,local
 build:remote --remote_timeout=7200
 build:remote --auth_enabled=true
 build:remote --remote_download_toplevel
+
+# Windows bazel does not allow sandboxed as a spawn strategy
+build:remote-windows --spawn_strategy=remote,local
+build:remote-windows --strategy=Javac=remote,local
+build:remote-windows --strategy=Closure=remote,local
+build:remote-windows --strategy=Genrule=remote,local
+build:remote-windows --remote_timeout=7200
+build:remote-windows --auth_enabled=true
+build:remote-windows --remote_download_toplevel
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
@@ -180,9 +206,12 @@ build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
+build:remote-msvc-cl --config=remote-windows
+build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
+
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:04f06115b6ee7cfea74930353fb47a41149cbec3
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:923df85a4ba7f30dcd0cb6b0c6d8d604f0e20f48
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -204,23 +233,29 @@ build:docker-msan --config=docker-sandbox
 build:docker-msan --config=rbe-toolchain-clang-libc++
 build:docker-msan --config=rbe-toolchain-msan
 
+build:docker-tsan --config=docker-sandbox
+build:docker-tsan --config=rbe-toolchain-clang-libc++
+build:docker-tsan --config=rbe-toolchain-tsan
+
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 
 # Fuzz builds
-build:asan-fuzzer --config=clang-asan
+# -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION is passed in in the bazel build target
+# rules for fuzz tests. Passing it in the CLI will cause dependencies to be build
+# with the macro. Causing issues in RouteMatcherTest.TestRoutes that expect prod
+# behavior from RE2 library.
+build:asan-fuzzer --config=asan
 build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
-build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
-build:plain-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
 
 # Compile database generation config
 # We don't care about built binaries so always strip and use fastbuild.
@@ -242,6 +277,7 @@ build:windows --define manual_stamp=manual_stamp
 build:windows --copt="-DCARES_STATICLIB"
 build:windows --copt="-DNGHTTP2_STATICLIB"
 build:windows --copt="-DCURL_STATICLIB"
+build:windows --cxxopt="/std:c++17"
 
 # Required to work around build defects on Windows MSVC cl
 # Unguarded gcc pragmas in quiche are not recognized by MSVC

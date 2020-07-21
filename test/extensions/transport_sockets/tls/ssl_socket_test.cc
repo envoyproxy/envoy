@@ -32,9 +32,11 @@
 #include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -343,8 +345,13 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedDigest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
       }
+      // Assert twice to ensure a cached value is returned and still valid.
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
+
       if (!options.expectedLocalUri().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
       }
       EXPECT_EQ(options.expectedSerialNumber(),
@@ -606,7 +613,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   if (!options.clientSession().empty()) {
     const SslSocketInfo* ssl_socket =
         dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-    SSL* client_ssl_socket = ssl_socket->rawSslForTest();
+    SSL* client_ssl_socket = ssl_socket->ssl();
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_socket);
     SSL_SESSION* client_ssl_session =
         SSL_SESSION_from_bytes(reinterpret_cast<const uint8_t*>(options.clientSession().data()),
@@ -649,8 +656,10 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       const SslSocketInfo* ssl_socket =
           dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-      SSL* client_ssl_socket = ssl_socket->rawSslForTest();
+      SSL* client_ssl_socket = ssl_socket->ssl();
       if (!options.expectedProtocolVersion().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
         EXPECT_EQ(options.expectedProtocolVersion(), client_connection->ssl()->tlsVersion());
       }
       if (!options.expectedCiphersuite().empty()) {
@@ -664,7 +673,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       absl::optional<std::string> server_ssl_requested_server_name;
       const SslSocketInfo* server_ssl_socket =
           dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
-      SSL* server_ssl = server_ssl_socket->rawSslForTest();
+      SSL* server_ssl = server_ssl_socket->ssl();
       auto requested_server_name = SSL_get_servername(server_ssl, TLSEXT_NAMETYPE_host_name);
       if (requested_server_name != nullptr) {
         server_ssl_requested_server_name = std::string(requested_server_name);
@@ -2511,7 +2520,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   const SslSocketInfo* ssl_socket =
       dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
   SSL_set_cert_cb(
-      ssl_socket->rawSslForTest(),
+      ssl_socket->ssl(),
       [](SSL* ssl, void*) -> int {
         STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
         EXPECT_NE(nullptr, list);
@@ -2624,7 +2633,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         const SslSocketInfo* ssl_socket =
             dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-        ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
+        ssl_session = SSL_get1_session(ssl_socket->ssl());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         if (expected_lifetime_hint) {
           auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
@@ -2647,7 +2656,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const SslSocketInfo* ssl_socket =
       dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-  SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
+  SSL_set_session(ssl_socket->ssl(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
   client_connection->connect();
@@ -2753,7 +2762,7 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
 
         const SslSocketInfo* ssl_socket =
             dynamic_cast<const SslSocketInfo*>(server_connection->ssl().get());
-        SSL* server_ssl_socket = ssl_socket->rawSslForTest();
+        SSL* server_ssl_socket = ssl_socket->ssl();
         SSL_CTX* server_ssl_context = SSL_get_SSL_CTX(server_ssl_socket);
         if (expect_support) {
           EXPECT_EQ(0, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
@@ -3207,7 +3216,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         const SslSocketInfo* ssl_socket =
             dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-        ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
+        ssl_session = SSL_get1_session(ssl_socket->ssl());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -3226,7 +3235,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   const SslSocketInfo* ssl_socket =
       dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
-  SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
+  SSL_set_session(ssl_socket->ssl(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
   client_connection->connect();
@@ -3640,7 +3649,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
 
-  // Connection using TLSv1.3 (client) and defaults (server) succeeds (non-FIPS) or fails (FIPS).
+  // Connection using TLSv1.3 (client) and defaults (server) succeeds.
   client_params->set_tls_minimum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   client_params->set_tls_maximum_protocol_version(
@@ -3650,11 +3659,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   TestUtilOptionsV2 error_test_options(listener, client, false, GetParam());
   error_test_options.setExpectedServerStats("ssl.connection_error")
       .setExpectedTransportFailureReasonContains("TLSV1_ALERT_PROTOCOL_VERSION");
-#ifndef BORINGSSL_FIPS
   testUtilV2(tls_v1_3_test_options);
-#else // BoringSSL FIPS
-  testUtilV2(error_test_options);
-#endif
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
 
@@ -3663,11 +3668,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   client_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-#ifndef BORINGSSL_FIPS
   testUtilV2(tls_v1_3_test_options);
-#else // BoringSSL FIPS
-  testUtilV2(tls_v1_2_test_options);
-#endif
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
 
@@ -3847,6 +3848,11 @@ TEST_P(SslSocketTest, ALPN) {
   testUtilV2(test_options);
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
+
+  // Client attempts to configure ALPN that is too large.
+  client_ctx->add_alpn_protocols(std::string(100000, 'a'));
+  EXPECT_THROW_WITH_MESSAGE(testUtilV2(test_options), EnvoyException,
+                            "Invalid ALPN protocol string");
 }
 
 TEST_P(SslSocketTest, CipherSuites) {
@@ -4189,15 +4195,29 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   server_ctx->add_alpn_protocols("test");
   testUtilV2(test_options);
   server_ctx->clear_alpn_protocols();
-
   // Override client side ALPN, "test" ALPN is used.
   server_ctx->add_alpn_protocols("test");
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(
-      new Network::TransportSocketOptionsImpl("", {}, {"foo", "test", "bar"}));
+  auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{"foo", "test", "bar"});
 
   testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
       transport_socket_options));
-  server_ctx->clear_alpn_protocols();
+
+  // Set fallback ALPN on the client side ALPN, "test" ALPN is used since no ALPN is specified
+  // in the config.
+  server_ctx->add_alpn_protocols("test");
+  transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{}, "test");
+  testUtilV2(test_options.setExpectedALPNProtocol("test").setTransportSocketOptions(
+      transport_socket_options));
+
+  // Update the client TLS config to specify ALPN. The fallback value should no longer be used.
+  // Note that the server prefers "test" over "bar", but since the client only configures "bar",
+  // the resulting ALPN will be "bar" even though "test" is included in the fallback.
+  server_ctx->add_alpn_protocols("bar");
+  client.mutable_common_tls_context()->add_alpn_protocols("bar");
+  testUtilV2(test_options.setExpectedALPNProtocol("bar").setTransportSocketOptions(
+      transport_socket_options));
 }
 
 // Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates

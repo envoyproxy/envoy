@@ -55,17 +55,17 @@ public:
    * @param seed the seed to use for the hash
    * @return 64-bit hash representation of the supplied string view
    */
-  static uint64_t murmurHash2_64(absl::string_view key, uint64_t seed = STD_HASH_SEED);
+  static uint64_t murmurHash2(absl::string_view key, uint64_t seed = STD_HASH_SEED);
 
 private:
-  static inline uint64_t unaligned_load(const char* p) {
+  static inline uint64_t unalignedLoad(const char* p) {
     uint64_t result;
     memcpy(&result, p, sizeof(result));
     return result;
   }
 
   // Loads n bytes, where 1 <= n < 8.
-  static inline uint64_t load_bytes(const char* p, int n) {
+  static inline uint64_t loadBytes(const char* p, int n) {
     uint64_t result = 0;
     --n;
     do {

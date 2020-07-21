@@ -32,8 +32,8 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 Currently there are three build images for Linux and one for Windows:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 9 compiler.
-* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 9 compiler, this image is experimental and not well tested.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 10 compiler.
+* `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 10 compiler, this image is experimental and not well tested.
 * `envoyproxy/envoy-build-windows2019` &mdash; based on Windows 2019 LTS with VS 2019 Build Tools.
 
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
@@ -176,8 +176,7 @@ The macOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
 which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
 on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
-build and test Envoy. If Envoy cannot be built (`error: /Library/Developer/CommandLineTools/usr/bin/libtool: no output file specified (specify with -o output)`),
-ensure that Xcode is installed.
+build and test Envoy. Note that the full version of Xcode (not just Command Line Tools) is required.
 
 # Coverity Scan Build Flow
 

@@ -130,6 +130,7 @@ public:
   void onAccept(ConnectionSocketPtr&& socket) override { onAccept_(socket); }
 
   MOCK_METHOD(void, onAccept_, (ConnectionSocketPtr & socket));
+  MOCK_METHOD(void, onReject, ());
 };
 
 class MockUdpListenerCallbacks : public UdpListenerCallbacks {
@@ -221,6 +222,7 @@ public:
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
+  MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const));
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr& option));
@@ -233,7 +235,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, connect, (const Address::InstanceConstSharedPtr));
   MOCK_METHOD(Api::SysCallIntResult, listen, (int));
   MOCK_METHOD(Api::SysCallIntResult, setSocketOption, (int, int, const void*, socklen_t));
-  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*));
+  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   IoHandlePtr io_handle_;
@@ -282,6 +284,7 @@ public:
   MOCK_METHOD(const IoHandle&, ioHandle, (), (const));
   MOCK_METHOD(Socket::Type, socketType, (), (const));
   MOCK_METHOD(Address::Type, addressType, (), (const));
+  MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const));
   MOCK_METHOD(void, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion), (const));
@@ -291,7 +294,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, connect, (const Address::InstanceConstSharedPtr));
   MOCK_METHOD(Api::SysCallIntResult, listen, (int));
   MOCK_METHOD(Api::SysCallIntResult, setSocketOption, (int, int, const void*, socklen_t));
-  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*));
+  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*), (const));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   IoHandlePtr io_handle_;
@@ -308,6 +311,9 @@ public:
   MOCK_METHOD(ConnectionSocket&, socket, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueFilterChain, (bool));
+  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
+  MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
 
   NiceMock<MockConnectionSocket> socket_;
 };
@@ -340,6 +346,7 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(Network::ActiveUdpListenerFactory*, udpListenerFactory, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
+  MOCK_METHOD(ResourceLimit&, openConnections, ());
 
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;

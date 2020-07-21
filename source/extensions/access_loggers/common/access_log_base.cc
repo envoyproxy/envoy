@@ -12,17 +12,14 @@ void ImplBase::log(const Http::RequestHeaderMap* request_headers,
                    const Http::ResponseHeaderMap* response_headers,
                    const Http::ResponseTrailerMap* response_trailers,
                    const StreamInfo::StreamInfo& stream_info) {
-  ConstSingleton<Http::RequestHeaderMapImpl> empty_request_headers;
-  ConstSingleton<Http::ResponseHeaderMapImpl> empty_response_headers;
-  ConstSingleton<Http::ResponseTrailerMapImpl> empty_response_trailers;
   if (!request_headers) {
-    request_headers = &empty_request_headers.get();
+    request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
   }
   if (!response_headers) {
-    response_headers = &empty_response_headers.get();
+    response_headers = Http::StaticEmptyHeaders::get().response_headers.get();
   }
   if (!response_trailers) {
-    response_trailers = &empty_response_trailers.get();
+    response_trailers = Http::StaticEmptyHeaders::get().response_trailers.get();
   }
   if (filter_ &&
       !filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {

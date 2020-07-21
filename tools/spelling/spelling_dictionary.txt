@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 ABI
 ACK
+ACL
 AES
 AFAICT
 ALPN
@@ -25,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+ceil
 CHACHA
 CHLO
 CHMOD
@@ -78,8 +80,10 @@ ECMP
 ECONNREFUSED
 EDESTRUCTION
 EDF
+EINPROGRESS
 EINVAL
 ELB
+EMSGSIZE
 ENOTFOUND
 ENOTSUP
 ENV
@@ -119,6 +123,8 @@ GETting
 GLB
 GOAWAY
 GRPC
+GRO
+GSO
 GSS
 GTEST
 GURL
@@ -295,6 +301,7 @@ STL
 STRLEN
 STS
 SVG
+Symbolizer
 TBD
 TCLAP
 TCP
@@ -336,9 +343,11 @@ WASM
 WAVM
 WIP
 WKT
+WRONGPASS
 WRR
 WS
 WSA
+WSS
 Welford's
 Wi
 XDS
@@ -566,6 +575,7 @@ epoll
 errno
 etag
 etags
+evaluator
 evbuffer
 evbuffers
 evconnlistener
@@ -643,6 +653,7 @@ hoc
 hostname
 hostnames
 hostset
+hotrestart
 hrefs
 huffman
 hystrix
@@ -660,6 +671,7 @@ inflight
 -ing
 init
 initializer
+initializers
 inlined
 inlining
 inobservability
@@ -767,6 +779,7 @@ mutexes
 mux
 muxed
 mysql
+namelen
 nameserver
 namespace
 namespaces
@@ -861,6 +874,7 @@ preorder
 prepend
 prepended
 prev
+probabilistically
 proc
 profiler
 programmatically
@@ -967,6 +981,7 @@ sanitizer
 satisfiable
 scalability
 sched
+schedulable
 schemas
 scopekey
 sendmsg
@@ -1097,7 +1112,9 @@ tuples
 typedef
 typeid
 typesafe
+uber
 ucontext
+udpa
 uint
 un-
 unacked
@@ -1149,8 +1166,6 @@ vptr
 wakeup
 wakeups
 websocket
-whitelist
-whitelisted
 whitespace
 whitespaces
 wildcard

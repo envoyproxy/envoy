@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
@@ -50,7 +52,8 @@ using GrpcMetricsStreamerSharedPtr = std::shared_ptr<GrpcMetricsStreamer>;
 class GrpcMetricsStreamerImpl : public Singleton::Instance, public GrpcMetricsStreamer {
 public:
   GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
-                          const LocalInfo::LocalInfo& local_info);
+                          const LocalInfo::LocalInfo& local_info,
+                          envoy::config::core::v3::ApiVersion transport_api_version);
 
   // GrpcMetricsStreamer
   void send(envoy::service::metrics::v3::StreamMetricsMessage& message) override;
@@ -64,7 +67,11 @@ private:
                     envoy::service::metrics::v3::StreamMetricsResponse>
       client_;
   const LocalInfo::LocalInfo& local_info_;
+  const Protobuf::MethodDescriptor& service_method_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
+
+using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 
 /**
  * Stat Sink implementation of Metrics Service.

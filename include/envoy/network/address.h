@@ -10,7 +10,6 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/io_handle.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"

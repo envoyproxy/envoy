@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <string>
 
 #include "envoy/stats/tag.h"
@@ -115,7 +116,7 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
 private:
-  bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
+  bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
   Histogram::Unit unit_;
   Store& parent_;
@@ -125,7 +126,7 @@ private:
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
   mutable Thread::MutexBasicLockable merge_lock_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
+  std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
   RefcountHelper refcount_helper_;
 };
@@ -263,6 +264,11 @@ public:
    */
   Thread::ThreadSynchronizer& sync() { return sync_; }
 
+  /**
+   * @return a set of well known tag names; used to reduce symbol table churn.
+   */
+  const StatNameSet& wellKnownTags() const { return *well_known_tags_; }
+
 private:
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
@@ -375,6 +381,9 @@ private:
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
+    template <class StatType>
+    using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
+
     /**
      * Looks up an existing stat, populating the local cache if necessary. Does
      * not check the TLS or rejects, and does not create a stat if it does not
@@ -385,7 +394,7 @@ private:
      * @return a reference to the stat, if it exists.
      */
     template <class StatType>
-    absl::optional<std::reference_wrapper<const StatType>>
+    StatTypeOptConstRef<StatType>
     findStatLockHeld(StatName name,
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
@@ -424,7 +433,7 @@ private:
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
-  absl::flat_hash_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
+  absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
@@ -454,7 +463,11 @@ private:
 
   Thread::ThreadSynchronizer sync_;
   std::atomic<uint64_t> next_scope_id_{};
+
+  StatNameSetPtr well_known_tags_;
 };
+
+using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
 
 } // namespace Stats
 } // namespace Envoy

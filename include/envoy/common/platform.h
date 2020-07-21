@@ -53,13 +53,13 @@
   __pragma(pack(push, 1)) definition, ##__VA_ARGS__;                                               \
   __pragma(pack(pop))
 
-using ssize_t = ptrdiff_t;
+typedef ptrdiff_t ssize_t;
 
 // This is needed so the OsSysCalls interface compiles on Windows,
 // shmOpen takes mode_t as an argument.
-using mode_t = uint32_t;
+typedef uint32_t mode_t;
 
-using os_fd_t = SOCKET;
+typedef SOCKET os_fd_t;
 
 typedef unsigned int sa_family_t;
 
@@ -125,6 +125,23 @@ struct msghdr {
 #define ENVOY_SHUT_WR SD_SEND
 #define ENVOY_SHUT_RDWR SD_BOTH
 
+// winsock2 functions return distinct set of error codes, disjoint from POSIX errors (that are
+// also available on Windows and set by POSIX function invocations). Here we map winsock2 error
+// codes with platform agnostic macros that correspond to the same or roughly similar errors on
+// POSIX systems for use in cross-platform socket error handling.
+#define SOCKET_ERROR_AGAIN WSAEWOULDBLOCK
+#define SOCKET_ERROR_NOT_SUP WSAEOPNOTSUPP
+#define SOCKET_ERROR_AF_NO_SUP WSAEAFNOSUPPORT
+#define SOCKET_ERROR_IN_PROGRESS WSAEINPROGRESS
+// winsock2 does not differentiate between PERM and ACCESS violations
+#define SOCKET_ERROR_PERM WSAEACCES
+#define SOCKET_ERROR_ACCESS WSAEACCES
+#define SOCKET_ERROR_MSG_SIZE WSAEMSGSIZE
+#define SOCKET_ERROR_INTR WSAEINTR
+#define SOCKET_ERROR_ADDR_NOT_AVAIL WSAEADDRNOTAVAIL
+#define SOCKET_ERROR_INVAL WSAEINVAL
+#define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
+
 #else // POSIX
 
 #include <arpa/inet.h>
@@ -133,6 +150,7 @@ struct msghdr {
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h> // for UDP_GRO
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
 #include <sys/socket.h>
@@ -171,7 +189,7 @@ struct msghdr {
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
-using os_fd_t = int;
+typedef int os_fd_t;
 
 #define INVALID_SOCKET -1
 #define SOCKET_VALID(sock) ((sock) >= 0)
@@ -183,6 +201,19 @@ using os_fd_t = int;
 #define ENVOY_SHUT_RD SHUT_RD
 #define ENVOY_SHUT_WR SHUT_WR
 #define ENVOY_SHUT_RDWR SHUT_RDWR
+
+// Mapping POSIX socket errors to common error names
+#define SOCKET_ERROR_AGAIN EAGAIN
+#define SOCKET_ERROR_NOT_SUP ENOTSUP
+#define SOCKET_ERROR_AF_NO_SUP EAFNOSUPPORT
+#define SOCKET_ERROR_IN_PROGRESS EINPROGRESS
+#define SOCKET_ERROR_PERM EPERM
+#define SOCKET_ERROR_ACCESS EACCES
+#define SOCKET_ERROR_MSG_SIZE EMSGSIZE
+#define SOCKET_ERROR_INTR EINTR
+#define SOCKET_ERROR_ADDR_NOT_AVAIL EADDRNOTAVAIL
+#define SOCKET_ERROR_INVAL EINVAL
+#define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 
 #endif
 
@@ -205,3 +236,28 @@ struct mmsghdr {
   unsigned int msg_len;
 };
 #endif
+
+#define SUPPORTS_GETIFADDRS
+#ifdef WIN32
+#undef SUPPORTS_GETIFADDRS
+#endif
+
+// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
+#ifdef __ANDROID_API__
+#if __ANDROID_API__ < 24
+#undef SUPPORTS_GETIFADDRS
+#endif // __ANDROID_API__ < 24
+#endif // ifdef __ANDROID_API__
+
+// https://android.googlesource.com/platform/bionic/+/master/docs/status.md
+// ``pthread_getname_np`` is introduced in API 26
+#define SUPPORTS_PTHREAD_NAMING 0
+#if defined(__ANDROID_API__)
+#if __ANDROID_API__ >= 26
+#undef SUPPORTS_PTHREAD_NAMING
+#define SUPPORTS_PTHREAD_NAMING 1
+#endif // __ANDROID_API__ >= 26
+#elif defined(__linux__)
+#undef SUPPORTS_PTHREAD_NAMING
+#define SUPPORTS_PTHREAD_NAMING 1
+#endif // defined(__ANDROID_API__)

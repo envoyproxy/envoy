@@ -18,16 +18,22 @@ envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
+    # This test takes a while to run specially under tsan.
+    # Shard it to avoid test timeout.
+    shard_count = 2,
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//source/extensions/filters/network/redis_proxy:router_interface",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -85,6 +91,7 @@ envoy_cc_mock(
         "//source/extensions/common/redis:cluster_refresh_manager_interface",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:fault_interface",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
         "//source/extensions/filters/network/redis_proxy:router_interface",
@@ -98,7 +105,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
@@ -116,6 +123,7 @@ envoy_extension_cc_benchmark_binary(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
+        "//test/mocks/event:event_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
@@ -148,6 +156,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.redis_proxy",
     tags = ["fails_on_windows"],
     deps = [
+        "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/integration:integration_lib",
     ],
