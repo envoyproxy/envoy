@@ -758,6 +758,8 @@ routes:
 
     EXPECT_EQ("k2", mmc[1]->name());
     EXPECT_EQ(hv2, mmc[1]->value());
+
+    EXPECT_EQ(Http::LowerCaseString{""}, route->routeEntry()->clusterHeader());
   }
 
   // match with weighted cluster with different metadata key
