@@ -26,6 +26,9 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
   // now for Envoy, w/o setting the mode
   FANCY_LOG(info, "Build the logger for this file.");
   Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
+  postCallback("/logging", header_map, response);
+  FANCY_LOG(error, response.toString());
+  
   postCallback("/logging?level=warning", header_map, response);
   FANCY_LOG(warn, "After post 1: all level is warning now!");
   EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
