@@ -13,6 +13,8 @@
 namespace Envoy {
 namespace Network {
 
+static const uint64_t K_MAX_OUTGOING_PACKET_SIZE = 1452; // Based on quic::kMaxOutgoingPacketSize
+
 #define UDP_PACKET_WRITER_STATS(GAUGE)                                                             \
   GAUGE(internal_buffer_size, NeverImport)                                                         \
   GAUGE(last_buffered_msg_size, NeverImport)                                                       \
@@ -23,6 +25,15 @@ namespace Network {
  */
 struct UdpPacketWriterStats {
   UDP_PACKET_WRITER_STATS(GENERATE_GAUGE_STRUCT)
+};
+
+struct InternalBufferWriteLocation {
+  InternalBufferWriteLocation() = default;
+  InternalBufferWriteLocation(char* buffer, std::function<void(const char*)> release_buffer)
+      : buffer_(buffer), release_buffer_(std::move(release_buffer)) {}
+
+  char* buffer_ = nullptr;
+  std::function<void(const char*)> release_buffer_;
 };
 
 class UdpPacketWriter {
@@ -64,24 +75,17 @@ public:
    */
   virtual bool isBatchMode() const PURE;
 
-  // TODO(yugant): Change char* below return to a struct {char*, fn_ptr}. Explanation below.
-  //
-  // Is it okay to skip the release_buffer function pointer, and only return char*?
-  // For GsoBatchWriter Yes, since it will always return nullptr for the function ptr
-  // But other BatchWriter implementations may be using release_buffer fn ptr to
-  // release buffers from a free_list. Hence for that it would be better to have the return
-  // type here as a struct with both char* and function ptr.
-
   /**
    * @brief Get pointer to the next write location in internal buffer,
    * it should be called iff the caller does not call writePacket
    * for the returned buffer.
    * @param local_ip is the source address to be used to send.
    * @param peer_address is the destination address to send to.
-   * @return char* pointer to the next write location
+   * @return { char* to the next write location,
+   *           func to release buffer }
    */
-  virtual char* getNextWriteLocation(const Address::Ip* local_ip,
-                                     const Address::Instance& peer_address) PURE;
+  virtual InternalBufferWriteLocation
+  getNextWriteLocation(const Address::Ip* local_ip, const Address::Instance& peer_address) PURE;
 
   /**
    * @brief Batch Mode: Try to send all buffered packets

@@ -58,10 +58,10 @@ QuicEnvoyPacketWriter::GetNextWriteLocation(const quic::QuicIpAddress& self_ip,
       quicAddressToEnvoyAddressInstance(self_address);
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
-  // TODO(yugant):Change this to not only take a char* pointer here
-  char* buf = envoy_udp_packet_writer_.getNextWriteLocation(
-      local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
-  return quic::QuicPacketBuffer(buf, nullptr);
+  Network::InternalBufferWriteLocation write_location =
+      envoy_udp_packet_writer_.getNextWriteLocation(
+          local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
+  return quic::QuicPacketBuffer(write_location.buffer_, write_location.release_buffer_);
 }
 
 quic::WriteResult QuicEnvoyPacketWriter::Flush() {

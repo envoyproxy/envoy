@@ -21,14 +21,14 @@ public:
   bool isWriteBlocked() const override { return write_blocked_; }
   void setWritable() override { write_blocked_ = false; }
   uint64_t getMaxPacketSize(const Address::Instance& /*peer_address*/) const override {
-    // TODO(yugant): Find a proper place to get this constant
-    return 1452u;
+    return Network::K_MAX_OUTGOING_PACKET_SIZE;
   }
   bool isBatchMode() const override { return false; }
 
-  char* getNextWriteLocation(const Address::Ip* /*local_ip*/,
-                             const Address::Instance& /*peer_address*/) override {
-    return nullptr;
+  Network::InternalBufferWriteLocation
+  getNextWriteLocation(const Address::Ip* /*local_ip*/,
+                       const Address::Instance& /*peer_address*/) override {
+    return {nullptr, nullptr};
   }
   Api::IoCallUint64Result flush() override {
     return Api::IoCallUint64Result(
