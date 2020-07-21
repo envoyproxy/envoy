@@ -21,7 +21,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -101,8 +101,8 @@ protected:
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   // server_factory_context_ is used by rds
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  std::unique_ptr<RouteConfigProviderManager> route_config_provider_manager_;
-  std::unique_ptr<ScopedRoutesConfigProviderManager> config_provider_manager_;
+  RouteConfigProviderManagerPtr route_config_provider_manager_;
+  ScopedRoutesConfigProviderManagerPtr config_provider_manager_;
 
   Event::SimulatedTimeSystem time_system_;
 };

@@ -384,28 +384,24 @@ public:
       sampled_ = metadata.sampled().value();
     }
 
-    metadata.headers().iterate(
-        [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
-          absl::string_view key = header.key().getStringView();
-          if (key.empty()) {
-            return Http::HeaderMap::Iterate::Continue;
-          }
+    metadata.headers().iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      absl::string_view key = header.key().getStringView();
+      if (key.empty()) {
+        return Http::HeaderMap::Iterate::Continue;
+      }
 
-          RequestHeader& rh = *static_cast<RequestHeader*>(cb);
-          if (key == Headers::get().ClientId.get()) {
-            rh.client_id_ = ClientId(std::string(header.value().getStringView()));
-          } else if (key == Headers::get().Dest.get()) {
-            rh.dest_ = std::string(header.value().getStringView());
-          } else if (key.find(":d:") == 0 && key.size() > 3) {
-            rh.delegations_.emplace_back(std::string(key.substr(3)),
-                                         std::string(header.value().getStringView()));
-          } else if (key[0] != ':') {
-            rh.contexts_.emplace_back(std::string(key),
-                                      std::string(header.value().getStringView()));
-          }
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        this);
+      if (key == Headers::get().ClientId.get()) {
+        client_id_ = ClientId(std::string(header.value().getStringView()));
+      } else if (key == Headers::get().Dest.get()) {
+        dest_ = std::string(header.value().getStringView());
+      } else if (key.find(":d:") == 0 && key.size() > 3) {
+        delegations_.emplace_back(std::string(key.substr(3)),
+                                  std::string(header.value().getStringView()));
+      } else if (key[0] != ':') {
+        contexts_.emplace_back(std::string(key), std::string(header.value().getStringView()));
+      }
+      return Http::HeaderMap::Iterate::Continue;
+    });
   }
 
   void write(Buffer::Instance& buffer) {
@@ -575,16 +571,13 @@ public:
     }
   }
   ResponseHeader(const MessageMetadata& metadata) : spans_(metadata.spans()) {
-    metadata.headers().iterate(
-        [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
-          absl::string_view key = header.key().getStringView();
-          if (!key.empty() && key[0] != ':') {
-            static_cast<std::list<RequestContext>*>(cb)->emplace_back(
-                std::string(key), std::string(header.value().getStringView()));
-          }
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        &contexts_);
+    metadata.headers().iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      absl::string_view key = header.key().getStringView();
+      if (!key.empty() && key[0] != ':') {
+        contexts_.emplace_back(std::string(key), std::string(header.value().getStringView()));
+      }
+      return Http::HeaderMap::Iterate::Continue;
+    });
   }
 
   void write(Buffer::Instance& buffer) {
@@ -1061,7 +1054,7 @@ void TwitterProtocolImpl::updateMetadataWithResponseHeader(const ThriftObject& h
   }
 
   SpanList& spans = resp_header.spans();
-  std::copy(spans.begin(), spans.end(), std::back_inserter(metadata.mutable_spans()));
+  std::copy(spans.begin(), spans.end(), std::back_inserter(metadata.mutableSpans()));
 }
 
 void TwitterProtocolImpl::writeResponseHeader(Buffer::Instance& buffer,

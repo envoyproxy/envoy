@@ -67,7 +67,7 @@ public:
               address:
                 socket_address:
                   address: 127.0.0.1
-                  port_value: 11002        
+                  port_value: 11002
   )EOF";
     const std::string merge_window_enabled = R"EOF(
       common_lb_config:
@@ -231,7 +231,7 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   )EOF";
 
   EXPECT_CALL(log_manager_, createAccessLog("foo"));
-  create(parseBootstrapFromV2Json(json));
+  create(parseBootstrapFromV3Json(json));
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
@@ -262,7 +262,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
                           "invalid value \"foo\" for type TYPE_ENUM");
 }
 
@@ -280,7 +280,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   )EOF",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2")}));
 
-  EXPECT_THROW(create(parseBootstrapFromV2Json(json)), EnvoyException);
+  EXPECT_THROW(create(parseBootstrapFromV3Json(json)), EnvoyException);
 }
 
 TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
@@ -298,7 +298,7 @@ TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV2Json(json)), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(create(parseBootstrapFromV3Json(json)), EnvoyException,
                           "fake_property: Cannot find field");
 }
 
@@ -317,7 +317,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2"),
                     defaultStaticClusterJson("new_cluster")}));
 
-  create(parseBootstrapFromV2Json(json));
+  create(parseBootstrapFromV3Json(json));
   checkStats(3 /*added*/, 0 /*modified*/, 0 /*removed*/, 3 /*active*/, 0 /*warming*/);
 
   factory_.tls_.shutdownThread();
@@ -327,7 +327,7 @@ TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   const std::string json = fmt::sprintf(
       "{\"static_resources\":{%s}}",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
-  const auto config = parseBootstrapFromV2Json(json);
+  const auto config = parseBootstrapFromV3Json(json);
   EXPECT_THROW(create(config), EnvoyException);
 }
 
@@ -697,7 +697,7 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
   cluster1->info_->lb_type_ = LoadBalancerType::ClusterProvided;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Json(json)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
                             "cluster manager: cluster provided LB specified but cluster "
                             "'cluster_0' did not provide one. Check cluster documentation.");
 }
@@ -711,7 +711,7 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
   cluster1->info_->name_ = "cluster_0";
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
       .WillOnce(Return(std::make_pair(cluster1, new MockThreadAwareLoadBalancer())));
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Json(json)), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
                             "cluster manager: cluster provided LB not specified but cluster "
                             "'cluster_0' provided one. Check cluster documentation.");
 }
@@ -731,7 +731,7 @@ public:
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
         .WillOnce(Return(std::make_pair(cluster1, nullptr)));
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-    create(parseBootstrapFromV2Json(json));
+    create(parseBootstrapFromV3Json(json));
 
     EXPECT_EQ(nullptr, cluster_manager_->get("cluster_0")->loadBalancer().chooseHost(nullptr));
 
@@ -834,7 +834,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  create(parseBootstrapFromV2Json(json));
+  create(parseBootstrapFromV3Json(json));
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
                                                               Http::Protocol::Http2, nullptr));
@@ -890,7 +890,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
                                         clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  create(parseBootstrapFromV2Json(json));
+  create(parseBootstrapFromV3Json(json));
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
   EXPECT_EQ(cluster.info(), cluster_manager_->get("cluster_1")->info());
@@ -918,7 +918,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     "dynamic_resources": {
       "cds_config": {
         "api_config_source": {
-          "api_type": "UNSUPPORTED_REST_LEGACY",
+          "api_type": "0",
           "refresh_delay": "30s",
           "cluster_names": ["cds_cluster"]
         }
@@ -958,7 +958,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   EXPECT_CALL(*cds_cluster, initialize(_));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseBootstrapFromV2Json(json));
+  create(parseBootstrapFromV3Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -1000,78 +1000,102 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  version_info: version3
  static_clusters:
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
       name: "fake_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
       name: "fake_cluster2"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
  dynamic_active_clusters:
   - version_info: "version1"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
       name: "cluster3"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - version_info: "version2"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
       name: "cluster4"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
       name: "cluster5"
       type: "STATIC"
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1120,7 +1144,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*foo, initialize(_));
 
-  create(parseBootstrapFromV2Json(json));
+  create(parseBootstrapFromV3Json(json));
   foo->initialize_callback_();
 
   // Now add a dynamic cluster. This cluster will have a member update callback from the local
@@ -1178,14 +1202,18 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
 dynamic_warming_clusters:
   - version_info: "version3"
     cluster:
-      "@type": type.googleapis.com/envoy.api.v2.Cluster
+      "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
       name: "fake_cluster"
       type: STATIC
       connect_timeout: 0.25s
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
     last_updated:
       seconds: 1234567891
       nanos: 234000000
@@ -1221,14 +1249,18 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.api.v2.Cluster
+       "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
-       hosts:
-       - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
+       load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -1242,7 +1274,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize(_));
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
-      parseClusterFromV2Json(fmt::sprintf(kDefaultStaticClusterTmpl, "fake_cluster",
+      parseClusterFromV3Json(fmt::sprintf(kDefaultStaticClusterTmpl, "fake_cluster",
                                           R"EOF(
 "socket_address": {
   "address": "127.0.0.1",
@@ -1254,14 +1286,18 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version3"
      cluster:
-       "@type": type.googleapis.com/envoy.api.v2.Cluster
+       "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
-       hosts:
-       - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
+       load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
      last_updated:
        seconds: 1234567891
        nanos: 234000000
@@ -1404,7 +1440,7 @@ TEST_F(ClusterManagerImplTest, AddOrUpdateClusterStaticExists) {
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseBootstrapFromV2Json(json));
+  create(parseBootstrapFromV3Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -1433,7 +1469,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
 
-  create(parseBootstrapFromV2Json(json));
+  create(parseBootstrapFromV3Json(json));
 
   ReadyWatcher initialized;
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
@@ -1501,7 +1537,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
           // Test inline init.
           initialize_callback();
         }));
-    create(parseBootstrapFromV2Json(json));
+    create(parseBootstrapFromV3Json(json));
 
     EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(cp1));
     cluster_manager_->httpConnPoolForCluster("some_cluster", ResourcePriority::Default,
@@ -1564,7 +1600,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
           // Test inline init.
           initialize_callback();
         }));
-    create(parseBootstrapFromV2Json(json));
+    create(parseBootstrapFromV3Json(json));
 
     EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp1));
     cluster_manager_->tcpConnPoolForCluster("some_cluster", ResourcePriority::Default, nullptr);
@@ -3089,6 +3125,8 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   init_helper_.startInitializingSecondaryClusters();
 }
 
+using NameVals = std::vector<std::pair<Network::SocketOptionName, int>>;
+
 // Validate that when options are set in the ClusterManager and/or Cluster, we see the socket option
 // propagated to setsockopt(). This is as close to an end-to-end test as we have for this feature,
 // due to the complexity of creating an integration test involving the network stack. We only test
@@ -3101,8 +3139,7 @@ public:
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
   // TODO(tschroed): Extend this to support socket state as well.
-  void expectSetsockopts(const std::vector<std::pair<Network::SocketOptionName, int>>& names_vals) {
-
+  void expectSetsockopts(const NameVals& names_vals) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     NiceMock<Network::MockConnectionSocket> socket;
@@ -3145,8 +3182,15 @@ public:
   }
 
   void expectSetsockoptFreebind() {
-    std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-        {ENVOY_SOCKET_IP_FREEBIND, 1}};
+    NameVals names_vals{{ENVOY_SOCKET_IP_FREEBIND, 1}};
+    if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+      names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+    }
+    expectSetsockopts(names_vals);
+  }
+
+  void expectOnlyNoSigpipeOptions() {
+    NameVals names_vals{{std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1)}};
     expectSetsockopts(names_vals);
   }
 
@@ -3186,7 +3230,11 @@ TEST_F(SockoptsTest, SockoptsUnset) {
                     port_value: 11001
   )EOF";
   initialize(yaml);
-  expectNoSocketOptions();
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    expectOnlyNoSigpipeOptions();
+  } else {
+    expectNoSocketOptions();
+  }
 }
 
 TEST_F(SockoptsTest, FreebindClusterOnly) {
@@ -3289,8 +3337,11 @@ TEST_F(SockoptsTest, SockoptsClusterOnly) {
 
   )EOF";
   initialize(yaml);
-  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}, {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
   expectSetsockopts(names_vals);
 }
 
@@ -3318,8 +3369,11 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
         { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
   )EOF";
   initialize(yaml);
-  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}, {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
   expectSetsockopts(names_vals);
 }
 
@@ -3349,8 +3403,11 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
       socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
   )EOF";
   initialize(yaml);
-  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
-      {ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}, {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
   expectSetsockopts(names_vals);
 }
 
@@ -3399,6 +3456,14 @@ public:
               options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           return connection_;
         }));
+    if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+      EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_NOSIGPIPE.level(),
+                                          ENVOY_SOCKET_SO_NOSIGPIPE.option(), _, sizeof(int)))
+          .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+            EXPECT_EQ(1, *static_cast<const int*>(optval));
+            return {0, 0};
+          }));
+    }
     EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_KEEPALIVE.level(),
                                         ENVOY_SOCKET_SO_KEEPALIVE.option(), _, sizeof(int)))
         .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
@@ -3432,6 +3497,29 @@ public:
             return {0, 0};
           }));
     }
+    auto conn_data = cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
+    EXPECT_EQ(connection_, conn_data.connection_.get());
+  }
+
+  void expectOnlyNoSigpipeOptions() {
+    NiceMock<Network::MockConnectionSocket> socket;
+    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+        .WillOnce(Invoke([this, &socket](Network::Address::InstanceConstSharedPtr,
+                                         Network::Address::InstanceConstSharedPtr,
+                                         Network::TransportSocketPtr&,
+                                         const Network::ConnectionSocket::OptionsSharedPtr& options)
+                             -> Network::ClientConnection* {
+          EXPECT_NE(nullptr, options.get());
+          EXPECT_TRUE((Network::Socket::applyOptions(
+              options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
+          return connection_;
+        }));
+    EXPECT_CALL(socket, setSocketOption(ENVOY_SOCKET_SO_NOSIGPIPE.level(),
+                                        ENVOY_SOCKET_SO_NOSIGPIPE.option(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return {0, 0};
+        }));
     auto conn_data = cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
     EXPECT_EQ(connection_, conn_data.connection_.get());
   }
@@ -3472,7 +3560,11 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
                     port_value: 11001
   )EOF";
   initialize(yaml);
-  expectNoSocketOptions();
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    expectOnlyNoSigpipeOptions();
+  } else {
+    expectNoSocketOptions();
+  }
 }
 
 TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {
