@@ -187,14 +187,27 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
   expectVerifyStatus(Status::JwtMissed, headers);
 }
 
-// Test multiple tokens; one of them is bad, verification is ok.
-TEST_F(AuthenticatorTest, TestMultipleJWTOneBad) {
+// Test multiple tokens; the one from query parameter is bad, verification should fail.
+TEST_F(AuthenticatorTest, TestMultipleJWTOneBadFromQuery) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
 
   // headers with multiple tokens: one good, one bad
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {":path", "/foo?access_token=" + std::string(NonExistKidToken)},
+  };
+
+  expectVerifyStatus(Status::JwtVerificationFail, headers);
+}
+
+// Test multiple tokens; the one from header is bad, verification should fail.
+TEST_F(AuthenticatorTest, TestMultipleJWTOneBadFromHeader) {
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
+
+  // headers with multiple tokens: one good, one bad
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {"Authorization", "Bearer " + std::string(NonExistKidToken)},
+      {":path", "/foo?access_token=" + std::string(GoodToken)},
   };
 
   expectVerifyStatus(Status::JwtVerificationFail, headers);
