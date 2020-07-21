@@ -21,4 +21,4 @@ Example plugin configuration:
               filename: "/etc/envoy_filter_http_wasm_example.wasm"
       singleton: true
 
-The preceeding snippet configures a plugin singleton service from a Wasm binary on local disk.
+The preceding snippet configures a plugin singleton service from a Wasm binary on local disk.

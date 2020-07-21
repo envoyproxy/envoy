@@ -34,4 +34,4 @@ Example filter configuration:
           allow_precompiled: true
  
 
-The preceeding snippet configures a filter from a Wasm binary on local disk.
+The preceding snippet configures a filter from a Wasm binary on local disk.
