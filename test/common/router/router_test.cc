@@ -3751,10 +3751,13 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  absl::string_view rc_details2 = "upstream_reset_after_response_started{remote reset}";
-  EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details2));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  // Normally, sendLocalReply will actually send the reply, but in this case the
+  // HCM will detect the headers have already been sent and not route through
+  // the encoder again.
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _, _, _, _)).WillOnce(testing::InvokeWithoutArgs([] {
+  }));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   // For normal HTTP, once we have a 200 we consider this a success, even if a
   // later reset occurs.

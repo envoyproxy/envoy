@@ -361,6 +361,10 @@ private:
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override {
     stream_info_.setResponseCodeDetails(details);
+    if (encoded_response_headers_) {
+      resetStream();
+      return;
+    }
     Utility::sendLocalReply(
         remote_closed_,
         Utility::EncodeFunctions{
@@ -415,6 +419,7 @@ private:
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
+  bool encoded_response_headers_{};
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool send_xff_{true};

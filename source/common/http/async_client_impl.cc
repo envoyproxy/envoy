@@ -98,6 +98,7 @@ void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_str
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
             *headers);
   ASSERT(!remote_closed_);
+  encoded_response_headers_ = true;
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
   // At present, the router cleans up stream state as soon as the remote is closed, making a

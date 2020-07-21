@@ -1985,6 +1985,40 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   EXPECT_FALSE(codec_client_->disconnected());
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/12131
+TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  // Make sure that a disconnect results in valid 5xx response headers even when preceded by a 100.
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_500_after_100", "false");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    EXPECT_FALSE(response->complete());
+  } else {
+    response->waitForReset();
+    EXPECT_FALSE(response->complete());
+  }
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
