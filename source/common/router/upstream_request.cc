@@ -90,10 +90,9 @@ UpstreamRequest::~UpstreamRequest() {
     const MonotonicTime end_time = dispatcher.timeSource().monotonicTime();
     const std::chrono::milliseconds response_time =
         std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_);
-    parent_.cluster()
-        ->timeoutBudgetStats()
-        ->upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
-            FilterUtility::percentageOfTimeout(response_time, parent_.timeout().per_try_timeout_));
+    Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = parent_.cluster()->timeoutBudgetStats();
+    tb_stats->get().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+        FilterUtility::percentageOfTimeout(response_time, parent_.timeout().per_try_timeout_));
   }
 
   stream_info_.setUpstreamTiming(upstream_timing_);

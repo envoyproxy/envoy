@@ -13,6 +13,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
 #include "common/network/utility.h"
@@ -2411,6 +2412,63 @@ TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
                             "Only one of typed_extension_protocol_options or "
                             "extension_protocol_options can be specified");
 }
+
+TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
+  const std::string yaml_disabled = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+  )EOF";
+
+  auto cluster = makeCluster(yaml_disabled);
+  // By default, histograms tracking request/response sizes are not published.
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+
+  const std::string yaml_disabled2 = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_cluster_stats: { timeout_budgets : true }
+  )EOF";
+
+  cluster = makeCluster(yaml_disabled2);
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+
+  const std::string yaml_disabled3 = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_cluster_stats: { request_response_sizes : false }
+  )EOF";
+
+  cluster = makeCluster(yaml_disabled3);
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+}
+
+TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_cluster_stats: { request_response_sizes : true }
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  // The stats should be created.
+  ASSERT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
+
+  Upstream::ClusterRequestResponseSizeStats req_resp_stats =
+      cluster->info()->requestResponseSizeStats()->get();
+
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_headers_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_body_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rs_body_size_.unit());
+}
+
 TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   const std::string yaml = R"EOF(
     name: name
@@ -2502,7 +2560,64 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
 }
 
+TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
+  // Check that without the flag specified, the histogram is null.
+  const std::string yaml_disabled = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+  )EOF";
+
+  auto cluster = makeCluster(yaml_disabled);
+  // The stats will be null if they have not been explicitly turned on.
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+
+  const std::string yaml_disabled2 = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_cluster_stats: { request_response_sizes : true }
+  )EOF";
+
+  cluster = makeCluster(yaml_disabled2);
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+
+  const std::string yaml_disabled3 = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_cluster_stats: { timeout_budgets : false }
+  )EOF";
+
+  cluster = makeCluster(yaml_disabled3);
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+}
+
 TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
+  // Check that with the flag, the histogram is created.
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_cluster_stats: { timeout_budgets : true }
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  // The stats should be created.
+  ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+
+  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
+}
+
+TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -2526,9 +2641,13 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
 
   cluster = makeCluster(yaml);
   // The stats should be created.
-  EXPECT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+  ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+
+  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
-            cluster->info()->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.unit());
+            tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
 // Validates HTTP2 SETTINGS config.

@@ -284,6 +284,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   //                                          in callback manager.
   // 2020/07/07  11252    44971       46000   Introduce Least Request LB active request bias config
   // 2020/07/15  11748    45003       46000   Stream error on invalid messaging
+  // 2020/07/20  11559    44747       46000   stats: add histograms for request/response headers
+  //                                          and body sizes.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -301,7 +303,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 45003);
+    EXPECT_MEMORY_EQ(m_per_cluster, 44747);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
@@ -357,6 +359,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   //                                          in callback manager.
   // 2020/07/07  11252    37083       38000   Introduce Least Request LB active request bias config
   // 2020/07/15  11748    37115       38000   Stream error on invalid messaging
+  // 2020/07/20  11559    36859       38000   stats: add histograms for request/response headers
+  //                                          and body sizes.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -374,7 +378,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 37115);
+    EXPECT_MEMORY_EQ(m_per_cluster, 36859);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }

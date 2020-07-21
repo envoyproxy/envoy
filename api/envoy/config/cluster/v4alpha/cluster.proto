@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 49]
+// [#next-free-field: 50]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -545,9 +545,9 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  reserved 12, 15, 7, 11, 35;
+  reserved 12, 15, 7, 11, 35, 47;
 
-  reserved "hosts", "tls_context", "extension_protocol_options";
+  reserved "hosts", "tls_context", "extension_protocol_options", "track_timeout_budgets";
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket_match* in the
@@ -855,13 +855,6 @@ message Cluster {
   // from the LRS stream here.]
   core.v4alpha.ConfigSource lrs_server = 42;
 
-  // If track_timeout_budgets is true, the :ref:`timeout budget histograms
-  // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
-  // request. These show what percentage of a request's per try and global timeout was used. A value
-  // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
-  // of 100 would indicate that the request took the entirety of the timeout given to it.
-  bool track_timeout_budgets = 47;
-
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
   // Currently this field only applies for HTTP traffic but is designed for eventual use for custom
@@ -880,6 +873,9 @@ message Cluster {
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
   core.v4alpha.TypedExtensionConfig upstream_config = 48;
+
+  // Configuration to track optional cluster stats.
+  TrackClusterStats track_cluster_stats = 49;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
@@ -941,4 +937,21 @@ message UpstreamConnectionOptions {
 
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
   core.v4alpha.TcpKeepalive tcp_keepalive = 1;
+}
+
+message TrackClusterStats {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.cluster.v3.TrackClusterStats";
+
+  // If timeout_budgets is true, the :ref:`timeout budget histograms
+  // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
+  // request. These show what percentage of a request's per try and global timeout was used. A value
+  // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
+  // of 100 would indicate that the request took the entirety of the timeout given to it.
+  bool timeout_budgets = 1;
+
+  // If request_response_sizes is true, then the :ref:`histograms
+  // <config_cluster_manager_cluster_stats_request_response_sizes>`  tracking header and body sizes
+  // of requests and responses will be published.
+  bool request_response_sizes = 2;
 }
