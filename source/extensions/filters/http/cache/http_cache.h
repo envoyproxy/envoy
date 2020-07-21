@@ -214,7 +214,7 @@ public:
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
   // data into cache too fast for the cache to handle, clients should wait for
-  // the cache to call ready_for_next_chunk() before streaming the next chunk.
+  // the cache to call readyForNextChunk() before streaming the next chunk.
   //
   // The client can abort the streaming insertion by dropping the
   // InsertContextPtr. A cache can abort the insertion by passing 'false' into
