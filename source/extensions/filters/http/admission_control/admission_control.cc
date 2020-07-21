@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
@@ -31,8 +32,8 @@ using GrpcStatus = Grpc::Status::GrpcStatus;
 static constexpr double defaultAggression = 2.0;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
-    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource&,
-    Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
+    const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls,
     std::shared_ptr<ResponseEvaluator> response_evaluator)
     : random_(random), scope_(scope), tls_(std::move(tls)),
       admission_control_feature_(proto_config.enabled(), runtime),
@@ -49,7 +50,7 @@ double AdmissionControlFilterConfig::aggression() const {
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
-      record_request_(true) {}
+      expect_grpc_status_in_trailer_(false), record_request_(true) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // TODO(tonya11en): Ensure we document the fact that healthchecks are ignored.
@@ -122,8 +123,9 @@ AdmissionControlFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 bool AdmissionControlFilter::shouldRejectRequest() const {
-  const double total = config_->getController().requestTotalCount();
-  const double success = config_->getController().requestSuccessCount();
+  const auto request_counts = config_->getController().requestCounts();
+  const double total = request_counts.requests;
+  const double success = request_counts.successes;
   const double probability = (total - config_->aggression() * success) / (total + 1);
 
   // Choosing an accuracy of 4 significant figures for the probability.

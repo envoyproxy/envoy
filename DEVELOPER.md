@@ -30,7 +30,7 @@ Below is a list of additional documentation to aid the development process:
 
 - [Performance testing Envoy with `tcmalloc`/`pprof`](https://github.com/envoyproxy/envoy/blob/master/bazel/PPROF.md)
 
-- [Porting Envoy and common porting issues](https://github.com/envoyproxy/envoy/blob/master/bazel/PORTING.md)
+- [Porting Envoy and common porting issues](https://github.com/envoyproxy/envoy/blob/master/PORTING.md)
 
 And some documents on components of Envoy architecture:
 

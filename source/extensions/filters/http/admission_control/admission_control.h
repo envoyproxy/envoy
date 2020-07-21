@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/http/codes.h"
@@ -49,21 +50,23 @@ using AdmissionControlProto =
 class AdmissionControlFilterConfig {
 public:
   AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-                               TimeSource&, Runtime::RandomGenerator& random, Stats::Scope& scope,
+                               Random::RandomGenerator& random, Stats::Scope& scope,
                                ThreadLocal::SlotPtr&& tls,
                                std::shared_ptr<ResponseEvaluator> response_evaluator);
   virtual ~AdmissionControlFilterConfig() = default;
 
-  virtual ThreadLocalController& getController() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual ThreadLocalController& getController() const {
+    return tls_->getTyped<ThreadLocalControllerImpl>();
+  }
 
-  Runtime::RandomGenerator& random() const { return random_; }
+  Random::RandomGenerator& random() const { return random_; }
   bool filterEnabled() const { return admission_control_feature_.enabled(); }
   Stats::Scope& scope() const { return scope_; }
   double aggression() const;
   ResponseEvaluator& responseEvaluator() const { return *response_evaluator_; }
 
 private:
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   Stats::Scope& scope_;
   const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;

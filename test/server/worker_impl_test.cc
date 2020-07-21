@@ -6,7 +6,9 @@
 #include "server/worker_impl.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/guard_dog.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 

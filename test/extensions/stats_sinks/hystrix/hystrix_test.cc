@@ -5,7 +5,9 @@
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/admin_stream.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -527,7 +529,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
 
   // Check that response_headers has been set correctly
   EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");
-  EXPECT_EQ(response_headers.CacheControl()->value(), "no-cache");
+  EXPECT_EQ(response_headers.get_("cache-control"), "no-cache");
   EXPECT_EQ(response_headers.Connection()->value(), "close");
   EXPECT_EQ(response_headers.get_("access-control-allow-origin"), "*");
   EXPECT_THAT(response_headers.get_("access-control-allow-headers"), HasSubstr("Accept"));

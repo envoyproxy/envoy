@@ -1,4 +1,4 @@
-## Envoy Porting
+# Envoy Porting
 
 * Linux (the original/baseline implementation)
 * Mac OS/X port 
@@ -20,11 +20,11 @@ down to the assembly level;
 
 * [Compiler Explorer](https://godbolt.org/)
 
-Note that each port has its own development channel on envoyproxy slack. For example there
-are champions at `#envoy-windows-dev`, `#envoy-osx-dev` etc. who are happy to answer quick
-questions and support contributors who are encountering architecture-specific CI failures.
-There are also tags for issues and PR's such as `area/windows` which can help to raise
-issues to specific maintainers of these ports.
+Note that each port has its own development channel on (envoyproxy slack)[https://envoyproxy.slack.com/].
+For example there are champions at `#envoy-windows-dev`, `#envoy-osx-dev` etc. who are happy to answer
+quick questions and support contributors who are encountering architecture-specific CI failures. There are
+also tags for issues and PR's such as `area/windows` which can help to raise issues to specific maintainers
+of these ports.
 
 ### General Porting Issues with respect to Microsoft Visual C++ (cl.exe)
 

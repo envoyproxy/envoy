@@ -16,7 +16,7 @@ namespace Http2 {
  * shifting to a new connection if we reach max streams on the primary. This is a base class
  * used for both the prod implementation as well as the testing one.
  */
-class ConnPoolImpl : public Envoy::Http::ConnPoolImplBase {
+class ConnPoolImpl : public Envoy::Http::HttpConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -29,7 +29,7 @@ public:
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
 
   // ConnPoolImplBase
-  ActiveClientPtr instantiateActiveClient() override;
+  Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override;
 
 protected:
   class ActiveClient : public CodecClientCallbacks,
@@ -42,7 +42,6 @@ protected:
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 
     // ConnPoolImpl::ActiveClient
-    bool hasActiveRequests() const override;
     bool closingWithIncompleteRequest() const override;
     RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
@@ -53,14 +52,16 @@ protected:
     }
 
     // Http::ConnectionCallbacks
-    void onGoAway() override { parent().onGoAway(*this); }
+    void onGoAway(Http::GoAwayErrorCode error_code) override {
+      parent().onGoAway(*this, error_code);
+    }
 
     bool closed_with_active_rq_{};
   };
 
   uint64_t maxRequestsPerConnection();
   void movePrimaryClientToDraining();
-  void onGoAway(ActiveClient& client);
+  void onGoAway(ActiveClient& client, Http::GoAwayErrorCode error_code);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
 

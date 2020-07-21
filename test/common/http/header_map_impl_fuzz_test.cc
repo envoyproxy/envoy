@@ -152,12 +152,6 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       header_map = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*header_map);
       break;
     }
-    case test::common::http::Action::kLookup: {
-      const Http::HeaderEntry* header_entry;
-      header_map->lookup(Http::LowerCaseString(replaceInvalidCharacters(action.lookup())),
-                         &header_entry);
-      break;
-    }
     case test::common::http::Action::kRemove: {
       header_map->remove(Http::LowerCaseString(replaceInvalidCharacters(action.remove())));
       break;
@@ -178,20 +172,16 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
     // Exercise some read-only accessors.
     header_map->size();
     header_map->byteSize();
-    header_map->iterate(
-        [](const Http::HeaderEntry& header, void * /*context*/) -> Http::HeaderMap::Iterate {
-          header.key();
-          header.value();
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        nullptr);
-    header_map->iterateReverse(
-        [](const Http::HeaderEntry& header, void * /*context*/) -> Http::HeaderMap::Iterate {
-          header.key();
-          header.value();
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        nullptr);
+    header_map->iterate([](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      header.key();
+      header.value();
+      return Http::HeaderMap::Iterate::Continue;
+    });
+    header_map->iterateReverse([](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      header.key();
+      header.value();
+      return Http::HeaderMap::Iterate::Continue;
+    });
   }
 }
 

@@ -9,7 +9,7 @@
 #include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -35,16 +35,15 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
     auto evaluator = std::make_unique<SuccessCriteriaEvaluator>(proto.success_criteria());
-    return std::make_shared<AdmissionControlFilterConfig>(
-        proto, runtime_, time_system_, random_, scope_, std::move(tls), std::move(evaluator));
+    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, random_, scope_,
+                                                          std::move(tls), std::move(evaluator));
   }
 
 protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl scope_;
-  Event::SimulatedTimeSystem time_system_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
 };
 
 // Verify the configuration when all fields are set.

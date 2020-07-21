@@ -44,6 +44,7 @@ public:
                                    RecvMsgOutput& output) override;
 
   bool supportsMmsg() const override;
+  bool supportsUdpGro() const override;
 
   Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult listen(int backlog) override;
@@ -65,10 +66,10 @@ private:
       return Api::IoCallUint64Result(result.rc_,
                                      Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
     }
-    RELEASE_ASSERT(result.errno_ != EINVAL, "Invalid argument passed in.");
+    RELEASE_ASSERT(result.errno_ != SOCKET_ERROR_INVAL, "Invalid argument passed in.");
     return Api::IoCallUint64Result(
         /*rc=*/0,
-        (result.errno_ == EAGAIN
+        (result.errno_ == SOCKET_ERROR_AGAIN
              // EAGAIN is frequent enough that its memory allocation should be avoided.
              ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)
@@ -77,11 +78,11 @@ private:
 
   os_fd_t fd_;
 
-  // The minimum cmsg buffer size to filled in destination address and packets dropped when
-  // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
-  // addresses.
+  // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
+  // size when receiving a packet. It is possible for a received packet to contain both IPv4
+  // and IPV6 addresses.
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                           CMSG_SPACE(sizeof(struct in6_pktinfo))};
+                           CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
 };
 
 } // namespace Network

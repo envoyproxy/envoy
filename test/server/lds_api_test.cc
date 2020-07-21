@@ -9,18 +9,21 @@
 #include "server/lds_api.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/listener_manager.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 
-using testing::_;
-using testing::InSequence;
-using testing::Invoke;
-using testing::Return;
-using testing::Throw;
+using ::testing::_;
+using ::testing::InSequence;
+using ::testing::Invoke;
+using ::testing::NiceMock;
+using ::testing::Return;
+using ::testing::Throw;
 
 namespace Envoy {
 namespace Server {
@@ -77,15 +80,14 @@ public:
     EXPECT_CALL(listener_manager_, beginListenerUpdate());
   }
 
-  void addListener(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& listeners,
-                   const std::string& listener_name) {
+  envoy::config::listener::v3::Listener buildListener(const std::string& listener_name) {
     envoy::config::listener::v3::Listener listener;
     listener.set_name(listener_name);
     auto socket_address = listener.mutable_address()->mutable_socket_address();
     socket_address->set_address(listener_name);
     socket_address->set_port_value(1);
     listener.add_filter_chains();
-    listeners.Add()->PackFrom(listener);
+    return listener;
   }
 
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> grpc_mux_;
@@ -103,38 +105,11 @@ private:
   std::list<NiceMock<Network::MockListenerConfig>> listeners_;
 };
 
-// Negative test for protoc-gen-validate constraints.
-TEST_F(LdsApiTest, ValidateFail) {
-  InSequence s;
-
-  setup();
-
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
-  envoy::config::listener::v3::Listener listener;
-  listeners.Add()->PackFrom(listener);
-  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
-  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
-  EXPECT_CALL(listener_manager_, beginListenerUpdate());
-  // Validate that the error state is passed to the listener manager.
-  EXPECT_CALL(listener_manager_, endListenerUpdate(_))
-      .WillOnce(Invoke([](ListenerManager::FailureStates&& state) {
-        EXPECT_EQ(1, state.size());
-        EXPECT_EQ("Proto constraint validation failed (ListenerValidationError.Address: "
-                  "[\"value is required\"]): ",
-                  state[0]->details());
-        EXPECT_TRUE(state[0]->has_failed_configuration());
-      }));
-  EXPECT_CALL(init_watcher_, ready());
-
-  EXPECT_THROW(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException);
-}
-
 TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   InSequence s;
 
   setup();
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   // Construct a minimal listener that would pass proto validation.
@@ -153,9 +128,9 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
 
-  listeners.Add()->PackFrom(listener);
+  const auto decoded_resources = TestUtility::decodeResources({listener});
   EXPECT_THROW_WITH_MESSAGE(
-      lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
+      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""), EnvoyException,
       "Error adding/updating listener(s) invalid-listener: something is wrong\n");
 }
 
@@ -164,7 +139,6 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
@@ -174,7 +148,7 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
   ;
   EXPECT_CALL(init_watcher_, ready());
 
-  lds_callbacks_->onConfigUpdate(listeners, "");
+  lds_callbacks_->onConfigUpdate({}, "");
 }
 
 TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
@@ -182,14 +156,13 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   // Add 4 listeners - 2 valid and 2 invalid.
-  addListener(listeners, "valid-listener-1");
-  addListener(listeners, "invalid-listener-1");
-  addListener(listeners, "valid-listener-2");
-  addListener(listeners, "invalid-listener-2");
+  const auto listener_0 = buildListener("valid-listener-1");
+  const auto listener_1 = buildListener("invalid-listener-1");
+  const auto listener_2 = buildListener("valid-listener-2");
+  const auto listener_3 = buildListener("invalid-listener-2");
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
@@ -203,7 +176,10 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
 
   EXPECT_CALL(init_watcher_, ready());
 
-  EXPECT_THROW_WITH_MESSAGE(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
+  const auto decoded_resources =
+      TestUtility::decodeResources({listener_0, listener_1, listener_2, listener_3});
+  EXPECT_THROW_WITH_MESSAGE(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
+                            EnvoyException,
                             "Error adding/updating listener(s) invalid-listener-1: something is "
                             "wrong\ninvalid-listener-2: something else is wrong\n");
 }
@@ -216,9 +192,7 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
-  addListener(listeners, "duplicate_listener");
-  addListener(listeners, "duplicate_listener");
+  const auto listener = buildListener("duplicate_listener");
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
@@ -227,7 +201,9 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
 
-  EXPECT_THROW_WITH_MESSAGE(lds_callbacks_->onConfigUpdate(listeners, ""), EnvoyException,
+  const auto decoded_resources = TestUtility::decodeResources({listener, listener});
+  EXPECT_THROW_WITH_MESSAGE(lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
+                            EnvoyException,
                             "Error adding/updating listener(s) duplicate_listener: duplicate "
                             "listener duplicate_listener found\n");
 }
@@ -264,7 +240,9 @@ TEST_F(LdsApiTest, Basic) {
   expectAdd("listener2", "0", true);
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
-  lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
+  lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -295,7 +273,9 @@ TEST_F(LdsApiTest, Basic) {
   expectAdd("listener1", "1", false);
   expectAdd("listener3", "1", true);
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
-  lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
+  lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
   EXPECT_EQ("1", lds_->versionInfo());
 }
 
@@ -326,7 +306,9 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   expectAdd("listener1", "0", true);
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
-  lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
+  lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -342,7 +324,9 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   makeListenersAndExpectCall({"listener1"});
   EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
-  lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
+  lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
   EXPECT_EQ("1", lds_->versionInfo());
 }
 
@@ -372,7 +356,9 @@ resources:
   expectAdd("listener0", {}, true);
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
-  lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
+  lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 
   std::string response2_basic = R"EOF(
 version_info: '1'
@@ -409,39 +395,10 @@ resources:
   // Can't check version here because of bazel sandbox paths for the certs.
   expectAdd("listener-8080", {}, true);
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
-  EXPECT_NO_THROW(lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info()));
-}
-
-// Validate behavior when the config is delivered but it fails PGV validation.
-TEST_F(LdsApiTest, FailureInvalidConfig) {
-  InSequence s;
-
-  setup();
-
-  // To test the case of valid JSON with invalid config, create a listener with no address.
-  const std::string response1_json = R"EOF(
-{
-  "version_info": "1",
-  "resources": [
-    {
-      "@type": "type.googleapis.com/envoy.api.v2.Listener",
-      "name": "listener1",
-      "filter_chains": [ { "filters": null } ]
-    }
-  ]
-}
-  )EOF";
-  auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
-
-  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
-  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
-  EXPECT_CALL(listener_manager_, beginListenerUpdate());
-  EXPECT_CALL(listener_manager_, endListenerUpdate(_));
-  EXPECT_CALL(init_watcher_, ready());
-  EXPECT_THROW(lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info()),
-               EnvoyException);
-  EXPECT_EQ("", lds_->versionInfo());
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
+  EXPECT_NO_THROW(
+      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
 }
 
 // Validate behavior when the config fails delivery at the subscription level.
@@ -487,7 +444,9 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   expectAdd("listener2", "0", true);
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
   EXPECT_CALL(init_watcher_, ready());
-  lds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
+  lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -518,7 +477,9 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   expectAdd("listener1", "1", false);
   expectAdd("listener3", "1", true);
   EXPECT_CALL(listener_manager_, endListenerUpdate(_));
-  lds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
+  lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info());
 }
 
 } // namespace
