@@ -408,7 +408,6 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2020/02/13  10042    1363         1655   Metadata object are shared across different clusters
   //                                          and hosts.
   // 2020/04/02  10624    1380         1655   Use 100 clusters rather than 1000 to avoid timeouts
-  // 2020/07/21  11823    1381         1800   Adjust to fix CI. Is test flaky with 100 hosts?
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -422,7 +421,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_host, 1381);
+    EXPECT_MEMORY_EQ(m_per_host, 1380);
   }
   EXPECT_MEMORY_LE(m_per_host, 1800); // Round up to allow platform variations.
 }
