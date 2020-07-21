@@ -5,7 +5,7 @@
 #include <csignal>
 
 #include "common/common/assert.h"
-#include "common/common/version.h"
+#include "common/version/version.h"
 
 namespace Envoy {
 
