@@ -18,6 +18,8 @@ namespace TransportSockets {
 namespace Tls {
 namespace {
 
+using ::testing::AtLeast;
+using ::testing::Invoke;
 using ::testing::StrictMock;
 
 // A callback shaped like pem_password_cb.
@@ -161,6 +163,100 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
 
   // In the error case, HandshakerImpl also closes the connection.
   EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+}
+
+class HandshakerWithOutOfProcessComponent : public Ssl::Handshaker {
+ public:
+  void initialize(SSL&) override{};
+
+  Network::PostIoAction doHandshake(
+      Ssl::SocketState &state, SSL*,
+      Ssl::HandshakerCallbacks &callbacks) override {
+    Network::PostIoAction action;
+    auto thread = Thread::threadFactoryForTest().createThread([&] {
+      callbacks.HandBack(out_of_process_component.doHandshake(
+          callbacks.HandOff(), state, callbacks, *transport_socket_callbacks_,
+          action));
+    });
+    thread->join();
+    return action;
+  }
+
+  void setTransportSocketCallbacks(
+      Network::TransportSocketCallbacks &callbacks) override {
+    transport_socket_callbacks_ = &callbacks;
+  }
+
+ private:
+  class OutOfProcessComponent {
+   public:
+    // Accepts and returns a uniqueptr<SSL> by-move.
+    // Mutates |state| and |action| in-place.
+    bssl::UniquePtr<SSL> doHandshake(
+        bssl::UniquePtr<SSL> ssl, Ssl::SocketState &state,
+        Ssl::HandshakerCallbacks &callbacks,
+        Network::TransportSocketCallbacks &transport_socket_callbacks,
+        Network::PostIoAction &action) {
+      int rc = SSL_do_handshake(ssl.get());
+      if (rc == 1) {
+        state = Ssl::SocketState::HandshakeComplete;
+        callbacks.OnSuccessCb(ssl.get());
+        transport_socket_callbacks.raiseEvent(
+            Network::ConnectionEvent::Connected);
+        action = Network::PostIoAction::Close;
+      } else {
+        int err = SSL_get_error(ssl.get(), rc);
+        switch (err) {
+          case SSL_ERROR_WANT_READ:
+          case SSL_ERROR_WANT_WRITE:
+            action = Network::PostIoAction::KeepOpen;
+            break;
+          default:
+            callbacks.OnFailureCb();
+            action = Network::PostIoAction::Close;
+        }
+      }
+      return ssl;
+    }
+  };
+
+  OutOfProcessComponent out_of_process_component;
+  Network::TransportSocketCallbacks *transport_socket_callbacks_{};
+};
+
+TEST_F(HandshakerTest, NormalOperationWithHandshakerWithOutOfProcessComponent) {
+  Network::MockTransportSocketCallbacks transport_socket_callbacks;
+  EXPECT_CALL(transport_socket_callbacks,
+              raiseEvent(Network::ConnectionEvent::Connected))
+      .Times(1);
+
+  HandshakerWithOutOfProcessComponent handshaker;
+  handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
+
+  StrictMock<MockHandshakerCallbacks> callbacks;
+  EXPECT_CALL(callbacks, OnSuccessCb).Times(1);
+  EXPECT_CALL(callbacks, HandOff)
+      .Times(AtLeast(1))
+      .WillRepeatedly(Invoke([this]() -> bssl::UniquePtr<SSL> {
+        return std::move(this->server_ssl_);
+      }));
+  EXPECT_CALL(callbacks, HandBack)
+      .Times(AtLeast(1))
+      .WillRepeatedly([this](bssl::UniquePtr<SSL> ssl) {
+        this->server_ssl_ = std::move(ssl);
+      });
+
+  auto socket_state = Ssl::SocketState::PreHandshake;
+  auto post_io_action = Network::PostIoAction::KeepOpen;  // default enum
+
+  while (post_io_action != Network::PostIoAction::Close) {
+    SSL_do_handshake(client_ssl_.get());
+    post_io_action =
+        handshaker.doHandshake(socket_state, server_ssl_.get(), callbacks);
+  }
+
+  EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+  EXPECT_EQ(socket_state, Ssl::SocketState::HandshakeComplete);
 }
 
 } // namespace
