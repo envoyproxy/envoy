@@ -80,7 +80,6 @@ public:
    */
   virtual Ssl::HandshakerPtr createHandshaker() const PURE;
 
-
   /**
    * @return the handshaker factory for attribute evaluation.
    */
