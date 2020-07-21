@@ -46,9 +46,6 @@ public:
   }
 
   UdpPacketWriter* udpPacketWriter() override { return udp_packet_writer_.get(); }
-  UdpPacketWriterFactory* udpPacketWriterFactory() override {
-    return listener_config_.udpPacketWriterFactory();
-  }
 
 protected:
   void handleWriteCallback();
@@ -63,7 +60,6 @@ private:
   TimeSource& time_source_;
   Event::FileEventPtr file_event_;
   UdpPacketWriterPtr udp_packet_writer_;
-  ListenerConfig& listener_config_;
 };
 
 } // namespace Network

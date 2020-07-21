@@ -1,8 +1,6 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
-#include "common/network/udp_packet_writer_handler_impl.h"
-
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/network/io_handle.h"
@@ -134,13 +132,6 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, config);
     config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
                                                      config);
-
-    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
-        .WillByDefault(Invoke(
-            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
-              return std::make_unique<Network::UdpDefaultWriter>(io_handle, scope);
-            }));
-
     EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),
                         ReturnNew<Upstream::MockClusterUpdateCallbacksHandle>()));
@@ -166,15 +157,12 @@ public:
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
-
     EXPECT_CALL(*filter_, createIoHandle(_))
         .WillOnce(Return(ByMove(Network::IoHandlePtr{test_sessions_.back().io_handle_})));
     EXPECT_CALL(*new_session.io_handle_, fd());
     EXPECT_CALL(callbacks_.udp_listener_.dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge, Event::FileReadyType::Read))
         .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
-    EXPECT_CALL(callbacks_.udp_listener_, udpPacketWriterFactory())
-        .WillOnce(Return(&udp_packet_writer_factory_));
   }
 
   void checkTransferStats(uint64_t rx_bytes, uint64_t rx_datagrams, uint64_t tx_bytes,
@@ -190,7 +178,6 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   UdpProxyFilterConfigSharedPtr config_;
   Network::MockUdpReadFilterCallbacks callbacks_;
-  NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;

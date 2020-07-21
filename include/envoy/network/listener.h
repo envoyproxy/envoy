@@ -317,11 +317,6 @@ public:
    * @return udp_packet_writer_
    * */
   virtual Network::UdpPacketWriter* udpPacketWriter() PURE;
-
-  /**
-   * @return factory to create new udp_packet_writers
-   * */
-  virtual Network::UdpPacketWriterFactory* udpPacketWriterFactory() PURE;
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
