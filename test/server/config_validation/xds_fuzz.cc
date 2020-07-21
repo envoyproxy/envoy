@@ -304,8 +304,7 @@ void XdsFuzzTest::replay() {
 void XdsFuzzTest::verifyListeners() {
   ENVOY_LOG_MISC(debug, "Verifying listeners");
   const auto& abstract_rep = verifier_.listeners();
-  Protobuf::RepeatedPtrField<envoy::admin::v3::ListenersConfigDump::DynamicListener> dump =
-      getListenersConfigDump().dynamic_listeners();
+  const auto dump = getListenersConfigDump().dynamic_listeners();
 
   for (auto& rep : abstract_rep) {
     ENVOY_LOG_MISC(debug, "Verifying {} with state {}", rep.listener.name(), rep.state);
