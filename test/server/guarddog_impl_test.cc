@@ -20,6 +20,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <vector>
 
 using testing::InSequence;
 using testing::NiceMock;
@@ -90,8 +91,8 @@ INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogTestBase,
 class GuardDogDeathTest : public GuardDogTestBase {
 protected:
   GuardDogDeathTest()
-      : config_kill_(1000, 1000, 100, 1000, 0), config_multikill_(1000, 1000, 1000, 500, 0),
-        config_multikill_threshold_(1000, 1000, 1000, 500, 60) {}
+      : config_kill_(1000, 1000, 100, 1000, 0, actions_), config_multikill_(1000, 1000, 1000, 500, 0, actions_),
+        config_multikill_threshold_(1000, 1000, 1000, 500, 60, actions_) {}
 
   /**
    * This does everything but the final forceCheckForTest() that should cause
@@ -148,7 +149,8 @@ protected:
 
     time_system_->advanceTimeWait(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
   }
-
+  
+  std::vector<std::string> actions_;
   NiceMock<Configuration::MockMain> config_kill_;
   NiceMock<Configuration::MockMain> config_multikill_;
   NiceMock<Configuration::MockMain> config_multikill_threshold_;
@@ -255,7 +257,7 @@ TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
 
 class GuardDogMissTest : public GuardDogTestBase {
 protected:
-  GuardDogMissTest() : config_miss_(500, 1000, 0, 0, 0), config_mega_(1000, 500, 0, 0, 0) {}
+  GuardDogMissTest() : config_miss_(500, 1000, 0, 0, 0, actions_), config_mega_(1000, 500, 0, 0, 0, actions_) {}
 
   void checkMiss(uint64_t count, const std::string& descriptor) {
     EXPECT_EQ(count, TestUtility::findCounter(stats_store_, "server.watchdog_miss")->value())
@@ -274,6 +276,7 @@ protected:
         << descriptor;
   }
 
+  std::vector<std::string> actions_;
   NiceMock<Configuration::MockMain> config_miss_;
   NiceMock<Configuration::MockMain> config_mega_;
 };
@@ -375,27 +378,31 @@ TEST_P(GuardDogMissTest, MissCountTest) {
 
 TEST_P(GuardDogTestBase, StartStopTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(0, 0, 0, 0, 0);
+  std::vector<std::string> actions;
+  NiceMock<Configuration::MockMain> config(0, 0, 0, 0, 0, actions);
   initGuardDog(stats, config);
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(40, 50, 0, 0, 0);
+  std::vector<std::string> actions;
+  NiceMock<Configuration::MockMain> config(40, 50, 0, 0, 0, actions);
   initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(40));
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0);
+  std::vector<std::string> actions;
+  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0, actions);
   initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(90));
 }
 
 TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0);
+  std::vector<std::string> actions;
+  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0, actions);
   initGuardDog(stats, config);
   auto watched_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");

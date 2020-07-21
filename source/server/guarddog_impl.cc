@@ -7,9 +7,12 @@
 #include <utility>
 #include <vector>
 
+#include "common/common/logger.h"
+#include "common/config/utility.h"
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/server/guarddog.h"
+#include "envoy/server/guarddog_config.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -46,12 +49,29 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_megamiss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
               .statName())),
-      event_to_callbacks_({
-        {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL, {}},
-        {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL, {}},
-        {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS, {}},
-        {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS, {}},
-      }),
+      event_to_callbacks_([](const Server::Configuration::Main& config) -> EventToCallbackMap {
+        EventToCallbackMap map = {
+          {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL, {}},
+          {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL, {}},
+          {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS, {}},
+          {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS, {}},
+        };
+
+        Configuration::GuardDogActionFactoryContext context;
+        
+        const auto& actions = config.wdActions();
+        for(const auto& action : actions) {
+          if(action.event() == WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_UNKNOWN) {
+            ENVOY_LOG_MISC(error, "WatchDogAction specified with UNKNOWN event");
+          } else {
+            // Get factory and add the created cb
+            auto& factory = Config::Utility::getAndCheckFactoryByName<Configuration::GuardDogActionFactory>(action.name());
+            map[action.event()].push_back(factory.createGuardDogActionFromProto(action, context));
+          }
+        }
+
+        return map;
+      }(config)),
       dispatcher_(api.allocateDispatcher("guarddog_thread")),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
   start(api);
