@@ -293,7 +293,8 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
 }
 
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) {
-  // We retry our own rate limited requests only when the envoy-ratelimited policy is in effect.
+  // A response that contains the x-envoy-ratelimited header comes from an upstream envoy.
+  // We retry these only when the envoy-ratelimited policy is in effect.
   if (response_headers.EnvoyRateLimited() != nullptr) {
     return retry_on_ & RetryPolicy::RETRY_ON_ENVOY_RATE_LIMITED;
   }
