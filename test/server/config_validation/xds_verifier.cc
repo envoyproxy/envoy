@@ -32,8 +32,23 @@ bool XdsVerifier::hasRoute(const envoy::config::listener::v3::Listener& listener
   return all_routes_.contains(getRoute(listener));
 }
 
+bool XdsVerifier::hasRoute(const std::string& name) {
+  return all_routes_.contains(name);
+}
+
 bool XdsVerifier::hasActiveRoute(const envoy::config::listener::v3::Listener& listener) {
   return active_routes_.contains(getRoute(listener));
+}
+
+bool XdsVerifier::hasActiveRoute(const std::string& name) {
+  return active_routes_.contains(name);
+}
+
+bool XdsVerifier::hasListener(const std::string& name,
+                              ListenerState state) {
+  return std::any_of(listeners_.begin(), listeners_.end(), [&](const auto& rep) {
+    return rep.listener.name() == name && state == rep.state;
+  });
 }
 
 /**
