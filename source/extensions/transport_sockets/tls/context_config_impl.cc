@@ -178,7 +178,8 @@ ContextConfigImpl::ContextConfigImpl(
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
-                                                default_max_protocol_version)) {
+                                                default_max_protocol_version)),
+      handshaker_factory_(*HandshakerFactoryImpl::getDefaultHandshakerFactory()) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -217,11 +218,10 @@ ContextConfigImpl::ContextConfigImpl(
   if (config.has_custom_listener_handshaker()) {
     auto& handshaker_config = config.custom_listener_handshaker().typed_config();
     handshaker_factory_ =
-        &Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
-    handshaker_factory_->setConfig(
-        Config::Utility::translateAnyToFactoryConfig(
-            handshaker_config.typed_config(), factory_context.messageValidationVisitor(),
-            *handshaker_factory_));
+        Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
+    handshaker_factory_.setConfig(Config::Utility::translateAnyToFactoryConfig(
+        handshaker_config.typed_config(), factory_context.messageValidationVisitor(),
+        handshaker_factory_));
   }
 }
 
@@ -235,12 +235,8 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
 }
 
 Ssl::HandshakerPtr ContextConfigImpl::createHandshaker() const {
-  if (handshaker_factory_ == nullptr) {
-    return std::make_unique<HandshakerImpl>();
-  } else {
-    HandshakerFactoryContextImpl context(api_, alpnProtocols());
-    return handshaker_factory_->createHandshaker(context);
-  }
+  HandshakerFactoryContextImpl context(api_, alpnProtocols());
+  return handshaker_factory_.createHandshaker(context);
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {

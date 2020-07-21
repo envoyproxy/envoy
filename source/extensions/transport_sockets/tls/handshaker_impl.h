@@ -47,6 +47,26 @@ private:
   const std::string alpn_protocols_;
 };
 
+class HandshakerFactoryImpl : public Ssl::HandshakerFactory {
+public:
+  std::string name() const override { return "envoy.default_tls_handshaker"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  Ssl::HandshakerPtr createHandshaker(Ssl::HandshakerFactoryContext&) override {
+    return std::make_unique<HandshakerImpl>();
+  }
+
+  void setConfig(ProtobufTypes::MessagePtr) override {}
+
+  static HandshakerFactory* getDefaultHandshakerFactory() {
+    static HandshakerFactoryImpl default_handshaker_factory;
+    return &default_handshaker_factory;
+  }
+};
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

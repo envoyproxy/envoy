@@ -99,8 +99,7 @@ private:
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 
-  // Ptr to HandshakerFactory. If nullptr, uses default Handshaker impl.
-  Ssl::HandshakerFactory* handshaker_factory_{};
+  Ssl::HandshakerFactory& handshaker_factory_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
