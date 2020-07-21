@@ -1,5 +1,7 @@
 #include "server/guarddog_impl.h"
 
+#include <sys/types.h>
+
 #include <chrono>
 #include <memory>
 
@@ -23,6 +25,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       time_source_(api.timeSource()), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
+      multi_kill_fraction_(config.wdMultiKillThreshold() / 100.0),
       loop_interval_([&]() -> std::chrono::milliseconds {
         // The loop interval is simply the minimum of all specified intervals,
         // but we must account for the 0=disabled case. This lambda takes care
@@ -60,8 +63,14 @@ void GuardDogImpl::step() {
   const auto now = time_source_.monotonicTime();
 
   {
-    bool seen_one_multi_timeout(false);
+    size_t multi_kill_count = 0;
     Thread::LockGuard guard(wd_lock_);
+
+    // Compute the multikill threshold
+    const size_t required_for_multi_kill =
+        std::max(static_cast<size_t>(2),
+                 static_cast<size_t>(ceil(multi_kill_fraction_ * watched_dogs_.size())));
+
     for (auto& watched_dog : watched_dogs_) {
       const auto ltt = watched_dog->dog_->lastTouchTime();
       const auto delta = now - ltt;
@@ -90,13 +99,10 @@ void GuardDogImpl::step() {
                           watched_dog->dog_->threadId().debugString()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
-        if (seen_one_multi_timeout) {
-
-          PANIC(fmt::format(
-              "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
-              watched_dog->dog_->threadId().debugString()));
-        } else {
-          seen_one_multi_timeout = true;
+        if (++multi_kill_count >= required_for_multi_kill) {
+          PANIC(fmt::format("GuardDog: At least {} threads ({},...) stuck for more than "
+                            "watchdog_multikill_timeout",
+                            multi_kill_count, watched_dog->dog_->threadId().debugString()));
         }
       }
     }
