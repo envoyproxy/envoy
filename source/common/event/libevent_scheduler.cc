@@ -15,7 +15,7 @@ void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
 }
 } // namespace
 
-LibeventScheduler::LibeventScheduler(){
+LibeventScheduler::LibeventScheduler() {
   auto eventBase = event_base_new();
   RELEASE_ASSERT(eventBase != nullptr, "Failed to initialize libevent event_base");
   libevent_ = Libevent::BasePtr(eventBase);
