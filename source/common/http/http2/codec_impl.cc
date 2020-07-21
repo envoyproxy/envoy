@@ -28,17 +28,23 @@ namespace Http {
 namespace Http2 {
 
 class Http2ResponseCodeDetailValues {
+ public:
   // Invalid HTTP header field was received and stream is going to be
   // closed.
   const absl::string_view ng_http2_err_http_header_ = "http2.invalid.header.field";
-
   // Violation in HTTP messaging rule.
   const absl::string_view ng_http2_err_http_messaging_ = "http2.violation.of.messaging.rule";
-
   // none of the above
   const absl::string_view ng_http2_err_unknown_ = "http2.unknown.nghttp2.error";
+  // The number of headers (or trailers) exceeded the configured limits
+  const absl::string_view too_many_headers = "http2.too_many_headers";
+  // Envoy detected an HTTP/2 frame flood from the server.
+  const absl::string_view outbound_frame_flood = "http2.outbound_frame_flood";
+  // Envoy detected an inbound HTTP/2 frame flood.
+  const absl::string_view inbound_frame_flood = "http2.inbound_frame_flood";
+  // Envoy was configured to drop requests with header keys begining with underscores.
+  const absl::string_view invalid_underscore = "http2.unexpected_underscore";
 
-public:
   const absl::string_view errorDetails(int error_code) const {
     switch (error_code) {
     case NGHTTP2_ERR_HTTP_HEADER:
@@ -369,6 +375,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
   if (!parent_.addOutboundFrameFragment(output, framehd, FRAME_HEADER_SIZE)) {
     ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
                    parent_.connection_);
+    setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
     return NGHTTP2_ERR_FLOODED;
   }
 
@@ -590,6 +597,10 @@ int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().
   if (hd->type != NGHTTP2_HEADERS && hd->type != NGHTTP2_DATA) {
     if (!trackInboundFrames(hd, 0)) {
+      StreamImpl* stream = getStream(hd->stream_id);
+      if (stream != nullptr) {
+        stream->setDetails(Http2ResponseCodeDetails::get().inbound_frame_flood);
+      }
       return NGHTTP2_ERR_FLOODED;
     }
   }
@@ -617,6 +628,10 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
   if (frame->hd.type == NGHTTP2_DATA) {
     if (!trackInboundFrames(&frame->hd, frame->data.padlen)) {
+      StreamImpl* stream = getStream(frame->hd.stream_id);
+      if (stream != nullptr) {
+        stream->setDetails(Http2ResponseCodeDetails::get().inbound_frame_flood);
+      }
       return NGHTTP2_ERR_FLOODED;
     }
   }
@@ -947,6 +962,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
 
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
+    stream->setDetails(Http2ResponseCodeDetails::get().invalid_underscore);
     name.clear();
     value.clear();
     return should_return.value();
@@ -956,8 +972,9 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
 
   if (stream->headers().byteSize() > max_headers_kb_ * 1024 ||
       stream->headers().size() > max_headers_count_) {
-    // This will cause the library to reset/close the stream.
+    stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
+    // This will cause the library to reset/close the stream.
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
   } else {
     return 0;
@@ -1300,6 +1317,10 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
 
   if (!trackInboundFrames(&frame->hd, frame->headers.padlen)) {
+    StreamImpl* stream = getStream(frame->hd.stream_id);
+    if (stream) {
+      stream->setDetails(Http2ResponseCodeDetails::get().inbound_frame_flood);
+    }
     return NGHTTP2_ERR_FLOODED;
   }
 
