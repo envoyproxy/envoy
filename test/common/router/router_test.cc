@@ -6561,7 +6561,7 @@ public:
 };
 
 TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestHeaders) {
-  test_time_.setSystemTime(std::chrono::milliseconds(2000));
+  test_time_.setSystemTime(std::chrono::seconds(2));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -6582,7 +6582,7 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestHeaders) {
 
 // Validate that the date header is updated on each retry (in addition to the original request).
 TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestRetryHeaders) {
-  test_time_.setSystemTime(std::chrono::milliseconds(2000));
+  test_time_.setSystemTime(std::chrono::seconds(2));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
@@ -6619,7 +6619,7 @@ TEST_F(RouterTestRequestDateHeader, AddsDateHeaderToRequestRetryHeaders) {
   router_.retry_state_->expectHeadersRetry();
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
 
-  test_time_.setSystemTime(std::chrono::milliseconds(4000));
+  test_time_.setSystemTime(std::chrono::seconds(4));
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))

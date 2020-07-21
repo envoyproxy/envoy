@@ -24,7 +24,7 @@ public:
 
 TEST(SlowDateProviderImplTest, RequestHeaders) {
   MockTimeSource time_source;
-  SystemTime time_point{SystemTime::duration(2000000)};
+  SystemTime time_point{std::chrono::seconds(2)};
   EXPECT_CALL(time_source, systemTime()).WillOnce(Return(time_point));
 
   SlowDateProviderImpl provider(time_source);
@@ -37,7 +37,7 @@ TEST(SlowDateProviderImplTest, RequestHeaders) {
 
 TEST(SlowDateProviderImplTest, ResponseHeaders) {
   MockTimeSource time_source;
-  SystemTime time_point{SystemTime::duration(2000000)};
+  SystemTime time_point{std::chrono::seconds(2)};
   EXPECT_CALL(time_source, systemTime()).WillOnce(Return(time_point));
 
   SlowDateProviderImpl provider(time_source);
