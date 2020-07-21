@@ -2,9 +2,9 @@
 // This is an Envoy driver for benchmarks.
 #include "test/benchmark/main.h"
 
-#include "test/test_common/environment.h"
-
 #include "common/common/logger.h"
+
+#include "test/test_common/environment.h"
 
 #include "benchmark/benchmark.h"
 #include "tclap/CmdLine.h"
