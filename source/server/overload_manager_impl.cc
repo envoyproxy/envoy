@@ -10,6 +10,7 @@
 
 #include "server/resource_monitor_config_impl.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -51,7 +52,7 @@ public:
   void setState(const std::string& action, OverloadActionState state) { actions_[action] = state; }
 
 private:
-  std::unordered_map<std::string, OverloadActionState> actions_;
+  absl::node_hash_map<std::string, OverloadActionState> actions_;
 };
 
 Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
