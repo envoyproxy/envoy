@@ -36,10 +36,10 @@ class AuthenticatorTest : public testing::Test {
 public:
   void SetUp() override {
     TestUtility::loadFromYaml(ExampleConfig, proto_config_);
-    CreateAuthenticator();
+    createAuthenticator();
   }
 
-  void CreateAuthenticator(
+  void createAuthenticator(
       ::google::jwt_verify::CheckAudience* check_audience = nullptr,
       const absl::optional<std::string>& provider = absl::make_optional<std::string>(ProviderName),
       bool allow_failed = false, bool allow_missing = false) {
@@ -115,7 +115,7 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
 TEST_F(AuthenticatorTest, TestForwardJwt) {
   // Config forward_jwt flag
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_forward(true);
-  CreateAuthenticator();
+  createAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
@@ -139,7 +139,7 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
   // Config payload_in_metadata flag
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
       "my_payload");
-  CreateAuthenticator();
+  createAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
@@ -225,7 +225,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTAllGood) {
 
 // Test multiple tokens; one of them is bad and allow_failed, verification is ok.
 TEST_F(AuthenticatorTest, TestMultipleJWTOneBadAllowFails) {
-  CreateAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/true, /*all_missing=*/false);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(1);
 
@@ -240,7 +240,7 @@ TEST_F(AuthenticatorTest, TestMultipleJWTOneBadAllowFails) {
 
 // Test empty header and allow_missing, verification is ok.
 TEST_F(AuthenticatorTest, TestAllowMissingWithEmptyHeader) {
-  CreateAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
                       /*allow_failed=*/false, /*all_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
@@ -299,7 +299,7 @@ TEST_F(AuthenticatorTest, TestInvalidLocalJwks) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.clear_remote_jwks();
   provider.mutable_local_jwks()->set_inline_string("invalid");
-  CreateAuthenticator();
+  createAuthenticator();
 
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
@@ -320,7 +320,7 @@ TEST_F(AuthenticatorTest, TestNonMatchAudJWT) {
 TEST_F(AuthenticatorTest, TestIssuerNotFound) {
   // Create a config with an other issuer.
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_issuer("other_issuer");
-  CreateAuthenticator();
+  createAuthenticator();
 
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _)).Times(0);
 
@@ -368,7 +368,7 @@ TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // In this config, there is no forward_payload_header
   auto& provider0 = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider0.clear_forward_payload_header();
-  CreateAuthenticator();
+  createAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
@@ -393,7 +393,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
     header->set_value_prefix("Bearer ");
   }
 
-  CreateAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
+  createAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
@@ -440,7 +440,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   header->set_name("other-auth");
   header->set_value_prefix("Bearer ");
 
-  CreateAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
+  createAuthenticator(nullptr, absl::nullopt, /*allow_failed=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .Times(2)
       .WillRepeatedly(Invoke([](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
@@ -467,7 +467,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
 TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
   auto check_audience = std::make_unique<::google::jwt_verify::CheckAudience>(
       std::vector<std::string>{"invalid_service"});
-  CreateAuthenticator(check_audience.get());
+  createAuthenticator(check_audience.get());
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
