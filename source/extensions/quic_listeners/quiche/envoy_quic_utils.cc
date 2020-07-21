@@ -21,12 +21,11 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
                                                      false)
              : nullptr;
 }
-
+// TODO(yugant): Do something here
 quic::QuicIpAddress envoyAddressIpToQuicIpAddress(const Network::Address::Ip* envoy_ip) {
   ASSERT(envoy_ip != nullptr);
   uint32_t port = envoy_ip->port();
   sockaddr_storage ss;
-
   if (envoy_ip->version() == Network::Address::IpVersion::v4) {
     // Create and return quic ipv4 address
     auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
@@ -46,19 +45,17 @@ quic::QuicIpAddress envoyAddressIpToQuicIpAddress(const Network::Address::Ip* en
   return quic::QuicIpAddress(ipv6_addr->sin6_addr);
 }
 
-// TODO(yugant): Here do as fn(Addr::Instance) and wrappers with Ip,
-// InstanceConstSharedPtr to replace it
-quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
-    const Network::Address::InstanceConstSharedPtr& envoy_address) {
-  ASSERT(envoy_address != nullptr && envoy_address->type() == Network::Address::Type::Ip);
-  uint32_t port = envoy_address->ip()->port();
+quic::QuicSocketAddress
+envoyAddressToQuicSocketAddress(const Network::Address::Instance& envoy_address) {
+  ASSERT(envoy_address.type() == Network::Address::Type::Ip);
+  uint32_t port = envoy_address.ip()->port();
   sockaddr_storage ss;
-  if (envoy_address->ip()->version() == Network::Address::IpVersion::v4) {
+  if (envoy_address.ip()->version() == Network::Address::IpVersion::v4) {
     auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
     memset(ipv4_addr, 0, sizeof(sockaddr_in));
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_port = htons(port);
-    ipv4_addr->sin_addr.s_addr = envoy_address->ip()->ipv4()->address();
+    ipv4_addr->sin_addr.s_addr = envoy_address.ip()->ipv4()->address();
   } else {
     auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
     memset(ipv6_addr, 0, sizeof(sockaddr_in6));
@@ -66,9 +63,17 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
     ipv6_addr->sin6_port = htons(port);
     ASSERT(sizeof(ipv6_addr->sin6_addr.s6_addr) == 16u);
     *reinterpret_cast<absl::uint128*>(ipv6_addr->sin6_addr.s6_addr) =
-        envoy_address->ip()->ipv6()->address();
+        envoy_address.ip()->ipv6()->address();
   }
   return quic::QuicSocketAddress(ss);
+}
+
+// TODO(yugant): Here do as fn(Addr::Instance) and wrappers with Ip,
+// InstanceConstSharedPtr to replace it
+quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
+    const Network::Address::InstanceConstSharedPtr& envoy_address) {
+  ASSERT(envoy_address != nullptr);
+  return envoyAddressToQuicSocketAddress(*envoy_address);
 }
 
 spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {

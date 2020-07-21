@@ -7,9 +7,23 @@
 #include "envoy/buffer/buffer.h"   // Buffer
 #include "envoy/network/address.h" // Address
 #include "envoy/network/socket.h"  // Socket
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 namespace Envoy {
 namespace Network {
+
+#define UDP_PACKET_WRITER_STATS(GAUGE)                                                             \
+  GAUGE(internal_buffer_size, NeverImport)                                                         \
+  GAUGE(last_buffered_msg_size, NeverImport)                                                       \
+  GAUGE(sent_bytes, NeverImport)
+
+/**
+ * Wrapper struct for udp packet writer stats. @see stats_macros.h
+ */
+struct UdpPacketWriterStats {
+  UDP_PACKET_WRITER_STATS(GENERATE_GAUGE_STRUCT)
+};
 
 class UdpPacketWriter {
 public:
@@ -67,6 +81,9 @@ public:
 
   // Returns the ioHandle associated with the udp_packet_writer
   virtual Network::IoHandle& getWriterIoHandle() const PURE;
+
+  // Returns stats for udp packet writer handler
+  virtual UdpPacketWriterStats getUdpPacketWriterStats() PURE;
 };
 
 using UdpPacketWriterPtr = std::unique_ptr<UdpPacketWriter>;
@@ -80,7 +97,8 @@ public:
    * @param socket UDP socket used to send packets.
    * @return the UdpPacketWriter created.
    */
-  virtual UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle) PURE;
+  virtual UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
+                                                   Stats::Scope& scope) PURE;
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;

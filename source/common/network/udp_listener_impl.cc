@@ -45,9 +45,10 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
                                               socket_->localAddress()->asString()));
   }
-
+  // Can be used here config.listenerScope();
   // Create udp_packet_writer
-  udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(socket_->ioHandle());
+  udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(
+      socket_->ioHandle(), config.listenerScope());
 }
 
 UdpListenerImpl::~UdpListenerImpl() {

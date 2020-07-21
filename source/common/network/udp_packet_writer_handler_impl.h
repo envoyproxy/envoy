@@ -11,7 +11,7 @@ namespace Network {
 
 class UdpDefaultWriter : public UdpPacketWriter {
 public:
-  UdpDefaultWriter(Network::IoHandle& io_handle);
+  UdpDefaultWriter(Network::IoHandle& io_handle, Stats::Scope& scope);
 
   ~UdpDefaultWriter() override;
 
@@ -39,9 +39,13 @@ public:
   std::string name() const override;
   Network::IoHandle& getWriterIoHandle() const override;
 
+  Network::UdpPacketWriterStats getUdpPacketWriterStats() override { return stats_; }
+  Network::UdpPacketWriterStats generateStats(Stats::Scope& scope);
+
 private:
   bool write_blocked_;
   Network::IoHandle& io_handle_;
+  Network::UdpPacketWriterStats stats_;
 };
 
 } // namespace Network

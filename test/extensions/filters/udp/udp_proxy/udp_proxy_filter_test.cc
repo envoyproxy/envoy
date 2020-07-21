@@ -135,10 +135,11 @@ public:
     config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
                                                      config);
 
-    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_))
-        .WillByDefault(Invoke([&](Network::IoHandle& io_handle) -> Network::UdpPacketWriterPtr {
-          return std::make_unique<Network::UdpDefaultWriter>(io_handle);
-        }));
+    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
+        .WillByDefault(Invoke(
+            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
+              return std::make_unique<Network::UdpDefaultWriter>(io_handle, scope);
+            }));
 
     EXPECT_CALL(cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&cluster_update_callbacks_),

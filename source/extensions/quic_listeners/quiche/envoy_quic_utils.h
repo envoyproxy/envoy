@@ -37,6 +37,9 @@ quic::QuicIpAddress envoyAddressIpToQuicIpAddress(const Network::Address::Ip* en
 quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
     const Network::Address::InstanceConstSharedPtr& envoy_address);
 
+quic::QuicSocketAddress
+envoyAddressToQuicSocketAddress(const Network::Address::Instance& envoy_address);
+
 // The returned header map has all keys in lower case.
 template <class T>
 std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {

@@ -11,8 +11,9 @@
 namespace Envoy {
 namespace Network {
 
-UdpPacketWriterPtr UdpDefaultWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle) {
-  return std::make_unique<UdpDefaultWriter>(io_handle);
+UdpPacketWriterPtr UdpDefaultWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle,
+                                                                  Stats::Scope& scope) {
+  return std::make_unique<UdpDefaultWriter>(io_handle, scope);
 }
 
 ProtobufTypes::MessagePtr UdpDefaultWriterConfigFactory::createEmptyConfigProto() {

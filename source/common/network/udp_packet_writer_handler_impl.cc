@@ -7,8 +7,8 @@
 namespace Envoy {
 namespace Network {
 
-UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle)
-    : write_blocked_(false), io_handle_(io_handle) {
+UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle, Stats::Scope& scope)
+    : write_blocked_(false), io_handle_(io_handle), stats_(generateStats(scope)) {
   // Just set the socket and write_blocked_ in the constructor
 }
 
@@ -28,6 +28,9 @@ Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& bu
       write_blocked_ = true;
     }
 
+    // Update Stats
+    stats_.sent_bytes_.set(result.rc_);
+
     return result;
   }
   // Otherwise Return Blocked
@@ -39,6 +42,10 @@ Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& bu
 }
 
 std::string UdpDefaultWriter::name() const { return UdpWriterNames::get().DefaultWriter; }
+
+Network::UdpPacketWriterStats UdpDefaultWriter::generateStats(Stats::Scope& scope) {
+  return {UDP_PACKET_WRITER_STATS(POOL_GAUGE(scope))};
+}
 
 Network::IoHandle& UdpDefaultWriter::getWriterIoHandle() const { return io_handle_; }
 

@@ -352,3 +352,27 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "udp_listener_impl_batch_writer_test",
+    srcs = ["udp_listener_impl_batch_writer_test.cc"],
+    tags = ["fails_on_windows"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:listener_lib",
+        "//source/common/network:socket_option_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/extensions/quic_listeners/quiche:udp_gso_batch_writer_lib",
+        "//test/common/network:listener_impl_test_base_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)

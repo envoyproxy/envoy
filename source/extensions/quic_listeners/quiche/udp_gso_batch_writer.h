@@ -26,7 +26,7 @@ const std::string GsoBatchWriterName{"udp_gso_batch_writer"};
 
 class UdpGsoBatchWriter : public quic::QuicGsoBatchWriter, public Network::UdpPacketWriter {
 public:
-  UdpGsoBatchWriter(Network::IoHandle& io_handle);
+  UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope);
 
   ~UdpGsoBatchWriter() override;
 
@@ -46,17 +46,22 @@ public:
   Api::IoCallUint64Result flush() override;
 
   std::string name() const override { return GsoBatchWriterName; }
-  Network::IoHandle& getWriterIoHandle const override;
+  Network::IoHandle& getWriterIoHandle() const override;
+
+  Network::UdpPacketWriterStats getUdpPacketWriterStats() override { return stats_; }
+  Network::UdpPacketWriterStats generateStats(Stats::Scope& scope);
 
 private:
   Network::IoHandle& io_handle_;
+  Network::UdpPacketWriterStats stats_;
 };
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {
 public:
   UdpGsoBatchWriterFactory();
 
-  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle);
+  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
+                                                    Stats::Scope& scope);
 
 private:
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;

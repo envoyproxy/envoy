@@ -114,12 +114,13 @@ protected:
     // Use UdpDefaultWriter to perform non-batched writes for the purpose of this test
     ON_CALL(listener_config_, udpPacketWriterFactory())
         .WillByDefault(Return(&udp_packet_writer_factory_));
-    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_))
-        .WillByDefault(Invoke([&](Network::IoHandle& io_handle) -> Network::UdpPacketWriterPtr {
-          Network::UdpPacketWriterPtr udp_packet_writer =
-              std::make_unique<Network::UdpDefaultWriter>(io_handle);
-          return udp_packet_writer;
-        }));
+    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
+        .WillByDefault(Invoke(
+            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
+              Network::UdpPacketWriterPtr udp_packet_writer =
+                  std::make_unique<Network::UdpDefaultWriter>(io_handle, scope);
+              return udp_packet_writer;
+            }));
 
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager_));
