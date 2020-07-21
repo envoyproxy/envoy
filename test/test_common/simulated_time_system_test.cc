@@ -17,7 +17,9 @@ namespace Event {
 namespace Test {
 namespace {
 
-class SimulatedTimeSystemTest : public testing::TestWithParam<bool> {
+enum class ActivateMode { DelayActivateTimers, EagerlyActivateTimers };
+
+class SimulatedTimeSystemTest : public testing::TestWithParam<ActivateMode> {
 protected:
   SimulatedTimeSystemTest()
       : scheduler_(time_system_.createScheduler(base_scheduler_, base_scheduler_)),
@@ -25,10 +27,10 @@ protected:
         start_system_time_(time_system_.systemTime()) {
     Runtime::LoaderSingleton::getExisting()->mergeValues(
         {{"envoy.reloadable_features.activate_timers_next_event_loop",
-          activateTimersNextEventLoop() ? "true" : "false"}});
+          activateMode() == ActivateMode::DelayActivateTimers ? "true" : "false"}});
   }
 
-  bool activateTimersNextEventLoop() { return GetParam(); }
+  ActivateMode activateMode() { return GetParam(); }
 
   void trackPrepareCalls() {
     base_scheduler_.registerOnPrepareCallback([this]() { output_.append(1, 'p'); });
@@ -76,7 +78,9 @@ protected:
   SystemTime start_system_time_;
 };
 
-INSTANTIATE_TEST_SUITE_P(DelayTimerActivation, SimulatedTimeSystemTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(DelayTimerActivation, SimulatedTimeSystemTest,
+                         testing::Values(ActivateMode::DelayActivateTimers,
+                                         ActivateMode::EagerlyActivateTimers));
 
 TEST_P(SimulatedTimeSystemTest, AdvanceTimeAsync) {
   EXPECT_EQ(start_monotonic_time_, time_system_.monotonicTime());
@@ -189,7 +193,7 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   // Timer 4 runs as part of the first wakeup since its new schedule time has a delta of 0. Timer 2
   // is delayed since it is rescheduled with a non-zero delta.
   advanceMsAndLoop(5);
-  if (activateTimersNextEventLoop()) {
+  if (activateMode() == ActivateMode::DelayActivateTimers) {
 #ifdef WIN32
     // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run again
     // to pick up next iteration callbacks.
@@ -201,7 +205,7 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   }
 
   advanceMsAndLoop(100);
-  if (activateTimersNextEventLoop()) {
+  if (activateMode() == ActivateMode::DelayActivateTimers) {
     EXPECT_EQ("p013p4p2", output_);
   } else {
     EXPECT_EQ("p0134p2", output_);
@@ -233,7 +237,7 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
   // because it is scheduled with zero delay. Timer 2 executes in a later iteration because it is
   // re-enabled with a non-zero timeout.
   advanceMsAndLoop(5);
-  if (activateTimersNextEventLoop()) {
+  if (activateMode() == ActivateMode::DelayActivateTimers) {
 #ifdef WIN32
     // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run again
     // to pick up next iteration callbacks.
@@ -245,7 +249,7 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderDisableAndRescheduleTimer) {
   }
 
   advanceMsAndLoop(100);
-  if (activateTimersNextEventLoop()) {
+  if (activateMode() == ActivateMode::DelayActivateTimers) {
     EXPECT_THAT(output_, testing::AnyOf("p03p14p2", "p03p41p2"));
   } else {
     EXPECT_EQ("p0314p2", output_);
