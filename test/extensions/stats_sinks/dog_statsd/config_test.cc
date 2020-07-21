@@ -70,7 +70,7 @@ TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
   const std::string name = StatsSinkNames::get().DogStatsd;
 
   envoy::config::metrics::v3::DogStatsdSink sink_config;
-  sink_config.set_max_bytes_per_datagram(128);
+  sink_config.mutable_max_bytes_per_datagram()->set_value(128);
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
@@ -118,6 +118,7 @@ TEST_P(DogStatsdConfigLoopbackTest, DefaultBufferSize) {
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   ASSERT_NE(udp_sink, nullptr);
+  // Expect default buffer size of 0 (no buffering)
   EXPECT_EQ(udp_sink->getBufferSizeForTest(), 0);
 }
 

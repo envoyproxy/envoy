@@ -16,6 +16,8 @@
 #include "common/common/macros.h"
 #include "common/network/io_socket_handle_impl.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
@@ -40,13 +42,14 @@ public:
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                uint64_t buffer_size = 0);
+                absl::optional<uint64_t> buffer_size = absl::nullopt);
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                uint64_t buffer_size = 0)
+                absl::optional<uint64_t> buffer_size = absl::nullopt)
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
-        prefix_(prefix.empty() ? getDefaultPrefix() : prefix), buffer_size_(buffer_size) {
+        prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
+        buffer_size_(buffer_size.value_or(0)) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }

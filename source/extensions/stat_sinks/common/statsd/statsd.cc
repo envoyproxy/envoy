@@ -46,9 +46,10 @@ void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance& data) {
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
-                             const std::string& prefix, uint64_t buffer_size)
+                             const std::string& prefix, absl::optional<uint64_t> buffer_size)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
-      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), buffer_size_(buffer_size) {
+      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
+      buffer_size_(buffer_size.value_or(0)) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<WriterImpl>(*this);
   });
@@ -60,7 +61,7 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      std::string counter_str =
+      const std::string counter_str =
           absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_, "|c",
                        buildTagStr(counter.counter_.get().tags()));
       writeBuffer(buffer, writer, counter_str);
@@ -69,7 +70,7 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      std::string gauge_str =
+      const std::string gauge_str =
           absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(), "|g",
                        buildTagStr(gauge.get().tags()));
       writeBuffer(buffer, writer, gauge_str);
