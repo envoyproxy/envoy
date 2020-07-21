@@ -214,7 +214,6 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
 
   std::vector<RawByteRange> parsed_ranges;
   for (absl::string_view cur_range : ranges) {
-
     absl::optional<uint64_t> first = HttpCacheUtils::readAndRemoveLeadingDigits(cur_range);
 
     if (!absl::ConsumePrefix(&cur_range, "-")) {
