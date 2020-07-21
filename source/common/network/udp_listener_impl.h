@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atomic>
-#include <list>
 
 #include "envoy/common/time.h"
 
@@ -33,8 +32,6 @@ public:
   void enable() override;
 
   // Network::UdpListener Interface
-  void addUpstreamProcessor(UdpPacketProcessor* processor) override;
-  void removeUpstreamProcessor(UdpPacketProcessor* processor) override;
   Event::Dispatcher& dispatcher() override;
   const Address::InstanceConstSharedPtr& localAddress() const override;
   Api::IoCallUint64Result send(const UdpSendData& data) override;
@@ -54,11 +51,9 @@ protected:
 
   UdpListenerCallbacks& cb_;
   uint32_t packets_dropped_{0};
-  std::list<UdpPacketProcessor*> processors_;
 
 private:
   void onSocketEvent(short flags);
-  void disableFileEvent();
 
   TimeSource& time_source_;
   Event::FileEventPtr file_event_;

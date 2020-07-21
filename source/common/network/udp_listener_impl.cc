@@ -45,16 +45,11 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
 }
 
 UdpListenerImpl::~UdpListenerImpl() {
-  disableFileEvent();
+  disable();
   file_event_.reset();
-
-  for (UdpPacketProcessor* processor : processors_) {
-    // Disable the processor to prevent receiving packets from upstream.
-    processor->disable();
-  }
 }
 
-void UdpListenerImpl::disable() { disableFileEvent(); }
+void UdpListenerImpl::disable() { file_event_->setEnabled(0); }
 
 void UdpListenerImpl::enable() {
   file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -72,8 +67,6 @@ void UdpListenerImpl::onSocketEvent(short flags) {
     handleWriteCallback();
   }
 }
-
-void UdpListenerImpl::disableFileEvent() { file_event_->setEnabled(0); }
 
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
@@ -105,14 +98,6 @@ void UdpListenerImpl::handleWriteCallback() {
   ENVOY_UDP_LOG(trace, "handleWriteCallback");
   cb_.onWriteReady(*socket_);
 }
-
-void UdpListenerImpl::addUpstreamProcessor(UdpPacketProcessor* processor) {
-  processors_.push_back(processor);
-}
-
-void UdpListenerImpl::removeUpstreamProcessor(UdpPacketProcessor* processor) {
-  processors_.remove(processor);
-};
 
 Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
 

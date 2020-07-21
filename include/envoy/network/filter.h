@@ -402,7 +402,7 @@ public:
   /**
    * @return the udp listener that owns this read filter.
    */
-  virtual UdpListener* udpListener() PURE;
+  virtual UdpListener& udpListener() PURE;
 };
 
 /**

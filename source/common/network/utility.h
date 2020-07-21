@@ -39,16 +39,6 @@ public:
   virtual ~UdpPacketProcessor() = default;
 
   /**
-   * Temporarily disable packet processing.
-   */
-  virtual void disable() PURE;
-
-  /**
-   * Enable packet processing.
-   */
-  virtual void enable() PURE;
-
-  /**
    * Consume the packet read out of the socket with the information from UDP
    * header.
    * @param local_address is the destination address in the UDP header.

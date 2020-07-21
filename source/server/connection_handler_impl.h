@@ -361,13 +361,17 @@ public:
   Network::Listener* listener() override { return udp_listener_.get(); }
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
-  void shutdownListener() override { udp_listener_.reset(); }
+  void shutdownListener() override {
+    // The read_filter_ should be deleted before the udp_listener_ is deleted.
+    read_filter_.reset();
+    udp_listener_.reset();
+  }
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;
 
   // Network::UdpReadFilterCallbacks
-  Network::UdpListener* udpListener() override;
+  Network::UdpListener& udpListener() override;
 
 private:
   Network::UdpListenerPtr udp_listener_;

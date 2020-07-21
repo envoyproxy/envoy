@@ -119,10 +119,6 @@ private:
     const Upstream::Host& host() const { return *host_; }
     void write(const Buffer::Instance& buffer);
 
-    // Network::UdpPacketProcessor
-    void disable() override { socket_event_->setEnabled(0); }
-    void enable() override { socket_event_->setEnabled(Event::FileReadyType::Read); }
-
   private:
     void onIdleTimer();
     void onReadReady();
@@ -202,7 +198,7 @@ private:
     ClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
     ~ClusterInfo();
     void onData(Network::UdpRecvData& data);
-    void removeSession(ActiveSession* session);
+    void removeSession(const ActiveSession* session);
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;

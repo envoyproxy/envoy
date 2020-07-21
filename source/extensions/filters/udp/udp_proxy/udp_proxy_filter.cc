@@ -132,17 +132,10 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
   auto new_session_ptr = new_session.get();
   sessions_.emplace(std::move(new_session));
   host_to_sessions_[host.get()].emplace(new_session_ptr);
-  filter_.read_callbacks_->udpListener()->addUpstreamProcessor(new_session_ptr);
   return new_session_ptr;
 }
 
-void UdpProxyFilter::ClusterInfo::removeSession(ActiveSession* session) {
-  // Remove it from udp listener.
-  Network::UdpListener* const udpListener = filter_.read_callbacks_->udpListener();
-  if (udpListener != nullptr) {
-    udpListener->removeUpstreamProcessor(session);
-  }
-
+void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
   // First remove from the host to sessions map.
   ASSERT(host_to_sessions_[&session->host()].count(session) == 1);
   auto host_sessions_it = host_to_sessions_.find(&session->host());
@@ -160,12 +153,12 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                              Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                              const Upstream::HostConstSharedPtr& host)
     : cluster_(cluster), addresses_(std::move(addresses)), host_(host),
-      idle_timer_(cluster.filter_.read_callbacks_->udpListener()->dispatcher().createTimer(
+      idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
       io_handle_(cluster.filter_.createIoHandle(host)),
-      socket_event_(cluster.filter_.read_callbacks_->udpListener()->dispatcher().createFileEvent(
+      socket_event_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createFileEvent(
           io_handle_->fd(), [this](uint32_t) { onReadReady(); }, Event::FileTriggerType::Edge,
           Event::FileReadyType::Read)) {
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
@@ -251,7 +244,7 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
   cluster_.cluster_.info()->stats().upstream_cx_rx_bytes_total_.add(buffer_length);
 
   Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *buffer};
-  const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener()->send(data);
+  const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener().send(data);
   if (!rc.ok()) {
     cluster_.filter_.config_->stats().downstream_sess_tx_errors_.inc();
   } else {

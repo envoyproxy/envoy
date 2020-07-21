@@ -27,7 +27,6 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
@@ -46,16 +45,6 @@ public:
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
 };
 
-class MockUdpListenerImpl : public UdpListenerImpl {
-public:
-  MockUdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                      UdpListenerCallbacks& cb, TimeSource& time_source)
-      : UdpListenerImpl(dispatcher, socket, cb, time_source) {}
-  ~MockUdpListenerImpl() override = default;
-
-  uint64_t processorCount() const { return processors_.size(); }
-};
-
 class UdpListenerImplTest : public ListenerImplTestBase {
 public:
   UdpListenerImplTest()
@@ -72,7 +61,7 @@ public:
       server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
     }
 
-    listener_ = std::make_unique<MockUdpListenerImpl>(
+    listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
   }
 
@@ -124,7 +113,7 @@ protected:
   Network::Test::UdpSyncPeer client_{GetParam()};
   Address::InstanceConstSharedPtr send_to_addr_;
   MockUdpListenerCallbacks listener_callbacks_;
-  std::unique_ptr<MockUdpListenerImpl> listener_;
+  std::unique_ptr<UdpListenerImpl> listener_;
   size_t num_packets_received_by_listener_{0};
   NiceMock<MockSupportsUdpGro> udp_gro_syscall_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&udp_gro_syscall_};
@@ -549,28 +538,6 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 #endif
-
-/**
- * The processors should be added or removed correctly.
- */
-TEST_P(UdpListenerImplTest, AddRemoveProcessors) {
-  listener_->addUpstreamProcessor(nullptr);
-  EXPECT_EQ(1, listener_->processorCount());
-
-  listener_->removeUpstreamProcessor(nullptr);
-  EXPECT_EQ(0, listener_->processorCount());
-}
-
-/**
- * The processors should be disabled when the listener is deleted.
- */
-TEST_P(UdpListenerImplTest, DisableProcessors) {
-  NiceMock<MockUdpPacketProcessor> processor;
-
-  listener_->addUpstreamProcessor(&processor);
-  EXPECT_CALL(processor, disable());
-  listener_.reset();
-}
 
 } // namespace
 } // namespace Network
