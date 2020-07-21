@@ -520,7 +520,28 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ(0UL, headers.remove(Headers::get().ContentLength));
 }
 
-TEST(HeaderMapImplTest, RemoveRegex) {
+TEST(HeaderMapImplTest, RemoveIf) {
+  LowerCaseString key1 = LowerCaseString("X-postfix-foo");
+  LowerCaseString key2 = LowerCaseString("X-postfix-");
+  LowerCaseString key3 = LowerCaseString("x-postfix-eep");
+
+  TestRequestHeaderMapImpl headers;
+  headers.addReference(key1, "value");
+  headers.addReference(key2, "value");
+  headers.addReference(key3, "value");
+
+  EXPECT_EQ(0UL, headers.removeIf([](const HeaderEntry&) -> bool { return false; }));
+
+  EXPECT_EQ(2UL, headers.removeIf([](const HeaderEntry& entry) -> bool {
+    return absl::EndsWith(entry.key().getStringView(), "foo") ||
+           absl::EndsWith(entry.key().getStringView(), "eep");
+  }));
+
+  TestRequestHeaderMapImpl expected{{"X-postfix-", "value"}};
+  EXPECT_EQ(expected, headers);
+}
+
+TEST(HeaderMapImplTest, RemovePrefix) {
   // These will match.
   LowerCaseString key1 = LowerCaseString("X-prefix-foo");
   LowerCaseString key3 = LowerCaseString("X-Prefix-");
@@ -552,7 +573,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ(nullptr, headers.get(key2));
   EXPECT_EQ(nullptr, headers.get(key4));
 
-  // Add inline and remove by regex
+  // Add inline and remove by prefix
   headers.setContentLength(5);
   EXPECT_EQ("5", headers.getContentLengthValue());
   EXPECT_EQ(1UL, headers.size());
@@ -560,6 +581,17 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ(1UL, headers.removePrefix(LowerCaseString("content")));
   EXPECT_EQ(nullptr, headers.ContentLength());
 }
+
+class HeaderAndValueCb
+    : public testing::MockFunction<void(const std::string&, const std::string&)> {
+public:
+  HeaderMap::ConstIterateCb asIterateCb() {
+    return [this](const Http::HeaderEntry& header) -> HeaderMap::Iterate {
+      Call(std::string(header.key().getStringView()), std::string(header.value().getStringView()));
+      return HeaderMap::Iterate::Continue;
+    };
+  }
+};
 
 TEST(HeaderMapImplTest, SetRemovesAllValues) {
   TestRequestHeaderMapImpl headers;
@@ -577,10 +609,8 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
   headers.addReference(key1, ref_value3);
   headers.addReference(key1, ref_value4);
 
-  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
-
   {
-    MockCb cb;
+    HeaderAndValueCb cb;
 
     InSequence seq;
     EXPECT_CALL(cb, Call("hello", "world"));
@@ -588,31 +618,19 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
     EXPECT_CALL(cb, Call("hello", "globe"));
     EXPECT_CALL(cb, Call("hello", "earth"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
   }
 
   headers.setReference(key1, ref_value5); // set moves key to end
 
   {
-    MockCb cb;
+    HeaderAndValueCb cb;
 
     InSequence seq;
     EXPECT_CALL(cb, Call("olleh", "planet"));
     EXPECT_CALL(cb, Call("hello", "blue marble"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
   }
 }
 
@@ -714,19 +732,12 @@ TEST(HeaderMapImplTest, SetCopy) {
   headers.setCopy(foo, "override-monde");
   EXPECT_EQ(headers.size(), 2);
 
-  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
-  MockCb cb;
+  HeaderAndValueCb cb;
 
   InSequence seq;
   EXPECT_CALL(cb, Call("hello", "override-monde"));
   EXPECT_CALL(cb, Call("hello", "monde2"));
-  headers.iterate(
-      [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-        static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                         std::string(header.value().getStringView()));
-        return HeaderMap::Iterate::Continue;
-      },
-      &cb);
+  headers.iterate(cb.asIterateCb());
 
   // Test setting an empty string and then overriding.
   EXPECT_EQ(2UL, headers.remove(foo));
@@ -847,20 +858,13 @@ TEST(HeaderMapImplTest, Iterate) {
   LowerCaseString foo_key("foo");
   headers.setReferenceKey(foo_key, "bar"); // set moves key to end
 
-  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
-  MockCb cb;
+  HeaderAndValueCb cb;
 
   InSequence seq;
   EXPECT_CALL(cb, Call("hello", "world"));
   EXPECT_CALL(cb, Call("world", "hello"));
   EXPECT_CALL(cb, Call("foo", "bar"));
-  headers.iterate(
-      [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-        static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                         std::string(header.value().getStringView()));
-        return HeaderMap::Iterate::Continue;
-      },
-      &cb);
+  headers.iterate(cb.asIterateCb());
 }
 
 TEST(HeaderMapImplTest, IterateReverse) {
@@ -870,24 +874,20 @@ TEST(HeaderMapImplTest, IterateReverse) {
   LowerCaseString world_key("world");
   headers.setReferenceKey(world_key, "hello");
 
-  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
-  MockCb cb;
+  HeaderAndValueCb cb;
 
   InSequence seq;
   EXPECT_CALL(cb, Call("world", "hello"));
   EXPECT_CALL(cb, Call("foo", "bar"));
   // no "hello"
-  headers.iterateReverse(
-      [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-        static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                         std::string(header.value().getStringView()));
-        if (header.key().getStringView() != "foo") {
-          return HeaderMap::Iterate::Continue;
-        } else {
-          return HeaderMap::Iterate::Break;
-        }
-      },
-      &cb);
+  headers.iterateReverse([&cb](const Http::HeaderEntry& header) -> HeaderMap::Iterate {
+    cb.Call(std::string(header.key().getStringView()), std::string(header.value().getStringView()));
+    if (header.key().getStringView() != "foo") {
+      return HeaderMap::Iterate::Continue;
+    } else {
+      return HeaderMap::Iterate::Break;
+    }
+  });
 }
 
 TEST(HeaderMapImplTest, Get) {
@@ -1002,8 +1002,7 @@ TEST(TestHeaderMapImplDeathTest, TestHeaderLengthChecks) {
 }
 
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {
-  using MockCb = testing::MockFunction<void(const std::string&, const std::string&)>;
-  MockCb cb;
+  HeaderAndValueCb cb;
 
   {
     LowerCaseString foo("hello");
@@ -1029,13 +1028,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     EXPECT_CALL(cb, Call("hello", "world"));
     EXPECT_CALL(cb, Call("content-type", "text/html"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
 
     // Removal of the header before which pseudo-headers are inserted
     EXPECT_EQ(1UL, headers.remove(foo));
@@ -1045,13 +1038,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     EXPECT_CALL(cb, Call(":method", "PUT"));
     EXPECT_CALL(cb, Call("content-type", "text/html"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
 
     // Next pseudo-header goes after other pseudo-headers, but before normal headers
     headers.setReferenceKey(Headers::get().Path, "/test");
@@ -1062,13 +1049,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     EXPECT_CALL(cb, Call(":path", "/test"));
     EXPECT_CALL(cb, Call("content-type", "text/html"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
 
     // Removing the last normal header
     EXPECT_EQ(1UL, headers.remove(Headers::get().ContentType));
@@ -1078,13 +1059,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     EXPECT_CALL(cb, Call(":method", "PUT"));
     EXPECT_CALL(cb, Call(":path", "/test"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
 
     // Adding a new pseudo-header after removing the last normal header
     headers.setReferenceKey(Headers::get().Host, "host");
@@ -1095,13 +1070,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     EXPECT_CALL(cb, Call(":path", "/test"));
     EXPECT_CALL(cb, Call(":authority", "host"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
 
     // Adding the first normal header
     headers.setReferenceKey(Headers::get().ContentType, "text/html");
@@ -1113,13 +1082,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     EXPECT_CALL(cb, Call(":authority", "host"));
     EXPECT_CALL(cb, Call("content-type", "text/html"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
 
     // Removing all pseudo-headers
     EXPECT_EQ(1UL, headers.remove(Headers::get().Path));
@@ -1130,13 +1093,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
 
     EXPECT_CALL(cb, Call("content-type", "text/html"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
 
     // Removing all headers
     EXPECT_EQ(1UL, headers.remove(Headers::get().ContentType));
@@ -1150,13 +1107,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
 
     EXPECT_CALL(cb, Call(":status", "200"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
   }
 
   // Starting with a normal header
@@ -1174,13 +1125,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     EXPECT_CALL(cb, Call("content-type", "text/plain"));
     EXPECT_CALL(cb, Call("hello", "world"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
   }
 
   // Starting with a pseudo-header
@@ -1198,13 +1143,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     EXPECT_CALL(cb, Call("content-type", "text/plain"));
     EXPECT_CALL(cb, Call("hello", "world"));
 
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
-          static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
-                                           std::string(header.value().getStringView()));
-          return HeaderMap::Iterate::Continue;
-        },
-        &cb);
+    headers.iterate(cb.asIterateCb());
   }
 }
 

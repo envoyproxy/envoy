@@ -102,6 +102,7 @@ def envoy_cc_fuzz_test(
         name = test_lib_name,
         deps = deps + envoy_stdlib_deps() + [
             repository + "//test/fuzz:fuzz_runner_lib",
+            repository + "//test/test_common:test_version_linkstamp",
         ],
         repository = repository,
         tags = tags,
@@ -110,14 +111,24 @@ def envoy_cc_fuzz_test(
     cc_test(
         name = name,
         copts = fuzz_copts + envoy_copts("@envoy", test = True),
-        linkopts = _envoy_test_linkopts(),
-        linkstatic = 1,
-        args = ["$(locations %s)" % corpus_name],
+        linkopts = _envoy_test_linkopts() + select({
+            "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
+            "//conditions:default": [],
+        }),
+        linkstatic = envoy_linkstatic(),
+        args = select({
+            "@envoy//bazel:libfuzzer_coverage": ["$(locations %s)" % corpus_name],
+            "@envoy//bazel:libfuzzer": [],
+            "//conditions:default": ["$(locations %s)" % corpus_name],
+        }),
         data = [corpus_name],
         # No fuzzing on macOS or Windows
         deps = select({
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],
             "@envoy//bazel:windows_x86_64": [repository + "//test:dummy_main"],
+            "@envoy//bazel:libfuzzer": [
+                ":" + test_lib_name,
+            ],
             "//conditions:default": [
                 ":" + test_lib_name,
                 repository + "//test/fuzz:main",
@@ -139,19 +150,6 @@ def envoy_cc_fuzz_test(
         testonly = 1,
         deps = [":" + test_lib_name],
         tags = ["manual"] + tags,
-    )
-    cc_test(
-        name = name + "_with_libfuzzer",
-        copts = fuzz_copts + envoy_copts("@envoy", test = True),
-        linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
-        linkstatic = 1,
-        args = select({
-            "@envoy//bazel:coverage_build": ["$(locations %s)" % corpus_name],
-            "//conditions:default": [],
-        }),
-        data = [corpus_name],
-        deps = [":" + test_lib_name],
-        tags = ["manual", "fuzzer"] + tags,
     )
 
 # Envoy C++ test targets should be specified with this function.
@@ -182,6 +180,7 @@ def envoy_cc_test(
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:main",
+            repository + "//test/test_common:test_version_linkstamp",
         ],
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
@@ -235,12 +234,16 @@ def envoy_cc_test_library(
 def envoy_cc_test_binary(
         name,
         tags = [],
+        deps = [],
         **kargs):
     envoy_cc_binary(
         name,
         testonly = 1,
         linkopts = _envoy_test_linkopts(),
         tags = tags + ["compilation_db_dep"],
+        deps = deps + [
+            "@envoy//test/test_common:test_version_linkstamp",
+        ],
         **kargs
     )
 

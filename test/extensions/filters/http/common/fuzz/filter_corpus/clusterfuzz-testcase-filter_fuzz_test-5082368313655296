@@ -1,0 +1,7 @@
+config {
+  name: "envoy.filters.http.header_to_metadata"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config"
+    value: "\n\033\n\002;;\032\023\022\001;\032\014stanotcci_fi \t \001\n+\n\001;\022\021\022\001;\032\014static_confi\032\023\022\001;\032\014static_confi \t\022\031\n\002m;\032\023\022\001;\032\014stanotcci_fi \t"
+  }
+}

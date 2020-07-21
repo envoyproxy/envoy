@@ -3,5 +3,9 @@ config {
   mark: 0
 }
 
-address: "tcp://1.2.3.4:0"
-
+data {
+  sock {
+    local_address: "tcp://0.0.0.0:0"
+    remote_address: "tcp://1.2.3.4:0"
+  }
+}

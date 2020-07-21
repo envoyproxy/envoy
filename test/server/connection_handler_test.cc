@@ -6,6 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/io_socket_handle_impl.h"
@@ -14,9 +15,9 @@
 
 #include "server/connection_handler_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 

@@ -12,12 +12,14 @@
 #include "common/runtime/runtime_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -35,64 +37,6 @@ using testing::Return;
 namespace Envoy {
 namespace Runtime {
 namespace {
-
-TEST(Random, DISABLED_benchmarkRandom) {
-  Runtime::RandomGeneratorImpl random;
-
-  for (size_t i = 0; i < 1000000000; ++i) {
-    random.random();
-  }
-}
-
-TEST(Random, SanityCheckOfUniquenessRandom) {
-  Runtime::RandomGeneratorImpl random;
-  std::set<uint64_t> results;
-  const size_t num_of_results = 1000000;
-
-  for (size_t i = 0; i < num_of_results; ++i) {
-    results.insert(random.random());
-  }
-
-  EXPECT_EQ(num_of_results, results.size());
-}
-
-TEST(Random, SanityCheckOfStdLibRandom) {
-  Runtime::RandomGeneratorImpl random;
-
-  static const auto num_of_items = 100;
-  std::vector<uint64_t> v(num_of_items);
-  std::iota(v.begin(), v.end(), 0);
-
-  static const auto num_of_checks = 10000;
-  for (size_t i = 0; i < num_of_checks; ++i) {
-    const auto prev = v;
-    std::shuffle(v.begin(), v.end(), random);
-    EXPECT_EQ(v.size(), prev.size());
-    EXPECT_NE(v, prev);
-    EXPECT_FALSE(std::is_sorted(v.begin(), v.end()));
-  }
-}
-
-TEST(UUID, CheckLengthOfUUID) {
-  RandomGeneratorImpl random;
-
-  std::string result = random.uuid();
-
-  size_t expected_length = 36;
-  EXPECT_EQ(expected_length, result.length());
-}
-
-TEST(UUID, SanityCheckOfUniqueness) {
-  std::set<std::string> uuids;
-  const size_t num_of_uuids = 100000;
-
-  RandomGeneratorImpl random;
-  for (size_t i = 0; i < num_of_uuids; ++i) {
-    uuids.insert(random.uuid());
-  }
-
-  EXPECT_EQ(num_of_uuids, uuids.size());
-}
 
 class LoaderImplTest : public testing::Test {
 protected:
@@ -114,7 +58,7 @@ protected:
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
-  MockRandomGenerator generator_;
+  Random::MockRandomGenerator generator_;
   std::unique_ptr<LoaderImpl> loader_;
   Api::ApiPtr api_;
   Upstream::MockClusterManager cm_;
@@ -1110,6 +1054,28 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(RtdsLoaderImplTest, BadConfigSource) {
+  Upstream::MockClusterManager cm_;
+  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+      .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
+        throw EnvoyException("bad config");
+        return nullptr;
+      }));
+
+  envoy::config::bootstrap::v3::LayeredRuntime config;
+  auto* layer = config.add_layers();
+  layer->set_name("some_other_resource");
+  auto* rtds_layer = layer->mutable_rtds_layer();
+  rtds_layer->set_name("some_resource");
+  rtds_layer->mutable_rtds_config();
+
+  EXPECT_CALL(cm_, subscriptionFactory()).Times(1);
+  LoaderImpl loader(dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_,
+                    *api_);
+
+  EXPECT_THROW_WITH_MESSAGE(loader.initialize(cm_), EnvoyException, "bad config");
 }
 
 } // namespace

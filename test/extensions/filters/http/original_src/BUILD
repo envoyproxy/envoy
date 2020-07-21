@@ -29,7 +29,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/original_src:config",
         "//source/extensions/filters/http/original_src:config_lib",
         "//source/extensions/filters/http/original_src:original_src_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto",
     ],
 )

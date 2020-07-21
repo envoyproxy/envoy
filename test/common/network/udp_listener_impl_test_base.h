@@ -91,7 +91,7 @@ protected:
   }
 
   // Validates receive data, source/destination address and received time.
-  void validateRecvCallbackParams(const UdpRecvData& data) {
+  void validateRecvCallbackParams(const UdpRecvData& data, size_t num_packet_per_recv) {
     ASSERT_NE(data.addresses_.local_, nullptr);
 
     ASSERT_NE(data.addresses_.peer_, nullptr);
@@ -104,10 +104,6 @@ protected:
 
     EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
 
-    size_t num_packet_per_recv = 1u;
-    if (Api::OsSysCallsSingleton::get().supportsMmsg()) {
-      num_packet_per_recv = 16u;
-    }
     EXPECT_EQ(time_system_.monotonicTime(),
               data.receive_time_ +
                   std::chrono::milliseconds(
