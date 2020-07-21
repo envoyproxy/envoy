@@ -12,6 +12,11 @@ class UdpPacketWriterConfigFactory : public Config::UntypedFactory {
 public:
   ~UdpPacketWriterConfigFactory() override = default;
 
+  /**
+   * @brief Create a Empty Config Proto object which can be used
+   * for UdpPacketWriter creation
+   * @return ProtobufTypes::MessagePtr
+   */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**

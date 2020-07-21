@@ -27,6 +27,10 @@ struct UdpPacketWriterStats {
   UDP_PACKET_WRITER_STATS(GENERATE_GAUGE_STRUCT)
 };
 
+/**
+ * InternalBufferWriteLocation bundles a buffer and a function that
+ * releases it.
+ */
 struct InternalBufferWriteLocation {
   InternalBufferWriteLocation() = default;
   InternalBufferWriteLocation(char* buffer, std::function<void(const char*)> release_buffer)
@@ -42,6 +46,7 @@ public:
 
   /**
    * @brief Sends a packet via given UDP socket with specific source address.
+   *
    * @param buffer points to the buffer containing the packet
    * @param local_ip is the source address to be used to send.
    * @param peer_address is the destination address to send to.
@@ -65,6 +70,7 @@ public:
   /**
    * @brief Get the maximum size of the packet which can be written using this
    * writer for the supplied peer address.
+   *
    * @param peer_address  is the destination address to send to.
    * @return uint64_t the Max Packet Size object
    */
@@ -80,6 +86,7 @@ public:
    * @brief Get pointer to the next write location in internal buffer,
    * it should be called iff the caller does not call writePacket
    * for the returned buffer.
+   *
    * @param local_ip is the source address to be used to send.
    * @param peer_address is the destination address to send to.
    * @return { char* to the next write location,

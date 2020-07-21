@@ -18,13 +18,13 @@ public:
   // Following writePacket utilizes Utility::writeToSocket() implementation
   Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer, const Address::Ip* local_ip,
                                       const Address::Instance& peer_address) override;
+
   bool isWriteBlocked() const override { return write_blocked_; }
   void setWritable() override { write_blocked_ = false; }
   uint64_t getMaxPacketSize(const Address::Instance& /*peer_address*/) const override {
     return Network::K_MAX_OUTGOING_PACKET_SIZE;
   }
   bool isBatchMode() const override { return false; }
-
   Network::InternalBufferWriteLocation
   getNextWriteLocation(const Address::Ip* /*local_ip*/,
                        const Address::Instance& /*peer_address*/) override {
@@ -38,8 +38,8 @@ public:
 
   std::string name() const override;
   Network::IoHandle& getWriterIoHandle() const override;
-
   Network::UdpPacketWriterStats getUdpPacketWriterStats() override { return stats_; }
+
   Network::UdpPacketWriterStats generateStats(Stats::Scope& scope);
 
 private:

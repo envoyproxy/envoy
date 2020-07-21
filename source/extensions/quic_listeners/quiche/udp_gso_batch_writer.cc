@@ -6,7 +6,6 @@
 
 namespace Envoy {
 namespace Quic {
-
 namespace {
 Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result) {
   if (quic_result.status == quic::WRITE_STATUS_OK) {
