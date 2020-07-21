@@ -42,7 +42,7 @@ public:
   const absl::string_view outbound_frame_flood = "http2.outbound_frames_flood";
   // Envoy detected an inbound HTTP/2 frame flood.
   const absl::string_view inbound_empty_frame_flood = "http2.inbound_empty_frames_flood";
-  // Envoy was configured to drop requests with header keys begining with underscores.
+  // Envoy was configured to drop requests with header keys beginning with underscores.
   const absl::string_view invalid_underscore = "http2.unexpected_underscore";
 
   const absl::string_view errorDetails(int error_code) const {
