@@ -28,7 +28,7 @@ namespace Http {
 namespace Http2 {
 
 class Http2ResponseCodeDetailValues {
- public:
+public:
   // Invalid HTTP header field was received and stream is going to be
   // closed.
   const absl::string_view ng_http2_err_http_header_ = "http2.invalid.header.field";
@@ -39,9 +39,9 @@ class Http2ResponseCodeDetailValues {
   // The number of headers (or trailers) exceeded the configured limits
   const absl::string_view too_many_headers = "http2.too_many_headers";
   // Envoy detected an HTTP/2 frame flood from the server.
-  const absl::string_view outbound_frame_flood = "http2.outbound_frame_flood";
+  const absl::string_view outbound_frame_flood = "http2.outbound_frames_flood";
   // Envoy detected an inbound HTTP/2 frame flood.
-  const absl::string_view inbound_frame_flood = "http2.inbound_frame_flood";
+  const absl::string_view inbound_empty_frame_flood = "http2.inbound_empty_frames_flood";
   // Envoy was configured to drop requests with header keys begining with underscores.
   const absl::string_view invalid_underscore = "http2.unexpected_underscore";
 
@@ -597,10 +597,6 @@ int ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
   // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().
   if (hd->type != NGHTTP2_HEADERS && hd->type != NGHTTP2_DATA) {
     if (!trackInboundFrames(hd, 0)) {
-      StreamImpl* stream = getStream(hd->stream_id);
-      if (stream != nullptr) {
-        stream->setDetails(Http2ResponseCodeDetails::get().inbound_frame_flood);
-      }
       return NGHTTP2_ERR_FLOODED;
     }
   }
@@ -628,10 +624,6 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
   if (frame->hd.type == NGHTTP2_DATA) {
     if (!trackInboundFrames(&frame->hd, frame->data.padlen)) {
-      StreamImpl* stream = getStream(frame->hd.stream_id);
-      if (stream != nullptr) {
-        stream->setDetails(Http2ResponseCodeDetails::get().inbound_frame_flood);
-      }
       return NGHTTP2_ERR_FLOODED;
     }
   }
@@ -1317,10 +1309,6 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
 
   if (!trackInboundFrames(&frame->hd, frame->headers.padlen)) {
-    StreamImpl* stream = getStream(frame->hd.stream_id);
-    if (stream) {
-      stream->setDetails(Http2ResponseCodeDetails::get().inbound_frame_flood);
-    }
     return NGHTTP2_ERR_FLOODED;
   }
 
@@ -1384,7 +1372,7 @@ bool ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32
     break;
   }
 
-  if (!checkInboundFrameLimits()) {
+  if (!checkInboundFrameLimits(hd->stream_id)) {
     // NGHTTP2_ERR_FLOODED is overridden within nghttp2 library and it doesn't propagate
     // all the way to nghttp2_session_mem_recv() where we need it.
     flood_detected_ = true;
@@ -1394,8 +1382,9 @@ bool ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32
   return true;
 }
 
-bool ServerConnectionImpl::checkInboundFrameLimits() {
+bool ServerConnectionImpl::checkInboundFrameLimits(int32_t stream_id) {
   ASSERT(dispatching_downstream_data_);
+  ConnectionImpl::StreamImpl* stream = getStream(stream_id);
 
   if (consecutive_inbound_frames_with_empty_payload_ >
       max_consecutive_inbound_frames_with_empty_payload_) {
@@ -1403,6 +1392,9 @@ bool ServerConnectionImpl::checkInboundFrameLimits() {
                    "error reading frame: Too many consecutive frames with an empty payload "
                    "received in this HTTP/2 session.",
                    connection_);
+    if (stream) {
+      stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
+    }
     stats_.inbound_empty_frames_flood_.inc();
     return false;
   }

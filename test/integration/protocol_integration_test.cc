@@ -942,6 +942,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 
 // Verify that request with headers containing underscores is rejected when configured.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -967,6 +968,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefa
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
   }
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
