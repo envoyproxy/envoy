@@ -289,9 +289,12 @@ message MetadataFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v3.MetadataFilter";
 
-  // Matcher to check metadata for specified value. For example, to match on the access_log_hint metadata
+  // Matcher to check metadata for specified value. For example, to match on the access_log_hint metadata,
   // set the filter to "envoy.common" and the path to "access_log_hint".
   type.matcher.v4alpha.MetadataMatcher matcher = 1;
+
+  // Default result if the key does not exist in dynamic metadata: if true, then log; if false, then don't log.
+  bool no_key_default = 2;
 }
 
 // Extension filter is statically registered at runtime.

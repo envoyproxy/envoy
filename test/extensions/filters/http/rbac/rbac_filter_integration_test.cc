@@ -64,19 +64,16 @@ typed_config:
           - any: true
 )EOF";
 
-// const std::string RBAC_CONFIG_WITH_LOG_ACTION = R"EOF(
-// name: rbac
-// typed_config:
-//   "@type": type.googleapis.com/envoy.config.filter.http.rbac.v3.RBAC
-//   rules:
-//     action: LOG
-//     policies:
-//       foo:
-//         permissions:
-//           - header: { name: ":method", exact_match: "GET" }
-//         principals:
-//           - any: true
-// )EOF";
+const std::string RBAC_CONFIG_WITH_LOG_ACTION = R"EOF(
+rules:
+  action: LOG
+  policies:
+    foo:
+      permissions:
+        - header: { name: ":method", exact_match: "GET" }
+      principals:
+        - any: true
+)EOF";
 
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
 

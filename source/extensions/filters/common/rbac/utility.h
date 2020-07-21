@@ -18,6 +18,8 @@ public:
   const std::string ShadowEngineResultField{"shadow_engine_result"};
   const std::string EngineResultAllowed{"allowed"};
   const std::string EngineResultDenied{"denied"};
+  const std::string AccessLogKey{"access_log_hint"};
+  const std::string CommonNamespace{"envoy.common"};
 };
 
 using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;

@@ -474,34 +474,6 @@ typed_config:
   }
 }
 
-// TEST_F(AccessLogImplTest, LogKey) {
-
-//   const std::string yaml = R"EOF(
-// name: accesslog
-// filter:
-//   log_key_filter: {}
-// typed_config:
-//   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-//   path: /dev/null
-//   )EOF";
-
-//   InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
-//   ProtobufWkt::Struct metrics;
-//   auto& fields = *metrics.mutable_fields();
-//   *fields["access_log_policy"].mutable_string_value() = "no";
-//   stream_info_.setDynamicMetadata("envoy.common", metrics);
-
-//   EXPECT_CALL(*file_, write(_)).Times(0);
-//   logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-
-//   *fields["access_log_policy"].mutable_string_value() = "yes";
-//   stream_info_.setDynamicMetadata("envoy.common", metrics);
-
-//   EXPECT_CALL(*file_, write(_));
-//   logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-// }
-
-
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
@@ -1298,7 +1270,7 @@ name: accesslog
 filter:
   metadata_filter:
     matcher:
-      filter: "envoy.common"
+      filter: "some.namespace"
       path:
         - key: "a"
         - key: "b"
@@ -1320,7 +1292,7 @@ typed_config:
   auto& fields_c = *struct_c.mutable_fields();
   fields_c["c"].set_bool_value(true);
 
-  stream_info.setDynamicMetadata("envoy.common", metadata_val);
+  stream_info.setDynamicMetadata("some.namespace", metadata_val);
 
   const InstanceSharedPtr log =
       AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
@@ -1331,6 +1303,67 @@ typed_config:
   fields_c["c"].set_bool_value(false);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
+}
+
+TEST_F(AccessLogImplTest, MetadataFilterNoKey) {
+  const std::string default_true_yaml = R"EOF(
+name: accesslog
+filter:
+  metadata_filter:
+    matcher:
+      filter: "some.namespace"
+      path:
+        - key: "a"
+        - key: "b"
+        - key: "c"
+      value:
+        bool_match: true
+    no_key_default: true
+
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+    const std::string default_false_yaml = R"EOF(
+name: accesslog
+filter:
+  metadata_filter:
+    matcher:
+      filter: "some.namespace"
+      path:
+        - key: "a"
+        - key: "b"
+        - key: "c"
+      value:
+        bool_match: true
+    no_key_default: false
+
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  TestStreamInfo stream_info;
+  ProtobufWkt::Struct metadata_val;
+  auto& fields_a = *metadata_val.mutable_fields();
+  auto& struct_b = *fields_a["a"].mutable_struct_value();
+  auto& fields_b = *struct_b.mutable_fields();
+  fields_b["b"].set_bool_value(true);
+
+  stream_info.setDynamicMetadata("some.namespace", metadata_val);
+
+  const InstanceSharedPtr default_false_log =
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(default_false_yaml), context_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+
+  default_false_log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+
+  const InstanceSharedPtr default_true_log =
+      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(default_true_yaml), context_);
+  EXPECT_CALL(*file_, write(_)).Times(1);
+
+  default_true_log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
 }
 
 class TestHeaderFilterFactory : public ExtensionFilterFactory {

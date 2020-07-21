@@ -13,6 +13,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
+using LogDecision = Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision;
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
@@ -86,23 +88,30 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
 
   if (engine != nullptr) {
     std::string effective_policy_id;
-
     if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
-      //=====================================LogDecision==========================
-      ProtobufWkt::Struct metrics;
-      auto& fields = *metrics.mutable_fields();
-      auto log_dec = engine->shouldLog(callbacks_->connection(),
-                                       callbacks_->connection().streamInfo(), &effective_policy_id);
-      if (log_dec != Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision::Undecided) {
-        bool log_yes =
-            log_dec == Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision::Yes;
+      // Check log decision
+      LogDecision log_dec = engine->shouldLog(
+          callbacks_->connection(), callbacks_->connection().streamInfo(), &effective_policy_id);
+      if (log_dec != LogDecision::Undecided) {
+        ProtobufWkt::Struct log_metadata;
+        auto& fields = *log_metadata.mutable_fields();
+        fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey]
+            .set_bool_value(log_dec == LogDecision::Yes);
+        callbacks_->connection().streamInfo().setDynamicMetadata(
+            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace,
+            log_metadata);
 
-        *fields["envoy.log"].mutable_string_value() = log_yes ? "yes" : "no";
+        if (log_dec == LogDecision::Yes) {
+          ENVOY_LOG(debug, "request logged");
+          config_->stats().logged_.inc();
+        } else {
+          ENVOY_LOG(debug, "request not logged");
+          config_->stats().not_logged_.inc();
+        }
       }
-
-      callbacks_->connection().streamInfo().setDynamicMetadata("common", metrics);
     }
 
+    // Check authorization decision
     if (engine->allowed(callbacks_->connection(), callbacks_->connection().streamInfo(),
                         &effective_policy_id)) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {

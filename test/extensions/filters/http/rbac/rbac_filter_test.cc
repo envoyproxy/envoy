@@ -72,6 +72,15 @@ public:
     ON_CALL(connection_, requestedServerName()).WillByDefault(Return(requested_server_name_));
   }
 
+  void checkAccessLogMetadata(bool expected) {
+    auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
+        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
+    EXPECT_EQ(expected,
+              filter_meta.fields()
+                  .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
+                  .bool_value());
+  }
+
   void setMetadata() {
     ON_CALL(req_info_, setDynamicMetadata(HttpFilterNames::get().Rbac, _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
@@ -80,11 +89,13 @@ public:
                                                                   obj));
         }));
 
-    ON_CALL(req_info_, setDynamicMetadata("envoy.common", _))
+    ON_CALL(req_info_,
+            setDynamicMetadata(
+                Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>("envoy.common",
-                                                                  obj));
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+                  Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
         }));
   }
 
@@ -131,11 +142,10 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
 
-  //Check Log
+  // Check Log
   setMetadata();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  EXPECT_EQ("yes", filter_meta.fields().at("envoy.log").string_value());
+  checkAccessLogMetadata(true);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Path) {
@@ -157,11 +167,10 @@ TEST_F(RoleBasedAccessControlFilterTest, Path) {
   };
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
-  //Check Log
+  // Check Log
   setMetadata();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers, false));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  EXPECT_EQ("no", filter_meta.fields().at("envoy.log").string_value());
+  checkAccessLogMetadata(false);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Denied) {
@@ -219,8 +228,7 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.common");
-  EXPECT_EQ(true, filter_meta.fields().at("access_log_hint").bool_value());
+  checkAccessLogMetadata(true);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
@@ -238,8 +246,7 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.common");
-  EXPECT_EQ(false, filter_meta.fields().at("access_log_hint").bool_value());
+  checkAccessLogMetadata(false);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, AllowNoChangeLog) {
@@ -250,23 +257,10 @@ TEST_F(RoleBasedAccessControlFilterTest, AllowNoChangeLog) {
   EXPECT_EQ(0U, config_->stats().logged_.value());
   EXPECT_EQ(0U, config_->stats().not_logged_.value());
 
-  auto& filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  // Check that Allow action does not set 'envoy.log' metadata
-  EXPECT_EQ(filter_meta.fields().end(), filter_meta.fields().find("envoy.log"));
-
-  // setDestinationPort(123);
-  // setMetadata();
-
-  // EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
-  // filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  // EXPECT_EQ("yes", req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac).fields().at("envoy.log").string_value());
-
-  // setDestinationPort(123);
-  // setMetadata();
-
-  // filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  // EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
-  // EXPECT_EQ("yes", filter_meta.fields().at("envoy.log").string_value());
+  // Check that Allow action does not set access log metadata
+  EXPECT_EQ(req_info_.dynamicMetadata().filter_metadata().end(),
+            req_info_.dynamicMetadata().filter_metadata().find(
+                Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
 }
 
 } // namespace

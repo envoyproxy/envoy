@@ -234,14 +234,15 @@ private:
   */
 class MetadataFilter : public Filter {
 public:
-  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& config);
+  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config);
 
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
               const Http::ResponseHeaderMap& response_headers,
               const Http::ResponseTrailerMap& response_trailers) const override;
 
 private:
-  const Envoy::Matchers::MetadataMatcher matcher_;
+  const envoy::type::matcher::v3::MetadataMatcher matcher_config_;
+  bool default_res_;
 };
 
 /**
