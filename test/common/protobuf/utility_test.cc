@@ -21,7 +21,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/proto/deprecated.pb.h"
 #include "test/proto/sensitive.pb.h"
 #include "test/test_common/environment.h"
@@ -1458,9 +1458,9 @@ protected:
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestUtil::TestStore store_;
-  Runtime::MockRandomGenerator generator_;
+  Random::MockRandomGenerator generator_;
   Api::ApiPtr api_;
-  Runtime::MockRandomGenerator rand_;
+  Random::MockRandomGenerator rand_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;

@@ -26,7 +26,7 @@ public:
   SubsetLoadBalancer(
       LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
       ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-      Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
+      Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
       const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
           lb_ring_hash_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
@@ -231,7 +231,7 @@ private:
   ClusterStats& stats_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
 
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;

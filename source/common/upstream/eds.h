@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -74,7 +76,7 @@ private:
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
-  std::unique_ptr<Config::Subscription> subscription_;
+  Config::SubscriptionPtr subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
@@ -82,6 +84,8 @@ private:
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;
 };
+
+using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;
 
 class EdsClusterFactory : public ClusterFactoryImplBase {
 public:

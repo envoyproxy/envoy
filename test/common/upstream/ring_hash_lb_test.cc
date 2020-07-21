@@ -71,7 +71,7 @@ public:
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<RingHashLoadBalancer> lb_;
 };
 

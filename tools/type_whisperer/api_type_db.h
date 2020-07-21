@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

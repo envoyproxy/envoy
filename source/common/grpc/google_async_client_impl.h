@@ -30,6 +30,9 @@ namespace Envoy {
 namespace Grpc {
 
 class GoogleAsyncStreamImpl;
+
+using GoogleAsyncStreamImplPtr = std::unique_ptr<GoogleAsyncStreamImpl>;
+
 class GoogleAsyncRequestImpl;
 
 struct GoogleAsyncTag {
@@ -109,6 +112,8 @@ private:
   // on shutdown.
   absl::node_hash_set<GoogleAsyncStreamImpl*> streams_;
 };
+
+using GoogleAsyncClientThreadLocalPtr = std::unique_ptr<GoogleAsyncClientThreadLocal>;
 
 // Google gRPC client stats. TODO(htuch): consider how a wider set of stats collected by the
 // library, such as the census related ones, can be externalized as needed.
@@ -190,7 +195,7 @@ private:
   // the client if it gets destructed. The streams need to wait for their tags
   // to drain from the CQ.
   GoogleStubSharedPtr stub_;
-  std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
+  std::list<GoogleAsyncStreamImplPtr> active_streams_;
   const std::string stat_prefix_;
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;
@@ -256,7 +261,7 @@ private:
     // End-of-stream with no additional message.
     PendingMessage() = default;
 
-    const absl::optional<grpc::ByteBuffer> buf_;
+    const absl::optional<grpc::ByteBuffer> buf_{};
     const bool end_stream_{true};
   };
 
