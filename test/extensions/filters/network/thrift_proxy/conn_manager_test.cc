@@ -16,7 +16,7 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 
@@ -235,6 +235,26 @@ public:
       frame.drain(27);
       buffer.move(frame);
     }
+  }
+
+  void writeVoidFramedBinaryMessage(Buffer::Instance& buffer, int32_t seq_id) {
+    Buffer::OwnedImpl msg;
+    ProtocolPtr proto =
+        NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
+    MessageMetadata metadata;
+    metadata.setMethodName("name");
+    metadata.setMessageType(MessageType::Reply);
+    metadata.setSequenceId(seq_id);
+
+    proto->writeMessageBegin(msg, metadata);
+    proto->writeStructBegin(msg, "");
+    proto->writeFieldBegin(msg, "", FieldType::Stop, 0);
+    proto->writeStructEnd(msg);
+    proto->writeMessageEnd(msg);
+
+    TransportPtr transport =
+        NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
+    transport->encodeFrame(buffer, metadata, msg);
   }
 
   void writeFramedBinaryTApplicationException(Buffer::Instance& buffer, int32_t seq_id) {
@@ -655,6 +675,40 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
 
   writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
+  initializeFilter();
+  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  writeVoidFramedBinaryMessage(write_buffer_, 0x0F);
 
   FramedTransportImpl transport;
   BinaryProtocolImpl proto;

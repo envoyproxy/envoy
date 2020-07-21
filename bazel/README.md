@@ -92,7 +92,7 @@ for how to update or override dependencies.
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
-    Xcode is also required to build Envoy on macOS.
+    The full version of Xcode (not just Command Line Tools) is also required to build Envoy on macOS.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
     Apple clang version 11.0.0 (clang-1100.0.33.8).
 
@@ -638,13 +638,19 @@ test/run_envoy_bazel_coverage.sh
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
 
+To generate coverage results for fuzz targets, use the `FUZZ_COVERAGE` environment variable, e.g.:
+```
+FUZZ_COVERAGE=true VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh
+```
+This generates a coverage report for fuzz targets after running the target for one minute against fuzzing engine libfuzzer using its coprus as initial seed inputs. The full coverage report will be available in `generated/fuzz_coverage/coverage.html`.
+
 Coverage for every PR is available in Circle in the "artifacts" tab of the coverage job. You will
 need to navigate down and open "coverage.html" but then you can navigate per normal. NOTE: We
 have seen some issues with seeing the artifacts tab. If you can't see it, log out of Circle, and
 then log back in and it should start working.
 
 The latest coverage report for master is available
-[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html).
+[here](https://storage.googleapis.com/envoy-postsubmit/master/coverage/index.html). The latest fuzz coverage report for master is available [here](https://storage.googleapis.com/envoy-postsubmit/master/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by

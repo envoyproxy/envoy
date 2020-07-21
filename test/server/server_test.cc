@@ -5,12 +5,12 @@
 #include "envoy/server/bootstrap_extension_config.h"
 
 #include "common/common/assert.h"
-#include "common/common/version.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/thread_local/thread_local_impl.h"
+#include "common/version/version.h"
 
 #include "server/process_context_impl.h"
 #include "server/server.h"
@@ -18,7 +18,11 @@
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/bootstrap_extension_factory.h"
+#include "test/mocks/server/hot_restart.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/options.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
@@ -254,7 +258,7 @@ protected:
   testing::NiceMock<MockOptions> options_;
   DefaultListenerHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
-  std::unique_ptr<ThreadLocal::InstanceImpl> thread_local_;
+  ThreadLocal::InstanceImplPtr thread_local_;
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;

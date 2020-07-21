@@ -93,11 +93,11 @@ public:
   bool hasAttachments() const { return !attachments_.empty(); }
   const AttachmentMap& attachments() const { return attachments_; }
 
-  Buffer::Instance& message_origin_data() { return message_origin_buffer_; }
-  size_t message_size() const { return header_size() + body_size(); }
+  Buffer::Instance& messageOriginData() { return message_origin_buffer_; }
+  size_t messageSize() const { return headerSize() + bodySize(); }
 
-  virtual size_t body_size() const PURE;
-  virtual size_t header_size() const PURE;
+  virtual size_t bodySize() const PURE;
+  virtual size_t headerSize() const PURE;
 
 protected:
   Context() = default;
@@ -118,10 +118,10 @@ class RpcInvocation {
 public:
   virtual ~RpcInvocation() = default;
 
-  virtual const std::string& service_name() const PURE;
-  virtual const std::string& method_name() const PURE;
-  virtual const absl::optional<std::string>& service_version() const PURE;
-  virtual const absl::optional<std::string>& service_group() const PURE;
+  virtual const std::string& serviceName() const PURE;
+  virtual const std::string& methodName() const PURE;
+  virtual const absl::optional<std::string>& serviceVersion() const PURE;
+  virtual const absl::optional<std::string>& serviceGroup() const PURE;
 };
 
 using RpcInvocationSharedPtr = std::shared_ptr<RpcInvocation>;

@@ -18,7 +18,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -120,7 +120,7 @@ http_filters:
   }
 
   NiceMock<Server::MockInstance> server_;
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
   RouteConfigProviderSharedPtr rds_;
 };
 
@@ -290,7 +290,7 @@ public:
     server_factory_context_.thread_local_.shutdownThread();
   }
 
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
 };
 
 // Verifies that maybeCreateInitManager() creates a noop init manager if the main init manager is in
@@ -353,14 +353,14 @@ public:
   }
 
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds_;
-  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+  RouteConfigProviderManagerImplPtr route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
 };
 
 envoy::config::route::v3::RouteConfiguration
-parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+parseRouteConfigurationFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
   envoy::config::route::v3::RouteConfiguration route_config;
-  TestUtility::loadFromYaml(yaml, route_config, true);
+  TestUtility::loadFromYaml(yaml, route_config, true, avoid_boosting);
   return route_config;
 }
 
@@ -394,7 +394,7 @@ virtual_hosts:
   // Only static route.
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
-          parseRouteConfigurationFromV2Yaml(config_yaml), server_factory_context_,
+          parseRouteConfigurationFromV3Yaml(config_yaml), server_factory_context_,
           validation_visitor_);
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
@@ -403,7 +403,7 @@ virtual_hosts:
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
   - route_config:
-      "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+      "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
       name: foo
       virtual_hosts:
         - name: bar
@@ -430,7 +430,7 @@ dynamic_route_configs:
   "version_info": "1",
   "resources": [
     {
-      "@type": "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
       "name": "foo_route_config",
       "virtual_hosts": null
     }
@@ -451,7 +451,7 @@ dynamic_route_configs:
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
   - route_config:
-      "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+      "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
       name: foo
       virtual_hosts:
         - name: bar
@@ -465,7 +465,7 @@ static_route_configs:
 dynamic_route_configs:
   - version_info: "1"
     route_config:
-      "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
+      "@type": type.googleapis.com/envoy.config.route.v3.RouteConfiguration
       name: foo_route_config
       virtual_hosts:
     last_updated:
@@ -484,7 +484,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   EXPECT_FALSE(provider_->configInfo().has_value());
 
-  const auto route_config = parseRouteConfigurationFromV2Yaml(R"EOF(
+  const auto route_config = parseRouteConfigurationFromV3Yaml(R"EOF(
 name: foo_route_config
 virtual_hosts:
   - name: bar
@@ -565,7 +565,7 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
   EXPECT_EQ(Init::Manager::State::Initializing, real_init_manager.state());
 
   {
-    const auto route_config = parseRouteConfigurationFromV2Yaml(R"EOF(
+    const auto route_config = parseRouteConfigurationFromV3Yaml(R"EOF(
 name: foo_route_config
 virtual_hosts:
   - name: bar
