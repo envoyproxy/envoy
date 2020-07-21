@@ -41,8 +41,7 @@ int main(int argc, char** argv) {
 
 bool Envoy::benchmark::skipExpensiveBenchmarks() {
   if (skip_expensive_benchmarks) {
-    auto logger = Logger::Registry::getLog(Logger::Id::testing);
-    logger.warn("Expensive benchmarks are being skipped; see test/README.md for more information");
+    ENVOY_LOG_MISC(warn, "Expensive benchmarks are being skipped; see test/README.md for more information");
   }
 
   return skip_expensive_benchmarks;
