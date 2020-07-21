@@ -22,6 +22,7 @@ public:
   // Check whether the filter's config is invalid for fuzzer(e.g. system call).
   void checkInvalidInputForFuzzer(const std::string& filter_name,
                                   Protobuf::Message* config_message);
+  static void setThriftFilters(envoy::config::listener::v3::Filter* config_message);
 
 protected:
   // Set-up filter specific mock expectations in constructor.

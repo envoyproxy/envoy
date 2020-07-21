@@ -1,5 +1,6 @@
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "extensions/filters/network/common/utility.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -23,7 +24,12 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
                      NetworkFilterNames::get().Echo,
                      NetworkFilterNames::get().DirectResponse,
                      NetworkFilterNames::get().DubboProxy,
-                     NetworkFilterNames::get().SniCluster};
+                     NetworkFilterNames::get().SniCluster,
+
+                     NetworkFilterNames::get().ThriftProxy,
+                     NetworkFilterNames::get().ZooKeeperProxy,
+                     NetworkFilterNames::get().HttpConnectionManager,
+                     NetworkFilterNames::get().SniDynamicForwardProxy};
   }
   return filter_names_;
 }
@@ -59,6 +65,15 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
+    read_filter_callbacks_->connection_.local_address_ =
+    ext_authz_addr_;
+    read_filter_callbacks_->connection_.remote_address_ =
+        ext_authz_addr_;     
+  }else if(filter_name == NetworkFilterNames::get().HttpConnectionManager){
+    read_filter_callbacks_->connection_.local_address_ =
+        http_conn_manager_addr_;
+    read_filter_callbacks_->connection_.remote_address_ =
+        http_conn_manager_addr_;  
   }
 }
 
@@ -70,17 +85,17 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       std::string(filter_name));
   if (filter_name == NetworkFilterNames::get().DirectResponse) {
     envoy::extensions::filters::network::direct_response::v3::Config& config =
-        dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(
-            *config_message);
+      dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(
+        *config_message);
     if (config.response().specifier_case() ==
         envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
       throw EnvoyException(
-          fmt::format("direct_response trying to open a file. Config:\n{}", config.DebugString()));
+        fmt::format("direct_response trying to open a file. Config:\n{}", config.DebugString()));
     }
   } else if (filter_name == NetworkFilterNames::get().LocalRateLimit) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& config =
-        dynamic_cast<envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit&>(
-            *config_message);
+      dynamic_cast<envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit&>(
+          *config_message);
     if (config.token_bucket().fill_interval().seconds() > seconds_in_one_day_) {
       // Too large fill_interval may cause "c++/v1/chrono" overflow when simulated_time_system_ is
       // converting it to a smaller unit. Constraining fill_interval to no greater than one day is
@@ -90,6 +105,20 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
                       config.DebugString()));
     }
   }
+}
+
+void UberFilterFuzzer::setThriftFilters(envoy::config::listener::v3::Filter*){
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
+  *(config.mutable_stat_prefix())="thrift";
+  *(config.mutable_route_config()->mutable_name())="local_route";
+  auto filter1 = config.mutable_thrift_filters()->Add();
+  *(filter1->mutable_name())="envoy.filters.thrift.router";
+  auto filter2 = config.mutable_thrift_filters()->Add();
+  *(filter2->mutable_name())="envoy.filters.thrift.rate_limit";
+  ProtobufWkt::Any out_config;
+  out_config.PackFrom(config);
+  std::cout<<"debug_string:\n"<<out_config.DebugString()<<std::endl;
+  std::cout<<"serialized_string"<<out_config.SerializeAsString()<<std::endl;
 }
 
 } // namespace NetworkFilters

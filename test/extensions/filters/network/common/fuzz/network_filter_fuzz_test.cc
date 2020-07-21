@@ -39,7 +39,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
             absl::StrCat("type.googleapis.com/",
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
       }};
-
+  // UberFilterFuzzer::setThriftFilters(nullptr);
   try {
     TestUtility::validate(input);
     // Check the filter's name in case some filters are not supported yet.

@@ -56,5 +56,7 @@ envoy_cc_fuzz_test(
         ":uber_filter_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
+        "//source/extensions/filters/network/thrift_proxy/router:config",
+        "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
     ] + envoy_all_network_filters(),
 )
