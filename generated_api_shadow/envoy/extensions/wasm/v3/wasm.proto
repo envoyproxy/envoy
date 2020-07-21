@@ -19,7 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for a Wasm VM.
 // [#next-free-field: 6]
-// [#not-implemented-hide:] pending implementation.
 message VmConfig {
   // An ID which will be used along with a hash of the wasm code (or the name of the registered Null
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
@@ -48,7 +47,6 @@ message VmConfig {
 
 // Base Configuration for Wasm Plugins e.g. filters and services.
 // [#next-free-field: 6]
-// [#not-implemented-hide:] pending implementation.
 message PluginConfig {
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
   // multiple filters/services are handled by the same *vm_id* and *root_id* and for
@@ -81,10 +79,8 @@ message PluginConfig {
   bool fail_open = 5;
 }
 
-// WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig
-// <envoy_api_msg_extensions.wasm.v3.WasmService>`. This opaque configuration will be used to
-// create a Wasm Service.
-// [#not-implemented-hide:] pending implementation.
+// WasmService is configured as a built-in *envoy.wasm_service* :ref:`WasmService
+// <config_wasm_service>` This opaque configuration will be used to create a Wasm Service.
 message WasmService {
   // General plugin configuration.
   PluginConfig config = 1;
