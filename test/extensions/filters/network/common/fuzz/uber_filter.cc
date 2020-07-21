@@ -108,9 +108,11 @@ void UberFilterFuzzer::fuzz(
       factory_context_.dispatcher().run(Event::Dispatcher::RunType::NonBlock);
       break;
     }
-    default:
+    default: {
       // Unhandled actions.
+      ENVOY_LOG_MISC(debug, "Action support is missing for:\n{}", action.DebugString());
       PANIC("A case is missing for an action");
+    }
     }
   }
 

@@ -5,7 +5,21 @@ config {
   }
 }
 actions {
+  on_new_connection {
+  }
+}
+actions {
   advance_time {
-    milliseconds: 16777216
+    milliseconds: 268435
+  }
+}
+actions {
+  on_data {
+    data: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 1677721
   }
 }

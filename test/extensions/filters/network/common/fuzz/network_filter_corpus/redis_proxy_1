@@ -6,21 +6,11 @@ config {
   }
 }
 actions {
-  advance_time {
-    milliseconds: 1862270976
-  }
-}
-actions {
   on_new_connection {
 
   }
 }
 actions {
-  advance_time {
-    milliseconds: 455213056
-  }
-}
-actions {
   on_new_connection {
   }
 }
@@ -34,10 +24,5 @@ actions {
   on_data {
     data: "0"
     end_stream: true
-  }
-}
-actions {
-  advance_time {
-    milliseconds: 1862270976
   }
 }

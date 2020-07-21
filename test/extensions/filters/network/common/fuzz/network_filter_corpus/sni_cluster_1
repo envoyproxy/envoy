@@ -10,7 +10,7 @@ actions {
 }
 actions {
   advance_time {
-    milliseconds: 268435456
+    milliseconds: 268435
   }
 }
 actions {
