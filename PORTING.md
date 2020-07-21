@@ -1,7 +1,7 @@
 # Envoy Porting
 
 * Linux (the original/baseline implementation)
-* Mac OS/X port 
+* macOS port 
 * Windows Win32 API port
 
 ## Troubleshooting Common Porting Issues
