@@ -51,7 +51,7 @@ ThreadLocalState::ThreadLocalState(const std::string& code, ThreadLocal::SlotAll
 
   // First verify that the supplied code can be parsed.
   CSmartPtr<lua_State, lua_close> state(lua_open());
-  ASSERT(state.get() != nullptr, "unable to create new lua state object");
+  RELEASE_ASSERT(state.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state.get());
 
   if (0 != luaL_dostring(state.get(), code.c_str())) {
@@ -71,8 +71,8 @@ int ThreadLocalState::getGlobalRef(uint64_t slot) {
 }
 
 uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
-  tls_slot_->runOnAllThreads([this, global]() {
-    LuaThreadLocal& tls = tls_slot_->getTyped<LuaThreadLocal>();
+  tls_slot_->runOnAllThreads([global](ThreadLocal::ThreadLocalObjectSharedPtr previous) {
+    LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(previous);
     lua_getglobal(tls.state_.get(), global.c_str());
     if (lua_isfunction(tls.state_.get(), -1)) {
       tls.global_slots_.push_back(luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX));
@@ -81,6 +81,7 @@ uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
       lua_pop(tls.state_.get(), 1);
       tls.global_slots_.push_back(LUA_REFNIL);
     }
+    return previous;
   });
 
   return current_global_slot_++;
@@ -92,7 +93,7 @@ CoroutinePtr ThreadLocalState::createCoroutine() {
 }
 
 ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code) : state_(lua_open()) {
-  ASSERT(state_.get() != nullptr, "unable to create new lua state object");
+  RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
   luaL_openlibs(state_.get());
   int rc = luaL_dostring(state_.get(), code.c_str());
   ASSERT(rc == 0);
