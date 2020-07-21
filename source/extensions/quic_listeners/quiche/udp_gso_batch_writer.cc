@@ -65,10 +65,8 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
   quic::QuicSocketAddress self_addr = envoyAddressIpToQuicSocketAddress(local_ip);
   size_t payload_len = static_cast<size_t>(buffer.length());
 
-  // TODO(yugant): If QUIC Then: define PerPacketOptions
-  // Take extra parameter to writeToSocket and use it to create PerPacketOptions
-  // Also we are not taking care of setting write_blocked_ (if needed) over here, as the
-  // WritePacket implementation will do that for us.
+  // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
+  // specify this parameter here at a later stage.
   quic::WriteResult quic_result =
       WritePacket(buffer.toString().c_str(), payload_len, self_addr.host(), peer_addr,
                   /*quic::PerPacketOptions=*/nullptr);

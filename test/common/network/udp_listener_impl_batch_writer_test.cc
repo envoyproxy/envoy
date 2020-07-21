@@ -71,6 +71,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplBatchWriterTest,
  *       buffered and already buffered packets are sent to client
  *     - When payload size < gso_size verify that the new payload is
  *       sent along with the already buffered payloads.
+ *  3. Call UdpPacketWriter's External Flush
+ *     - Verify that the internal buffer is emptied and its contents
+ *       are delivered to the client.
  */
 TEST_P(UdpListenerImplBatchWriterTest, SendData) {
 
@@ -137,7 +140,20 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
     }
   }
 
-  // TODO(yugant): Add Test External Flush
+  // Test External Flush
+  auto flush_result = listener_->udpPacketWriter()->flush();
+  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().internal_buffer_size_.value(),
+            0);
+  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().last_buffered_msg_size_.value(),
+            0);
+  const uint64_t bytes_flushed = payloads.back().length();
+  UdpRecvData received_flush_data;
+  client_.recv(received_flush_data);
+  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().sent_bytes_.value(),
+            received_flush_data.buffer_->length());
+  EXPECT_EQ(bytes_flushed, received_flush_data.buffer_->length());
+  EXPECT_EQ(send_from_addr->asString(), received_flush_data.addresses_.peer_->asString());
+  EXPECT_EQ(received_flush_data.buffer_->toString(), payloads.back());
 }
 
 } // namespace
