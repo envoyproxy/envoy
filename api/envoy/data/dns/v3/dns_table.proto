@@ -44,8 +44,10 @@ message DnsTable {
     oneof protocol_config {
       option (validate.required) = true;
 
+      // Specify the protocol number for the service. Envoy will try to resolve the number to the protocol name. Eg. 6 will resolve to "tcp"
       uint32 number = 1 [(validate.rules).uint32 = {lt: 255}];
 
+      // Specify the protocol name for the service.
       string name = 2 [(validate.rules).string = {min_len: 2 well_known_regex: HTTP_HEADER_NAME}];
     }
   }
