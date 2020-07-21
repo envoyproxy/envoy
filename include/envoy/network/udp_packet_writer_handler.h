@@ -45,15 +45,14 @@ public:
   virtual bool isWriteBlocked() const PURE;
 
   /**
-   * @brief records that the socket has become writable, for example when an EPOLLOUT
+   * @brief Records that the socket has become writable, for example when an EPOLLOUT
    * is received or an asynchronous write completes.
    */
   virtual void setWritable() PURE;
 
   /**
-   * @brief get the maximum size of the packet which can be written using this
+   * @brief Get the maximum size of the packet which can be written using this
    * writer for the supplied peer address.
-   *
    * @param peer_address  is the destination address to send to.
    * @return uint64_t the Max Packet Size object
    */
@@ -74,10 +73,9 @@ public:
   // type here as a struct with both char* and function ptr.
 
   /**
-   * @brief get pointer to the next write location in internal buffer,
+   * @brief Get pointer to the next write location in internal buffer,
    * it should be called iff the caller does not call writePacket
    * for the returned buffer.
-   *
    * @param local_ip is the source address to be used to send.
    * @param peer_address is the destination address to send to.
    * @return char* pointer to the next write location
@@ -86,8 +84,8 @@ public:
                                      const Address::Instance& peer_address) PURE;
 
   /**
-   * @brief batch Mode: Try to send all buffered packets
-   *        passThrough Mode: NULL operation
+   * @brief Batch Mode: Try to send all buffered packets
+   *        PassThrough Mode: NULL operation
    *
    * @return Api::IoCallUint64Result
    */
@@ -99,12 +97,12 @@ public:
   virtual std::string name() const PURE;
 
   /**
-   * @brief get the io handle associated with the udp_packet_writer
+   * @brief Get the io handle associated with the udp_packet_writer
    */
   virtual Network::IoHandle& getWriterIoHandle() const PURE;
 
   /**
-   * @brief get the Udp Packet Writer Stats object
+   * @brief Get the Udp Packet Writer Stats object
    */
   virtual UdpPacketWriterStats getUdpPacketWriterStats() PURE;
 };

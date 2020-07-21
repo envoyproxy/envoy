@@ -8,27 +8,14 @@ namespace Envoy {
 namespace Quic {
 
 namespace {
-Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result,
-                                               Network::UdpPacketWriterStats& stats,
-                                               size_t buflen) {
+Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result) {
   if (quic_result.status == quic::WRITE_STATUS_OK) {
     // Write Successful
     if (quic_result.bytes_written == 0) {
-      stats.internal_buffer_size_.add(buflen);
-      stats.last_buffered_msg_size_.set(buflen);
       ENVOY_LOG_MISC(trace, "sendmsg successful, message buffered to send");
     } else {
-      if (buflen < stats.last_buffered_msg_size_.value()) {
-        stats.internal_buffer_size_.set(0);
-        stats.last_buffered_msg_size_.set(0);
-      } else {
-        stats.internal_buffer_size_.set(buflen);
-        stats.last_buffered_msg_size_.set(buflen);
-      }
       ENVOY_LOG_MISC(trace, "sendmsg successful, flushed bytes {}", quic_result.bytes_written);
     }
-    stats.sent_bytes_.set(quic_result.bytes_written);
-
     // Return bytes_written as rc & nullptr as error on success
     return Api::IoCallUint64Result(
         /*rc=*/quic_result.bytes_written,
@@ -62,7 +49,7 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result,
 
 } // namespace
 
-// Initialize QuicGsoBatchWriter, and set socket_
+// Initialize QuicGsoBatchWriter, set io_handle_ and stats_
 UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope)
     : quic::QuicGsoBatchWriter(std::make_unique<quic::QuicBatchWriterBuffer>(), io_handle.fd()),
       io_handle_(io_handle), stats_(generateStats(scope)) {}
@@ -76,17 +63,18 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
   // Convert received parameters to relevant forms
   quic::QuicSocketAddress peer_addr = envoyAddressInstanceToQuicSocketAddress(peer_address);
   quic::QuicSocketAddress self_addr = envoyAddressIpToQuicSocketAddress(local_ip);
-  size_t buflen = static_cast<size_t>(buffer.length());
+  size_t payload_len = static_cast<size_t>(buffer.length());
 
   // TODO(yugant): If QUIC Then: define PerPacketOptions
   // Take extra parameter to writeToSocket and use it to create PerPacketOptions
   // Also we are not taking care of setting write_blocked_ (if needed) over here, as the
   // WritePacket implementation will do that for us.
   quic::WriteResult quic_result =
-      WritePacket(buffer.toString().c_str(), buflen, self_addr.host(), peer_addr,
+      WritePacket(buffer.toString().c_str(), payload_len, self_addr.host(), peer_addr,
                   /*quic::PerPacketOptions=*/nullptr);
+  updateUdpPacketWriterStats(quic_result, payload_len);
 
-  return convertQuicWriteResult(quic_result, stats_, buflen);
+  return convertQuicWriteResult(quic_result);
 }
 
 uint64_t UdpGsoBatchWriter::getMaxPacketSize(const Network::Address::Instance& peer_address) const {
@@ -104,10 +92,25 @@ char* UdpGsoBatchWriter::getNextWriteLocation(const Network::Address::Ip* local_
 
 Api::IoCallUint64Result UdpGsoBatchWriter::flush() {
   quic::WriteResult quic_result = Flush();
-  return convertQuicWriteResult(quic_result, stats_, /*buflen=*/0);
+  updateUdpPacketWriterStats(quic_result, /*payload_len=*/0);
+
+  return convertQuicWriteResult(quic_result);
 }
 
-Network::IoHandle& UdpGsoBatchWriter::getWriterIoHandle() const { return io_handle_; }
+void UdpGsoBatchWriter::updateUdpPacketWriterStats(quic::WriteResult quic_result,
+                                                   size_t payload_len) {
+  stats_.internal_buffer_size_.set(batch_buffer().SizeInUse());
+  stats_.sent_bytes_.set(quic_result.bytes_written);
+  if (quic_result.bytes_written > 0) {
+    stats_.last_buffered_msg_size_.set(
+        payload_len < stats_.last_buffered_msg_size_.value() ? 0 : payload_len);
+  } else if (quic_result.status == quic::WRITE_STATUS_OK ||
+             quic_result.status == quic::WRITE_STATUS_BLOCKED_DATA_BUFFERED) {
+    stats_.last_buffered_msg_size_.set(payload_len);
+  } else {
+    stats_.last_buffered_msg_size_.set(0);
+  }
+}
 
 Network::UdpPacketWriterStats UdpGsoBatchWriter::generateStats(Stats::Scope& scope) {
   return {UDP_PACKET_WRITER_STATS(POOL_GAUGE(scope))};
