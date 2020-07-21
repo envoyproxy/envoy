@@ -20,6 +20,7 @@ actions {
 }
 actions {
   on_data {
+    data: "y"
   }
 }
 actions {
@@ -27,8 +28,4 @@ actions {
     milliseconds: 2097152
   }
 }
-actions {
-  advance_time {
-    milliseconds: 778793567
-  }
-}
+

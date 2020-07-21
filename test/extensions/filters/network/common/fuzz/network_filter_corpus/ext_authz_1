@@ -5,6 +5,15 @@ config {
   }
 }
 actions {
+  on_data {
+    data: "y"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
   advance_time {
     milliseconds: 655360
   }

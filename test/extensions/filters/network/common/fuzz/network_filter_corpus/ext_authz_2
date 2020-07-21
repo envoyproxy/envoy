@@ -6,6 +6,10 @@ config {
   }
 }
 actions {
+  on_new_connection {
+  }
+}
+actions {
   on_data {
     data: ":"
   }
