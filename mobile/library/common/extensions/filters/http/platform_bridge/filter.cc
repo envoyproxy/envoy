@@ -14,22 +14,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace PlatformBridge {
 
-Http::FilterHeadersStatus mapStatus(envoy_filter_headers_status_t status) {
-  switch (status) {
-  case ENVOY_FILTER_HEADERS_STATUS_CONTINUE:
-    return Http::FilterHeadersStatus::Continue;
-  case ENVOY_FILTER_HEADERS_STATUS_STOP_ITERATION:
-    return Http::FilterHeadersStatus::StopIteration;
-  case ENVOY_FILTER_HEADERS_STATUS_CONTINUE_AND_END_STREAM:
-    return Http::FilterHeadersStatus::ContinueAndEndStream;
-  case ENVOY_FILTER_HEADERS_STATUS_STOP_ALL_ITERATION_AND_BUFFER:
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
-  default:
-    ASSERT(false, fmt::format("unrecognized filter status from platform: {}", status));
-    return Http::FilterHeadersStatus::Continue;
-  }
-}
-
 PlatformBridgeFilterConfig::PlatformBridgeFilterConfig(
     const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& proto_config)
     : platform_filter_(static_cast<envoy_http_filter*>(
@@ -48,7 +32,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::onHeaders(Http::HeaderMap& heade
   envoy_headers in_headers = Http::Utility::toBridgeHeaders(headers);
   envoy_filter_headers_status result =
       on_headers(in_headers, end_stream, platform_filter_->context);
-  Http::FilterHeadersStatus status = mapStatus(result.status);
+  Http::FilterHeadersStatus status = static_cast<Http::FilterHeadersStatus>(result.status);
   // TODO(goaway): Current platform implementations expose immutable headers, thus any modification
   // necessitates a full copy. Add 'modified' bit to determine when we can elide the copy. See also
   // https://github.com/lyft/envoy-mobile/issues/949 for potential future optimization.

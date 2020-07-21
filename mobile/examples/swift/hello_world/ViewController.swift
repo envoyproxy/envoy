@@ -15,7 +15,7 @@ final class ViewController: UITableViewController {
     super.viewDidLoad()
     do {
       NSLog("starting Envoy...")
-      self.client = try StreamClientBuilder().build()
+      self.client = try StreamClientBuilder().addFilter(DemoFilter()).build()
     } catch let error {
       NSLog("starting Envoy failed: \(error)")
     }
@@ -56,7 +56,11 @@ final class ViewController: UITableViewController {
       .newStreamPrototype()
       .setOnResponseHeaders { [weak self] headers, _ in
         let statusCode = headers.httpStatus ?? -1
-        let message = "received headers with status \(statusCode)"
+        var message = "received headers with status \(statusCode)"
+        if let filterDemoValue = headers.value(forName: "filter-demo")?.first {
+          message += " and filter-demo set to \(filterDemoValue)"
+        }
+
         let response = Response(message: message,
                                 serverHeader: headers.value(forName: "server")?.first ?? "")
         NSLog(message)

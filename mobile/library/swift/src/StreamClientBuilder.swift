@@ -21,6 +21,7 @@ public final class StreamClientBuilder: NSObject {
   private var statsFlushSeconds: UInt32 = 60
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
+  private var filterChain: [EnvoyHTTPFilter] = []
   private var virtualClusters: String = "[]"
 
   // MARK: - Public
@@ -107,6 +108,21 @@ public final class StreamClientBuilder: NSObject {
     return self
   }
 
+  /// Add HTTP filter for requests sent by this client. Note the current implementation
+  /// uses a single filter instance for all streams on an engine; in other words,
+  /// filters must be effectively stateless. An upcoming change will switch to
+  /// per-stream filter instances (which can then maintain their own state).
+  ///
+  /// - parameter filter: HTTP Filter to be invoked for streams.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addFilter(_ filter: Filter) -> StreamClientBuilder {
+    // TODO(goaway): Update types here for per-stream instances.
+    self.filterChain.append(EnvoyHTTPFilter(filter: filter))
+    return self
+  }
+
   /// Add the App Version of the App using this Envoy Client.
   ///
   /// - parameter appVersion: The version.
@@ -155,6 +171,7 @@ public final class StreamClientBuilder: NSObject {
         dnsRefreshSeconds: self.dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
+        filterChain: self.filterChain,
         statsFlushSeconds: self.statsFlushSeconds,
         appVersion: self.appVersion,
         appId: self.appId,

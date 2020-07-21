@@ -7,12 +7,11 @@
 /**
  * Return codes for on-headers filter invocations. @see envoy/http/filter.h
  */
-typedef enum {
-  ENVOY_FILTER_HEADERS_STATUS_CONTINUE = 0,
-  ENVOY_FILTER_HEADERS_STATUS_STOP_ITERATION,
-  ENVOY_FILTER_HEADERS_STATUS_CONTINUE_AND_END_STREAM,
-  ENVOY_FILTER_HEADERS_STATUS_STOP_ALL_ITERATION_AND_BUFFER,
-} envoy_filter_headers_status_t;
+typedef int envoy_filter_headers_status_t;
+extern const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusContinue;
+extern const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusStopIteration;
+extern const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusContinueAndEndStream;
+extern const envoy_filter_headers_status_t kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
 
 /**
  * Compound return type for on-headers filter invocations.
