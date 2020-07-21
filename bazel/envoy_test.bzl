@@ -254,8 +254,8 @@ def envoy_cc_benchmark_binary(
     )
 
 # Tests to validate that Envoy benchmarks run successfully should be specified
-# with this function. Not for actual performance measurements: iteratons will be
-# skipped in the interest of execution time.
+# with this function. Not for actual performance measurements: iteratons and
+# expensive benchmarks will be skipped in the interest of execution time.
 def envoy_benchmark_test(
         name,
         benchmark_binary,

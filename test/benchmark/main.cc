@@ -4,6 +4,8 @@
 
 #include "test/test_common/environment.h"
 
+#include "common/common/logger.h"
+
 #include "benchmark/benchmark.h"
 #include "tclap/CmdLine.h"
 
@@ -37,4 +39,11 @@ int main(int argc, char** argv) {
   benchmark::RunSpecifiedBenchmarks();
 }
 
-bool Envoy::benchmark::skipExpensiveBenchmarks() { return skip_expensive_benchmarks; }
+bool Envoy::benchmark::skipExpensiveBenchmarks() {
+  if (skip_expensive_benchmarks) {
+    auto logger = Logger::Registry::getLog(Logger::Id::testing);
+    logger.warn("Expensive benchmarks are being skipped; see test/README.md for more information");
+  }
+
+  return skip_expensive_benchmarks;
+}

@@ -128,9 +128,10 @@ microbenchmarks. There are custom bazel rules, `envoy_cc_benchmark_binary` and
 `envoy_benchmark_test`, to execute them locally and in CI environments
 respectively. `envoy_benchmark_test` rules call the benchmark binary from a
 [script](https://github.com/envoyproxy/envoy/blob/master/bazel/test_for_benchmark_wrapper.sh)
-which runs the test quickly instead of rigourously. In order to collect
-meaningful bechmarks, `bazel run -c opt` the benchmark binary target on a
-quiescent machine.
+which runs the benchmark with a minimal number of iterations and skipping
+expensive benchmarks to quickly verify that the binary is able to run to
+completion. In order to collect meaningful bechmarks, `bazel run -c opt` the
+benchmark binary target on a quiescent machine.
 
 If you would like to detect when your benchmark test is running under the
 wrapper, call
