@@ -304,6 +304,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
       purgePendingRequests(client.real_host_description_, failure_reason, reason);
+      // TODO(alyssawilk) only iff upstream is healthy.
       // See if we should prefetch another connection based on active connections.
       tryCreateNewConnections();
     }
