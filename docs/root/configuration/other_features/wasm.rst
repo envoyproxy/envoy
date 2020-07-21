@@ -3,7 +3,7 @@
 Wasm service
 ============
 
-The :ref:`WasmService <envoy_api_msg_extensions.wasm.v3.WasmService>` configuration specifies a
+The :ref:`WasmService <envoy_v3_api_msg_extensions.wasm.v3.WasmService>` configuration specifies a
 singleton or per-worker Wasm service for background or on-demand activities.
 
 Example plugin configuration:
