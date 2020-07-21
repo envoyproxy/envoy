@@ -1083,7 +1083,7 @@ message RetryPolicy {
     // Specifies the maximum rate limited retry back off interval that Envoy
     // will allow. If a rate limited reset header contains an interval longer
     // than this then the default exponential back off strategy will be used
-    // instead.
+    // instead. Defaults to 300 seconds.
     google.protobuf.Duration reset_max_interval = 2 [(validate.rules).duration = {gt {}}];
   }
 
