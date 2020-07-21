@@ -254,9 +254,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   }
 
   std::string exception_msg;
-  Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
-  detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources, clean_removed_resources,
-                                        exception_msg);
+  Protobuf::RepeatedPtrField<std::string> clean_removed_resources =
+      detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources, exception_msg);
   if (!exception_msg.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
   }
@@ -309,10 +308,11 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
-void ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
+Protobuf::RepeatedPtrField<std::string>
+ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    Protobuf::RepeatedPtrField<std::string>& clean_removed_resources, std::string& exception_msg) {
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, std::string& exception_msg) {
+  Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
   // all the scope names to be removed or updated.
   absl::flat_hash_set<std::string> updated_or_removed_scopes;
   for (const std::string& removed_resource : removed_resources) {
@@ -342,7 +342,7 @@ void ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     auto scope_config_inserted = scoped_routes.try_emplace(scope_name, std::move(scoped_route));
     if (!scope_config_inserted.second) {
       exception_msg = fmt::format("duplicate scoped route configuration '{}' found", scope_name);
-      return;
+      return clean_removed_resources;
     }
     const envoy::config::route::v3::ScopedRouteConfiguration& scoped_route_config =
         scope_config_inserted.first->second;
@@ -351,7 +351,7 @@ void ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
       exception_msg =
           fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
                       scope_name_by_hash[key_fingerprint], scope_name);
-      return;
+      return clean_removed_resources;
     }
   }
 
@@ -361,6 +361,7 @@ void ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
       *clean_removed_resources.Add() = removed_resource;
     }
   }
+  return clean_removed_resources;
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
