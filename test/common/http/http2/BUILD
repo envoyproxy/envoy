@@ -148,12 +148,18 @@ envoy_cc_fuzz_test(
     name = "response_header_fuzz_test",
     srcs = ["response_header_fuzz_test.cc"],
     corpus = "response_header_corpus",
-    deps = [":frame_replay_lib"],
+    deps = [
+        ":frame_replay_lib",
+        "//test/common/http/http2:codec_impl_test_util",
+    ],
 )
 
 envoy_cc_fuzz_test(
     name = "request_header_fuzz_test",
     srcs = ["request_header_fuzz_test.cc"],
     corpus = "request_header_corpus",
-    deps = [":frame_replay_lib"],
+    deps = [
+        ":frame_replay_lib",
+        "//test/common/http/http2:codec_impl_test_util",
+    ],
 )

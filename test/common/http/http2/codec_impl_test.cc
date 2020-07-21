@@ -1749,8 +1749,12 @@ TEST_P(Http2CodecImplTest, PingFlood) {
         buffer.move(frame);
       }));
 
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many control frames in the outbound queue.");
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_THROW_WITH_MESSAGE(
+      client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+          ? "Too many control frames in the outbound queue."
+          : "Too many frames in the outbound queue.");
   EXPECT_EQ(ack_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_control_flood").value());
 }
@@ -1820,8 +1824,12 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
 
   // 1 more ping frame should overflow the outbound frame limit.
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many control frames in the outbound queue.");
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_THROW_WITH_MESSAGE(
+      client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+          ? "Too many control frames in the outbound queue."
+          : "Too many frames in the outbound queue.");
 }
 
 // Verify that codec detects flood of outbound HEADER frames
@@ -1996,8 +2004,12 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
 
 TEST_P(Http2CodecImplTest, PriorityFlood) {
   priorityFlood();
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many PRIORITY frames");
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_THROW_WITH_MESSAGE(
+      client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+          ? "Too many PRIORITY frames"
+          : "Flooding was detected in this HTTP/2 session, and it must be closed");
 }
 
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
@@ -2009,8 +2021,12 @@ TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
 
 TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
   windowUpdateFlood();
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many WINDOW_UPDATE frames");
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_THROW_WITH_MESSAGE(
+      client_->sendPendingFrames().IgnoreError(), ServerCodecError,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+          ? "Too many WINDOW_UPDATE frames"
+          : "Flooding was detected in this HTTP/2 session, and it must be closed");
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
@@ -2026,7 +2042,11 @@ TEST_P(Http2CodecImplTest, EmptyDataFlood) {
   auto status = server_wrapper_.dispatch(data, *server_);
   EXPECT_FALSE(status.ok());
   EXPECT_TRUE(isBufferFloodError(status));
-  EXPECT_EQ("Too many consecutive frames with an empty payload", status.message());
+  // Legacy codec does not propagate error details and uses generic error message
+  EXPECT_EQ(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_codec_behavior")
+                ? "Too many consecutive frames with an empty payload"
+                : "Flooding was detected in this HTTP/2 session, and it must be closed",
+            status.message());
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
