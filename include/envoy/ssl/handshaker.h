@@ -45,9 +45,10 @@ public:
    * Do the handshake.
    *
    *  * |state| is a mutable reference.
-   *  * |ssl| is a pointer, and this method may be called with |ssl| == nullptr,
-   *    for example during a reentrant call to doHandshake() during a period
-   *    when the handshaker has handed off the SSL*.
+   *  * |ssl| should be either a pointer to some underlying SSL object, or
+   *    nullptr (in the case of a socket which has handed off its SSL object to
+   *    another process). Since doHandshake gets called repeatedly until done,
+   *    implementations should handle a nullptr |ssl| gracefully.
    *  * |callbacks| may not exist throughout the lifetime of the Handshaker, and
    *    should not be stored in an implementation.
    */
