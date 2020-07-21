@@ -41,10 +41,11 @@ public:
   virtual ~UdpPacketWriter() = default;
 
   /**
-   * Sends a packet via given UDP socket with specific source address.
+   * @brief Sends a packet via given UDP socket with specific source address.
    * @param buffer points to the buffer containing the packet
    * @param local_ip is the source address to be used to send.
    * @param peer_address is the destination address to send to.
+   * @return result with number of bytes written, and write status
    */
   virtual Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
                                               const Address::Ip* local_ip,
