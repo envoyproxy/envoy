@@ -7,6 +7,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// A set of headers that may be passed to/from an Envoy stream.
 typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
+/// A mutable set of headers that may be passed to/from an Envoy stream.
+typedef NSMutableDictionary<NSString *, NSMutableArray<NSString *> *> EnvoyMutableHeaders;
+
 #pragma mark - EnvoyHTTPCallbacks
 
 /// Interface that can handle callbacks from an HTTP stream.
@@ -52,6 +55,24 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  * stream will be issued afterwards.
  */
 @property (nonatomic, strong) void (^onCancel)(void);
+
+@end
+
+#pragma mark - EnvoyHTTPFilter
+
+/// Return codes for on-headers filter invocations. @see envoy/http/filter.h
+extern const int kEnvoyFilterHeadersStatusContinue;
+extern const int kEnvoyFilterHeadersStatusStopIteration;
+extern const int kEnvoyFilterHeadersStatusContinueAndEndStream;
+extern const int kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
+
+@interface EnvoyHTTPFilter : NSObject
+
+@property (nonatomic, strong) NSString *name;
+
+@property (nonatomic, strong) NSArray * (^onRequestHeaders)(EnvoyHeaders *headers, BOOL endStream);
+
+@property (nonatomic, strong) NSArray * (^onResponseHeaders)(EnvoyHeaders *headers, BOOL endStream);
 
 @end
 
@@ -122,6 +143,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
+@property (nonatomic, strong) NSArray<EnvoyHTTPFilter *> *httpFilters;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
@@ -135,6 +157,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
+                        filterChain:(NSArray<EnvoyHTTPFilter *> *)httpFilters
                   statsFlushSeconds:(UInt32)statsFlushSeconds
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId

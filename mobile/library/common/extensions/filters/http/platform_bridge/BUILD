@@ -9,7 +9,10 @@ api_proto_package()
 
 envoy_cc_library(
     name = "platform_bridge_filter_lib",
-    srcs = ["filter.cc"],
+    srcs = [
+        "c_types.cc",
+        "filter.cc",
+    ],
     hdrs = [
         "c_types.h",
         "filter.h",

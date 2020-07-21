@@ -37,18 +37,4 @@ public protocol ResponseFilter: Filter {
   ///
   /// - returns: The trailer status containing body with which to continue or buffer.
   func onResponseTrailers(_ trailers: ResponseTrailers) -> FilterTrailerStatus<ResponseTrailers>
-
-  /// Called at most once when an error within Envoy occurs.
-  ///
-  /// This should be considered a terminal state, and invalidates any previous attempts to
-  /// `stopIteration{...}`.
-  ///
-  /// - error: The error that occurred within Envoy.
-  func onError(_ error: EnvoyError)
-
-  /// Called at most once when the client cancels the stream.
-  ///
-  /// This should be considered a terminal state, and invalidates any previous attempts to
-  /// `stopIteration{...}`.
-  func onCancel()
 }
