@@ -187,7 +187,7 @@ public:
    * Gets the current map of vendor specific factory versions.
    */
   static absl::flat_hash_map<std::string, envoy::config::core::v3::BuildVersion>&
-  versioned_factories() {
+  versionedFactories() {
     using VersionedFactoryMap =
         absl::flat_hash_map<std::string, envoy::config::core::v3::BuildVersion>;
     MUTABLE_CONSTRUCT_ON_FIRST_USE(VersionedFactoryMap);
@@ -236,7 +236,7 @@ public:
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
-    versioned_factories().emplace(std::make_pair(name, version));
+    versionedFactories().emplace(std::make_pair(name, version));
     if (!instead_value.empty()) {
       deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
     }
@@ -328,8 +328,8 @@ public:
    */
   static absl::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) {
-    auto it = versioned_factories().find(name);
-    if (it == versioned_factories().end()) {
+    auto it = versionedFactories().find(name);
+    if (it == versionedFactories().end()) {
       return absl::nullopt;
     }
     return it->second;
@@ -528,7 +528,8 @@ public:
     if (!instance_.name().empty()) {
       FactoryRegistry<Base>::registerFactory(instance_, instance_.name());
     } else {
-      ASSERT(deprecated_names.size() != 0);
+      ASSERT(deprecated_names.size() != 0,
+             "Attempted to register a factory without a name or deprecated name");
     }
 
     for (auto deprecated_name : deprecated_names) {

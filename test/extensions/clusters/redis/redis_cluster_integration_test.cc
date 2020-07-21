@@ -170,7 +170,7 @@ public:
     });
 
     on_server_ready_function_ = [this](Envoy::IntegrationTestServer& test_server) {
-      mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&(test_server.server().random()));
+      mock_rng_ = dynamic_cast<Random::MockRandomGenerator*>(&(test_server.server().random()));
       // Abort now if we cannot downcast the server's random number generator pointer.
       ASSERT_TRUE(mock_rng_ != nullptr);
       // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
@@ -201,7 +201,7 @@ protected:
     std::string ok = "+OK\r\n";
 
     redis_client->clearData();
-    redis_client->write(request);
+    ASSERT_TRUE(redis_client->write(request));
 
     if (fake_upstream_connection.get() == nullptr) {
       expect_auth_command = (!auth_password.empty());
@@ -356,7 +356,7 @@ protected:
     return result.str();
   }
 
-  Runtime::MockRandomGenerator* mock_rng_{};
+  Random::MockRandomGenerator* mock_rng_{};
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
   int random_index_;
@@ -471,7 +471,7 @@ TEST_P(RedisClusterIntegrationTest, ClusterSlotRequestAfterRedirection) {
   std::string proxy_to_server;
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2,
       fake_upstream_connection_3;
@@ -593,7 +593,7 @@ TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
   std::string proxy_to_server;
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  redis_client->write(request);
+  ASSERT_TRUE(redis_client->write(request));
 
   FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
 

@@ -16,9 +16,6 @@
 namespace Envoy {
 namespace Quic {
 
-// using QuicRuntimeFlagsMapPtr = std::map<std::string,
-// envoy::config::core::v3::RuntimeFeatureFlag>;
-
 // QUIC specific UdpListenerCallbacks implementation which delegates incoming
 // packets, write signals and listener errors to QuicDispatcher.
 class ActiveQuicListener : public Network::UdpListenerCallbacks,

@@ -199,6 +199,11 @@ config_setting(
     values = {"define": "path_normalization_by_default=true"},
 )
 
+config_setting(
+    name = "enable_legacy_codecs_in_integration_tests",
+    values = {"define": "use_legacy_codecs_in_integration_tests=true"},
+)
+
 cc_proto_library(
     name = "grpc_health_proto",
     deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
@@ -339,6 +344,19 @@ config_setting(
 config_setting(
     name = "android_logger",
     values = {"define": "logger=android"},
+)
+
+config_setting(
+    name = "libfuzzer_coverage",
+    define_values = {
+        "FUZZING_ENGINE": "libfuzzer",
+        "ENVOY_CONFIG_COVERAGE": "1",
+    },
+)
+
+config_setting(
+    name = "libfuzzer",
+    values = {"define": "FUZZING_ENGINE=libfuzzer"},
 )
 
 alias(

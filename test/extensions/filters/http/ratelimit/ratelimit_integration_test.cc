@@ -135,25 +135,19 @@ public:
     response_msg.set_overall_code(code);
 
     response_headers_to_add.iterate(
-        [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
-          auto header = static_cast<envoy::service::ratelimit::v3::RateLimitResponse*>(context)
-                            ->mutable_response_headers_to_add()
-                            ->Add();
+        [&response_msg](const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
+          auto header = response_msg.mutable_response_headers_to_add()->Add();
           header->set_key(std::string(h.key().getStringView()));
           header->set_value(std::string(h.value().getStringView()));
           return Http::HeaderMap::Iterate::Continue;
-        },
-        &response_msg);
+        });
     request_headers_to_add.iterate(
-        [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
-          auto header = static_cast<envoy::service::ratelimit::v3::RateLimitResponse*>(context)
-                            ->mutable_request_headers_to_add()
-                            ->Add();
+        [&response_msg](const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
+          auto header = response_msg.mutable_request_headers_to_add()->Add();
           header->set_key(std::string(h.key().getStringView()));
           header->set_value(std::string(h.value().getStringView()));
           return Http::HeaderMap::Iterate::Continue;
-        },
-        &response_msg);
+        });
     ratelimit_request_->sendGrpcMessage(response_msg);
     ratelimit_request_->finishGrpcStream(Grpc::Status::Ok);
   }
@@ -223,22 +217,18 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   waitForSuccessfulUpstreamResponse();
 
   ratelimit_response_headers.iterate(
-      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
+      [response = response_.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
         EXPECT_EQ(entry.value(), response->headers().get(lower_key)->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
-      },
-      response_.get());
+      });
 
-  request_headers_to_add.iterate(
-      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        FakeStream* upstream = static_cast<FakeStream*>(context);
-        Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-        EXPECT_EQ(entry.value(), upstream->headers().get(lower_key)->value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      upstream_request_.get());
+  request_headers_to_add.iterate([upstream = upstream_request_.get()](
+                                     const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
+    EXPECT_EQ(entry.value(), upstream->headers().get(lower_key)->value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   cleanup();
 
@@ -270,13 +260,11 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   waitForFailedUpstreamResponse(429);
 
   ratelimit_response_headers.iterate(
-      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
+      [response = response_.get()](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
         Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
         EXPECT_EQ(entry.value(), response->headers().get(lower_key)->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
-      },
-      response_.get());
+      });
 
   cleanup();
 

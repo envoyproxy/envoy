@@ -20,9 +20,11 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/common/assert.h"
 #include "common/common/basic_resource_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
@@ -76,7 +78,7 @@ public:
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
-  Network::Socket& mutable_socket() { return *socket_; }
+  Network::Socket& mutableSocket() { return *socket_; }
 
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
@@ -168,6 +170,7 @@ public:
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
+  bool streamErrorOnInvalidHttpMessaging() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
@@ -243,6 +246,39 @@ private:
 
     Router::ScopedConfigConstSharedPtr config_;
     TimeSource& time_source_;
+  };
+
+  /**
+   * Implementation of OverloadManager that is never overloaded. Using this instead of the real
+   * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
+   */
+  struct NullOverloadManager : public OverloadManager {
+    struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
+      const OverloadActionState& getState(const std::string&) override { return inactive_; }
+
+      const OverloadActionState inactive_ = OverloadActionState::Inactive;
+    };
+
+    NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
+        : tls_(slot_allocator.allocateSlot()) {}
+
+    void start() override {
+      tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        return std::make_shared<NullThreadLocalOverloadState>();
+      });
+    }
+
+    ThreadLocalOverloadState& getThreadLocalOverloadState() override {
+      return tls_->getTyped<NullThreadLocalOverloadState>();
+    }
+
+    bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
+      // This method shouldn't be called by the admin listener
+      NOT_REACHED_GCOVR_EXCL_LINE;
+      return false;
+    }
+
+    ThreadLocal::SlotPtr tls_;
   };
 
   /**
@@ -389,6 +425,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;
+  NullOverloadManager null_overload_manager_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
   Stats::IsolatedStoreImpl no_op_store_;

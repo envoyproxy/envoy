@@ -39,7 +39,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
-  std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
+  Stats::ThreadLocalStoreImplPtr store_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,

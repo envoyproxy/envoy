@@ -66,7 +66,10 @@ ActiveQuicListener::ActiveQuicListener(
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       quiche::QuicheStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
-      quic::QuicRandom::GetInstance(), std::move(proof_source), quic::KeyExchangeSource::Default());
+      quic::QuicRandom::GetInstance(),
+      std::make_unique<EnvoyQuicProofSource>(listen_socket_, listener_config.filterChainManager(),
+                                             stats_),
+      quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());
