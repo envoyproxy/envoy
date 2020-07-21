@@ -55,7 +55,7 @@ float ConnPoolImplBase::prefetchRatio() const {
 
 void ConnPoolImplBase::tryCreateNewConnections() {
   // Somewhat arbitrarily cap the number of connections prefetched due to new
-  // incoming connections.  The prefetch ratio is capped at 3, so in steady
+  // incoming connections. The prefetch ratio is capped at 3, so in steady
   // state, no more than 3 connections should be prefetched. If hosts go
   // unhealthy, and connections are not immediately prefetched, it could be that
   // many connections are desired when the host becomes healthy again, but
