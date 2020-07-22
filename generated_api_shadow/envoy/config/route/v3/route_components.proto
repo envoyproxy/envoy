@@ -1106,7 +1106,7 @@ message RetryPolicy {
     //  1. An interval in seconds as an integer, for example: ``120``.
     //  2. A unix timestamp as an integer, for example: ``1595320702``. The timestamp
     //     must be in the future relative to the current system time.
-    repeated HeaderMatcher reset_headers = 1;
+    repeated HeaderMatcher reset_headers = 1 [(validate.rules).repeated = {min_items: 1}];
 
     // Specifies the maximum rate limited retry back off interval that Envoy
     // will allow. If a rate limited reset header contains an interval longer
