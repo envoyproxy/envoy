@@ -197,6 +197,7 @@ def envoy_dependencies(skip_targets = []):
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
     _repository_impl("rules_cc")
+    _org_unicode_icuuc()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -235,6 +236,7 @@ def _boringssl_fips():
         sha256 = location["sha256"],
         genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
+        patches = ["@envoy//bazel/external:boringssl_fips.patch"],
     )
 
 def _com_github_circonus_labs_libcircllhist():
@@ -699,6 +701,8 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     _repository_impl(
         name = "com_googlesource_googleurl",
+        patches = ["@envoy//bazel/external:googleurl.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "googleurl",
@@ -811,7 +815,6 @@ def _com_github_gperftools_gperftools():
     http_archive(
         name = "com_github_gperftools_gperftools",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_cmds = ["./autogen.sh"],
         **location
     )
 
@@ -856,6 +859,17 @@ filegroup(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
         **_get_location("kafka_python_client")
+    )
+
+def _org_unicode_icuuc():
+    _repository_impl(
+        name = "org_unicode_icuuc",
+        build_file = "@envoy//bazel/external:icuuc.BUILD",
+        # TODO(dio): Consider patching udata when we need to embed some data.
+    )
+    native.bind(
+        name = "icuuc",
+        actual = "@org_unicode_icuuc//:common",
     )
 
 def _foreign_cc_dependencies():

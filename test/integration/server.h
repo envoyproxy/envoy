@@ -150,6 +150,15 @@ public:
   }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    return wrapped_scope_->iterate(fn);
+  }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return wrapped_scope_->iterate(fn);
+  }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
@@ -333,6 +342,11 @@ public:
     return store_.textReadouts();
   }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
+
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}
@@ -465,7 +479,7 @@ protected:
                                        Network::Address::InstanceConstSharedPtr local_address,
                                        ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                        Server::ComponentFactory& component_factory,
-                                       Runtime::RandomGeneratorPtr&& random_generator,
+                                       Random::RandomGeneratorPtr&& random_generator,
                                        ProcessObjectOptRef process_object) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
@@ -528,7 +542,7 @@ private:
                                Network::Address::InstanceConstSharedPtr local_address,
                                ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                Server::ComponentFactory& component_factory,
-                               Runtime::RandomGeneratorPtr&& random_generator,
+                               Random::RandomGeneratorPtr&& random_generator,
                                ProcessObjectOptRef process_object) override;
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done

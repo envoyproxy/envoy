@@ -54,14 +54,16 @@ class ConnectionImpl;
 // Abstract nghttp2_session factory. Used to enable injection of factories for testing.
 class Nghttp2SessionFactory {
 public:
+  using ConnectionImplType = ConnectionImpl;
   virtual ~Nghttp2SessionFactory() = default;
 
   // Returns a new nghttp2_session to be used with |connection|.
   virtual nghttp2_session* create(const nghttp2_session_callbacks* callbacks,
-                                  ConnectionImpl* connection, const nghttp2_option* options) PURE;
+                                  ConnectionImplType* connection,
+                                  const nghttp2_option* options) PURE;
 
   // Initializes the |session|.
-  virtual void init(nghttp2_session* session, ConnectionImpl* connection,
+  virtual void init(nghttp2_session* session, ConnectionImplType* connection,
                     const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
 };
 
@@ -256,7 +258,7 @@ protected:
     // Callback function for MetadataDecoder.
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
-    bool buffers_overrun() const { return read_disable_count_ > 0; }
+    bool buffersOverrun() const { return read_disable_count_ > 0; }
 
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
@@ -491,6 +493,7 @@ private:
   int onFrameReceived(const nghttp2_frame* frame);
   int onBeforeFrameSend(const nghttp2_frame* frame);
   int onFrameSend(const nghttp2_frame* frame);
+  int onError(absl::string_view error);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
@@ -503,7 +506,7 @@ private:
   virtual void checkOutboundQueueLimits() PURE;
   void incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
   virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
-  virtual bool checkInboundFrameLimits() PURE;
+  virtual bool checkInboundFrameLimits(int32_t stream_id) PURE;
   void releaseOutboundFrame();
   void releaseOutboundControlFrame();
 
@@ -517,12 +520,13 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
+  using SessionFactory = Nghttp2SessionFactory;
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
                        CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
-                       Nghttp2SessionFactory& http2_session_factory);
+                       SessionFactory& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
@@ -542,7 +546,7 @@ private:
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
   void checkOutboundQueueLimits() override {}
   bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
-  bool checkInboundFrameLimits() override { return true; }
+  bool checkInboundFrameLimits(int32_t) override { return true; }
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -567,7 +571,7 @@ private:
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
   void checkOutboundQueueLimits() override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
-  bool checkInboundFrameLimits() override;
+  bool checkInboundFrameLimits(int32_t stream_id) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 
   // Http::Connection
