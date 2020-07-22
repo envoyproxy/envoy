@@ -103,6 +103,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
+DURATION_VALUE_REGEX = re.compile(r'duration\([0-9]+')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -620,6 +621,11 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if DURATION_VALUE_REGEX.search(line):
+    # Matching duration(int-const)
+    reportError(
+        "Don't use ambiguous duration(value), use explicit an explicit duration type, e.g. std::chrono::milliseconds(value) or std::chrono::duration<int64_t, std::micro>(value)"
+    )
   if not allowlistedForRegisterFactory(file_path):
     if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
       reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "

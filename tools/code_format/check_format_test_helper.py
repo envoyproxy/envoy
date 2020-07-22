@@ -166,6 +166,10 @@ def runChecks():
       "Don't reference real-world time sources from production code; use injection")
   errors += checkUnfixableError("real_time_source.cc", real_time_inject_error)
   errors += checkUnfixableError("real_time_system.cc", real_time_inject_error)
+  errors += checkUnfixableError(
+      "duration_value.cc",
+      "Don't use ambiguous duration(value), use explicit an explicit duration type, e.g. std::chrono::milliseconds(value) or std::chrono::duration<int64_t, std::micro>(value)"
+  )
   errors += checkUnfixableError("system_clock.cc", real_time_inject_error)
   errors += checkUnfixableError("steady_clock.cc", real_time_inject_error)
   errors += checkUnfixableError(
