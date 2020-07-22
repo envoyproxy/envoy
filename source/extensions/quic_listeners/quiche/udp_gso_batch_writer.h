@@ -5,12 +5,20 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 // QUICHE uses offsetof().
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
-// QUICHE doesn't mark override at QuicBatchWriterBase::SupportsReleaseTime()
-#pragma GCC diagnostic ignored "-Winconsistent-missing-override"
 // QUICHE allows ignored qualifiers
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+// QUICHE doesn't mark override at QuicBatchWriterBase::SupportsReleaseTime()
+#pragma clang diagnostic ignored "-Winconsistent-missing-override"
+#endif
+
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 #pragma GCC diagnostic pop
 
