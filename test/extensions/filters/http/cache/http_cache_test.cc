@@ -1,6 +1,7 @@
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
 
+#include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"

@@ -1,4 +1,4 @@
-load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library", "envoy_package")
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
@@ -8,11 +8,21 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "common",
+    hdrs = ["common.h"],
+    deps = [
+        "//source/extensions/filters/http/cache:cache_headers_utils_lib",
+        "//source/extensions/filters/http/cache:http_cache_lib",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "cache_headers_utils_test",
     srcs = ["cache_headers_utils_test.cc"],
     extension_name = "envoy.filters.http.cache",
     deps = [
+        ":common",
         "//include/envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
@@ -25,6 +35,7 @@ envoy_extension_cc_test(
     srcs = ["http_cache_test.cc"],
     extension_name = "envoy.filters.http.cache",
     deps = [
+        ":common",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
         "//test/mocks/http:http_mocks",
