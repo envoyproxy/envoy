@@ -286,8 +286,8 @@ INSTANTIATE_TEST_SUITE_P(RequestCacheControlTest, RequestCacheControlTest,
                          testing::ValuesIn(RequestCacheControlTest::getTestCases()));
 
 TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
-  absl::string_view cache_control_header = GetParam().cache_control_header;
-  RequestCacheControl expected_request_cache_control = GetParam().request_cache_control;
+  const absl::string_view cache_control_header = GetParam().cache_control_header;
+  const RequestCacheControl expected_request_cache_control = GetParam().request_cache_control;
   EXPECT_EQ(expected_request_cache_control, RequestCacheControl(cache_control_header));
 }
 
@@ -295,15 +295,15 @@ INSTANTIATE_TEST_SUITE_P(ResponseCacheControlTest, ResponseCacheControlTest,
                          testing::ValuesIn(ResponseCacheControlTest::getTestCases()));
 
 TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
-  absl::string_view cache_control_header = GetParam().cache_control_header;
-  ResponseCacheControl expected_response_cache_control = GetParam().response_cache_control;
+  const absl::string_view cache_control_header = GetParam().cache_control_header;
+  const ResponseCacheControl expected_response_cache_control = GetParam().response_cache_control;
   EXPECT_EQ(expected_response_cache_control, ResponseCacheControl(cache_control_header));
 }
 
 INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(HttpTimeTest::getOkTestCases()));
 
 TEST_P(HttpTimeTest, Ok) {
-  Http::TestResponseHeaderMapImpl response_headers{{"date", GetParam()}};
+  const Http::TestResponseHeaderMapImpl response_headers{{"date", GetParam()}};
   // Manually confirmed that 784111777 is 11/6/94, 8:46:37.
   EXPECT_EQ(784111777,
             SystemTime::clock::to_time_t(CacheHeadersUtils::httpTime(response_headers.Date())));

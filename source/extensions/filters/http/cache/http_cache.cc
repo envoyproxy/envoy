@@ -76,11 +76,11 @@ size_t localHashKey(const Key& key) { return stableHashKey(key); }
 bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers) const {
   // TODO(yosrym93): Store parsed response cache-control in cache instead of parsing it on every
   // lookup
-  absl::string_view cache_control =
+  const absl::string_view cache_control =
       response_headers.getInlineValue(response_cache_control_handle.handle());
   const ResponseCacheControl response_cache_control(cache_control);
 
-  SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
+  const SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
 
   if (timestamp_ < response_time) {
     // Response time is in the future, validate response
@@ -88,8 +88,8 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
   }
 
   const SystemTime::duration response_age = timestamp_ - response_time;
-  bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
-                                  request_cache_control_.max_age_.value() < response_age;
+  const bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
+                                        request_cache_control_.max_age_.value() < response_age;
   if (response_cache_control.must_validate_ || request_cache_control_.must_validate_ ||
       request_max_age_exceeded) {
     // Either the request or response explicitly require validation or a request max-age requirement
@@ -104,7 +104,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
              response_headers.get(Http::Headers::get().Expires),
          "Cache entry does not have valid expiration data.");
 
-  SystemTime expiration_time =
+  const SystemTime expiration_time =
       response_cache_control.max_age_.has_value()
           ? response_time + response_cache_control.max_age_.value()
           : CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
@@ -113,13 +113,13 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
     // Response is stale, requires validation
     // if the response does not allow being served stale
     // or the request max-stale directive does not allow it
-    bool allowed_by_max_stale =
+    const bool allowed_by_max_stale =
         request_cache_control_.max_stale_.has_value() &&
         request_cache_control_.max_stale_.value() > timestamp_ - expiration_time;
     return response_cache_control.no_stale_ || !allowed_by_max_stale;
   } else {
     // Response is fresh, requires validation only if there is an unsatisfied min-fresh requirement
-    bool min_fresh_unsatisfied =
+    const bool min_fresh_unsatisfied =
         request_cache_control_.min_fresh_.has_value() &&
         request_cache_control_.min_fresh_.value() > expiration_time - timestamp_;
     return min_fresh_unsatisfied;

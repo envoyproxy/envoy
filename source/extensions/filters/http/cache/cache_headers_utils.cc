@@ -55,7 +55,7 @@ separateDirectiveAndArgument(absl::string_view full_directive) {
 // https://httpwg.org/specs/rfc7234.html#collected.abnf
 
 RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header) {
-  std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
+  const std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {
     absl::string_view directive, argument;
@@ -80,7 +80,7 @@ RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header)
 }
 
 ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_header) {
-  std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
+  const std::vector<absl::string_view> directives = absl::StrSplit(cache_control_header, ',');
 
   for (auto full_directive : directives) {
     absl::string_view directive, argument;
