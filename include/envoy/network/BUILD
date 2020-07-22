@@ -51,6 +51,7 @@ envoy_cc_library(
         "//include/envoy/api:io_error_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
     ],
 )
 
