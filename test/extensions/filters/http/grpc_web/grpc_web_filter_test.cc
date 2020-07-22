@@ -95,13 +95,7 @@ public:
             [=](Buffer::Instance& data, bool) { EXPECT_EQ(expected_message, data.toString()); }));
   }
 
-  void expectRequiredGrpcUpstreamHeaders(const Http::TestRequestHeaderMapImpl& request_headers,
-                                         bool is_valid_grpc_web_request = true) {
-    if (is_valid_grpc_web_request) {
-      EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-      EXPECT_CALL(stream_info_, protocol()).WillOnce(Return(Http::Protocol::Http11));
-    }
-
+  void expectRequiredGrpcUpstreamHeaders(const Http::TestRequestHeaderMapImpl& request_headers) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
     // Ensure we never send content-length upstream
     EXPECT_EQ(nullptr, request_headers.ContentLength());
@@ -119,7 +113,6 @@ public:
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   Http::TestRequestHeaderMapImpl request_headers_{{":path", "/"}};
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
@@ -178,7 +171,7 @@ TEST_F(GrpcWebFilterTest, InvalidBase64) {
                            Http::Headers::get().ContentTypeValues.GrpcWebText);
   expectErrorResponse(Http::Code::BadRequest, "Bad gRPC-web request, invalid base64 data.");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
-  expectRequiredGrpcUpstreamHeaders(request_headers_, /*is_valid_grpc_web_request=*/false);
+  expectRequiredGrpcUpstreamHeaders(request_headers_);
 
   Buffer::OwnedImpl request_buffer;
   Buffer::OwnedImpl decoded_buffer;
@@ -193,7 +186,7 @@ TEST_F(GrpcWebFilterTest, Base64NoPadding) {
                            Http::Headers::get().ContentTypeValues.GrpcWebText);
   expectErrorResponse(Http::Code::BadRequest, "Bad gRPC-web request, invalid base64 data.");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
-  expectRequiredGrpcUpstreamHeaders(request_headers_, /*is_valid_grpc_web_request=*/false);
+  expectRequiredGrpcUpstreamHeaders(request_headers_);
 
   Buffer::OwnedImpl request_buffer;
   Buffer::OwnedImpl decoded_buffer;
