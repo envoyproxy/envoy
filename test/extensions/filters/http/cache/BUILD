@@ -14,6 +14,7 @@ envoy_cc_test_library(
     deps = [
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
+        "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
     ],
 )
 
@@ -49,6 +50,7 @@ envoy_extension_cc_test(
     srcs = ["cache_filter_test.cc"],
     extension_name = "envoy.filters.http.cache",
     deps = [
+        ":common",
         "//source/extensions/filters/http/cache:cache_filter_lib",
         "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
         "//test/mocks/server:factory_context_mocks",
