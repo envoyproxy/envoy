@@ -242,6 +242,11 @@ public:
     return absl::nullopt;
   }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
+
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
@@ -349,6 +354,28 @@ private:
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
+    template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
+      for (auto& iter : map) {
+        if (!fn(iter.second)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    bool iterate(const IterateFn<Counter>& fn) const override {
+      return iterHelper(fn, central_cache_->counters_);
+    }
+    bool iterate(const IterateFn<Gauge>& fn) const override {
+      return iterHelper(fn, central_cache_->gauges_);
+    }
+    bool iterate(const IterateFn<Histogram>& fn) const override {
+      return iterHelper(fn, central_cache_->histograms_);
+    }
+    bool iterate(const IterateFn<TextReadout>& fn) const override {
+      return iterHelper(fn, central_cache_->text_readouts_);
+    }
+
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.
     CounterOptConstRef findCounter(StatName name) const override;
@@ -417,6 +444,16 @@ private:
     // operation in the fast path.
     absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
+
+  template <class StatFn> bool iterHelper(StatFn fn) const {
+    Thread::LockGuard lock(lock_);
+    for (ScopeImpl* scope : scopes_) {
+      if (!scope->iterate(fn)) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
