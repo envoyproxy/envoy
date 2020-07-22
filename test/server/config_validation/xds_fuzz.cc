@@ -68,8 +68,6 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
 
-  drain_time_ = std::chrono::seconds(5);
-
   if (input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
   } else {
@@ -306,7 +304,7 @@ void XdsFuzzTest::verifyListeners() {
   const auto& abstract_rep = verifier_.listeners();
   const auto dump = getListenersConfigDump().dynamic_listeners();
 
-  for (auto& rep : abstract_rep) {
+  for (const auto& rep : abstract_rep) {
     ENVOY_LOG_MISC(debug, "Verifying {} with state {}", rep.listener.name(), rep.state);
 
     auto listener_dump = std::find_if(dump.begin(), dump.end(), [&](auto& listener) {

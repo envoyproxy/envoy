@@ -34,13 +34,13 @@ public:
 
   const std::vector<ListenerRepresentation>& listeners() const { return listeners_; }
 
-  uint32_t numWarming() { return num_warming_; }
-  uint32_t numActive() { return num_active_; }
-  uint32_t numDraining() { return num_draining_; }
+  uint32_t numWarming() const { return num_warming_; }
+  uint32_t numActive() const { return num_active_; }
+  uint32_t numDraining() const { return num_draining_; }
 
-  uint32_t numAdded() { return num_added_; }
-  uint32_t numModified() { return num_modified_; }
-  uint32_t numRemoved() { return num_removed_; }
+  uint32_t numAdded() const { return num_added_; }
+  uint32_t numModified() const { return num_modified_; }
+  uint32_t numRemoved() const { return num_removed_; }
 
   void dumpState();
 

@@ -48,19 +48,15 @@ void XdsVerifier::dumpState() {
 }
 
 /*
- * if you add a new listener that is not being updated, there are two cases:
- * 1. the listener has not been added before
- *    - if envoy knows about the listener's route, it will be added as active, else warming
- * 1. a listener of the same name has been added before but it now draining
- *    - if the routes match, the old listener will be added back to active
- *    - if the routes don't match, the listener will be added as active/warming as relevant
+ * if a listener is added for the first time, it will be added as active/warming depending on if
+ * envoy knows about its route config
  *
  * if a listener is updated (i.e. there is a already a listener by this name), there are 3 cases:
  * 1. the old listener is active and the new is warming:
  *    - old will remain active
  *    - new will be added as warming, to replace the old when it gets its route
  * 2. the old listener is active and new is active:
- *    - old's filter chain is drained (seemingly instantaneously)
+ *    - old is drained (seemingly instantaneously)
  *    - new is added as active
  * 3. the old listener is warming and new is active/warming:
  *    - old is completely removed
@@ -84,7 +80,7 @@ void XdsVerifier::listenerUpdated(const envoy::config::listener::v3::Listener& l
   }
 
   for (unsigned long i = 0; i < listeners_.size(); ++i) {
-    auto& rep = listeners_[i];
+    const auto& rep = listeners_[i];
     if (rep.listener.name() == listener.name()) {
       if (rep.state == ACTIVE) {
         num_modified_++;
@@ -119,24 +115,7 @@ void XdsVerifier::listenerUpdated(const envoy::config::listener::v3::Listener& l
  */
 void XdsVerifier::listenerAdded(const envoy::config::listener::v3::Listener& listener,
                                 bool from_update) {
-  // if the same listener being added is already draining, it will be moved back to active, and if
-  // the listener is already in listeners_ num_added_ should not be incremented
-  bool found = false;
-  for (auto& rep : listeners_) {
-    if (rep.listener.name() == listener.name()) {
-      found = true;
-    }
-    if (rep.listener.name() == listener.name() && getRoute(rep.listener) == getRoute(listener) &&
-        rep.state == DRAINING) {
-      num_draining_--;
-      ENVOY_LOG_MISC(debug, "Changing {} from DRAINING back to ACTIVE", listener.name());
-      rep.state = ACTIVE;
-      num_active_++;
-      return;
-    }
-  }
-
-  if (!found && !from_update) {
+  if (!from_update) {
     num_added_++;
   }
 
