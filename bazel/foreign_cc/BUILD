@@ -147,8 +147,8 @@ envoy_cmake_external(
     deps = [
         ":ares",
         ":nghttp2",
+        ":zlib",
         "//external:ssl",
-        "//external:zlib",
     ],
 )
 
@@ -214,8 +214,6 @@ envoy_cmake_external(
         "YAML_CPP_BUILD_TESTS": "off",
         "YAML_CPP_BUILD_TOOLS": "off",
         "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_C_COMPILER_FORCED": "on",
-        "SKIP_BUILD_EXAMPLES": "on",
     },
     lib_source = "@com_github_jbeder_yaml_cpp//:all",
     static_libraries = select({
