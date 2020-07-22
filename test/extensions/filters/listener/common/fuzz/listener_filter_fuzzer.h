@@ -3,6 +3,7 @@
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 
@@ -29,6 +30,8 @@ public:
   void fuzz(Network::ListenerFilter& filter) { filter.onAccept(cb_); }
 
 private:
+  FakeOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   NiceMock<Network::MockListenerFilterCallbacks> cb_;
   FakeConnectionSocket socket_;
 };

@@ -3,7 +3,6 @@
 #include "common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 
@@ -66,6 +65,10 @@ private:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   Network::Address::Type addr_type_;
+};
+
+class FakeOsSysCalls : public Api::OsSysCallsImpl {
+  // Will add some methods later.
 };
 
 } // namespace ListenerFilters

@@ -23,6 +23,7 @@ envoy_cc_test_library(
         ":listener_filter_fakes",
         "//include/envoy/network:filter_interface",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -32,6 +33,5 @@ envoy_cc_test_library(
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//test/mocks/network:network_mocks",
-        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
