@@ -1,10 +1,5 @@
 #include "extensions/filters/http/cache/cache_filter.h"
 
-#include <string>
-
-#include "envoy/http/filter.h"
-#include "envoy/http/header_map.h"
-
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"

@@ -6,7 +6,6 @@
 
 #include "common/singleton/const_singleton.h"
 #include "common/singleton/threadsafe_singleton.h"
-#include "include/envoy/http/_virtual_includes/header_map_interface/envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Http {

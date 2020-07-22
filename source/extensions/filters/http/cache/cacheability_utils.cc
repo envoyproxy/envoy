@@ -1,7 +1,5 @@
 #include "extensions/filters/http/cache/cacheability_utils.h"
 
-#include "envoy/http/header_map.h"
-
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 
