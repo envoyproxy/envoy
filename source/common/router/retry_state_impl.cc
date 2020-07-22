@@ -52,6 +52,8 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   request_headers.removeEnvoyRetryOn();
   request_headers.removeEnvoyRetryGrpcOn();
   request_headers.removeEnvoyMaxRetries();
+  request_headers.removeEnvoyRateLimitedResetHeaders();
+  request_headers.removeEnvoyRateLimitedResetMaxIntervalMs();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consume_all_retry_headers")) {
     request_headers.removeEnvoyHedgeOnPerTryTimeout();
     request_headers.removeEnvoyRetriableHeaderNames();
