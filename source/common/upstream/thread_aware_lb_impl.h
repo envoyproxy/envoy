@@ -10,6 +10,8 @@ namespace Envoy {
 namespace Upstream {
 
 using NormalizedHostWeightVector = std::vector<std::pair<HostConstSharedPtr, double>>;
+using NormalizedHostWeightVectorPtr = std::shared_ptr<NormalizedHostWeightVector>;
+using NormalizedHostWeightMap = std::map<HostConstSharedPtr, double>;
 
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
 public:
@@ -27,6 +29,33 @@ public:
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
   };
   using HashingLoadBalancerSharedPtr = std::shared_ptr<HashingLoadBalancer>;
+
+  /**
+   * Class for consistent hashing load balancer (CH-LB) with bounded loads.
+   * It is common to both RingHash and Maglev load balancers, because the logic of selecing the next
+   * host when one is overloaded is independent of the CH-LB type.
+   */
+  class BoundedLoadHashingLoadBalancer : public HashingLoadBalancer {
+  public:
+      BoundedLoadHashingLoadBalancer(HashingLoadBalancerSharedPtr hlb_ptr,
+                                           const NormalizedHostWeightVectorPtr normalized_host_weight,
+                                           uint32_t hash_balance_factor):
+      hlb_ptr(hlb_ptr),
+      normalized_host_weights_(normalized_host_weight),
+      hash_balance_factor(hash_balance_factor){
+          ASSERT(hash_balance_factor > 0);
+          for (auto const & item : *normalized_host_weights_) {
+            normalized_host_weights_map_[item.first] = item.second;
+          }
+    };
+    virtual ~BoundedLoadHashingLoadBalancer() = default;
+    virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const;
+  private:
+    HashingLoadBalancerSharedPtr hlb_ptr;
+    NormalizedHostWeightVectorPtr normalized_host_weights_;
+    NormalizedHostWeightMap normalized_host_weights_map_;
+    uint32_t hash_balance_factor;
+  };
 
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
@@ -48,7 +77,6 @@ protected:
 private:
   struct PerPriorityState {
     std::shared_ptr<HashingLoadBalancer> current_lb_;
-    std::shared_ptr<NormalizedHostWeightVector> normalized_host_weights_;
     bool global_panic_{};
   };
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
@@ -84,8 +112,9 @@ private:
   };
 
   virtual HashingLoadBalancerSharedPtr
-  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
-                     double min_normalized_weight, double max_normalized_weight) PURE;
+  createLoadBalancer(const NormalizedHostWeightVectorPtr normalized_host_weights,
+                     double min_normalized_weight, double max_normalized_weight,
+                     uint32_t hash_balance_factor) PURE;
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
