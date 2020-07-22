@@ -9,7 +9,7 @@
 namespace Envoy {
 
 /**
- * Benchmark for the main slow path, i.e. new logger creation.
+ * Benchmark for the main slow path, i.e. new logger creation here.
  */
 static void fancySlowPath(benchmark::State& state) {
   FANCY_LOG(info, "Slow path test begins.");
