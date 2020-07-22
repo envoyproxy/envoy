@@ -26,8 +26,8 @@ envoy_proto_library(
 envoy_cc_test_library(
     name = "uber_readfilter_lib",
     srcs = [
-        "uber_readfilter.cc",
         "uber_per_readfilter.cc",
+        "uber_readfilter.cc",
     ],
     hdrs = ["uber_readfilter.h"],
     deps = [
