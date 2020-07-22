@@ -548,6 +548,14 @@ public:
   virtual size_t remove(const LowerCaseString& key) PURE;
 
   /**
+   * Remove all instances of headers where the header matches the predicate.
+   * @param predicate supplies the predicate to match headers against.
+   * @return the number of headers removed.
+   */
+  using HeaderMatchPredicate = std::function<bool(const HeaderEntry&)>;
+  virtual size_t removeIf(const HeaderMatchPredicate& predicate) PURE;
+
+  /**
    * Remove all instances of headers where the key begins with the supplied prefix.
    * @param prefix supplies the prefix to match header keys against.
    * @return the number of headers removed.

@@ -1129,7 +1129,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: header name contains underscores");
-  EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
+  EXPECT_EQ("http1.unexpected_underscore", response_encoder->getStream().responseDetails());
   EXPECT_EQ(1, store_.counter("http1.requests_rejected_with_underscores_in_headers").value());
 }
 
