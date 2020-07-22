@@ -1,3 +1,4 @@
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
 
 #include "test/mocks/http/mocks.h"
@@ -101,19 +102,6 @@ TEST_F(LookupRequestTest, MakeLookupResultBody) {
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_EQ(lookup_response.content_length_, content_length);
-  EXPECT_TRUE(lookup_response.response_ranges_.empty());
-  EXPECT_FALSE(lookup_response.has_trailers_);
-}
-
-TEST_F(LookupRequestTest, MakeLookupResultNoDate) {
-  const LookupRequest lookup_request(request_headers_, current_time_);
-  const Http::TestResponseHeaderMapImpl response_headers(
-      {{"cache-control", "public, max-age=3600"}});
-  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
-  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
-  ASSERT_TRUE(lookup_response.headers_);
-  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
-  EXPECT_EQ(lookup_response.content_length_, 0);
   EXPECT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
 }

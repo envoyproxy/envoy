@@ -2,7 +2,7 @@
 
 #include "common/http/headers.h"
 
-#include "extensions/filters/http/cache/cache_filter_utils.h"
+#include "extensions/filters/http/cache/cacheability_utils.h"
 
 #include "absl/strings/string_view.h"
 
@@ -37,13 +37,17 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
         *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
-  if (!CacheFilterUtils::isCacheableRequest(headers)) {
+  if (!CacheabilityUtils::isCacheableRequest(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
     return Http::FilterHeadersStatus::Continue;
   }
   ASSERT(decoder_callbacks_);
-  lookup_ = cache_.makeLookupContext(LookupRequest(headers, time_source_.systemTime()));
+
+  LookupRequest lookup_request(headers, time_source_.systemTime());
+  request_allows_inserts_ = !lookup_request.requestCacheControl().no_store_;
+  lookup_ = cache_.makeLookupContext(std::move(lookup_request));
+
   ASSERT(lookup_);
 
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
@@ -60,7 +64,10 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) {
-  if (lookup_ && CacheFilterUtils::isCacheableResponse(headers)) {
+  // If lookup_ is null, the request wasn't cacheable, so the response isn't either.
+  if (lookup_ && request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers)) {
+    // TODO(yosrym93): Add date internal header or metadata to cached responses and use it instead
+    // of the date header
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
@@ -79,11 +86,15 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 }
 
 void CacheFilter::onHeaders(LookupResult&& result) {
+  // TODO(yosrym93): Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
-  case CacheEntryStatus::RequiresValidation:
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::UnsatisfiableRange:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
+  case CacheEntryStatus::RequiresValidation:
+    // Cache entries that require validation are treated as unusable entries
+    // until validation is implemented
+    // TODO(yosrym93): Implement response validation
   case CacheEntryStatus::Unusable:
     if (state_ == GetHeadersState::FinishedGetHeadersCall) {
       // decodeHeader returned Http::FilterHeadersStatus::StopAllIterationAndWatermark--restart it
