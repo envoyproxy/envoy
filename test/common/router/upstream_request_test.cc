@@ -19,18 +19,6 @@ public:
                                     std::make_unique<NiceMock<Router::MockGenericConnPool>>()};
 };
 
-// UpstreamRequest is responsible for ignoring 100-continue headers after the initial 100.
-TEST_F(UpstreamRequestTest, Coalesce100ContinueHeaders) {
-  auto continue_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
-      Http::TestResponseHeaderMapImpl({{":status", "100"}}));
-  EXPECT_CALL(router_filter_interface_, onUpstream100ContinueHeaders(_, _));
-  upstream_request_.decode100ContinueHeaders(std::move(continue_headers));
-  continue_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
-      Http::TestResponseHeaderMapImpl({{":status", "100"}}));
-  EXPECT_CALL(router_filter_interface_, onUpstream100ContinueHeaders(_, _)).Times(0);
-  upstream_request_.decode100ContinueHeaders(std::move(continue_headers));
-}
-
 // UpstreamRequest is responsible processing for passing 101 upgrade headers to onUpstreamHeaders.
 TEST_F(UpstreamRequestTest, Decode101UpgradeHeaders) {
   auto upgrade_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(

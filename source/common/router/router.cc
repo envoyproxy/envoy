@@ -1125,7 +1125,14 @@ void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
   // the complexity until someone asks for it.
   retry_state_.reset();
 
-  callbacks_->encode100ContinueHeaders(std::move(headers));
+  // We coalesce 100-continue headers here, to prevent encoder filters and HCM from having to worry
+  // about this. This is done in the router filter, rather than UpstreamRequest, since we want to
+  // potentially coalesce across retries and multiple upstream requests in the future, even though
+  // we currently don't support retry after 100.
+  if (!downstream_100_continue_headers_encoded_) {
+    downstream_100_continue_headers_encoded_ = true;
+    callbacks_->encode100ContinueHeaders(std::move(headers));
+  }
 }
 
 void Filter::resetAll() {

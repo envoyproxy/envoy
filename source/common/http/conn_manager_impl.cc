@@ -1696,8 +1696,9 @@ void ConnectionManagerImpl::ActiveStream::maybeContinueEncoding(
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         ResponseHeaderMap& headers,
                                                         bool end_stream) {
+  // See encodeHeaders() comments in include/envoy/http/filter.h for why the 1xx precondition holds.
   ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
-         Utility::getResponseStatus(headers) == 101);
+         Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols));
   resetIdleTimer();
   disarmRequestTimeout();
 

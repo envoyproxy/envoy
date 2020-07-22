@@ -287,10 +287,7 @@ private:
       parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
                              parent_.state_.is_head_request_, grpc_status, details);
     }
-    // It is only safe to invoke this once per request. It's the responsibility of the caller, e.g.
-    // UpstreamRequest, to ensure that this precondition is met.
     void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
-    // The only 1xx that may be provided to encodeHeaders() is a 101 upgrade.
     void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;

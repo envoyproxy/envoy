@@ -2193,7 +2193,7 @@ TEST_P(Http1ClientConnectionImplTest, ContinueHeaders) {
 }
 
 // Multiple 100 responses are passed to the response encoder (who is responsible for coalescing).
-TEST_F(Http1ClientConnectionImplTest, MultipleContinueHeaders) {
+TEST_P(Http1ClientConnectionImplTest, MultipleContinueHeaders) {
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -2222,7 +2222,7 @@ TEST_F(Http1ClientConnectionImplTest, MultipleContinueHeaders) {
 
 // 101/102 headers etc. are passed to the response encoder (who is responsibly for deciding to
 // upgrade, ignore, etc.).
-TEST_F(Http1ClientConnectionImplTest, 1xxNonContinueHeaders) {
+TEST_P(Http1ClientConnectionImplTest, 1xxNonContinueHeaders) {
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;

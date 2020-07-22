@@ -277,7 +277,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders(bool allow_waiting_for_info
     const uint64_t status = Http::Utility::getResponseStatus(*headers);
     if (CodeUtility::is1xx(status)) {
       waiting_for_non_informational_headers_ = true;
-      if (status == 100) {
+      if (status == enumToInt(Http::Code::Continue)) {
         is_100_continue_header = true;
       }
     } else {
@@ -677,7 +677,8 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       if (!stream->deferred_reset_) {
         if (stream->waiting_for_non_informational_headers_) {
           ASSERT(!nghttp2_session_check_server_session(session_));
-          // We can continue to receive 1xx, we forward to HCM and allow it to coalesce.
+          // We can continue to receive 1xx, we forward to the router filter and allow it to
+          // coalesce.
           stream->decodeHeaders(true);
         } else {
           ASSERT(stream->remote_end_stream_);

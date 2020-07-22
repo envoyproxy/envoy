@@ -378,6 +378,28 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
   response_encoder_->encodeHeaders(response_headers, true);
 };
 
+// nghttp2 rejects trailers with :status.
+TEST_P(Http2CodecImplTest, TrailerStatus) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
+  response_encoder_->encode100ContinueHeaders(continue_headers);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+
+  // nghttp2 doesn't allow :status in trailers
+  EXPECT_THROW(response_encoder_->encode100ContinueHeaders(continue_headers), ClientCodecError);
+  EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
+};
+
 // Multiple 100 responses are passed to the response encoder (who is responsible for coalescing).
 TEST_P(Http2CodecImplTest, MultipleContinueHeaders) {
   initialize();
@@ -412,6 +434,21 @@ TEST_P(Http2CodecImplTest, 1xxNonContinueHeaders) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(other_headers, false);
 };
+
+// nghttp2 treats 101 inside an HTTP/2 stream as an invalid HTTP header field.
+TEST_P(Http2CodecImplTest, Invalid101SwitchingProtocols) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestResponseHeaderMapImpl upgrade_headers{{":status", "101"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
+  EXPECT_THROW(response_encoder_->encodeHeaders(upgrade_headers, false), ClientCodecError);
+  EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
+}
 
 TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
   initialize();

@@ -269,16 +269,25 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
-  if (allow_waiting_for_informational_headers &&
-      CodeUtility::is1xx(Http::Utility::getResponseStatus(*headers))) {
-    waiting_for_non_informational_headers_ = true;
+
+  bool is_100_continue_header = false;
+  if (allow_waiting_for_informational_headers) {
+    const uint64_t status = Http::Utility::getResponseStatus(*headers);
+    if (CodeUtility::is1xx(status)) {
+      waiting_for_non_informational_headers_ = true;
+      if (status == enumToInt(Http::Code::Continue)) {
+        is_100_continue_header = true;
+      }
+    } else {
+      waiting_for_non_informational_headers_ = false;
+    }
   }
 
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
 
-  if (headers->Status()->value() == "100") {
+  if (is_100_continue_header) {
     ASSERT(!remote_end_stream_);
     response_decoder_.decode100ContinueHeaders(std::move(headers));
   } else {
@@ -663,30 +672,16 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
       // if local is not complete.
       if (!stream->deferred_reset_) {
-        if (!stream->waiting_for_non_informational_headers_) {
-          if (!stream->remote_end_stream_) {
-            // This indicates we have received more headers frames than Envoy
-            // supports. Even if this is valid HTTP (something like 103 early hints) fail here
-            // rather than trying to push unexpected headers through the Envoy pipeline as that
-            // will likely result in Envoy crashing.
-            // It would be cleaner to reset the stream rather than reset the/ entire connection but
-            // it's also slightly more dangerous so currently we err on the side of safety.
-            stats_.too_many_header_frames_.inc();
-            throw CodecProtocolException("Unexpected 'trailers' with no end stream.");
-          } else {
-            stream->decodeTrailers();
-          }
-        } else {
+        if (stream->waiting_for_non_informational_headers_) {
           ASSERT(!nghttp2_session_check_server_session(session_));
-          stream->waiting_for_non_informational_headers_ = false;
-
-          // Even if we have :status 100 in the client case in a response, when
-          // we received a 1xx to start out with, nghttp2 message checking
-          // guarantees proper flow here.
-          stream->decodeHeaders(false);
+          // We can continue to receive 1xx, we forward to the router filter and allow it to
+          // coalesce.
+          stream->decodeHeaders(true);
+        } else {
+          ASSERT(stream->remote_end_stream_);
+          stream->decodeTrailers();
         }
       }
-
       break;
     }
 

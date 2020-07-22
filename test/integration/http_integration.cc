@@ -853,9 +853,9 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   }
 }
 
-void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upstream_complete,
-                                                       bool with_encoder_filter,
-                                                       bool with_multiple_1xx_headers) {
+void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_complete,
+                                               bool with_encoder_filter,
+                                               bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
     config_helper_.addFilter("name: envoy.filters.http.cors");
