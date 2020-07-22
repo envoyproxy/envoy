@@ -20,8 +20,16 @@ envoy_cc_test_library(
     hdrs = ["listener_filter_fuzzer.h"],
     deps = [
         ":listener_filter_fuzzer_proto_cc_proto",
+        ":listener_filter_fakes",
         "//include/envoy/network:filter_interface",
-        "//test/mocks/network:network_fakes",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "listener_filter_fakes",
+    hdrs = ["listener_filter_fakes.h"],
+    deps = [
         "//test/mocks/network:network_mocks",
     ],
 )
