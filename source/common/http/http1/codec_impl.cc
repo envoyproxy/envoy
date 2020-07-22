@@ -39,6 +39,7 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view BodyDisallowed = "http1.body_disallowed";
   const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
+  const absl::string_view InvalidUnderscore = "http1.unexpected_underscore";
 };
 
 struct Http1HeaderTypesValues {
@@ -1045,7 +1046,7 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
       ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}",
                      connection_, current_header_field_.getStringView());
       error_code_ = Http::Code::BadRequest;
-      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
+      sendProtocolError(Http1ResponseCodeDetails::get().InvalidUnderscore);
       stats_.requests_rejected_with_underscores_in_headers_.inc();
       throw CodecProtocolException("http/1.1 protocol error: header name contains underscores");
     }

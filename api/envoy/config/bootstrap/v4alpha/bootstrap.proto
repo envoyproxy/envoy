@@ -13,6 +13,7 @@ import "envoy/config/listener/v4alpha/listener.proto";
 import "envoy/config/metrics/v4alpha/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
+import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -288,6 +289,7 @@ message ClusterManager {
 // Envoy process watchdog configuration. When configured, this monitors for
 // nonresponsive threads and kills the process after the configured thresholds.
 // See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
+// [#next-free-field: 6]
 message Watchdog {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v3.Watchdog";
 
@@ -305,10 +307,16 @@ message Watchdog {
   // kill behavior. If not specified the default is 0 (disabled).
   google.protobuf.Duration kill_timeout = 3;
 
-  // If at least two watched threads have been nonresponsive for at least this
-  // duration assume a true deadlock and kill the entire Envoy process. Set to 0
-  // to disable this behavior. If not specified the default is 0 (disabled).
+  // If max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))
+  // threads have been nonresponsive for at least this duration kill the entire
+  // Envoy process. Set to 0 to disable this behavior. If not specified the
+  // default is 0 (disabled).
   google.protobuf.Duration multikill_timeout = 4;
+
+  // Sets the threshold for *multikill_timeout* in terms of the percentage of
+  // nonresponsive threads required for the *multikill_timeout*.
+  // If not specified the default is 0.
+  type.v3.Percent multikill_threshold = 5;
 }
 
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).
