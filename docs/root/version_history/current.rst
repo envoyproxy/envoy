@@ -24,6 +24,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * csrf: fixed issues with regards to origin and host header parsing.
+* dynamic_forward_proxy: only perform DNS lookups for routes to Dynamic Forward Proxy clusters since other cluster types handle DNS lookup themselves.
 * fault: fixed an issue with `active_faults` gauge not being decremented for when abort faults were injected.
 
 Removed Config or Runtime
