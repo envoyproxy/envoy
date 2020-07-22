@@ -1,3 +1,4 @@
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
@@ -9,13 +10,13 @@ namespace Network {
 
 class FakeConnectionSocket : public MockConnectionSocket {
 public:
-  ~FakeConnectionSocket() override = default;
+  FakeConnectionSocket()
+      : io_handle_(std::make_unique<IoSocketHandleImpl>(42))
+      , local_address_(nullptr), remote_address_(nullptr) {}
 
-  FakeConnectionSocket() : local_address_(nullptr), remote_address_(nullptr) {}
+  ~FakeConnectionSocket() override { io_handle_->close(); }
 
-  FakeConnectionSocket(const Address::InstanceConstSharedPtr& local_address,
-                       const Address::InstanceConstSharedPtr& remote_address)
-      : local_address_(local_address), remote_address_(remote_address) {}
+  IoHandle& ioHandle() override { return *io_handle_; }
 
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
@@ -54,6 +55,8 @@ public:
     return Api::SysCallIntResult{0, 0};
   }
 
+private:
+  const IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
 };
