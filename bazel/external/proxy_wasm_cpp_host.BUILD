@@ -30,7 +30,7 @@ cc_library(
         "//external:protobuf",
         "//external:wee8",
         "//external:zlib",
-        "@boringssl//:ssl",
+        "//external:ssl",
         "@proxy_wasm_cpp_sdk//:api_lib",
         "@proxy_wasm_cpp_sdk//:common_lib",
     ],
