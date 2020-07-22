@@ -94,6 +94,12 @@ connect-failure
     configuration <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or via
     :ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`.
 
+.. _config_http_filters_router_retry_policy-envoy-ratelimited:
+
+envoy-ratelimited
+  Envoy will retry if the header :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>`
+  is present.
+
 retriable-4xx
   Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.
   Currently, the only response code in this category is 409.
@@ -294,9 +300,11 @@ information.
 x-envoy-ratelimited
 ^^^^^^^^^^^^^^^^^^^
 
-If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
-looked at, only its presence. This header is set by :ref:`rate limit filter<config_http_filters_rate_limit>`
-when the request is rate limited.
+If this header is set by upstream, Envoy will not retry unless the retry policy
+:ref:`envoy-ratelimited<config_http_filters_router_retry_policy-envoy-ratelimited>`
+is enabled. Currently, the value of the header is not looked at, only its
+presence. This header is set by :ref:`rate limit
+filter<config_http_filters_rate_limit>` when the request is rate limited.
 
 .. _config_http_filters_router_headers_set:
 
