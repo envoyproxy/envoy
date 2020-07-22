@@ -518,7 +518,7 @@ private:
   virtual Status checkOutboundQueueLimits() PURE;
   Status incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
-  virtual Status checkInboundFrameLimits() PURE;
+  virtual Status checkInboundFrameLimits(int32_t stream_id) PURE;
   void releaseOutboundFrame();
   void releaseOutboundControlFrame();
 
@@ -558,7 +558,7 @@ private:
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
   Status checkOutboundQueueLimits() override { return okStatus(); }
   Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return okStatus(); }
-  Status checkInboundFrameLimits() override { return okStatus(); }
+  Status checkInboundFrameLimits(int32_t) override { return okStatus(); }
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -583,7 +583,7 @@ private:
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
   Status checkOutboundQueueLimits() override;
   Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
-  Status checkInboundFrameLimits() override;
+  Status checkInboundFrameLimits(int32_t stream_id) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 
   // Http::Connection
