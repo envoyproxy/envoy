@@ -246,7 +246,7 @@ public:
    * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
   virtual IoHandlePtr socket(Socket::Type type, Address::Type addr_type, Address::IpVersion version,
-                             int socket_v6only) PURE;
+                             bool socket_v6only) PURE;
 
   /**
    * Low level api to create a socket in the underlying host stack. Does not create an

@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Network {
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
-                                        Address::IpVersion version, int socket_v6only) {
+                                        Address::IpVersion version, bool socket_v6only) {
 #if defined(__APPLE__) || defined(WIN32)
   int flags = 0;
 #else
