@@ -19,10 +19,10 @@ const absl::flat_hash_set<absl::string_view>& cacheableStatusCodes() {
                          "301", "308", "404", "405", "410", "414", "451", "501");
 }
 
-const std::vector<const Http::LowerCaseString* const>& conditionalHeaders() {
+const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
   // As defined by: https://httpwg.org/specs/rfc7232.html#preconditions
   CONSTRUCT_ON_FIRST_USE(
-      std::vector<const Http::LowerCaseString* const>, &Http::CustomHeaders::get().IfMatch,
+      std::vector<const Http::LowerCaseString*>, &Http::CustomHeaders::get().IfMatch,
       &Http::CustomHeaders::get().IfNonMatch, &Http::CustomHeaders::get().IfModifiedSince,
       &Http::CustomHeaders::get().IfUnmodifiedSince, &Http::CustomHeaders::get().IfRange);
 }
