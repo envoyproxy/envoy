@@ -22,7 +22,16 @@ typedef intptr_t envoy_stream_t;
 /**
  * Result codes returned by all calls made to this interface.
  */
-typedef enum { ENVOY_SUCCESS, ENVOY_FAILURE } envoy_status_t;
+typedef enum {
+  ENVOY_SUCCESS = 0,
+  ENVOY_FAILURE = 1,
+} envoy_status_t;
+
+/**
+ * Equivalent constants to envoy_status_t, for contexts where the enum may not be usable.
+ */
+extern const int kEnvoySuccess;
+extern const int kEnvoyFailure;
 
 /**
  * Error code associated with terminal status of a HTTP stream.

@@ -175,6 +175,10 @@ extern const int kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
 
 #pragma mark - EnvoyEngine
 
+/// Return codes for Engine interface. @see /library/common/types/c_types.h
+extern const int kEnvoySuccess;
+extern const int kEnvoyFailure;
+
 /// Wrapper layer for calling into Envoy's C/++ API.
 @protocol EnvoyEngine
 
