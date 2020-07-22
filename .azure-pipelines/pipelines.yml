@@ -51,17 +51,20 @@ jobs:
           ciTarget: bazel.release
 
   - job: release_arm64
-    displayName: "Linux-arm64 release.server_only"
+    displayName: "Linux-arm64 release"
     dependsOn: ["format"]
-    condition: ne(variables['Build.Reason'], 'PullRequest')
+    # For master builds, continue even if format fails
+    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    timeoutInMinutes: 360
     pool: "arm-large"
     steps:
       - template: bazel.yml
         parameters:
           managedAgent: false
-          ciTarget: bazel.release.server_only
+          ciTarget: bazel.release
           rbe: false
           artifactSuffix: ".arm64"
+          bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: bazel
     displayName: "Linux-x64"
