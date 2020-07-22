@@ -147,6 +147,10 @@ private:
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
+  // Detect scope name and scope key conflict between added scopes or between added scopes and old
+  // scopes. Some removed scopes may be in added resources list, instead of being removed, they
+  // should be updated, so only return scope names that will disappear after update. If conflict
+  // detected, fill exception_msg with infomation about scope conflict and return.
   Protobuf::RepeatedPtrField<std::string> detectUpdateConflictAndCleanupRemoved(
       const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources, std::string& exception_msg);
