@@ -110,7 +110,7 @@ void cleanTapConfig(Protobuf::Message* message) {
   else if (config.common_config().config_type_case() ==
                envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
                    kStaticConfig &&
-           config.common_config().static_config().output_config().sinks().size() > 0 &&
+           !config.common_config().static_config().output_config().sinks().empty() &&
            config.common_config()
                    .static_config()
                    .output_config()
