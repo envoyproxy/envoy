@@ -90,6 +90,7 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
+    "envoy.reloadable_features.skip_encoding_empty_trailers",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
 };

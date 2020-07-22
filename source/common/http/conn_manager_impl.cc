@@ -104,7 +104,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Http::Context& http_context, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
-                                             Server::OverloadManager* overload_manager,
+                                             Server::OverloadManager& overload_manager,
                                              TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
@@ -113,14 +113,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
       local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
-      overload_stop_accepting_requests_ref_(
-          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 Server::OverloadActionNames::get().StopAcceptingRequests)
-                           : Server::OverloadManager::getInactiveState()),
-      overload_disable_keepalive_ref_(
-          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 Server::OverloadActionNames::get().DisableHttpKeepAlive)
-                           : Server::OverloadManager::getInactiveState()),
+      overload_stop_accepting_requests_ref_(overload_manager.getThreadLocalOverloadState().getState(
+          Server::OverloadActionNames::get().StopAcceptingRequests)),
+      overload_disable_keepalive_ref_(overload_manager.getThreadLocalOverloadState().getState(
+          Server::OverloadActionNames::get().DisableHttpKeepAlive)),
       time_source_(time_source) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -2053,7 +2049,9 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
   }
 
   // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
-  // a problem when processing empty trailers. https://github.com/envoyproxy/envoy/issues/10514.
+  // a problem with processing empty trailers of an HTTP/2 response as reported here:
+  // https://github.com/envoyproxy/envoy/issues/10514. This runtime feature flag is disabled by
+  // default.
   const bool skip_encoding_empty_trailers =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_encoding_empty_trailers");
   if (trailers.empty() && skip_encoding_empty_trailers) {
