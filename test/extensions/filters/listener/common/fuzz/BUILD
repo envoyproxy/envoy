@@ -30,6 +30,8 @@ envoy_cc_test_library(
     name = "listener_filter_fakes",
     hdrs = ["listener_filter_fakes.h"],
     deps = [
+        "//source/common/api:os_sys_calls_lib",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )

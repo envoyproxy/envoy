@@ -30,7 +30,7 @@ public:
 
 private:
   NiceMock<Network::MockListenerFilterCallbacks> cb_;
-  Network::FakeConnectionSocket socket_;
+  FakeConnectionSocket socket_;
 };
 
 } // namespace ListenerFilters

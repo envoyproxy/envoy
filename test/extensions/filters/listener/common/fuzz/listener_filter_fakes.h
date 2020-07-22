@@ -1,42 +1,45 @@
+#include "common/api/os_sys_calls_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
-namespace Network {
+namespace Extensions {
+namespace ListenerFilters {
 
-class FakeConnectionSocket : public MockConnectionSocket {
+class FakeConnectionSocket : public Network::MockConnectionSocket {
 public:
   FakeConnectionSocket()
-      : io_handle_(std::make_unique<IoSocketHandleImpl>(42))
+      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42))
       , local_address_(nullptr), remote_address_(nullptr) {}
 
   ~FakeConnectionSocket() override { io_handle_->close(); }
 
-  IoHandle& ioHandle() override { return *io_handle_; }
+  Network::IoHandle& ioHandle() override { return *io_handle_; }
 
-  void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
+  void setLocalAddress(const Network::Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
     if (local_address_ != nullptr) {
       addr_type_ = local_address_->type();
     }
   }
 
-  void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
+  void setRemoteAddress(const Network::Address::InstanceConstSharedPtr& remote_address) override {
     remote_address_ = remote_address;
   }
 
-  const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
 
-  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
 
-  Address::Type addressType() const override { return addr_type_; }
+  Network::Address::Type addressType() const override { return addr_type_; }
 
-  absl::optional<Address::IpVersion> ipVersion() const override {
-    if (addr_type_ != Address::Type::Ip) {
+  absl::optional<Network::Address::IpVersion> ipVersion() const override {
+    if (addr_type_ != Network::Address::Type::Ip) {
       return absl::nullopt;
     }
 
@@ -59,11 +62,12 @@ public:
   }
 
 private:
-  const IoHandlePtr io_handle_;
-  Address::InstanceConstSharedPtr local_address_;
-  Address::InstanceConstSharedPtr remote_address_;
-  Address::Type addr_type_;
+  const Network::IoHandlePtr io_handle_;
+  Network::Address::InstanceConstSharedPtr local_address_;
+  Network::Address::InstanceConstSharedPtr remote_address_;
+  Network::Address::Type addr_type_;
 };
 
-} // namespace Network
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy
