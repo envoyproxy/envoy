@@ -17,4 +17,8 @@ from the file "source/common/http/http2/codec_impl.cc" of the form
 for example:
 `invalid http2: Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], value: [3]`
 
+You can also check :ref:`HTTP/2 stats`<config_http_conn_man_stats_per_codec>`: in many cases where
+Envoy resets streams, for example if there are more headers than allowed by configuration or flood
+detection kicks in, http2 counters will be incremented as the streams are reset.
+
 

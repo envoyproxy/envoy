@@ -1730,6 +1730,7 @@ TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
 
   uint32_t request_idx = 0;
@@ -1743,12 +1744,14 @@ TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
 
   tcp_client_->waitForDisconnect();
 
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.inbound_empty_frames_flood"));
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyData) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
@@ -1763,6 +1766,7 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
 
   tcp_client_->waitForDisconnect();
 
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.inbound_empty_frames_flood"));
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());

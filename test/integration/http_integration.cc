@@ -40,6 +40,8 @@
 namespace Envoy {
 namespace {
 
+using testing::HasSubstr;
+
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
   switch (type) {
@@ -1002,6 +1004,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 
 void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size,
                                                   uint32_t max_count) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   // `size` parameter dictates the size of each header that will be added to the request and `count`
   // parameter is the number of headers to be added. The actual request byte size will exceed `size`
   // due to the keys and other headers. The actual request header count will exceed `count` by four
@@ -1044,6 +1047,9 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
     auto response = sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  if (count > max_count) {
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
   }
 }
 
