@@ -120,6 +120,7 @@ private:
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;
   const std::chrono::milliseconds multi_kill_timeout_;
+  const double multi_kill_fraction_;
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
