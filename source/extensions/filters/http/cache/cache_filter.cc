@@ -190,6 +190,8 @@ void CacheFilter::onHeaders(LookupResult&& result) {
     validating_cache_entry_ = true;
     lookup_result_ = std::make_unique<LookupResult>(std::move(result));
     injectValidationHeaders();
+    // The following line is necessary for GCC to know that there is no break on purpose
+    // fall through
   case CacheEntryStatus::Unusable:
     if (get_headers_state_ == GetHeadersState::FinishedGetHeadersCall) {
       // decodeHeader returned Http::FilterHeadersStatus::StopAllIterationAndWatermark--restart it
