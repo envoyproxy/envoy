@@ -3565,17 +3565,13 @@ virtual_hosts:
     route:
       cluster: www
   - match:
-      prefix: "/empty-backoff"
-    route:
-      cluster: www
-      retry_policy:
-        rate_limited_retry_back_off: {}
-  - match:
       prefix: "/sub-ms-interval"
     route:
       cluster: www
       retry_policy:
         rate_limited_retry_back_off:
+          reset_headers:
+          - name: Retry-After
           reset_max_interval: 0.0001s # < 1 ms
   - match:
       prefix: "/typical-backoff"
@@ -3597,17 +3593,6 @@ virtual_hosts:
                                ->retryPolicy()
                                .rateLimitedResetMaxInterval());
   EXPECT_EQ(0, config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
-                   ->routeEntry()
-                   ->retryPolicy()
-                   .rateLimitedResetHeaders()
-                   .size());
-
-  // has empty ratelimit retry back off
-  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/empty-backoff", "GET"), 0)
-                               ->routeEntry()
-                               ->retryPolicy()
-                               .rateLimitedResetMaxInterval());
-  EXPECT_EQ(0, config.route(genHeaders("www.lyft.com", "/empty-backoff", "GET"), 0)
                    ->routeEntry()
                    ->retryPolicy()
                    .rateLimitedResetHeaders()
