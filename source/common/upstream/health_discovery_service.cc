@@ -111,16 +111,18 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
           auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
           Network::Utility::addressToProtobufAddress(
               *host->address(), *endpoint->mutable_endpoint()->mutable_address());
-          // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
+          // TODO(lilika): Add support for more granular options of
+          // envoy::api::v2::core::HealthStatus
           if (host->health() == Host::Health::Healthy) {
             endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
             if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
               endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
             } else if (host->getActiveHealthFailureType() ==
-                      Host::ActiveHealthFailureType::UNHEALTHY) {
+                       Host::ActiveHealthFailureType::UNHEALTHY) {
               endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
-            } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
+            } else if (host->getActiveHealthFailureType() ==
+                       Host::ActiveHealthFailureType::UNKNOWN) {
               endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
             } else {
               NOT_REACHED_GCOVR_EXCL_LINE;
