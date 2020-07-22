@@ -169,6 +169,7 @@ public:
   static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
   static const uint32_t RETRY_ON_RESET                   = 0x800;
   static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
+  static const uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
