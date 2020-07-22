@@ -164,14 +164,14 @@ public:
    * @param key baggage key
    * @return the baggage's value for the given input key
    */
-  virtual std::string getBaggage(absl::string_view key) PURE;
+  virtual std::string getBaggage(const std::string& key) PURE;
 
   /**
    * Set a key/value pair in the current span's baggage
    * @param key baggage key
    * @param key baggage value
    */
-  virtual void setBaggage(absl::string_view key, absl::string_view value) PURE;
+  virtual void setBaggage(const std::string& key, const std::string& value) PURE;
 };
 
 /**
