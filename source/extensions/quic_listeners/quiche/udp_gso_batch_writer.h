@@ -9,6 +9,7 @@
 #pragma GCC diagnostic ignored "-Winconsistent-missing-override"
 // QUICHE allows ignored qualifiers
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
+
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
 
 #pragma GCC diagnostic pop
@@ -73,7 +74,7 @@ public:
   UdpGsoBatchWriterFactory();
 
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
-                                                    Stats::Scope& scope);
+                                                    Stats::Scope& scope) override;
 
 private:
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;

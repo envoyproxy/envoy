@@ -365,6 +365,7 @@ envoy_cc_library(
     name = "udp_gso_batch_writer_lib",
     srcs = ["udp_gso_batch_writer.cc"],
     hdrs = ["udp_gso_batch_writer.h"],
+    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",

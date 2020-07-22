@@ -50,6 +50,7 @@ envoy_cc_library(
         ":socket_interface",
         "//include/envoy/api:io_error_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 
