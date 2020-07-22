@@ -34,6 +34,11 @@ public:
 
   const std::vector<ListenerRepresentation>& listeners() const { return listeners_; }
 
+  const absl::flat_hash_map<std::string, envoy::config::route::v3::RouteConfiguration>&
+  routes() const {
+    return active_routes_;
+  };
+
   uint32_t numWarming() const { return num_warming_; }
   uint32_t numActive() const { return num_active_; }
   uint32_t numDraining() const { return num_draining_; }

@@ -1,5 +1,6 @@
 #include "test/server/config_validation/xds_fuzz.h"
 
+#include "envoy/api/v2/route.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
@@ -335,9 +336,24 @@ void XdsFuzzTest::verifyListeners() {
   }
 }
 
+void XdsFuzzTest::verifyRoutes() {
+  auto dump = getRoutesConfigDump();
+
+  // go through routes in verifier and make sure each is in the config dump
+  auto routes = verifier_.routes();
+  EXPECT_EQ(routes.size(), dump.size());
+  for (const auto& route : routes) {
+    EXPECT_TRUE(std::any_of(dump.begin(), dump.end(), [&](const auto& dump_route) {
+      return route.first == dump_route.name();
+    }));
+  }
+}
+
 void XdsFuzzTest::verifyState() {
   verifyListeners();
   ENVOY_LOG_MISC(debug, "Verified listeners");
+  verifyRoutes();
+  ENVOY_LOG_MISC(debug, "Verified routes");
 
   EXPECT_EQ(test_server_->gauge("listener_manager.total_listeners_draining")->value(),
             verifier_.numDraining());
@@ -358,6 +374,28 @@ envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {
   auto message_ptr =
       test_server_->server().admin().getConfigTracker().getCallbacksMap().at("listeners")();
   return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
+}
+
+std::vector<envoy::api::v2::RouteConfiguration> XdsFuzzTest::getRoutesConfigDump() {
+  auto map = test_server_->server().admin().getConfigTracker().getCallbacksMap();
+
+  // there is no route config dump before envoy has a route
+  if (map.find("routes") == map.end()) {
+    return {};
+  }
+
+  auto message_ptr = map.at("routes")();
+  auto dump = dynamic_cast<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
+
+  // since the route config dump gives the RouteConfigurations as an Any, go through and cast them
+  // back to RouteConfigurations
+  std::vector<envoy::api::v2::RouteConfiguration> dump_routes;
+  for (const auto& route : dump.dynamic_route_configs()) {
+    envoy::api::v2::RouteConfiguration dyn_route;
+    route.route_config().UnpackTo(&dyn_route);
+    dump_routes.push_back(dyn_route);
+  }
+  return dump_routes;
 }
 
 } // namespace Envoy
