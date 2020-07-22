@@ -24,11 +24,10 @@ typedef struct {
 /**
  * Return codes for on-data filter invocations. @see envoy/http/filter.h
  */
-typedef enum {
-  ENVOY_FILTER_DATA_STATUS_CONTINUE = 0,
-  ENVOY_FILTER_DATA_STATUS_STOP_ITERATION_AND_BUFFER,
-  ENVOY_FILTER_DATA_STATUS_STOP_ITERATION_NO_BUFFER,
-} envoy_filter_data_status_t;
+typedef int envoy_filter_data_status_t;
+extern const envoy_filter_data_status_t kEnvoyFilterDataStatusContinue;
+extern const envoy_filter_data_status_t kEnvoyFilterDataStatusStopIterationAndBuffer;
+extern const envoy_filter_data_status_t kEnvoyFilterDataStatusStopIterationNoBuffer;
 
 /**
  * Compound return type for on-data filter invocations.

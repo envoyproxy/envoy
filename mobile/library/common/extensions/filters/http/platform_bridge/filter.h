@@ -50,6 +50,8 @@ public:
 private:
   Http::FilterHeadersStatus onHeaders(Http::HeaderMap& headers, bool end_stream,
                                       envoy_filter_on_headers_f on_headers);
+  Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream,
+                                envoy_filter_on_data_f on_data);
   const envoy_http_filter* platform_filter_;
 };
 
