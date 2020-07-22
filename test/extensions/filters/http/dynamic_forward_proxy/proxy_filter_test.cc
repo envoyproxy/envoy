@@ -249,8 +249,6 @@ TEST_F(ProxyFilterTest, NoCluster) {
 
 // No cluster type leads to skipping DNS lookups.
 TEST_F(ProxyFilterTest, NoClusterType) {
-  CustomClusterType cluster_type;
-  cluster_type.set_name(Envoy::Extensions::Clusters::ClusterTypes::get().Static);
   cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = absl::nullopt;
 
   InSequence s;
