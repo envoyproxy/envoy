@@ -313,7 +313,7 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, std::string& exception_msg) {
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
-  // all the scope names to be removed or updated.
+  // All the scope names to be removed or updated.
   absl::flat_hash_set<std::string> updated_or_removed_scopes;
   for (const std::string& removed_resource : removed_resources) {
     updated_or_removed_scopes.insert(removed_resource);
@@ -326,7 +326,6 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
   }
 
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash = scope_name_by_hash_;
-  // don't check key conflict with scopes to be updated or removed
   absl::erase_if(scope_name_by_hash, [&updated_or_removed_scopes](const auto& key_name) {
     auto const& [key, name] = key_name;
     return (updated_or_removed_scopes.contains(name));
