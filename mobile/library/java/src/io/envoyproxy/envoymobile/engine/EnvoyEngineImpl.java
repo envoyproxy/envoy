@@ -4,6 +4,10 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
 /* Concrete implementation of the `EnvoyEngine` interface. */
 public class EnvoyEngineImpl implements EnvoyEngine {
+  // TODO(goaway): enforce agreement values in /library/common/types/c_types.h.
+  private static final int ENVOY_SUCCESS = 0;
+  private static final int ENVOY_FAILURE = 1;
+
   private final long engineHandle;
 
   public EnvoyEngineImpl() {
@@ -37,7 +41,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
       return JniLibrary.runEngine(this.engineHandle, configurationYAML, logLevel);
     } catch (Throwable throwable) {
       // TODO: Need to have a way to log the exception somewhere.
-      return 1;
+      return ENVOY_FAILURE;
     }
   }
 

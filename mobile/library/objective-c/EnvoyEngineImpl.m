@@ -132,14 +132,14 @@ ios_http_filter_on_response_headers(envoy_headers headers, bool end_stream, void
   api->on_response_data = NULL;
   api->context = context;
   register_platform_api(filter.name.UTF8String, api);
-  return 0;
+  return kEnvoySuccess;
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
   NSString *templateYAML = [[NSString alloc] initWithUTF8String:config_template];
   NSString *resolvedYAML = [config resolveTemplate:templateYAML];
   if (resolvedYAML == nil) {
-    return 1;
+    return kEnvoyFailure;
   }
 
   for (EnvoyHTTPFilter *filter in config.httpFilters) {
@@ -162,7 +162,7 @@ ios_http_filter_on_response_headers(envoy_headers headers, bool end_stream, void
   } @catch (NSException *exception) {
     NSLog(@"[Envoy] exception caught: %@", exception);
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];
-    return 1;
+    return kEnvoyFailure;
   }
 }
 
