@@ -29,7 +29,17 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
                      NetworkFilterNames::get().ThriftProxy,
                      NetworkFilterNames::get().ZooKeeperProxy,
                      NetworkFilterNames::get().HttpConnectionManager,
-                     NetworkFilterNames::get().SniDynamicForwardProxy};
+                     NetworkFilterNames::get().SniDynamicForwardProxy,
+                     NetworkFilterNames::get().KafkaBroker,
+                     NetworkFilterNames::get().RocketmqProxy, //fix the assert
+                     NetworkFilterNames::get().RateLimit//ratelimit
+                     //rbac
+
+                      // mongo_proxy
+                      // mysql_proxy
+                      // postgres_proxy
+                    //tcp_proxy
+                     };
   }
   return filter_names_;
 }
