@@ -218,7 +218,7 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, ShouldRegisterRequest) {
 
   EXPECT_CALL(*request_metrics_, onRequest(api_key));
 
-  MonotonicTime time_point{std::chrono::microseconds(1234)};
+  MonotonicTime time_point{std::chrono::milliseconds(1234)};
   EXPECT_CALL(time_source_, monotonicTime()).WillOnce(Return(time_point));
 
   // when
