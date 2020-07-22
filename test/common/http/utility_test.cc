@@ -310,9 +310,10 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 namespace {
 
-envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV2Yaml(const std::string& yaml) {
+envoy::config::core::v3::Http2ProtocolOptions
+parseHttp2OptionsFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
   envoy::config::core::v3::Http2ProtocolOptions http2_options;
-  TestUtility::loadFromYamlAndValidate(yaml, http2_options);
+  TestUtility::loadFromYamlAndValidate(yaml, http2_options, false, avoid_boosting);
   return ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options);
 }
 
@@ -321,7 +322,7 @@ envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV2Yaml(const 
 TEST(HttpUtility, parseHttp2Settings) {
   {
     using ::Envoy::Http2::Utility::OptionsLimits;
-    auto http2_options = parseHttp2OptionsFromV2Yaml("{}");
+    auto http2_options = parseHttp2OptionsFromV3Yaml("{}");
     EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
     EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS,
               http2_options.max_concurrent_streams().value());
@@ -348,7 +349,7 @@ max_concurrent_streams: 2
 initial_stream_window_size: 65535
 initial_connection_window_size: 65535
     )EOF";
-    auto http2_options = parseHttp2OptionsFromV2Yaml(yaml);
+    auto http2_options = parseHttp2OptionsFromV3Yaml(yaml);
     EXPECT_EQ(1U, http2_options.hpack_table_size().value());
     EXPECT_EQ(2U, http2_options.max_concurrent_streams().value());
     EXPECT_EQ(65535U, http2_options.initial_stream_window_size().value());

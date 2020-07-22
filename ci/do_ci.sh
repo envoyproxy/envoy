@@ -181,7 +181,7 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan --build_tests_only ${TEST_TARGETS}
+  bazel_with_collection test --config=rbe-toolchain-tsan ${BAZEL_BUILD_OPTIONS} -c dbg --build_tests_only ${TEST_TARGETS}
   if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
     echo "Building and testing envoy-filter-example tests..."
     pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
@@ -272,6 +272,13 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
   test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
+  collect_build_profile coverage
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
+  setup_clang_toolchain
+  echo "bazel coverage build with fuzz tests ${COVERAGE_TEST_TARGETS}"
+
+  FUZZ_COVERAGE=true test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then

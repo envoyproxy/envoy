@@ -1148,19 +1148,16 @@ request_headers_to_add:
 
   using CountMap = absl::flat_hash_map<std::string, int>;
   CountMap counts;
-  header_map.iterate(
-      [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
-        CountMap* m = static_cast<CountMap*>(cb_v);
-        absl::string_view key = header.key().getStringView();
-        CountMap::iterator i = m->find(key);
-        if (i == m->end()) {
-          m->insert({std::string(key), 1});
-        } else {
-          i->second++;
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &counts);
+  header_map.iterate([&counts](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    absl::string_view key = header.key().getStringView();
+    CountMap::iterator i = counts.find(key);
+    if (i == counts.end()) {
+      counts.insert({std::string(key), 1});
+    } else {
+      i->second++;
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   EXPECT_EQ(1, counts["static-header"]);
   EXPECT_EQ(1, counts["x-client-ip"]);

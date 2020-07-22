@@ -8,15 +8,12 @@
 
 namespace Envoy {
 namespace Http {
+// NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const HeaderMapImpl& headers, std::ostream* os) {
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        std::ostream* os = static_cast<std::ostream*>(context);
-        *os << "{'" << header.key().getStringView() << "','" << header.value().getStringView()
-            << "'}";
-        return HeaderMap::Iterate::Continue;
-      },
-      os);
+  headers.iterate([os](const HeaderEntry& header) -> HeaderMap::Iterate {
+    *os << "{'" << header.key().getStringView() << "','" << header.value().getStringView() << "'}";
+    return HeaderMap::Iterate::Continue;
+  });
 }
 
 void PrintTo(const HeaderMapPtr& headers, std::ostream* os) {
