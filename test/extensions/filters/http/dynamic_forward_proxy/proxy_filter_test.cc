@@ -1,5 +1,7 @@
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
+#include "extensions/clusters/well_known_names.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -20,6 +22,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace DynamicForwardProxy {
 namespace {
+
+using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
 
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 using MockLoadDnsCacheEntryResult =
@@ -43,6 +47,12 @@ public:
     // Allow for an otherwise strict mock.
     EXPECT_CALL(callbacks_, connection()).Times(AtLeast(0));
     EXPECT_CALL(callbacks_, streamId()).Times(AtLeast(0));
+
+    // Configure upstream cluster to be a Dynamic Forward Proxy since that's the
+    // kind we need to do DNS entries for.
+    CustomClusterType cluster_type;
+    cluster_type.set_name(Envoy::Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy);
+    cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = cluster_type;
 
     // Configure max pending to 1 so we can test circuit breaking.
     cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0);
@@ -234,6 +244,30 @@ TEST_F(ProxyFilterTest, NoCluster) {
 
   EXPECT_CALL(callbacks_, route());
   EXPECT_CALL(cm_, get(_)).WillOnce(Return(nullptr));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// No cluster type leads to skipping DNS lookups.
+TEST_F(ProxyFilterTest, NoClusterType) {
+  cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = absl::nullopt;
+
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, get(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// Cluster that isn't a dynamic forward proxy cluster
+TEST_F(ProxyFilterTest, NonDynamicForwardProxy) {
+  CustomClusterType cluster_type;
+  cluster_type.set_name(Envoy::Extensions::Clusters::ClusterTypes::get().Static);
+  cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = cluster_type;
+
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(cm_, get(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 

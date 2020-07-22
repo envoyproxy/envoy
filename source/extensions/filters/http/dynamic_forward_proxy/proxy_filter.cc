@@ -1,10 +1,12 @@
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "common/runtime/runtime_features.h"
 
+#include "extensions/clusters/well_known_names.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -17,6 +19,8 @@ struct ResponseStringValues {
   const std::string DnsCacheOverflow = "DNS cache overflow";
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
 };
+
+using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
 
 using ResponseStrings = ConstSingleton<ResponseStringValues>;
 
@@ -54,6 +58,17 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::Continue;
   }
   cluster_info_ = cluster->info();
+
+  // We only need to do DNS lookups for hosts in dynamic forward proxy clusters,
+  // since the other cluster types do their own DNS management.
+  const absl::optional<CustomClusterType>& cluster_type = cluster_info_->clusterType();
+  if (!cluster_type) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  if (cluster_type->name() !=
+      Envoy::Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
   const bool should_use_dns_cache_circuit_breakers =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_dns_cache_circuit_breakers");
