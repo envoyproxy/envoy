@@ -17,13 +17,14 @@ namespace Envoy {
 class XdsVerifier {
 public:
   XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta);
-  void listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update = false);
-  void listenerUpdated(envoy::config::listener::v3::Listener listener);
+  void listenerAdded(const envoy::config::listener::v3::Listener& listener,
+                     bool from_update = false);
+  void listenerUpdated(const envoy::config::listener::v3::Listener& listener);
   void listenerRemoved(const std::string& name);
   void drainedListener(const std::string& name);
 
-  void routeAdded(envoy::config::route::v3::RouteConfiguration route);
-  void routeUpdated(envoy::config::route::v3::RouteConfiguration route);
+  void routeAdded(const envoy::config::route::v3::RouteConfiguration& route);
+  void routeUpdated(const envoy::config::route::v3::RouteConfiguration& route);
 
   enum ListenerState { WARMING, ACTIVE, DRAINING, REMOVED };
   struct ListenerRepresentation {

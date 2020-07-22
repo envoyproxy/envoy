@@ -71,7 +71,7 @@ void XdsVerifier::dumpState() {
  * update a listener when its route is changed, draining/removing the old listener and adding the
  * updated listener
  */
-void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener) {
+void XdsVerifier::listenerUpdated(const envoy::config::listener::v3::Listener& listener) {
   ENVOY_LOG_MISC(debug, "About to update listener {}", listener.name());
   dumpState();
 
@@ -117,7 +117,8 @@ void XdsVerifier::listenerUpdated(envoy::config::listener::v3::Listener listener
  * @param from_update whether this function was called from listenerUpdated, in which case
  * num_added_ should not be incremented
  */
-void XdsVerifier::listenerAdded(envoy::config::listener::v3::Listener listener, bool from_update) {
+void XdsVerifier::listenerAdded(const envoy::config::listener::v3::Listener& listener,
+                                bool from_update) {
   // if the same listener being added is already draining, it will be moved back to active, and if
   // the listener is already in listeners_ num_added_ should not be incremented
   bool found = false;
@@ -266,7 +267,7 @@ void XdsVerifier::markForRemoval(ListenerRepresentation& rep) {
  * called when a route that was previously added is re-added
  * the original route might have been ignored if no resources refer to it, so we can add it here
  */
-void XdsVerifier::routeUpdated(envoy::config::route::v3::RouteConfiguration route) {
+void XdsVerifier::routeUpdated(const envoy::config::route::v3::RouteConfiguration& route) {
   if (!all_routes_.contains(route.name()) &&
       std::any_of(listeners_.begin(), listeners_.end(),
                   [&](auto& rep) { return getRoute(rep.listener) == route.name(); })) {
@@ -285,7 +286,7 @@ void XdsVerifier::routeUpdated(envoy::config::route::v3::RouteConfiguration rout
 /**
  * add a new route and update any listeners that refer to this route
  */
-void XdsVerifier::routeAdded(envoy::config::route::v3::RouteConfiguration route) {
+void XdsVerifier::routeAdded(const envoy::config::route::v3::RouteConfiguration& route) {
   // routes that are not referenced by any resource are ignored, so this creates a distinction
   // between SOTW and delta
   // if an unreferenced route is sent in delta, it is ignored forever as it will not be sent in
