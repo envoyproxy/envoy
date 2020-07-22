@@ -172,9 +172,8 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
 
 TEST_F(LookupRequestTest, SatisfiableRange) {
   // add method (GET) and range to headers
-  request_headers_.addReference(Http::LowerCaseString(":method"),
-                                Http::Headers::get().MethodValues.Get);
-  request_headers_.addReference(Http::LowerCaseString("range"), "bytes=1-99,3-,-2");
+  request_headers_.addReference(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get);
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99,3-,-2");
 
   const LookupRequest lookup_request(request_headers_, current_time_);
 
@@ -211,9 +210,8 @@ TEST_F(LookupRequestTest, SatisfiableRange) {
 
 TEST_F(LookupRequestTest, NotSatisfiableRange) {
   // add method (GET) and range headers
-  request_headers_.addReference(Http::LowerCaseString(":method"),
-                                Http::Headers::get().MethodValues.Get);
-  request_headers_.addReference(Http::LowerCaseString("range"), "bytes=5-99,100-");
+  request_headers_.addReference(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get);
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=5-99,100-");
 
   const LookupRequest lookup_request(request_headers_, current_time_);
 
