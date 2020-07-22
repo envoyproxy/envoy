@@ -268,6 +268,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     deps = [
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/stats:utility_lib",
     ],
 )
