@@ -19,12 +19,12 @@ const absl::flat_hash_set<absl::string_view>& cacheableStatusCodes() {
                          "301", "308", "404", "405", "410", "414", "451", "501");
 }
 
-const std::vector<Http::LowerCaseString>& conditionalHeaders() {
+const std::vector<const Http::LowerCaseString* const>& conditionalHeaders() {
   // As defined by: https://httpwg.org/specs/rfc7232.html#preconditions
   CONSTRUCT_ON_FIRST_USE(
-      std::vector<Http::LowerCaseString>, Http::LowerCaseString{"if-match"},
-      Http::LowerCaseString{"if-none-match"}, Http::LowerCaseString{"if-modified-since"},
-      Http::LowerCaseString{"if-unmodified-since"}, Http::LowerCaseString{"if-range"});
+      std::vector<const Http::LowerCaseString* const>, &Http::CustomHeaders::get().IfMatch,
+      &Http::CustomHeaders::get().IfNonMatch, &Http::CustomHeaders::get().IfModifiedSince,
+      &Http::CustomHeaders::get().IfUnmodifiedSince, &Http::CustomHeaders::get().IfRange);
 }
 } // namespace
 
@@ -44,8 +44,8 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   // If needed to be handled properly refer to:
   // https://httpwg.org/specs/rfc7234.html#validation.received
   bool contains_conditional_headers = false;
-  for (const auto& conditional_header : conditionalHeaders()) {
-    if (headers.get(Http::LowerCaseString{conditional_header})) {
+  for (auto conditional_header : conditionalHeaders()) {
+    if (headers.get(*conditional_header)) {
       contains_conditional_headers = true;
       break;
     }

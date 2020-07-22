@@ -58,7 +58,6 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   lookup_ = cache_.makeLookupContext(std::move(lookup_request));
 
   ASSERT(lookup_);
-
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
 
   // Used exclusively to access the RequestHeaderMap in onHeaders
@@ -92,7 +91,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     ASSERT(lookup_result_, "CacheFilter trying to validate a non-existent lookup result");
 
     // Check whether the cached entry should be updated before modifying the 304 response
-    bool should_update_cached_entry = shouldUpdateCachedEntry(headers);
+    const bool should_update_cached_entry = shouldUpdateCachedEntry(headers);
 
     // Update the 304 response status code and content-length
     headers.setStatus(lookup_result_->headers_->getStatusValue());
@@ -134,8 +133,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   // Either a cache miss or a cache entry is no longer valid
   // Check if the new response can be cached
   if (request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers)) {
-    // TODO(yosrym93): Add date internal header or metadata to cached responses and use it instead
-    // of the date header
+    // TODO(#12140): Add date internal header or metadata to cached responses
+    ASSERT(lookup_, "CacheFilter::encodeHeaders no LookupContext to use to insert data");
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
@@ -148,12 +147,11 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     return Http::FilterDataStatus::Continue;
   }
   if (insert_) {
-    ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting body", *encoder_callbacks_);
+    ENVOY_STREAM_LOG(debug, "CacheFilter::encodeData inserting body", *encoder_callbacks_);
     // TODO(toddmgreer): Wait for the cache if necessary.
     insert_->insertBody(
         data, [](bool) {}, end_stream);
-  }
-  if (encode_cached_response_state_ == EncodeCachedResponseState::IterationStopped) {
+  } else if (encode_cached_response_state_ == EncodeCachedResponseState::IterationStopped) {
     // Iteration stopped waiting for cached body (and trailers) to be encoded
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
@@ -161,19 +159,19 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 }
 
 void CacheFilter::getHeaders() {
-  ASSERT(lookup_);
+  ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
   lookup_->getHeaders([this](LookupResult&& result) { onHeaders(std::move(result)); });
 }
 
 void CacheFilter::getBody() {
-  ASSERT(lookup_);
+  ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
   lookup_->getBody(remaining_body_[0],
                    [this](Buffer::InstancePtr&& body) { onBody(std::move(body)); });
 }
 
 void CacheFilter::getTrailers() {
-  ASSERT(lookup_);
+  ASSERT(lookup_, "CacheFilter is trying to call getTrailers with no LookupContext");
   ASSERT(response_has_trailers_, "No reason to call getTrailers when there's no trailers to get.");
   lookup_->getTrailers(
       [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailers(std::move(trailers)); });
@@ -289,11 +287,11 @@ void CacheFilter::injectValidationHeaders() {
 
   if (etag_header) {
     absl::string_view etag = etag_header->value().getStringView();
-    request_headers_->setCopy(Http::LowerCaseString{"if-none-match"}, etag);
+    request_headers_->setReferenceKey(Http::CustomHeaders::get().IfNonMatch, etag);
   }
   if (last_modified_header) {
     absl::string_view last_modified = last_modified_header->value().getStringView();
-    request_headers_->setCopy(Http::LowerCaseString{"if-unmodified-since"}, last_modified);
+    request_headers_->setCopy(Http::CustomHeaders::get().IfUnmodifiedSince, last_modified);
   }
 }
 

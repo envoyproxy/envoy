@@ -64,6 +64,11 @@ public:
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString IfMatch{"if-match"};
+  const LowerCaseString IfNonMatch{"if-none-match"};
+  const LowerCaseString IfModifiedSince{"if-modified-since"};
+  const LowerCaseString IfUnmodifiedSince{"if-unmodified-since"};
+  const LowerCaseString IfRange{"if-range"};
   const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
