@@ -29,7 +29,7 @@ def replace_includes(mock_name):
     classname = "Mock" + ''.join(map(lambda x: x[:1].upper() + x[1:], classname_tokens))
     classnames.append(classname)
     classname2filename[classname] = filename
-    bazelname = "//test/mocks/{}:" + filename.split('/')[-1].replace(
+    bazelname = "//test/mocks/{}:".format(mock_name) + filename.split('/')[-1].replace(
         '.h', '') + '_mocks'.format(mock_name)
     classname2bazelname[classname] = bazelname
 
