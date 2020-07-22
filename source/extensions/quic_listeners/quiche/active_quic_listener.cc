@@ -34,16 +34,6 @@ ActiveQuicListener::ActiveQuicListener(
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags)
-    : ActiveQuicListener(dispatcher, parent, listen_socket, listener_config, quic_config,
-                         std::move(options),
-                         enabled, quic_flags) {}
-
-ActiveQuicListener::ActiveQuicListener(
-    Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-    Network::SocketSharedPtr listen_socket, Network::ListenerConfig& listener_config,
-    const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-    std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket), enabled_(enabled, Runtime::LoaderSingleton::get()),
@@ -78,9 +68,7 @@ ActiveQuicListener::ActiveQuicListener(
       per_worker_stats_, dispatcher, listen_socket_);
   quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
   for (auto const& flag : quic_flags) {
-    // transform envoy runtime feature flags into quiche flags and put them into registry???
-    // dummy statement to pass compilation
-    flag.runtime_key();
+    flag_registry_.updateFlag(Runtime::FeatureFlag(flag, Runtime::LoaderSingleton::get()));
   }
 }
 

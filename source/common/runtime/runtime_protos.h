@@ -21,6 +21,7 @@ public:
         runtime_(runtime) {}
 
   bool enabled() const { return runtime_.snapshot().getBoolean(runtime_key_, default_value_); }
+  const std::string runtime_key() const { return runtime_key_; }
 
 private:
   const std::string runtime_key_;

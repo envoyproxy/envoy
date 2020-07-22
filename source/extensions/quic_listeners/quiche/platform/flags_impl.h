@@ -37,6 +37,9 @@ public:
   // Look up a flag by name.
   Flag* FindFlag(const std::string& name) const;
 
+  //to be implemented.
+  void updateFlag(const Envoy::Runtime::FeatureFlag& flag) const;
+
 private:
   FlagRegistry();
 
@@ -55,6 +58,8 @@ public:
 
   // Reset flag to default value.
   virtual void ResetValue() = 0;
+
+  virtual void setRuntimeFlag(const Envoy::Runtime::FeatureFlag& runtime_flag) = 0;
 
   // Return flag name.
   std::string name() const { return name_; }
@@ -81,6 +86,11 @@ public:
   void ResetValue() override {
     absl::MutexLock lock(&mutex_);
     value_ = default_value_;
+  }
+
+  void setRuntimeFlag(const Envoy::Runtime::FeatureFlag& runtime_flag) override {
+    absl::MutexLock lock(&mutex_);
+    runtime_value_ = std::make_unique<Envoy::Runtime::FeatureFlag>(runtime_flag);
   }
 
   // Set flag value.

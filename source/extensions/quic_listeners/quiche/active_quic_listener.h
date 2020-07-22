@@ -38,13 +38,6 @@ public:
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
                      std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags);
 
-  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::SocketSharedPtr listen_socket,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     Network::Socket::OptionsSharedPtr options,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-                     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags);
-
   ~ActiveQuicListener() override;
 
   void onListenerShutdown();
@@ -74,7 +67,6 @@ private:
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   Network::Socket& listen_socket_;
   Runtime::FeatureFlag enabled_;
-  // QuicRuntimeFlagsMapPtr quic_runtime_flags_;
   quiche::FlagRegistry& flag_registry_;
 };
 

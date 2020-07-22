@@ -46,6 +46,14 @@ Flag* FlagRegistry::FindFlag(const std::string& name) const {
   return (it != flags_.end()) ? it->second : nullptr;
 }
 
+void FlagRegistry::updateFlag(const Envoy::Runtime::FeatureFlag& runtime_flag) const {
+  const auto found = flags_.find(runtime_flag.runtime_key()); 
+  if (found != flags_.end()) {
+    const auto flag = found->second;
+    flag->setRuntimeFlag(runtime_flag);
+  } 
+}
+
 template <> bool TypedFlag<bool>::SetValueFromString(const std::string& value_str) {
   static const auto* kTrueValues = new std::set<std::string>({"1", "t", "true", "y", "yes"});
   static const auto* kFalseValues = new std::set<std::string>({"0", "f", "false", "n", "no"});
