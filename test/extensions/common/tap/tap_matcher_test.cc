@@ -31,12 +31,7 @@ public:
   Http::TestResponseTrailerMapImpl response_trailers_;
 };
 
-// Base test class for config parameterized tests.
-class TapMatcherGenericBodyConfigTest
-    : public TapMatcherTestBase,
-      public ::testing::TestWithParam<
-          std::tuple<TapMatcherTestBase::Direction, std::tuple<std::vector<std::string>, size_t>>> {
-};
+class TapMatcherGenericBodyConfigTest : public TapMatcherTestBase, public ::testing::Test {};
 
 class TapMatcherGenericBodyTest
     : public TapMatcherTestBase,
@@ -193,16 +188,6 @@ http_request_generic_body_match:
 )EOF";
   ASSERT_ANY_THROW(TestUtility::loadFromYaml(matcher_yaml, config_));
 }
-
-INSTANTIATE_TEST_SUITE_P(
-    TapMatcherGenericBodyTestConfigSuite, TapMatcherGenericBodyConfigTest,
-    ::testing::Combine(
-        ::testing::Values(TapMatcherTestBase::Direction::Request,
-                          TapMatcherTestBase::Direction::Response),
-        ::testing::Values(
-            // Should match - envoy is in the body
-            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\""}, 5),
-            std::make_tuple(std::vector<std::string>{"    - string_match: \"envoy\""}, 5))));
 
 // Test different configurations against the body.
 // Parameterized test passes various configurations

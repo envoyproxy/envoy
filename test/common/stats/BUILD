@@ -228,7 +228,7 @@ envoy_cc_test(
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
@@ -268,6 +268,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     deps = [
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/stats:utility_lib",
     ],
 )

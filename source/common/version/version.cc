@@ -1,4 +1,4 @@
-#include "common/common/version.h"
+#include "common/version/version.h"
 
 #include <map>
 #include <regex>
@@ -6,7 +6,6 @@
 
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
-#include "common/common/version_linkstamp.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/numbers.h"
