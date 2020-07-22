@@ -1091,7 +1091,9 @@ message RetryPolicy {
     // Specifies the rate limited retry reset headers (like ``Retry-After`` or
     // ``X-RateLimit-Reset``) to match against the response. If a request is
     // being retried and the response contains one of these headers the value
-    // of the header will be used as the retry back off interval, with jitter added.
+    // of the header will be used as the retry back off interval, with jitter
+    // added. If multiple headers are specified they are tried in the order
+    // given and the first matching header in the response is used.
     //
     // The value of the header must be either:
     //  1. An interval in seconds as an integer, for example: ``120``.
