@@ -379,15 +379,15 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
   if (socket_type == Network::Socket::Type::Datagram) {
     auto udp_writer_config = config_.udp_writer_config();
-    if (udp_writer_config.udp_writer_name().empty()) {
-      udp_writer_config.set_udp_writer_name(Network::UdpWriterNames::get().DefaultWriter);
+    if (udp_writer_config.name().empty()) {
+      udp_writer_config.set_name(Network::UdpWriterNames::get().DefaultWriter);
     }
 
     auto& config_factory =
         Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterConfigFactory>(
-            udp_writer_config.udp_writer_name());
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        udp_writer_config, validation_visitor_, config_factory);
+            udp_writer_config.name());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        udp_writer_config.typed_config(), validation_visitor_, config_factory);
     udp_writer_factory_ = config_factory.createUdpPacketWriterFactory(*message);
   }
 }

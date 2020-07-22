@@ -13,7 +13,6 @@
 
 #pragma GCC diagnostic pop
 
-#include "envoy/config/listener/v3/udp_writer_config.pb.h"
 #include "envoy/network/udp_packet_writer_handler.h"
 
 #include "common/protobuf/utility.h"

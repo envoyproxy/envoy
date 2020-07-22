@@ -5,11 +5,11 @@ package envoy.config.listener.v4alpha;
 import "envoy/config/accesslog/v4alpha/accesslog.proto";
 import "envoy/config/core/v4alpha/address.proto";
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/socket_option.proto";
 import "envoy/config/listener/v4alpha/api_listener.proto";
 import "envoy/config/listener/v4alpha/listener_components.proto";
 import "envoy/config/listener/v4alpha/udp_listener_config.proto";
-import "envoy/config/listener/v4alpha/udp_writer_config.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -256,5 +256,5 @@ message Listener {
   // UdpWriterProto in Listener Config
   // This field specifies the udp_writer_name, e.g. "udp_default_writer" or
   // "udp_gso_batch_writer", that can be used to instantiate udp_writer.
-  UdpWriterConfig udp_writer_config = 23;
+  core.v4alpha.TypedExtensionConfig udp_writer_config = 23;
 }
