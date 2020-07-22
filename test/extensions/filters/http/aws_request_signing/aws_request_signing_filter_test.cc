@@ -72,6 +72,17 @@ TEST_F(AwsRequestSigningFilterTest, SignFails) {
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
 }
 
+// Verify FilterConfigImpl's getters.
+TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
+  Stats::IsolatedStoreImpl stats;
+  auto signer = std::make_unique<Common::Aws::MockSigner>();
+  FilterConfigImpl config(std::move(signer), "prefix", stats, "foo");
+
+  config.signer();
+  config.stats();
+  EXPECT_EQ("foo", config.hostRewrite());
+}
+
 } // namespace
 } // namespace AwsRequestSigningFilter
 } // namespace HttpFilters
