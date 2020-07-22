@@ -36,15 +36,12 @@ ActiveQuicListener::ActiveQuicListener(
     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags)
     : ActiveQuicListener(dispatcher, parent, listen_socket, listener_config, quic_config,
                          std::move(options),
-                         std::make_unique<EnvoyQuicProofSource>(
-                             listen_socket, listener_config.filterChainManager()),
                          enabled, quic_flags) {}
 
 ActiveQuicListener::ActiveQuicListener(
     Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
     Network::SocketSharedPtr listen_socket, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-    std::unique_ptr<quic::ProofSource> proof_source,
     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, &listener_config),

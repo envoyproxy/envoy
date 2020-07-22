@@ -42,7 +42,6 @@ public:
                      Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options,
-                     std::unique_ptr<quic::ProofSource> proof_source,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
                      std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags);
 
