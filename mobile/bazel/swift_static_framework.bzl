@@ -136,8 +136,8 @@ _swift_static_framework = rule(
             cfg = "host",
             executable = True,
         ),
-        _whitelist_function_transition = attr.label(
-            default = "@build_bazel_rules_apple//tools/whitelists/function_transition_whitelist",
+        _allowlist_function_transition = attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
         _zipper = attr.label(
             default = "@bazel_tools//tools/zip:zipper",

@@ -28,6 +28,8 @@ build --define cxxopts=-std=c++17
 # More information on stamping can be found here:
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
+# https://github.com/bazelbuild/bazel/issues/10674#issuecomment-658208918
+build:ios --incompatible_objc_compile_info_migration
 
 # Default flags for builds targeting Android
 build:android --define logger=android
