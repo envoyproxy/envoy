@@ -4,8 +4,8 @@
 #include "extensions/filters/network/well_known_names.h"
 
 #include "test/config/utility.h"
-#include "test/extensions/filters/network/common/fuzz/network_filter_fuzz.pb.validate.h"
-#include "test/extensions/filters/network/common/fuzz/uber_filter.h"
+#include "test/extensions/filters/network/common/fuzz/network_readfilter_fuzz.pb.validate.h"
+#include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {

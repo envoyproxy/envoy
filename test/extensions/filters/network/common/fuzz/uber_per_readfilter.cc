@@ -6,7 +6,7 @@
 #include "extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
-#include "test/extensions/filters/network/common/fuzz/uber_filter.h"
+#include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
 
 namespace Envoy {
 namespace Extensions {
