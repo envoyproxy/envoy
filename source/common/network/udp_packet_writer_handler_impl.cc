@@ -10,7 +10,7 @@ namespace Network {
 UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle, Stats::Scope& scope)
     : write_blocked_(false), io_handle_(io_handle), stats_(generateStats(scope)) {}
 
-UdpDefaultWriter::~UdpDefaultWriter() {}
+UdpDefaultWriter::~UdpDefaultWriter() = default;
 
 Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& buffer,
                                                       const Address::Ip* local_ip,

@@ -54,7 +54,7 @@ UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope&
       io_handle_(io_handle), stats_(generateStats(scope)) {}
 
 // Do Nothing in the Destructor For now
-UdpGsoBatchWriter::~UdpGsoBatchWriter() {}
+UdpGsoBatchWriter::~UdpGsoBatchWriter() = default;
 
 Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
@@ -114,7 +114,7 @@ Network::UdpPacketWriterStats UdpGsoBatchWriter::generateStats(Stats::Scope& sco
   return {UDP_PACKET_WRITER_STATS(POOL_GAUGE(scope))};
 }
 
-UdpGsoBatchWriterFactory::UdpGsoBatchWriterFactory() {}
+UdpGsoBatchWriterFactory::UdpGsoBatchWriterFactory() = default;
 
 Network::UdpPacketWriterPtr
 UdpGsoBatchWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope) {
