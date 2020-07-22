@@ -8,6 +8,7 @@
 #include "envoy/thread/thread.h"
 
 #include "common/common/base_logger.h"
+#include "common/common/fancy_logger.h"
 #include "common/common/fmt.h"
 #include "common/common/logger_impl.h"
 #include "common/common/macros.h"
@@ -339,9 +340,13 @@ protected:
 #define ENVOY_FLUSH_LOG() ENVOY_LOGGER().flush()
 
 /**
- * Convenience macro to log to the class' logger.
+ * Convenience macro to log to the class' logger (migrating to fine-grained Fancy Logger).
  */
+#ifndef FANCY
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+#else
+#define ENVOY_LOG(LEVEL, ...) FANCY_LOG(LEVEL, ##__VA_ARGS__)
+#endif
 
 /**
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
