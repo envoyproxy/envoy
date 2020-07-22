@@ -60,6 +60,11 @@ private:
  * A WatcherImpl is an entity that listens for notifications that either an initialization target or
  * all targets registered with a manager have initialized. It can only be invoked through a
  * WatcherHandleImpl.
+ * The WathcerImpl has two types of ctors. We restrict the watcher_ inside ManagerImpl to be
+ * constructed with the 'ReadyFnSendName' fn so that the init manager will get target name
+ * information when the watcher_ calls 'onTargetSendName(target_name)' For any other purpose, a
+ * watcher can be constructed with either ctor. If you do not need a watcher to carry any string
+ * information such as the target_name, the first type with 'ReadyFn' fn is enough.
  */
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::init> {
 public:
