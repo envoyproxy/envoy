@@ -1,3 +1,5 @@
+#include "common/common/utility.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -11,7 +13,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
-#include "common/common/utility.h"
 #include "common/grpc/status.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"

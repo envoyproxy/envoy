@@ -1,3 +1,5 @@
+#include "extensions/filters/network/http_connection_manager/config.h"
+
 #include <chrono>
 #include <memory>
 #include <string>
@@ -32,8 +34,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
-
-#include "extensions/filters/network/http_connection_manager/config.h"
 
 namespace Envoy {
 namespace Extensions {
