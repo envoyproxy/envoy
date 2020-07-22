@@ -80,7 +80,7 @@ TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   FilterConfigImpl config(std::move(signer), "prefix", stats, "foo");
 
   EXPECT_EQ(signer_ptr, &config.signer());
-  EXPECT_NO_THROW(config.stats());
+  EXPECT_EQ(0UL, config.stats().signing_added_.value());
   EXPECT_EQ("foo", config.hostRewrite());
 }
 
