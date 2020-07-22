@@ -99,10 +99,8 @@ protected:
     locality_endpoints->mutable_locality()->set_region("middle_earth");
     locality_endpoints->mutable_locality()->set_zone("shire");
     locality_endpoints->mutable_locality()->set_sub_zone("hobbiton");
-    auto* socket_address = locality_endpoints
-                               ->add_endpoints()
-                               ->mutable_address()
-                               ->mutable_socket_address();
+    auto* socket_address =
+        locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
     socket_address->set_address("127.0.0.0");
     socket_address->set_port_value(1234);
 
