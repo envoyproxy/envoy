@@ -215,7 +215,9 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     pending_trailers_to_encode_ = cloneTrailers(trailers);
     createPendingFlushTimer();
   } else {
-    submitTrailers(trailers);
+    if (!trailers.empty()) {
+      submitTrailers(trailers);
+    }
     parent_.sendPendingFrames();
   }
 }
@@ -322,10 +324,6 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 }
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
-  if (trailers.empty()) {
-    return;
-  }
-
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
   int rc = nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(),
@@ -350,9 +348,11 @@ ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* 
     if (local_end_stream_ && pending_send_data_.length() <= length) {
       *data_flags |= NGHTTP2_DATA_FLAG_EOF;
       if (pending_trailers_to_encode_) {
-        // We need to tell the library to not set end stream so that we can emit the trailers.
-        *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
-        submitTrailers(*pending_trailers_to_encode_);
+        if (!pending_trailers_to_encode_->empty()) {
+          // We need to tell the library to not set end stream so that we can emit the trailers.
+          *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
+          submitTrailers(*pending_trailers_to_encode_);
+        }
         pending_trailers_to_encode_.reset();
       }
     }
