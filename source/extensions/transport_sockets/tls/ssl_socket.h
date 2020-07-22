@@ -55,7 +55,7 @@ private:
 
 class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 public:
-  SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx);
+  SslSocketInfo(SSL* ssl, ContextImplSharedPtr ctx);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -78,11 +78,9 @@ public:
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
   absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
-  SSL* ssl() const { return ssl_.get(); }
-  bssl::UniquePtr<SSL> handoffSsl() { return std::move(ssl_); }
-  void handbackSsl(bssl::UniquePtr<SSL> ssl) { ssl_ = std::move(ssl); }
+  SSL* ssl() const { return ssl_; }
 
-  bssl::UniquePtr<SSL> ssl_;
+  SSL* ssl_;
 
 private:
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
@@ -102,6 +100,7 @@ private:
 };
 
 using SslSocketInfoSharedPtr = std::shared_ptr<SslSocketInfo>;
+using HandshakerMaker = std::function<Ssl::HandshakerPtr(bssl::UniquePtr<SSL>)>;
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::PrivateKeyConnectionCallbacks,
@@ -110,7 +109,7 @@ class SslSocket : public Network::TransportSocket,
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
             const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-            Ssl::HandshakerPtr handshaker);
+            HandshakerMaker handshaker_maker);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -125,15 +124,13 @@ public:
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakerCallbacks
-  bssl::UniquePtr<SSL> HandOff() override;
-  void HandBack(bssl::UniquePtr<SSL> ssl) override;
   void OnSuccessCb(SSL* ssl) override;
   void OnFailureCb() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 
 protected:
-  SSL* rawSsl() const { return info_->ssl_.get(); }
+  SSL* rawSsl() const { return handshaker_->ssl(); }
 
 private:
   struct ReadResult {

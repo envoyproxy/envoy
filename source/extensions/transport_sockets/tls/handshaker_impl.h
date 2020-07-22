@@ -15,16 +15,21 @@ namespace Tls {
 // response enums, among other things.
 class HandshakerImpl : public Envoy::Ssl::Handshaker {
 public:
+  HandshakerImpl(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
+
   void initialize(SSL&) override {}
 
-  Network::PostIoAction doHandshake(Envoy::Ssl::SocketState& state, SSL* ssl,
+  Network::PostIoAction doHandshake(Envoy::Ssl::SocketState& state,
                                     Ssl::HandshakerCallbacks& callbacks) override;
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
     transport_socket_callbacks_ = &callbacks;
   }
 
+  SSL* ssl() override { return ssl_.get(); }
+
 private:
+  bssl::UniquePtr<SSL> ssl_;
   Network::TransportSocketCallbacks* transport_socket_callbacks_{};
 };
 
@@ -50,8 +55,9 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
-  Ssl::HandshakerPtr createHandshaker(Ssl::HandshakerFactoryContext&) override {
-    return std::make_unique<HandshakerImpl>();
+  Ssl::HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl,
+                                      Ssl::HandshakerFactoryContext&) override {
+    return std::make_unique<HandshakerImpl>(std::move(ssl));
   }
 
   void setConfig(ProtobufTypes::MessagePtr) override {}

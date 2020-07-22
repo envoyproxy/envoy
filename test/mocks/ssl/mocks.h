@@ -86,7 +86,7 @@ public:
   MOCK_METHOD(bool, isReady, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
 
-  MOCK_METHOD(Ssl::HandshakerPtr, createHandshaker, (), (const));
+  MOCK_METHOD(Ssl::HandshakerPtr, createHandshaker, (bssl::UniquePtr<SSL>), (const));
 
   MOCK_METHOD(const std::string&, serverNameIndication, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
@@ -110,7 +110,7 @@ public:
   MOCK_METHOD(bool, isReady, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::seconds>, sessionTimeout, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
-  MOCK_METHOD(Ssl::HandshakerPtr, createHandshaker, (), (const));
+  MOCK_METHOD(Ssl::HandshakerPtr, createHandshaker, (bssl::UniquePtr<SSL>), (const));
 
   MOCK_METHOD(bool, requireClientCertificate, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));

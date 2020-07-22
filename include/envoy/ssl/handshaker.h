@@ -16,14 +16,6 @@ public:
   virtual ~HandshakerCallbacks() = default;
 
   /**
-   * Hands off the internally-held SSL object for external manipulation.
-   */
-  virtual bssl::UniquePtr<SSL> HandOff() PURE;
-  /**
-   * Accepts an SSL object for internal storage.
-   */
-  virtual void HandBack(bssl::UniquePtr<SSL> ssl) PURE;
-  /**
    * Called when a handshake is successfully performed.
    */
   virtual void OnSuccessCb(SSL* ssl) PURE;
@@ -33,6 +25,10 @@ public:
   virtual void OnFailureCb() PURE;
 };
 
+/*
+ * Interface for a Handshaker which is responsible for owning the
+ * bssl::UniquePtr<SSL> and performing handshakes.
+ */
 class Handshaker {
 public:
   virtual ~Handshaker() = default;
@@ -45,14 +41,10 @@ public:
    * Do the handshake.
    *
    *  * |state| is a mutable reference.
-   *  * |ssl| should be either a pointer to some underlying SSL object, or
-   *    nullptr (in the case of a socket which has handed off its SSL object to
-   *    another process). Since doHandshake gets called repeatedly until done,
-   *    implementations should handle a nullptr |ssl| gracefully.
    *  * |callbacks| may not exist throughout the lifetime of the Handshaker, and
    *    should not be stored in an implementation.
    */
-  virtual Network::PostIoAction doHandshake(SocketState& state, SSL* ssl,
+  virtual Network::PostIoAction doHandshake(SocketState& state,
                                             HandshakerCallbacks& callbacks) PURE;
 
   /**
@@ -61,6 +53,12 @@ public:
    * state, raise connection events, etc.
    */
   virtual void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) PURE;
+
+  /*
+   * Access the held SSL object as a ptr. Callsites should handle nullptr
+   * gracefully.
+   */
+  virtual SSL* ssl() PURE;
 };
 
 using HandshakerPtr = std::unique_ptr<Handshaker>;
@@ -82,7 +80,8 @@ public:
 
 class HandshakerFactory : public Config::TypedFactory {
 public:
-  virtual HandshakerPtr createHandshaker(HandshakerFactoryContext& context) PURE;
+  virtual HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl,
+                                         HandshakerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tls_handshakers"; }
 

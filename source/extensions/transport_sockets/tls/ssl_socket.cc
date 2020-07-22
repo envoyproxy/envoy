@@ -46,12 +46,14 @@ public:
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                     Ssl::HandshakerPtr handshaker)
+                     HandshakerMaker handshaker_maker)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), handshaker_(std::move(handshaker)),
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), handshaker_([this, handshaker_maker]() {
+        bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
+        return handshaker_maker(std::move(ssl));
+      }()),
       state_(SocketState::PreHandshake) {
-  bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
-  info_ = std::make_shared<SslSocketInfo>(std::move(ssl), ctx_);
+  info_ = std::make_shared<SslSocketInfo>(handshaker_->ssl(), ctx_);
 
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
@@ -174,15 +176,13 @@ void SslSocket::onPrivateKeyMethodComplete() {
   }
 }
 
-bssl::UniquePtr<SSL> SslSocket::HandOff() { return info_->handoffSsl(); }
-void SslSocket::HandBack(bssl::UniquePtr<SSL> ssl) { info_->handbackSsl(std::move(ssl)); }
 void SslSocket::OnSuccessCb(SSL* ssl) {
   ctx_->logHandshake(ssl);
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 void SslSocket::OnFailureCb() { drainErrorQueue(); }
 
-PostIoAction SslSocket::doHandshake() { return handshaker_->doHandshake(state_, rawSsl(), *this); }
+PostIoAction SslSocket::doHandshake() { return handshaker_->doHandshake(state_, *this); }
 
 void SslSocket::drainErrorQueue() {
   bool saw_error = false;
@@ -292,9 +292,8 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
   return certificate_validation_status_;
 }
 
-SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx)
-    : ssl_(std::move(ssl)) {
-  SSL_set_ex_data(ssl_.get(), ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
+SslSocketInfo::SslSocketInfo(SSL* ssl, ContextImplSharedPtr ctx) : ssl_(ssl) {
+  SSL_set_ex_data(ssl_, ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
 }
 
 bool SslSocketInfo::peerCertificatePresented() const {
@@ -605,8 +604,9 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Client,
-                                       transport_socket_options, config_->createHandshaker());
+    return std::make_unique<SslSocket>(
+        std::move(ssl_ctx), InitialState::Client, transport_socket_options,
+        [this](bssl::UniquePtr<SSL> ssl) { return config_->createHandshaker(std::move(ssl)); });
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.upstream_context_secrets_not_ready_.inc();
@@ -646,8 +646,9 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSha
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
-    return std::make_unique<SslSocket>(std::move(ssl_ctx), InitialState::Server, nullptr,
-                                       config_->createHandshaker());
+    return std::make_unique<SslSocket>(
+        std::move(ssl_ctx), InitialState::Server, nullptr,
+        [this](bssl::UniquePtr<SSL> ssl) { return config_->createHandshaker(std::move(ssl)); });
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
     stats_.downstream_context_secrets_not_ready_.inc();

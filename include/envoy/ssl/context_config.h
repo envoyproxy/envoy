@@ -78,7 +78,7 @@ public:
   /**
    * @return the handshaker to use for TLS handshakes.
    */
-  virtual Ssl::HandshakerPtr createHandshaker() const PURE;
+  virtual Ssl::HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl) const PURE;
 
   /**
    * @return the handshaker factory for attribute evaluation.
