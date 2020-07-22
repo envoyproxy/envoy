@@ -258,8 +258,8 @@ void Http2ConnPoolImplTest::closeClient(size_t index) {
 }
 
 void Http2ConnPoolImplTest::closeAllClients() {
-  for (size_t i = 0; i < test_clients_.size(); ++i) {
-    test_clients_[i].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  for (auto& test_client : test_clients_) {
+    test_client.connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   }
   EXPECT_CALL(*this, onClientDestroy()).Times(test_clients_.size());
   dispatcher_.clearDeferredDeleteList();
