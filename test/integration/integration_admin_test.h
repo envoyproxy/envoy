@@ -18,9 +18,8 @@ public:
     config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
     config_helper_.addConfigModifier(
         [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          auto& hist_settings = *bootstrap.mutable_stats_config()
-                                     ->mutable_histogram_settings()
-                                     ->mutable_bucket_settings();
+          auto& hist_settings =
+              *bootstrap.mutable_stats_config()->mutable_histogram_bucket_settings();
           envoy::config::metrics::v3::HistogramBucketSettings* setting = hist_settings.Add();
           setting->mutable_match()->set_suffix("upstream_cx_connect_ms");
           setting->mutable_buckets()->Add(0);

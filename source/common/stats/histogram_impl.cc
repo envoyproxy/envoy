@@ -84,7 +84,7 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
 HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config)
     : configs_([&config]() {
         std::vector<Config> configs;
-        for (const auto& matcher : config.histogram_settings().bucket_settings()) {
+        for (const auto& matcher : config.histogram_bucket_settings()) {
           configs.emplace_back(matcher.match(), ConstSupportedBuckets{matcher.buckets().begin(),
                                                                       matcher.buckets().end()});
         }

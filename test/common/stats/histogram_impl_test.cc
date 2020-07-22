@@ -13,7 +13,7 @@ class HistogramSettingsImplTest : public testing::Test {
 public:
   void initialize() {
     envoy::config::metrics::v3::StatsConfig config;
-    auto& bucket_settings = *config.mutable_histogram_settings()->mutable_bucket_settings();
+    auto& bucket_settings = *config.mutable_histogram_bucket_settings();
     for (auto& item : buckets_configs_) {
       bucket_settings.Add(std::move(item));
     }
