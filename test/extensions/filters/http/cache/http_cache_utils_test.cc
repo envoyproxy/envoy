@@ -75,16 +75,16 @@ TEST_P(EffectiveMaxAgeTest, EffectiveMaxAgeTest) {
             std::chrono::seconds(GetParam().effective_max_age_secs));
 }
 
-void testReadAndRemoveLeadingDigits(absl::string_view s, int64_t expected,
+void testReadAndRemoveLeadingDigits(absl::string_view input, int64_t expected,
                                     absl::string_view remaining) {
-  absl::string_view input(s);
-  auto output = HttpCacheUtils::readAndRemoveLeadingDigits(input);
+  absl::string_view test_input(input);
+  auto output = HttpCacheUtils::readAndRemoveLeadingDigits(test_input);
   if (output) {
-    EXPECT_EQ(output, static_cast<uint64_t>(expected));
-    EXPECT_EQ(input, remaining);
+    EXPECT_EQ(output, static_cast<uint64_t>(expected)) << "input=" << input;
+    EXPECT_EQ(test_input, remaining) << "input=" << input;
   } else {
-    EXPECT_LT(expected, 0);
-    EXPECT_EQ(input, remaining);
+    EXPECT_LT(expected, 0) << "input=" << input;
+    EXPECT_EQ(test_input, remaining) << "input=" << input;
   }
 }
 

@@ -184,12 +184,10 @@ SystemTime HttpCacheUtils::httpTime(const Http::HeaderEntry* header_entry) {
 }
 
 absl::optional<uint64_t> HttpCacheUtils::readAndRemoveLeadingDigits(absl::string_view& str) {
-  const char* ptr = str.data();
-  const char* limit = ptr + str.size();
   uint64_t val = 0;
+  uint32_t bytes_consumed = 0;
 
-  while (ptr < limit) {
-    const char cur = *ptr;
+  for (const char cur : str) {
     if (cur < '0' || cur > '9') {
       break;
     }
@@ -199,12 +197,12 @@ absl::optional<uint64_t> HttpCacheUtils::readAndRemoveLeadingDigits(absl::string
       return absl::nullopt;
     }
     val = new_val;
-    ptr++;
+    ++bytes_consumed;
   }
 
-  if (ptr > str.data()) {
+  if (bytes_consumed) {
     // Consume some digits
-    str.remove_prefix(ptr - str.data());
+    str.remove_prefix(bytes_consumed);
     return val;
   }
   return absl::nullopt;
