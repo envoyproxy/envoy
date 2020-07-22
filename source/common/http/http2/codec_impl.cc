@@ -1108,7 +1108,9 @@ void ConnectionImpl::sendSettings(
 }
 
 int ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
-  nghttp2_callback_status_ = std::move(status);
+  // Keep the error status that caused the original failure. Subsequent
+  // error statuses are silently discarded.
+  nghttp2_callback_status_.Update(std::move(status));
   return nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
