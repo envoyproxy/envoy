@@ -385,7 +385,7 @@ absl::string_view V8::getPrecompiledSectionName() {
   return "";
 #else
   static const auto name =
-      absl::StrCat("precompiled_v8_v", V8_MAJOR_VERSION, ".", V8_MINOR_VERSION, ".",
+      absl::StrCat("precompiled_wee8_v", V8_MAJOR_VERSION, ".", V8_MINOR_VERSION, ".",
                    V8_BUILD_NUMBER, ".", V8_PATCH_LEVEL, "_", WEE8_WASM_PRECOMPILE_PLATFORM);
   return name;
 #endif
