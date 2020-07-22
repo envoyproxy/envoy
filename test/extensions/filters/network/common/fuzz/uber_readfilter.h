@@ -2,7 +2,7 @@
 
 #include "common/protobuf/protobuf.h"
 
-#include "test/extensions/filters/network/common/fuzz/network_filter_fuzz.pb.validate.h"
+#include "test/extensions/filters/network/common/fuzz/network_readfilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/utils/fakes.h"
 #include "test/mocks/network/mocks.h"
 

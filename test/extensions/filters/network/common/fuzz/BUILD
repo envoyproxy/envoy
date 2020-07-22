@@ -15,8 +15,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_proto_library(
-    name = "network_filter_fuzz_proto",
-    srcs = ["network_filter_fuzz.proto"],
+    name = "network_readfilter_fuzz_proto",
+    srcs = ["network_readfilter_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
         "@envoy_api//envoy/config/listener/v3:pkg",
@@ -24,14 +24,14 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
-    name = "uber_filter_lib",
+    name = "uber_readfilter_lib",
     srcs = [
-        "uber_filter.cc",
-        "uber_per_filter.cc",
+        "uber_readfilter.cc",
+        "uber_per_readfilter.cc",
     ],
-    hdrs = ["uber_filter.h"],
+    hdrs = ["uber_readfilter.h"],
     deps = [
-        ":network_filter_fuzz_proto_cc_proto",
+        ":network_readfilter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:utility_lib",
@@ -45,13 +45,13 @@ envoy_cc_test_library(
 )
 
 envoy_cc_fuzz_test(
-    name = "network_filter_fuzz_test",
-    srcs = ["network_filter_fuzz_test.cc"],
-    corpus = "network_filter_corpus",
+    name = "network_readfilter_fuzz_test",
+    srcs = ["network_readfilter_fuzz_test.cc"],
+    corpus = "network_readfilter_corpus",
     # All Envoy network filters must be linked to the test in order for the fuzzer to pick
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [
-        ":uber_filter_lib",
+        ":uber_readfilter_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
     ] + envoy_all_network_filters(),
