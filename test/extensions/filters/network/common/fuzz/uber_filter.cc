@@ -82,10 +82,10 @@ void UberFilterFuzzer::fuzz(
   perFilterSetup(proto_config.name());
   // Add filter to connection_.
   cb_(read_filter_callbacks_->connection_);
-  // std::cout<<"passed validation!"<<std::endl;
-  // if (actions.size() > 5) {
-  //   PANIC("A case is found!");
-  // }
+  std::cout<<"passed validation!"<<std::endl;
+  if (actions.size() > 2) {
+    PANIC("A case is found!");
+  }
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
