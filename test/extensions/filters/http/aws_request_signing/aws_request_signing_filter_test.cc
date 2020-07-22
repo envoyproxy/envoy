@@ -76,10 +76,11 @@ TEST_F(AwsRequestSigningFilterTest, SignFails) {
 TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   Stats::IsolatedStoreImpl stats;
   auto signer = std::make_unique<Common::Aws::MockSigner>();
+  const auto signer_ptr = signer.get();
   FilterConfigImpl config(std::move(signer), "prefix", stats, "foo");
 
-  config.signer();
-  config.stats();
+  EXPECT_EQ(signer_ptr, &config.signer());
+  EXPECT_NO_THROW(config.stats());
   EXPECT_EQ("foo", config.hostRewrite());
 }
 
