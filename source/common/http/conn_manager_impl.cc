@@ -607,6 +607,17 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
+
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rq_body_size_.recordValue(stream_info_.bytesReceived());
+      req_resp_stats->get().upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
+    }
+  }
 
   // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
   // response code and when no other response flags are set.
@@ -722,6 +733,17 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
+
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
+    }
+  }
+
   connection_manager_.stats_.named_.downstream_rq_completed_.inc();
   connection_manager_.listener_stats_.downstream_rq_completed_.inc();
   if (CodeUtility::is1xx(response_code)) {
@@ -769,6 +791,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
+
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
+    }
+  }
 
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
