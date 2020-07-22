@@ -15,8 +15,9 @@ namespace Server {
 namespace Configuration {
 class MockMain : public Main {
 public:
-  MockMain() : MockMain(0, 0, 0, 0) {}
-  MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill);
+  MockMain() : MockMain(0, 0, 0, 0, 0.0) {}
+  MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill,
+           double wd_multikill_threshold);
   ~MockMain() override;
 
   MOCK_METHOD(Upstream::ClusterManager*, clusterManager, ());
@@ -26,11 +27,13 @@ public:
   MOCK_METHOD(std::chrono::milliseconds, wdMegaMissTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, wdKillTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, wdMultiKillTimeout, (), (const));
+  MOCK_METHOD(double, wdMultiKillThreshold, (), (const));
 
   std::chrono::milliseconds wd_miss_;
   std::chrono::milliseconds wd_megamiss_;
   std::chrono::milliseconds wd_kill_;
   std::chrono::milliseconds wd_multikill_;
+  double wd_multikill_threshold_;
 };
 } // namespace Configuration
 } // namespace Server
