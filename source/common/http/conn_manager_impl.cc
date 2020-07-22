@@ -2579,6 +2579,10 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  if (!routeConfig().has_value() || !routeConfig().value()->usesVhds()) {
+    (*route_config_updated_cb)(false);
+    return;
+  }
   parent_.requestRouteConfigUpdate(dispatcher(), std::move(route_config_updated_cb));
 }
 
