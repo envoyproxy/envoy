@@ -27,7 +27,7 @@ message DnsCacheCircuitBreakers {
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -95,4 +95,8 @@ message DnsCacheConfig {
   // If `envoy.reloadable_features.enable_dns_cache_circuit_breakers` is enabled,
   // envoy will use dns cache circuit breakers with default settings even if this value is not set.
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
+
+  // [#next-major-version: Reconcile DNS options in a single message.]
+  // Always use TCP queries instead of UDP queries for DNS lookups.
+  bool use_tcp_for_dns_lookups = 8;
 }
