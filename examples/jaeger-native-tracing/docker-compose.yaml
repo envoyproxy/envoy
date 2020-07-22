@@ -3,8 +3,8 @@ services:
 
   front-envoy:
     build:
-      context: ../
-      dockerfile: front-proxy/Dockerfile-frontenvoy
+      context: ../front-proxy
+      dockerfile: Dockerfile-frontenvoy
     volumes:
       - ./front-envoy-jaeger.yaml:/etc/front-envoy.yaml
       - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
