@@ -99,7 +99,7 @@ message DownstreamTlsContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 11]
+// [#next-free-field: 13]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -123,6 +123,20 @@ message CommonTlsContext {
     }
   }
 
+  // Similar to CertificateProvider above, but allows the plugin instances to be configured on the
+  // client side instead of being sent from the control plane.
+  message CertificateProviderInstance {
+    // Plugin instance name. This name must be defined in the client's configuration (e.g., a
+    // bootstrap file) to correspond to a plugin instance (i.e., the same data in the typed_config
+    // field that would be sent in the CertificateProvider message if the config was sent by the
+    // control plane). If not present, defaults to "default".
+    string plugin_instance_name = 1;
+
+    // Opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
+    // a root-certificate (validation context) or "TLS" to specify a new tls-certificate.
+    string certificate_name = 2;
+  }
+
   message CombinedCertificateValidationContext {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.auth.CommonTlsContext.CombinedCertificateValidationContext";
@@ -143,6 +157,12 @@ message CommonTlsContext {
     // validation_context_sds_secret_config is not used.
     // [#not-implemented-hide:]
     CertificateProvider validation_context_certificate_provider = 3
+        [(udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"];
+
+    // Certificate provider instance for fetching validation context - only to be used when
+    // validation_context_sds_secret_config is not used.
+    // [#not-implemented-hide:]
+    CertificateProviderInstance validation_context_certificate_provider_instance = 4
         [(udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"];
   }
 
@@ -168,6 +188,10 @@ message CommonTlsContext {
   // [#not-implemented-hide:]
   CertificateProvider tls_certificate_certificate_provider = 9;
 
+  // Certificate provider instance for fetching TLS certificates.
+  // [#not-implemented-hide:]
+  CertificateProviderInstance tls_certificate_certificate_provider_instance = 11;
+
   oneof validation_context_type {
     // How to validate peer certificates.
     CertificateValidationContext validation_context = 3;
@@ -188,6 +212,10 @@ message CommonTlsContext {
     // Certificate provider for fetching validation context.
     // [#not-implemented-hide:]
     CertificateProvider validation_context_certificate_provider = 10;
+
+    // Certificate provider instance for fetching validation context.
+    // [#not-implemented-hide:]
+    CertificateProviderInstance validation_context_certificate_provider_instance = 12;
   }
 
   // Supplies the list of ALPN protocols that the listener should expose. In
