@@ -4,11 +4,10 @@
 #include <ostream>
 
 #include "envoy/http/codes.h"
+#include "envoy/http/header_map.h"
 
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/cache/http_cache_utils.h"
 
 #include "absl/time/time.h"
 
@@ -74,21 +73,57 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
-// Returns true if response_headers is fresh.
-bool LookupRequest::isFresh(const Http::ResponseHeaderMap& response_headers) const {
-  if (!response_headers.Date()) {
-    return false;
+bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers) const {
+  // TODO(yosrym93): Store parsed response cache-control in cache instead of parsing it on every
+  // lookup
+  const absl::string_view cache_control =
+      response_headers.getInlineValue(response_cache_control_handle.handle());
+  const ResponseCacheControl response_cache_control(cache_control);
+
+  const SystemTime response_time = CacheHeadersUtils::httpTime(response_headers.Date());
+
+  if (timestamp_ < response_time) {
+    // Response time is in the future, validate response
+    return true;
   }
-  const Http::HeaderEntry* cache_control_header =
-      response_headers.getInline(response_cache_control_handle.handle());
-  if (cache_control_header) {
-    const SystemTime::duration effective_max_age =
-        HttpCacheUtils::effectiveMaxAge(cache_control_header->value().getStringView());
-    return timestamp_ - HttpCacheUtils::httpTime(response_headers.Date()) < effective_max_age;
+
+  const SystemTime::duration response_age = timestamp_ - response_time;
+  const bool request_max_age_exceeded = request_cache_control_.max_age_.has_value() &&
+                                        request_cache_control_.max_age_.value() < response_age;
+  if (response_cache_control.must_validate_ || request_cache_control_.must_validate_ ||
+      request_max_age_exceeded) {
+    // Either the request or response explicitly require validation or a request max-age requirement
+    // is not satisfied
+    return true;
   }
-  // We didn't find a cache-control header with enough info to determine
-  // freshness, so fall back to the expires header.
-  return timestamp_ <= HttpCacheUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
+
+  // CacheabilityUtils::isCacheableResponse(..) guarantees that any cached response satisfies this
+  // When date metadata injection for responses with no date
+  // is implemented, this ASSERT will need to be updated
+  ASSERT((response_headers.Date() && response_cache_control.max_age_.has_value()) ||
+             response_headers.get(Http::Headers::get().Expires),
+         "Cache entry does not have valid expiration data.");
+
+  const SystemTime expiration_time =
+      response_cache_control.max_age_.has_value()
+          ? response_time + response_cache_control.max_age_.value()
+          : CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
+
+  if (timestamp_ > expiration_time) {
+    // Response is stale, requires validation
+    // if the response does not allow being served stale
+    // or the request max-stale directive does not allow it
+    const bool allowed_by_max_stale =
+        request_cache_control_.max_stale_.has_value() &&
+        request_cache_control_.max_stale_.value() > timestamp_ - expiration_time;
+    return response_cache_control.no_stale_ || !allowed_by_max_stale;
+  } else {
+    // Response is fresh, requires validation only if there is an unsatisfied min-fresh requirement
+    const bool min_fresh_unsatisfied =
+        request_cache_control_.min_fresh_.has_value() &&
+        request_cache_control_.min_fresh_.value() > expiration_time - timestamp_;
+    return min_fresh_unsatisfied;
+  }
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
@@ -96,8 +131,9 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
-  result.cache_entry_status_ =
-      isFresh(*response_headers) ? CacheEntryStatus::Ok : CacheEntryStatus::RequiresValidation;
+  result.cache_entry_status_ = requiresValidation(*response_headers)
+                                   ? CacheEntryStatus::RequiresValidation
+                                   : CacheEntryStatus::Ok;
   result.headers_ = std::move(response_headers);
   result.content_length_ = content_length;
   if (!adjustByteRangeSet(result.response_ranges_, request_range_spec_, content_length)) {

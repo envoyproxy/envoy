@@ -2,10 +2,14 @@
 // This is an Envoy driver for benchmarks.
 #include "test/benchmark/main.h"
 
+#include "common/common/logger.h"
+
 #include "test/test_common/environment.h"
 
 #include "benchmark/benchmark.h"
 #include "tclap/CmdLine.h"
+
+using namespace Envoy;
 
 static bool skip_expensive_benchmarks = false;
 
@@ -15,7 +19,7 @@ static bool skip_expensive_benchmarks = false;
 // separated by --.
 // TODO(pgenera): convert this to abseil/flags/ when benchmark also adopts abseil.
 int main(int argc, char** argv) {
-  Envoy::TestEnvironment::initializeTestMain(argv[0]);
+  TestEnvironment::initializeTestMain(argv[0]);
 
   // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
   TCLAP::CmdLine cmd("envoy-benchmark-test", ' ', "0.1");
@@ -33,8 +37,14 @@ int main(int argc, char** argv) {
 
   skip_expensive_benchmarks = skip_switch.getValue();
 
-  benchmark::Initialize(&argc, argv);
-  benchmark::RunSpecifiedBenchmarks();
+  ::benchmark::Initialize(&argc, argv);
+
+  if (skip_expensive_benchmarks) {
+    ENVOY_LOG_MISC(
+        critical,
+        "Expensive benchmarks are being skipped; see test/README.md for more information");
+  }
+  ::benchmark::RunSpecifiedBenchmarks();
 }
 
 bool Envoy::benchmark::skipExpensiveBenchmarks() { return skip_expensive_benchmarks; }
