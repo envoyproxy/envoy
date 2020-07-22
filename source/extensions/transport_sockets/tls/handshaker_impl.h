@@ -17,8 +17,6 @@ class HandshakerImpl : public Envoy::Ssl::Handshaker {
 public:
   HandshakerImpl(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
 
-  void initialize(SSL&) override {}
-
   Network::PostIoAction doHandshake(Envoy::Ssl::SocketState& state,
                                     Ssl::HandshakerCallbacks& callbacks) override;
 

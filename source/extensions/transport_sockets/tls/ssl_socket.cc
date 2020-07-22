@@ -61,7 +61,6 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
     ASSERT(state == InitialState::Server);
     SSL_set_accept_state(rawSsl());
   }
-  handshaker_->initialize(*rawSsl());
 }
 
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {

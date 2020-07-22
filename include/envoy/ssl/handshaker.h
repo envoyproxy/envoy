@@ -33,10 +33,6 @@ class Handshaker {
 public:
   virtual ~Handshaker() = default;
 
-  // The initialize method must be called before
-  // doHandshake() is called.
-  virtual void initialize(SSL& ssl) PURE;
-
   /**
    * Do the handshake.
    *
