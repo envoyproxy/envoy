@@ -9,18 +9,8 @@ actions {
   }
 }
 actions {
-  remove_route {
-    route_num: 14849
-  }
-}
-actions {
   add_route {
     route_num: 4261412864
-  }
-}
-actions {
-  remove_route {
-    route_num: 14849
   }
 }
 actions {
@@ -30,11 +20,6 @@ actions {
 }
 actions {
   add_route {
-    route_num: 7012388
-  }
-}
-actions {
-  remove_route {
     route_num: 7012388
   }
 }
