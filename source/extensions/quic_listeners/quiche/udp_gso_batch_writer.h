@@ -8,15 +8,17 @@
 // QUICHE allows ignored qualifiers
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
 
-#if defined(__clang__)
-#pragma clang diagnostic push
 // QUICHE doesn't mark override at QuicBatchWriterBase::SupportsReleaseTime()
+#ifdef __clang__
+#pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
+#elif defined(__GNUC__) && __GNUC__ >= 5
+#pragma GCC diagnostic ignored "-Wsuggest-override"
 #endif
 
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
 
-#if defined(__clang__)
+#ifdef __clang__
 #pragma clang diagnostic pop
 #endif
 
