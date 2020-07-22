@@ -286,6 +286,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  // In ENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
+#ifdef ENVOY_USE_LEGACY_CODECS_IN__INTEGRATION_TESTS
+  ENVOY_LOG_MISC(debug, "Using legacy codecs");
+  setLegacyCodecs();
+#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -537,15 +542,6 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
       });
 
   connection->run();
-}
-
-IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
-    const std::string& bootstrap_path,
-    std::function<void(IntegrationTestServer&)> on_server_ready_function,
-    std::function<void()> on_server_init_function, Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function,
-                                       on_server_init_function, deterministic_, time_system, *api_,
-                                       defer_listener_finalization_);
 }
 
 void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {

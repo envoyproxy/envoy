@@ -523,6 +523,7 @@ public:
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
                                                                   const std::string& stat_prefix,
                                                                   bool track_remaining);
+  static ClusterRequestResponseSizeStats generateRequestResponseSizeStats(Stats::Scope&);
   static ClusterTimeoutBudgetStats generateTimeoutBudgetStats(Stats::Scope&);
 
   // Upstream::ClusterInfo
@@ -578,10 +579,27 @@ public:
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
-  ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
-  const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const override {
-    return timeout_budget_stats_;
+
+  ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const override {
+    if (optional_cluster_stats_ == nullptr ||
+        optional_cluster_stats_->request_response_size_stats_ == nullptr) {
+      return absl::nullopt;
+    }
+
+    return std::ref(*(optional_cluster_stats_->request_response_size_stats_));
   }
+
+  ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
+
+  ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const override {
+    if (optional_cluster_stats_ == nullptr ||
+        optional_cluster_stats_->timeout_budget_stats_ == nullptr) {
+      return absl::nullopt;
+    }
+
+    return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
+  }
+
   const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
     return source_address_;
   };
@@ -623,6 +641,13 @@ private:
     Managers managers_;
   };
 
+  struct OptionalClusterStats {
+    OptionalClusterStats(const envoy::config::cluster::v3::Cluster& config,
+                         Stats::Scope& stats_scope);
+    const ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
+    const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
+  };
+
   Runtime::Loader& runtime_;
   const std::string name_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
@@ -637,7 +662,7 @@ private:
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
-  const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
+  const std::unique_ptr<OptionalClusterStats> optional_cluster_stats_;
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
