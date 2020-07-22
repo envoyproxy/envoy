@@ -166,9 +166,10 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
 }
 
-std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
-parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
-                              ProtobufMessage::ValidationVisitor& validation_visitor) {
+std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
+    const envoy::config::cluster::v3::Cluster& config,
+    ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::TransportSocketFactoryContext& factory_context) {
   if (!config.typed_extension_protocol_options().empty() &&
       !config.hidden_envoy_deprecated_extension_protocol_options().empty()) {
     throw EnvoyException("Only one of typed_extension_protocol_options or "
@@ -183,8 +184,9 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
     // protocol options.
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object = createProtocolOptionsConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
+    auto object =
+        createProtocolOptionsConfig(name, it.second, ProtobufWkt::Struct::default_instance(),
+                                    validation_visitor, factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -197,7 +199,7 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
-                                              validation_visitor);
+                                              validation_visitor, factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -700,7 +702,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
       common_http_protocol_options_(config.common_http_protocol_options()),
-      extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
+      extension_protocol_options_(
+          parseExtensionProtocolOptions(config, validation_visitor, factory_context)),
       resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),

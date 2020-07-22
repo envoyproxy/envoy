@@ -31,11 +31,11 @@ public:
     return std::make_unique<ProtocolOptionsProto>();
   }
 
-  Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& proto_config,
-                              ProtobufMessage::ValidationVisitor& validation_visitor) override {
+  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsConfig(
+      const Protobuf::Message& proto_config, ProtobufMessage::ValidationVisitor& validation_visitor,
+      Server::Configuration::TransportSocketFactoryContext& factory_context) override {
     return createProtocolOptionsTyped(MessageUtil::downcastAndValidate<const ProtocolOptionsProto&>(
-        proto_config, validation_visitor));
+        proto_config, validation_visitor, factory_context));
   }
 
   std::string name() const override { return name_; }
