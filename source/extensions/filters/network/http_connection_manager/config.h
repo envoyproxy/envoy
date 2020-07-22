@@ -264,9 +264,8 @@ class Utility {
 public:
   struct Singletons {
     std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
-    std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager_;
-    std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
-        scoped_routes_config_provider_manager_;
+    Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
+    Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager_;
     Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
   };
 

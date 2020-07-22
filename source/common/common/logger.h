@@ -104,7 +104,7 @@ public:
   virtual void flush() PURE;
 
 protected:
-  SinkDelegate* previous_delegate() { return previous_delegate_; }
+  SinkDelegate* previousDelegate() { return previous_delegate_; }
 
 private:
   SinkDelegate* previous_delegate_;
@@ -146,7 +146,7 @@ public:
     set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
   }
   void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override;
-  void set_should_escape(bool should_escape) { should_escape_ = should_escape; }
+  void setShouldEscape(bool should_escape) { should_escape_ = should_escape; }
 
   /**
    * @return bool whether a lock has been established.

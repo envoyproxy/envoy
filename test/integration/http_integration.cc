@@ -40,6 +40,8 @@
 namespace Envoy {
 namespace {
 
+using testing::HasSubstr;
+
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
   switch (type) {
@@ -342,16 +344,14 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
                                          const std::string& expected_body) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response_code, response->headers().getStatusValue());
-  expected_headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        auto response_headers = static_cast<Http::ResponseHeaderMap*>(context);
-        const Http::HeaderEntry* entry =
-            response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
-        EXPECT_NE(entry, nullptr);
-        EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      const_cast<void*>(static_cast<const void*>(&response->headers())));
+  expected_headers.iterate([response_headers = &response->headers()](
+                               const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    const Http::HeaderEntry* entry =
+        response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
+    EXPECT_NE(entry, nullptr);
+    EXPECT_EQ(header.value().getStringView(), entry->value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   EXPECT_EQ(response->body(), expected_body);
 }
@@ -1019,6 +1019,7 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
 
 void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size,
                                                   uint32_t max_count) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   // `size` parameter dictates the size of each header that will be added to the request and `count`
   // parameter is the number of headers to be added. The actual request byte size will exceed `size`
   // due to the keys and other headers. The actual request header count will exceed `count` by four
@@ -1061,6 +1062,9 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
     auto response = sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  if (count > max_count) {
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
   }
 }
 
