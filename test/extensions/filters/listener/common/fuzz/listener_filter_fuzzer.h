@@ -12,17 +12,23 @@ namespace ListenerFilters {
 
 class ListenerFilterFuzzer {
 public:
-  void fuzz(Network::ListenerFilter& filter,
-            const test::extensions::filters::listener::FilterFuzzTestCase& input);
-
-private:
-  void fuzzerSetup(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
+  ListenerFilterFuzzer(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
-    socketSetup(input);
+    try {
+      socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
+    } catch (const EnvoyException& e) {
+      // If fuzzed local address is malformed or missing, socket's local address will be nullptr
+    }
+    try {
+      socket_.setRemoteAddress(Network::Utility::resolveUrl(input.sock().remote_address()));
+    } catch (const EnvoyException& e) {
+      // If fuzzed remote address is malformed or missing, socket's remote address will be nullptr
+    }
   }
 
-  void socketSetup(const test::extensions::filters::listener::FilterFuzzTestCase& input);
+  void fuzz(Network::ListenerFilter& filter) { filter.onAccept(cb_); }
 
+private:
   NiceMock<Network::MockListenerFilterCallbacks> cb_;
   Network::FakeConnectionSocket socket_;
 };

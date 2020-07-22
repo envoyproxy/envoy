@@ -20,6 +20,9 @@ public:
 
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
+    if (local_address_ != nullptr) {
+      addr_type_ = local_address_->type();
+    }
   }
 
   void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
@@ -30,10 +33,10 @@ public:
 
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
 
-  Address::Type addressType() const override { return local_address_->type(); }
+  Address::Type addressType() const override { return addr_type_; }
 
   absl::optional<Address::IpVersion> ipVersion() const override {
-    if (local_address_->type() != Address::Type::Ip) {
+    if (addr_type_ != Address::Type::Ip) {
       return absl::nullopt;
     }
 
@@ -59,6 +62,7 @@ private:
   const IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   Address::InstanceConstSharedPtr remote_address_;
+  Address::Type addr_type_;
 };
 
 } // namespace Network
