@@ -281,6 +281,7 @@ absl::optional<std::chrono::milliseconds> RetryStateImpl::parseRateLimitedResetI
           // Try to parse the value of the header as an int storing the number of seconds
           if (absl::SimpleAtoi(header_value, &num_seconds)) {
             parsed_value = true;
+            break;
           }
         }
       }

@@ -1047,6 +1047,20 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
               state_->parseRateLimitedResetInterval(response_headers));
   }
 
+  // The second and third reset header match and the first of these two is used
+  {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {"x-envoy-retry-on", "5xx"},
+        {"x-envoy-ratelimited-reset-headers", "Retry-After,X-RateLimit-Reset,X-Retry-After"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "429"}, {"x-ratelimit-reset", "2"}, {"X-Retry-After", "3"}};
+    EXPECT_EQ(absl::optional<std::chrono::milliseconds>(2000),
+              state_->parseRateLimitedResetInterval(response_headers));
+  }
+
   // The header value is a timestamp before now()
   {
     Http::TestRequestHeaderMapImpl request_headers{
