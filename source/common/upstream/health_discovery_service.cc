@@ -104,8 +104,7 @@ void HdsDelegate::handleFailure() {
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
 envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelegate::sendResponse() {
   absl::flat_hash_map<
-      std::string,
-      std::vector<std::pair<HostSharedPtr, envoy::service::health::v3::EndpointHealth*>>>
+      size_t, std::vector<std::pair<HostSharedPtr, envoy::service::health::v3::EndpointHealth*>>>
       hostsByLocality;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
   for (const auto& cluster : hds_clusters_) {
@@ -131,7 +130,7 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
           }
         }
 
-        std::string hash = host->locality().SerializeAsString();
+        auto hash = MessageUtil::hash(host->locality());
         const auto& locality_group = hostsByLocality.insert(
             {hash,
              std::vector<std::pair<HostSharedPtr, envoy::service::health::v3::EndpointHealth*>>()});
