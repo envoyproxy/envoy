@@ -413,19 +413,19 @@ public:
              std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
   void waitForCounterEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterGe(statStore(), name, value, time_system_);
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_));
   }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForCounterGe(statStore(), name, value, time_system_);
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_));
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeGe(statStore(), name, value, time_system_);
+    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_));
   }
 
   void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeEq(statStore(), name, value, time_system_);
+    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_));
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

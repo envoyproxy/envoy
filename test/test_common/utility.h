@@ -204,9 +204,10 @@ public:
    * @param name supplies the name of the counter to wait for.
    * @param value supplies the value of the counter.
    * @param time_system the time system to use for waiting.
-   * @param timeout the maximum time to wait before throwing an exception.
+   * @param timeout the maximum time to wait before timing out.
+   * @return AssertionSuccess() if the counter was == to the value within the timeout, else AssertionFailure().
    */
-  static void waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+  static AssertionResult waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
                                Event::TestTimeSystem& time_system,
                                std::chrono::milliseconds timeout = DefaultTimeout);
 
@@ -216,9 +217,10 @@ public:
    * @param name counter name.
    * @param value target value.
    * @param time_system the time system to use for waiting.
-   * @param timeout the maximum time to wait before throwing an exception.
+   * @param timeout the maximum time to wait before timing out.
+   * @return AssertionSuccess() if the counter was == to the value within the timeout, else AssertionFailure().
    */
-  static void waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+  static AssertionResult waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
                                Event::TestTimeSystem& time_system,
                                std::chrono::milliseconds timeout = DefaultTimeout);
 
@@ -228,9 +230,10 @@ public:
    * @param name gauge name.
    * @param value target value.
    * @param time_system the time system to use for waiting.
-   * @param timeout the maximum time to wait before throwing an exception.
+   * @param timeout the maximum time to wait before timing out.
+   * @return AssertionSuccess() if the counter was == to the value within the timeout, else AssertionFailure().
    */
-  static void waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+  static AssertionResult waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
                              Event::TestTimeSystem& time_system,
                              std::chrono::milliseconds timeout = DefaultTimeout);
 
@@ -240,9 +243,10 @@ public:
    * @param name gauge name.
    * @param value target value.
    * @param time_system the time system to use for waiting.
-   * @param timeout the maximum time to wait before throwing an exception.
+   * @param timeout the maximum time to wait before timing out.
+   * @return AssertionSuccess() if the counter was == to the value within the timeout, else AssertionFailure().
    */
-  static void waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+  static AssertionResult waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                              Event::TestTimeSystem& time_system,
                              std::chrono::milliseconds timeout = DefaultTimeout);
 

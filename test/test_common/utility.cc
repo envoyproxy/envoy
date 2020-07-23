@@ -139,7 +139,7 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
   return findByName(store.textReadouts(), name);
 }
 
-void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system,
                                    std::chrono::milliseconds timeout) {
   auto end_time = time_system.monotonicTime() + timeout;
@@ -147,12 +147,13 @@ void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (time_system.monotonicTime() >= end_time) {
       ENVOY_LOG_MISC(trace, "Timed out waiting for {} to be {}", name, value);
-      throw EnvoyException(fmt::format("timed out waiting for {} to be {}", name, value));
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system,
                                    std::chrono::milliseconds timeout) {
   auto end_time = time_system.monotonicTime() + timeout;
@@ -160,12 +161,13 @@ void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (time_system.monotonicTime() >= end_time) {
       ENVOY_LOG_MISC(trace, "Timed out waiting for {} to be {}", name, value);
-      throw EnvoyException(fmt::format("timed out waiting for {} to be {}", name, value));
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
                                  Event::TestTimeSystem& time_system,
                                  std::chrono::milliseconds timeout) {
   auto end_time = time_system.monotonicTime() + timeout;
@@ -173,12 +175,13 @@ void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, u
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (time_system.monotonicTime() >= end_time) {
       ENVOY_LOG_MISC(trace, "Timed out waiting for {} to be {}", name, value);
-      throw EnvoyException(fmt::format("timed out waiting for {} to be {}", name, value));
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                                  Event::TestTimeSystem& time_system,
                                  std::chrono::milliseconds timeout) {
   auto end_time = time_system.monotonicTime() + timeout;
@@ -186,9 +189,10 @@ void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, u
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (time_system.monotonicTime() >= end_time) {
       ENVOY_LOG_MISC(trace, "Timed out waiting for {} to be {}", name, value);
-      throw EnvoyException(fmt::format("timed out waiting for {} to be {}", name, value));
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
   }
+  return AssertionSuccess();
 }
 
 std::list<Network::DnsResponse>
