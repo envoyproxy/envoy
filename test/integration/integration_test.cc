@@ -290,11 +290,11 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 }
 
 TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(true, true);
+  testEnvoyProxying1xx(true, true);
 }
 
 TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(false, true);
+  testEnvoyProxying1xx(false, true);
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
@@ -304,7 +304,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
-  testEnvoyProxying100Continue(true);
+  testEnvoyProxying1xx(true);
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a

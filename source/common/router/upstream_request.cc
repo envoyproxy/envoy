@@ -119,6 +119,23 @@ void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& head
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
+  // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
+  //
+  // We could in principle handle other headers here, but this might result in the double invocation
+  // of decodeHeaders() (once for informational, again for non-informational), which is likely an
+  // easy to miss corner case in the filter and HCM contract.
+  //
+  // This filtering is done early in upstream request, unlike 100 coalescing which is performed in
+  // the router filter, since the filtering only depends on the state of a single upstream, and we
+  // don't want to confuse accounting such as onFirstUpstreamRxByteReceived() with informational
+  // headers.
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  if (Http::CodeUtility::is1xx(response_code) &&
+      response_code != enumToInt(Http::Code::SwitchingProtocols)) {
+    return;
+  }
+
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
   // byte.
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
@@ -128,7 +145,6 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
-  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
 
   if (paused_for_connect_ && response_code == 200) {
