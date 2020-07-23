@@ -1,9 +1,11 @@
 #include "common/network/socket_interface_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
 #include "envoy/network/socket.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
@@ -39,7 +41,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
   RELEASE_ASSERT(SOCKET_VALID(result.rc_),
-                 fmt::format("socket(2) failed, got error: {}", strerror(result.errno_)));
+                 fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_);
 
 #if defined(__APPLE__) || defined(WIN32)
@@ -75,10 +77,23 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   const Api::SysCallSocketResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
   if (SOCKET_VALID(result.rc_)) {
     RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0,
-                   fmt::format("Fail to close fd: response code {}", strerror(result.rc_)));
+                   fmt::format("Fail to close fd: response code {}", errorDetails(result.rc_)));
   }
   return SOCKET_VALID(result.rc_);
 }
+
+Server::BootstrapExtensionPtr
+SocketInterfaceImpl::createBootstrapExtension(const Protobuf::Message&,
+                                              Server::Configuration::ServerFactoryContext&) {
+  return std::make_unique<SocketInterfaceExtension>(*this);
+}
+
+ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {
+  return std::make_unique<
+      envoy::extensions::network::socket_interface::v3::DefaultSocketInterface>();
+}
+
+REGISTER_FACTORY(SocketInterfaceImpl, Server::Configuration::BootstrapExtensionFactory);
 
 static SocketInterfaceLoader* socket_interface_ =
     new SocketInterfaceLoader(std::make_unique<SocketInterfaceImpl>());

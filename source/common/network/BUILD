@@ -17,10 +17,10 @@ envoy_cc_library(
     hdrs = [
         "address_impl.h",
         "io_socket_handle_impl.h",
-        "socket_interface_impl.h",
     ],
     deps = [
         ":io_socket_error_lib",
+        ":socket_interface_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:io_handle_interface",
@@ -48,7 +48,6 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":utility_lib",
-        "//include/envoy/json:json_object_interface",
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
@@ -157,6 +156,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/api:io_error_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -173,6 +173,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "socket_interface_lib",
+    hdrs = ["socket_interface.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:socket_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:bootstrap_extension_config_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "socket_lib",
     srcs = [
         "socket_impl.cc",
@@ -184,9 +195,11 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
+        ":socket_interface_lib",
         "//include/envoy/network:socket_interface",
         "//source/common/common:assert_lib",
-        "//source/common/singleton:threadsafe_singleton",
+        "//source/common/common:utility_lib",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )
 
@@ -197,6 +210,7 @@ envoy_cc_library(
     deps = [
         ":socket_lib",
         ":utility_lib",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -220,7 +234,9 @@ envoy_cc_library(
         ":listen_socket_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/network:listener_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
@@ -276,6 +292,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

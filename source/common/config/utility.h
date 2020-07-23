@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -12,6 +13,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
@@ -330,6 +332,12 @@ public:
   createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   /**
+   * Create HistogramSettings instance.
+   */
+  static Stats::HistogramSettingsConstPtr
+  createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+
+  /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::api::v3::core::ApiConfigSource. Must have config type GRPC.
@@ -394,7 +402,7 @@ public:
    */
   template <typename T>
   static BackOffStrategyPtr prepareDnsRefreshStrategy(const T& config, uint64_t dns_refresh_rate_ms,
-                                                      Runtime::RandomGenerator& random) {
+                                                      Random::RandomGenerator& random) {
     if (config.has_dns_failure_refresh_rate()) {
       uint64_t base_interval_ms =
           PROTOBUF_GET_MS_REQUIRED(config.dns_failure_refresh_rate(), base_interval);

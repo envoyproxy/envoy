@@ -8,6 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/config/datasource.h"
 #include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
 
@@ -101,6 +102,7 @@ void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table
 }
 
 Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
+                                         Tracing::Span& parent_span,
                                          Http::AsyncClient::Callbacks& callbacks) {
   const std::string cluster = luaL_checkstring(state, 2);
   luaL_checktype(state, 3, LUA_TTABLE);
@@ -115,7 +117,7 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
     luaL_error(state, "http call cluster invalid. Must be configured");
   }
 
-  auto headers = std::make_unique<Http::RequestHeaderMapImpl>();
+  auto headers = Http::RequestHeaderMapImpl::create();
   buildHeadersFromTable(*headers, state, 3);
   Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(headers)));
 
@@ -135,10 +137,37 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
     timeout = std::chrono::milliseconds(timeout_ms);
   }
 
-  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(
-      std::move(message), callbacks, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+  auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout).setParentSpan(parent_span);
+  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(std::move(message),
+                                                                         callbacks, options);
 }
 } // namespace
+
+PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
+    : lua_state_(lua_code, tls) {
+  lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
+  lua_state_.registerType<Filters::Common::Lua::ConnectionWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
+  lua_state_.registerType<HeaderMapWrapper>();
+  lua_state_.registerType<HeaderMapIterator>();
+  lua_state_.registerType<StreamInfoWrapper>();
+  lua_state_.registerType<DynamicMetadataMapWrapper>();
+  lua_state_.registerType<DynamicMetadataMapIterator>();
+  lua_state_.registerType<StreamHandleWrapper>();
+  lua_state_.registerType<PublicKeyWrapper>();
+
+  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
+  if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
+    ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
+  }
+
+  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
+  if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
+    ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
+  }
+}
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::HeaderMap& headers, bool end_stream, Filter& filter,
@@ -240,7 +269,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   luaL_checktype(state, 2, LUA_TTABLE);
   size_t body_size;
   const char* raw_body = luaL_optlstring(state, 3, nullptr, &body_size);
-  auto headers = std::make_unique<Http::ResponseHeaderMapImpl>();
+  auto headers = Http::ResponseHeaderMapImpl::create();
   buildHeadersFromTable(*headers, state, 2);
 
   uint64_t status;
@@ -270,14 +299,14 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 
   if (lua_toboolean(state, async_flag_index)) {
-    return luaHttpCallAsynchronous(state);
+    return doAsynchronousHttpCall(state, callbacks_.activeSpan());
   } else {
-    return luaHttpCallSynchronous(state);
+    return doSynchronousHttpCall(state, callbacks_.activeSpan());
   }
 }
 
-int StreamHandleWrapper::luaHttpCallSynchronous(lua_State* state) {
-  http_request_ = makeHttpCall(state, filter_, *this);
+int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state, Tracing::Span& span) {
+  http_request_ = makeHttpCall(state, filter_, span, *this);
   if (http_request_) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
@@ -288,8 +317,8 @@ int StreamHandleWrapper::luaHttpCallSynchronous(lua_State* state) {
   }
 }
 
-int StreamHandleWrapper::luaHttpCallAsynchronous(lua_State* state) {
-  makeHttpCall(state, filter_, noopCallbacks());
+int StreamHandleWrapper::doAsynchronousHttpCall(lua_State* state, Tracing::Span& span) {
+  makeHttpCall(state, filter_, span, noopCallbacks());
   return 0;
 }
 
@@ -301,17 +330,15 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
 
   // We need to build a table with the headers as return param 1. The body will be return param 2.
   lua_newtable(coroutine_.luaState());
-  response->headers().iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        lua_State* state = static_cast<lua_State*>(context);
-        lua_pushlstring(state, header.key().getStringView().data(),
-                        header.key().getStringView().length());
-        lua_pushlstring(state, header.value().getStringView().data(),
-                        header.value().getStringView().length());
-        lua_settable(state, -3);
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      coroutine_.luaState());
+  response->headers().iterate([lua_State = coroutine_.luaState()](
+                                  const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    lua_pushlstring(lua_State, header.key().getStringView().data(),
+                    header.key().getStringView().length());
+    lua_pushlstring(lua_State, header.value().getStringView().data(),
+                    header.value().getStringView().length());
+    lua_settable(lua_State, -3);
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   // TODO(mattklein123): Avoid double copy here.
   if (response->body() != nullptr) {
@@ -567,32 +594,29 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   return 1;
 }
 
-FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                           Upstream::ClusterManager& cluster_manager)
-    : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
-  lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
-  lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
-  lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
-  lua_state_.registerType<Filters::Common::Lua::ConnectionWrapper>();
-  lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
-  lua_state_.registerType<HeaderMapWrapper>();
-  lua_state_.registerType<HeaderMapIterator>();
-  lua_state_.registerType<StreamInfoWrapper>();
-  lua_state_.registerType<DynamicMetadataMapWrapper>();
-  lua_state_.registerType<DynamicMetadataMapIterator>();
-  lua_state_.registerType<StreamHandleWrapper>();
-  lua_state_.registerType<PublicKeyWrapper>();
-
-  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
-  if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
-    ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
+FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
+                           ThreadLocal::SlotAllocator& tls,
+                           Upstream::ClusterManager& cluster_manager, Api::Api& api)
+    : cluster_manager_(cluster_manager) {
+  auto global_setup_ptr = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
+  if (global_setup_ptr) {
+    per_lua_code_setups_map_[GLOBAL_SCRIPT_NAME] = std::move(global_setup_ptr);
   }
 
-  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
-  if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
-    ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
+  for (const auto& source : proto_config.source_codes()) {
+    const std::string code = Config::DataSource::read(source.second, true, api);
+    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
+    if (!per_lua_code_setup_ptr) {
+      continue;
+    }
+    per_lua_code_setups_map_[source.first] = std::move(per_lua_code_setup_ptr);
   }
 }
+
+FilterConfigPerRoute::FilterConfigPerRoute(
+    const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
+    ThreadLocal::SlotAllocator&, Api::Api&)
+    : disabled_(config.disabled()), name_(config.name()) {}
 
 void Filter::onDestroy() {
   destroyed_ = true;
@@ -607,12 +631,14 @@ void Filter::onDestroy() {
 Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                                             Filters::Common::Lua::CoroutinePtr& coroutine,
                                             FilterCallbacks& callbacks, int function_ref,
-                                            Http::HeaderMap& headers, bool end_stream) {
+                                            PerLuaCodeSetup* setup, Http::HeaderMap& headers,
+                                            bool end_stream) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
+  ASSERT(setup);
+  coroutine = setup->createCoroutine();
 
-  coroutine = config_->createCoroutine();
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);
@@ -687,6 +713,9 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
     return;
   case spdlog::level::off:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return;
+  case spdlog::level::n_levels:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

@@ -8,7 +8,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/random_generator.h"
 #include "common/http/header_map_impl.h"
+#include "common/network/socket_option_impl.h"
 
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -98,6 +100,28 @@ TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
 
 TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTrailers(66, 60); }
+
+// Verify downstream codec stream flush timeout.
+TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        constexpr uint64_t IdleTimeoutMs = 400;
+        hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+      });
+  initialize();
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.mutable_initial_stream_window_size()->set_value(65535);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(70000, true);
+  test_server_->waitForCounterEq("http2.tx_flush_timeout", 1);
+  response->waitForReset();
+}
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
@@ -239,7 +263,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
   const int size = 4;
   std::vector<Http::MetadataMapVector> multiple_vecs(size);
   for (int i = 0; i < size; i++) {
-    Runtime::RandomGeneratorImpl random;
+    Random::RandomGeneratorImpl random;
     int value_size = random.random() % Http::METADATA_MAX_PAYLOAD_SIZE + 1;
     Http::MetadataMap metadata_map = {{std::string(i, 'a'), std::string(value_size, 'b')}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
@@ -1498,42 +1522,48 @@ void Http2FloodMitigationTest::beginSession() {
   // set lower outbound frame limits to make tests run faster
   config_helper_.setOutboundFramesLimits(1000, 100);
   initialize();
-  tcp_client_ = makeTcpConnection(lookupPort("http"));
+  // Set up a raw connection to easily send requests without reading responses. Also, set a small
+  // TCP receive buffer to speed up connection backup.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  tcp_client_ = makeTcpConnection(lookupPort("http"), options);
   startHttp2Session();
 }
 
 Http2Frame Http2FloodMitigationTest::readFrame() {
   Http2Frame frame;
-  tcp_client_->waitForData(frame.HeaderSize);
+  EXPECT_TRUE(tcp_client_->waitForData(frame.HeaderSize));
   frame.setHeader(tcp_client_->data());
   tcp_client_->clearData(frame.HeaderSize);
   auto len = frame.payloadSize();
   if (len) {
-    tcp_client_->waitForData(len);
+    EXPECT_TRUE(tcp_client_->waitForData(len));
     frame.setPayload(tcp_client_->data());
     tcp_client_->clearData(len);
   }
   return frame;
 }
 
-void Http2FloodMitigationTest::sendFame(const Http2Frame& frame) {
+void Http2FloodMitigationTest::sendFrame(const Http2Frame& frame) {
   ASSERT_TRUE(tcp_client_->connected());
-  tcp_client_->write(std::string(frame), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
 }
 
 void Http2FloodMitigationTest::startHttp2Session() {
-  tcp_client_->write(Http2Frame::Preamble, false, false);
+  ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
 
   // Send empty initial SETTINGS frame.
   auto settings = Http2Frame::makeEmptySettingsFrame();
-  tcp_client_->write(std::string(settings), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // Read initial SETTINGS frame from the server.
   readFrame();
 
   // Send an SETTINGS ACK.
   settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
-  tcp_client_->write(std::string(settings), false, false);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // read pending SETTINGS and WINDOW_UPDATE frames
   readFrame();
@@ -1556,14 +1586,13 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
   // Add early stop if we have sent more than 100M of frames, as it this
   // point it is obvious something is wrong.
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
-    tcp_client_->write({buf.begin(), buf.end()}, false, false);
+    ASSERT_TRUE(tcp_client_->write({buf.begin(), buf.end()}, false, false));
     total_bytes_sent += buf.size();
   }
 
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_delayed_close_timeout", 1);
 }
 
 // Verify that the server detects the flood using specified request parameters.
@@ -1572,7 +1601,7 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
                                            const std::string& flood_stat) {
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, host, path);
-  sendFame(request);
+  sendFrame(request);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
   EXPECT_EQ(expected_http_status, frame.responseStatus());
@@ -1580,7 +1609,7 @@ void Http2FloodMitigationTest::floodServer(absl::string_view host, absl::string_
   uint64_t total_bytes_sent = 0;
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
     request = Http2Frame::makeRequest(++request_idx, host, path);
-    sendFame(request);
+    sendFrame(request);
     total_bytes_sent += request.size();
   }
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
@@ -1622,6 +1651,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
   autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
@@ -1634,13 +1664,15 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
   beginSession();
 
   int i = 0;
   auto request = Http::Http2::Http2Frame::makeMalformedRequest(i);
-  sendFame(request);
+  sendFrame(request);
   auto response = readFrame();
   // Make sure we've got RST_STREAM from the server
   EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
@@ -1651,7 +1683,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   uint64_t total_bytes_sent = 0;
   while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
     request = Http::Http2::Http2Frame::makeMalformedRequest(++i);
-    sendFame(request);
+    sendFrame(request);
     total_bytes_sent += request.size();
   }
   EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
@@ -1688,7 +1720,7 @@ TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
 
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
-  sendFame(request);
+  sendFrame(request);
 
   tcp_client_->waitForDisconnect();
 
@@ -1698,39 +1730,43 @@ TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyHeadersContinuation) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
 
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeEmptyHeadersFrame(request_idx);
-  sendFame(request);
+  sendFrame(request);
 
   for (int i = 0; i < 2; i++) {
     request = Http2Frame::makeEmptyContinuationFrame(request_idx);
-    sendFame(request);
+    sendFrame(request);
   }
 
   tcp_client_->waitForDisconnect();
 
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.inbound_empty_frames_flood"));
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 TEST_P(Http2FloodMitigationTest, EmptyData) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   uint32_t request_idx = 0;
   auto request = Http2Frame::makePostRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
 
   for (int i = 0; i < 2; i++) {
     request = Http2Frame::makeEmptyDataFrame(request_idx);
-    sendFame(request);
+    sendFrame(request);
   }
 
   tcp_client_->waitForDisconnect();
 
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http2.inbound_empty_frames_flood"));
   EXPECT_EQ(1, test_server_->counter("http2.inbound_empty_frames_flood")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
@@ -1749,7 +1785,7 @@ TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
   // Open stream.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
 
   floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
               "http2.inbound_priority_frames_flood");
@@ -1763,7 +1799,7 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
   // Open stream.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
   // Reading response marks this stream as closed in nghttp2.
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
@@ -1779,7 +1815,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   // Open stream.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
 
   floodServer(Http2Frame::makeWindowUpdateFrame(request_idx, 1),
               "http2.inbound_window_update_frames_flood");
@@ -1793,7 +1829,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
   // Send invalid request.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
 
   tcp_client_->waitForDisconnect();
 
@@ -1811,7 +1847,9 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
   autonomous_upstream_ = true;
   beginSession();
@@ -1820,7 +1858,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   // Send invalid request.
   uint32_t request_idx = 0;
   auto request = Http2Frame::makeMalformedRequestWithZerolenHeader(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
   // Make sure we've got RST_STREAM from the server.
   auto response = readFrame();
   EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
@@ -1828,7 +1866,7 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
   // Send valid request using the same connection.
   request_idx++;
   request = Http2Frame::makeRequest(request_idx, "host", "/");
-  sendFame(request);
+  sendFrame(request);
   response = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, response.type());
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());

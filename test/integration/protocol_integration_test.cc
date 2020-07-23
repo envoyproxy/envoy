@@ -452,9 +452,12 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingReset) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send back an upstream failure and end stream. Make sure an immediate reset
-  // doesn't cause problems.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  upstream_request_->encodeResetStream();
+  // doesn't cause problems. Schedule via the upstream_request_ dispatcher to ensure that the stream
+  // still exists when encoding the reset stream.
+  upstream_request_->postToConnectionThread([this]() {
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+    upstream_request_->encodeResetStream();
+  });
 
   // Make sure the fake stream is reset.
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
@@ -939,6 +942,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 
 // Verify that request with headers containing underscores is rejected when configured.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -964,6 +968,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefa
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
   }
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
@@ -989,6 +994,10 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // The invalid data will trigger disconnect.
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  }
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();
@@ -1095,6 +1104,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("400", response->headers().getStatusValue());
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
@@ -1106,7 +1116,9 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
 
   initialize();
@@ -1162,7 +1174,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
 
   initialize();
@@ -1344,6 +1358,16 @@ name: decode-headers-only
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
+  // Send one 95 kB URL with limit 60 kB headers.
+  testLargeRequestUrl(95, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
+  // Send one 95 kB URL with limit 96 kB headers.
+  testLargeRequestUrl(95, 96);
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
   // Send one 95 kB header with limit 60 kB and 100 headers.
   testLargeRequestHeaders(95, 1, 60, 100);
@@ -1454,9 +1478,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::RequestTrailerMapImpl request_trailers;
+  auto request_trailers = Http::RequestTrailerMapImpl::create();
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
+    request_trailers->addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1468,7 +1492,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
                                                                  {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  codec_client_->sendTrailers(*request_encoder_, *request_trailers);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -1940,7 +1964,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   }
 }
 
-// Make sure that with stream_error_on_invalid_http_messaging true, CONNECT
+// Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
@@ -1949,7 +1973,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+        hcm.mutable_http2_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
 
   initialize();
@@ -1959,6 +1985,40 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
 
   response->waitForReset();
   EXPECT_FALSE(codec_client_->disconnected());
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/12131
+TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  // Make sure that a disconnect results in valid 5xx response headers even when preceded by a 100.
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnectLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_500_after_100", "false");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    EXPECT_FALSE(response->complete());
+  } else {
+    response->waitForReset();
+    EXPECT_FALSE(response->complete());
+  }
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

@@ -5,11 +5,11 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/grpc/status.h"
 
-#include "common/common/version.h"
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/ads_integration.h"
@@ -594,8 +594,9 @@ class AdsFailIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
 public:
   AdsFailIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                            adsIntegrationConfig(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                            ConfigHelper::adsBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                                envoy::config::core::v3::ApiVersion::V2)) {
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -634,8 +635,9 @@ class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
 public:
   AdsConfigIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                            adsIntegrationConfig(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                            ConfigHelper::adsBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                                envoy::config::core::v3::ApiVersion::V2)) {
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -795,8 +797,9 @@ class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParam
 public:
   AdsClusterFromFileIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
-                            adsIntegrationConfig(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                            ConfigHelper::adsBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC",
+                                envoy::config::core::v3::ApiVersion::V2)) {
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();

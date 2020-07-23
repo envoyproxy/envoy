@@ -34,6 +34,7 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
+  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
   ContinueAndEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
@@ -325,10 +326,13 @@ public:
   virtual RequestTrailerMap& addDecodedTrailers() PURE;
 
   /**
-   * Create a locally generated response using the provided response_code and body_text parameters.
-   * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
-   * HTTP response code and grpc-status and grpc-message headers mapped from the provided
-   * parameters.
+   * Attempts to create a locally generated response using the provided response_code and body_text
+   * parameters. If the request was a gRPC request the local reply will be encoded as a gRPC
+   * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
+   * provided parameters.
+   *
+   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
    * @param body_text supplies the optional body text which is sent using the text/plain content

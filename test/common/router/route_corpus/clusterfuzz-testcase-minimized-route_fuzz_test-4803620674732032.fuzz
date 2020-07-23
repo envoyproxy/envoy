@@ -1,0 +1,485 @@
+config {
+  virtual_hosts {
+    name: "/"
+    domains: ""
+    domains: ""
+    domains: "*"
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+      name: "J"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+            value: true
+          }
+        }
+      }
+      response_headers_to_remove: "\021"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\25537"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "W"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\020"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+            value: true
+          }
+        }
+      }
+      response_headers_to_remove: "\021"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      response_headers_to_remove: "\022"
+      filter_action {
+      }
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+            value: true
+          }
+        }
+      }
+      response_headers_to_remove: ""
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+            value: true
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+        }
+      }
+      response_headers_to_remove: "\021"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\001"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\0s#"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+      request_headers_to_remove: "J"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        prefix: ""
+        grpc {
+        }
+      }
+      route {
+        cluster_header: "J"
+        upgrade_configs {
+          enabled {
+          }
+        }
+      }
+      response_headers_to_remove: "\022"
+    }
+  }
+}

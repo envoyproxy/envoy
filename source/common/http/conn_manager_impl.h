@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/api_listener.h"
@@ -54,10 +55,10 @@ class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public Http::ApiListener {
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
-                        Runtime::RandomGenerator& random_generator, Http::Context& http_context,
+                        Random::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager* overload_manager, TimeSource& time_system);
+                        Server::OverloadManager& overload_manager, TimeSource& time_system);
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -84,7 +85,7 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Http::ConnectionCallbacks
-  void onGoAway() override;
+  void onGoAway(GoAwayErrorCode error_code) override;
 
   // Http::ServerConnectionCallbacks
   RequestDecoder& newStream(ResponseEncoder& response_encoder,
@@ -101,9 +102,6 @@ public:
   }
 
   TimeSource& timeSource() { return time_source_; }
-
-  // Return a reference to the shared_ptr so that it can be lazy created on demand.
-  std::shared_ptr<StreamInfo::FilterState>& filterState() { return filter_state_; }
 
 private:
   struct ActiveStream;
@@ -495,7 +493,11 @@ private:
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                        absl::string_view details);
+                        absl::string_view details) override;
+    void sendLocalReplyViaFilterChain(
+        bool is_grpc_request, Code code, absl::string_view body,
+        const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+        const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
     // As with most of the encode functions, this runs encodeHeaders on various
     // filters before calling encodeHeadersInternal which does final header munging and passes the
@@ -627,7 +629,7 @@ private:
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
             is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
-            is_head_request_(false) {}
+            is_head_request_(false), non_100_response_headers_encoded_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -655,6 +657,8 @@ private:
       // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
       bool has_continue_headers_ : 1;
       bool is_head_request_ : 1;
+      // Tracks if headers other than 100-Continue have been encoded to the codec.
+      bool non_100_response_headers_encoded_ : 1;
       // Whether a filter has indicated that the request should be treated as a headers only
       // request.
       bool decoding_headers_only_{false};
@@ -791,7 +795,7 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
-  Runtime::RandomGenerator& random_generator_;
+  Random::RandomGenerator& random_generator_;
   Http::Context& http_context_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
@@ -803,7 +807,6 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-  std::shared_ptr<StreamInfo::FilterState> filter_state_;
 };
 
 } // namespace Http

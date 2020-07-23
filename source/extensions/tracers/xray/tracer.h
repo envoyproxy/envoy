@@ -65,7 +65,7 @@ public:
 
   /**
    * Adds a key-value pair to either the Span's annotations or metadata.
-   * A whitelist of keys are added to the annotations, everything else is added to the metadata.
+   * An allowlist of keys are added to the annotations, everything else is added to the metadata.
    */
   void setTag(absl::string_view name, absl::string_view value) override;
 

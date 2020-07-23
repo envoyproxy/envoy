@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export ENVOY_BIN="${TEST_SRCDIR}/envoy/test/integration/hotrestart_main"
 source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
 
 function expect_fail_with_error() {

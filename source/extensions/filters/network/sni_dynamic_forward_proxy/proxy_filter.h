@@ -40,6 +40,7 @@ class ProxyFilter
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   ProxyFilter(ProxyFilterConfigSharedPtr config);
+
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override {
     return Network::FilterStatus::Continue;
@@ -54,6 +55,7 @@ public:
 
 private:
   const ProxyFilterConfigSharedPtr config_;
+  Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };

@@ -26,10 +26,10 @@ namespace Envoy {
 namespace {
 
 // TODO(jmarantz): switch this to simulated-time after debugging flakes.
-class HdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class HdsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                            public HttpIntegrationTest {
 public:
-  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(
@@ -41,11 +41,12 @@ public:
 
   void initialize() override {
     setUpstreamCount(upstream_endpoints_);
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup hds and corresponding gRPC cluster.
       auto* hds_config = bootstrap.mutable_hds_config();
       hds_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       hds_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("hds_cluster");
+      hds_config->set_transport_api_version(apiVersion());
       auto* hds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       hds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       hds_cluster->mutable_circuit_breakers()->Clear();
@@ -60,8 +61,10 @@ public:
     // Endpoint connections
     host_upstream_ =
         std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
+    host_upstream_->set_allow_unexpected_disconnects(true);
     host2_upstream_ =
         std::make_unique<FakeUpstream>(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem());
+    host2_upstream_->set_allow_unexpected_disconnects(true);
   }
 
   // Sets up a connection between Envoy and the management server.
@@ -79,7 +82,6 @@ public:
     ASSERT_TRUE(host_fake_connection_->waitForNewStream(*dispatcher_, host_stream_));
     ASSERT_TRUE(host_stream_->waitForEndStream(*dispatcher_));
 
-    host_upstream_->set_allow_unexpected_disconnects(true);
     EXPECT_EQ(host_stream_->headers().getPathValue(), "/healthcheck");
     EXPECT_EQ(host_stream_->headers().getMethodValue(), "GET");
     EXPECT_EQ(host_stream_->headers().getHostValue(), "anna");
@@ -89,7 +91,6 @@ public:
       ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
       ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
 
-      host2_upstream_->set_allow_unexpected_disconnects(true);
       EXPECT_EQ(host2_stream_->headers().getPathValue(), "/healthcheck");
       EXPECT_EQ(host2_stream_->headers().getMethodValue(), "GET");
       EXPECT_EQ(host2_stream_->headers().getHostValue(), cluster2);
@@ -209,6 +210,25 @@ public:
     while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                                         healthy, host_upstream_->localAddress())) {
       ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
+      EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
+      EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
+                                                    "StreamHealthCheck", apiVersion(),
+                                                    /*use_alpha=*/false, serviceNamespace()),
+                hds_stream_->headers().getPathValue());
+      EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
+    }
+  }
+
+  const std::string serviceNamespace() const {
+    switch (apiVersion()) {
+    case envoy::config::core::v3::ApiVersion::AUTO:
+      FALLTHRU;
+    case envoy::config::core::v3::ApiVersion::V2:
+      return "discovery";
+    case envoy::config::core::v3::ApiVersion::V3:
+      return "health";
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
@@ -232,9 +252,8 @@ public:
   envoy::service::health::v3::HealthCheckSpecifier server_health_check_specifier_;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, HdsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, HdsIntegrationTest,
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Tests Envoy HTTP health checking a single healthy endpoint and reporting that it is
 // indeed healthy to the server.
@@ -295,9 +314,10 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoy sends a health check message to an endpoint
-  healthcheckEndpoints();
+  ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
 
   // Endpoint doesn't respond to the health check
+  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect(true));
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::TIMEOUT);
@@ -361,19 +381,17 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->mutable_timeout()
-      ->set_nanos(500000000); // 0.5 seconds
+      ->set_nanos(100000000); // 0.1 seconds
 
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoys asks the endpoint if it's healthy
-  host_upstream_->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
-  ASSERT_TRUE(
-      host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
 
   // No response from the endpoint
+  ASSERT_TRUE(host_fake_raw_connection_->waitForDisconnect(true));
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::TIMEOUT);
@@ -399,7 +417,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoy asks the endpoint if it's healthy
-  host_upstream_->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
@@ -434,7 +451,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoy asks the endpoint if it's healthy
-  host_upstream_->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
@@ -672,7 +688,6 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Envoy sends a health check message to an endpoint
-  host2_upstream_->set_allow_unexpected_disconnects(true);
   ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
   ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
   ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));

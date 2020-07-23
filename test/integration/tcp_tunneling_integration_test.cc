@@ -297,22 +297,39 @@ TEST_P(TcpTunnelingIntegrationTest, Basic) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
   // Send some data from downstream to upstream, and make sure it goes through.
-  tcp_client->write("hello", false);
+  ASSERT_TRUE(tcp_client->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
   // Send data from upstream to downstream.
   upstream_request_->encodeData(12, false);
-  tcp_client->waitForData(12);
+  ASSERT_TRUE(tcp_client->waitForData(12));
 
   // Now send more data and close the TCP client. This should be treated as half close, so the data
   // should go through.
-  tcp_client->write("hello", false);
+  ASSERT_TRUE(tcp_client->write("hello", false));
   tcp_client->close();
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // If the upstream now sends 'end stream' the connection is fully closed.
   upstream_request_->encodeData(0, true);
+}
+
+// Validates that if the cluster is not configured with HTTP/2 we don't attempt
+// to tunnel the data.
+TEST_P(TcpTunnelingIntegrationTest, InvalidCluster) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters()
+        ->Mutable(0)
+        ->clear_http2_protocol_options();
+  });
+  initialize();
+
+  // Start a connection and see it close immediately due to the invalid cluster.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
 }
 
 TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
@@ -347,21 +364,21 @@ TEST_P(TcpTunnelingIntegrationTest, CloseUpstreamFirst) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
   // Send data in both directions.
-  tcp_client->write("hello", false);
+  ASSERT_TRUE(tcp_client->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
   // Send data from upstream to downstream with an end stream and make sure the data is received
   // before the connection is half-closed.
   upstream_request_->encodeData(12, true);
-  tcp_client->waitForData(12);
+  ASSERT_TRUE(tcp_client->waitForData(12));
   tcp_client->waitForHalfClose();
 
   // Attempt to send data upstream.
   // should go through.
-  tcp_client->write("hello", false);
+  ASSERT_TRUE(tcp_client->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
-  tcp_client->write("hello", true);
+  ASSERT_TRUE(tcp_client->write("hello", true));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 }
@@ -409,7 +426,7 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
   std::string data(1024 * 16, 'a');
-  tcp_client->write(data);
+  ASSERT_TRUE(tcp_client->write(data));
   upstream_request_->encodeData(data, false);
 
   tcp_client->waitForDisconnect(true);
@@ -431,7 +448,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
   tcp_client->readDisable(true);
-  tcp_client->write("", true);
+  ASSERT_TRUE(tcp_client->write("", true));
 
   // This ensures that readDisable(true) has been run on its thread
   // before tcp_client starts writing.
@@ -465,7 +482,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
   // before tcp_client starts writing.
   tcp_client->waitForHalfClose();
 
-  tcp_client->write(data, true);
+  ASSERT_TRUE(tcp_client->write(data, true));
 
   // Note that upstream_flush_active will *not* be incremented for the HTTP
   // tunneling case. The data is already written to the stream, so no drainer
@@ -488,7 +505,7 @@ TEST_P(TcpTunnelingIntegrationTest, H2ConnectionReuse) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
   // Send data in both directions.
-  tcp_client1->write("hello1", false);
+  ASSERT_TRUE(tcp_client1->write("hello1", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello1"));
 
   // Send data from upstream to downstream with an end stream and make sure the data is received
@@ -507,7 +524,7 @@ TEST_P(TcpTunnelingIntegrationTest, H2ConnectionReuse) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
-  tcp_client2->write("hello2", false);
+  ASSERT_TRUE(tcp_client2->write("hello2", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello2"));
 
   // Send data from upstream to downstream with an end stream and make sure the data is received

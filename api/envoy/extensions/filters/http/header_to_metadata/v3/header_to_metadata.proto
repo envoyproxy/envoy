@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.header_to_metadata.v3;
 
+import "envoy/type/matcher/v3/regex.proto";
+
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -44,7 +47,7 @@ message Config {
     BASE64 = 1;
   }
 
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message KeyValuePair {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.header_to_metadata.v2.Config.KeyValuePair";
@@ -57,15 +60,25 @@ message Config {
 
     // The value to pair with the given key.
     //
-    // When used for a `on_header_present` case, if value is non-empty it'll be used
-    // instead of the header value. If both are empty, no metadata is added.
+    // When used for a
+    // :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`
+    // case, if value is non-empty it'll be used instead of the header value. If both are empty, no metadata is added.
     //
-    // When used for a `on_header_missing` case, a non-empty value must be provided
-    // otherwise no metadata is added.
-    string value = 3;
+    // When used for a :ref:`on_header_missing <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_missing>`
+    // case, a non-empty value must be provided otherwise no metadata is added.
+    string value = 3 [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
+
+    // If present, the header's value will be matched and substituted with this. If there is no match or substitution, the header value
+    // is used as-is.
+    //
+    // This is only used for :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`.
+    //
+    // Note: if the `value` field is non-empty this field should be empty.
+    type.matcher.v3.RegexMatchAndSubstitute regex_value_rewrite = 6
+        [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
 
     // The value's type — defaults to string.
-    ValueType type = 4;
+    ValueType type = 4 [(validate.rules).enum = {defined_only: true}];
 
     // How is the value encoded, default is NONE (not encoded).
     // The value will be decoded accordingly before storing to metadata.

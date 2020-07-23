@@ -104,6 +104,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:stl_helpers",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -187,7 +188,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
-        "//source/common/http:utility_lib",
+        "//source/common/http:url_utility_lib",
     ],
 )
 
@@ -226,6 +227,16 @@ envoy_cc_library(
         "@com_googlesource_quiche//:quic_core_utils_lib",
         "@com_googlesource_quiche//:quic_platform_mem_slice_span",
     ],
+)
+
+envoy_cc_library(
+    name = "quic_platform_udp_socket_impl_lib",
+    hdrs = select({
+        "//bazel:linux": ["quic_udp_socket_platform_impl.h"],
+        "//conditions:default": [],
+    }),
+    repository = "@envoy",
+    tags = ["nofips"],
 )
 
 envoy_cc_library(

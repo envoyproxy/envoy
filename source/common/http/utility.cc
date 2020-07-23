@@ -1,7 +1,5 @@
 #include "common/http/utility.h"
 
-#include <http_parser.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -23,6 +21,7 @@
 #include "common/http/message_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -144,10 +143,29 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 
 envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  auto ret = initializeAndValidateOptions(options);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+    ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
+  }
+  return ret;
+}
+
+envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
   // This will throw an exception when a custom parameter and a named parameter collide.
   validateCustomSettingsParameters(options);
+
+  if (!options.has_override_stream_error_on_invalid_http_message()) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        options.stream_error_on_invalid_http_messaging());
+  }
 
   if (!options_clone.has_hpack_table_size()) {
     options_clone.mutable_hpack_table_size()->set_value(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
@@ -205,43 +223,6 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 
 namespace Http {
 
-static const char kDefaultPath[] = "/";
-
-bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
-  struct http_parser_url u;
-  http_parser_url_init(&u);
-  const int result =
-      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
-
-  if (result != 0) {
-    return false;
-  }
-  if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
-      (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
-    return false;
-  }
-  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
-                              u.field_data[UF_SCHEMA].len);
-
-  uint16_t authority_len = u.field_data[UF_HOST].len;
-  if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
-    authority_len = authority_len + u.field_data[UF_PORT].len + 1;
-  }
-  host_and_port_ =
-      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
-
-  // RFC allows the absolute-uri to not end in /, but the absolute path form
-  // must start with
-  uint64_t path_len = absolute_url.length() - (u.field_data[UF_HOST].off + hostAndPort().length());
-  if (path_len > 0) {
-    uint64_t path_beginning = u.field_data[UF_HOST].off + hostAndPort().length();
-    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
-  } else if (!is_connect) {
-    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
-  }
-  return true;
-}
-
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
@@ -272,14 +253,26 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   }
 
   start++;
-  return parseParameters(url, start);
+  return parseParameters(url, start, /*decode_params=*/false);
+}
+
+Utility::QueryParams Utility::parseAndDecodeQueryString(absl::string_view url) {
+  size_t start = url.find('?');
+  if (start == std::string::npos) {
+    QueryParams params;
+    return params;
+  }
+
+  start++;
+  return parseParameters(url, start, /*decode_params=*/true);
 }
 
 Utility::QueryParams Utility::parseFromBody(absl::string_view body) {
-  return parseParameters(body, 0);
+  return parseParameters(body, 0, /*decode_params=*/true);
 }
 
-Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start) {
+Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t start,
+                                              bool decode_params) {
   QueryParams params;
 
   while (start < data.size()) {
@@ -291,8 +284,10 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
 
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
-      params.emplace(StringUtil::subspan(data, start, start + equal),
-                     StringUtil::subspan(data, start + equal + 1, end));
+      const auto param_name = StringUtil::subspan(data, start, start + equal);
+      const auto param_value = StringUtil::subspan(data, start + equal + 1, end);
+      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
+                     decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
       params.emplace(StringUtil::subspan(data, start, end), "");
     }
@@ -315,50 +310,41 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
 
-  struct State {
-    std::string key_;
-    std::string ret_;
-  };
+  std::string ret;
 
-  State state;
-  state.key_ = key;
+  headers.iterateReverse([&key, &ret](const HeaderEntry& header) -> HeaderMap::Iterate {
+    // Find the cookie headers in the request (typically, there's only one).
+    if (header.key() == Http::Headers::get().Cookie.get()) {
 
-  headers.iterateReverse(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        // Find the cookie headers in the request (typically, there's only one).
-        if (header.key() == Http::Headers::get().Cookie.get()) {
-
-          // Split the cookie header into individual cookies.
-          for (const auto s : StringUtil::splitToken(header.value().getStringView(), ";")) {
-            // Find the key part of the cookie (i.e. the name of the cookie).
-            size_t first_non_space = s.find_first_not_of(" ");
-            size_t equals_index = s.find('=');
-            if (equals_index == absl::string_view::npos) {
-              // The cookie is malformed if it does not have an `=`. Continue
-              // checking other cookies in this header.
-              continue;
-            }
-            const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-            State* state = static_cast<State*>(context);
-            // If the key matches, parse the value from the rest of the cookie string.
-            if (k == state->key_) {
-              absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
-
-              // Cookie values may be wrapped in double quotes.
-              // https://tools.ietf.org/html/rfc6265#section-4.1.1
-              if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-                v = v.substr(1, v.size() - 2);
-              }
-              state->ret_ = std::string{v};
-              return HeaderMap::Iterate::Break;
-            }
-          }
+      // Split the cookie header into individual cookies.
+      for (const auto s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+        // Find the key part of the cookie (i.e. the name of the cookie).
+        size_t first_non_space = s.find_first_not_of(" ");
+        size_t equals_index = s.find('=');
+        if (equals_index == absl::string_view::npos) {
+          // The cookie is malformed if it does not have an `=`. Continue
+          // checking other cookies in this header.
+          continue;
         }
-        return HeaderMap::Iterate::Continue;
-      },
-      &state);
+        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+        // If the key matches, parse the value from the rest of the cookie string.
+        if (k == key) {
+          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
 
-  return state.ret_;
+          // Cookie values may be wrapped in double quotes.
+          // https://tools.ietf.org/html/rfc6265#section-4.1.1
+          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+            v = v.substr(1, v.size() - 2);
+          }
+          ret = std::string{v};
+          return HeaderMap::Iterate::Break;
+        }
+      }
+    }
+    return HeaderMap::Iterate::Continue;
+  });
+
+  return ret;
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
@@ -469,6 +455,11 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     if (!body_text.empty() && !local_reply_data.is_head_request_) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
+      // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
+      // https://github.com/envoyproxy/envoy/blob/master/source/common/formatter/substitution_formatter.cc#L129
+      if (body_text[body_text.length() - 1] == '\n') {
+        body_text = body_text.substr(0, body_text.length() - 1);
+      }
       response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
     encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
@@ -828,7 +819,9 @@ void Utility::traversePerFilterConfigGeneric(
   }
 }
 
-std::string Utility::PercentEncoding::encode(absl::string_view value) {
+std::string Utility::PercentEncoding::encode(absl::string_view value,
+                                             absl::string_view reserved_chars) {
+  absl::flat_hash_set<char> reserved_char_set{reserved_chars.begin(), reserved_chars.end()};
   for (size_t i = 0; i < value.size(); ++i) {
     const char& ch = value[i];
     // The escaping characters are defined in
@@ -837,22 +830,23 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
     // We do checking for each char in the string. If the current char is included in the defined
     // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
     // to the returned string one by one) started from the current index.
-    if (ch < ' ' || ch >= '~' || ch == '%') {
-      return PercentEncoding::encode(value, i);
+    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
+      return PercentEncoding::encode(value, i, reserved_char_set);
     }
   }
   return std::string(value);
 }
 
-std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index) {
+std::string Utility::PercentEncoding::encode(absl::string_view value, const size_t index,
+                                             const absl::flat_hash_set<char>& reserved_char_set) {
   std::string encoded;
   if (index > 0) {
-    absl::StrAppend(&encoded, value.substr(0, index - 1));
+    absl::StrAppend(&encoded, value.substr(0, index));
   }
 
   for (size_t i = index; i < value.size(); ++i) {
     const char& ch = value[i];
-    if (ch < ' ' || ch >= '~' || ch == '%') {
+    if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
       absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));

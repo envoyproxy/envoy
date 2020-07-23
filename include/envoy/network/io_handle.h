@@ -85,6 +85,8 @@ public:
     Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
+    // The gso_size, if specified in the transport header
+    unsigned int gso_size_{0};
   };
 
   /**
@@ -142,13 +144,18 @@ public:
   virtual bool supportsMmsg() const PURE;
 
   /**
+   * return true if the platform supports udp_gro
+   */
+  virtual bool supportsUdpGro() const PURE;
+
+  /**
    * Bind to address. The handle should have been created with a call to socket()
    * @param address address to bind to.
    * @param addrlen address length
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    *   is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallIntResult bind(const sockaddr* address, socklen_t addrlen) PURE;
+  virtual Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) PURE;
 
   /**
    * Listen on bound handle.
@@ -166,7 +173,7 @@ public:
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    *   is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallIntResult connect(const sockaddr* address, socklen_t addrlen) PURE;
+  virtual Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) PURE;
 
   /**
    * Set option (see man 2 setsockopt)

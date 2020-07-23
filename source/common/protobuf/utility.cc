@@ -343,13 +343,33 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
-    if (message.ParseFromString(contents)) {
-      MessageUtil::checkForUnexpectedFields(message, validation_visitor);
-      return;
+    auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
+                                                              MessageVersion message_version) {
+      try {
+        if (message.ParseFromString(contents)) {
+          MessageUtil::checkForUnexpectedFields(message, validation_visitor);
+        }
+        return;
+      } catch (EnvoyException& ex) {
+        if (message_version == MessageVersion::LATEST_VERSION) {
+          // Failed reading the latest version - pass the same error upwards
+          throw ex;
+        }
+      }
+      throw ApiBoostRetryException(
+          "Failed to parse at earlier version, trying again at later version.");
+    };
+
+    if (do_boosting) {
+      // Attempts to read as the previous version and upgrade, and if it fails
+      // attempts to read as latest version.
+      tryWithApiBoosting(read_proto_binary, message);
+    } else {
+      read_proto_binary(message, MessageVersion::LATEST_VERSION);
     }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
-                         message.GetTypeName() + ")");
+    return;
   }
+
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
     auto read_proto_text = [&contents, &path](Protobuf::Message& message,
@@ -435,6 +455,21 @@ public:
 
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
+      if (absl::StartsWith(field.name(), Config::VersionUtil::DeprecatedFieldShadowPrefix)) {
+        // The field was marked as hidden_envoy_deprecated and an error must be thrown,
+        // unless it is part of an explicit test that needs access to the deprecated field
+        // when we enable runtime deprecation override to allow point field overrides for tests.
+        if (!runtime_ ||
+            !runtime_->snapshot().deprecatedFeatureEnabled(
+                absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
+          const std::string fatal_error = absl::StrCat(
+              "Illegal use of hidden_envoy_deprecated_ V2 field '", field.full_name(),
+              "' from file ", filename,
+              " while using the latest V3 configuration. This field has been removed from the "
+              "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
+          throw ProtoValidationException(fatal_error, message);
+        }
+      }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
                        ". This configuration will be removed from "
@@ -542,16 +577,18 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
         Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
     // If the earlier version matches, unpack and upgrade.
     if (earlier_version_desc != nullptr && any_full_name == earlier_version_desc->full_name()) {
-      Protobuf::DynamicMessageFactory dmf;
-      auto earlier_message =
-          ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
-      ASSERT(earlier_message != nullptr);
-      if (!any_message.UnpackTo(earlier_message.get())) {
+      // Take the Any message but adjust its type URL, since earlier/later versions are wire
+      // compatible.
+      ProtobufWkt::Any any_message_with_fixup;
+      any_message_with_fixup.MergeFrom(any_message);
+      any_message_with_fixup.set_type_url("type.googleapis.com/" +
+                                          message.GetDescriptor()->full_name());
+      if (!any_message_with_fixup.UnpackTo(&message)) {
         throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                         earlier_message->GetDescriptor()->full_name(),
-                                         any_message.DebugString()));
+                                         earlier_version_desc->full_name(),
+                                         any_message_with_fixup.DebugString()));
       }
-      Config::VersionConverter::upgrade(*earlier_message, message);
+      Config::VersionConverter::annotateWithOriginalType(*earlier_version_desc, message);
       return;
     }
   }
