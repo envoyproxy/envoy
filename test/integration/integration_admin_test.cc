@@ -12,6 +12,7 @@
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
 #include "common/profiler/profiler.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_matcher_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -225,6 +226,24 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(), HasSubstr("# TYPE envoy_cluster_upstream_cx_active gauge\n"));
   EXPECT_THAT(response->body(),
               HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
+
+  // Test that a specific bucket config is applied. Buckets 0-3 (inclusive) are set in initialize().
+  for (int i = 0; i <= 3; i++) {
+    EXPECT_THAT(
+        response->body(),
+        HasSubstr(fmt::format("envoy_cluster_upstream_cx_connect_ms_bucket{{envoy_cluster_name="
+                              "\"cluster_0\",le=\"{}\"}} 0\n",
+                              i)));
+  }
+
+  // Test that other histograms use the default buckets.
+  for (double bucket : Stats::HistogramSettingsImpl::defaultBuckets()) {
+    EXPECT_THAT(
+        response->body(),
+        HasSubstr(fmt::format("envoy_cluster_upstream_cx_length_ms_bucket{{envoy_cluster_name="
+                              "\"cluster_0\",le=\"{0:.32g}\"}} 0\n",
+                              bucket)));
+  }
 
   EXPECT_EQ("200", request("admin", "GET", "/stats/prometheus", response));
   EXPECT_THAT(

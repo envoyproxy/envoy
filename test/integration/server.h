@@ -351,6 +351,7 @@ public:
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}
   void setStatsMatcher(StatsMatcherPtr&&) override {}
+  void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}

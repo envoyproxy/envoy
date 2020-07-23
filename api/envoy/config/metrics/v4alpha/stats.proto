@@ -83,6 +83,35 @@ message StatsConfig {
   //   `issue #8771 <https://github.com/envoyproxy/envoy/issues/8771>`_ for more information.
   //   If any unexpected behavior changes are observed, please open a new issue immediately.
   StatsMatcher stats_matcher = 3;
+
+  // Defines rules for setting the histogram buckets. Rules are evaluated in order, and the first
+  // match is applied. If no match is found (or if no rules are set), the following default buckets
+  // are used:
+  //
+  //   .. code-block:: json
+  //
+  //     [
+  //       0.5,
+  //       1,
+  //       5,
+  //       10,
+  //       25,
+  //       50,
+  //       100,
+  //       250,
+  //       500,
+  //       1000,
+  //       2500,
+  //       5000,
+  //       10000,
+  //       30000,
+  //       60000,
+  //       300000,
+  //       600000,
+  //       1800000,
+  //       3600000
+  //     ]
+  repeated HistogramBucketSettings histogram_bucket_settings = 4;
 }
 
 // Configuration for disabling stat instantiation.
@@ -257,6 +286,19 @@ message TagSpecifier {
     // Specifies a fixed tag value for the ``tag_name``.
     string fixed_value = 3;
   }
+}
+
+// Specifies a matcher for stats and the buckets that matching stats should use.
+message HistogramBucketSettings {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v3.HistogramBucketSettings";
+
+  // The stats that this rule applies to. The match is applied to the original stat name
+  // before tag-extraction, for example `cluster.exampleclustername.upstream_cx_length_ms`.
+  type.matcher.v4alpha.StringMatcher match = 1 [(validate.rules).message = {required: true}];
+
+  // Each value is the upper bound of a successive bucket.
+  repeated double buckets = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // Stats configuration proto schema for built-in *envoy.stat_sinks.statsd* sink. This sink does not support

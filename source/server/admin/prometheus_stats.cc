@@ -151,7 +151,7 @@ std::string generateHistogramOutput(const Stats::ParentHistogram& histogram,
   const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
 
   const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
-  const std::vector<double>& supported_buckets = stats.supportedBuckets();
+  Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
   const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
   std::string output;
   for (size_t i = 0; i < supported_buckets.size(); ++i) {
