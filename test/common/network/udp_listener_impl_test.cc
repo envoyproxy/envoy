@@ -314,6 +314,8 @@ TEST_P(UdpListenerImplTest, SendData) {
   const uint64_t bytes_to_read = payload.length();
   UdpRecvData data;
   client_.recv(data);
+  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().sent_bytes_.value(),
+            bytes_to_read);
   EXPECT_EQ(bytes_to_read, data.buffer_->length());
   EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
   EXPECT_EQ(data.buffer_->toString(), payload);
@@ -333,9 +335,24 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  auto send_result = listener_->send(send_data);
+  EXPECT_FALSE(send_result.ok());
+  EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+  // Failed write shouldn't drain the data.
+  EXPECT_EQ(payload.length(), buffer->length());
+  // Verify the writer is set to blocked
+  EXPECT_TRUE(listener_->udpPacketWriter()->isWriteBlocked());
+
+  // Reset write_blocked status
+  listener_->udpPacketWriter()->setWritable();
+  EXPECT_FALSE(listener_->udpPacketWriter()->isWriteBlocked());
+
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
-  auto send_result = listener_->send(send_data);
+  send_result = listener_->send(send_data);
   EXPECT_FALSE(send_result.ok());
   EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
   // Failed write shouldn't drain the data.
