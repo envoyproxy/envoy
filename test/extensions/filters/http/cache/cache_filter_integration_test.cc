@@ -136,13 +136,13 @@ TEST_P(CacheIntegrationTest, SuccessfulValidation) {
 
   // Check for injected conditional headers -- no "Last-Modified" header so should fallback to
   // "Date".
-  Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"},
-                                                     {"if-modified-since", original_response_date}};
+  const Http::TestRequestHeaderMapImpl injected_headers = {
+      {"if-none-match", "abc123"}, {"if-modified-since", original_response_date}};
   EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
-  // Create a 304 (not modified) response -> cached response is valid.
-  Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
-                                                                   {"date", not_modified_date}};
+  // Create a 304 (not modified) response -> cached response is valid
+  const Http::TestResponseHeaderMapImpl not_modified_response_headers = {
+      {":status", "304"}, {"date", not_modified_date}};
   upstream_request_->encodeHeaders(not_modified_response_headers, /*end_stream=*/true);
 
   // The original response headers should be updated with 304 response headers.
