@@ -139,7 +139,8 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             const ProtobufWkt::Struct& config,
-                            ProtobufMessage::ValidationVisitor& validation_visitor) {
+                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                            Server::Configuration::TransportSocketFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           name);
@@ -163,7 +164,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
                                                 *proto_config);
 
-  return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
+  return factory->createProtocolOptionsConfig(*proto_config, validation_visitor, factory_context);
 }
 
 std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
