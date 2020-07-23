@@ -140,7 +140,7 @@ TEST_F(FormatTest, OutputEscaped) {
 }
 
 /**
- * Test for Fancy Logger macros.
+ * Test for Fancy Logger convenient macros.
  */
 TEST(Fancy, Global) {
   FANCY_LOG(info, "Hello world! Here's a line of fancy log!");
