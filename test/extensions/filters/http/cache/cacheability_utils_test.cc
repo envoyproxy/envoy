@@ -18,6 +18,7 @@ protected:
                                                      {":method", "GET"},
                                                      {"x-forwarded-proto", "http"},
                                                      {":authority", "test.com"}};
+  std::string condtionalHeader() const { return GetParam(); }
 };
 
 class IsCacheableResponseTest : public testing::Test {
@@ -72,11 +73,17 @@ TEST_F(IsCacheableRequestTest, AuthorizationHeader) {
 
 INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, IsCacheableRequestTest,
                          testing::Values("if-match", "if-none-match", "if-modified-since",
-                                         "if-unmodified-since", "if-range"));
+                                         "if-unmodified-since", "if-range"),
+                         [](const auto& info) {
+                           std::string test_name = info.param;
+                           absl::c_replace_if(
+                               test_name, [](char c) { return !std::isalnum(c); }, '_');
+                           return test_name;
+                         });
 
 TEST_P(IsCacheableRequestTest, ConditionalHeaders) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
-  request_headers_.setCopy(Http::LowerCaseString{GetParam()}, "test-value");
+  request_headers_.setCopy(Http::LowerCaseString{condtionalHeader()}, "test-value");
   EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
 }
 
