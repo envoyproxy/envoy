@@ -631,10 +631,6 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
 }
 
 TEST_F(RedisConnPoolImplTest, MakeRequestToHost) {
-  InSequence s;
-
-  setup(false);
-
   Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolRequest active_request1;
   Common::Redis::Client::MockPoolRequest active_request2;
@@ -645,48 +641,55 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToHost) {
   Upstream::HostConstSharedPtr host1;
   Upstream::HostConstSharedPtr host2;
 
-  // There is no cluster yet, so makeRequestToHost() should fail.
-  EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
-  // Add the cluster now.
-  update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
+  {
+    InSequence s;
 
-  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
-  EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
-      .WillOnce(Return(&active_request1));
-  Common::Redis::Client::PoolRequest* request1 =
-      conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
-  EXPECT_EQ(&active_request1, request1);
-  EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
+    setup(false);
 
-  // IPv6 address returned from Redis server will not have square brackets
-  // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
-  // the address.
-  EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
-  EXPECT_CALL(*client2, makeRequest_(Ref(value), Ref(callbacks2)))
-      .WillOnce(Return(&active_request2));
-  Common::Redis::Client::PoolRequest* request2 =
-      conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
-  EXPECT_EQ(&active_request2, request2);
-  EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
+    // There is no cluster yet, so makeRequestToHost() should fail.
+    EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
+    // Add the cluster now.
+    update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
-  // Test with a badly specified host address (no colon, no address, no port).
-  EXPECT_EQ(conn_pool_->makeRequestToHost("bad", value, callbacks1), nullptr);
-  // Test with a badly specified IPv4 address.
-  EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.bad:3000", value, callbacks1), nullptr);
-  // Test with a badly specified TCP port.
-  EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:bad", value, callbacks1), nullptr);
-  // Test with a TCP port outside of the acceptable range for a 32-bit integer.
-  EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:4294967297", value, callbacks1),
-            nullptr); // 2^32 + 1
-  // Test with a TCP port outside of the acceptable range for a TCP port (0 .. 65535).
-  EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:65536", value, callbacks1), nullptr);
-  // Test with a badly specified IPv6-like address.
-  EXPECT_EQ(conn_pool_->makeRequestToHost("bad:ipv6:3000", value, callbacks1), nullptr);
-  // Test with a valid IPv6 address and a badly specified TCP port (out of range).
-  EXPECT_EQ(conn_pool_->makeRequestToHost("2001:470:813b:::70000", value, callbacks1), nullptr);
+    EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
+    EXPECT_CALL(*client1, makeRequest_(Ref(value), Ref(callbacks1)))
+        .WillOnce(Return(&active_request1));
+    Common::Redis::Client::PoolRequest* request1 =
+        conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1);
+    EXPECT_EQ(&active_request1, request1);
+    EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
 
-  EXPECT_CALL(*client2, close());
+    // IPv6 address returned from Redis server will not have square brackets
+    // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
+    // the address.
+    EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
+    EXPECT_CALL(*client2, makeRequest_(Ref(value), Ref(callbacks2)))
+        .WillOnce(Return(&active_request2));
+    Common::Redis::Client::PoolRequest* request2 =
+        conn_pool_->makeRequestToHost("2001:470:813B:0:0:0:0:1:3333", value, callbacks2);
+    EXPECT_EQ(&active_request2, request2);
+    EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
+
+    // Test with a badly specified host address (no colon, no address, no port).
+    EXPECT_EQ(conn_pool_->makeRequestToHost("bad", value, callbacks1), nullptr);
+    // Test with a badly specified IPv4 address.
+    EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.bad:3000", value, callbacks1), nullptr);
+    // Test with a badly specified TCP port.
+    EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:bad", value, callbacks1), nullptr);
+    // Test with a TCP port outside of the acceptable range for a 32-bit integer.
+    EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:4294967297", value, callbacks1),
+              nullptr); // 2^32 + 1
+    // Test with a TCP port outside of the acceptable range for a TCP port (0 .. 65535).
+    EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:65536", value, callbacks1), nullptr);
+    // Test with a badly specified IPv6-like address.
+    EXPECT_EQ(conn_pool_->makeRequestToHost("bad:ipv6:3000", value, callbacks1), nullptr);
+    // Test with a valid IPv6 address and a badly specified TCP port (out of range).
+    EXPECT_EQ(conn_pool_->makeRequestToHost("2001:470:813b:::70000", value, callbacks1), nullptr);
+  }
+
+  // We cannot guarantee which order close will be called, perform these checks unsequenced
   EXPECT_CALL(*client1, close());
+  EXPECT_CALL(*client2, close());
   tls_.shutdownThread();
 }
 
