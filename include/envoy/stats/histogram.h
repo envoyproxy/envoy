@@ -11,6 +11,23 @@
 namespace Envoy {
 namespace Stats {
 
+using ConstSupportedBuckets = const std::vector<double>;
+
+class HistogramSettings {
+public:
+  virtual ~HistogramSettings() = default;
+
+  /**
+   * For formats like Prometheus where the entire histogram is published (but not
+   * like statsd where each value to include in the histogram is emitted separately),
+   * get the limits for each histogram bucket.
+   * @return The buckets for the histogram. Each value is an upper bound of a bucket.
+   */
+  virtual ConstSupportedBuckets& buckets(absl::string_view stat_name) const PURE;
+};
+
+using HistogramSettingsConstPtr = std::unique_ptr<const HistogramSettings>;
+
 /**
  * Holds the computed statistics for a histogram.
  */
@@ -43,7 +60,7 @@ public:
    * with 0 as the implicit lower bound. For timers, these bucket thresholds
    * are in milliseconds but the thresholds are applicable to all types of data.
    */
-  virtual const std::vector<double>& supportedBuckets() const PURE;
+  virtual ConstSupportedBuckets& supportedBuckets() const PURE;
 
   /**
    * Returns computed bucket values during the period. The vector contains an approximation

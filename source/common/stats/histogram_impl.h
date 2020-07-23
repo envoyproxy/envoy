@@ -3,10 +3,12 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
+#include "common/common/matchers.h"
 #include "common/common/non_copyable.h"
 #include "common/stats/metric_impl.h"
 
@@ -15,18 +17,38 @@
 namespace Envoy {
 namespace Stats {
 
+class HistogramSettingsImpl : public HistogramSettings {
+public:
+  HistogramSettingsImpl() = default;
+  HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config);
+
+  // HistogramSettings
+  const ConstSupportedBuckets& buckets(absl::string_view stat_name) const override;
+
+  static ConstSupportedBuckets& defaultBuckets();
+
+private:
+  using Config = std::pair<Matchers::StringMatcherImpl, ConstSupportedBuckets>;
+  const std::vector<Config> configs_{};
+};
+
 /**
  * Implementation of HistogramStatistics for circllhist.
  */
 class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
 public:
-  HistogramStatisticsImpl() : computed_quantiles_(supportedQuantiles().size(), 0.0) {}
+  HistogramStatisticsImpl();
+
   /**
    * HistogramStatisticsImpl object is constructed using the passed in histogram.
    * @param histogram_ptr pointer to the histogram for which stats will be calculated. This pointer
    * will not be retained.
    */
-  HistogramStatisticsImpl(const histogram_t* histogram_ptr);
+  HistogramStatisticsImpl(
+      const histogram_t* histogram_ptr,
+      ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
+
+  static ConstSupportedBuckets& defaultSupportedBuckets();
 
   void refresh(const histogram_t* new_histogram_ptr);
 
@@ -35,12 +57,13 @@ public:
   std::string bucketSummary() const override;
   const std::vector<double>& supportedQuantiles() const final;
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
-  const std::vector<double>& supportedBuckets() const override;
+  ConstSupportedBuckets& supportedBuckets() const override { return supported_buckets_; }
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
   uint64_t sampleCount() const override { return sample_count_; }
   double sampleSum() const override { return sample_sum_; }
 
 private:
+  ConstSupportedBuckets& supported_buckets_;
   std::vector<double> computed_quantiles_;
   std::vector<uint64_t> computed_buckets_;
   uint64_t sample_count_;

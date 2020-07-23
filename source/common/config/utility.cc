@@ -20,6 +20,7 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
@@ -219,6 +220,11 @@ Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootst
 Stats::StatsMatcherPtr
 Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
+}
+
+Stats::HistogramSettingsConstPtr
+Utility::createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  return std::make_unique<Stats::HistogramSettingsImpl>(bootstrap.stats_config());
 }
 
 Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
