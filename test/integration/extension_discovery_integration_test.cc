@@ -164,6 +164,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_reload",
                                  1);
   test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{
@@ -192,6 +193,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   sendXdsResponse("foo", "1", invalidConfig());
   test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_fail", 1);
   test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{
@@ -212,6 +214,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   sendXdsResponse("foo", "1", invalidConfig());
   test_server_->waitForCounterGe("http.config_test.extension_config_discovery.foo.config_fail", 1);
   test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{
@@ -230,6 +233,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   registerTestServerPorts({"http"});
   test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   // Initial request uses the default config.
   Http::TestRequestHeaderMapImpl request_headers{
@@ -254,6 +258,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarmingFail) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   registerTestServerPorts({"http"});
   test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   // Update should not cause a different response.
   sendXdsResponse("bar", "1", invalidConfig());
@@ -278,6 +283,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameName) {
   test_server_->waitForCounterGe("http.config_test.extension_config_discovery.baz.config_reload",
                                  1);
   test_server_->waitUntilListenersReady();
+  test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestRequestHeaderMapImpl request_headers{
