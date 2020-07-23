@@ -428,12 +428,10 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   // the existing listener.
   bool active_listener_exists = false;
   bool warming_listener_exists = false;
-
   if (existing_warming_listener != warming_listeners_.end() &&
       *(*existing_warming_listener)->address() != *new_listener->address()) {
     warming_listener_exists = true;
   }
-
   if (existing_active_listener != active_listeners_.end() &&
       *(*existing_active_listener)->address() != *new_listener->address()) {
     active_listener_exists = true;
