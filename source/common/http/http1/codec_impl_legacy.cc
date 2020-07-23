@@ -1148,6 +1148,8 @@ int ClientConnectionImpl::onHeadersComplete() {
 
     // http-parser treats 1xx headers as their own complete response. Swallow the spurious
     // onMessageComplete and continue processing for purely informational headers.
+    // 101-SwitchingProtocols is exempt as all data after the header is proxied through after
+    // upgrading.
     if (CodeUtility::is1xx(parser_.status_code) &&
         parser_.status_code != enumToInt(Http::Code::SwitchingProtocols)) {
       ignore_message_complete_for_1xx_ = true;

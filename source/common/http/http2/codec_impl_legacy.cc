@@ -97,7 +97,7 @@ template <typename T> static T* removeConst(const void* object) {
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
     : parent_(parent), local_end_stream_sent_(false), remote_end_stream_(false),
-      data_deferred_(false), waiting_for_non_informational_headers_(false),
+      data_deferred_(false), received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
   parent_.stats_.streams_active_.inc();
@@ -267,27 +267,20 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   readDisable(false);
 }
 
-void ConnectionImpl::ClientStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
+void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
-
-  bool is_100_continue_header = false;
-  if (allow_waiting_for_informational_headers) {
-    const uint64_t status = Http::Utility::getResponseStatus(*headers);
-    if (CodeUtility::is1xx(status)) {
-      waiting_for_non_informational_headers_ = true;
-      if (status == enumToInt(Http::Code::Continue)) {
-        is_100_continue_header = true;
-      }
-    } else {
-      waiting_for_non_informational_headers_ = false;
-    }
-  }
+  const uint64_t status = Http::Utility::getResponseStatus(*headers);
 
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
 
-  if (is_100_continue_header) {
+  // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that further
+  // proxying is on an upgrade path.
+  received_noninformational_headers_ =
+      !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
+
+  if (status == enumToInt(Http::Code::Continue)) {
     ASSERT(!remote_end_stream_);
     response_decoder_.decode100ContinueHeaders(std::move(headers));
   } else {
@@ -300,8 +293,7 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
       std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
 }
 
-void ConnectionImpl::ServerStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
-  ASSERT(!allow_waiting_for_informational_headers);
+void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
   auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
@@ -664,7 +656,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     switch (frame->headers.cat) {
     case NGHTTP2_HCAT_RESPONSE:
     case NGHTTP2_HCAT_REQUEST: {
-      stream->decodeHeaders(frame->headers.cat == NGHTTP2_HCAT_RESPONSE);
+      stream->decodeHeaders();
       break;
     }
 
@@ -672,14 +664,13 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
       // if local is not complete.
       if (!stream->deferred_reset_) {
-        if (stream->waiting_for_non_informational_headers_) {
-          ASSERT(!nghttp2_session_check_server_session(session_));
-          // We can continue to receive 1xx, we forward to the router filter and allow it to
-          // coalesce.
-          stream->decodeHeaders(true);
-        } else {
+        if (nghttp2_session_check_server_session(session_) ||
+            stream->received_noninformational_headers_) {
           ASSERT(stream->remote_end_stream_);
           stream->decodeTrailers();
+        } else {
+          // We're a client session and still waiting for non-informational headers.
+          stream->decodeHeaders();
         }
       }
       break;

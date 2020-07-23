@@ -1129,6 +1129,9 @@ void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
   // about this. This is done in the router filter, rather than UpstreamRequest, since we want to
   // potentially coalesce across retries and multiple upstream requests in the future, even though
   // we currently don't support retry after 100.
+  // It's plausible that this functionality might need to move to HCM in the future for internal
+  // redirects, but we would need to maintain the "only call encode100ContinueHeaders() once"
+  // invariant.
   if (!downstream_100_continue_headers_encoded_) {
     downstream_100_continue_headers_encoded_ = true;
     callbacks_->encode100ContinueHeaders(std::move(headers));
