@@ -15,6 +15,8 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -101,38 +103,57 @@ void HdsDelegate::handleFailure() {
 
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
 envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelegate::sendResponse() {
+  absl::flat_hash_map<
+      std::string,
+      std::vector<std::pair<HostSharedPtr, envoy::service::health::v3::EndpointHealth*>>>
+      hostsByLocality;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
   for (const auto& cluster : hds_clusters_) {
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
-      const auto& hostsPerLocality = hosts->hostsPerLocality();
-      for (const auto& hostsPerLocalitySet : hostsPerLocality.get()) {
-        for (const auto& host : hostsPerLocalitySet) {
-          ENVOY_LOG(debug, "locality = {}", hostsPerLocality.hasLocalLocality());
-          auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
-          Network::Utility::addressToProtobufAddress(
-              *host->address(), *endpoint->mutable_endpoint()->mutable_address());
-          // TODO(lilika): Add support for more granular options of
-          // envoy::api::v2::core::HealthStatus
-          if (host->health() == Host::Health::Healthy) {
-            endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
+      for (const auto& host : hosts->hosts()) {
+        auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
+        Network::Utility::addressToProtobufAddress(
+            *host->address(), *endpoint->mutable_endpoint()->mutable_address());
+        // TODO(lilika): Add support for more granular options of
+        // envoy::api::v2::core::HealthStatus
+        if (host->health() == Host::Health::Healthy) {
+          endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
+        } else {
+          if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
+            endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
+          } else if (host->getActiveHealthFailureType() ==
+                     Host::ActiveHealthFailureType::UNHEALTHY) {
+            endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+          } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
+            endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
           } else {
-            if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
-              endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
-            } else if (host->getActiveHealthFailureType() ==
-                       Host::ActiveHealthFailureType::UNHEALTHY) {
-              endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
-            } else if (host->getActiveHealthFailureType() ==
-                       Host::ActiveHealthFailureType::UNKNOWN) {
-              endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
-            } else {
-              NOT_REACHED_GCOVR_EXCL_LINE;
-            }
+            NOT_REACHED_GCOVR_EXCL_LINE;
           }
         }
+
+        std::string hash = host->locality().SerializeAsString();
+        const auto& locality_group = hostsByLocality.insert(
+            {hash,
+             std::vector<std::pair<HostSharedPtr, envoy::service::health::v3::EndpointHealth*>>()});
+        locality_group.first->second.push_back({host, endpoint});
+      }
+    }
+
+    auto* localityEndpointsByCluster =
+        response.mutable_endpoint_health_response()->add_cluster_endpoints_health();
+    localityEndpointsByCluster->set_cluster_name(cluster->info()->name());
+    for (const auto& hosts : hostsByLocality) {
+      auto* endpointsByLocality = localityEndpointsByCluster->add_locality_endpoints_health();
+      for (const auto& host_endpoint : hosts.second) {
+        if (!endpointsByLocality->has_locality()) {
+          endpointsByLocality->mutable_locality()->MergeFrom(host_endpoint.first->locality());
+        }
+        endpointsByLocality->add_endpoints_health()->MergeFrom(*host_endpoint.second);
       }
     }
   }
   ENVOY_LOG(debug, "Sending EndpointHealthResponse to server {}", response.DebugString());
+
   stream_->sendMessage(response, false);
   stats_.responses_.inc();
   setHdsStreamResponseTimer();
