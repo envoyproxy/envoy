@@ -132,6 +132,9 @@ public:
    */
   void log(Envoy::SystemTime, const std::string&) override {}
 
+  void setBaggage(const std::string&, const std::string&) override {}
+  std::string getBaggage(const std::string&) override { return std::string(); }
+
   /**
    * Creates a child span.
    * In X-Ray terms this creates a sub-segment and sets its parent ID to the current span's ID.

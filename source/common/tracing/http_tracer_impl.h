@@ -169,7 +169,10 @@ public:
   void log(SystemTime, const std::string&) override {}
   void finishSpan() override {}
   void injectContext(Http::RequestHeaderMap&) override {}
-  const std::string getBaggage(const std::string& key) override {}
+  void setBaggage(const std::string&, const std::string&) override {}
+  std::string getBaggage(const std::string&) override {
+    return std::string();
+  }
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }

@@ -64,6 +64,10 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void setBaggage(const std::string&, const std::string&) override {}
+  std::string getBaggage(const std::string&) override {
+    return std::string();
+  }
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;

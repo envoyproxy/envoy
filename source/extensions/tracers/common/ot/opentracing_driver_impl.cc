@@ -104,12 +104,12 @@ void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
   finish_options_.log_records.emplace_back(std::move(record));
 }
 
-void OpenTracingSpan::setBaggage(absl::string_view key, absl::string_view value) {
+void OpenTracingSpan::setBaggage(const std::string& key, const std::string& value) {
     span_->SetBaggageItem(key, value);
 }
 
-std::string OpenTracingSpan::getBaggage(absl::string_view key) {
-    span_->BaggageItem(key);
+std::string OpenTracingSpan::getBaggage(const std::string& key) {
+    return span_->BaggageItem(key);
 }
 
 void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
