@@ -1395,6 +1395,29 @@ bool ServerContextImpl::TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t
   return false;
 }
 
+bool ContextImpl::verifyCertChain(bssl::UniquePtr<X509> leaf_cert,
+                                  bssl::UniquePtr<STACK_OF(X509)> intermediates,
+                                  std::string& error_details) {
+  bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
+  // It doesn't matter which SSL context is used, because they share the same
+  // cert validation config.
+  X509_STORE* store = SSL_CTX_get_cert_store(tls_contexts_[0].ssl_ctx_.get());
+  if (!X509_STORE_CTX_init(ctx.get(), store, leaf_cert.get(), intermediates.get())) {
+    error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
+    return false;
+  }
+
+  int res = doVerifyCertChain(ctx.get(), nullptr, std::move(leaf_cert), nullptr);
+  if (res <= 0) {
+    const int n = X509_STORE_CTX_get_error(ctx.get());
+    const int depth = X509_STORE_CTX_get_error_depth(ctx.get());
+    error_details = absl::StrCat("X509_verify_cert: certificate verification error at depth ",
+                                 depth, ": ", X509_verify_cert_error_string(n));
+    return false;
+  }
+  return true;
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

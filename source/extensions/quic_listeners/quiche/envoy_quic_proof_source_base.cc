@@ -50,7 +50,8 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& server_ad
   bssl::UniquePtr<EVP_PKEY> pub_key(X509_get_pubkey(cert.get()));
   int sign_alg = deduceSignatureAlgorithmFromPublicKey(pub_key.get(), &error_details);
   if (sign_alg == 0) {
-    ENVOY_LOG(warn, error_details);
+    ENVOY_LOG(warn, absl::StrCat("Failed to deduce signature algorithm from public key: ",
+                                 error_details));
     quic::QuicCryptoProof proof;
     callback->Run(/*ok=*/false, nullptr, proof, nullptr);
     return;

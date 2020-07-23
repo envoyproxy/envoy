@@ -101,13 +101,8 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
-  // Called by verifyCallback to do the actual cert chain verification.
-  int doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                        bssl::UniquePtr<X509> leaf_cert,
-                        const Network::TransportSocketOptions* transport_socket_options);
-
-  // Always return the first SSL context in the config.
-  SSL_CTX* chooseSslContexts() const { return tls_contexts_[0].ssl_ctx_.get(); }
+  bool verifyCertChain(bssl::UniquePtr<X509> leaf_cert,
+                       bssl::UniquePtr<STACK_OF(X509)> intermediates, std::string& error_details);
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -124,6 +119,11 @@ protected:
 
   // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
+
+  // Called by verifyCallback to do the actual cert chain verification.
+  int doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                        bssl::UniquePtr<X509> leaf_cert,
+                        const Network::TransportSocketOptions* transport_socket_options);
 
   Envoy::Ssl::ClientValidationStatus
   verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,

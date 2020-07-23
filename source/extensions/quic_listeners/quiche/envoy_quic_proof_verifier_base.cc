@@ -17,14 +17,12 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifierBase::VerifyProof(
     const std::string& signature, const quic::ProofVerifyContext* context,
     std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
     std::unique_ptr<quic::ProofVerifierCallback> callback) {
-  quic::QuicAsyncStatus res = VerifyCertChain(hostname, port, certs, "", cert_sct, context,
-                                              error_details, details, std::move(callback));
-  if (res == quic::QUIC_FAILURE) {
+  if (!verifySignature(server_config, chlo_hash, certs[0], signature)) {
     return quic::QUIC_FAILURE;
   }
-  ASSERT(res != quic::QUIC_PENDING);
-  return verifySignature(server_config, chlo_hash, certs[0], signature) ? quic::QUIC_SUCCESS
-                                                                        : quic::QUIC_FAILURE;
+
+  return VerifyCertChain(hostname, port, certs, "", cert_sct, context, error_details, details,
+                         std::move(callback));
 }
 
 bool EnvoyQuicProofVerifierBase::verifySignature(const std::string& server_config,

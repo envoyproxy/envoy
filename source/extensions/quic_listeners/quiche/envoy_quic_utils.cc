@@ -134,11 +134,11 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes,
   orig_data = data = reinterpret_cast<const uint8_t*>(der_bytes.data());
   bssl::UniquePtr<X509> cert(d2i_X509(nullptr, &data, der_bytes.size()));
   if (!cert.get()) {
-    *error_details = "d2i_X509";
+    *error_details = "d2i_X509: fail to parse DER";
     return nullptr;
   }
   if (data < orig_data || static_cast<size_t>(data - orig_data) != der_bytes.size()) {
-    // Trailing garbage.
+    *error_details = "There is railing garbage in DER.";
     return nullptr;
   }
   return cert;
@@ -157,6 +157,7 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
       *error_details = "Invalid leaf cert, only P-256 ECDSA certificates are supported";
     }
+    // QUICHE uses SHA-256 as hash function in cert signature.
     sign_alg = SSL_SIGN_ECDSA_SECP256R1_SHA256;
   } break;
   case EVP_PKEY_RSA: {

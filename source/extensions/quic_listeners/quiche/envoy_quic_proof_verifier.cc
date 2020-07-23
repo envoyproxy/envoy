@@ -29,22 +29,9 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
       sk_X509_push(intermediates.get(), cert.release());
     }
   }
-
-  bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
-  // It doesn't matter which SSL context is used, because they share the same
-  // cert validation config.
-  X509_STORE* store = SSL_CTX_get_cert_store(context_impl_.chooseSslContexts());
-  if (!X509_STORE_CTX_init(ctx.get(), store, leaf.get(), intermediates.get())) {
-    *error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
-    return quic::QUIC_FAILURE;
-  }
-
-  int res = context_impl_.doVerifyCertChain(ctx.get(), nullptr, std::move(leaf), nullptr);
-  if (res <= 0) {
-    const int n = X509_STORE_CTX_get_error(ctx.get());
-    const int depth = X509_STORE_CTX_get_error_depth(ctx.get());
-    *error_details = absl::StrCat("X509_verify_cert: certificate verification error at depth ",
-                                  depth, ": ", X509_verify_cert_error_string(n));
+  bool success =
+      context_impl_.verifyCertChain(std::move(leaf), std::move(intermediates), *error_details);
+  if (!success) {
     return quic::QUIC_FAILURE;
   }
 
