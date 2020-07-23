@@ -1253,10 +1253,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
   // This does not work for HTTP/3 because the port is not closed until the listener is completely
   // destroyed. TODO(danzh) Match TCP behavior as much as possible.
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
-    EXPECT_NO_THROW(Network::TcpListenSocket(
-        Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
-                                             http_port),
-        nullptr, true));
+    ASSERT_TRUE(waitForPortAvailable(http_port));
   }
 }
 
