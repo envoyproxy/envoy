@@ -195,8 +195,14 @@ TEST_P(SimulatedTimeSystemTest, TimerOrderAndRescheduleTimer) {
   advanceMsAndLoop(5);
   if (activateMode() == ActivateMode::DelayActivateTimers) {
 #ifdef WIN32
-    // The event loop runs for a single iteration in NonBlock mode on Windows. Force it to run again
-    // to pick up next iteration callbacks.
+    // Force it to run again to pick up next iteration callbacks.
+    // The event loop runs for a single iteration in NonBlock mode on Windows as a hack to work
+    // around LEVEL trigger fd registrations constantly firing events and preventing the NonBlock
+    // event loop from ever reaching the no-fd event and no-expired timers termination condition. It
+    // is not possible to get consistent event loop behavior since the time system does not override
+    // the base scheduler's run behavior, and libevent does not provide a mode where it runs at most
+    // N iterations before breaking out of the loop for us to prefer over the single iteration mode
+    // used on Windows.
     advanceMsAndLoop(0);
 #endif
     EXPECT_EQ("p013p4", output_);
