@@ -286,6 +286,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  // In ENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
+#ifdef ENVOY_USE_LEGACY_CODECS_IN__INTEGRATION_TESTS
+  ENVOY_LOG_MISC(debug, "Using legacy codecs");
+  setLegacyCodecs();
+#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -687,6 +692,23 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
     failure << x << ", ";
   }
   return failure << "}";
+}
+
+AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
+                                                          std::chrono::milliseconds timeout) {
+  const auto end_time = time_system_.monotonicTime() + timeout;
+  while (time_system_.monotonicTime() < end_time) {
+    try {
+      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
+                                   *Network::Test::getCanonicalLoopbackAddress(version_), port),
+                               nullptr, true);
+      return AssertionSuccess();
+    } catch (const EnvoyException&) {
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+    }
+  }
+
+  return AssertionFailure() << "Timeout waiting for port availability";
 }
 
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(

@@ -13,6 +13,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
@@ -329,6 +330,12 @@ public:
    */
   static Stats::StatsMatcherPtr
   createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+
+  /**
+   * Create HistogramSettings instance.
+   */
+  static Stats::HistogramSettingsConstPtr
+  createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.

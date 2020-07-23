@@ -322,7 +322,6 @@ envoy_cc_fuzz_test(
         "//test/integration:integration_lib",
         "//test/mocks/server:options_mocks",
         "//test/mocks/server:hot_restart_mocks",
-        "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
@@ -356,7 +355,7 @@ envoy_cc_test(
     ],
     tags = ["fails_on_windows"],
     deps = [
-        "//source/common/common:version_lib",
+        "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",

@@ -28,17 +28,23 @@ namespace Http {
 namespace Http2 {
 
 class Http2ResponseCodeDetailValues {
+public:
   // Invalid HTTP header field was received and stream is going to be
   // closed.
   const absl::string_view ng_http2_err_http_header_ = "http2.invalid.header.field";
-
   // Violation in HTTP messaging rule.
   const absl::string_view ng_http2_err_http_messaging_ = "http2.violation.of.messaging.rule";
-
   // none of the above
   const absl::string_view ng_http2_err_unknown_ = "http2.unknown.nghttp2.error";
+  // The number of headers (or trailers) exceeded the configured limits
+  const absl::string_view too_many_headers = "http2.too_many_headers";
+  // Envoy detected an HTTP/2 frame flood from the server.
+  const absl::string_view outbound_frame_flood = "http2.outbound_frames_flood";
+  // Envoy detected an inbound HTTP/2 frame flood.
+  const absl::string_view inbound_empty_frame_flood = "http2.inbound_empty_frames_flood";
+  // Envoy was configured to drop requests with header keys beginning with underscores.
+  const absl::string_view invalid_underscore = "http2.unexpected_underscore";
 
-public:
   const absl::string_view errorDetails(int error_code) const {
     switch (error_code) {
     case NGHTTP2_ERR_HTTP_HEADER:
@@ -87,7 +93,7 @@ void ProdNghttp2SessionFactory::init(nghttp2_session*, ConnectionImpl* connectio
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
  * it copies them.
  */
-template <typename T> static T* remove_const(const void* object) {
+template <typename T> static T* removeConst(const void* object) {
   return const_cast<T*>(reinterpret_cast<const T*>(object));
 }
 
@@ -120,8 +126,8 @@ static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& he
   }
   const absl::string_view header_key = header.key().getStringView();
   const absl::string_view header_value = header.value().getStringView();
-  headers.push_back({remove_const<uint8_t>(header_key.data()),
-                     remove_const<uint8_t>(header_value.data()), header_key.size(),
+  headers.push_back({removeConst<uint8_t>(header_key.data()),
+                     removeConst<uint8_t>(header_value.data()), header_key.size(),
                      header_value.size(), flags});
 }
 
@@ -241,7 +247,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
   } else {
     ASSERT(read_disable_count_ > 0);
     --read_disable_count_;
-    if (!buffers_overrun()) {
+    if (!buffersOverrun()) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
       parent_.sendPendingFrames();
@@ -369,6 +375,7 @@ int ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t 
   if (!parent_.addOutboundFrameFragment(output, framehd, FRAME_HEADER_SIZE)) {
     ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
                    parent_.connection_);
+    setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
     return NGHTTP2_ERR_FLOODED;
   }
 
@@ -557,7 +564,7 @@ int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
   stream->pending_recv_data_.add(data, len);
   // Update the window to the peer unless some consumer of this stream's data has hit a flow control
   // limit and disabled reads on this stream
-  if (!stream->buffers_overrun()) {
+  if (!stream->buffersOverrun()) {
     nghttp2_session_consume(session_, stream_id, len);
   } else {
     stream->unconsumed_bytes_ += len;
@@ -947,6 +954,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
 
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
+    stream->setDetails(Http2ResponseCodeDetails::get().invalid_underscore);
     name.clear();
     value.clear();
     return should_return.value();
@@ -956,8 +964,9 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
 
   if (stream->headers().byteSize() > max_headers_kb_ * 1024 ||
       stream->headers().size() > max_headers_count_) {
-    // This will cause the library to reset/close the stream.
+    stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
+    // This will cause the library to reset/close the stream.
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
   } else {
     return 0;
@@ -1363,7 +1372,7 @@ bool ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32
     break;
   }
 
-  if (!checkInboundFrameLimits()) {
+  if (!checkInboundFrameLimits(hd->stream_id)) {
     // NGHTTP2_ERR_FLOODED is overridden within nghttp2 library and it doesn't propagate
     // all the way to nghttp2_session_mem_recv() where we need it.
     flood_detected_ = true;
@@ -1373,8 +1382,9 @@ bool ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd, uint32
   return true;
 }
 
-bool ServerConnectionImpl::checkInboundFrameLimits() {
+bool ServerConnectionImpl::checkInboundFrameLimits(int32_t stream_id) {
   ASSERT(dispatching_downstream_data_);
+  ConnectionImpl::StreamImpl* stream = getStream(stream_id);
 
   if (consecutive_inbound_frames_with_empty_payload_ >
       max_consecutive_inbound_frames_with_empty_payload_) {
@@ -1382,6 +1392,9 @@ bool ServerConnectionImpl::checkInboundFrameLimits() {
                    "error reading frame: Too many consecutive frames with an empty payload "
                    "received in this HTTP/2 session.",
                    connection_);
+    if (stream) {
+      stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
+    }
     stats_.inbound_empty_frames_flood_.inc();
     return false;
   }

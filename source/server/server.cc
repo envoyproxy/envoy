@@ -27,7 +27,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
-#include "common/common/version.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/http/codes.h"
@@ -44,6 +43,7 @@
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
+#include "common/version/version.h"
 
 #include "server/admin/utils.h"
 #include "server/configuration_impl.h"
@@ -324,15 +324,16 @@ void InstanceImpl::initialize(const Options& options,
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
-  validation_context_.static_warning_validation_visitor().setUnknownCounter(
+  validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
-  validation_context_.dynamic_warning_validation_visitor().setUnknownCounter(
+  validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
       server_stats_->dynamic_unknown_fields_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
