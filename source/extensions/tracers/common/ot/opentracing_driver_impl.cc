@@ -103,12 +103,10 @@ void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
 }
 
 void OpenTracingSpan::setBaggage(const std::string& key, const std::string& value) {
-    span_->SetBaggageItem(key, value);
+  span_->SetBaggageItem(key, value);
 }
 
-std::string OpenTracingSpan::getBaggage(const std::string& key) {
-    return span_->BaggageItem(key);
-}
+std::string OpenTracingSpan::getBaggage(const std::string& key) { return span_->BaggageItem(key); }
 
 void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   if (driver_.propagationMode() == OpenTracingDriver::PropagationMode::SingleHeader) {
