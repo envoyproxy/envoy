@@ -77,7 +77,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
-      ratelimited_reset_headers_(route_policy.rateLimitedResetHeaders()) {
+      ratelimited_reset_headers_(route_policy.rateLimitedResetHeaders()),
+      ratelimited_reset_max_interval_(route_policy.rateLimitedResetMaxInterval()) {
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
@@ -159,8 +160,6 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
     if (absl::SimpleAtoi(max_interval, &out)) {
       ratelimited_reset_max_interval_ = std::chrono::milliseconds(out);
     }
-  } else if (route_policy.rateLimitedResetMaxInterval().has_value()) {
-    ratelimited_reset_max_interval_ = route_policy.rateLimitedResetMaxInterval().value();
   }
 
   if (request_headers.EnvoyRateLimitedResetHeaders()) {

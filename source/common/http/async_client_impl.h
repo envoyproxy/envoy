@@ -155,8 +155,8 @@ private:
     const std::vector<Http::HeaderMatcherSharedPtr>& rateLimitedResetHeaders() const override {
       return ratelimited_reset_headers_;
     }
-    absl::optional<std::chrono::milliseconds> rateLimitedResetMaxInterval() const override {
-      return absl::nullopt;
+    std::chrono::milliseconds rateLimitedResetMaxInterval() const override {
+      return std::chrono::milliseconds(300000);
     }
 
     const std::vector<uint32_t> retriable_status_codes_{};

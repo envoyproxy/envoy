@@ -938,7 +938,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitResetMaxInterval) {
   }
 
   // The remaining cases expect the config to have a max_interval
-  policy_.ratelimited_reset_max_interval_ = absl::optional<std::chrono::milliseconds>(3000);
+  policy_.ratelimited_reset_max_interval_ = std::chrono::milliseconds(4000);
 
   // Value set in config is used as fallback
   {
@@ -946,7 +946,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitResetMaxInterval) {
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
 
-    EXPECT_EQ(std::chrono::milliseconds(3000), state_->rateLimitedResetMaxInterval());
+    EXPECT_EQ(std::chrono::milliseconds(4000), state_->rateLimitedResetMaxInterval());
   }
 
   // Value set in headers takes precedence over config

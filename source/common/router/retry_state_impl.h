@@ -130,7 +130,7 @@ private:
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<Http::HeaderMatcherSharedPtr> ratelimited_reset_headers_{};
-  std::chrono::milliseconds ratelimited_reset_max_interval_{300000};
+  std::chrono::milliseconds ratelimited_reset_max_interval_{};
 };
 
 } // namespace Router

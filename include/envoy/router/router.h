@@ -246,7 +246,7 @@ public:
    * @return absl::optional<std::chrono::milliseconds> limit placed on a rate limited retry
    * interval.
    */
-  virtual absl::optional<std::chrono::milliseconds> rateLimitedResetMaxInterval() const PURE;
+  virtual std::chrono::milliseconds rateLimitedResetMaxInterval() const PURE;
 };
 
 /**

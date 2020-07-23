@@ -3588,10 +3588,11 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   // has no ratelimit retry back off
-  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
-                               ->routeEntry()
-                               ->retryPolicy()
-                               .rateLimitedResetMaxInterval());
+  EXPECT_EQ(std::chrono::milliseconds(300000),
+            config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .rateLimitedResetMaxInterval());
   EXPECT_EQ(0, config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
                    ->routeEntry()
                    ->retryPolicy()
@@ -3599,7 +3600,7 @@ virtual_hosts:
                    .size());
 
   // has sub millisecond interval
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
+  EXPECT_EQ(std::chrono::milliseconds(1),
             config.route(genHeaders("www.lyft.com", "/sub-ms-interval", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
@@ -3616,8 +3617,7 @@ virtual_hosts:
   EXPECT_TRUE(retry_policy.rateLimitedResetHeaders()[0]->matchesHeaders(expected_0));
   EXPECT_TRUE(retry_policy.rateLimitedResetHeaders()[1]->matchesHeaders(expected_1));
 
-  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(50),
-            retry_policy.rateLimitedResetMaxInterval());
+  EXPECT_EQ(std::chrono::milliseconds(50), retry_policy.rateLimitedResetMaxInterval());
 }
 
 TEST_F(RouteMatcherTest, HedgeRouteLevel) {
