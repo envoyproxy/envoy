@@ -195,7 +195,7 @@ void UberFilterFuzzer::fuzz(
         Server::Configuration::NamedHttpFilterConfigFactory>(proto_config.name());
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
-    // Clean-up config with filter-specific logic.
+    // Clean-up config with filter-specific logic before it runs through validations.
     cleanFuzzedConfig(proto_config.name(), message.get());
     cb_ = factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
     cb_(filter_callback_);
