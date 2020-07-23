@@ -99,8 +99,10 @@ TEST_P(CacheIntegrationTest, SuccessfulValidation) {
       {":path", absl::StrCat("/", protocolTestParamsToString({GetParam(), 0}))},
       {":scheme", "http"},
       {":authority", "SuccessfulValidation"}};
+
+  const std::string original_response_date = formatter_.now(simTime());
   Http::TestResponseHeaderMapImpl response_headers = {{":status", "200"},
-                                                      {"date", formatter_.now(simTime())},
+                                                      {"date", original_response_date},
                                                       {"cache-control", "max-age=0"},
                                                       {"content-length", "42"},
                                                       {"etag", "abc123"}};
@@ -123,18 +125,19 @@ TEST_P(CacheIntegrationTest, SuccessfulValidation) {
   }
 
   simTime().advanceTimeWait(std::chrono::seconds(10));
+  const std::string not_modified_date = formatter_.now(simTime());
 
-  // Send second request, the cached response should be validate then served
+  // Send second request, the cached response should be validated then served
   IntegrationStreamDecoderPtr response_decoder =
       codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  // Check for injected precondition headers
-  Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"}};
+  // Check for injected precondition headers (no Last-Modified header so should fallback to Date)
+  Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"},
+                                                     {"if-modified-since", original_response_date}};
   EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
   // Create a 304 (not modified) response -> cached response is valid
-  auto not_modified_date = formatter_.now(simTime());
   Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
                                                                    {"date", not_modified_date}};
   upstream_request_->encodeHeaders(not_modified_response_headers, /*end_stream=*/true);

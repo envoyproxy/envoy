@@ -302,9 +302,16 @@ void CacheFilter::injectValidationHeaders() {
     absl::string_view etag = etag_header->value().getStringView();
     request_headers_->setReferenceKey(Http::CustomHeaders::get().IfNonMatch, etag);
   }
-  if (last_modified_header) {
+  if (CacheHeadersUtils::httpTime(last_modified_header) != SystemTime()) {
+    // Valid Last-Modified header exists
+    std::cout << "LAST MODIFIED" << std::endl;
     absl::string_view last_modified = last_modified_header->value().getStringView();
-    request_headers_->setCopy(Http::CustomHeaders::get().IfUnmodifiedSince, last_modified);
+    request_headers_->setCopy(Http::CustomHeaders::get().IfModifiedSince, last_modified);
+  } else {
+    // Either Last-Modified is missing or invalid, fallback to Date
+    std::cout << "DATE FALBACK" << std::endl;
+    absl::string_view date = lookup_result_->headers_->getDateValue();
+    request_headers_->setCopy(Http::CustomHeaders::get().IfModifiedSince, date);
   }
 }
 

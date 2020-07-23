@@ -83,6 +83,7 @@ private:
 
   // Used exclusively to store a reference to the request header map passed to decodeHeaders to be
   // used in onHeaders afterwards the pointer must not be used and is set back to null
+  // This Http::RequestHeaderMap is NOT owned by the CacheFilter
   Http::RequestHeaderMap* request_headers_ = nullptr;
 
   // Tracks what body bytes still need to be read from the cache. This is currently only one Range,
