@@ -216,7 +216,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
+TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeClusterSizeWithFakeSymbolTable) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(true);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -308,7 +308,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
 
-TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
+TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeClusterSizeWithRealSymbolTable) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -383,7 +383,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
 
-TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
+TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeHostSizeWithStats) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
