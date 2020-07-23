@@ -286,6 +286,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/07/15  11748    45003       46000   Stream error on invalid messaging
   // 2020/07/20  11559    44747       46000   stats: add histograms for request/response headers
   //                                          and body sizes.
+  // 2020/07/21  12034    44811       46000   Add configurable histogram buckets.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -304,7 +305,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
     // https://github.com/envoyproxy/envoy/issues/12209
-    // EXPECT_MEMORY_EQ(m_per_cluster, 44747);
+    // EXPECT_MEMORY_EQ(m_per_cluster, 44811);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
@@ -357,11 +358,11 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/05/20  11223    36603       36800   Add primary clusters tracking to cluster manager.
   // 2020/06/10  11561    36603       36923   Make upstreams pluggable
   // 2020/06/29  11751    36827       38000   Improve time complexity of removing callback handle.
-  //                                          in callback manager.
   // 2020/07/07  11252    37083       38000   Introduce Least Request LB active request bias config
   // 2020/07/15  11748    37115       38000   Stream error on invalid messaging
   // 2020/07/20  11559    36859       38000   stats: add histograms for request/response headers
   //                                          and body sizes.
+  // 2020/07/21  12034    36923       38000   Add configurable histogram buckets.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -380,7 +381,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
     // https://github.com/envoyproxy/envoy/issues/12209
-    // EXPECT_MEMORY_EQ(m_per_cluster, 36859);
+    // EXPECT_MEMORY_EQ(m_per_cluster, 36923);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }

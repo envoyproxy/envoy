@@ -471,6 +471,7 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/stats:histogram_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
