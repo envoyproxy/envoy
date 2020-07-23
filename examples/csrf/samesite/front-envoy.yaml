@@ -15,7 +15,7 @@ static_resources:
             - name: envoy.access_loggers.file
               typed_config:
                 "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-                path: "/var/log/access.log"
+                path: "/dev/stdout"
           route_config:
             name: local_route
             virtual_hosts:
@@ -114,3 +114,12 @@ admin:
     socket_address:
       address: 0.0.0.0
       port_value: 8001
+
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      envoy.deprecated_features:envoy.api.v2.route.CorsPolicy.allow_origin: true
+      envoy.deprecated_features:envoy.api.v2.route.Route.per_filter_config: true
+      envoy.deprecated_features:envoy.api.v2.route.VirtualHost.per_filter_config: true
+      envoy.deprecated_features:envoy.type.matcher.StringMatcher.regex: true
