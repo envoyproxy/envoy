@@ -82,7 +82,7 @@ STD_REGEX_ALLOWLIST = (
     "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
     "./source/server/admin/stats_handler.cc", "./source/server/admin/prometheus_stats.h",
     "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
-    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/common/version.cc")
+    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -218,11 +218,7 @@ def readFile(path):
 # lookPath searches for the given executable in all directories in PATH
 # environment variable. If it cannot be found, empty string is returned.
 def lookPath(executable):
-  for path_dir in os.environ["PATH"].split(os.pathsep):
-    executable_path = os.path.expanduser(os.path.join(path_dir, executable))
-    if os.path.exists(executable_path):
-      return executable_path
-  return ""
+  return shutil.which(executable) or ''
 
 
 # pathExists checks whether the given path exists. This function assumes that
@@ -565,6 +561,22 @@ def isInSubdir(filename, *subdirs):
   return False
 
 
+# Determines if given token exists in line without leading or trailing token characters
+# e.g. will return True for a line containing foo() but not foo_bar() or baz_foo
+def tokenInLine(token, line):
+  index = 0
+  while True:
+    index = line.find(token, index)
+    if index < 1:
+      break
+    if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
+      if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
+                                                 line[index + len(token)] == '_'):
+        return True
+    index = index + 1
+  return False
+
+
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
   if line.find(".  ") != -1:
@@ -616,23 +628,25 @@ def checkSourceLine(line, file_path, reportError):
     if "UnpackTo" in line:
       reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   # Check that we use the absl::Time library
-  if "std::get_time" in line:
+  if tokenInLine("std::get_time", line):
     if "test/" in file_path:
       reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
     else:
       reportError("Don't use std::get_time; use the injectable time system")
-  if "std::put_time" in line:
+  if tokenInLine("std::put_time", line):
     reportError("Don't use std::put_time; use absl::Time equivalent instead")
-  if "gmtime" in line:
+  if tokenInLine("gmtime", line):
     reportError("Don't use gmtime; use absl::Time equivalent instead")
-  if "mktime" in line:
+  if tokenInLine("mktime", line):
     reportError("Don't use mktime; use absl::Time equivalent instead")
-  if "localtime" in line:
+  if tokenInLine("localtime", line):
     reportError("Don't use localtime; use absl::Time equivalent instead")
-  if "strftime" in line:
+  if tokenInLine("strftime", line):
     reportError("Don't use strftime; use absl::FormatTime instead")
-  if "strptime" in line:
+  if tokenInLine("strptime", line):
     reportError("Don't use strptime; use absl::FormatTime instead")
+  if tokenInLine("strerror", line):
+    reportError("Don't use strerror; use Envoy::errorDetails instead")
   if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
@@ -884,6 +898,21 @@ def checkOwners(dir_name, owned_directories, error_messages):
     error_messages.append("New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
 
+def checkApiShadowStarlarkFiles(api_shadow_root, file_path, error_messages):
+  command = "diff -u "
+  command += file_path + " "
+  api_shadow_starlark_path = api_shadow_root + re.sub(r"\./api/", '', file_path)
+  command += api_shadow_starlark_path
+
+  error_message = executeCommand(command, "invalid .bzl in generated_api_shadow", file_path)
+  if operation_type == "check":
+    error_messages += error_message
+  elif operation_type == "fix" and len(error_message) != 0:
+    shutil.copy(file_path, api_shadow_starlark_path)
+
+  return error_messages
+
+
 def checkFormatVisitor(arg, dir_name, names):
   """Run checkFormat in parallel for the given files.
 
@@ -900,7 +929,7 @@ def checkFormatVisitor(arg, dir_name, names):
   # python lists are passed as references, this is used to collect the list of
   # async results (futures) from running checkFormat and passing them back to
   # the caller.
-  pool, result_list, owned_directories, error_messages = arg
+  pool, result_list, owned_directories, api_shadow_root, error_messages = arg
 
   # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
   # manner as it is a small and limited list.
@@ -913,6 +942,10 @@ def checkFormatVisitor(arg, dir_name, names):
     checkOwners(dir_name[len(source_prefix):], owned_directories, error_messages)
 
   for file_name in names:
+    if dir_name.startswith("./api") and isSkylarkFile(file_name):
+      result = pool.apply_async(checkApiShadowStarlarkFiles,
+                                args=(api_shadow_root, dir_name + "/" + file_name, error_messages))
+      result_list.append(result)
     result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))
     result_list.append(result)
 
@@ -979,6 +1012,7 @@ if __name__ == "__main__":
 
   operation_type = args.operation_type
   target_path = args.target_path
+  api_shadow_root = args.api_shadow_prefix
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
@@ -1044,8 +1078,8 @@ if __name__ == "__main__":
       # For each file in target_path, start a new task in the pool and collect the
       # results (results is passed by reference, and is used as an output).
       for root, _, files in os.walk(target_path):
-        checkFormatVisitor((pool, results, owned_directories, error_messages), root,
-                           [f for f in files if path_predicate(f)])
+        checkFormatVisitor((pool, results, owned_directories, api_shadow_root, error_messages),
+                           root, [f for f in files if path_predicate(f)])
 
       # Close the pool to new tasks, wait for all of the running tasks to finish,
       # then collect the error messages.

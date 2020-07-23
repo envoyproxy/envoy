@@ -6,6 +6,7 @@
 #include "envoy/http/filter.h"
 
 #include "common/common/macros.h"
+#include "common/http/headers.h"
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
@@ -94,7 +95,7 @@ public:
       Compression::Decompressor::DecompressorFactoryPtr decompressor_factory);
 
   Compression::Decompressor::DecompressorPtr makeDecompressor() {
-    return decompressor_factory_->createDecompressor();
+    return decompressor_factory_->createDecompressor(decompressor_stats_prefix_);
   }
   const std::string& contentEncoding() { return decompressor_factory_->contentEncoding(); }
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
@@ -102,6 +103,7 @@ public:
 
 private:
   const std::string stats_prefix_;
+  const std::string decompressor_stats_prefix_;
   const Compression::Decompressor::DecompressorFactoryPtr decompressor_factory_;
   const RequestDirectionConfig request_direction_config_;
   const ResponseDirectionConfig response_direction_config_;
@@ -126,22 +128,75 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
 
 private:
+  template <class HeaderType>
   Http::FilterHeadersStatus
   maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                       Compression::Decompressor::DecompressorPtr& decompressor,
-                      Http::StreamFilterCallbacks& callbacks,
-                      Http::RequestOrResponseHeaderMap& headers);
+                      Http::StreamFilterCallbacks& callbacks, HeaderType& headers) {
+    if (direction_config.decompressionEnabled() && !hasCacheControlNoTransform(headers) &&
+        contentEncodingMatches(headers)) {
+      direction_config.stats().decompressed_.inc();
+      decompressor = config_->makeDecompressor();
+
+      // Update headers.
+      headers.removeContentLength();
+      modifyContentEncoding(headers);
+
+      ENVOY_STREAM_LOG(debug, "do decompress {}: {}", callbacks, direction_config.logString(),
+                       headers);
+    } else {
+      direction_config.stats().not_decompressed_.inc();
+      ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks, direction_config.logString(),
+                       headers);
+    }
+
+    return Http::FilterHeadersStatus::Continue;
+  }
 
   Http::FilterDataStatus
   maybeDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                   const Compression::Decompressor::DecompressorPtr& decompressor,
                   Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const;
 
-  // TODO(junr03): these do not need to be member functions. They can all be part of a static
-  // utility class. Moreover, they can be shared between compressor and decompressor.
-  bool hasCacheControlNoTransform(Http::RequestOrResponseHeaderMap& headers) const;
-  bool contentEncodingMatches(Http::RequestOrResponseHeaderMap& headers) const;
-  void modifyContentEncoding(Http::RequestOrResponseHeaderMap& headers) const;
+  // TODO(junr03): These can be shared between compressor and decompressor.
+  template <Http::CustomInlineHeaderRegistry::Type Type>
+  static Http::CustomInlineHeaderRegistry::Handle<Type> getCacheControlHandle();
+  template <class HeaderType> static bool hasCacheControlNoTransform(HeaderType& headers) {
+    const auto handle = getCacheControlHandle<HeaderType::header_map_type>();
+    return headers.getInline(handle)
+               ? StringUtil::caseFindToken(
+                     headers.getInlineValue(handle), ",",
+                     Http::CustomHeaders::get().CacheControlValues.NoTransform)
+               : false;
+  }
+
+  /**
+   * Content-Encoding matches if the configured encoding is the first value in the comma-delimited
+   * Content-Encoding header, regardless of spacing and casing.
+   */
+  template <Http::CustomInlineHeaderRegistry::Type Type>
+  static Http::CustomInlineHeaderRegistry::Handle<Type> getContentEncodingHandle();
+  template <class HeaderType> bool contentEncodingMatches(HeaderType& headers) const {
+    const auto handle = getContentEncodingHandle<HeaderType::header_map_type>();
+    if (headers.getInline(handle)) {
+      absl::string_view coding =
+          StringUtil::trim(StringUtil::cropRight(headers.getInlineValue(handle), ","));
+      return StringUtil::CaseInsensitiveCompare()(config_->contentEncoding(), coding);
+    }
+    return false;
+  }
+
+  template <class HeaderType> static void modifyContentEncoding(HeaderType& headers) {
+    const auto handle = getContentEncodingHandle<HeaderType::header_map_type>();
+    const auto all_codings = StringUtil::trim(headers.getInlineValue(handle));
+    const auto remaining_codings = StringUtil::trim(StringUtil::cropLeft(all_codings, ","));
+
+    if (remaining_codings != all_codings) {
+      headers.setInline(handle, remaining_codings);
+    } else {
+      headers.removeInline(handle);
+    }
+  }
 
   DecompressorFilterConfigSharedPtr config_;
   Compression::Decompressor::DecompressorPtr request_decompressor_{};

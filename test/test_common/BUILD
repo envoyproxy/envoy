@@ -127,6 +127,8 @@ envoy_cc_test_library(
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:decoded_resource_lib",
+        "//source/common/config:opaque_resource_decoder_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
@@ -266,6 +268,7 @@ envoy_cc_test_library(
     deps = [
         ":only_one_thread_lib",
         ":test_time_system_interface",
+        ":utility_lib",
         "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
         "//source/common/event:timer_lib",
@@ -291,4 +294,10 @@ envoy_cc_test(
         ":test_time_lib",
         ":utility_lib",
     ],
+)
+
+envoy_basic_cc_library(
+    name = "test_version_linkstamp",
+    srcs = ["test_version_linkstamp.cc"],
+    alwayslink = 1,
 )

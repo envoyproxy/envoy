@@ -175,7 +175,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
   initializeCall(DriverMode::Success);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeRawConnectionPtr fake_upstream_connection;
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
@@ -202,7 +202,7 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
   initializeCall(DriverMode::IDLException);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -229,7 +229,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
   initializeCall(DriverMode::Exception);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -262,7 +262,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
   expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(partial_request);
+  ASSERT_TRUE(tcp_client->write(partial_request));
   tcp_client->close();
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -284,7 +284,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(partial_request);
+  ASSERT_TRUE(tcp_client->write(partial_request));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -307,7 +307,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyUpstreamClose) {
       request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -334,7 +334,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   initializeOneway();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
 
   FakeUpstream* expected_upstream = getExpectedUpstream(true);
   FakeRawConnectionPtr fake_upstream_connection;
@@ -355,7 +355,7 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClose) {
   initializeOneway();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
   tcp_client->close();
 
   FakeUpstream* expected_upstream = getExpectedUpstream(true);
@@ -380,7 +380,7 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
   expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(partial_request);
+  ASSERT_TRUE(tcp_client->write(partial_request));
   tcp_client->close();
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -415,13 +415,13 @@ TEST_P(ThriftTwitterConnManagerIntegrationTest, Success) {
 
   // Upgrade request/response happens without an upstream.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(upgrade_request_bytes.toString());
+  ASSERT_TRUE(tcp_client->write(upgrade_request_bytes.toString()));
   tcp_client->waitForData(upgrade_response_bytes.toString());
   EXPECT_TRUE(
       TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), upgrade_response_bytes));
 
   // First real request triggers upstream connection.
-  tcp_client->write(request_bytes_.toString());
+  ASSERT_TRUE(tcp_client->write(request_bytes_.toString()));
   FakeRawConnectionPtr fake_upstream_connection;
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));

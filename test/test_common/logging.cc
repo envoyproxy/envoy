@@ -2,6 +2,8 @@
 
 #include "common/common/assert.h"
 
+#include "absl/synchronization/mutex.h"
+
 namespace Envoy {
 
 LogLevelSetter::LogLevelSetter(spdlog::level::level_enum log_level) {
@@ -26,10 +28,12 @@ LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
 LogRecordingSink::~LogRecordingSink() = default;
 
 void LogRecordingSink::log(absl::string_view msg) {
-  previous_delegate()->log(msg);
+  previousDelegate()->log(msg);
+
+  absl::MutexLock ml(&mtx_);
   messages_.push_back(std::string(msg));
 }
 
-void LogRecordingSink::flush() { previous_delegate()->flush(); }
+void LogRecordingSink::flush() { previousDelegate()->flush(); }
 
 } // namespace Envoy

@@ -58,7 +58,7 @@ envoy_extension_cc_test(
         ":mock_config_cc_proto",
         "//source/extensions/filters/http/compressor:config",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )

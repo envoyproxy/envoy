@@ -26,6 +26,10 @@ MockMirrorPolicy::MockMirrorPolicy(ConnPool::InstanceSharedPtr conn_pool)
   ON_CALL(*this, shouldMirror(_)).WillByDefault(Return(true));
 }
 
+MockFaultManager::MockFaultManager() = default;
+MockFaultManager::MockFaultManager(const MockFaultManager&) {}
+MockFaultManager::~MockFaultManager() = default;
+
 namespace ConnPool {
 
 MockPoolCallbacks::MockPoolCallbacks() = default;
@@ -46,6 +50,9 @@ MockSplitCallbacks::~MockSplitCallbacks() = default;
 
 MockInstance::MockInstance() = default;
 MockInstance::~MockInstance() = default;
+
+MockCommandSplitterFactory::MockCommandSplitterFactory() = default;
+MockCommandSplitterFactory::~MockCommandSplitterFactory() = default;
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

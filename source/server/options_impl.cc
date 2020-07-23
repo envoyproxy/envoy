@@ -10,8 +10,8 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
-#include "common/common/version.h"
 #include "common/protobuf/utility.h"
+#include "common/version/version.h"
 
 #include "server/options_impl_platform.h"
 
@@ -142,12 +142,6 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                     "One of 'serve' (default; validate configs and then serve "
                                     "traffic normally) or 'validate' (validate configs and exit).",
                                     false, "serve", "string", cmd);
-  TCLAP::ValueArg<uint64_t> max_stats("", "max-stats",
-                                      "Deprecated and unused; please do not specify.", false, 123,
-                                      "uint64_t", cmd);
-  TCLAP::ValueArg<uint64_t> max_obj_name_len("", "max-obj-name-len",
-                                             "Deprecated and unused; please do not specify.", false,
-                                             123, "uint64_t", cmd);
   TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
                                        "Disable hot restart functionality", cmd, false);
   TCLAP::SwitchArg enable_mutex_tracing(
@@ -156,7 +150,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
 
   TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
-                                              "Use fake symbol table implementation", false, true,
+                                              "Use fake symbol table implementation", false, false,
                                               "bool", cmd);
 
   TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
