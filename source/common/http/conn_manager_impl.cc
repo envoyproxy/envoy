@@ -1527,7 +1527,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
 
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  absl::optional<Router::ConfigConstSharedPtr> route_config;
+  absl::optional<Router::ConfigConstSharedPtr> route_config = routeConfig();
   if (!route_config.has_value() || !route_config.value()->usesVhds()) {
     (*route_config_updated_cb)(false);
     return;
