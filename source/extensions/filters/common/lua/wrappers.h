@@ -112,7 +112,8 @@ private:
  */
 class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
 public:
-  SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr info) : connection_info_{info} {}
+  explicit SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr info)
+      : connection_info_{info} {}
   static ExportedFunctions exportedFunctions() {
     return {{"peerCertificatePresented", static_luaPeerCertificatePresented},
             {"peerCertificateValidated", static_luaPeerCertificateValidated},
