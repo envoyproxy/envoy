@@ -612,7 +612,7 @@ drain_type: modify_only
                                     "", true),
       EnvoyException,
       "error updating listener: 'foo' has a different address "
-      "'127.0.0.1:1235' from existing listener");
+      "'127.0.0.1:1235' from existing listener address '127.0.0.1:1234'");
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
