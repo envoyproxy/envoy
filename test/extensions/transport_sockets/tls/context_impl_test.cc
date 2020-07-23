@@ -43,36 +43,37 @@ namespace TransportSockets {
 namespace Tls {
 
 namespace {
-const std::vector<std::string> KNOWN_CIPHER_SUITES{"ECDHE-ECDSA-AES128-GCM-SHA256",
-                                                   "ECDHE-RSA-AES128-GCM-SHA256",
-                                                   "ECDHE-ECDSA-AES256-GCM-SHA384",
-                                                   "ECDHE-RSA-AES256-GCM-SHA384",
-                                                   "ECDHE-ECDSA-CHACHA20-POLY1305",
-                                                   "ECDHE-RSA-CHACHA20-POLY1305",
-                                                   "ECDHE-PSK-CHACHA20-POLY1305",
-                                                   "ECDHE-ECDSA-AES128-SHA",
-                                                   "ECDHE-RSA-AES128-SHA",
-                                                   "ECDHE-PSK-AES128-CBC-SHA",
-                                                   "ECDHE-ECDSA-AES256-SHA",
-                                                   "ECDHE-RSA-AES256-SHA",
-                                                   "ECDHE-PSK-AES256-CBC-SHA",
-                                                   "AES128-GCM-SHA256",
-                                                   "AES256-GCM-SHA384",
-                                                   "AES128-SHA",
-                                                   "PSK-AES128-CBC-SHA",
-                                                   "AES256-SHA",
-                                                   "PSK-AES256-CBC-SHA",
-                                                   "DES-CBC3-SHA"};
-
+const std::vector<std::string>& knownCipherSuites() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {"ECDHE-ECDSA-AES128-GCM-SHA256",
+                                                    "ECDHE-RSA-AES128-GCM-SHA256",
+                                                    "ECDHE-ECDSA-AES256-GCM-SHA384",
+                                                    "ECDHE-RSA-AES256-GCM-SHA384",
+                                                    "ECDHE-ECDSA-CHACHA20-POLY1305",
+                                                    "ECDHE-RSA-CHACHA20-POLY1305",
+                                                    "ECDHE-PSK-CHACHA20-POLY1305",
+                                                    "ECDHE-ECDSA-AES128-SHA",
+                                                    "ECDHE-RSA-AES128-SHA",
+                                                    "ECDHE-PSK-AES128-CBC-SHA",
+                                                    "ECDHE-ECDSA-AES256-SHA",
+                                                    "ECDHE-RSA-AES256-SHA",
+                                                    "ECDHE-PSK-AES256-CBC-SHA",
+                                                    "AES128-GCM-SHA256",
+                                                    "AES256-GCM-SHA384",
+                                                    "AES128-SHA",
+                                                    "PSK-AES128-CBC-SHA",
+                                                    "AES256-SHA",
+                                                    "PSK-AES256-CBC-SHA",
+                                                    "DES-CBC3-SHA"});
+}
 } // namespace
 
 class SslLibraryCipherSuiteSupport : public ::testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(CipherSuites, SslLibraryCipherSuiteSupport,
-                         ::testing::ValuesIn(KNOWN_CIPHER_SUITES));
+                         ::testing::ValuesIn(knownCipherSuites()));
 
 // Tests for whether new cipher suites are added. When they are, they must be added to
-// KNOWN_CIPHER_SUITES so that this test can detect if they are removed in the future.
+// knownCipherSuites() so that this test can detect if they are removed in the future.
 TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
   EXPECT_NE(0, SSL_CTX_set_strict_cipher_list(ctx.get(), "ALL"));
@@ -81,7 +82,7 @@ TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
   for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(ctx.get())) {
     present_cipher_suites.push_back(SSL_CIPHER_get_name(cipher));
   }
-  EXPECT_THAT(present_cipher_suites, testing::IsSubsetOf(KNOWN_CIPHER_SUITES));
+  EXPECT_THAT(present_cipher_suites, testing::IsSubsetOf(knownCipherSuites()));
 }
 
 // Test that no previously supported cipher suites were removed from the SSL library. If a cipher
