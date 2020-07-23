@@ -1,8 +1,7 @@
 FROM frolvlad/alpine-glibc:alpine-3.12_glibc-2.31
-ARG TARGETPLATFORM
 RUN mkdir -p /etc/envoy
 
-ADD ${TARGETPLATFORM}/build_release_stripped/envoy /usr/local/bin/envoy
+ADD linux/amd64/build_release_stripped/envoy /usr/local/bin/envoy
 
 ADD configs/google_com_proxy.v2.yaml /etc/envoy/envoy.yaml
 RUN apk add --no-cache shadow su-exec \
