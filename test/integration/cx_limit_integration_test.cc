@@ -37,6 +37,24 @@ public:
 
   void initialize() override { BaseIntegrationTest::initialize(); }
 
+  AssertionResult waitForConnections(uint32_t envoy_downstream_connections) {
+    // The multiplier of 2 is because both Envoy's downstream connections and
+    // the test server's downstream connections are counted by the global
+    // counter.
+    uint32_t expected_connections = envoy_downstream_connections * 2;
+
+    for (int i = 0; i < 10; ++i) {
+      if (Network::AcceptedSocketImpl::acceptedSocketCount() == expected_connections) {
+        return AssertionSuccess();
+      }
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+    }
+    if (Network::AcceptedSocketImpl::acceptedSocketCount() == expected_connections) {
+      return AssertionSuccess();
+    }
+    return AssertionFailure();
+  }
+
   // Assumes a limit of 2 connections.
   void doTest(std::function<void()> init_func, std::string&& check_stat) {
     init_func();
@@ -68,6 +86,8 @@ public:
     tcp_clients.front()->close();
     ASSERT_TRUE(raw_conns.front()->waitForDisconnect());
 
+    // Make sure to not try to connect again until the acceptedSocketCount is updated.
+    ASSERT_TRUE(waitForConnections(1));
     tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
     raw_conns.emplace_back();
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
