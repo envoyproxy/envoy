@@ -227,8 +227,8 @@ private:
 
   LoggerMode logger_mode_ = LoggerMode::Envoy;
 
-  static std::string fancy_log_format_;
-  static spdlog::level::level_enum fancy_default_level_;
+  std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+  spdlog::level::level_enum fancy_default_level_ = spdlog::level::info;
 };
 
 /**

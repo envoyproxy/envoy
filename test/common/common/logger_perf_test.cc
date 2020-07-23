@@ -18,7 +18,7 @@ static void fancySlowPath(benchmark::State& state) {
     (void)_;
     for (int i = 0; i < state.range(0); i++) {
       std::string key = "k" + std::to_string(i + (state.thread_index << 8));
-      FancyContext::initFancyLogger(key, logger);
+      getFancyContext().initFancyLogger(key, logger);
     }
   }
 }
@@ -61,7 +61,7 @@ static void fancyFastPath(benchmark::State& state) {
   // control log length to be the same as normal Envoy below
   std::string msg(100 - strlen(__FILE__) + 4, '.');
   spdlog::level::level_enum lv = state.range(1) ? spdlog::level::trace : spdlog::level::info;
-  FancyContext::setFancyLogger(FANCY_KEY, lv);
+  getFancyContext().setFancyLogger(FANCY_KEY, lv);
   for (auto _ : state) {
     (void)_;
     for (int i = 0; i < state.range(0); i++) {
@@ -93,7 +93,7 @@ static void fancyLevelSetting(benchmark::State& state) {
   for (auto _ : state) {
     (void)_;
     for (int i = 0; i < state.range(0); i++) {
-      FancyContext::setFancyLogger(__FILE__, spdlog::level::warn);
+      getFancyContext().setFancyLogger(__FILE__, spdlog::level::warn);
     }
   }
 }

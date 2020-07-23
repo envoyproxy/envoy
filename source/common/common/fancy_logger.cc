@@ -15,10 +15,6 @@ using spdlog::level::level_enum;
 
 namespace Envoy {
 
-absl::Mutex FancyContext::fancy_log_lock_(absl::kConstInit);
-
-FancyMapPtr FancyContext::fancy_log_map_ = std::make_shared<FancyMap>();
-
 /**
  * Implements a lock from BasicLockable, to avoid dependency problem of thread.h.
  */
@@ -33,7 +29,7 @@ private:
   absl::Mutex mutex_;
 };
 
-SpdLoggerPtr FancyContext::getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+SpdLoggerSharedPtr FancyContext::getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
   absl::ReaderMutexLock l(&fancy_log_lock_);
   auto it = fancy_log_map_->find(key);
   if (it != fancy_log_map_->end()) {
@@ -112,7 +108,7 @@ void FancyContext::initSink() {
 
 spdlog::logger* FancyContext::createLogger(std::string key, int level)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_) {
-  SpdLoggerPtr new_logger = std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
+  SpdLoggerSharedPtr new_logger = std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
   if (!Logger::Registry::getSink()->hasLock()) { // occurs in benchmark test
     initSink();
   }
@@ -129,6 +125,10 @@ spdlog::logger* FancyContext::createLogger(std::string key, int level)
   new_logger->flush_on(level_enum::critical);
   fancy_log_map_->insert(std::make_pair(key, new_logger));
   return new_logger.get();
+}
+
+FancyContext& getFancyContext() {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(FancyContext);
 }
 
 } // namespace Envoy

@@ -146,7 +146,7 @@ TEST_F(FormatTest, OutputEscaped) {
 }
 
 /**
- * Test for Fancy Logger macros.
+ * Test for Fancy Logger convenient macros.
  */
 TEST(Fancy, Global) {
   FANCY_LOG(info, "Hello world! Here's a line of fancy log!");
@@ -162,7 +162,7 @@ TEST(Fancy, Global) {
 }
 
 TEST(Fancy, FastPath) {
-  FancyContext::setFancyLogger(__FILE__, spdlog::level::info);
+  getFancyContext().setFancyLogger(__FILE__, spdlog::level::info);
   for (int i = 0; i < 10; i++) {
     FANCY_LOG(warn, "Fake warning No. {}", i);
   }
@@ -170,33 +170,33 @@ TEST(Fancy, FastPath) {
 
 TEST(Fancy, SetLevel) {
   const char* file = "P=NP_file";
-  bool res = FancyContext::setFancyLogger(file, spdlog::level::trace);
+  bool res = getFancyContext().setFancyLogger(file, spdlog::level::trace);
   EXPECT_EQ(res, false);
-  SpdLoggerPtr p = FancyContext::getFancyLogEntry(file);
+  SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(file);
   EXPECT_EQ(p, nullptr);
 
-  res = FancyContext::setFancyLogger(__FILE__, spdlog::level::err);
+  res = getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
   EXPECT_EQ(res, true);
   FANCY_LOG(error, "Fancy Error! Here's a test for level.");
   FANCY_LOG(warn, "Warning: you shouldn't see this message!");
-  p = FancyContext::getFancyLogEntry(__FILE__);
+  p = getFancyContext().getFancyLogEntry(__FILE__);
   EXPECT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::err);
 
-  FancyContext::setAllFancyLoggers(spdlog::level::info);
+  getFancyContext().setAllFancyLoggers(spdlog::level::info);
   FANCY_LOG(info, "Info: all loggers back to info.");
   FANCY_LOG(debug, "Debug: you shouldn't see this message!");
-  EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
+  EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
 }
 
 TEST(Fancy, Iteration) {
   FANCY_LOG(info, "Info: iteration test begins.");
-  FANCY_LOG(info, FancyContext::listFancyLoggers());
+  FANCY_LOG(info, getFancyContext().listFancyLoggers());
   std::string log_format = "[%T.%e][%t][%l][%n] %v";
-  FancyContext::setDefaultFancyLevelFormat(spdlog::level::warn, log_format);
+  getFancyContext().setDefaultFancyLevelFormat(spdlog::level::warn, log_format);
   FANCY_LOG(warn, "Warning: now level is warn, format changed (Date removed).");
-  FANCY_LOG(warn, FancyContext::listFancyLoggers());
-  EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
+  FANCY_LOG(warn, getFancyContext().listFancyLoggers());
+  EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
 }
 
 TEST(Fancy, Context) {
@@ -207,7 +207,9 @@ TEST(Fancy, Context) {
   printf(" --> Logger Mode: %d\n", LOGGER_MODE);
   EXPECT_EQ(mode, compile_mode);
   if (LOGGER_MODE) {
-    ENVOY_LOG(critical, "Compile option set: it's a Fancy Log printed by ENVOY_LOG!");
+    TestFilterLog filter;
+    filter.logMessage();
+    FANCY_LOG(critical, "Compile option set: it's a Fancy Log printed by ENVOY_LOG!");
   }
   Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
   EXPECT_EQ(Logger::Context::getLoggerMode(), Logger::LoggerMode::Fancy);

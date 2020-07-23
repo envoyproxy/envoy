@@ -38,7 +38,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
     response.add("\n");
   } else {
     response.add("active loggers:\n");
-    std::string logger_info = FancyContext::listFancyLoggers();
+    std::string logger_info = getFancyContext().listFancyLoggers();
     response.add(logger_info);
   }
 
@@ -101,10 +101,10 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
     spdlog::level::level_enum lv = static_cast<spdlog::level::level_enum>(level_to_use);
     if (name == "level") {
       FANCY_LOG(info, "change all log levels: level='{}'", level);
-      FancyContext::setAllFancyLoggers(lv);
+      getFancyContext().setAllFancyLoggers(lv);
     } else {
       FANCY_LOG(info, "change log level: name='{}' level='{}'", name, level);
-      bool res = FancyContext::setFancyLogger(name, lv);
+      bool res = getFancyContext().setFancyLogger(name, lv);
       return res;
     }
   }
