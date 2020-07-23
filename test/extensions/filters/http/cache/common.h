@@ -30,7 +30,7 @@ public:
 
 private:
   struct DelayedCallbacks {
-    std::function<void()>&headers_cb_, body_cb_, trailers_cb_;
+    std::function<void()>&headers_cb_, &body_cb_, &trailers_cb_;
   };
   class DelayedLookupContext : public LookupContext {
   public:

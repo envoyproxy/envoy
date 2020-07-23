@@ -39,6 +39,140 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
+TEST_F(CacheFilterTest, UncacheableRequest) {
+  request_headers_.setHost("UncacheableRequest");
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+
+  // POST requests are not cacheable
+  request_headers_.setMethod(Http::Headers::get().MethodValues.Post);
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 2 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // If the first response was cached, the filter will return StopAllIterationAndWatermark
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, ImmediateMiss) {
+  request_headers_.setHost("ImmediateMiss");
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Change the request host to miss
+    request_headers_.setHost("ImmediateMiss2");
+
+    // Decode request 2 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, DelayedMiss) {
+  request_headers_.setHost("DelayedMiss");
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Decode request 1 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Change the request host to miss
+    request_headers_.setHost("DelayedMiss2");
+
+    // Decode request 2 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+}
+
 TEST_F(CacheFilterTest, ImmediateHitNoBody) {
   request_headers_.setHost("ImmediateHitNoBody");
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
@@ -48,8 +182,12 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
     // Create filter for request 1.
     CacheFilter filter = makeFilter(simple_cache_);
 
-    // Decode request 1 header.
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     // Encode response header.
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
@@ -64,6 +202,10 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
                                               HeaderHasValueRef("age", "0")),
                                true));
+    // Make sure the filter did not encode any data
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // Make sure decoding does not continue
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
@@ -72,7 +214,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
 }
 
 TEST_F(CacheFilterTest, DelayedHitNoBody) {
-  request_headers_.setHost("ImmediateHitNoBody");
+  request_headers_.setHost("DelayedHitNoBody");
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
@@ -80,11 +222,19 @@ TEST_F(CacheFilterTest, DelayedHitNoBody) {
     // Create filter for request 1.
     CacheFilter filter = makeFilter(delayed_cache_);
 
-    // Decode request 1 header.
+    // Decode request 1 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+
+    // Make the delayed callback to call onHeaders
     delayed_cache_.delayed_headers_cb_();
+
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     // Encode response header.
@@ -95,13 +245,17 @@ TEST_F(CacheFilterTest, DelayedHitNoBody) {
     // Create filter for request 2.
     CacheFilter filter = makeFilter(delayed_cache_);
 
-    // Decode request 2 header.
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
                                               HeaderHasValueRef("age", "0")),
                                true));
+    // Make sure the filter did not encode any data
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // Make sure decoding does not continue
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     delayed_cache_.delayed_headers_cb_();
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
     filter.onDestroy();
@@ -118,7 +272,10 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
     // Create filter for request 1.
     CacheFilter filter = makeFilter(simple_cache_);
 
-    // Decode request 1 header.
+    // Decode request 1 header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
 
     // Encode response header.
@@ -140,8 +297,69 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
     EXPECT_CALL(
         decoder_callbacks_,
         encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+    // Make sure decoding does not continue
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, DelayedHitBody) {
+  request_headers_.setHost("DelayedHitBody");
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+  const std::string body = "abc";
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Decode request 1 header
+    // No hit will be found, so the filter should call continueDecoding
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // The filter should stop iteration waiting for cache response
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callback to call onHeaders
+    delayed_cache_.delayed_headers_cb_();
+
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Decode request 2 header
+
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               false));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+
+    // Make sure decoding does not continue
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // Make the delayed callbacks to call onHeaders & onBody
+    delayed_cache_.delayed_headers_cb_();
+    delayed_cache_.delayed_body_cb_();
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
     filter.onDestroy();
   }
