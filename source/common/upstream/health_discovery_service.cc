@@ -188,10 +188,9 @@ void HdsDelegate::processMessage(
       auto* endpoints = cluster_config.mutable_load_assignment()->add_endpoints();
       // if this group contains locality information, save it.
       if (locality_endpoints.has_locality()) {
-        endpoints->mutable_locality()->set_region(locality_endpoints.locality().region());
-        endpoints->mutable_locality()->set_zone(locality_endpoints.locality().zone());
-        endpoints->mutable_locality()->set_sub_zone(locality_endpoints.locality().sub_zone());
+        endpoints->mutable_locality()->MergeFrom(locality_endpoints.locality());
       }
+
       // add all endpoints for this locality group to the config
       for (const auto& endpoint : locality_endpoints.endpoints()) {
         endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address()->MergeFrom(
