@@ -147,3 +147,14 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "scaled_range_timer_lib",
+    srcs = ["scaled_range_timer.cc"],
+    hdrs = ["scaled_range_timer.h"],
+    deps = [
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:scope_tracker",
+    ],
+)

@@ -142,7 +142,7 @@ private:
 
 class MockTimer : public Timer {
 public:
-  MockTimer();
+  MockTimer(TimerCb callback = nullptr);
   MockTimer(MockDispatcher* dispatcher);
   ~MockTimer() override;
 
@@ -169,6 +169,7 @@ public:
   MockDispatcher* dispatcher_{};
   const ScopeTrackedObject* scope_{};
   bool enabled_{};
+  std::chrono::milliseconds duration_ms_;
 
 private:
   Event::TimerCb callback_;
