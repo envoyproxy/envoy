@@ -100,7 +100,7 @@ void FancyContext::initSink() {
   if (!sp->hasLock()) {
     static FancyBasicLockable tlock;
     sp->setLock(tlock);
-    sp->set_should_escape(false);
+    sp->setShouldEscape(false);
   }
 }
 

@@ -16,7 +16,7 @@ envoy_cc_test_library(
     deps = [
         "//source/server/admin:admin_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
     ],
@@ -54,7 +54,7 @@ envoy_cc_test(
     srcs = ["admin_filter_test.cc"],
     deps = [
         "//source/server/admin:admin_filter_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:environment_lib",
     ],
 )

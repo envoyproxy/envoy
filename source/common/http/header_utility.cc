@@ -78,18 +78,13 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
 
 void HeaderUtility::getAllOfHeader(const HeaderMap& headers, absl::string_view key,
                                    std::vector<absl::string_view>& out) {
-  auto args = std::make_pair(LowerCaseString(std::string(key)), &out);
-
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        auto key_ret =
-            static_cast<std::pair<LowerCaseString, std::vector<absl::string_view>*>*>(context);
-        if (header.key() == key_ret->first.get().c_str()) {
-          key_ret->second->emplace_back(header.value().getStringView());
-        }
-        return HeaderMap::Iterate::Continue;
-      },
-      &args);
+  headers.iterate([key = LowerCaseString(std::string(key)),
+                   &out](const HeaderEntry& header) -> HeaderMap::Iterate {
+    if (header.key() == key.get().c_str()) {
+      out.emplace_back(header.value().getStringView());
+    }
+    return HeaderMap::Iterate::Continue;
+  });
 }
 
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
@@ -170,16 +165,14 @@ bool HeaderUtility::isConnectResponse(const RequestHeaderMapPtr& request_headers
 }
 
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
-  headers_to_add.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        HeaderString k;
-        k.setCopy(header.key().getStringView());
-        HeaderString v;
-        v.setCopy(header.value().getStringView());
-        static_cast<HeaderMap*>(context)->addViaMove(std::move(k), std::move(v));
-        return HeaderMap::Iterate::Continue;
-      },
-      &headers);
+  headers_to_add.iterate([&headers](const HeaderEntry& header) -> HeaderMap::Iterate {
+    HeaderString k;
+    k.setCopy(header.key().getStringView());
+    HeaderString v;
+    v.setCopy(header.value().getStringView());
+    headers.addViaMove(std::move(k), std::move(v));
+    return HeaderMap::Iterate::Continue;
+  });
 }
 
 bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
@@ -223,8 +216,7 @@ void HeaderUtility::stripPortFromHost(RequestHeaderMap& headers, uint32_t listen
 absl::optional<std::reference_wrapper<const absl::string_view>>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
-      headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
+  if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
   }
   return absl::nullopt;

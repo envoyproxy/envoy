@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/server/request_id_extension_config.h"
@@ -16,7 +17,7 @@ public:
   /**
    * Return a newly created instance of the default RequestIDExtension implementation.
    */
-  static RequestIDExtensionSharedPtr defaultInstance(Envoy::Runtime::RandomGenerator& random);
+  static RequestIDExtensionSharedPtr defaultInstance(Envoy::Random::RandomGenerator& random);
 
   /**
    * Return a globally shared instance of the noop RequestIDExtension implementation.

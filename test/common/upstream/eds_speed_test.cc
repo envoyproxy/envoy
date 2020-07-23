@@ -148,11 +148,11 @@ public:
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::shared_ptr<EdsClusterImpl> cluster_;
+  EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
   Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_{validation_visitor_, "cluster_name"};
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockAdmin> admin_;
@@ -162,8 +162,8 @@ public:
   Api::ApiPtr api_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  std::shared_ptr<Config::GrpcMuxImpl> grpc_mux_;
-  std::unique_ptr<Config::GrpcSubscriptionImpl> subscription_;
+  Config::GrpcMuxImplSharedPtr grpc_mux_;
+  Config::GrpcSubscriptionImplPtr subscription_;
 };
 
 } // namespace Upstream

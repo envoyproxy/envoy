@@ -100,7 +100,7 @@ Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create() {
 
 namespace {
 Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_set,
-                                              Runtime::RandomGenerator& random) {
+                                              Random::RandomGenerator& random) {
   auto hosts = host_set.healthyHosts();
   if (hosts.empty()) {
     hosts = host_set.degradedHosts();
@@ -185,7 +185,7 @@ RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
     const NetworkFilters::Common::Redis::RespValue& request,
     NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
     : hash_key_(is_redis_cluster ? Crc16::crc16(hashtag(key, true))
-                                 : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))),
+                                 : MurmurHash::murmurHash2(hashtag(key, enabled_hashtagging))),
       is_read_(isReadRequest(request)), read_policy_(read_policy) {}
 
 // Inspired by the redis-cluster hashtagging algorithm
