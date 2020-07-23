@@ -253,6 +253,7 @@ envoy_cc_library(
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",

@@ -877,6 +877,21 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "extension_discovery_integration_test",
+    srcs = ["extension_discovery_integration_test.cc"],
+    tags = ["fails_on_windows"],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/filters/http/rbac:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test_library(
     name = "server_stats_interface",
     hdrs = ["server_stats.h"],

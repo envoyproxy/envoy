@@ -242,6 +242,7 @@ message ResponseFlagFilter {
         in: "DPE"
         in: "UMSDR"
         in: "RFCF"
+        in: "NFCF"
       }
     }
   }];

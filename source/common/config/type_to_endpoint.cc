@@ -177,6 +177,13 @@ TypeUrlToVersionedServiceMap* buildTypeUrlToServiceMap() {
                                 "envoy.service.listener.v3.ListenerDiscoveryService"),
            SERVICE_VERSION_INFO("envoy.service.discovery.v2.RuntimeDiscoveryService",
                                 "envoy.service.runtime.v3.RuntimeDiscoveryService"),
+           ServiceVersionInfoMap{{
+               "envoy.service.extension.v3.ExtensionConfigDiscoveryService",
+               ServiceVersionInfo{{
+                   {envoy::config::core::v3::ApiVersion::V3,
+                    "envoy.service.extension.v3.ExtensionConfigDiscoveryService"},
+               }},
+           }},
        }) {
     for (const auto& registered_service : registered) {
       const TypeUrl resource_type_url = getResourceTypeUrl(registered_service.first);

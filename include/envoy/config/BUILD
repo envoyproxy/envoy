@@ -30,6 +30,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "extension_config_provider_interface",
+    hdrs = ["extension_config_provider.h"],
+    deps = ["//source/common/protobuf"],
+)
+
+envoy_cc_library(
     name = "grpc_mux_interface",
     hdrs = ["grpc_mux.h"],
     deps = [

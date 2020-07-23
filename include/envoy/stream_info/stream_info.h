@@ -76,8 +76,10 @@ enum ResponseFlag {
   UpstreamMaxStreamDurationReached = 0x80000,
   // True if the response was served from an Envoy cache filter.
   ResponseFromCacheFilter = 0x100000,
+  // Filter config was not received within the permitted warming deadline.
+  NoFilterConfigFound = 0x200000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = ResponseFromCacheFilter
+  LastFlag = NoFilterConfigFound
 };
 
 /**

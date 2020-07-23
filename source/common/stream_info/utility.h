@@ -42,6 +42,7 @@ private:
   const static std::string DOWNSTREAM_PROTOCOL_ERROR;
   const static std::string UPSTREAM_MAX_STREAM_DURATION_REACHED;
   const static std::string RESPONSE_FROM_CACHE_FILTER;
+  const static std::string NO_FILTER_CONFIG_FOUND;
 };
 
 /**
