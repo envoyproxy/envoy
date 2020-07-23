@@ -54,7 +54,7 @@ private:
 
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
       const ProtocolOptionsProto&,
-      Server::Configuration::TransportSocketFactoryContext& factory_context) {
+      Server::Configuration::TransportSocketFactoryContext&) {
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name_));
   }
 
