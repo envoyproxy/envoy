@@ -216,7 +216,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeClusterSizeWithFakeSymbolTable) {
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(true);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -303,12 +303,13 @@ TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeClusterSizeWithFakeSymbolTab
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 44747);
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_cluster, 44747);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
 
-TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeClusterSizeWithRealSymbolTable) {
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -378,12 +379,13 @@ TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeClusterSizeWithRealSymbolTab
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 36859);
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_cluster, 36859);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
 
-TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeHostSizeWithStats) {
+TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
@@ -425,7 +427,8 @@ TEST_P(ClusterMemoryTestRunner, DISABLED_MemoryLargeHostSizeWithStats) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_host, 1380);
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_host, 1380);
   }
   EXPECT_MEMORY_LE(m_per_host, 1800); // Round up to allow platform variations.
 }
