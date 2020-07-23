@@ -139,9 +139,9 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
   return findByName(store.textReadouts(), name);
 }
 
-AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
-                                   Event::TestTimeSystem& time_system,
-                                   std::chrono::milliseconds timeout) {
+AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
+                                              uint64_t value, Event::TestTimeSystem& time_system,
+                                              std::chrono::milliseconds timeout) {
   auto end_time = time_system.monotonicTime() + timeout;
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
@@ -153,9 +153,9 @@ AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::st
   return AssertionSuccess();
 }
 
-AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
-                                   Event::TestTimeSystem& time_system,
-                                   std::chrono::milliseconds timeout) {
+AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,
+                                              uint64_t value, Event::TestTimeSystem& time_system,
+                                              std::chrono::milliseconds timeout) {
   auto end_time = time_system.monotonicTime() + timeout;
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
@@ -167,9 +167,9 @@ AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::st
   return AssertionSuccess();
 }
 
-AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
-                                 Event::TestTimeSystem& time_system,
-                                 std::chrono::milliseconds timeout) {
+AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name,
+                                            uint64_t value, Event::TestTimeSystem& time_system,
+                                            std::chrono::milliseconds timeout) {
   auto end_time = time_system.monotonicTime() + timeout;
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
@@ -181,9 +181,9 @@ AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::stri
   return AssertionSuccess();
 }
 
-AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
-                                 Event::TestTimeSystem& time_system,
-                                 std::chrono::milliseconds timeout) {
+AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name,
+                                            uint64_t value, Event::TestTimeSystem& time_system,
+                                            std::chrono::milliseconds timeout) {
   auto end_time = time_system.monotonicTime() + timeout;
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
