@@ -51,7 +51,7 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   switch (config.filter_specifier_case()) {
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kStatusCodeFilter:
@@ -118,7 +118,7 @@ bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
 }
 
 RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& config,
-                             Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+                             Runtime::Loader& runtime, Random::RandomGenerator& random)
     : runtime_(runtime), random_(random), runtime_key_(config.runtime_key()),
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
@@ -143,7 +143,7 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
 
 OperatorFilter::OperatorFilter(
     const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& config : configs) {
     filters_.emplace_back(FilterFactory::fromProto(config, runtime, random, validation_visitor));
@@ -151,12 +151,12 @@ OperatorFilter::OperatorFilter(
 }
 
 OrFilter::OrFilter(const envoy::config::accesslog::v3::OrFilter& config, Runtime::Loader& runtime,
-                   Runtime::RandomGenerator& random,
+                   Random::RandomGenerator& random,
                    ProtobufMessage::ValidationVisitor& validation_visitor)
     : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
 
 AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
                      ProtobufMessage::ValidationVisitor& validation_visitor)
     : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
 

@@ -37,7 +37,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],

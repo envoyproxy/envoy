@@ -32,7 +32,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/original_src:config",
         "//source/extensions/filters/listener/original_src:config_lib",
         "//source/extensions/filters/listener/original_src:original_src_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
     ],
 )
 
@@ -56,6 +56,7 @@ envoy_proto_library(
     name = "original_src_fuzz_test_proto",
     srcs = ["original_src_fuzz_test.proto"],
     deps = [
+        "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_proto",
         "@envoy_api//envoy/extensions/filters/listener/original_src/v3:pkg",
     ],
 )
@@ -67,7 +68,6 @@ envoy_cc_fuzz_test(
     deps = [
         ":original_src_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_src:original_src_lib",
-        "//test/mocks/network:network_mocks",
-        "@envoy_api//envoy/extensions/filters/listener/original_src/v3:pkg_cc_proto",
+        "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
     ],
 )

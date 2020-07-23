@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+ceil
 CHACHA
 CHLO
 CHMOD
@@ -122,6 +123,8 @@ GETting
 GLB
 GOAWAY
 GRPC
+GRO
+GSO
 GSS
 GTEST
 GURL
@@ -434,6 +437,7 @@ bulkstrings
 bursty
 bytecode
 bytestream
+cacheable
 cacheability
 callee
 callsite
@@ -776,6 +780,7 @@ mutexes
 mux
 muxed
 mysql
+namelen
 nameserver
 namespace
 namespaces
@@ -1108,6 +1113,7 @@ tuples
 typedef
 typeid
 typesafe
+uber
 ucontext
 udpa
 uint

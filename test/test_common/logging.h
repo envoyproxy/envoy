@@ -94,7 +94,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
     ASSERT_FALSE(expected_messages.empty()) << "Expected messages cannot be empty.";               \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
-    sink_ptr->set_should_escape(escaped);                                                          \
+    sink_ptr->setShouldEscape(escaped);                                                            \
     Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
     stmt;                                                                                          \
     if (log_recorder.messages().empty()) {                                                         \

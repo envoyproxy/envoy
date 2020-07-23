@@ -353,12 +353,7 @@ ClientContextConfigImpl::ClientContextConfigImpl(
 }
 
 const unsigned ServerContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;
-const unsigned ServerContextConfigImpl::DEFAULT_MAX_VERSION =
-#ifndef BORINGSSL_FIPS
-    TLS1_3_VERSION;
-#else // BoringSSL FIPS
-    TLS1_2_VERSION;
-#endif
+const unsigned ServerContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_3_VERSION;
 
 const std::string ServerContextConfigImpl::DEFAULT_CIPHER_SUITES =
 #ifndef BORINGSSL_FIPS

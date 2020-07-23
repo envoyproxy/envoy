@@ -170,6 +170,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "random_generator_test",
+    srcs = ["random_generator_test.cc"],
+    # Fails on windows with cr/lf yaml file checkouts
+    tags = ["fails_on_windows"],
+    deps = [
+        "//source/common/common:random_generator_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     external_deps = [
@@ -298,7 +310,7 @@ envoy_cc_test(
         "abseil_strings",
     ],
     deps = [
-        "//source/common/common:version_lib",
+        "//source/common/version:version_lib",
     ],
 )
 

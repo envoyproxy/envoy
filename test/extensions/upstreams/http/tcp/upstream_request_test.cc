@@ -10,7 +10,8 @@
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -34,7 +35,8 @@ public:
   MockRouterFilterInterface()
       : config_("prefix.", context_, ShadowWriterPtr(new MockShadowWriter()), router_proto) {
     auto cluster_info = new NiceMock<Upstream::MockClusterInfo>();
-    cluster_info->timeout_budget_stats_ = absl::nullopt;
+    cluster_info->timeout_budget_stats_ = nullptr;
+    ON_CALL(*cluster_info, timeoutBudgetStats()).WillByDefault(Return(absl::nullopt));
     cluster_info_.reset(cluster_info);
     ON_CALL(*this, callbacks()).WillByDefault(Return(&callbacks_));
     ON_CALL(*this, config()).WillByDefault(ReturnRef(config_));

@@ -20,7 +20,9 @@
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
+#include "common/http/http1/codec_impl_legacy.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http2/codec_impl_legacy.h"
 #include "common/http/http3/quic_codec_factory.h"
 #include "common/http/http3/well_known_names.h"
 #include "common/http/request_id_extension_impl.h"
@@ -89,13 +91,13 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                                                                       context.threadLocal());
           });
 
-  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
+  Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
-  std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager =
+  Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager =
       context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
           [&context, route_config_provider_manager] {
@@ -144,8 +146,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(),
-        &context.overloadManager(), context.dispatcher().timeSource())});
+        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
+        context.dispatcher().timeSource())});
   };
 }
 
@@ -178,7 +180,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
-      http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
+      http2_options_(Http2::Utility::initializeAndValidateOptions(
+          config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
+          config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
@@ -202,6 +206,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
+      stream_error_on_invalid_http_messaging_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stream_error_on_invalid_http_message, false)),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
 #ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -477,18 +483,32 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1: {
-    Http::Http1::CodecStats& stats =
-        Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope());
-    return std::make_unique<Http::Http1::ServerConnectionImpl>(
-        connection, stats, callbacks, http1_settings_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+    if (context_.runtime().snapshot().runtimeFeatureEnabled(
+            "envoy.reloadable_features.new_codec_behavior")) {
+      return std::make_unique<Http::Http1::ServerConnectionImpl>(
+          connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
+          callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+          headersWithUnderscoresAction());
+    } else {
+      return std::make_unique<Http::Legacy::Http1::ServerConnectionImpl>(
+          connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
+          callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+          headersWithUnderscoresAction());
+    }
   }
   case CodecType::HTTP2: {
-    Http::Http2::CodecStats& stats =
-        Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope());
-    return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, stats, http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
+    if (context_.runtime().snapshot().runtimeFeatureEnabled(
+            "envoy.reloadable_features.new_codec_behavior")) {
+      return std::make_unique<Http::Http2::ServerConnectionImpl>(
+          connection, callbacks,
+          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()), http2_options_,
+          maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+    } else {
+      return std::make_unique<Http::Legacy::Http2::ServerConnectionImpl>(
+          connection, callbacks,
+          Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()), http2_options_,
+          maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+    }
   }
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
@@ -591,8 +611,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
-        context.runtime(), context.localInfo(), context.clusterManager(),
-        &context.overloadManager(), context.dispatcher().timeSource());
+        context.runtime(), context.localInfo(), context.clusterManager(), context.overloadManager(),
+        context.dispatcher().timeSource());
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.
