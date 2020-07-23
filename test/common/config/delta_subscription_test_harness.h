@@ -197,8 +197,8 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
-  std::shared_ptr<NewGrpcMuxImpl> xds_context_;
-  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
+  NewGrpcMuxImplSharedPtr xds_context_;
+  GrpcSubscriptionImplPtr subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
