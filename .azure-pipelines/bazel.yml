@@ -58,6 +58,7 @@ steps:
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       ${{ if eq(parameters.rbe, false) }}:
         BAZEL_BUILD_EXTRA_OPTIONS: "--curses=no --experimental_repository_cache_hardlinks ${{ parameters.bazelBuildExtraOptions }}"
+        BAZEL_REMOTE_CACHE: $(LocalBuildCache)
 
     displayName: "Run CI script"
 
