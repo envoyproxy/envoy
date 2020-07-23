@@ -160,7 +160,7 @@ void XdsVerifier::listenerAdded(const envoy::config::listener::v3::Listener& lis
 void XdsVerifier::listenerRemoved(const std::string& name) {
   bool found = false;
 
-  for (auto it = listeners_.begin(); it != listeners_.end(); ) {
+  for (auto it = listeners_.begin(); it != listeners_.end();) {
     auto& rep = *it;
     if (rep.listener.name() != name) {
       ++it;
