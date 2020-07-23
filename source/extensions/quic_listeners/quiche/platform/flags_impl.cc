@@ -47,11 +47,11 @@ Flag* FlagRegistry::FindFlag(const std::string& name) const {
 }
 
 void FlagRegistry::updateFlag(const Envoy::Runtime::FeatureFlag& runtime_flag) const {
-  const auto found = flags_.find(runtime_flag.runtime_key()); 
+  const auto found = flags_.find(runtime_flag.runtime_key());
   if (found != flags_.end()) {
     const auto flag = found->second;
     flag->setRuntimeFlag(runtime_flag);
-  } 
+  }
 }
 
 template <> bool TypedFlag<bool>::SetValueFromString(const std::string& value_str) {

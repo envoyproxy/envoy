@@ -42,6 +42,6 @@ message QuicProtocolOptions {
   QuicFlags quic_flags = 5;
 
   message QuicFlags {
-    core.v3.RuntimeFeatureFlag quic_allow_chlo_buffering = 1;  
+    core.v3.RuntimeFeatureFlag quic_allow_chlo_buffering = 1;
   }
 }

@@ -37,7 +37,7 @@ public:
   // Look up a flag by name.
   Flag* FindFlag(const std::string& name) const;
 
-  //to be implemented.
+  // to be implemented.
   void updateFlag(const Envoy::Runtime::FeatureFlag& flag) const;
 
 private:

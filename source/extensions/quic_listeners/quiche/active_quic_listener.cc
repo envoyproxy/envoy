@@ -18,22 +18,25 @@
 namespace Envoy {
 namespace Quic {
 
-ActiveQuicListener::ActiveQuicListener(
-    Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-    Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-    Network::Socket::OptionsSharedPtr options,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-    const std::vector<Runtime::FeatureFlag>& quic_flags)
+ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
+                                       Network::ConnectionHandler& parent,
+                                       Network::ListenerConfig& listener_config,
+                                       const quic::QuicConfig& quic_config,
+                                       Network::Socket::OptionsSharedPtr options,
+                                       const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                                       const std::vector<Runtime::FeatureFlag>& quic_flags)
     : ActiveQuicListener(dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
                          quic_config, std::move(options), enabled, quic_flags) {}
 
-ActiveQuicListener::ActiveQuicListener(
-    Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-    Network::SocketSharedPtr listen_socket, Network::ListenerConfig& listener_config,
-    const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-    const std::vector<Runtime::FeatureFlag>& quic_flags)
+ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
+                                       Network::ConnectionHandler& parent,
+                                       Network::SocketSharedPtr listen_socket,
+                                       Network::ListenerConfig& listener_config,
+                                       const quic::QuicConfig& quic_config,
+                                       Network::Socket::OptionsSharedPtr options,
+                                       const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                                       const std::vector<Runtime::FeatureFlag>& quic_flags)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, &listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket), enabled_(enabled, Runtime::LoaderSingleton::get()),
@@ -124,8 +127,7 @@ void ActiveQuicListener::shutdownListener() {
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
-    : concurrency_(concurrency), enabled_(config.enabled()),
-    quic_flags_(config.quic_flags()) {
+    : concurrency_(concurrency), enabled_(config.enabled()), quic_flags_(config.quic_flags()) {
   uint64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -204,16 +206,16 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
   }
 #endif
 
-  return std::make_unique<ActiveQuicListener>(
-      disptacher, parent, config, quic_config_, std::move(options), enabled_,
-      vectorizeQuicFlags());
+  return std::make_unique<ActiveQuicListener>(disptacher, parent, config, quic_config_,
+                                              std::move(options), enabled_, vectorizeQuicFlags());
 }
 
 std::vector<Runtime::FeatureFlag> ActiveQuicListenerFactory::vectorizeQuicFlags() {
   auto runtime_quic_flags = std::vector<Runtime::FeatureFlag>();
   if (quic_flags_.has_quic_allow_chlo_buffering()) {
-    auto feature_flag = Runtime::FeatureFlag(quic_flags_.quic_allow_chlo_buffering(), Runtime::LoaderSingleton::get());
-    runtime_quic_flags.push_back(feature_flag);  
+    auto feature_flag = Runtime::FeatureFlag(quic_flags_.quic_allow_chlo_buffering(),
+                                             Runtime::LoaderSingleton::get());
+    runtime_quic_flags.push_back(feature_flag);
   }
   return runtime_quic_flags;
 }
