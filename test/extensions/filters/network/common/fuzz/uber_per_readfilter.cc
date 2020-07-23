@@ -12,8 +12,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-  // Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
-  // std::chrono::time_point.
+// Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
+// std::chrono::time_point.
 static const int SecondsPerDay = 86400;
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // These filters have already been covered by this fuzzer.
