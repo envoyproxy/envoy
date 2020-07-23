@@ -1,7 +1,9 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client.h"
 
@@ -13,6 +15,8 @@
 namespace Envoy {
 namespace Config {
 
+template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
+
 // Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
@@ -21,7 +25,7 @@ class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
-             const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
+             const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
              Event::Dispatcher& dispatcher, Stats::Scope& scope,
              const RateLimitSettings& rate_limit_settings)
       : callbacks_(callbacks), async_client_(std::move(async_client)),
@@ -74,7 +78,7 @@ public:
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveMessage(std::unique_ptr<ResponseProto>&& message) override {
+  void onReceiveMessage(ResponseProtoPtr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
     // Sometimes during hot restarts this stat's value becomes inconsistent and will continue to
@@ -135,7 +139,7 @@ private:
 
   // Reestablishes the gRPC channel when necessary, with some backoff politeness.
   Event::TimerPtr retry_timer_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;
 

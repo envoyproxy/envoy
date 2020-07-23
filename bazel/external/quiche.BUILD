@@ -59,6 +59,7 @@ quiche_copts = select({
         # Remove these after upstream fix.
         "-Wno-unused-parameter",
         "-Wno-unused-function",
+        "-Wno-return-type",
         "-Wno-unknown-warning-option",
         "-Wno-deprecated-copy",
         "-Wno-ignored-qualifiers",
@@ -66,6 +67,8 @@ quiche_copts = select({
         "-Wno-inconsistent-missing-override",
         # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
         "-Wno-invalid-offsetof",
+        # to suppress errors re: size_t vs. int comparisons
+        "-Wno-sign-compare",
     ],
 })
 
@@ -1824,6 +1827,7 @@ envoy_cc_library(
         ":quic_core_crypto_encryption_lib",
         ":quic_core_framer_lib",
         ":quic_core_idle_network_detector_lib",
+        ":quic_core_legacy_version_encapsulator_lib",
         ":quic_core_mtu_discovery_lib",
         ":quic_core_network_blackhole_detector_lib",
         ":quic_core_one_block_arena_lib",
@@ -2192,6 +2196,7 @@ envoy_cc_library(
     name = "quic_core_frames_frames_lib",
     srcs = [
         "quiche/quic/core/frames/quic_ack_frame.cc",
+        "quiche/quic/core/frames/quic_ack_frequency_frame.cc",
         "quiche/quic/core/frames/quic_blocked_frame.cc",
         "quiche/quic/core/frames/quic_connection_close_frame.cc",
         "quiche/quic/core/frames/quic_crypto_frame.cc",
@@ -2216,6 +2221,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "quiche/quic/core/frames/quic_ack_frame.h",
+        "quiche/quic/core/frames/quic_ack_frequency_frame.h",
         "quiche/quic/core/frames/quic_blocked_frame.h",
         "quiche/quic/core/frames/quic_connection_close_frame.h",
         "quiche/quic/core/frames/quic_crypto_frame.h",
@@ -2564,6 +2570,29 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":quic_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_legacy_version_encapsulator_lib",
+    srcs = [
+        "quiche/quic/core/quic_legacy_version_encapsulator.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_legacy_version_encapsulator.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_crypto_crypto_handshake_lib",
+        ":quic_core_crypto_encryption_lib",
+        ":quic_core_packet_creator_lib",
+        ":quic_core_packets_lib",
+        ":quic_core_types_lib",
+        ":quic_core_utils_lib",
+        ":quic_platform",
+        ":quiche_common_platform",
     ],
 )
 

@@ -39,6 +39,7 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view BodyDisallowed = "http1.body_disallowed";
   const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
+  const absl::string_view InvalidUnderscore = "http1.unexpected_underscore";
 };
 
 struct Http1HeaderTypesValues {
@@ -110,27 +111,24 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           absl::optional<uint64_t> status, bool end_stream) {
   bool saw_content_length = false;
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        absl::string_view key_to_use = header.key().getStringView();
-        uint32_t key_size_to_use = header.key().size();
-        // Translate :authority -> host so that upper layers do not need to deal with this.
-        if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
-          key_size_to_use = Headers::get().HostLegacy.get().size();
-        }
+  headers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+    absl::string_view key_to_use = header.key().getStringView();
+    uint32_t key_size_to_use = header.key().size();
+    // Translate :authority -> host so that upper layers do not need to deal with this.
+    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+      key_to_use = absl::string_view(Headers::get().HostLegacy.get());
+      key_size_to_use = Headers::get().HostLegacy.get().size();
+    }
 
-        // Skip all headers starting with ':' that make it here.
-        if (key_to_use[0] == ':') {
-          return HeaderMap::Iterate::Continue;
-        }
+    // Skip all headers starting with ':' that make it here.
+    if (key_to_use[0] == ':') {
+      return HeaderMap::Iterate::Continue;
+    }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
-            key_to_use, header.value().getStringView());
+    encodeFormattedHeader(key_to_use, header.value().getStringView());
 
-        return HeaderMap::Iterate::Continue;
-      },
-      this);
+    return HeaderMap::Iterate::Continue;
+  });
 
   if (headers.ContentLength()) {
     saw_content_length = true;
@@ -174,9 +172,6 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
       chunk_encoding_ = false;
-
-      // Assert 1xx (may have content) OR 204 and end stream.
-      ASSERT(*status < 200 || end_stream);
     } else {
       // For responses to connect requests, do not send the chunked encoding header:
       // https://tools.ietf.org/html/rfc7231#section-4.3.6.
@@ -237,13 +232,10 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // Finalize the body
     connection_.buffer().add(LAST_CHUNK);
 
-    trailers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
-              header.key().getStringView(), header.value().getStringView());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
+    trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+      encodeFormattedHeader(header.key().getStringView(), header.value().getStringView());
+      return HeaderMap::Iterate::Continue;
+    });
 
     connection_.flushOutput();
     connection_.buffer().add(CRLF);
@@ -1054,7 +1046,7 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
       ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}",
                      connection_, current_header_field_.getStringView());
       error_code_ = Http::Code::BadRequest;
-      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
+      sendProtocolError(Http1ResponseCodeDetails::get().InvalidUnderscore);
       stats_.requests_rejected_with_underscores_in_headers_.inc();
       throw CodecProtocolException("http/1.1 protocol error: header name contains underscores");
     }
