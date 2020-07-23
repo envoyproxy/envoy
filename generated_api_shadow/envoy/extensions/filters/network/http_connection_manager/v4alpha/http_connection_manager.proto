@@ -5,6 +5,7 @@ package envoy.extensions.filters.network.http_connection_manager.v4alpha;
 import "envoy/config/accesslog/v4alpha/accesslog.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/protocol.proto";
 import "envoy/config/core/v4alpha/substitution_format_string.proto";
 import "envoy/config/route/v4alpha/route.proto";
@@ -803,42 +804,13 @@ message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter";
 
-  // [#not-implemented-hide:] Configuration source specifier for the late-bound
-  // filter configuration. The HTTP Listener is warmed until all the initial
-  // filter configurations are received, unless the flag to apply the default
-  // configuration is set. Subsequent filter updates are atomic on a per-worker
-  // basis, and apply to new streams while the active streams continue using
-  // the older filter configurations. If the initial delivery of the filter
-  // configuration fails, due to a timeout for example, the optional default
-  // configuration is applied. Without a default configuration, the filter is
-  // disabled, and the HTTP listener responds with 500 immediately. After the
-  // failure, the listener continues subscribing to the subsequent filter
-  // configurations.
-  message HttpFilterConfigSource {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter."
-        "HttpFilterConfigSource";
-
-    config.core.v4alpha.ConfigSource config_source = 1;
-
-    // Optional default configuration to use as the initial configuration if
-    // there is a failure to receive the initial filter configuration or if
-    // `apply_default_config_without_warming` flag is set.
-    google.protobuf.Any default_config = 2;
-
-    // Use the default config as the initial configuration without warming and
-    // waiting for the first xDS response. Requires the default configuration
-    // to be supplied.
-    bool apply_default_config_without_warming = 3;
-  }
-
   reserved 3, 2;
 
   reserved "config";
 
   // The name of the filter configuration. The name is used as a fallback to
   // select an extension if the type of the configuration proto is not
-  // sufficient. It also serves as a resource name in FilterConfigDS.
+  // sufficient. It also serves as a resource name in ExtensionConfigDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
@@ -846,8 +818,10 @@ message HttpFilter {
   oneof config_type {
     google.protobuf.Any typed_config = 4;
 
-    // [#not-implemented-hide:] Configuration source specifier for FilterConfigDS.
-    HttpFilterConfigSource filter_config_ds = 5;
+    // Configuration source specifier for an extension configuration discovery service.
+    // In case of a failure and without the default configuration, the HTTP listener responds with 500.
+    // Extension configs delivered through this mechanism are not expected to require warming (see https://github.com/envoyproxy/envoy/issues/12061).
+    config.core.v4alpha.ExtensionConfigSource config_discovery = 5;
   }
 }
 
