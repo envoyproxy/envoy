@@ -318,6 +318,9 @@ FakeHttpConnection::FakeHttpConnection(
 }
 
 AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
+  if (!shared_connection_.connected()) {
+    return AssertionSuccess();
+  }
   return shared_connection_.executeOnDispatcher(
       [](Network::Connection& connection) {
         connection.close(Network::ConnectionCloseType::FlushWrite);
