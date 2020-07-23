@@ -28,9 +28,10 @@ Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& bu
   }
   // Otherwise Writer Blocked, return EAGAIN
   ENVOY_LOG_MISC(trace, "Udp Writer is blocked, skip sending");
-  return Api::IoCallUint64Result(/*rc=*/0,
-                                 /*err=*/Api::IoErrorPtr(new Network::IoSocketError(EAGAIN),
-                                                         Network::IoSocketError::deleteIoError));
+  return Api::IoCallUint64Result(
+      /*rc=*/0,
+      /*err=*/Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_AGAIN),
+                              Network::IoSocketError::deleteIoError));
 }
 
 std::string UdpDefaultWriter::name() const { return UdpWriterNames::get().DefaultWriter; }

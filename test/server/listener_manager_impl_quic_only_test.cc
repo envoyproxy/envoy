@@ -44,6 +44,8 @@ filter_chains:
 reuse_port: true
 udp_listener_config:
   udp_listener_name: "quiche_quic_listener"
+udp_writer_config:
+  name: "udp_gso_batch_writer"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -86,6 +88,8 @@ udp_listener_config:
   EXPECT_EQ(1u, manager_->listeners().size());
   EXPECT_FALSE(manager_->listeners()[0].get().udpListenerFactory()->isTransportConnectionless());
   manager_->listeners().front().get().listenSocketFactory().getListenSocket();
+
+  EXPECT_TRUE(manager_->listeners().front().get().udpPacketWriterFactory()->isBatchWriterFactory());
 
   // No filter chain found with non-matching transport protocol.
   EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));

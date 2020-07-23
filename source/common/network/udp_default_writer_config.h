@@ -11,6 +11,7 @@ class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
 public:
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                     Stats::Scope& scope) override;
+  bool isBatchWriterFactory() const override { return false; }
 };
 
 // This class uses a protobuf config to create a UDP packet writer factory which

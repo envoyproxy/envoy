@@ -334,6 +334,7 @@ public:
 
   MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter,
               (Network::IoHandle&, Stats::Scope&), ());
+  MOCK_METHOD(bool, isBatchWriterFactory, (), (const));
 };
 
 class MockListenerConfig : public ListenerConfig {
