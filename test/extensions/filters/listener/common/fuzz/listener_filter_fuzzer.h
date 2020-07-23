@@ -15,6 +15,7 @@ class ListenerFilterFuzzer {
 public:
   ListenerFilterFuzzer(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
+    ON_CALL(cb_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher_));
     try {
       socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
     } catch (const EnvoyException& e) {
@@ -34,6 +35,7 @@ private:
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   NiceMock<Network::MockListenerFilterCallbacks> cb_;
   FakeConnectionSocket socket_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 } // namespace ListenerFilters
