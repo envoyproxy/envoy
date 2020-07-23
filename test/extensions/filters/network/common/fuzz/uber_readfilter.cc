@@ -1,7 +1,5 @@
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
 
-#include "envoy/common/exception.h"
-
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 
@@ -75,7 +73,7 @@ void UberFilterFuzzer::fuzz(
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
 
   } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "Controlled exception in filter setup{}", e.what());
+    ENVOY_LOG_MISC(debug, "Controlled exception in filter setup {}", e.what());
     return;
   }
   perFilterSetup(proto_config.name());

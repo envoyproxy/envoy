@@ -14,38 +14,42 @@ namespace Extensions {
 namespace NetworkFilters {
 // Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
 // std::chrono::time_point.
+namespace {
+// Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
+// std::chrono::time_point.
 static const int SecondsPerDay = 86400;
+} // namespace
+
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // These filters have already been covered by this fuzzer.
   // Will extend to cover other network filters one by one.
-  static ::std::vector<absl::string_view> filter_names_;
-  if (filter_names_.empty()) {
-    filter_names_ = {
-        NetworkFilterNames::get().ExtAuthorization,
-        NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RedisProxy,
-        NetworkFilterNames::get().ClientSslAuth,
-        NetworkFilterNames::get().Echo,
-        NetworkFilterNames::get().DirectResponse,
-        NetworkFilterNames::get().DubboProxy,
-        NetworkFilterNames::get().SniCluster,
+  static std::vector<absl::string_view> filter_names;
+  if (filter_names.empty()) {
+    filter_names = {        
+      NetworkFilterNames::get().ExtAuthorization,
+      NetworkFilterNames::get().LocalRateLimit,
+      NetworkFilterNames::get().RedisProxy,
+      NetworkFilterNames::get().ClientSslAuth,
+      NetworkFilterNames::get().Echo,
+      NetworkFilterNames::get().DirectResponse,
+      NetworkFilterNames::get().DubboProxy,
+      NetworkFilterNames::get().SniCluster,
 
-        NetworkFilterNames::get().ThriftProxy,
-        NetworkFilterNames::get().ZooKeeperProxy,
-        NetworkFilterNames::get().HttpConnectionManager,
-        NetworkFilterNames::get().SniDynamicForwardProxy,
-        NetworkFilterNames::get().KafkaBroker,
-        NetworkFilterNames::get().RocketmqProxy, // fix the assert
-        NetworkFilterNames::get().RateLimit,     // ratelimit
-        NetworkFilterNames::get().Rbac
+      NetworkFilterNames::get().ThriftProxy,
+      NetworkFilterNames::get().ZooKeeperProxy,
+      NetworkFilterNames::get().HttpConnectionManager,
+      NetworkFilterNames::get().SniDynamicForwardProxy,
+      NetworkFilterNames::get().KafkaBroker,
+      NetworkFilterNames::get().RocketmqProxy, // fix the assert
+      NetworkFilterNames::get().RateLimit,     // ratelimit
+      NetworkFilterNames::get().Rbac
 
-        // mongo_proxy
-        // mysql_proxy
-        // postgres_proxy
-        // tcp_proxy
-    };
+      // mongo_proxy
+      // mysql_proxy
+      // postgres_proxy
+      // tcp_proxy
   }
-  return filter_names_;
+  return filter_names;
 }
 
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
@@ -116,7 +120,8 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name,
                                                   Protobuf::Message* config_message) {
   // System calls such as reading files are prohibited in this fuzzer. Some input that crashes the
-  // mock/fake objects are also prohibited.
+  // mock/fake objects are also prohibited. For now there are only two filters {DirectResponse,
+  // LocalRateLimit} on which we have constraints.
   const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
       std::string(filter_name));
   if (filter_name == NetworkFilterNames::get().DirectResponse) {
@@ -126,19 +131,19 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     if (config.response().specifier_case() ==
         envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
       throw EnvoyException(
-          fmt::format("direct_response trying to open a file. Config:\n{}", config.DebugString()));
+          absl::StrCat("direct_response trying to open a file. Config:\n{}", config.DebugString()));
     }
   } else if (filter_name == NetworkFilterNames::get().LocalRateLimit) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& config =
         dynamic_cast<envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit&>(
             *config_message);
-    if (config.token_bucket().fill_interval().seconds() > seconds_in_one_day_) {
+    if (config.token_bucket().fill_interval().seconds() > SecondsPerDay) {
       // Too large fill_interval may cause "c++/v1/chrono" overflow when simulated_time_system_ is
       // converting it to a smaller unit. Constraining fill_interval to no greater than one day is
       // reasonable.
       throw EnvoyException(
-          fmt::format("local_ratelimit trying to set a large fill_interval. Config:\n{}",
-                      config.DebugString()));
+          absl::StrCat("local_ratelimit trying to set a large fill_interval. Config:\n{}",
+                       config.DebugString()));
     }
   }
 }
