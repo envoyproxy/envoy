@@ -327,7 +327,6 @@ private:
 
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
 
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
@@ -457,6 +456,10 @@ private:
 
     // Indicates which filter to start the iteration with.
     enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
+
+    Event::Dispatcher& dispatcher() {
+      return connection_manager_.read_callbacks_->connection().dispatcher();
+    }
 
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
@@ -590,9 +593,18 @@ private:
     void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);
     void
-    requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
-                             Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+
+    /**
+     *
+     * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS
+     * route config provider is used. Scoped RDS provides are not supported at the moment, as
+     * retrieval of a route configuration in their case requires passing of http request headers
+     * as a parameter.
+     */
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
+
+    bool usesSrds() { return connection_manager_.config_.scopedRouteConfigProvider() != nullptr; }
 
     void refreshCachedTracingCustomTags();
 

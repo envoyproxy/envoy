@@ -1526,20 +1526,24 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
 }
 
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
-    Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  absl::optional<Router::ConfigConstSharedPtr> route_config;
+  if (!route_config.has_value() || !route_config.value()->usesVhds()) {
+    (*route_config_updated_cb)(false);
+    return;
+  }
   ASSERT(!request_headers_->Host()->value().empty());
   const auto& host_header = absl::AsciiStrToLower(request_headers_->getHostValue());
-  route_config_update_requester_->requestRouteConfigUpdate(host_header, thread_local_dispatcher,
+  route_config_update_requester_->requestRouteConfigUpdate(host_header, dispatcher(),
                                                            std::move(route_config_updated_cb));
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
-  if (connection_manager_.config_.routeConfigProvider() == nullptr) {
-    return {};
+  if (connection_manager_.config_.routeConfigProvider() != nullptr) {
+    return absl::optional<Router::ConfigConstSharedPtr>(
+        connection_manager_.config_.routeConfigProvider()->config());
   }
-  return absl::optional<Router::ConfigConstSharedPtr>(
-      connection_manager_.config_.routeConfigProvider()->config());
+  return {};
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -2363,7 +2367,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::connec
 }
 
 Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
-  return parent_.connection_manager_.read_callbacks_->connection().dispatcher();
+  return parent_.dispatcher();
 }
 
 StreamInfo::StreamInfo& ConnectionManagerImpl::ActiveStreamFilterBase::streamInfo() {
@@ -2579,16 +2583,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  if (!routeConfig().has_value() || !routeConfig().value()->usesVhds()) {
-    (*route_config_updated_cb)(false);
-    return;
-  }
-  parent_.requestRouteConfigUpdate(dispatcher(), std::move(route_config_updated_cb));
-}
-
-absl::optional<Router::ConfigConstSharedPtr>
-ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
-  return parent_.routeConfig();
+  parent_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
