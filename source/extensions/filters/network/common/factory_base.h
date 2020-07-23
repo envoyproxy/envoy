@@ -52,9 +52,9 @@ private:
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     Server::Configuration::FactoryContext& context) PURE;
 
-  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsTyped(const ProtocolOptionsProto&,
-                             Server::Configuration::FactoryContext& context) {
+  virtual Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
+      const ProtocolOptionsProto&,
+      Server::Configuration::TransportSocketFactoryContext& factory_context) {
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name_));
   }
 
