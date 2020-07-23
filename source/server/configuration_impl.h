@@ -109,6 +109,8 @@ public:
     return watchdog_multikill_timeout_;
   }
 
+  double wdMultiKillThreshold() const override { return watchdog_multikill_threshold_; }
+
 private:
   /**
    * Initialize tracers and corresponding sinks.
@@ -125,6 +127,7 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
+  double watchdog_multikill_threshold_;
 };
 
 /**
