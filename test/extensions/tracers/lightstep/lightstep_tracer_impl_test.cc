@@ -718,6 +718,15 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   EXPECT_FALSE(base2_context.empty());
 }
 
+TEST_F(LightStepDriverTest, GetAndSetBaggage) {
+  setupValidDriver();
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  span->setBaggage("key1", "value1");
+  EXPECT_EQ(span->getBaggage("key1"), "value1");
+}
+
 } // namespace
 } // namespace Lightstep
 } // namespace Tracers
