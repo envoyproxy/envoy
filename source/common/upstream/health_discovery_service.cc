@@ -164,7 +164,6 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     }
   }
   ENVOY_LOG(debug, "Sending EndpointHealthResponse to server {}", response.DebugString());
-
   stream_->sendMessage(response, false);
   stats_.responses_.inc();
   setHdsStreamResponseTimer();
