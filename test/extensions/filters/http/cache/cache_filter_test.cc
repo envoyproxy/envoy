@@ -66,9 +66,10 @@ TEST_F(CacheFilterTest, UncacheableRequest) {
 }
 
 TEST_F(CacheFilterTest, ImmediateMiss) {
-  request_headers_.setHost("ImmediateMiss");
+  for (int request = 1; request <= 2; request++) {
+    // Each iteration a request is sent to a different host, therefore the second one is a miss
+    request_headers_.setHost("ImmediateMiss" + std::to_string(request));
 
-  {
     // Create filter for request 1
     CacheFilter filter = makeFilter(simple_cache_);
 
@@ -80,62 +81,20 @@ TEST_F(CacheFilterTest, ImmediateMiss) {
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     // Encode response header
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
-    filter.onDestroy();
-  }
-  {
-    // Change the request host to miss
-    request_headers_.setHost("ImmediateMiss2");
-
-    // Create filter for request 2
-    CacheFilter filter = makeFilter(simple_cache_);
-
-    // Decode request 2 header
-    // Make sure the filter did not encode any headers or data
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
-    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
-    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
-
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter.onDestroy();
   }
 }
 
 TEST_F(CacheFilterTest, DelayedMiss) {
-  request_headers_.setHost("DelayedMiss");
+  for (int request = 1; request <= 2; request++) {
+    // Each iteration a request is sent to a different host, therefore the second one is a miss
+    request_headers_.setHost("DelayedMiss" + std::to_string(request));
 
-  {
     // Create filter for request 1
     CacheFilter filter = makeFilter(delayed_cache_);
 
     // Decode request 1 header
-    // No hit will be found, so the filter should call continueDecoding
-    EXPECT_CALL(decoder_callbacks_, continueDecoding);
-    // Make sure the filter did not encode any headers or data
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
-    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
-    // The filter should stop iteration waiting for cache response
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
-
-    // Make the delayed callback to call onHeaders
-    delayed_cache_.delayed_headers_cb_();
-
-    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
-
-    // Encode response header
-    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
-    filter.onDestroy();
-  }
-  {
-    // Create filter for request 2
-    CacheFilter filter = makeFilter(delayed_cache_);
-
-    // Change the request host to miss
-    request_headers_.setHost("DelayedMiss2");
-
-    // Decode request 2 header
     // No hit will be found, so the filter should call continueDecoding
     EXPECT_CALL(decoder_callbacks_, continueDecoding);
     // Make sure the filter did not encode any headers or data
@@ -572,7 +531,6 @@ TEST_F(CacheFilterTest, ImmediateUnsuccessfulValidation) {
 
 TEST_F(CacheFilterTest, DelayedUnuccessfulValidation) {
   request_headers_.setHost("DelayedUnuccessfulValidation");
-  const std::string body = "abc";
 
   {
     // Create filter for request 1
@@ -594,6 +552,7 @@ TEST_F(CacheFilterTest, DelayedUnuccessfulValidation) {
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
     // Encode response header
+    const std::string body = "abc";
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
