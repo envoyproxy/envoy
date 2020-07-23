@@ -129,6 +129,15 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test(
+    name = "xds_verifier_test",
+    srcs = ["xds_verifier_test.cc"],
+    deps = [
+        ":xds_verifier_lib",
+        "//test/config:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
@@ -138,7 +147,6 @@ envoy_cc_test_library(
         ":xds_verifier_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
