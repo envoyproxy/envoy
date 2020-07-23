@@ -29,14 +29,14 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-                     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags);
+                     const std::vector<Runtime::FeatureFlag>& quic_flags);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-                     std::vector<envoy::config::core::v3::RuntimeFeatureFlag> quic_flags);
+                     const std::vector<Runtime::FeatureFlag>& quic_flags);
 
   ~ActiveQuicListener() override;
 
@@ -86,12 +86,14 @@ public:
   bool isTransportConnectionless() const override { return false; }
 
 private:
+  std::vector<Runtime::FeatureFlag> vectorizeQuicFlags();
   friend class ActiveQuicListenerFactoryPeer;
 
   quic::QuicConfig quic_config_;
   const uint32_t concurrency_;
   absl::once_flag install_bpf_once_;
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
+  envoy::config::listener::v3::QuicProtocolOptions::QuicFlags quic_flags_;
 };
 
 } // namespace Quic
