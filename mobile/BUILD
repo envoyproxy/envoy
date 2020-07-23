@@ -51,7 +51,7 @@ genrule(
     outs = ["output_in_dist_directory"],
     cmd = """
     chmod 755 $<
-    cp $< dist/
+    cp $< dist/envoy.aar
     touch $@
     """,
     stamp = True,
