@@ -84,7 +84,7 @@ TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
   EXPECT_THAT(present_cipher_suites, testing::IsSubsetOf(KNOWN_CIPHER_SUITES));
 }
 
-// Test that no previously supported cipher suites were removed from the SSL library.  If a cipher
+// Test that no previously supported cipher suites were removed from the SSL library. If a cipher
 // suite is removed, it must be added to the release notes as an incompatible change, because it can
 // cause previously loadable configurations to no longer load if they reference the cipher suite.
 TEST_P(SslLibraryCipherSuiteSupport, CipherSuitesNotRemoved) {
