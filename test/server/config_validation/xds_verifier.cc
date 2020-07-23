@@ -78,7 +78,7 @@ void XdsVerifier::dumpState() {
  * updated listener
  */
 void XdsVerifier::listenerUpdated(const envoy::config::listener::v3::Listener& listener) {
-  ENVOY_LOG_MISC(debug, "About to update listener {}", listener.name());
+  ENVOY_LOG_MISC(debug, "About to update listener {} to {}", listener.name(), getRoute(listener));
   dumpState();
 
   if (std::any_of(listeners_.begin(), listeners_.end(), [&](auto& rep) {
@@ -89,17 +89,25 @@ void XdsVerifier::listenerUpdated(const envoy::config::listener::v3::Listener& l
     return;
   }
 
-  for (unsigned long i = 0; i < listeners_.size(); ++i) {
-    const auto& rep = listeners_[i];
+  bool found = false;
+  for (auto it = listeners_.begin(); it != listeners_.end();) {
+    const auto& rep = *it;
+    ENVOY_LOG_MISC(debug, "checking {} for update", rep.listener.name());
     if (rep.listener.name() == listener.name()) {
-      if (rep.state == ACTIVE) {
+      // if we're updating a warming/active listener, num_modified_ must be incremented
+      if (rep.state != DRAINING && !found) {
         num_modified_++;
+        found = true;
+      }
+
+      if (rep.state == ACTIVE) {
         if (hasActiveRoute(listener)) {
           // if the new listener is ready to take traffic, the old listener will be removed
           // it seems to be directly removed without being added to the config dump as draining
           ENVOY_LOG_MISC(debug, "Removing {} after update", listener.name());
           num_active_--;
-          listeners_.erase(listeners_.begin() + i);
+          it = listeners_.erase(it);
+          continue;
         } else {
           // if the new listener has not gotten its route yet, the old listener will remain active
           // until that happens
@@ -109,9 +117,11 @@ void XdsVerifier::listenerUpdated(const envoy::config::listener::v3::Listener& l
         // if the old listener is warming, it will be removed and replaced with the new
         ENVOY_LOG_MISC(debug, "Removed warming listener {}", listener.name());
         num_warming_--;
-        listeners_.erase(listeners_.begin() + i);
+        it = listeners_.erase(it);
+        continue;
       }
     }
+    ++it;
   }
   dumpState();
   listenerAdded(listener, true);
@@ -149,24 +159,30 @@ void XdsVerifier::listenerAdded(const envoy::config::listener::v3::Listener& lis
  */
 void XdsVerifier::listenerRemoved(const std::string& name) {
   bool found = false;
-  for (unsigned long i = 0; i < listeners_.size(); ++i) {
-    auto& rep = listeners_[i];
+
+  for (auto it = listeners_.begin(); it != listeners_.end(); ) {
+    auto& rep = *it;
     if (rep.listener.name() != name) {
+      ++it;
       continue;
     }
 
     if (rep.state == ACTIVE) {
       // the listener will be drained before being removed
       ENVOY_LOG_MISC(debug, "Changing {} to DRAINING", name);
-      num_removed_++;
+      found = true;
       num_active_--;
       num_draining_++;
       rep.state = DRAINING;
+      ++it;
     } else if (rep.state == WARMING) {
       // the listener will be removed immediately
       ENVOY_LOG_MISC(debug, "Removed warming listener {}", name);
-      listeners_.erase(listeners_.begin() + i);
+      found = true;
       num_warming_--;
+      it = listeners_.erase(it);
+    } else {
+      ++it;
     }
   }
 

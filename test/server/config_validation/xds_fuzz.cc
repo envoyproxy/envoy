@@ -69,6 +69,9 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
 
+  // avoid listeners draining during the test
+  drain_time_ = std::chrono::seconds(60);
+
   if (input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
   } else {
@@ -171,7 +174,7 @@ void XdsFuzzTest::addRoute(const std::string& route_name) {
 
   if (has_route) {
     // if the route was already in routes_, don't send a duplicate add in delta request
-    updateRoute(routes_, {}, {});
+    updateRoute(routes_, {route}, {});
     verifier_.routeUpdated(route);
   } else {
     updateRoute(routes_, {route}, {});
