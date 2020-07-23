@@ -142,7 +142,11 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
   for (const auto& action : config.actions()) {
     const auto& name = action.name();
     ENVOY_LOG(debug, "Adding overload action {}", name);
-    // Cannot use in place construction as OverloadAction constructor may throw
+    // TODO: use in place construction once https://github.com/abseil/abseil-cpp/issues/388 is
+    // addressed
+    // We cannot currently use in place construction as the OverloadAction constructor may throw,
+    // causing an inconsistent internal state of the actions_ map, which on destruction results in
+    // an invalid free.
     auto result = actions_.try_emplace(name, OverloadAction(action, stats_scope));
     if (!result.second) {
       throw EnvoyException(absl::StrCat("Duplicate overload action ", name));
