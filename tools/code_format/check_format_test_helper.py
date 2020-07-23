@@ -275,6 +275,7 @@ def runChecks():
       "term absl::make_unique< should be replaced with standard library term std::make_unique<")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
+  errors += checkFileExpectingOK("duration_value_zero.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
   return errors
