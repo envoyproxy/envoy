@@ -43,8 +43,11 @@ in the configuration snippet below:
 Statistics
 ----------
 
-Every configured ZooKeeper proxy filter has statistics rooted at *zookeeper.<stat_prefix>.* with the
-following statistics:
+Every configured ZooKeeper proxy filter has statistics rooted at *<stat_prefix>.zookeeper.*. The filter
+will gather latency statistics in the *<stat_prefix>.zookeeper.<opcode>_response_latency* namespace. Latency
+stats are in milliseconds.
+
+The following counters are available:
 
 .. csv-table::
   :header: Name, Type, Description
