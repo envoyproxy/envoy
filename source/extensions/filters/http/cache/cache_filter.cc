@@ -14,7 +14,7 @@ namespace HttpFilters {
 namespace Cache {
 
 namespace {
-bool inline isResponseNotModified(const Http::ResponseHeaderMap& response_headers) {
+inline bool isResponseNotModified(const Http::ResponseHeaderMap& response_headers) {
   return Http::Utility::getResponseStatus(response_headers) == enumToInt(Http::Code::NotModified);
 }
 } // namespace
@@ -82,52 +82,13 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 
   filter_state_ = FilterState::Encoding;
 
-  // If lookup_ is null, the request wasn't cacheable, so the response isn't either
+  // If lookup_ is null, the request wasn't cacheable, so the response isn't either.
   if (!lookup_) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (validating_cache_entry_ && isResponseNotModified(headers)) {
-    ASSERT(lookup_result_, "CacheFilter trying to validate a non-existent lookup result");
-
-    // Check whether the cached entry should be updated before modifying the 304 response
-    const bool should_update_cached_entry = shouldUpdateCachedEntry(headers);
-
-    // Update the 304 response status code and content-length
-    headers.setStatus(lookup_result_->headers_->getStatusValue());
-    headers.setContentLength(lookup_result_->headers_->getContentLengthValue());
-
-    // A cache entry was successfully validated; encode cached body and trailers
-    // encodeCachedResponse also adds the age header to lookup_result_
-    // so it should be called before headers are merged
-    encodeCachedResponse();
-
-    // Add any missing headers from the cached response to the 304 response
-    lookup_result_->headers_->iterate(
-        [response_headers = &headers](const Http::HeaderEntry& cached_header) {
-          // TODO(yosrym93): Try to avoid copying the header key twice
-          Http::LowerCaseString key(std::string(cached_header.key().getStringView()));
-          absl::string_view value = cached_header.value().getStringView();
-          if (!response_headers->get(key)) {
-            response_headers->setCopy(key, value);
-          }
-          return Http::HeaderMap::Iterate::Continue;
-        });
-
-    if (should_update_cached_entry) {
-      // TODO(yosrym93): else the cached entry should be deleted
-      cache_.updateHeaders(*lookup_, headers);
-    }
-
-    if (encode_cached_response_state_ == EncodeCachedResponseState::FinishedEncoding) {
-      // Cached body (and trailers) already encoded -- continue iteration
-      return Http::FilterHeadersStatus::Continue;
-    } else {
-      // Encoding body (and trailers) not finished yet, stop iteration to wait for it
-      // and tell it that iteration stopped
-      encode_cached_response_state_ = EncodeCachedResponseState::IterationStopped;
-      return Http::FilterHeadersStatus::StopIteration;
-    }
+    return processSuccessfulValidation(headers);
   }
 
   // Either a cache miss or a cache entry is no longer valid
@@ -138,6 +99,7 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
+    return Http::FilterHeadersStatus::Continue;
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -151,7 +113,9 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
     // TODO(toddmgreer): Wait for the cache if necessary.
     insert_->insertBody(
         data, [](bool) {}, end_stream);
-  } else if (encode_cached_response_state_ == EncodeCachedResponseState::IterationStopped) {
+    return Http::FilterDataStatus::Continue;
+  }
+  if (encode_cached_response_state_ == EncodeCachedResponseState::IterationStopped) {
     // Iteration stopped waiting for cached body (and trailers) to be encoded
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
@@ -190,8 +154,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
     validating_cache_entry_ = true;
     lookup_result_ = std::make_unique<LookupResult>(std::move(result));
     injectValidationHeaders();
-    // The following line is necessary for GCC to know that there is no break on purpose
-    // fall through
+    FALLTHRU;
   case CacheEntryStatus::Unusable:
     if (get_headers_state_ == GetHeadersState::FinishedGetHeadersCall) {
       // decodeHeader returned Http::FilterHeadersStatus::StopAllIterationAndWatermark--restart it
@@ -255,6 +218,54 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   }
   finishedEncodingCachedResponse();
+}
+
+Http::FilterHeadersStatus
+CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_headers) {
+  ASSERT(lookup_result_, "CacheFilter trying to validate a non-existent lookup result");
+  ASSERT(
+      validating_cache_entry_,
+      "processSuccessfulValidation must only be called when a cached response is being validated");
+  ASSERT(isResponseNotModified(response_headers),
+         "processSuccessfulValidation must only be called with 304 responses");
+
+  // Check whether the cached entry should be updated before modifying the 304 response
+  const bool should_update_cached_entry = shouldUpdateCachedEntry(response_headers);
+
+  // Update the 304 response status code and content-length
+  response_headers.setStatus(lookup_result_->headers_->getStatusValue());
+  response_headers.setContentLength(lookup_result_->headers_->getContentLengthValue());
+
+  // A cache entry was successfully validated; encode cached body and trailers.
+  // encodeCachedResponse also adds the age header to lookup_result_
+  // so it should be called before headers are merged.
+  encodeCachedResponse();
+
+  // Add any missing headers from the cached response to the 304 response.
+  lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
+    // TODO(yosrym93): Try to avoid copying the header key twice
+    Http::LowerCaseString key(std::string(cached_header.key().getStringView()));
+    absl::string_view value = cached_header.value().getStringView();
+    if (!response_headers.get(key)) {
+      response_headers.setCopy(key, value);
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  if (should_update_cached_entry) {
+    // TODO(yosrym93): else the cached entry should be deleted
+    cache_.updateHeaders(*lookup_, response_headers);
+  }
+
+  if (encode_cached_response_state_ == EncodeCachedResponseState::FinishedEncoding) {
+    // Cached body (and trailers) already encoded -- continue iteration
+    return Http::FilterHeadersStatus::Continue;
+  } else {
+    // Encoding body (and trailers) not finished yet, stop iteration to wait for it
+    // and tell it that iteration stopped
+    encode_cached_response_state_ = EncodeCachedResponseState::IterationStopped;
+    return Http::FilterHeadersStatus::StopIteration;
+  }
 }
 
 bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const {

@@ -50,6 +50,11 @@ private:
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
   // Precondition: lookup_result_ points to a cache lookup result that requires validation
+  //               validating_cache_entry_ is true (a stale cache entry was being validated)
+  // Serves a validated cached response after updating it with a 304 response
+  Http::FilterHeadersStatus processSuccessfulValidation(Http::ResponseHeaderMap& response_headers);
+
+  // Precondition: lookup_result_ points to a cache lookup result that requires validation
   // Checks if a cached entry should be updated with a 304 response
   bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
 
