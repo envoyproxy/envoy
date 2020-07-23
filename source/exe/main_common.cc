@@ -28,6 +28,12 @@
 #include "server/hot_restart_impl.h"
 #endif
 
+#ifndef FANCY
+#define LOGGER_MODE 0
+#else
+#define LOGGER_MODE 1
+#endif
+
 namespace Envoy {
 
 Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instance& server) {
@@ -58,6 +64,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   // before we do any configuration loading.
   OptionsImpl::disableExtensions(options.disabledExtensions());
 
+  Logger::LoggerMode log_mode = LOGGER_MODE ? Logger::LoggerMode::Fancy : Logger::LoggerMode::Envoy;
+
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
@@ -68,7 +76,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped());
+                                                         log_lock, options_.logFormatEscaped(), log_mode);
 
     configureComponentLogLevels();
 
@@ -89,7 +97,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     logging_context_ =
         std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                          restarter_->logLock(), options_.logFormatEscaped());
+                                          restarter_->logLock(), options_.logFormatEscaped(), log_mode);
     break;
   }
 }
