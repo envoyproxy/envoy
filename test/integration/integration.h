@@ -242,9 +242,8 @@ public:
   void cleanUpXdsConnection();
 
   // See if a port can be successfully bound within the given timeout.
-  AssertionResult
-  waitForPortAvailable(uint32_t port,
-                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  ABSL_MUST_USE_RESULT AssertionResult waitForPortAvailable(
+      uint32_t port, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Helpers for setting up expectations and making the internal gears turn for xDS request/response
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
