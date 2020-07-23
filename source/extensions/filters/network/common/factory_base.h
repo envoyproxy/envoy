@@ -35,7 +35,8 @@ public:
       const Protobuf::Message& proto_config, ProtobufMessage::ValidationVisitor& validation_visitor,
       Server::Configuration::TransportSocketFactoryContext& factory_context) override {
     return createProtocolOptionsTyped(MessageUtil::downcastAndValidate<const ProtocolOptionsProto&>(
-        proto_config, validation_visitor, factory_context));
+                                          proto_config, validation_visitor),
+                                      factory_context);
   }
 
   std::string name() const override { return name_; }
@@ -52,7 +53,8 @@ private:
                                     Server::Configuration::FactoryContext& context) PURE;
 
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsTyped(const ProtocolOptionsProto&) {
+  createProtocolOptionsTyped(const ProtocolOptionsProto&,
+                             Server::Configuration::FactoryContext& context) {
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name_));
   }
 
