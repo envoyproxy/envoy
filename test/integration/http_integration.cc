@@ -853,8 +853,9 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   }
 }
 
-void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upstream_complete,
-                                                       bool with_encoder_filter) {
+void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_complete,
+                                               bool with_encoder_filter,
+                                               bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
     config_helper_.addFilter("name: envoy.filters.http.cors");
@@ -891,6 +892,13 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   if (continue_before_upstream_complete) {
+    if (with_multiple_1xx_headers) {
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    }
     // This case tests sending on 100-Continue headers before the client has sent all the
     // request data.
     upstream_request_->encode100ContinueHeaders(
@@ -902,6 +910,13 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   if (!continue_before_upstream_complete) {
+    if (with_multiple_1xx_headers) {
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    }
     // This case tests forwarding 100-Continue after the client has sent all data.
     upstream_request_->encode100ContinueHeaders(
         Http::TestResponseHeaderMapImpl{{":status", "100"}});
