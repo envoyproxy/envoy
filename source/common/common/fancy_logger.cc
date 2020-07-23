@@ -5,6 +5,12 @@
 
 #include "common/common/logger.h"
 
+#ifndef FANCY
+#define LOGGER_MODE 0
+#else
+#define LOGGER_MODE 1
+#endif
+
 using spdlog::level::level_enum;
 
 namespace Envoy {
@@ -109,6 +115,10 @@ spdlog::logger* FancyContext::createLogger(std::string key, int level)
   SpdLoggerPtr new_logger = std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
   if (!Logger::Registry::getSink()->hasLock()) { // occurs in benchmark test
     initSink();
+  }
+  if (LOGGER_MODE && Logger::Context::getLoggerMode() == Logger::LoggerMode::Envoy) {
+    // Enabled by compile option, but using FANCY_LOG w/o mode being set is also possible
+    Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
   }
   level_enum lv = Logger::Context::getFancyDefaultLevel();
   if (level > -1) {

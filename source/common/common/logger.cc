@@ -92,9 +92,9 @@ std::string Context::fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
 spdlog::level::level_enum Context::fancy_default_level_ = spdlog::level::info;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock, bool should_escape, LoggerMode mode)
+                 Thread::BasicLockable& lock, bool should_escape)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
-      save_context_(current_context), logger_mode_(mode) {
+      save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -113,12 +113,6 @@ void Context::activate() {
   Registry::getSink()->setShouldEscape(should_escape_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
-
-  if (logger_mode_ == LoggerMode::Fancy) {
-    FancyContext::setDefaultFancyLevelFormat(log_level_, log_format_);
-    fancy_default_level_ = log_level_;
-    fancy_log_format_ = log_format_;
-  }
 }
 
 LoggerMode Context::getLoggerMode() { return current_context->logger_mode_; }

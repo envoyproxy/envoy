@@ -11,6 +11,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#ifndef FANCY
+#define LOGGER_MODE 0
+#else
+#define LOGGER_MODE 1
+#endif
+
 namespace Envoy {
 
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
@@ -196,7 +202,13 @@ TEST(Fancy, Iteration) {
 TEST(Fancy, Context) {
   FANCY_LOG(info, "Info: context API needs test.");
   Logger::LoggerMode mode = Logger::Context::getLoggerMode();
-  EXPECT_EQ(mode, Logger::LoggerMode::Envoy);
+  Logger::LoggerMode compile_mode =
+      LOGGER_MODE ? Logger::LoggerMode::Fancy : Logger::LoggerMode::Envoy;
+  printf(" --> Logger Mode: %d\n", LOGGER_MODE);
+  EXPECT_EQ(mode, compile_mode);
+  if (LOGGER_MODE) {
+    ENVOY_LOG(critical, "Compile option set: it's a Fancy Log printed by ENVOY_LOG!");
+  }
   Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
   EXPECT_EQ(Logger::Context::getLoggerMode(), Logger::LoggerMode::Fancy);
   EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
