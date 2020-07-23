@@ -157,17 +157,17 @@ TEST(Fancy, Global) {
 
 TEST(Fancy, SetLevel) {
   const char* file = "P=NP_file";
-  FancyContext::setFancyLogger(file, spdlog::level::trace);
+  getFancyContext().setFancyLogger(file, spdlog::level::trace);
 
-  FancyContext::setFancyLogger(__FILE__, spdlog::level::err);
+  getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
   FANCY_LOG(error, "Fancy Error! Here's a test for level.");
   FANCY_LOG(warn, "Warning: you shouldn't see this message!");
 }
 
 TEST(Fancy, Default) {
-  FancyContext::setFancyLogger(__FILE__, spdlog::level::info); // revert to default
+  getFancyContext().setFancyLogger(__FILE__, spdlog::level::info); // revert to default
   std::string fmt = "[%t][%l][%n] %v";
-  FancyContext::setDefaultFancyLevelFormat(spdlog::level::warn, fmt);
+  getFancyContext().setDefaultFancyLevelFormat(spdlog::level::warn, fmt);
   FANCY_LOG(info, "Info: you shouldn't see this message!");
   FANCY_LOG(warn, "Warning: warning at default log level!");
   EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] %v");
@@ -175,7 +175,7 @@ TEST(Fancy, Default) {
 }
 
 TEST(Fancy, FastPath) {
-  FancyContext::setFancyLogger(__FILE__, spdlog::level::info);
+  getFancyContext().setFancyLogger(__FILE__, spdlog::level::info);
   for (int i = 0; i < 10; i++) {
     FANCY_LOG(warn, "Fake warning No. {}", i);
   }
