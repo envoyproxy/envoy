@@ -9,6 +9,7 @@ import "envoy/config/endpoint/v3/endpoint_components.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -108,11 +109,32 @@ message EndpointHealth {
   config.core.v3.HealthStatus health_status = 2;
 }
 
+// Group endpoint health by locality under each cluster.
+message LocalityEndpointsHealth {
+  config.core.v3.Locality locality = 1;
+
+  repeated EndpointHealth endpoints_health = 2;
+}
+
+// The health status of endpoints in a cluster. The cluster name and locality
+// should match the corresponding fields in ClusterHealthCheck message.
+message ClusterEndpointsHealth {
+  string cluster_name = 1;
+
+  repeated LocalityEndpointsHealth locality_endpoints_health = 2;
+}
+
 message EndpointHealthResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.EndpointHealthResponse";
 
+  // [#comment:TODO(drewsortega): add deprecate annotation once cluster_endpoints_health is implemented]
+  // Deprecated - Flat list of endpoint health information.
   repeated EndpointHealth endpoints_health = 1;
+
+  // [#not-implemented-hide:]
+  // Organize Endpoint health information by cluster.
+  repeated ClusterEndpointsHealth cluster_endpoints_health = 2;
 }
 
 message HealthCheckRequestOrEndpointHealthResponse {
