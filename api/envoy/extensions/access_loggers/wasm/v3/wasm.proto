@@ -11,6 +11,7 @@ option java_package = "io.envoyproxy.envoy.extensions.access_loggers.wasm.v3";
 option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: Wasm access log]
 
