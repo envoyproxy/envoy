@@ -103,18 +103,20 @@ void HdsDelegate::handleFailure() {
 
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
 envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelegate::sendResponse() {
-  absl::flat_hash_map<
-      size_t, std::vector<std::pair<HostSharedPtr, envoy::service::health::v3::EndpointHealth*>>>
-      hostsByLocality;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
   for (const auto& cluster : hds_clusters_) {
+    // Group EndpointHealth info by Locality under each cluster
+    absl::flat_hash_map<const envoy::config::core::v3::Locality,
+                        std::vector<envoy::service::health::v3::EndpointHealth*>, LocalityHash,
+                        LocalityEqualTo>
+        hostsByLocality;
+
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
         auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
         Network::Utility::addressToProtobufAddress(
             *host->address(), *endpoint->mutable_endpoint()->mutable_address());
-        // TODO(lilika): Add support for more granular options of
-        // envoy::api::v2::core::HealthStatus
+        // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
         if (host->health() == Host::Health::Healthy) {
           endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
         } else {
@@ -130,24 +132,34 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
           }
         }
 
-        auto hash = MessageUtil::hash(host->locality());
+        // If there is not already a group by this locality, insert a new vector for it.
         const auto& locality_group = hostsByLocality.insert(
-            {hash,
-             std::vector<std::pair<HostSharedPtr, envoy::service::health::v3::EndpointHealth*>>()});
-        locality_group.first->second.push_back({host, endpoint});
+            {host->locality(), std::vector<envoy::service::health::v3::EndpointHealth*>()});
+
+        // Add to the new or existing vector the current EndpointHealth info by SharedPtr.
+        locality_group.first->second.push_back(endpoint);
       }
     }
 
+    // add a new ClusterEndpointsHealth repeated object to the response.
     auto* localityEndpointsByCluster =
         response.mutable_endpoint_health_response()->add_cluster_endpoints_health();
+    // Set the cluster name by our current cluster.
     localityEndpointsByCluster->set_cluster_name(cluster->info()->name());
+
+    // For every locality-to-hosts grouping, add to our proto.
     for (const auto& hosts : hostsByLocality) {
+      // add an endpoints-locality grouping.
       auto* endpointsByLocality = localityEndpointsByCluster->add_locality_endpoints_health();
-      for (const auto& host_endpoint : hosts.second) {
-        if (!endpointsByLocality->has_locality()) {
-          endpointsByLocality->mutable_locality()->MergeFrom(host_endpoint.first->locality());
-        }
-        endpointsByLocality->add_endpoints_health()->MergeFrom(*host_endpoint.second);
+
+      // if we have a known locality for this grouping, copy it.
+      if (!endpointsByLocality->has_locality()) {
+        endpointsByLocality->mutable_locality()->MergeFrom(hosts.first);
+      }
+
+      // add all endpoints to this locality grouping.
+      for (const auto& endpoint : hosts.second) {
+        endpointsByLocality->add_endpoints_health()->MergeFrom(*endpoint);
       }
     }
   }
