@@ -36,17 +36,14 @@ private:
   Server::Configuration::FakeFactoryContext factory_context_;
   Network::ReadFilterSharedPtr read_filter_;
   Network::FilterFactoryCb cb_;
-  Network::Address::InstanceConstSharedPtr ext_authz_addr_;
-  Network::Address::InstanceConstSharedPtr http_conn_manager_addr_;
+  Network::Address::InstanceConstSharedPtr pipe_addr_;
+  Network::Address::InstanceConstSharedPtr ipv4_addr_;
   Event::SimulatedTimeSystem& time_source_;
   std::shared_ptr<NiceMock<Network::MockReadFilterCallbacks>> read_filter_callbacks_;
   std::unique_ptr<Grpc::MockAsyncRequest> async_request_;
   std::unique_ptr<Grpc::MockAsyncClient> async_client_;
   std::unique_ptr<Grpc::MockAsyncClientFactory> async_client_factory_;
   Tracing::MockSpan span_;
-  // Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
-  // std::chrono::time_point.
-  int seconds_in_one_day_ = 86400;
 };
 
 } // namespace NetworkFilters
