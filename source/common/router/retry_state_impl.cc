@@ -373,7 +373,7 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
 
   // Yes, we will retry based on the headers - try to parse a rate limited reset interval from the
   // response.
-  if (would_retry && ratelimited_reset_headers_.size() > 0) {
+  if (would_retry && !ratelimited_reset_headers_.empty()) {
     const auto backoff_interval = parseRateLimitedResetInterval(response_headers);
     if (backoff_interval.has_value()) {
       ratelimited_backoff_strategy_ = std::make_unique<JitteredLowerBoundBackOffStrategy>(
