@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 49]
+// [#next-free-field: 50]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -334,6 +334,31 @@ message Cluster {
     // The number of random healthy hosts from which the host with the fewest active requests will
     // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
     google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32 = {gte: 2}];
+
+    // The following formula is used to calculate the dynamic weights when hosts have different load
+    // balancing weights:
+    //
+    // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
+    //
+    // The larger the active request bias is, the more aggressively active requests will lower the
+    // effective weight when all host weights are not equal.
+    //
+    // `active_request_bias` must be greater than or equal to 0.0.
+    //
+    // When `active_request_bias == 0.0` the Least Request Load Balancer doesn't consider the number
+    // of active requests at the time it picks a host and behaves like the Round Robin Load
+    // Balancer.
+    //
+    // When `active_request_bias > 0.0` the Least Request Load Balancer scales the load balancing
+    // weight by the number of active requests at the time it does a pick.
+    //
+    // The value is cached for performance reasons and refreshed whenever one of the Load Balancer's
+    // host sets changes, e.g., whenever there is a host membership update or a host load balancing
+    // weight change.
+    //
+    // .. note::
+    //   This setting only takes effect if all host weights are not equal.
+    core.v3.RuntimeDouble active_request_bias = 2;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
@@ -831,7 +856,12 @@ message Cluster {
   // request. These show what percentage of a request's per try and global timeout was used. A value
   // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
   // of 100 would indicate that the request took the entirety of the timeout given to it.
-  bool track_timeout_budgets = 47;
+  //
+  // .. attention::
+  //
+  //   This field has been deprecated in favor of `timeout_budgets`, part of
+  //   :ref:`track_cluster_stats <envoy_api_field_config.cluster.v3.Cluster.track_cluster_stats>`.
+  bool track_timeout_budgets = 47 [deprecated = true];
 
   // Optional customization and configuration of upstream connection pool, and upstream type.
   //
@@ -851,6 +881,9 @@ message Cluster {
   // CONNECT only if a custom filter indicates it is appropriate, the custom factories
   // can be registered and configured here.
   core.v3.TypedExtensionConfig upstream_config = 48;
+
+  // Configuration to track optional cluster stats.
+  TrackClusterStats track_cluster_stats = 49;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
@@ -910,4 +943,18 @@ message UpstreamConnectionOptions {
 
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
   core.v3.TcpKeepalive tcp_keepalive = 1;
+}
+
+message TrackClusterStats {
+  // If timeout_budgets is true, the :ref:`timeout budget histograms
+  // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
+  // request. These show what percentage of a request's per try and global timeout was used. A value
+  // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
+  // of 100 would indicate that the request took the entirety of the timeout given to it.
+  bool timeout_budgets = 1;
+
+  // If request_response_sizes is true, then the :ref:`histograms
+  // <config_cluster_manager_cluster_stats_request_response_sizes>`  tracking header and body sizes
+  // of requests and responses will be published.
+  bool request_response_sizes = 2;
 }

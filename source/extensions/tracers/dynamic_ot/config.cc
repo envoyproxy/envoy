@@ -8,7 +8,6 @@
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
-#include "extensions/tracers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +15,7 @@ namespace Tracers {
 namespace DynamicOt {
 
 DynamicOpenTracingTracerFactory::DynamicOpenTracingTracerFactory()
-    : FactoryBase(TracerNames::get().DynamicOt) {}
+    : FactoryBase("envoy.tracers.dynamic_ot") {}
 
 Tracing::HttpTracerSharedPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::DynamicOtConfig& proto_config,

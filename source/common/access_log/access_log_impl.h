@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
@@ -30,7 +31,7 @@ public:
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
   static FilterPtr fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             Runtime::Loader& runtime, Random::RandomGenerator& random,
                              ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
@@ -85,7 +86,7 @@ class OperatorFilter : public Filter {
 public:
   OperatorFilter(
       const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
 protected:
@@ -98,7 +99,7 @@ protected:
 class AndFilter : public OperatorFilter {
 public:
   AndFilter(const envoy::config::accesslog::v3::AndFilter& config, Runtime::Loader& runtime,
-            Runtime::RandomGenerator& random,
+            Random::RandomGenerator& random,
             ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
@@ -113,8 +114,7 @@ public:
 class OrFilter : public OperatorFilter {
 public:
   OrFilter(const envoy::config::accesslog::v3::OrFilter& config, Runtime::Loader& runtime,
-           Runtime::RandomGenerator& random,
-           ProtobufMessage::ValidationVisitor& validation_visitor);
+           Random::RandomGenerator& random, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
@@ -152,7 +152,7 @@ public:
 class RuntimeFilter : public Filter {
 public:
   RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& config, Runtime::Loader& runtime,
-                Runtime::RandomGenerator& random);
+                Random::RandomGenerator& random);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
@@ -161,7 +161,7 @@ public:
 
 private:
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   const std::string runtime_key_;
   const envoy::type::v3::FractionalPercent percent_;
   const bool use_independent_randomness_;
@@ -245,7 +245,7 @@ public:
    * @return an instance of extension filter implementation from a config proto.
    */
   virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                                 Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
+                                 Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
   std::string category() const override { return "envoy.access_logger.extension_filters"; }
 };

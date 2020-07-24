@@ -83,6 +83,35 @@ message StatsConfig {
   //   `issue #8771 <https://github.com/envoyproxy/envoy/issues/8771>`_ for more information.
   //   If any unexpected behavior changes are observed, please open a new issue immediately.
   StatsMatcher stats_matcher = 3;
+
+  // Defines rules for setting the histogram buckets. Rules are evaluated in order, and the first
+  // match is applied. If no match is found (or if no rules are set), the following default buckets
+  // are used:
+  //
+  //   .. code-block:: json
+  //
+  //     [
+  //       0.5,
+  //       1,
+  //       5,
+  //       10,
+  //       25,
+  //       50,
+  //       100,
+  //       250,
+  //       500,
+  //       1000,
+  //       2500,
+  //       5000,
+  //       10000,
+  //       30000,
+  //       60000,
+  //       300000,
+  //       600000,
+  //       1800000,
+  //       3600000
+  //     ]
+  repeated HistogramBucketSettings histogram_bucket_settings = 4;
 }
 
 // Configuration for disabling stat instantiation.
@@ -259,6 +288,16 @@ message TagSpecifier {
   }
 }
 
+// Specifies a matcher for stats and the buckets that matching stats should use.
+message HistogramBucketSettings {
+  // The stats that this rule applies to. The match is applied to the original stat name
+  // before tag-extraction, for example `cluster.exampleclustername.upstream_cx_length_ms`.
+  type.matcher.v3.StringMatcher match = 1 [(validate.rules).message = {required: true}];
+
+  // Each value is the upper bound of a successive bucket.
+  repeated double buckets = 2 [(validate.rules).repeated = {min_items: 1}];
+}
+
 // Stats configuration proto schema for built-in *envoy.stat_sinks.statsd* sink. This sink does not support
 // tagged metrics.
 // [#extension: envoy.stat_sinks.statsd]
@@ -330,6 +369,14 @@ message DogStatsdSink {
   // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field
   // <envoy_api_field_config.metrics.v3.StatsdSink.prefix>` for more details.
   string prefix = 3;
+
+  // Optional max datagram size to use when sending UDP messages. By default Envoy
+  // will emit one metric per datagram. By specifying a max-size larger than a single
+  // metric, Envoy will emit multiple, new-line separated metrics. The max datagram
+  // size should not exceed your network's MTU.
+  //
+  // Note that this value may not be respected if smaller than a single metric.
+  google.protobuf.UInt64Value max_bytes_per_datagram = 4 [(validate.rules).uint64 = {gt: 0}];
 }
 
 // Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.

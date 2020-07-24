@@ -41,7 +41,7 @@ public:
         subscription_factory_(local_info_, dispatcher_, cm_, random_, validation_visitor_, *api_,
                               runtime_) {}
 
-  std::unique_ptr<Subscription>
+  SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
         config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
@@ -50,7 +50,7 @@ public:
 
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
-  Runtime::MockRandomGenerator random_;
+  Random::MockRandomGenerator random_;
   MockSubscriptionCallbacks callbacks_;
   MockOpaqueResourceDecoder resource_decoder_;
   Http::MockAsyncClientRequest http_request_;
