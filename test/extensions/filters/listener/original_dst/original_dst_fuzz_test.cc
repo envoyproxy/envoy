@@ -1,7 +1,7 @@
 #include "extensions/filters/listener/original_dst/original_dst.h"
 
-#include "test/extensions/filters/listener/common/listener_filter_fuzzer.h"
-#include "test/extensions/filters/listener/common/listener_filter_fuzzer.pb.validate.h"
+#include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
+#include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {

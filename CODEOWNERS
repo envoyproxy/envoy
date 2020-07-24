@@ -22,7 +22,7 @@ extensions/filters/common/original_src @snowp @klarose
 # rocketmq_proxy extension
 /*/extensions/filters/network/rocketmq_proxy @aaron-ai @lizhanhui @lizan
 # thrift_proxy extension
-/*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
+/*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # compressor used by http compression filters
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
