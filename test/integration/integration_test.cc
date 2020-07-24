@@ -290,11 +290,11 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 }
 
 TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(true, true);
+  testEnvoyProxying1xx(true, true);
 }
 
 TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(false, true);
+  testEnvoyProxying1xx(false, true);
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
@@ -304,7 +304,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
-  testEnvoyProxying100Continue(true);
+  testEnvoyProxying1xx(true);
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
@@ -717,6 +717,10 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
 // an inline sendLocalReply to make sure the "kick" works under the call stack
 // of dispatch as well as when a response is proxied from upstream.
 TEST_P(IntegrationTest, PipelineInline) {
+  // When deprecating this flag, set hcm.mutable_stream_error_on_invalid_http_message true.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.hcm_stream_error_on_invalid_message",
+                                    "false");
+
   autonomous_upstream_ = true;
   initialize();
   std::string response;
@@ -1223,6 +1227,11 @@ TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
 // Send continuous pipelined requests while not reading responses, to check
 // HTTP/1.1 response flood protection.
 TEST_P(IntegrationTest, TestFlood) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(true);
+      });
   initialize();
 
   // Set up a raw connection to easily send requests without reading responses.
@@ -1300,6 +1309,11 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
 // Make sure flood protection doesn't kick in with many requests sent serially.
 TEST_P(IntegrationTest, TestManyBadRequests) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(true);
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

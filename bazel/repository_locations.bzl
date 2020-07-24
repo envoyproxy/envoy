@@ -53,11 +53,11 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     bazel_toolchains = dict(
-        sha256 = "2431088b38fd8e2878db17e3c5babb431de9e5c52b6d8b509d3070fa279a5be2",
-        strip_prefix = "bazel-toolchains-3.3.1",
+        sha256 = "882fecfc88d3dc528f5c5681d95d730e213e39099abff2e637688a91a9619395",
+        strip_prefix = "bazel-toolchains-3.4.0",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.3.1/bazel-toolchains-3.3.1.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.3.1.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.4.0/bazel-toolchains-3.4.0.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.4.0.tar.gz",
         ],
         use_category = ["build"],
     ),
@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "ff890c70d60e51c7ee80874f85c3905718b7f6929a6c367c850cdd0b9c01d44d",
-        strip_prefix = "envoy-build-tools-efaecf11d76b86551cf42e2354274ac2acd7042f",
-        # 2020-06-16
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/efaecf11d76b86551cf42e2354274ac2acd7042f.tar.gz"],
+        sha256 = "88e58fdb42021e64a0b35ae3554a82e92f5c37f630a4dab08a132fc77f8db4b7",
+        strip_prefix = "envoy-build-tools-1d6573e60207efaae6436b25ecc594360294f63a",
+        # 2020-07-18
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/1d6573e60207efaae6436b25ecc594360294f63a.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(
@@ -88,17 +88,17 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     boringssl_fips = dict(
-        sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
-        # fips-20180730
-        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
+        sha256 = "3b5fdf23274d4179c2077b5e8fa625d9debd7a390aac1d165b7e47234f648bb8",
+        # fips-20190808
+        urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-ae223d6138807a13006342edfeef32e813246b39.tar.xz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
     com_google_absl = dict(
-        sha256 = "cd477bfd0d19f803f85d118c7943b7908930310d261752730afa981118fee230",
-        strip_prefix = "abseil-cpp-ca9856cabc23d771bcce634677650eb6fc4363ae",
-        # 2020-04-30
-        urls = ["https://github.com/abseil/abseil-cpp/archive/ca9856cabc23d771bcce634677650eb6fc4363ae.tar.gz"],
+        sha256 = "ec8ef47335310cc3382bdc0d0cc1097a001e67dc83fcba807845aa5696e7e1e4",
+        strip_prefix = "abseil-cpp-302b250e1d917ede77b5ff00a6fd9f28430f1563",
+        # 2020-07-13
+        urls = ["https://github.com/abseil/abseil-cpp/archive/302b250e1d917ede77b5ff00a6fd9f28430f1563.tar.gz"],
         use_category = ["dataplane", "controlplane"],
         cpe = "N/A",
     ),
@@ -168,12 +168,9 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     com_github_gperftools_gperftools = dict(
-        # TODO(cmluciano): Bump to release 2.8
-        # The currently used version is specifically chosen to fix ppc64le builds that require inclusion
-        # of asm/ptrace.h, and also s390x builds that require special handling of mmap syscall.
-        sha256 = "97f0bc2b389c29305f5d1d8cc4d95e9212c33b55827ae65476fc761d78e3ec5d",
-        strip_prefix = "gperftools-gperftools-2.7.90",
-        urls = ["https://github.com/gperftools/gperftools/archive/gperftools-2.7.90.tar.gz"],
+        sha256 = "240deacdd628b6459671b83eb0c4db8e97baadf659f25b92e9a078d536bd513e",
+        strip_prefix = "gperftools-2.8",
+        urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-2.8/gperftools-2.8.tar.gz"],
         use_category = ["test"],
     ),
     com_github_grpc_grpc = dict(
@@ -230,9 +227,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_benchmark = dict(
-        sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
-        strip_prefix = "benchmark-1.5.0",
-        urls = ["https://github.com/google/benchmark/archive/v1.5.0.tar.gz"],
+        sha256 = "23082937d1663a53b90cb5b61df4bcc312f6dee7018da78ba00dd6bd669dfef2",
+        strip_prefix = "benchmark-1.5.1",
+        urls = ["https://github.com/google/benchmark/archive/v1.5.1.tar.gz"],
         use_category = ["test"],
     ),
     com_github_libevent_libevent = dict(
@@ -278,10 +275,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "d2e28897c297bd04429e43a1b485f7350acc23cbfee6365b8a3634c17840b2f6",
-        strip_prefix = "jwt_verify_lib-f44cf49d185ad0694b472da78071b4d67313fb86",
-        # 2020-06-03
-        urls = ["https://github.com/google/jwt_verify_lib/archive/f44cf49d185ad0694b472da78071b4d67313fb86.tar.gz"],
+        sha256 = "f1fde4f3ebb3b2d841332c7a02a4b50e0529a19709934c63bc6208d1bbe28fb1",
+        strip_prefix = "jwt_verify_lib-7276a339af8426724b744216f619c99152f8c141",
+        # 2020-07-09
+        urls = ["https://github.com/google/jwt_verify_lib/archive/7276a339af8426724b744216f619c99152f8c141.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -388,10 +385,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["other"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "193ffb4e13bd7886757fd22b61b7f7a400634412ad8e7e1071e73f57bedd7fc6",
-        strip_prefix = "opencensus-cpp-04ed0211931f12b03c1a76b3907248ca4db7bc90",
-        # 2020-03-24
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/04ed0211931f12b03c1a76b3907248ca4db7bc90.tar.gz"],
+        sha256 = "12ff300fa804f97bd07e2ff071d969e09d5f3d7bbffeac438c725fa52a51a212",
+        strip_prefix = "opencensus-cpp-7877337633466358ed680f9b26967da5b310d7aa",
+        # 2020-06-01
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/7877337633466358ed680f9b26967da5b310d7aa.tar.gz"],
         use_category = ["observability"],
         cpe = "N/A",
     ),
@@ -425,10 +422,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
-        sha256 = "1b283f93619b130504880d2f400bd449de9ab6be94ef26ecd2bb96921f48dd6c",
-        strip_prefix = "cel-cpp-50196761917300bbd47b59bd162e84817b67b7ab",
-        # 2020-06-08
-        urls = ["https://github.com/google/cel-cpp/archive/50196761917300bbd47b59bd162e84817b67b7ab.tar.gz"],
+        sha256 = "cad7d01139947d78e413d112cb8f7431fbb33cf66b0adf9c280824803fc2a72e",
+        strip_prefix = "cel-cpp-b9453a09b28a1531c4917e8792b3ea61f6b1a447",
+        # 2020-07-14
+        urls = ["https://github.com/google/cel-cpp/archive/b9453a09b28a1531c4917e8792b3ea61f6b1a447.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),

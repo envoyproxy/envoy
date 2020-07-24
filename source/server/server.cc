@@ -27,7 +27,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
-#include "common/common/version.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/http/codes.h"
@@ -35,6 +34,8 @@
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/socket_interface.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -42,6 +43,7 @@
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
+#include "common/version/version.h"
 
 #include "server/admin/utils.h"
 #include "server/configuration_impl.h"
@@ -322,15 +324,16 @@ void InstanceImpl::initialize(const Options& options,
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
-  validation_context_.static_warning_validation_visitor().setUnknownCounter(
+  validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
-  validation_context_.dynamic_warning_validation_visitor().setUnknownCounter(
+  validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
       server_stats_->dynamic_unknown_fields_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
@@ -382,6 +385,54 @@ void InstanceImpl::initialize(const Options& options,
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
+
+  loadServerFlags(initial_config.flagsPath());
+
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
+
+  // Initialize the overload manager early so other modules can register for actions.
+  overload_manager_ = std::make_unique<OverloadManagerImpl>(
+      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
+      messageValidationContext().staticValidationVisitor(), *api_);
+
+  heap_shrinker_ =
+      std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
+
+  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+        bootstrap_extension);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
+
+  if (!bootstrap_.default_socket_interface().empty()) {
+    auto& sock_name = bootstrap_.default_socket_interface();
+    auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
+    if (sock != nullptr) {
+      Network::SocketInterfaceSingleton::clear();
+      Network::SocketInterfaceSingleton::initialize(sock);
+    }
+  }
+
+  // Workers get created first so they register for thread local updates.
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(
+      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
+
+  // The main thread is also registered for thread local updates so that code that does not care
+  // whether it runs on the main thread or on workers can still use TLS.
+  thread_local_.registerThread(*dispatcher_, true);
+
+  // We can now initialize stats for threading.
+  stats_store_.initializeThreading(*dispatcher_, thread_local_);
+
+  // It's now safe to start writing stats from the main thread's dispatcher.
+  if (bootstrap_.enable_dispatcher_stats()) {
+    dispatcher_->initializeStats(stats_store_, "server.");
+  }
+
   if (initial_config.admin().address()) {
     if (initial_config.admin().accessLogPath().empty()) {
       throw EnvoyException("An admin access log path is required for a listening server.");
@@ -398,34 +449,6 @@ void InstanceImpl::initialize(const Options& options,
       admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
-  }
-
-  loadServerFlags(initial_config.flagsPath());
-
-  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
-
-  // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_);
-
-  heap_shrinker_ =
-      std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
-
-  // Workers get created first so they register for thread local updates.
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(
-      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
-
-  // The main thread is also registered for thread local updates so that code that does not care
-  // whether it runs on the main thread or on workers can still use TLS.
-  thread_local_.registerThread(*dispatcher_, true);
-
-  // We can now initialize stats for threading.
-  stats_store_.initializeThreading(*dispatcher_, thread_local_);
-
-  // It's now safe to start writing stats from the main thread's dispatcher.
-  if (bootstrap_.enable_dispatcher_stats()) {
-    dispatcher_->initializeStats(stats_store_, "server.");
   }
 
   // The broad order of initialization from this point on is the following:
@@ -492,16 +515,6 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
-
-  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
-    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
-        bootstrap_extension);
-    auto config = Config::Utility::translateAnyToFactoryConfig(
-        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
-        factory);
-    bootstrap_extensions_.push_back(
-        factory.createBootstrapExtension(*config, serverFactoryContext()));
-  }
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {

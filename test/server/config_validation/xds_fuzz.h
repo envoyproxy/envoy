@@ -13,6 +13,7 @@
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/server/config_validation/xds_fuzz.pb.h"
+#include "test/server/config_validation/xds_verifier.h"
 
 #include "absl/types/optional.h"
 
@@ -28,16 +29,17 @@ public:
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name);
 
-  envoy::config::listener::v3::Listener buildListener(uint32_t listener_num, uint32_t route_num);
+  envoy::config::listener::v3::Listener buildListener(const std::string& listener_name,
+                                                      const std::string& route_name);
 
-  envoy::config::route::v3::RouteConfiguration buildRouteConfig(uint32_t route_num);
+  envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& route_name);
 
   void updateListener(const std::vector<envoy::config::listener::v3::Listener>& listeners,
                       const std::vector<envoy::config::listener::v3::Listener>& added_or_updated,
                       const std::vector<std::string>& removed);
 
   void
-  updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration> routes,
+  updateRoute(const std::vector<envoy::config::route::v3::RouteConfiguration>& routes,
               const std::vector<envoy::config::route::v3::RouteConfiguration>& added_or_updated,
               const std::vector<std::string>& removed);
 
@@ -49,10 +51,23 @@ public:
   const size_t RoutesMax = 5;
 
 private:
-  absl::optional<std::string> removeListener(uint32_t listener_num);
-  absl::optional<std::string> removeRoute(uint32_t route_num);
+  void addListener(const std::string& listener_name, const std::string& route_name);
+  void removeListener(const std::string& listener_name);
+  void addRoute(const std::string& route_name);
+
+  void verifyState();
+  void verifyListeners();
+  void verifyRoutes();
+
+  envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
+  std::vector<envoy::api::v2::RouteConfiguration> getRoutesConfigDump();
+
+  bool eraseListener(const std::string& listener_name);
+  bool hasRoute(const std::string& route_num);
   AssertionResult waitForAck(const std::string& expected_type_url,
                              const std::string& expected_version);
+
+  XdsVerifier verifier_;
 
   Protobuf::RepeatedPtrField<test::server::config_validation::Action> actions_;
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;

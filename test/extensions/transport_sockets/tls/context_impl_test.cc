@@ -19,8 +19,10 @@
 #include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns3_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_ip_cert_info.h"
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -39,6 +41,57 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+namespace {
+const std::vector<std::string>& knownCipherSuites() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {"ECDHE-ECDSA-AES128-GCM-SHA256",
+                                                    "ECDHE-RSA-AES128-GCM-SHA256",
+                                                    "ECDHE-ECDSA-AES256-GCM-SHA384",
+                                                    "ECDHE-RSA-AES256-GCM-SHA384",
+                                                    "ECDHE-ECDSA-CHACHA20-POLY1305",
+                                                    "ECDHE-RSA-CHACHA20-POLY1305",
+                                                    "ECDHE-PSK-CHACHA20-POLY1305",
+                                                    "ECDHE-ECDSA-AES128-SHA",
+                                                    "ECDHE-RSA-AES128-SHA",
+                                                    "ECDHE-PSK-AES128-CBC-SHA",
+                                                    "ECDHE-ECDSA-AES256-SHA",
+                                                    "ECDHE-RSA-AES256-SHA",
+                                                    "ECDHE-PSK-AES256-CBC-SHA",
+                                                    "AES128-GCM-SHA256",
+                                                    "AES256-GCM-SHA384",
+                                                    "AES128-SHA",
+                                                    "PSK-AES128-CBC-SHA",
+                                                    "AES256-SHA",
+                                                    "PSK-AES256-CBC-SHA",
+                                                    "DES-CBC3-SHA"});
+}
+} // namespace
+
+class SslLibraryCipherSuiteSupport : public ::testing::TestWithParam<std::string> {};
+
+INSTANTIATE_TEST_SUITE_P(CipherSuites, SslLibraryCipherSuiteSupport,
+                         ::testing::ValuesIn(knownCipherSuites()));
+
+// Tests for whether new cipher suites are added. When they are, they must be added to
+// knownCipherSuites() so that this test can detect if they are removed in the future.
+TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  EXPECT_NE(0, SSL_CTX_set_strict_cipher_list(ctx.get(), "ALL"));
+
+  std::vector<std::string> present_cipher_suites;
+  for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(ctx.get())) {
+    present_cipher_suites.push_back(SSL_CIPHER_get_name(cipher));
+  }
+  EXPECT_THAT(present_cipher_suites, testing::IsSubsetOf(knownCipherSuites()));
+}
+
+// Test that no previously supported cipher suites were removed from the SSL library. If a cipher
+// suite is removed, it must be added to the release notes as an incompatible change, because it can
+// cause previously loadable configurations to no longer load if they reference the cipher suite.
+TEST_P(SslLibraryCipherSuiteSupport, CipherSuitesNotRemoved) {
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  EXPECT_NE(0, SSL_CTX_set_strict_cipher_list(ctx.get(), GetParam().c_str()));
+}
 
 class SslContextImplTest : public SslCertsTest {
 protected:

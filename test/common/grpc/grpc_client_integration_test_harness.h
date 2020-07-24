@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -8,6 +10,8 @@
 #include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/grpc/context_impl.h"
+#include "common/http/context_impl.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
 #include "common/grpc/google_async_client_impl.h"
@@ -28,7 +32,7 @@
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
@@ -199,6 +203,8 @@ public:
   const TestMetadata empty_metadata_;
 };
 
+using HelloworldStreamPtr = std::unique_ptr<HelloworldStream>;
+
 // Request related test utilities.
 class HelloworldRequest : public MockAsyncRequestCallbacks<helloworld::HelloReply> {
 public:
@@ -221,6 +227,8 @@ public:
   AsyncRequest* grpc_request_{};
   Tracing::MockSpan* child_span_{new Tracing::MockSpan()};
 };
+
+using HelloworldRequestPtr = std::unique_ptr<HelloworldRequest>;
 
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
@@ -346,7 +354,7 @@ public:
 
   virtual void expectExtraHeaders(FakeStream&) {}
 
-  std::unique_ptr<HelloworldRequest> createRequest(const TestMetadata& initial_metadata) {
+  HelloworldRequestPtr createRequest(const TestMetadata& initial_metadata) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -392,7 +400,7 @@ public:
     return request;
   }
 
-  std::unique_ptr<HelloworldStream> createStream(const TestMetadata& initial_metadata) {
+  HelloworldStreamPtr createStream(const TestMetadata& initial_metadata) {
     auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
         .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
@@ -438,7 +446,7 @@ public:
   std::unique_ptr<Http::TestRequestHeaderMapImpl> stream_headers_;
   std::vector<std::pair<std::string, std::string>> channel_args_;
 #ifdef ENVOY_GOOGLE_GRPC
-  std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
+  GoogleAsyncClientThreadLocalPtr google_tls_;
 #endif
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
   Event::TimerPtr timeout_timer_;

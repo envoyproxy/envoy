@@ -68,7 +68,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:options_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
@@ -98,7 +98,8 @@ envoy_cc_fuzz_test(
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:options_mocks",
+        "//test/test_common:environment_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
@@ -112,13 +113,32 @@ envoy_proto_library(
 )
 
 envoy_cc_test_library(
+    name = "xds_verifier_lib",
+    srcs = ["xds_verifier.cc"],
+    hdrs = ["xds_verifier.h"],
+    deps = [
+        ":xds_fuzz_proto_cc_proto",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
     deps = [
         ":xds_fuzz_proto_cc_proto",
+        ":xds_verifier_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -127,12 +147,13 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_fuzz_test(
-    name = "xds_fuzz_test",
-    srcs = ["xds_fuzz_test.cc"],
-    corpus = "xds_corpus",
-    deps = [
-        ":xds_fuzz_lib",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
+# https://github.com/envoyproxy/envoy/issues/12258
+# envoy_cc_fuzz_test(
+#     name = "xds_fuzz_test",
+#     srcs = ["xds_fuzz_test.cc"],
+#     corpus = "xds_corpus",
+#     deps = [
+#         ":xds_fuzz_lib",
+#         "//source/common/protobuf:utility_lib",
+#     ],
+# )

@@ -47,14 +47,11 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
 
 spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {
   spdy::SpdyHeaderBlock header_block;
-  headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        auto spdy_headers = static_cast<spdy::SpdyHeaderBlock*>(context);
-        // The key-value pairs are copied.
-        spdy_headers->insert({header.key().getStringView(), header.value().getStringView()});
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &header_block);
+  headers.iterate([&header_block](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    // The key-value pairs are copied.
+    header_block.insert({header.key().getStringView(), header.value().getStringView()});
+    return Http::HeaderMap::Iterate::Continue;
+  });
   return header_block;
 }
 

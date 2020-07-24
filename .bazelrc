@@ -22,6 +22,8 @@ build --enable_platform_specific_config
 
 # Enable position independent code, this option is not supported on Windows and default on on macOS.
 build:linux --copt=-fPIC
+build:linux --cxxopt=-std=c++17
+build:linux --conlyopt=-fexceptions
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -65,6 +67,7 @@ build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
 
 # macOS ASAN/UBSAN
+build:macos --cxxopt=-std=c++17
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
@@ -81,6 +84,8 @@ build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --linkopt -fuse-ld=lld
+build:clang-tsan --build_tag_filters=-no_san,-no_tsan
+build:clang-tsan --test_tag_filters=-no_san,-no_tsan
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
@@ -112,6 +117,7 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
 # Coverage options
 coverage --config=coverage
+coverage --build_tests_only
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
@@ -156,6 +162,10 @@ build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --config=clang-msan
+
+build:rbe-toolchain-tsan --linkopt=-L/opt/libcxx_tsan/lib
+build:rbe-toolchain-tsan --linkopt=-Wl,-rpath,/opt/libcxx_tsan/lib
+build:rbe-toolchain-tsan --config=clang-tsan
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --platforms=@rbe_ubuntu_gcc//config:platform
@@ -203,7 +213,7 @@ build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:f21773ab398a879f976936f72c78c9dd3718ca1e
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:923df85a4ba7f30dcd0cb6b0c6d8d604f0e20f48
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -225,23 +235,29 @@ build:docker-msan --config=docker-sandbox
 build:docker-msan --config=rbe-toolchain-clang-libc++
 build:docker-msan --config=rbe-toolchain-msan
 
+build:docker-tsan --config=docker-sandbox
+build:docker-tsan --config=rbe-toolchain-clang-libc++
+build:docker-tsan --config=rbe-toolchain-tsan
+
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 
 # Fuzz builds
-build:asan-fuzzer --config=clang-asan
+# -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION is passed in in the bazel build target
+# rules for fuzz tests. Passing it in the CLI will cause dependencies to be build
+# with the macro. Causing issues in RouteMatcherTest.TestRoutes that expect prod
+# behavior from RE2 library.
+build:asan-fuzzer --config=asan
 build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
-build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
-build:plain-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
 
 # Compile database generation config
 # We don't care about built binaries so always strip and use fastbuild.
@@ -263,6 +279,7 @@ build:windows --define manual_stamp=manual_stamp
 build:windows --copt="-DCARES_STATICLIB"
 build:windows --copt="-DNGHTTP2_STATICLIB"
 build:windows --copt="-DCURL_STATICLIB"
+build:windows --cxxopt="/std:c++17"
 
 # Required to work around build defects on Windows MSVC cl
 # Unguarded gcc pragmas in quiche are not recognized by MSVC

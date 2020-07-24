@@ -92,6 +92,8 @@ export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOM
   --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
+[[ "$(uname -m)" == "aarch64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --define=hot_restart=disabled --test_env=HEAPCHECK="
+
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 
 # Also setup some space for building Envoy standalone.
@@ -104,6 +106,9 @@ mkdir -p "${ENVOY_DELIVERY_DIR}"
 
 # This is where we copy the coverage report to.
 export ENVOY_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}"/generated/coverage.tar.gz
+
+# This is where we copy the fuzz coverage report to.
+export ENVOY_FUZZ_COVERAGE_ARTIFACT="${ENVOY_BUILD_DIR}"/generated/fuzz_coverage.tar.gz
 
 # This is where we dump failed test logs for CI collection.
 export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
