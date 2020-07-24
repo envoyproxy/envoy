@@ -12,13 +12,21 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-class IsCacheableRequestTest : public testing::TestWithParam<std::string> {
+class IsCacheableRequestTest : public testing::Test {
 protected:
   Http::TestRequestHeaderMapImpl request_headers_ = {{":path", "/"},
                                                      {":method", "GET"},
                                                      {"x-forwarded-proto", "http"},
                                                      {":authority", "test.com"}};
-  std::string condtionalHeader() const { return GetParam(); }
+};
+
+class RequestConditionalHeadersTest : public testing::TestWithParam<std::string> {
+protected:
+  Http::TestRequestHeaderMapImpl request_headers_ = {{":path", "/"},
+                                                     {":method", "GET"},
+                                                     {"x-forwarded-proto", "http"},
+                                                     {":authority", "test.com"}};
+  std::string conditionalHeader() const { return GetParam(); }
 };
 
 class IsCacheableResponseTest : public testing::Test {
@@ -71,7 +79,7 @@ TEST_F(IsCacheableRequestTest, AuthorizationHeader) {
   EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
 }
 
-INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, IsCacheableRequestTest,
+INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, RequestConditionalHeadersTest,
                          testing::Values("if-match", "if-none-match", "if-modified-since",
                                          "if-unmodified-since", "if-range"),
                          [](const auto& info) {
@@ -81,9 +89,9 @@ INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, IsCacheableRequestTest,
                            return test_name;
                          });
 
-TEST_P(IsCacheableRequestTest, ConditionalHeaders) {
+TEST_P(RequestConditionalHeadersTest, ConditionalHeaders) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
-  request_headers_.setCopy(Http::LowerCaseString{condtionalHeader()}, "test-value");
+  request_headers_.setCopy(Http::LowerCaseString{conditionalHeader()}, "test-value");
   EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
 }
 
