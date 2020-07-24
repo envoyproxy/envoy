@@ -104,16 +104,30 @@ void HdsDelegate::handleFailure() {
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
 envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelegate::sendResponse() {
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
-  for (const auto& cluster : hds_clusters_) {
-    // Group EndpointHealth info by Locality under each cluster
-    absl::flat_hash_map<const envoy::config::core::v3::Locality,
-                        std::vector<envoy::service::health::v3::EndpointHealth*>, LocalityHash,
-                        LocalityEqualTo>
-        hostsByLocality;
+  // Hold information about the current locality for comparison.
+  envoy::config::core::v3::Locality current_locality;
 
+  for (const auto& cluster : hds_clusters_) {
+    // Add cluster health response and set name
+    auto* cluster_health =
+        response.mutable_endpoint_health_response()->add_cluster_endpoints_health();
+    cluster_health->set_cluster_name(cluster->info()->name());
+
+    // Hold all endpoint health information by locality, updated when a new locality
+    // has been seen.
+    envoy::service::health::v3::LocalityEndpointsHealth* locality_health = nullptr;
+
+    // Iterate through all hosts in our priority set.
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
-        auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
+        // If we are on a new locality grouping, add grouping and copy the locality.
+        if (locality_health == nullptr || !LocalityEqualTo()(host->locality(), current_locality)) {
+          locality_health = cluster_health->add_locality_endpoints_health();
+          locality_health->mutable_locality()->MergeFrom(host->locality());
+        }
+
+        // Add this endpoint's health status to this locality grouping.
+        auto* endpoint = locality_health->add_endpoints_health();
         Network::Utility::addressToProtobufAddress(
             *host->address(), *endpoint->mutable_endpoint()->mutable_address());
         // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
@@ -132,34 +146,8 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
           }
         }
 
-        // If there is not already a group by this locality, insert a new vector for it.
-        const auto& locality_group = hostsByLocality.insert(
-            {host->locality(), std::vector<envoy::service::health::v3::EndpointHealth*>()});
-
-        // Add to the new or existing vector the current EndpointHealth info by SharedPtr.
-        locality_group.first->second.push_back(endpoint);
-      }
-    }
-
-    // add a new ClusterEndpointsHealth repeated object to the response.
-    auto* localityEndpointsByCluster =
-        response.mutable_endpoint_health_response()->add_cluster_endpoints_health();
-    // Set the cluster name by our current cluster.
-    localityEndpointsByCluster->set_cluster_name(cluster->info()->name());
-
-    // For every locality-to-hosts grouping, add to our proto.
-    for (const auto& hosts : hostsByLocality) {
-      // add an endpoints-locality grouping.
-      auto* endpointsByLocality = localityEndpointsByCluster->add_locality_endpoints_health();
-
-      // if we have a known locality for this grouping, copy it.
-      if (!endpointsByLocality->has_locality()) {
-        endpointsByLocality->mutable_locality()->MergeFrom(hosts.first);
-      }
-
-      // add all endpoints to this locality grouping.
-      for (const auto& endpoint : hosts.second) {
-        endpointsByLocality->add_endpoints_health()->MergeFrom(*endpoint);
+        // copy this endpoint's health info to the legacy flat-list.
+        response.mutable_endpoint_health_response()->add_endpoints_health()->MergeFrom(*endpoint);
       }
     }
   }
