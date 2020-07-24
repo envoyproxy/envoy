@@ -101,7 +101,8 @@ private:
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 
-  Ssl::HandshakerFactory& handshaker_factory_;
+  // This reference must be reseatable.
+  std::reference_wrapper<Ssl::HandshakerFactory> handshaker_factory_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
