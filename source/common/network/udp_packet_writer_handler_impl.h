@@ -25,7 +25,7 @@ public:
     return Network::K_MAX_OUTGOING_PACKET_SIZE;
   }
   bool isBatchMode() const override { return false; }
-  Network::InternalBufferWriteLocation
+  Network::UdpPacketWriterBuffer
   getNextWriteLocation(const Address::Ip* /*local_ip*/,
                        const Address::Instance& /*peer_address*/) override {
     return {nullptr, nullptr};

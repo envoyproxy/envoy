@@ -13,7 +13,10 @@
 namespace Envoy {
 namespace Network {
 
-static const uint64_t K_MAX_OUTGOING_PACKET_SIZE = 1452; // Based on quic::kMaxOutgoingPacketSize
+/**
+ * Max v6 packet size, excluding IP and UDP headers.
+ */
+static const uint64_t K_MAX_OUTGOING_PACKET_SIZE = 1452;
 
 #define UDP_PACKET_WRITER_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
   COUNTER(total_bytes_sent)                                                                        \
@@ -29,12 +32,12 @@ struct UdpPacketWriterStats {
 };
 
 /**
- * InternalBufferWriteLocation bundles a buffer and a function that
+ * UdpPacketWriterBuffer bundles a buffer and a function that
  * releases it.
  */
-struct InternalBufferWriteLocation {
-  InternalBufferWriteLocation() = default;
-  InternalBufferWriteLocation(char* buffer, std::function<void(const char*)> release_buffer)
+struct UdpPacketWriterBuffer {
+  UdpPacketWriterBuffer() = default;
+  UdpPacketWriterBuffer(char* buffer, std::function<void(const char*)> release_buffer)
       : buffer_(buffer), release_buffer_(std::move(release_buffer)) {}
 
   char* buffer_ = nullptr;
@@ -73,7 +76,7 @@ public:
    * writer for the supplied peer address.
    *
    * @param peer_address  is the destination address to send to.
-   * @return uint64_t the Max Packet Size object
+   * @return the max packet size
    */
   virtual uint64_t getMaxPacketSize(const Address::Instance& peer_address) const PURE;
 
@@ -86,15 +89,16 @@ public:
   /**
    * @brief Get pointer to the next write location in internal buffer,
    * it should be called iff the caller does not call writePacket
-   * for the returned buffer.
+   * for the returned buffer. The caller is expected to call writePacket
+   * with the buffer returned from this function to save a memcpy.
    *
    * @param local_ip is the source address to be used to send.
    * @param peer_address is the destination address to send to.
    * @return { char* to the next write location,
    *           func to release buffer }
    */
-  virtual InternalBufferWriteLocation
-  getNextWriteLocation(const Address::Ip* local_ip, const Address::Instance& peer_address) PURE;
+  virtual UdpPacketWriterBuffer getNextWriteLocation(const Address::Ip* local_ip,
+                                                     const Address::Instance& peer_address) PURE;
 
   /**
    * @brief Batch Mode: Try to send all buffered packets

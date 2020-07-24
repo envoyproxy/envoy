@@ -474,7 +474,7 @@ public:
   MOCK_METHOD(void, setWritable, ());
   MOCK_METHOD(uint64_t, getMaxPacketSize, (const Address::Instance& peer_address), (const));
   MOCK_METHOD(bool, isBatchMode, (), (const));
-  MOCK_METHOD(Network::InternalBufferWriteLocation, getNextWriteLocation,
+  MOCK_METHOD(Network::UdpPacketWriterBuffer, getNextWriteLocation,
               (const Address::Ip* local_ip, const Address::Instance& peer_address));
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
   MOCK_METHOD(std::string, name, (), (const));

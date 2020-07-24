@@ -314,7 +314,7 @@ public:
   virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
 
   /**
-   * @return udp_packet_writer_
+   * @return The udp packet writer used by this listener.
    * */
   virtual Network::UdpPacketWriter* udpPacketWriter() PURE;
 };

@@ -50,7 +50,7 @@ public:
   void setWritable() override { return SetWritable(); }
   bool isBatchMode() const override { return IsBatchMode(); }
   uint64_t getMaxPacketSize(const Network::Address::Instance& peer_address) const override;
-  Network::InternalBufferWriteLocation
+  Network::UdpPacketWriterBuffer
   getNextWriteLocation(const Network::Address::Ip* local_ip,
                        const Network::Address::Instance& peer_address) override;
   Api::IoCallUint64Result flush() override;
