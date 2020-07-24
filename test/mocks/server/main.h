@@ -18,8 +18,7 @@ public:
   // TODO(kbaichoo): modify to inject WD actions.
   MockMain() : MockMain(0, 0, 0, 0, 0.0, {}) {}
   MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill,
-           double wd_multikill_threshold,
-           const std::vector<std::string> wd_action_protos);
+           double wd_multikill_threshold, const std::vector<std::string> wd_action_protos);
   ~MockMain() override;
 
   MOCK_METHOD(Upstream::ClusterManager*, clusterManager, ());

@@ -1,8 +1,10 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <vector>
 
 #include "envoy/common/time.h"
+#include "envoy/server/guarddog_config.h"
 #include "envoy/server/watchdog.h"
 
 #include "common/api/api_impl.h"
@@ -14,13 +16,13 @@
 #include "test/mocks/common.h"
 #include "test/mocks/server/main.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <vector>
 
 using testing::InSequence;
 using testing::NiceMock;
@@ -91,7 +93,8 @@ INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogTestBase,
 class GuardDogDeathTest : public GuardDogTestBase {
 protected:
   GuardDogDeathTest()
-      : config_kill_(1000, 1000, 100, 1000, 0, actions_), config_multikill_(1000, 1000, 1000, 500, 0, actions_),
+      : config_kill_(1000, 1000, 100, 1000, 0, actions_),
+        config_multikill_(1000, 1000, 1000, 500, 0, actions_),
         config_multikill_threshold_(1000, 1000, 1000, 500, 60, actions_) {}
 
   /**
@@ -149,7 +152,7 @@ protected:
 
     time_system_->advanceTimeWait(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
   }
-  
+
   std::vector<std::string> actions_;
   NiceMock<Configuration::MockMain> config_kill_;
   NiceMock<Configuration::MockMain> config_multikill_;
@@ -257,7 +260,8 @@ TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
 
 class GuardDogMissTest : public GuardDogTestBase {
 protected:
-  GuardDogMissTest() : config_miss_(500, 1000, 0, 0, 0, actions_), config_mega_(1000, 500, 0, 0, 0, actions_) {}
+  GuardDogMissTest()
+      : config_miss_(500, 1000, 0, 0, 0, actions_), config_mega_(1000, 500, 0, 0, 0, actions_) {}
 
   void checkMiss(uint64_t count, const std::string& descriptor) {
     EXPECT_EQ(count, TestUtility::findCounter(stats_store_, "server.watchdog_miss")->value())
@@ -420,6 +424,108 @@ TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {
 TEST_P(GuardDogTestBase, AtomicIsAtomicTest) {
   std::atomic<std::chrono::steady_clock::duration> atomic_time;
   ASSERT_EQ(atomic_time.is_lock_free(), true);
+}
+
+class TestGuardDogAction : public Configuration::GuardDogAction {
+public:
+  TestGuardDogAction(std::vector<std::string>& events) : events_(events) {}
+
+  // Appends a string of the form: EVENT_TYPE : tid1,.., tidN to the events vector.
+  void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
+           std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+           MonotonicTime /*now*/) override {
+    std::string event_string =
+        envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent_Name(event);
+    absl::StrAppend(&event_string, " : ");
+    std::vector<std::string> output_string_parts;
+
+    for (const auto& thread_ltt_pair : thread_ltt_pairs) {
+      output_string_parts.push_back(thread_ltt_pair.first.debugString());
+    }
+
+    absl::StrAppend(&event_string, absl::StrJoin(output_string_parts, ","));
+    events_.push_back(event_string);
+  }
+
+protected:
+  std::vector<std::string>& events_; // not owned
+};
+
+// Test class used for GuardDogAction generation.
+template <class ConfigType>
+class TestGuardDogActionFactory : public Configuration::GuardDogActionFactory {
+public:
+  TestGuardDogActionFactory(const std::string& name, std::vector<std::string>& events)
+      : name_(name), events_(events) {}
+
+  // The GuardDogAction generated will add string in the config into the events vector.
+  Configuration::GuardDogActionPtr createGuardDogActionFromProto(
+      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& /*config */,
+      Configuration::GuardDogActionFactoryContext& /*context*/) override {
+    return std::make_unique<TestGuardDogAction>(events_);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ConfigType()};
+  }
+
+  std::string name() const override { return name_; }
+
+  const std::string name_;
+  std::vector<std::string>& events_; // not owned
+};
+
+/**
+ * Tests that various actions registered for the guarddog get called upon.
+ */
+class GuardDogActionsTest : public GuardDogTestBase {
+protected:
+  GuardDogActionsTest()
+      : actions_({getActionsConfig()}), f_("TestAction", events_), register_factory_(f_),
+        config_miss_(100, 200, 0, 0, 0, actions_), config_mega_(100, 200, 0, 0, 0, actions_) {}
+
+  std::string getActionsConfig() {
+    return R"EOF(
+      {
+        "config": {
+          "name": "TestAction",
+          "typed_config": {
+            "@type": "type.googleapis.com/google.protobuf.Empty"
+          }
+        },
+        "event": "MISS"
+      }
+    )EOF";
+  }
+
+  void SetupForMiss() {
+    initGuardDog(fake_stats_, config_miss_);
+    first_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    guard_dog_->forceCheckForTest();
+    time_system_->advanceTimeWait(std::chrono::milliseconds(99));
+  }
+
+  std::vector<std::string> actions_;
+  std::vector<std::string> events_;
+  TestGuardDogActionFactory<Envoy::ProtobufWkt::Struct> f_;
+  Registry::InjectFactory<Configuration::GuardDogActionFactory> register_factory_;
+  NiceMock<Stats::MockStore> fake_stats_;
+  NiceMock<Configuration::MockMain> config_miss_;
+  NiceMock<Configuration::MockMain> config_mega_;
+  WatchDogSharedPtr first_dog_;
+  WatchDogSharedPtr second_dog_;
+};
+
+INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogActionsTest,
+                         testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
+
+TEST_P(GuardDogActionsTest, CanHitTheCb) {
+  SetupForMiss();
+  ASSERT_EQ(events_.size(), 0);
+  time_system_->advanceTimeWait(std::chrono::milliseconds(2));
+  guard_dog_->forceCheckForTest();
+  EXPECT_EQ(events_.size(), 1);
+  std::cout << events_[0];
 }
 
 } // namespace

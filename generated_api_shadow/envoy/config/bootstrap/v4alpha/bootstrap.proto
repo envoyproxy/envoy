@@ -321,10 +321,8 @@ message Watchdog {
       MISS = 4;
     }
 
-    // The name of the action. This is just a well-known string that listeners can
-    // use for registering callbacks. Custom actions should be named using reverse
-    // DNS to ensure uniqueness.
-    string name = 1;
+    // Extension specific configuration for the action.
+    core.v4alpha.TypedExtensionConfig config = 1;
 
     WatchdogEvent event = 2;
   }

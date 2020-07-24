@@ -1,8 +1,9 @@
 #include "main.h"
 
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -16,7 +17,7 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill,
       wd_multikill_threshold_(wd_multikill_threshold), wd_actions_([&]() {
         Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction> actions;
 
-        for(auto& action_proto_str : wd_action_protos) {
+        for (const auto& action_proto_str : wd_action_protos) {
           envoy::config::bootstrap::v3::Watchdog::WatchdogAction action;
           TestUtility::loadFromJson(action_proto_str, action);
           actions.Add()->CopyFrom(action);
