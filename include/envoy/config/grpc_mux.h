@@ -85,22 +85,6 @@ public:
   ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::vector<std::string> type_urls) PURE;
 
   /**
-   * Retrieves the current pause state as set by pause()/resume().
-   * @param type_url type URL corresponding to xDS API, e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster
-   * @return bool whether the API is paused.
-   */
-  virtual bool paused(const std::string& type_url) const PURE;
-
-  /**
-   * Retrieves the current pause state as set by pause()/resume().
-   * @param type_urls type URLs corresponding to xDS API, e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster
-   * @return bool whether any of the APIs is paused.
-   */
-  virtual bool paused(const std::vector<std::string> type_urls) const PURE;
-
-  /**
    * Start a configuration subscription asynchronously for some API type and resources.
    * @param type_url type URL corresponding to xDS API, e.g.
    * type.googleapis.com/envoy.api.v2.Cluster.

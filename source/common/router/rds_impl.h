@@ -150,8 +150,10 @@ private:
 
   bool validateUpdateSize(int num_resources);
 
-  Envoy::Config::SubscriptionPtr subscription_;
   const std::string route_config_name_;
+  // This scope must outlive the subscription_ below as the subscription has derived stats.
+  Stats::ScopePtr scope_;
+  Envoy::Config::SubscriptionPtr subscription_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   // Init target used to notify the parent init manager that the subscription [and its sub resource]
@@ -162,7 +164,6 @@ private:
   // Target which starts the RDS subscription.
   Init::TargetImpl local_init_target_;
   Init::ManagerImpl local_init_manager_;
-  Stats::ScopePtr scope_;
   std::string stat_prefix_;
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;

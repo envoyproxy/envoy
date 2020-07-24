@@ -38,7 +38,11 @@ public:
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
       limit_request_ = std::make_unique<TokenBucketImpl>(
           rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
-      drain_request_timer_ = dispatcher.createTimer([this]() { callbacks_->onWriteable(); });
+      drain_request_timer_ = dispatcher.createTimer([this]() {
+        if (stream_ != nullptr) {
+          callbacks_->onWriteable();
+        }
+      });
     }
 
     // TODO(htuch): Make this configurable.
@@ -121,7 +125,9 @@ public:
     ASSERT(drain_request_timer_ != nullptr);
     control_plane_stats_.rate_limit_enforced_.inc();
     // Enable the drain request timer.
-    drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
+    if (!drain_request_timer_->enabled()) {
+      drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
+    }
     return false;
   }
 

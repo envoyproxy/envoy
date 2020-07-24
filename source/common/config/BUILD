@@ -396,6 +396,7 @@ envoy_cc_library(
         ":decoded_resource_lib",
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
