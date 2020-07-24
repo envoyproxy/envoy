@@ -126,8 +126,11 @@ private:
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
   ResponseEncoderImpl(ConnectionImpl& connection,
-                      Http::Http1::HeaderKeyFormatter* header_key_formatter)
-      : StreamEncoderImpl(connection, header_key_formatter) {}
+                      Http::Http1::HeaderKeyFormatter* header_key_formatter,
+                      absl::optional<bool>& stream_error_on_invalid_http_message)
+      : StreamEncoderImpl(connection, header_key_formatter) {
+    stream_error_on_invalid_http_message_ = stream_error_on_invalid_http_message;
+  }
 
   bool startedResponse() { return started_response_; }
 
@@ -441,8 +444,10 @@ protected:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, Http::Http1::HeaderKeyFormatter* header_key_formatter)
-        : response_encoder_(connection, header_key_formatter) {}
+    ActiveRequest(ServerConnectionImpl& connection,
+                  Http::Http1::HeaderKeyFormatter* header_key_formatter)
+        : response_encoder_(connection, header_key_formatter,
+                            connection.codec_settings_.stream_error_on_invalid_http_message_) {}
 
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};
