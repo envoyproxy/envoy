@@ -8,6 +8,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
+#include "envoy/server/guarddog_config.h"
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -101,6 +102,13 @@ private:
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
 
+  using WatchDogEvent = envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent;
+  // Helper function to invoke all the GuardDogActions registered for an Event.
+  void
+  invokeGuardDogActions(WatchDogEvent event,
+                        std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+                        MonotonicTime now);
+
   struct WatchedDog {
     WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
                const WatchDogSharedPtr& watch_dog);
@@ -125,9 +133,9 @@ private:
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
-  using WatchDogEvent = envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent;
-  using EventToCallbackMap = std::unordered_map<WatchDogEvent, std::vector<GuardDogActionCb>>;
-  EventToCallbackMap event_to_callbacks_;
+  using EventToActionsMap =
+      std::unordered_map<WatchDogEvent, std::vector<Configuration::GuardDogActionPtr>>;
+  EventToActionsMap events_to_actions_;
   std::vector<WatchedDogPtr> watched_dogs_ ABSL_GUARDED_BY(wd_lock_);
   Thread::MutexBasicLockable wd_lock_;
   Thread::ThreadPtr thread_;

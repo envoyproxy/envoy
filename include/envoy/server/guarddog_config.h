@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -14,9 +16,25 @@ namespace Server {
 namespace Configuration {
 
 struct GuardDogActionFactoryContext {
-  // TODO(kbaichoo): Fill this with useful context that might be used
-  int foo;
+  Api::Api& api_;
 };
+
+class GuardDogAction {
+public:
+  virtual ~GuardDogAction() = default;
+  /**
+   * Callback function for when the GuardDog observes an event.
+   * @param event the event the GuardDog observes.
+   * @param thread_ltt_pairs pairs of the relevant thread to the event, and the
+   *  last time touched (ltt) of those threads with their watchdog.
+   * @param now the current time.
+   */
+  virtual void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
+                   std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+                   MonotonicTime now) PURE;
+};
+
+using GuardDogActionPtr = std::unique_ptr<GuardDogAction>;
 
 /**
  * Implemented by each custom GuardDogAction and registered via Registry::registerFactory()
@@ -31,9 +49,9 @@ public:
    *
    * @param config supplies the configuration for the action.
    * @param context supplies the GuardDog Action's context.
-   * @return GuardDogActionCb the callback for the action.
+   * @return GuardDogActionPtr the GuardDogAction object.
    */
-  virtual GuardDogActionCb createGuardDogActionFromProto(
+  virtual GuardDogActionPtr createGuardDogActionFromProto(
       const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
       GuardDogActionFactoryContext& context) PURE;
 

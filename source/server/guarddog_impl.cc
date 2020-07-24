@@ -7,8 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "common/common/logger.h"
-#include "common/config/utility.h"
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/server/guarddog.h"
@@ -18,6 +16,8 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
+#include "common/common/logger.h"
+#include "common/config/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "server/watchdog_impl.h"
@@ -49,23 +49,20 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_megamiss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
               .statName())),
-      event_to_callbacks_([](const Server::Configuration::Main& config) -> EventToCallbackMap {
-        EventToCallbackMap map = {
-          {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL, {}},
-          {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL, {}},
-          {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS, {}},
-          {WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS, {}},
-        };
+      events_to_actions_([&](const Server::Configuration::Main& config) -> EventToActionsMap {
+        EventToActionsMap map;
 
-        Configuration::GuardDogActionFactoryContext context;
-        
+        Configuration::GuardDogActionFactoryContext context = {api};
+
         const auto& actions = config.wdActions();
-        for(const auto& action : actions) {
-          if(action.event() == WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_UNKNOWN) {
+        for (const auto& action : actions) {
+          if (action.event() == WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_UNKNOWN) {
             ENVOY_LOG_MISC(error, "WatchDogAction specified with UNKNOWN event");
           } else {
             // Get factory and add the created cb
-            auto& factory = Config::Utility::getAndCheckFactoryByName<Configuration::GuardDogActionFactory>(action.name());
+            auto& factory =
+                Config::Utility::getAndCheckFactory<Configuration::GuardDogActionFactory>(
+                    action.config());
             map[action.event()].push_back(factory.createGuardDogActionFromProto(action, context));
           }
         }
@@ -131,10 +128,9 @@ void GuardDogImpl::step() {
         }
       }
       if (killEnabled() && delta > kill_timeout_) {
-        // Runs all of the registered kill callbacks the order thery were registered.
-        for(GuardDogActionCb& cb : event_to_callbacks_[WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL]) {
-          cb(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL, {{tid, ltt}}, now);
-        }
+        invokeGuardDogActions(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL,
+                              {{tid, ltt}}, now);
+
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
                           watched_dog->dog_->threadId().debugString()));
       }
@@ -142,10 +138,8 @@ void GuardDogImpl::step() {
         multi_kill_threads.emplace_back(tid, ltt);
 
         if (multi_kill_threads.size() >= required_for_multi_kill) {
-          // Runs all of the registered multikill callbacks the order thery were registered.
-          for(GuardDogActionCb& cb : event_to_callbacks_[WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL]) {
-            cb(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL, multi_kill_threads, now);
-          }
+          invokeGuardDogActions(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL,
+                                multi_kill_threads, now);
 
           PANIC(fmt::format("GuardDog: At least {} threads ({},...) stuck for more than "
                             "watchdog_multikill_timeout",
@@ -155,17 +149,15 @@ void GuardDogImpl::step() {
     }
   }
 
-  // Run megamiss and miss handlers 
-  if(!mega_miss_threads.empty()) {
-    for(GuardDogActionCb& cb : event_to_callbacks_[WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS]) {
-      cb(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS, mega_miss_threads, now);
-    }
+  // Run megamiss and miss handlers
+  if (!mega_miss_threads.empty()) {
+    invokeGuardDogActions(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS,
+                          mega_miss_threads, now);
   }
 
-  if(!miss_threads.empty()) {
-    for(GuardDogActionCb& cb : event_to_callbacks_[WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS]) {
-      cb(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS, miss_threads, now);
-    }
+  if (!miss_threads.empty()) {
+    invokeGuardDogActions(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS, miss_threads,
+                          now);
   }
 
   {
@@ -224,6 +216,17 @@ void GuardDogImpl::stop() {
   if (thread_) {
     thread_->join();
     thread_.reset();
+  }
+}
+
+void GuardDogImpl::invokeGuardDogActions(
+    WatchDogEvent event, std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
+    MonotonicTime now) {
+  const auto& registered_actions = events_to_actions_.find(event);
+  if (registered_actions != events_to_actions_.end()) {
+    for (auto& action : registered_actions->second) {
+      action->run(event, thread_ltt_pairs, now);
+    }
   }
 }
 
