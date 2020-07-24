@@ -136,8 +136,7 @@ private:
   // during updating, the exception message is collected via the exception messages vector.
   // Returns true if any scope updated, false otherwise.
   bool addOrUpdateScopes(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
-                         Init::Manager& init_manager, const std::string& version_info,
-                         std::vector<std::string>& exception_msgs);
+                         Init::Manager& init_manager, const std::string& version_info);
   // Removes given scopes from the managed set of scopes.
   // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
   // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.
@@ -148,12 +147,18 @@ private:
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
+  // Detect scope name and scope key conflict between added scopes or between added scopes and old
+  // scopes. Some removed scopes may be in added resources list, instead of being removed, they
+  // should be updated, so only return scope names that will disappear after update. If conflict
+  // detected, fill exception_msg with information about scope conflict and return.
+  Protobuf::RepeatedPtrField<std::string> detectUpdateConflictAndCleanupRemoved(
+      const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources, std::string& exception_msg);
+
   // Envoy::Config::SubscriptionCallbacks
 
-  // NOTE: state-of-the-world form onConfigUpdate(resources, version_info) will throw an
-  // EnvoyException on any error and essentially reject an update. While the Delta form
-  // onConfigUpdate(added_resources, removed_resources, version_info) by design will partially
-  // accept correct RouteConfiguration from management server.
+  // NOTE: both delta form and state-of-the-world form onConfigUpdate(resources, version_info) will
+  // throw an EnvoyException on any error and essentially reject an update.
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,

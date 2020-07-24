@@ -116,23 +116,27 @@ ScopeKeyPtr ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers)
   return std::make_unique<ScopeKey>(std::move(key));
 }
 
-void ScopedConfigImpl::addOrUpdateRoutingScope(
-    const ScopedRouteInfoConstSharedPtr& scoped_route_info) {
-  const auto iter = scoped_route_info_by_name_.find(scoped_route_info->scopeName());
-  if (iter != scoped_route_info_by_name_.end()) {
-    ASSERT(scoped_route_info_by_key_.contains(iter->second->scopeKey().hash()));
-    scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
+void ScopedConfigImpl::addOrUpdateRoutingScopes(
+    const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos) {
+  for (auto& scoped_route_info : scoped_route_infos) {
+    const auto iter = scoped_route_info_by_name_.find(scoped_route_info->scopeName());
+    if (iter != scoped_route_info_by_name_.end()) {
+      ASSERT(scoped_route_info_by_key_.contains(iter->second->scopeKey().hash()));
+      scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
+    }
+    scoped_route_info_by_name_[scoped_route_info->scopeName()] = scoped_route_info;
+    scoped_route_info_by_key_[scoped_route_info->scopeKey().hash()] = scoped_route_info;
   }
-  scoped_route_info_by_name_[scoped_route_info->scopeName()] = scoped_route_info;
-  scoped_route_info_by_key_[scoped_route_info->scopeKey().hash()] = scoped_route_info;
 }
 
-void ScopedConfigImpl::removeRoutingScope(const std::string& scope_name) {
-  const auto iter = scoped_route_info_by_name_.find(scope_name);
-  if (iter != scoped_route_info_by_name_.end()) {
-    ASSERT(scoped_route_info_by_key_.contains(iter->second->scopeKey().hash()));
-    scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
-    scoped_route_info_by_name_.erase(iter);
+void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope_names) {
+  for (std::string const& scope_name : scope_names) {
+    const auto iter = scoped_route_info_by_name_.find(scope_name);
+    if (iter != scoped_route_info_by_name_.end()) {
+      ASSERT(scoped_route_info_by_key_.contains(iter->second->scopeKey().hash()));
+      scoped_route_info_by_key_.erase(iter->second->scopeKey().hash());
+      scoped_route_info_by_name_.erase(iter);
+    }
   }
 }
 

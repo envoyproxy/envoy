@@ -183,8 +183,10 @@ public:
   ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
       : scope_key_builder_(std::move(scope_key_builder)) {}
 
-  void addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr& scoped_route_info);
-  void removeRoutingScope(const std::string& scope_name);
+  void
+  addOrUpdateRoutingScopes(const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos);
+
+  void removeRoutingScopes(const std::vector<std::string>& scope_names);
 
   // Envoy::Router::ScopedConfig
   Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
