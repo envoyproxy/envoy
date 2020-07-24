@@ -2049,13 +2049,13 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
   }
 
   // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
-  // a problem with processing empty trailers of an HTTP/2 response as reported here:
-  // https://github.com/envoyproxy/envoy/issues/10514. This runtime feature flag is disabled by
-  // default.
+  // a problem with processing empty trailers (END_STREAM | END_HEADERS with zero length HEADERS) of
+  // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514.
   const bool skip_encoding_empty_trailers =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_encoding_empty_trailers");
   if (trailers.empty() && skip_encoding_empty_trailers) {
-    maybeEndEncode(true);
+    Buffer::OwnedImpl empty_buffer;
+    encodeDataInternal(empty_buffer, /*end_stream=*/true);
     return;
   }
 
