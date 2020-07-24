@@ -42,7 +42,7 @@ public:
 // Get value from a header.
 class HeaderValueSelector : public ValueSelector {
 public:
-  // Implements ValueSelector.
+  // ValueSelector.
   explicit HeaderValueSelector(Http::LowerCaseString header, bool remove)
       : header_(std::move(header)), remove_(std::move(remove)) {}
   absl::optional<std::string> extract(Http::HeaderMap& map) const override;
@@ -57,7 +57,7 @@ private:
 // Get value from a cookie.
 class CookieValueSelector : public ValueSelector {
 public:
-  // Implements ValueSelector.
+  // ValueSelector.
   explicit CookieValueSelector(std::string cookie) : cookie_(std::move(cookie)) {}
   absl::optional<std::string> extract(Http::HeaderMap& map) const override;
   std::string toString() const override { return fmt::format("cookie '{}'", cookie_); }
