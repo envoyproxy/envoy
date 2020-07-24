@@ -417,8 +417,12 @@ private:
   class RouteConfigUpdateRequester {
   public:
     virtual ~RouteConfigUpdateRequester() = default;
-    virtual void requestRouteConfigUpdate(const std::string, Event::Dispatcher&,
-                                          Http::RouteConfigUpdatedCallbackSharedPtr) {
+    virtual void requestVhdsUpdate(const std::string, Event::Dispatcher&,
+                                   Http::RouteConfigUpdatedCallbackSharedPtr) {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    };
+    virtual void requestSrdsUpdate(uint64_t, Event::Dispatcher&,
+                                   Http::RouteConfigUpdatedCallbackSharedPtr) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     };
   };
@@ -427,12 +431,17 @@ private:
   public:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
-    void requestRouteConfigUpdate(
-        const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
-        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider)
+        : scoped_route_config_provider_(scoped_route_config_provider) {}
+    void
+    requestVhdsUpdate(const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
+                      Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    void requestSrdsUpdate(uint64_t, Event::Dispatcher&,
+                           Http::RouteConfigUpdatedCallbackSharedPtr) override;
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
+    Config::ConfigProvider* scoped_route_config_provider_;
   };
 
   class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
@@ -456,10 +465,6 @@ private:
 
     // Indicates which filter to start the iteration with.
     enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
-
-    Event::Dispatcher& dispatcher() {
-      return connection_manager_.read_callbacks_->connection().dispatcher();
-    }
 
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
@@ -603,8 +608,6 @@ private:
      * as a parameter.
      */
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
-
-    bool usesSrds() { return connection_manager_.config_.scopedRouteConfigProvider() != nullptr; }
 
     void refreshCachedTracingCustomTags();
 
@@ -819,7 +822,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-};
+}; // namespace Http
 
 } // namespace Http
 } // namespace Envoy

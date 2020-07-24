@@ -149,5 +149,14 @@ ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
   return nullptr;
 }
 
+uint64_t ScopedConfigImpl::computeKeyHash(const Http::HeaderMap& headers) const {
+  return scope_key_builder_.computeScopeKey(headers)->hash();
+}
+
+bool ScopedConfigImpl::scopeExistsButNotLoaded(const uint64_t key_hash) const {
+  auto iter = scoped_route_info_by_key_.find(key_hash);
+  return iter != scoped_route_info_by_key_.end() && iter->second == nullptr;
+}
+
 } // namespace Router
 } // namespace Envoy

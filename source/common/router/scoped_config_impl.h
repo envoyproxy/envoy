@@ -189,6 +189,9 @@ public:
   // Envoy::Router::ScopedConfig
   Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
 
+  uint64_t computeKeyHash(const Http::HeaderMap& headers) const override;
+  bool scopeExistsButNotLoaded(uint64_t key_hash) const override;
+
 private:
   ScopeKeyBuilderImpl scope_key_builder_;
   // From scope name to cached ScopedRouteInfo.

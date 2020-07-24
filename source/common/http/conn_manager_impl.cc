@@ -517,11 +517,18 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
-void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
     const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
                                                     std::move(route_config_updated_cb));
+}
+
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
+    uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  scoped_route_config_provider_->requestRdsUpdate(key_hash, thread_local_dispatcher,
+                                                  std::move(route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
@@ -1528,14 +1535,25 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   absl::optional<Router::ConfigConstSharedPtr> route_config = routeConfig();
-  if (!route_config.has_value() || !route_config.value()->usesVhds()) {
-    (*route_config_updated_cb)(false);
+  Event::Dispatcher& thread_local_dispatcher =
+      connection_manager_.read_callbacks_->connection().dispatcher();
+  if (route_config.has_value() && route_config.value()->usesVhds()) {
+    ASSERT(!request_headers_->Host()->value().empty());
+    const auto& host_header = absl::AsciiStrToLower(request_headers_->getHostValue());
+    route_config_update_requester_->requestVhdsUpdate(host_header, thread_local_dispatcher,
+                                                      std::move(route_config_updated_cb));
     return;
+  } else if (snapped_scoped_routes_config_ != nullptr) {
+    uint64_t key_hash = snapped_scoped_routes_config_->computeKeyHash(*request_headers_);
+    if (snapped_scoped_routes_config_->scopeExistsButNotLoaded(key_hash)) {
+      route_config_update_requester_->requestSrdsUpdate(key_hash, thread_local_dispatcher,
+                                                        std::move(route_config_updated_cb));
+    } else {
+      (*route_config_updated_cb)(false);
+      return;
+    }
   }
-  ASSERT(!request_headers_->Host()->value().empty());
-  const auto& host_header = absl::AsciiStrToLower(request_headers_->getHostValue());
-  route_config_update_requester_->requestRouteConfigUpdate(host_header, dispatcher(),
-                                                           std::move(route_config_updated_cb));
+  (*route_config_updated_cb)(false);
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
@@ -2367,7 +2385,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStreamFilterBase::connec
 }
 
 Event::Dispatcher& ConnectionManagerImpl::ActiveStreamFilterBase::dispatcher() {
-  return parent_.dispatcher();
+  return parent_.connection_manager_.read_callbacks_->connection().dispatcher();
 }
 
 StreamInfo::StreamInfo& ConnectionManagerImpl::ActiveStreamFilterBase::streamInfo() {
