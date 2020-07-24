@@ -566,9 +566,27 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                      [&buckets, this](absl::string_view stat_name) {
                                        buckets = &parent_.histogram_settings_->buckets(stat_name);
                                      });
+
+#if 1
+    RefcountPtr<ParentHistogramImpl> stat;
+    {
+      Thread::LockGuard lock(parent_.hist_mutex_);
+      auto iter = parent_.histogram_set_.find(final_stat_name);
+      if (iter != parent_.histogram_set_.end()) {
+        stat = RefcountPtr<ParentHistogramImpl>(*iter);
+      } else {
+        stat = new ParentHistogramImpl(final_stat_name, unit, parent_, *this,
+                                       tag_helper.tagExtractedName(), tag_helper.statNameTags(),
+                                       *buckets);
+        parent_.histogram_set_.insert(stat.get());
+      }
+    }
+#else
     RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
         final_stat_name, unit, parent_, *this, tag_helper.tagExtractedName(),
         tag_helper.statNameTags(), *buckets));
+#endif
+
     central_ref = &central_cache_->histograms_[stat->statName()];
     *central_ref = stat;
   }
@@ -699,8 +717,9 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
   hist_clear(*other_histogram);
 }
 
-ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent,
-                                         TlsScope& tls_scope, StatName tag_extracted_name,
+ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
+                                         ThreadLocalStoreImpl& parent, TlsScope& tls_scope,
+                                         StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags,
                                          ConstSupportedBuckets& supported_buckets)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, parent.symbolTable()), unit_(unit),
@@ -714,6 +733,27 @@ ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }
+
+bool ParentHistogramImpl::decRefCount() { return parent_.decHistogramRefCount(*this, ref_count_); }
+
+bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
+                                                std::atomic<uint32_t>& ref_count) {
+  // We must hold the store's histogram lock when decrementing the
+  // refcount. Otherwise another thread may simultaneously try to allocate the
+  // same name'd stat after we decrement it, and we'll wind up with a
+  // dtor/update race. To avoid this we must hold the lock until the stat is
+  // removed from the map.
+  Thread::LockGuard lock(hist_mutex_);
+  ASSERT(ref_count >= 1);
+  if (--ref_count == 0) {
+    const size_t count = histogram_set_.erase(hist.statName());
+    ASSERT(count == 1);
+    return true;
+  }
+  return false;
+}
+
+SymbolTable& ParentHistogramImpl::symbolTable() { return parent_.symbolTable(); }
 
 Histogram::Unit ParentHistogramImpl::unit() const { return unit_; }
 

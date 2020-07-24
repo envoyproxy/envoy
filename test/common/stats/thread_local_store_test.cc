@@ -385,6 +385,29 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, ScopeOverlap) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  // Creating two scopes with the same name gets you two distinct scope objects.
+  ScopePtr scope1 = store_->createScope("scope.");
+  ScopePtr scope2 = store_->createScope("scope.");
+  EXPECT_NE(scope1, scope2);
+
+  // However, stats created in the two same-named scopes will be the same objects.
+  Counter& counter = scope1->counterFromString("counter");
+  EXPECT_EQ(&counter, &scope2->counterFromString("counter"));
+  Gauge& gauge = scope1->gaugeFromString("gauge", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&gauge, &scope2->gaugeFromString("gauge", Gauge::ImportMode::Accumulate));
+  TextReadout& text_readout = scope1->textReadoutFromString("tr");
+  EXPECT_EQ(&text_readout, &scope2->textReadoutFromString("tr"));
+  Histogram& histogram = scope1->histogramFromString("histogram", Histogram::Unit::Unspecified);
+  EXPECT_EQ(&histogram, &scope2->histogramFromString("histogram", Histogram::Unit::Unspecified));
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 // Validate that we sanitize away bad characters in the stats prefix.
 TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   InSequence s;

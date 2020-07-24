@@ -124,14 +124,13 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
     // multimap here. This makes sure that duplicate histograms get output. When shared storage is
     // implemented this can be switched back to a normal map.
-    std::multimap<std::string, std::string> all_histograms;
+    std::set<std::string> hist_names;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
       if (shouldShowMetric(*histogram, used_only, regex)) {
-        all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+        ASSERT(hist_names.insert(histogram->name()).second);
+        //all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+        response.add(fmt::format("{}: {}\n", histogram->name(), histogram->quantileSummary()));
       }
-    }
-    for (const auto& histogram : all_histograms) {
-      response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   }
   return rc;

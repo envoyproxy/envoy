@@ -75,14 +75,16 @@ private:
 using TlsHistogramSharedPtr = RefcountPtr<ThreadLocalHistogramImpl>;
 
 class TlsScope;
+class ThreadLocalStoreImpl;
 
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
  */
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
-  ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent, TlsScope& tls_scope,
-                      StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
+  ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
+                      TlsScope& tls_scope, StatName tag_extracted_name,
+                      const StatNameTagVector& stat_name_tags,
                       ConstSupportedBuckets& supported_buckets);
   ~ParentHistogramImpl() override;
 
@@ -108,19 +110,19 @@ public:
   const std::string bucketSummary() const override;
 
   // Stats::Metric
-  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+  SymbolTable& symbolTable() override;
   bool used() const override;
 
   // RefcountInterface
-  void incRefCount() override { refcount_helper_.incRefCount(); }
-  bool decRefCount() override { return refcount_helper_.decRefCount(); }
-  uint32_t use_count() const override { return refcount_helper_.use_count(); }
+  void incRefCount() override { ++ref_count_; }
+  bool decRefCount() override;
+  uint32_t use_count() const override { return ref_count_; }
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
   Histogram::Unit unit_;
-  Store& parent_;
+  ThreadLocalStoreImpl& parent_;
   TlsScope& tls_scope_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
@@ -129,7 +131,7 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
-  RefcountHelper refcount_helper_;
+  std::atomic<uint32_t> ref_count_{0};
 };
 
 using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
@@ -260,7 +262,7 @@ public:
     tag_producer_ = std::move(tag_producer);
   }
   void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
-  void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) override;
+  void setHistogramSettings(HistogramSettingsConstPtr&& histogram_ettings) override;
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
@@ -275,6 +277,8 @@ public:
    * @return a set of well known tag names; used to reduce symbol table churn.
    */
   const StatNameSet& wellKnownTags() const { return *well_known_tags_; }
+
+  bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
 
 private:
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
@@ -505,6 +509,24 @@ private:
   std::atomic<uint64_t> next_scope_id_{};
 
   StatNameSetPtr well_known_tags_;
+
+  struct HeapStatHash {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    size_t operator()(const Metric* a) const { return a->statName().hash(); }
+    size_t operator()(StatName a) const { return a.hash(); }
+  };
+
+  struct HeapStatCompare {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    bool operator()(const Metric* a, const Metric* b) const {
+      return a->statName() == b->statName();
+    }
+    bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
+  };
+
+  Thread::MutexBasicLockable hist_mutex_;
+  absl::flat_hash_set<ParentHistogramImpl*, HeapStatHash, HeapStatCompare>
+      histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
