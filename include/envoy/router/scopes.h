@@ -22,6 +22,9 @@ public:
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */
   virtual ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const PURE;
+
+  virtual uint64_t computeKeyHash(const Http::HeaderMap&) const { return 0; }
+  virtual bool scopeExistsButNotLoaded(uint64_t) const { return false; }
 };
 
 using ScopedConfigConstSharedPtr = std::shared_ptr<const ScopedConfig>;
