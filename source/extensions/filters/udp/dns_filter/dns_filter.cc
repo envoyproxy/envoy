@@ -12,9 +12,6 @@ namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
 
-static constexpr std::chrono::milliseconds DEFAULT_RESOLVER_TIMEOUT{500};
-static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
-
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
     const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config)

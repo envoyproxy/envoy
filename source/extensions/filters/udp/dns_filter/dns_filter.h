@@ -67,6 +67,9 @@ struct DnsEndpointConfig {
 
 using DnsVirtualDomainConfig = absl::flat_hash_map<std::string, DnsEndpointConfig>;
 
+static constexpr std::chrono::milliseconds DEFAULT_RESOLVER_TIMEOUT{1000};
+static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
+
 /**
  * DnsFilter configuration class abstracting access to data necessary for the filter's operation
  */
@@ -113,8 +116,8 @@ private:
   bool forward_queries_;
   uint64_t retry_count_;
   AddressConstPtrVec resolvers_;
-  std::chrono::milliseconds resolver_timeout_;
-  Random::RandomGenerator& random_;
+  std::chrono::milliseconds resolver_timeout_{DEFAULT_RESOLVER_TIMEOUT};
+  Runtime::RandomGenerator& random_;
   uint64_t max_pending_lookups_;
 };
 
