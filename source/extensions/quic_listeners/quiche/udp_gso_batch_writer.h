@@ -84,7 +84,6 @@ public:
 
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                     Stats::Scope& scope) override;
-  bool isBatchWriterFactory() const override { return true; }
 
 private:
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;

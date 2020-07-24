@@ -300,7 +300,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
  */
 TEST_P(UdpListenerImplTest, SendData) {
   EXPECT_FALSE(listener_->udpPacketWriter()->isBatchMode());
-
+  EXPECT_EQ(Network::UdpWriterNames::get().DefaultWriter, listener_->udpPacketWriter()->name());
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
@@ -325,6 +325,13 @@ TEST_P(UdpListenerImplTest, SendData) {
   EXPECT_EQ(bytes_to_read, data.buffer_->length());
   EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
   EXPECT_EQ(data.buffer_->toString(), payload);
+
+  // Verify External Flush is a No-op
+  auto flush_result = listener_->udpPacketWriter()->flush();
+  EXPECT_TRUE(flush_result.ok());
+  EXPECT_EQ(0, flush_result.rc_);
+  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value(),
+            total_bytes_sent);
 }
 
 /**

@@ -137,11 +137,6 @@ public:
    */
   virtual UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                    Stats::Scope& scope) PURE;
-  /**
-   * @return true if the UDP packet writer created by factory is capable of
-   * batch writing, else false
-   */
-  virtual bool isBatchWriterFactory() const PURE;
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;

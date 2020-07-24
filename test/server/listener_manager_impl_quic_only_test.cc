@@ -1,6 +1,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
+#include "common/network/well_known_names.h"
+
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
 #include "test/server/listener_manager_impl_test.h"
@@ -87,9 +89,13 @@ udp_writer_config:
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
   EXPECT_FALSE(manager_->listeners()[0].get().udpListenerFactory()->isTransportConnectionless());
-  manager_->listeners().front().get().listenSocketFactory().getListenSocket();
+  Network::SocketSharedPtr listen_socket =
+      manager_->listeners().front().get().listenSocketFactory().getListenSocket();
 
-  EXPECT_TRUE(manager_->listeners().front().get().udpPacketWriterFactory()->isBatchWriterFactory());
+  Network::UdpPacketWriterPtr udp_packet_writer =
+      manager_->listeners().front().get().udpPacketWriterFactory()->createUdpPacketWriter(
+          listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
+  EXPECT_EQ(Network::UdpWriterNames::get().GsoBatchWriter, udp_packet_writer->name());
 
   // No filter chain found with non-matching transport protocol.
   EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));
