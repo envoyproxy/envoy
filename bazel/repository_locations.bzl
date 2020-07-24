@@ -367,14 +367,6 @@ DEPENDENCY_REPOSITORIES = dict(
         urls = ["https://github.com/bazelbuild/rules_cc/archive/818289e5613731ae410efb54218a4077fb9dbb03.tar.gz"],
         use_category = ["build"],
     ),
-    rules_cc = dict(
-        sha256 = "9d48151ea71b3e225adfb6867e6d2c7d0dce46cbdc8710d9a9a628574dfd40a0",
-        strip_prefix = "rules_cc-818289e5613731ae410efb54218a4077fb9dbb03",
-        # 2020-05-13
-        # TODO(lizan): pin to a point releases when there's a released version.
-        urls = ["https://github.com/bazelbuild/rules_cc/archive/818289e5613731ae410efb54218a4077fb9dbb03.tar.gz"],
-        use_category = ["build"],
-    ),
     rules_foreign_cc = dict(
         sha256 = "7ca49ac5b0bc8f5a2c9a7e87b7f86aca604bda197259c9b96f8b7f0a4f38b57b",
         strip_prefix = "rules_foreign_cc-f54b7ae56dcf1b81bcafed3a08d58fc08ac095a7",
