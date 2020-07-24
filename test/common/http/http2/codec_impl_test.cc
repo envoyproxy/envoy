@@ -420,6 +420,33 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   expectDetailsRequest("http2.violation.of.messaging.rule");
 }
 
+TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfFalse) {
+  initialize();
+  
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  auto stream_error = response_encoder_->streamErrorOnInvalidHttpMessage();
+  EXPECT_TRUE(stream_error.has_value());
+  EXPECT_FALSE(stream_error.value());
+}
+
+TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfTrue) {
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+  
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  auto stream_error = response_encoder_->streamErrorOnInvalidHttpMessage();
+  EXPECT_TRUE(stream_error.has_value());
+  EXPECT_TRUE(stream_error.value());
+}
+
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   initialize();
 
