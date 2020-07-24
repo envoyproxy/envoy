@@ -50,8 +50,7 @@ public:
   /**
    * Sets the levels of all loggers.
    */
-  void setAllFancyLoggers(spdlog::level::level_enum level)
-      ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
+  void setAllFancyLoggers(spdlog::level::level_enum level) ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
 private:
   /**
@@ -92,7 +91,7 @@ FancyContext& getFancyContext();
     static std::atomic<spdlog::logger*> flogger{0};                                                \
     spdlog::logger* local_flogger = flogger.load(std::memory_order_relaxed);                       \
     if (!local_flogger) {                                                                          \
-      getFancyContext().initFancyLogger(FANCY_KEY, flogger);                                           \
+      getFancyContext().initFancyLogger(FANCY_KEY, flogger);                                       \
       local_flogger = flogger.load(std::memory_order_relaxed);                                     \
     }                                                                                              \
     local_flogger->log(spdlog::source_loc{__FILE__, __LINE__, __func__},                           \
@@ -116,10 +115,11 @@ FancyContext& getFancyContext();
  * Convenient macro for log flush.
  */
 #define FANCY_FLUSH_LOG()                                                                          \
-  { SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(FANCY_KEY);                                   \
+  do {                                                                                             \
+    SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(FANCY_KEY);                          \
     if (p) {                                                                                       \
       p->flush();                                                                                  \
     }                                                                                              \
-  }
+  } while (0)
 
 } // namespace Envoy
