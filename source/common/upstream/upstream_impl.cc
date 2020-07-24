@@ -139,7 +139,6 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             const ProtobufWkt::Struct& config,
-                            ProtobufMessage::ValidationVisitor& validation_visitor,
                             Server::Configuration::TransportSocketFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
@@ -161,15 +160,14 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
-                                                *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(
+      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
 
-  return factory->createProtocolOptionsConfig(*proto_config, validation_visitor, factory_context);
+  return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
 std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
     const envoy::config::cluster::v3::Cluster& config,
-    ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   if (!config.typed_extension_protocol_options().empty() &&
       !config.hidden_envoy_deprecated_extension_protocol_options().empty()) {
@@ -185,9 +183,8 @@ std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtoco
     // protocol options.
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object =
-        createProtocolOptionsConfig(name, it.second, ProtobufWkt::Struct::default_instance(),
-                                    validation_visitor, factory_context);
+    auto object = createProtocolOptionsConfig(
+        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -200,7 +197,7 @@ std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtoco
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
-                                              validation_visitor, factory_context);
+                                              factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }

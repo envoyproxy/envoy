@@ -2711,7 +2711,7 @@ public:
     return parent_.createEmptyProtocolOptionsProto();
   }
   Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& msg, ProtobufMessage::ValidationVisitor&,
+  createProtocolOptionsConfig(const Protobuf::Message& msg,
                               Server::Configuration::TransportSocketFactoryContext&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
@@ -2746,7 +2746,7 @@ public:
     return parent_.createEmptyProtocolOptionsProto();
   }
   Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& msg, ProtobufMessage::ValidationVisitor&,
+  createProtocolOptionsConfig(const Protobuf::Message& msg,
                               Server::Configuration::TransportSocketFactoryContext&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }

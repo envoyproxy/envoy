@@ -32,10 +32,10 @@ public:
   }
 
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsConfig(
-      const Protobuf::Message& proto_config, ProtobufMessage::ValidationVisitor& validation_visitor,
+      const Protobuf::Message& proto_config,
       Server::Configuration::TransportSocketFactoryContext& factory_context) override {
     return createProtocolOptionsTyped(MessageUtil::downcastAndValidate<const ProtocolOptionsProto&>(
-                                          proto_config, validation_visitor),
+                                          proto_config, factory_context.messageValidationContext()),
                                       factory_context);
   }
 
