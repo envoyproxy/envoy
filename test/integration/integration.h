@@ -46,7 +46,7 @@ public:
   const Http::ResponseHeaderMap* continue_headers() { return continue_headers_.get(); }
   const Http::ResponseHeaderMap& headers() { return *headers_; }
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
-  const Http::MetadataMap& metadata_map() { return *metadata_map_; }
+  const Http::MetadataMap& metadataMap() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
   void waitForHeaders();

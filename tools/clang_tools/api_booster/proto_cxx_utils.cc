@@ -43,7 +43,7 @@ ProtoCxxUtils::renameMethod(absl::string_view method_name,
                             const absl::node_hash_map<std::string, std::string> renames) {
   // Simple O(N * M) match, where M is constant (the set of prefixes/suffixes) so
   // should be fine.
-  for (const auto field_rename : renames) {
+  for (const auto& field_rename : renames) {
     const std::vector<std::string> GeneratedMethodPrefixes = {
         "clear_", "set_", "has_", "mutable_", "set_allocated_", "release_", "add_", "",
     };
