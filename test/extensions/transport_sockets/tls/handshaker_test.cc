@@ -172,7 +172,12 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
 class HandshakerImplForTest : public Ssl::Handshaker {
 public:
   HandshakerImplForTest(bssl::UniquePtr<SSL> ssl, std::function<void()> requested_cert_cb)
-      : ssl_(std::move(ssl)), requested_cert_cb_(requested_cert_cb) {}
+      : ssl_(std::move(ssl)), requested_cert_cb_(requested_cert_cb) {
+    SSL_set_cert_cb(
+      ssl_.get(), [](SSL*, void* arg) -> int { return *static_cast<bool*>(arg) ? 1 : -1; },
+      &cert_cb_ok_);
+  }
+
 
   Network::PostIoAction doHandshake(Ssl::SocketState& state,
                                     Ssl::HandshakerCallbacks& callbacks) override {
@@ -206,23 +211,21 @@ public:
 
   SSL* ssl() override { return ssl_.get(); }
 
+  void setCertCbOk() { cert_cb_ok_ = true; }
+
 private:
   bssl::UniquePtr<SSL> ssl_;
   std::function<void()> requested_cert_cb_;
+  bool cert_cb_ok_{false};
   Network::TransportSocketCallbacks* transport_socket_callbacks_{};
 };
 
 TEST_F(HandshakerTest, NormalOperationWithHandshakerImplForTest) {
-  bool cert_cb_ok = false;
-
   ::testing::MockFunction<void()> requested_cert_cb;
-  EXPECT_CALL(requested_cert_cb, Call).WillOnce([&]() { cert_cb_ok = true; });
-
-  SSL_set_cert_cb(
-      server_ssl_.get(), [](SSL*, void* arg) -> int { return *static_cast<bool*>(arg) ? 1 : -1; },
-      &cert_cb_ok);
 
   HandshakerImplForTest handshaker(std::move(server_ssl_), requested_cert_cb.AsStdFunction());
+
+  EXPECT_CALL(requested_cert_cb, Call).WillOnce([&]() { handshaker.setCertCbOk(); });
 
   Network::MockTransportSocketCallbacks transport_socket_callbacks;
   handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
