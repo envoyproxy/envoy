@@ -37,8 +37,8 @@ public:
   MOCK_METHOD(void, finishSpan, ());
   MOCK_METHOD(void, injectContext, (Http::RequestHeaderMap & request_headers));
   MOCK_METHOD(void, setSampled, (const bool sampled));
-  MOCK_METHOD(void, setBaggage, (const std::string& key, const std::string& value));
-  MOCK_METHOD(std::string, getBaggage, (const std::string& key));
+  MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
+  MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
                      SystemTime start_time) override {

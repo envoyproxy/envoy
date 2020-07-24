@@ -40,8 +40,8 @@ public:
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool) override;
-  std::string getBaggage(const std::string& key) override;
-  void setBaggage(const std::string& key, const std::string& value) override;
+  std::string getBaggage(absl::string_view key) override;
+  void setBaggage(absl::string_view key, absl::string_view value) override;
 
 private:
   OpenTracingDriver& driver_;

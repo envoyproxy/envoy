@@ -35,9 +35,9 @@ void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
   span_.log(timestamp, event);
 }
 
-void ZipkinSpan::setBaggage(const std::string&, const std::string&) {}
+void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
 
-std::string ZipkinSpan::getBaggage(const std::string&) { return std::string(); }
+std::string ZipkinSpan::getBaggage(absl::string_view) { return std::string(); }
 
 void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.

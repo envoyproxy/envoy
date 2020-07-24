@@ -69,8 +69,8 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Http::RequestHeaderMap& request_headers) override;
-  void setBaggage(const std::string&, const std::string&) override;
-  std::string getBaggage(const std::string&) override;
+  void setBaggage(absl::string_view, absl::string_view) override;
+  std::string getBaggage(absl::string_view) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
@@ -194,9 +194,9 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
   // timestamp is ignored.
   span_.AddAnnotation(event);
 }
-void Span::setBaggage(const std::string&, const std::string&) {}
+void Span::setBaggage(absl::string_view, absl::string_view) {}
 
-std::string Span::getBaggage(const std::string&) { return std::string(); }
+std::string Span::getBaggage(absl::string_view) { return std::string(); }
 
 void Span::finishSpan() { span_.End(); }
 

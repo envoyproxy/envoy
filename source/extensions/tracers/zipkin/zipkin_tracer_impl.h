@@ -75,8 +75,8 @@ public:
                               SystemTime start_time) override;
 
   void setSampled(bool sampled) override;
-  void setBaggage(const std::string&, const std::string&) override;
-  std::string getBaggage(const std::string&) override;
+  void setBaggage(absl::string_view, absl::string_view) override;
+  std::string getBaggage(absl::string_view) override;
 
   /**
    * @return a reference to the Zipkin::Span object.
