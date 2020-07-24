@@ -53,9 +53,9 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
-                        bool set_default_config = true) {
+                        bool set_default_config = true, bool rate_limit = false) {
     config_helper_.addConfigModifier(
-        [this, name, apply_without_warming, set_default_config](
+        [this, name, apply_without_warming, set_default_config, rate_limit](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 http_connection_manager) {
           auto* filter = http_connection_manager.mutable_http_filters()->Add();
@@ -81,6 +81,9 @@ public:
           auto* api_config_source = discovery->mutable_config_source()->mutable_api_config_source();
           api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
           api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+          if (rate_limit) {
+            api_config_source->mutable_rate_limit_settings()->mutable_max_tokens()->set_value(10);
+          }
           auto* grpc_service = api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "ecds_cluster", getEcdsFakeUpstream().localAddress());
           // keep router the last
@@ -113,11 +116,13 @@ public:
   }
 
   ~ExtensionDiscoveryIntegrationTest() override {
-    AssertionResult result = ecds_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = ecds_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    ecds_connection_.reset();
+    if (ecds_connection_ != nullptr) {
+      AssertionResult result = ecds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = ecds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      ecds_connection_.reset();
+    }
   }
 
   void createUpstreams() override {
@@ -155,7 +160,6 @@ public:
 
   FakeUpstream& getEcdsFakeUpstream() const { return *fake_upstreams_[1]; }
 
-private:
   FakeHttpConnectionPtr ecds_connection_{nullptr};
   FakeStreamPtr ecds_stream_{nullptr};
 };
@@ -321,6 +325,22 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameName) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(ExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
+  // If rate limiting is enabled on the config source, gRPC mux drainage updates the requests
+  // queue size on destruction. The update calls out to stats scope nested under the extension
+  // config subscription stats scope. This test verifies that the stats scope outlasts the gRPC
+  // subscription.
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", false, true);
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  test_server_.reset();
+  auto result = ecds_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  ecds_connection_.reset();
 }
 
 } // namespace

@@ -107,7 +107,6 @@ private:
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
 
-  std::unique_ptr<Config::Subscription> subscription_;
   const std::string filter_config_name_;
   uint64_t last_config_hash_{0ul};
   Server::Configuration::FactoryContext& factory_context_;
@@ -125,6 +124,10 @@ private:
   const std::string subscription_id_;
   absl::flat_hash_set<DynamicFilterConfigProviderImpl*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImpl;
+
+  // This must be the last since its destructor may call out to stats to report
+  // on draining requests.
+  std::unique_ptr<Config::Subscription> subscription_;
 };
 
 /**
