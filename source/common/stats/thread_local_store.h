@@ -262,7 +262,7 @@ public:
     tag_producer_ = std::move(tag_producer);
   }
   void setStatsMatcher(StatsMatcherPtr&& stats_matcher) override;
-  void setHistogramSettings(HistogramSettingsConstPtr&& histogram_ettings) override;
+  void setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) override;
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;

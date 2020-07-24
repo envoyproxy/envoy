@@ -128,7 +128,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
       if (shouldShowMetric(*histogram, used_only, regex)) {
         ASSERT(hist_names.insert(histogram->name()).second);
-        //all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+        // all_histograms.emplace(histogram->name(), histogram->quantileSummary());
         response.add(fmt::format("{}: {}\n", histogram->name(), histogram->quantileSummary()));
       }
     }

@@ -19,6 +19,8 @@
 
 #include "absl/strings/str_join.h"
 
+#define HIST_SET 1
+
 namespace Envoy {
 namespace Stats {
 
@@ -567,7 +569,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                        buckets = &parent_.histogram_settings_->buckets(stat_name);
                                      });
 
-#if 1
+#if HIST_SET
     RefcountPtr<ParentHistogramImpl> stat;
     {
       Thread::LockGuard lock(parent_.hist_mutex_);
@@ -734,7 +736,13 @@ ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(cumulative_histogram_);
 }
 
-bool ParentHistogramImpl::decRefCount() { return parent_.decHistogramRefCount(*this, ref_count_); }
+bool ParentHistogramImpl::decRefCount() {
+#if HIST_SET
+  return parent_.decHistogramRefCount(*this, ref_count_);
+#else
+  return --ref_count_ == 0;
+#endif
+}
 
 bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
                                                 std::atomic<uint32_t>& ref_count) {
@@ -747,7 +755,7 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
   ASSERT(ref_count >= 1);
   if (--ref_count == 0) {
     const size_t count = histogram_set_.erase(hist.statName());
-    ASSERT(count == 1);
+    ASSERT(shutting_down_ || count == 1);
     return true;
   }
   return false;
