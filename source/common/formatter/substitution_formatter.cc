@@ -716,6 +716,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.sha256PeerCertificateDigest();
         });
+  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_1") {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.sha1PeerCertificateDigest();
+        });
   } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
     field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
         [](const Ssl::ConnectionInfo& connection_info) {
