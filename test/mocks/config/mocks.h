@@ -97,8 +97,6 @@ public:
   MOCK_METHOD(void, start, (), (override));
   MOCK_METHOD(ScopedResume, pause, (const std::string& type_url), (override));
   MOCK_METHOD(ScopedResume, pause, (const std::vector<std::string> type_urls), (override));
-  MOCK_METHOD(bool, paused, (const std::string& type_url), (const, override));
-  MOCK_METHOD(bool, paused, (const std::vector<std::string> type_urls), (const, override));
 
   MOCK_METHOD(void, addSubscription,
               (const std::set<std::string>& resources, const std::string& type_url,

@@ -96,6 +96,8 @@ public:
   WatchMap& operator=(const WatchMap&) = delete;
 
 private:
+  void removeDeferredWatches();
+
   // Given a list of names that are new to an individual watch, returns those names that are in fact
   // new to the entire subscription.
   std::set<std::string> findAdditions(const std::vector<std::string>& newly_added_to_watch,
@@ -113,6 +115,11 @@ private:
 
   // Watches whose interest set is currently empty, which is interpreted as "everything".
   absl::flat_hash_set<Watch*> wildcard_watches_;
+
+  // Watches that have been removed inside the call stack of the WatchMap's onConfigUpdate(). This
+  // can happen when a watch's onConfigUpdate() results in another watch being removed via
+  // removeWatch().
+  std::unique_ptr<absl::flat_hash_set<Watch*>> deferred_removed_during_update_;
 
   // Maps a resource name to the set of watches interested in that resource. Has two purposes:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.

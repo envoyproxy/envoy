@@ -15,7 +15,10 @@
 #include "gtest/gtest.h"
 
 using ::testing::_;
+using ::testing::AtMost;
 using ::testing::Invoke;
+using ::testing::InvokeWithoutArgs;
+using ::testing::NiceMock;
 
 namespace Envoy {
 namespace Config {
@@ -233,6 +236,75 @@ TEST(WatchMapTest, Overlap) {
   }
 }
 
+// These are regression tests for #11877, validate that when two watches point at the same
+// watched resource, and an update to one of the watches removes one or both of them, that
+// WatchMap defers deletes and doesn't crash.
+class SameWatchRemoval : public testing::Test {
+public:
+  void SetUp() override {
+    envoy::config::endpoint::v3::ClusterLoadAssignment alice;
+    alice.set_cluster_name("alice");
+    updated_resources_.Add()->PackFrom(alice);
+    watch1_ = watch_map_.addWatch(callbacks1_, resource_decoder_);
+    watch2_ = watch_map_.addWatch(callbacks2_, resource_decoder_);
+    watch_map_.updateWatchInterest(watch1_, {"alice"});
+    watch_map_.updateWatchInterest(watch2_, {"alice"});
+  }
+
+  void removeAllInterest() {
+    ASSERT_FALSE(watch_cb_invoked_);
+    watch_cb_invoked_ = true;
+    watch_map_.removeWatch(watch1_);
+    watch_map_.removeWatch(watch2_);
+  }
+
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_{"cluster_name"};
+  WatchMap watch_map_;
+  NiceMock<MockSubscriptionCallbacks> callbacks1_;
+  MockSubscriptionCallbacks callbacks2_;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources_;
+  Watch* watch1_;
+  Watch* watch2_;
+  bool watch_cb_invoked_{};
+};
+
+TEST_F(SameWatchRemoval, SameWatchRemovalSotw) {
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  watch_map_.onConfigUpdate(updated_resources_, "version1");
+}
+
+TEST_F(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> delta_resources =
+      wrapInResource(updated_resources_, "version1");
+  Protobuf::RepeatedPtrField<std::string> removed_names_proto;
+
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  watch_map_.onConfigUpdate(delta_resources, removed_names_proto, "version1");
+}
+
+TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
+  Protobuf::RepeatedPtrField<std::string> removed_names_proto;
+  *removed_names_proto.Add() = "alice";
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
+  watch_map_.onConfigUpdate({}, removed_names_proto, "version1");
+}
+
 // Checks the following:
 // First watch on a resource name ==> updateWatchInterest() returns "add it to subscription"
 // Watch loses interest ==> "remove it from subscription"
@@ -270,7 +342,8 @@ TEST(WatchMapTest, AddRemoveAdd) {
   {
     AddedRemoved added_removed = watch_map.updateWatchInterest(watch1, {"dummy"});
     EXPECT_TRUE(added_removed.added_.empty());
-    EXPECT_EQ(std::set<std::string>({"alice"}), added_removed.removed_); // remove from subscription
+    EXPECT_EQ(std::set<std::string>({"alice"}),
+              added_removed.removed_); // remove from subscription
 
     // (The xDS client should have responded to updateWatchInterest()'s return value by removing
     // Alice from the subscription, so onConfigUpdate() calls should be impossible right now.)
@@ -367,11 +440,11 @@ TEST(WatchMapTest, WatchingEverything) {
   doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
 }
 
-// Delta onConfigUpdate has some slightly subtle details with how it handles the three cases where a
-// watch receives {only updates, updates+removals, only removals} to its resources. This test
+// Delta onConfigUpdate has some slightly subtle details with how it handles the three cases where
+// a watch receives {only updates, updates+removals, only removals} to its resources. This test
 // exercise those cases. Also, the removal-only case tests that SotW does call a watch's
-// onConfigUpdate even if none of the watch's interested resources are among the updated resources.
-// (Which ensures we deliver empty config updates when a resource is dropped.)
+// onConfigUpdate even if none of the watch's interested resources are among the updated
+// resources. (Which ensures we deliver empty config updates when a resource is dropped.)
 TEST(WatchMapTest, DeltaOnConfigUpdate) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;

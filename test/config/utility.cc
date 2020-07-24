@@ -397,6 +397,37 @@ ConfigHelper::buildCluster(const std::string& name, const std::string& lb_policy
   return cluster;
 }
 
+envoy::config::cluster::v3::Cluster
+ConfigHelper::buildTlsCluster(const std::string& name, const std::string& lb_policy,
+                              envoy::config::core::v3::ApiVersion api_version) {
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
+  TestUtility::loadFromYaml(
+      fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: EDS
+      eds_cluster_config:
+        eds_config:
+          resource_api_version: {}
+          ads: {{}}
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            validation_context:
+              trusted_ca:
+                filename: {}
+      lb_policy: {}
+      http2_protocol_options: {{}}
+    )EOF",
+                  name, apiVersionStr(api_version),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"),
+                  lb_policy),
+      cluster, shouldBoost(api_version));
+  return cluster;
+}
+
 envoy::config::endpoint::v3::ClusterLoadAssignment
 ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::string& address,
                                          uint32_t port,

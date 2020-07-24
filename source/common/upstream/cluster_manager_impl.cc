@@ -159,9 +159,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       if (cm_.adsMux()) {
         const auto type_urls =
             Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        if (!cm_.adsMux()->paused(type_urls)) {
-          maybe_resume_eds = cm_.adsMux()->pause(type_urls);
-        }
+        maybe_resume_eds = cm_.adsMux()->pause(type_urls);
       }
       initializeSecondaryClusters();
     }

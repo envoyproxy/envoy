@@ -43,6 +43,9 @@ TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
 TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   startSubscription({"name1", "name2", "name3"});
   auto resume_sub = subscription_->pause();
+  // If nested pause wasn't handled correctly, the single expectedSendMessage below would be
+  // insufficient.
+  auto nested_resume_sub = subscription_->pause();
 
   expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   // If not for the pause, these updates would make the expectSendMessage fail due to too many
