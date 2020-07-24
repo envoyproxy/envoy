@@ -152,7 +152,9 @@ HttpGenericBodyMatcher::HttpGenericBodyMatcher(
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
     // overlap_size_ indicates how many bytes from previous data chunk(s) are buffered.
-    overlap_size_ = std::max(overlap_size_, patterns_->back().length() - 1);
+    if (patterns_->back().length() != 0) {
+      overlap_size_ = std::max(overlap_size_, patterns_->back().length() - 1);
+    } 
   }
   limit_ = config.bytes_limit();
 }
