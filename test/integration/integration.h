@@ -13,13 +13,15 @@
 #include "common/config/version_converter.h"
 #include "common/http/codec_client.h"
 
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -189,6 +191,7 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
+  void setLegacyCodecs() { config_helper_.setLegacyCodecs(); }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
@@ -237,6 +240,10 @@ public:
   void createXdsUpstream();
   void createXdsConnection();
   void cleanUpXdsConnection();
+
+  // See if a port can be successfully bound within the given timeout.
+  ABSL_MUST_USE_RESULT AssertionResult waitForPortAvailable(
+      uint32_t port, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Helpers for setting up expectations and making the internal gears turn for xDS request/response
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
@@ -394,14 +401,6 @@ public:
   }
 
 protected:
-  // Create the envoy server in another thread and start it.
-  // Will not return until that server is listening.
-  virtual IntegrationTestServerPtr
-  createIntegrationTestServer(const std::string& bootstrap_path,
-                              std::function<void(IntegrationTestServer&)> on_server_ready_function,
-                              std::function<void()> on_server_init_function,
-                              Event::TestTimeSystem& time_system);
-
   bool initialized() const { return initialized_; }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;

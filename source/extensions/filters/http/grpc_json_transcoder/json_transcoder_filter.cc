@@ -31,14 +31,19 @@ using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;
 using google::api::HttpRule;
 using google::grpc::transcoding::JsonRequestTranslator;
+using JsonRequestTranslatorPtr = std::unique_ptr<JsonRequestTranslator>;
 using google::grpc::transcoding::MessageStream;
 using google::grpc::transcoding::PathMatcherBuilder;
 using google::grpc::transcoding::PathMatcherUtility;
 using google::grpc::transcoding::RequestInfo;
 using google::grpc::transcoding::RequestMessageTranslator;
+using RequestMessageTranslatorPtr = std::unique_ptr<RequestMessageTranslator>;
 using google::grpc::transcoding::ResponseToJsonTranslator;
+using ResponseToJsonTranslatorPtr = std::unique_ptr<ResponseToJsonTranslator>;
 using google::grpc::transcoding::Transcoder;
+using TranscoderPtr = std::unique_ptr<Transcoder>;
 using google::grpc::transcoding::TranscoderInputStream;
+using TranscoderInputStreamPtr = std::unique_ptr<TranscoderInputStream>;
 
 namespace Envoy {
 namespace Extensions {
@@ -71,9 +76,9 @@ public:
    * @param request_translator a JsonRequestTranslator that does the request translation
    * @param response_translator a ResponseToJsonTranslator that does the response translation
    */
-  TranscoderImpl(std::unique_ptr<RequestMessageTranslator> request_translator,
-                 std::unique_ptr<JsonRequestTranslator> json_request_translator,
-                 std::unique_ptr<ResponseToJsonTranslator> response_translator)
+  TranscoderImpl(RequestMessageTranslatorPtr request_translator,
+                 JsonRequestTranslatorPtr json_request_translator,
+                 ResponseToJsonTranslatorPtr response_translator)
       : request_translator_(std::move(request_translator)),
         json_request_translator_(std::move(json_request_translator)),
         request_message_stream_(request_translator_ ? *request_translator_
@@ -92,12 +97,12 @@ public:
   ProtobufUtil::Status ResponseStatus() override { return response_translator_->Status(); }
 
 private:
-  std::unique_ptr<RequestMessageTranslator> request_translator_;
-  std::unique_ptr<JsonRequestTranslator> json_request_translator_;
+  RequestMessageTranslatorPtr request_translator_;
+  JsonRequestTranslatorPtr json_request_translator_;
   MessageStream& request_message_stream_;
-  std::unique_ptr<ResponseToJsonTranslator> response_translator_;
-  std::unique_ptr<TranscoderInputStream> request_stream_;
-  std::unique_ptr<TranscoderInputStream> response_stream_;
+  ResponseToJsonTranslatorPtr response_translator_;
+  TranscoderInputStreamPtr request_stream_;
+  TranscoderInputStreamPtr response_stream_;
 };
 
 } // namespace
@@ -213,37 +218,59 @@ void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_
   addFileDescriptor(file_proto);
 }
 
+Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor,
+                                          const std::string& field_path_str,
+                                          std::vector<const Protobuf::Field*>* field_path,
+                                          bool* is_http_body) {
+  const Protobuf::Type* message_type =
+      type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
+  if (message_type == nullptr) {
+    return ProtobufUtil::Status(Code::NOT_FOUND,
+                                "Could not resolve type: " + descriptor->full_name());
+  }
+
+  Status status = type_helper_->ResolveFieldPath(
+      *message_type, field_path_str == "*" ? "" : field_path_str, field_path);
+  if (!status.ok()) {
+    return status;
+  }
+
+  if (field_path->empty()) {
+    *is_http_body = descriptor->full_name() == google::api::HttpBody::descriptor()->full_name();
+  } else {
+    const Protobuf::Type* body_type =
+        type_helper_->Info()->GetTypeByTypeUrl(field_path->back()->type_url());
+    *is_http_body = body_type != nullptr &&
+                    body_type->name() == google::api::HttpBody::descriptor()->full_name();
+  }
+  return Status::OK;
+}
+
 Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                               const HttpRule& http_rule,
                                               MethodInfoSharedPtr& method_info) {
   method_info = std::make_shared<MethodInfo>();
   method_info->descriptor_ = descriptor;
-  method_info->response_type_is_http_body_ =
-      descriptor->output_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
-
-  const Protobuf::Type* request_type = type_helper_->Info()->GetTypeByTypeUrl(
-      Grpc::Common::typeUrl(descriptor->input_type()->full_name()));
-  if (request_type == nullptr) {
-    return ProtobufUtil::Status(Code::NOT_FOUND,
-                                "Could not resolve type: " + descriptor->input_type()->full_name());
-  }
 
   Status status =
-      type_helper_->ResolveFieldPath(*request_type, http_rule.body() == "*" ? "" : http_rule.body(),
-                                     &method_info->request_body_field_path);
+      resolveField(descriptor->input_type(), http_rule.body(),
+                   &method_info->request_body_field_path, &method_info->request_type_is_http_body_);
   if (!status.ok()) {
     return status;
   }
 
-  if (method_info->request_body_field_path.empty()) {
-    method_info->request_type_is_http_body_ =
-        descriptor->input_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
-  } else {
-    const Protobuf::Type* body_type = type_helper_->Info()->GetTypeByTypeUrl(
-        method_info->request_body_field_path.back()->type_url());
-    method_info->request_type_is_http_body_ =
-        body_type != nullptr &&
-        body_type->name() == google::api::HttpBody::descriptor()->full_name();
+  status = resolveField(descriptor->output_type(), http_rule.response_body(),
+                        &method_info->response_body_field_path,
+                        &method_info->response_type_is_http_body_);
+  if (!status.ok()) {
+    return status;
+  }
+
+  if (!method_info->response_body_field_path.empty() && !method_info->response_type_is_http_body_) {
+    // TODO(euroelessar): Implement https://github.com/envoyproxy/envoy/issues/11136.
+    return Status(Code::UNIMPLEMENTED,
+                  "Setting \"response_body\" is not supported yet for non-HttpBody fields: " +
+                      descriptor->full_name());
   }
 
   return Status::OK;
@@ -257,8 +284,8 @@ bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_statu
 
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
-    google::grpc::transcoding::TranscoderInputStream& response_input,
-    std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) {
+    google::grpc::transcoding::TranscoderInputStream& response_input, TranscoderPtr& transcoder,
+    MethodInfoSharedPtr& method_info) {
   if (Grpc::Common::isGrpcRequestHeaders(headers)) {
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
@@ -302,8 +329,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     request_info.variable_bindings.emplace_back(std::move(resolved_binding));
   }
 
-  std::unique_ptr<RequestMessageTranslator> request_translator;
-  std::unique_ptr<JsonRequestTranslator> json_request_translator;
+  RequestMessageTranslatorPtr request_translator;
+  JsonRequestTranslatorPtr json_request_translator;
   if (method_info->request_type_is_http_body_) {
     request_translator = std::make_unique<RequestMessageTranslator>(*type_helper_->Resolver(),
                                                                     false, std::move(request_info));
@@ -316,7 +343,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
 
   const auto response_type_url =
       Grpc::Common::typeUrl(method_info->descriptor_->output_type()->full_name());
-  std::unique_ptr<ResponseToJsonTranslator> response_translator{new ResponseToJsonTranslator(
+  ResponseToJsonTranslatorPtr response_translator{new ResponseToJsonTranslator(
       type_helper_->Resolver(), response_type_url, method_info->descriptor_->server_streaming(),
       &response_input, print_options_)};
 
@@ -681,8 +708,14 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
   google::api::HttpBody http_body;
   for (auto& frame : frames) {
     if (frame.length_ > 0) {
+      http_body.Clear();
       Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
-      http_body.ParseFromZeroCopyStream(&stream);
+      if (!HttpBodyUtils::parseMessageByFieldPath(&stream, method_->response_body_field_path,
+                                                  &http_body)) {
+        // TODO(euroelessar): Return error to client.
+        encoder_callbacks_->resetStream();
+        return true;
+      }
       const auto& body = http_body.data();
 
       data.add(body);

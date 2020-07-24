@@ -39,6 +39,7 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view BodyDisallowed = "http1.body_disallowed";
   const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
+  const absl::string_view InvalidUnderscore = "http1.unexpected_underscore";
 };
 
 struct Http1HeaderTypesValues {
@@ -110,27 +111,24 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           absl::optional<uint64_t> status, bool end_stream) {
   bool saw_content_length = false;
-  headers.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        absl::string_view key_to_use = header.key().getStringView();
-        uint32_t key_size_to_use = header.key().size();
-        // Translate :authority -> host so that upper layers do not need to deal with this.
-        if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
-          key_size_to_use = Headers::get().HostLegacy.get().size();
-        }
+  headers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+    absl::string_view key_to_use = header.key().getStringView();
+    uint32_t key_size_to_use = header.key().size();
+    // Translate :authority -> host so that upper layers do not need to deal with this.
+    if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
+      key_to_use = absl::string_view(Headers::get().HostLegacy.get());
+      key_size_to_use = Headers::get().HostLegacy.get().size();
+    }
 
-        // Skip all headers starting with ':' that make it here.
-        if (key_to_use[0] == ':') {
-          return HeaderMap::Iterate::Continue;
-        }
+    // Skip all headers starting with ':' that make it here.
+    if (key_to_use[0] == ':') {
+      return HeaderMap::Iterate::Continue;
+    }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
-            key_to_use, header.value().getStringView());
+    encodeFormattedHeader(key_to_use, header.value().getStringView());
 
-        return HeaderMap::Iterate::Continue;
-      },
-      this);
+    return HeaderMap::Iterate::Continue;
+  });
 
   if (headers.ContentLength()) {
     saw_content_length = true;
@@ -234,13 +232,10 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // Finalize the body
     connection_.buffer().add(LAST_CHUNK);
 
-    trailers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          static_cast<StreamEncoderImpl*>(context)->encodeFormattedHeader(
-              header.key().getStringView(), header.value().getStringView());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
+    trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
+      encodeFormattedHeader(header.key().getStringView(), header.value().getStringView());
+      return HeaderMap::Iterate::Continue;
+    });
 
     connection_.flushOutput();
     connection_.buffer().add(CRLF);
@@ -1051,7 +1046,7 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
       ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}",
                      connection_, current_header_field_.getStringView());
       error_code_ = Http::Code::BadRequest;
-      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
+      sendProtocolError(Http1ResponseCodeDetails::get().InvalidUnderscore);
       stats_.requests_rejected_with_underscores_in_headers_.inc();
       throw CodecProtocolException("http/1.1 protocol error: header name contains underscores");
     }
@@ -1093,6 +1088,8 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 }
 
 int ClientConnectionImpl::onHeadersComplete() {
+  ENVOY_CONN_LOG(trace, "status_code {}", connection_, parser_.status_code);
+
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
@@ -1138,19 +1135,23 @@ int ClientConnectionImpl::onHeadersComplete() {
       }
     }
 
-    if (parser_.status_code == 100) {
-      // http-parser treats 100 continue headers as their own complete response.
-      // Swallow the spurious onMessageComplete and continue processing.
-      ignore_message_complete_for_100_continue_ = true;
+    if (parser_.status_code == enumToInt(Http::Code::Continue)) {
       pending_response_.value().decoder_->decode100ContinueHeaders(std::move(headers));
-
-      // Reset to ensure no information from the continue headers is used for the response headers
-      // in case the callee does not move the headers out.
-      headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
     } else if (cannotHaveBody() && !handling_upgrade_) {
       deferred_end_stream_headers_ = true;
     } else {
       pending_response_.value().decoder_->decodeHeaders(std::move(headers), false);
+    }
+
+    // http-parser treats 1xx headers as their own complete response. Swallow the spurious
+    // onMessageComplete and continue processing for purely informational headers.
+    // 101-SwitchingProtocols is exempt as all data after the header is proxied through after
+    // upgrading.
+    if (CodeUtility::is1xx(parser_.status_code) &&
+        parser_.status_code != enumToInt(Http::Code::SwitchingProtocols)) {
+      ignore_message_complete_for_1xx_ = true;
+      // Reset to ensure no information from the 1xx headers is used for the response headers.
+      headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
     }
   }
 
@@ -1176,8 +1177,8 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
 
 void ClientConnectionImpl::onMessageComplete() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
-  if (ignore_message_complete_for_100_continue_) {
-    ignore_message_complete_for_100_continue_ = false;
+  if (ignore_message_complete_for_1xx_) {
+    ignore_message_complete_for_1xx_ = false;
     return;
   }
   if (pending_response_.has_value()) {

@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -182,6 +182,31 @@ message RedisProxy {
         [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
   }
 
+  // RedisFault defines faults used for fault injection.
+  message RedisFault {
+    enum RedisFaultType {
+      // Delays requests. This is the base fault; other faults can have delays added.
+      DELAY = 0;
+
+      // Returns errors on requests.
+      ERROR = 1;
+    }
+
+    // Fault type.
+    RedisFaultType fault_type = 1 [(validate.rules).enum = {defined_only: true}];
+
+    // Percentage of requests fault applies to.
+    config.core.v3.RuntimeFractionalPercent fault_enabled = 2
+        [(validate.rules).message = {required: true}];
+
+    // Delay for all faults. If not set, defaults to zero
+    google.protobuf.Duration delay = 3;
+
+    // Commands fault is restricted to, if any. If not set, fault applies to all commands
+    // other than auth and ping (due to special handling of those commands in Envoy).
+    repeated string commands = 4;
+  }
+
   // The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -230,6 +255,35 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no password is set" error will be returned.
   config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
+
+  // List of faults to inject. Faults currently come in two flavors:
+  // - Delay, which delays a request.
+  // - Error, which responds to a request with an error. Errors can also have delays attached.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //    faults:
+  //    - fault_type: ERROR
+  //      fault_enabled:
+  //        default_value:
+  //          numerator: 10
+  //          denominator: HUNDRED
+  //        runtime_key: "bogus_key"
+  //        commands:
+  //        - GET
+  //      - fault_type: DELAY
+  //        fault_enabled:
+  //          default_value:
+  //            numerator: 10
+  //            denominator: HUNDRED
+  //          runtime_key: "bogus_key"
+  //        delay: 2s
+  //
+  // See the :ref:`fault injection section
+  // <config_network_filters_redis_proxy_fault_injection>` for more information on how to configure this.
+  repeated RedisFault faults = 8;
 
   // If a username is provided an ACL style AUTH command will be required with a username and password.
   // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis

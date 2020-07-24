@@ -9,7 +9,8 @@
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/options.h"
+#include "test/test_common/environment.h"
 
 namespace Envoy {
 namespace Server {

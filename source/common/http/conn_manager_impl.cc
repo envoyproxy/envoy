@@ -104,7 +104,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Http::Context& http_context, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
-                                             Server::OverloadManager* overload_manager,
+                                             Server::OverloadManager& overload_manager,
                                              TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
@@ -113,14 +113,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
       local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
-      overload_stop_accepting_requests_ref_(
-          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 Server::OverloadActionNames::get().StopAcceptingRequests)
-                           : Server::OverloadManager::getInactiveState()),
-      overload_disable_keepalive_ref_(
-          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 Server::OverloadActionNames::get().DisableHttpKeepAlive)
-                           : Server::OverloadManager::getInactiveState()),
+      overload_stop_accepting_requests_ref_(overload_manager.getThreadLocalOverloadState().getState(
+          Server::OverloadActionNames::get().StopAcceptingRequests)),
+      overload_disable_keepalive_ref_(overload_manager.getThreadLocalOverloadState().getState(
+          Server::OverloadActionNames::get().DisableHttpKeepAlive)),
       time_source_(time_source) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
@@ -611,6 +607,17 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
+
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rq_body_size_.recordValue(stream_info_.bytesReceived());
+      req_resp_stats->get().upstream_rs_body_size_.recordValue(stream_info_.bytesSent());
+    }
+  }
 
   // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
   // response code and when no other response flags are set.
@@ -726,6 +733,17 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
+
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
+    }
+  }
+
   connection_manager_.stats_.named_.downstream_rq_completed_.inc();
   connection_manager_.listener_stats_.downstream_rq_completed_.inc();
   if (CodeUtility::is1xx(response_code)) {
@@ -773,6 +791,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
+  Upstream::HostDescriptionConstSharedPtr upstream_host =
+      connection_manager_.read_callbacks_->upstreamHost();
+
+  if (upstream_host != nullptr) {
+    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
+        upstream_host->cluster().requestResponseSizeStats();
+    if (req_resp_stats.has_value()) {
+      req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
+    }
+  }
 
   // Both saw_connection_close_ and is_head_request_ affect local replies: set
   // them as early as possible.
@@ -1518,6 +1546,66 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  stream_info_.setResponseCodeDetails(details);
+
+  // The BadRequest error code indicates there has been a messaging error.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
+      !connection_manager_.config_.streamErrorOnInvalidHttpMessaging() &&
+      code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2) {
+    state_.saw_connection_close_ = true;
+  }
+
+  if (response_headers_.get() == nullptr) {
+    // If the response has not started at all, send the response through the filter chain.
+    sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
+                                 grpc_status, details);
+  } else if (!state_.non_100_response_headers_encoded_) {
+    ENVOY_STREAM_LOG(debug, "Sending local reply with details {} directly to the encoder", *this,
+                     details);
+    // In this case, at least the header and possibly the body has started
+    // processing through the filter chain, but no non-informational headers
+    // have been sent downstream. To ensure that filters don't get their
+    // state machine screwed up, bypass the filter chain and send the local
+    // reply directly to the codec.
+    //
+    // Make sure we won't end up with nested watermark calls from the body buffer.
+    state_.encoder_filters_streaming_ = true;
+    Http::Utility::sendLocalReply(
+        state_.destroyed_,
+        Utility::EncodeFunctions{
+            [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                absl::string_view& content_type) -> void {
+              connection_manager_.config_.localReply().rewrite(
+                  request_headers_.get(), response_headers, stream_info_, code, body, content_type);
+            },
+            [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
+              if (modify_headers != nullptr) {
+                modify_headers(*response_headers);
+              }
+              response_headers_ = std::move(response_headers);
+              encodeHeadersInternal(*response_headers_, end_stream);
+            },
+            [&](Buffer::Instance& data, bool end_stream) -> void {
+              encodeDataInternal(data, end_stream);
+            }},
+        Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*request_headers_), code, body,
+                                grpc_status, state_.is_head_request_});
+    maybeEndEncode(state_.local_complete_);
+  } else {
+    stream_info_.setResponseCodeDetails(details);
+    // If we land in this branch, response headers have already been sent to the client.
+    // All we can do at this point is reset the stream.
+    ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. Prior headers have already been sent",
+                     *this, details);
+    connection_manager_.doEndStream(*this);
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::sendLocalReplyViaFilterChain(
+    bool is_grpc_request, Code code, absl::string_view body,
+    const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(response_headers_ == nullptr);
   // For early error handling, do a best-effort attempt to create a filter chain
@@ -1525,7 +1613,6 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   // a no-op.
   createFilterChain();
 
-  stream_info_.setResponseCodeDetails(details);
   Utility::sendLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
@@ -1555,6 +1642,8 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers) {
   resetIdleTimer();
   ASSERT(connection_manager_.config_.proxy100Continue());
+  // The caller must guarantee that encode100ContinueHeaders() is invoked at most once.
+  ASSERT(!state_.has_continue_headers_ || filter != nullptr);
   // Make sure commonContinue continues encode100ContinueHeaders.
   state_.has_continue_headers_ = true;
 
@@ -1607,6 +1696,9 @@ void ConnectionManagerImpl::ActiveStream::maybeContinueEncoding(
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         ResponseHeaderMap& headers,
                                                         bool end_stream) {
+  // See encodeHeaders() comments in include/envoy/http/filter.h for why the 1xx precondition holds.
+  ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
+         Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols));
   resetIdleTimer();
   disarmRequestTimeout();
 
@@ -1772,6 +1864,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     }
   }
 
+  // 100-continue headers are handled via encode100ContinueHeaders.
+  state_.non_100_response_headers_encoded_ = true;
   chargeStats(headers);
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
@@ -2560,44 +2654,13 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
   } else {
     parent_.connection_manager_.stats_.named_.rs_too_large_.inc();
 
-    // If headers have not been sent to the user, send a 500.
-    if (!headers_continued_) {
-      // Make sure we won't end up with nested watermark calls from the body buffer.
-      parent_.state_.encoder_filters_streaming_ = true;
-      allowIteration();
-      parent_.stream_info_.setResponseCodeDetails(
-          StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
-      // This does not call the standard sendLocalReply because if there is already response data
-      // we do not want to pass a second set of response headers through the filter chain.
-      // Instead, call the encodeHeadersInternal / encodeDataInternal helpers
-      // directly, which maximizes shared code with the normal response path.
-      Http::Utility::sendLocalReply(
-          parent_.state_.destroyed_,
-          Utility::EncodeFunctions{
-              [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
-                  absl::string_view& content_type) -> void {
-                parent_.connection_manager_.config_.localReply().rewrite(
-                    parent_.request_headers_.get(), response_headers, parent_.stream_info_, code,
-                    body, content_type);
-              },
-              [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
-                parent_.response_headers_ = std::move(response_headers);
-                parent_.encodeHeadersInternal(*parent_.response_headers_, end_stream);
-              },
-              [&](Buffer::Instance& data, bool end_stream) -> void {
-                parent_.encodeDataInternal(data, end_stream);
-              }},
-          Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
-                                  Http::Code::InternalServerError,
-                                  CodeUtility::toString(Http::Code::InternalServerError),
-                                  absl::nullopt, parent_.state_.is_head_request_});
-      parent_.maybeEndEncode(parent_.state_.local_complete_);
-    } else {
-      ENVOY_STREAM_LOG(
-          debug, "Resetting stream. Response data too large and headers have already been sent",
-          *this);
-      resetStream();
-    }
+    // In this case, sendLocalReply will either send a response directly to the encoder, or
+    // reset the stream.
+    parent_.sendLocalReply(
+        parent_.request_headers_ && Grpc::Common::isGrpcRequestHeaders(*parent_.request_headers_),
+        Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
+        nullptr, parent_.state_.is_head_request_, absl::nullopt,
+        StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
   }
 }
 

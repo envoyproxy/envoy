@@ -96,6 +96,7 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":io_handle_interface",
+        "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

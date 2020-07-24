@@ -51,17 +51,20 @@ jobs:
           ciTarget: bazel.release
 
   - job: release_arm64
-    displayName: "Linux-arm64 release.server_only"
+    displayName: "Linux-arm64 release"
     dependsOn: ["format"]
-    condition: ne(variables['Build.Reason'], 'PullRequest')
+    # For master builds, continue even if format fails
+    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    timeoutInMinutes: 360
     pool: "arm-large"
     steps:
       - template: bazel.yml
         parameters:
           managedAgent: false
-          ciTarget: bazel.release.server_only
+          ciTarget: bazel.release
           rbe: false
           artifactSuffix: ".arm64"
+          bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: bazel
     displayName: "Linux-x64"
@@ -90,21 +93,28 @@ jobs:
           ciTarget: $(CI_TARGET)
 
   - job: coverage
-    displayName: "Linux-x64 coverage"
-    dependsOn: ["format"]
+    displayName: "Linux-x64"
+    dependsOn: ["release"]
     timeoutInMinutes: 360
     pool: "x64-large"
+    strategy:
+      maxParallel: 2
+      matrix:
+        coverage:
+          CI_TARGET: "coverage"
+        fuzz_coverage:
+          CI_TARGET: "fuzz_coverage"
     steps:
       - template: bazel.yml
         parameters:
           managedAgent: false
-          ciTarget: bazel.coverage
+          ciTarget: bazel.$(CI_TARGET)
           rbe: false
           # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
-          bazelBuildExtraOptions: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+          bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
 
-      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/coverage coverage'
-        displayName: "Upload Report to GCS"
+      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
+        displayName: "Upload $(CI_TARGET) Report to GCS"
         env:
           ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -149,6 +159,7 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
+          BAZEL_BUILD_EXTRA_OPTIONS: --remote_download_toplevel
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

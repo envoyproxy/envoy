@@ -58,7 +58,7 @@ public:
                         Random::RandomGenerator& random_generator, Http::Context& http_context,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager* overload_manager, TimeSource& time_system);
+                        Server::OverloadManager& overload_manager, TimeSource& time_system);
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -494,6 +494,10 @@ private:
                         bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override;
+    void sendLocalReplyViaFilterChain(
+        bool is_grpc_request, Code code, absl::string_view body,
+        const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+        const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
     // As with most of the encode functions, this runs encodeHeaders on various
     // filters before calling encodeHeadersInternal which does final header munging and passes the
@@ -625,7 +629,7 @@ private:
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
             is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
-            is_head_request_(false) {}
+            is_head_request_(false), non_100_response_headers_encoded_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -653,6 +657,8 @@ private:
       // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
       bool has_continue_headers_ : 1;
       bool is_head_request_ : 1;
+      // Tracks if headers other than 100-Continue have been encoded to the codec.
+      bool non_100_response_headers_encoded_ : 1;
       // Whether a filter has indicated that the request should be treated as a headers only
       // request.
       bool decoding_headers_only_{false};
