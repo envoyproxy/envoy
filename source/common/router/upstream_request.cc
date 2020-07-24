@@ -374,12 +374,14 @@ void UpstreamRequest::onPoolReady(
 
   calling_encode_headers_ = true;
   auto* headers = parent_.downstreamHeaders();
+  parent_.routeEntry()->finalizeRequestHeaders(*headers, parent_.callbacks()->streamInfo(),
+                                               !parent_.config().suppress_envoy_headers_);
   if (parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
-    parent_.downstreamHeaders()->setHost(host->hostname());
+    headers->setHost(host->hostname());
   }
 
   if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders());
+    span_->injectContext(*headers);
   }
 
   upstream_timing_.onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
@@ -401,7 +403,7 @@ void UpstreamRequest::onPoolReady(
     }
   }
 
-  upstream_->encodeHeaders(*parent_.downstreamHeaders(), shouldSendEndStream());
+  upstream_->encodeHeaders(*headers, shouldSendEndStream());
 
   calling_encode_headers_ = false;
 

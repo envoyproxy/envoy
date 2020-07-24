@@ -560,8 +560,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Inject the active span's tracing context into the request headers.
   callbacks_->activeSpan().injectContext(headers);
 
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
-                                       !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers,
                                    host->transportSocketFactory().implementsSecureTransport());
 
@@ -580,8 +578,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       active_shadow_policies_.push_back(std::cref(policy_ref));
     }
   }
-
-  ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
