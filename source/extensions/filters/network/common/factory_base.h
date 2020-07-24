@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/filter_config.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
