@@ -148,7 +148,9 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   ASSERT(size == 0);
 }
 
-void OwnedImpl::drain(uint64_t size) {
+void OwnedImpl::drain(uint64_t size) { drainImpl(size); }
+
+void OwnedImpl::drainImpl(uint64_t size) {
   while (size != 0) {
     if (slices_.empty()) {
       break;
@@ -220,28 +222,18 @@ void* OwnedImpl::linearize(uint32_t size) {
   }
   if (slices_[0]->dataSize() < size) {
     auto new_slice = OwnedSlice::create(size);
-    uint64_t bytes_copied = 0;
     Slice::Reservation reservation = new_slice->reserve(size);
     ASSERT(reservation.mem_ != nullptr);
     ASSERT(reservation.len_ == size);
-    auto dest = static_cast<uint8_t*>(reservation.mem_);
-    do {
-      uint64_t data_size = slices_.front()->dataSize();
-      uint64_t copy_size = std::min(data_size, size - bytes_copied);
-      if (copy_size > 0) {
-        memcpy(dest, slices_.front()->data(), copy_size);
-        bytes_copied += copy_size;
-        dest += copy_size;
-      }
-
-      slices_.front()->drain(copy_size);
-      if (slices_.front()->dataSize() == 0) {
-        slices_.pop_front();
-      }
-    } while (bytes_copied < size);
-    ASSERT(dest == static_cast<const uint8_t*>(reservation.mem_) + size);
+    copyOut(0, size, reservation.mem_);
     new_slice->commit(reservation);
+
+    // Replace the first 'size' bytes in the buffer with the new slice. Since new_slice re-adds the
+    // drained bytes, avoid use of the overridable 'drain' method to avoid incorrectly checking if
+    // we dipped below low-watermark.
+    drainImpl(size);
     slices_.emplace_front(std::move(new_slice));
+    length_ += size;
   }
   return slices_.front()->data();
 }

@@ -582,6 +582,7 @@ private:
   bool isSameBufferImpl(const Instance& rhs) const;
 
   void addImpl(const void* data, uint64_t size);
+  void drainImpl(uint64_t size);
 
   /**
    * Moves contents of the `other_slice` by either taking its ownership or coalescing it
