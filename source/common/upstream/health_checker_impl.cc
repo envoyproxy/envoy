@@ -714,9 +714,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
   ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (goaway || !parent_.reuse_connection_) {
-    // Stream reset was unexpected, so we haven't closed the connection
-    // yet in response to a GOAWAY or due to disabled connection reuse.
+  if (!parent_.reuse_connection_) {
+    // Stream reset was unexpected, so we haven't closed the connection yet.
     client_->close();
   }
 
@@ -803,7 +802,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onTimeout() {
   ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
   expect_reset_ = true;
-  if (received_no_error_goaway_ || !parent_.reuse_connection_) {
+  if (!parent_.reuse_connection_) {
     client_->close();
   } else {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);

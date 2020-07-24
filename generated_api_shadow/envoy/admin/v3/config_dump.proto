@@ -33,6 +33,7 @@ message ConfigDump {
   // * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v3.EndpointsConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v3.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v3.RoutesConfigDump>`
+  // [#not-implemented-hide:] * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v3.EndpointsConfigDump>`
   //
   // EDS Configuration will only be dumped by using parameter `?include_eds`
   //
@@ -350,7 +351,8 @@ message SecretsConfigDump {
   repeated DynamicSecret dynamic_warming_secrets = 3;
 }
 
-// Envoy's admin fill this message with all currently known endpoints. Endpoint
+// [#not-implemented-hide:]
+// Envoy's EDS implementation *will* fill this message with all currently known endpoints. Endpoint
 // configuration information can be used to recreate an Envoy configuration by populating all
 // endpoints as static endpoints or by returning them in an EDS response.
 message EndpointsConfigDump {
@@ -358,12 +360,12 @@ message EndpointsConfigDump {
     // The endpoint config.
     google.protobuf.Any endpoint_config = 1;
 
-    // [#not-implemented-hide:] The timestamp when the Endpoint was last updated.
+    // The timestamp when the Endpoint was last updated.
     google.protobuf.Timestamp last_updated = 2;
   }
 
   message DynamicEndpointConfig {
-    // [#not-implemented-hide:] This is the per-resource version information. This version is currently taken from the
+    // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
     // the endpoint configuration was loaded.
     string version_info = 1;
@@ -371,7 +373,7 @@ message EndpointsConfigDump {
     // The endpoint config.
     google.protobuf.Any endpoint_config = 2;
 
-    // [#not-implemented-hide:] The timestamp when the Endpoint was last updated.
+    // The timestamp when the Endpoint was last updated.
     google.protobuf.Timestamp last_updated = 3;
   }
 

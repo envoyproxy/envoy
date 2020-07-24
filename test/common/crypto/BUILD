@@ -26,27 +26,9 @@ envoy_cc_test(
     ],
 )
 
-envoy_proto_library(
-    name = "verify_signature_fuzz_proto",
-    srcs = ["verify_signature_fuzz.proto"],
-)
-
 envoy_cc_fuzz_test(
-    name = "get_sha_256_digest_fuzz_test",
-    srcs = ["get_sha_256_digest_fuzz_test.cc"],
-    corpus = "get_sha_256_digest_corpus",
+    name = "utility_fuzz_test",
+    srcs = ["utility_fuzz_test.cc"],
+    corpus = "utility_corpus",
     deps = ["//source/extensions/common/crypto:utility_lib"],
-)
-
-envoy_cc_fuzz_test(
-    name = "verify_signature_fuzz_test",
-    srcs = ["verify_signature_fuzz_test.cc"],
-    corpus = "verify_signature_corpus",
-    dictionaries = ["verify_signature_fuzz_test.dict"],
-    deps = [
-        ":verify_signature_fuzz_proto_cc_proto",
-        "//source/common/common:hex_lib",
-        "//source/common/crypto:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
-    ],
 )

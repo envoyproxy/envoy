@@ -502,13 +502,13 @@ private:
 template <class T>
 std::unique_ptr<T>
 createHeaderMap(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values) {
-  auto new_header_map = T::create();
+  auto new_header_map = std::make_unique<T>();
   HeaderMapImpl::initFromInitList(*new_header_map, values.begin(), values.end());
   return new_header_map;
 }
 
 template <class T, class It> std::unique_ptr<T> createHeaderMap(It begin, It end) {
-  auto new_header_map = T::create();
+  auto new_header_map = std::make_unique<T>();
   HeaderMapImpl::initFromInitList(*new_header_map, begin, end);
   return new_header_map;
 }

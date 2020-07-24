@@ -1,7 +1,10 @@
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
+<<<<<<< HEAD
 #include "envoy/network/exception.h"
+=======
+>>>>>>> 8cb2958f29af3e45e87653356b6099bd3a4cbfbf
 #include "envoy/server/bootstrap_extension_config.h"
 
 #include "common/common/assert.h"

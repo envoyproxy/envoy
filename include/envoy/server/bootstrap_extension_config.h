@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/protobuf/protobuf.h"
 

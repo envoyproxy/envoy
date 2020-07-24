@@ -474,9 +474,22 @@ protected:
   // them in the port_map_.
   bool defer_listener_finalization_{false};
 
-  // By default the test server will use custom stats to notify on increment.
-  // This override exists for tests measuring stats memory.
-  bool use_real_stats_{};
+  // The number of worker threads that the test server uses.
+  uint32_t concurrency_{1};
+
+  // The duration of the drain manager graceful drain period.
+  std::chrono::seconds drain_time_{1};
+
+  // Member variables for xDS testing.
+  FakeUpstream* xds_upstream_{};
+  FakeHttpConnectionPtr xds_connection_;
+  FakeStreamPtr xds_stream_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  bool create_xds_upstream_{false};
+  bool tls_xds_upstream_{false};
+  bool use_lds_{true}; // Use the integration framework's LDS set up.
+  Grpc::SotwOrDelta sotw_or_delta_{Grpc::SotwOrDelta::Sotw};
 
 private:
   // The type for the Envoy-to-backend connection

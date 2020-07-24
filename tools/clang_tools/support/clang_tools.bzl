@@ -1,11 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
-_clang_tools_copts = [
-    "-std=c++14",
-    "-fno-exceptions",
-    "-fno-rtti",
-]
-
 def clang_tools_cc_binary(name, copts = [], tags = [], deps = [], **kwargs):
     cc_binary(
         name = name,
@@ -15,14 +9,14 @@ def clang_tools_cc_binary(name, copts = [], tags = [], deps = [], **kwargs):
         **kwargs
     )
 
-def clang_tools_cc_library(name, copts = [], **kwargs):
+def clang_tools_cc_library(name, **kwargs):
     cc_library(
         name = name,
         copts = copts + _clang_tools_copts,
         **kwargs
     )
 
-def clang_tools_cc_test(name, copts = [], deps = [], **kwargs):
+def clang_tools_cc_test(name, deps = [], **kwargs):
     cc_test(
         name = name,
         copts = copts + _clang_tools_copts,

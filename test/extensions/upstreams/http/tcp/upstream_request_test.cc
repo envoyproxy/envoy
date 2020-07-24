@@ -29,6 +29,30 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+class MockGenericConnPool : public GenericConnPool {
+  MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
+  MOCK_METHOD(bool, cancelAnyPendingRequest, ());
+  MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
+  MOCK_METHOD(bool, initialize,
+              (Upstream::ClusterManager&, const RouteEntry&, Http::Protocol,
+               Upstream::LoadBalancerContext*));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
+};
+
+class MockGenericConnectionPoolCallbacks : public GenericConnectionPoolCallbacks {
+public:
+  MOCK_METHOD(void, onPoolFailure,
+              (Http::ConnectionPool::PoolFailureReason reason,
+               absl::string_view transport_failure_reason,
+               Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, onPoolReady,
+              (std::unique_ptr<GenericUpstream> && upstream,
+               Upstream::HostDescriptionConstSharedPtr host,
+               const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+               const StreamInfo::StreamInfo& info));
+  MOCK_METHOD(UpstreamRequest*, upstreamRequest, ());
+};
+
 class MockRouterFilterInterface : public RouterFilterInterface {
 public:
   MockRouterFilterInterface()
@@ -102,11 +126,10 @@ namespace Tcp {
 class TcpConnPoolTest : public ::testing::Test {
 public:
   TcpConnPoolTest() : host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
-    NiceMock<Router::MockRouteEntry> route_entry;
+    NiceMock<MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
     EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm, true, route_entry, Envoy::Http::Protocol::Http11,
-                                               nullptr);
+    EXPECT_TRUE(conn_pool_.initialize(cm, route_entry, Http::Protocol::Http11, nullptr));
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;

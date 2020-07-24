@@ -1,10 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@protodoc_pip3//:requirements.bzl", "requirement")
-load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 py_binary(
     name = "generate_empty",
