@@ -23,7 +23,7 @@ function collect_build_profile() {
   mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
   mv -f ${BUILD_DIR}/build_event.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.build_event.json" || true
   mv -f ${BUILD_DIR}/execution_log.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.execution_log.json" || true
-  (($build_profile_count++))
+  ((build_profile_count++))
 }
 
 function bazel_with_collection() {
