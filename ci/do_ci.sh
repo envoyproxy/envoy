@@ -45,7 +45,6 @@ function bazel_with_collection() {
 
 function cp_binary_for_outside_access() {
   DELIVERY_LOCATION="$1"
-  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
   cp -f \
     bazel-bin/"${ENVOY_BIN}" \
     "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
@@ -84,6 +83,11 @@ function bazel_binary_build() {
   fi
 
   echo "Building..."
+  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+
+  # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
+  [[ ! -z "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
+
   bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" "${ENVOY_BUILD_TARGET}" ${CONFIG_ARGS}
   collect_build_profile "${BINARY_TYPE}"_build
 
