@@ -490,7 +490,9 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     const char* rejected = "listener_manager.lds.update_rejected";
     for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
                                  rejected_counter = test_server_->counter(rejected);
-         (success_counter == nullptr || success_counter->value() < concurrency_) &&
+         (success_counter == nullptr ||
+          success_counter->value() <
+              concurrency_ * config_helper_.bootstrap().static_resources().listeners_size()) &&
          (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
          success_counter = test_server_->counter(success),
                                  rejected_counter = test_server_->counter(rejected)) {
