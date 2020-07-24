@@ -34,8 +34,6 @@ protected:
       {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
                                                     {"date", formatter_.now(time_source_)},
-                                                    {"etag", "abc123"},
-                                                    {"last-modified", formatter_.now(time_source_)},
                                                     {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -314,6 +312,11 @@ TEST_F(CacheFilterTest, ImmediateSuccessfulValidation) {
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
 
     // Encode response
+
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.addCopy("etag", "abc123");
+    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
@@ -325,7 +328,7 @@ TEST_F(CacheFilterTest, ImmediateSuccessfulValidation) {
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Make request require validation
-    request_headers_.addCopy(Http::CustomHeaders::get().CacheControl, "no-cache");
+    request_headers_.addCopy("cache-control", "no-cache");
 
     // Decode request 2 header
     // Make sure the filter did not encode any headers or data (during decoding)
@@ -396,7 +399,12 @@ TEST_F(CacheFilterTest, DelayedSuccessfulValidation) {
 
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
-    // Encode response header
+    // Encode response
+
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.addCopy("etag", "abc123");
+    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
@@ -483,6 +491,11 @@ TEST_F(CacheFilterTest, ImmediateUnsuccessfulValidation) {
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
 
     // Encode response
+
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.addCopy("etag", "abc123");
+    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+
     const std::string body = "abc";
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
@@ -551,7 +564,12 @@ TEST_F(CacheFilterTest, DelayedUnuccessfulValidation) {
 
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
-    // Encode response header
+    // Encode response
+
+    // Add Etag & Last-Modified headers to the response for validation
+    response_headers_.addCopy("etag", "abc123");
+    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+
     const std::string body = "abc";
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
@@ -621,6 +639,151 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
 
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter.onDestroy();
+  }
+}
+
+// A new type alias for a different type of tests that use the exact same class
+using ValidationHeadersTest = CacheFilterTest;
+
+TEST_F(ValidationHeadersTest, EtagAndLastModified) {
+  request_headers_.setHost("EtagAndLastModified");
+  const std::string etag = "abc123";
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+
+    // Add validation headers to the response
+    response_headers_.addCopy("etag", etag);
+    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.addCopy("cache-control", "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+  }
+}
+
+TEST_F(ValidationHeadersTest, EtagOnly) {
+  request_headers_.setHost("EtagOnly");
+  const std::string etag = "abc123";
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+
+    // Add validation headers to the response
+    response_headers_.addCopy("etag", etag);
+
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.addCopy("cache-control", "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    // If-Modified-Since falls back to date
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-none-match", "abc123"}, {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+  }
+}
+
+TEST_F(ValidationHeadersTest, LastModifiedOnly) {
+  request_headers_.setHost("LastModifiedOnly");
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+
+    // Add validation headers to the response
+    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.addCopy("cache-control", "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+  }
+}
+
+TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
+  request_headers_.setHost("NoEtagOrLastModified");
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.addCopy("cache-control", "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    // If-Modified-Since falls back to date
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
+  }
+}
+
+TEST_F(ValidationHeadersTest, InvalidLastModified) {
+  request_headers_.setHost("InvalidLastModified");
+
+  // Make request 1 to insert the response into cache
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+    filter.decodeHeaders(request_headers_, true);
+
+    // Add validation headers to the response
+    response_headers_.addCopy("last-modified", "invalid-date");
+
+    filter.encodeHeaders(response_headers_, true);
+  }
+  // Make request 2 to test for added conditional headers
+  {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Make sure the request requires validation
+    request_headers_.addCopy("cache-control", "no-cache");
+    filter.decodeHeaders(request_headers_, true);
+
+    // Make sure validation conditional headers are added
+    // If-Modified-Since falls back to date
+    const Http::TestRequestHeaderMapImpl injected_headers = {
+        {"if-modified-since", formatter_.now(time_source_)}};
+    EXPECT_THAT(request_headers_, IsSupersetOfHeaders(injected_headers));
   }
 }
 
