@@ -50,7 +50,8 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
 
   // Initialize the shared pointer.
   if (!rule.header().empty()) {
-    selector_ = std::make_shared<HeaderValueSelector>(Http::LowerCaseString(rule.header()), rule.remove());
+    selector_ =
+        std::make_shared<HeaderValueSelector>(Http::LowerCaseString(rule.header()), rule.remove());
   } else if (!rule.cookie().empty()) {
     selector_ = std::make_shared<CookieValueSelector>(rule.cookie());
   } else {
@@ -111,7 +112,7 @@ bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
   }
 
   for (const auto& entry : proto_rules) {
-      vector.emplace_back(entry);
+    vector.emplace_back(entry);
   }
 
   return true;
@@ -151,8 +152,8 @@ void HeaderToMetadataFilter::setEncoderFilterCallbacks(
 }
 
 bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta_namespace,
-                                         const std::string& key, std::string value,
-                                         ValueType type, ValueEncode encode) const {
+                                         const std::string& key, std::string value, ValueType type,
+                                         ValueEncode encode) const {
   ProtobufWkt::Value val;
 
   ASSERT(!value.empty());
@@ -216,10 +217,8 @@ const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& ns
 }
 
 // add metadata['key']= value depending on header present or missing case
-void HeaderToMetadataFilter::applyKeyValue(std::string value,
-                                           const Rule& rule,
-                                           const KeyValuePair& keyval,
-                                           StructMap& np) {
+void HeaderToMetadataFilter::applyKeyValue(std::string value, const Rule& rule,
+                                           const KeyValuePair& keyval, StructMap& np) {
   if (!keyval.value().empty()) {
     value = keyval.value();
   } else {
@@ -246,9 +245,11 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
     absl::optional<std::string> value = rule.selector_->extract(headers);
 
     if (value && proto_rule.has_on_header_present()) {
-      applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_present(), structs_by_namespace);
+      applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_present(),
+                    structs_by_namespace);
     } else if (!value && proto_rule.has_on_header_missing()) {
-      applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_missing(), structs_by_namespace);
+      applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_missing(),
+                    structs_by_namespace);
     }
   }
   // Any matching rules?

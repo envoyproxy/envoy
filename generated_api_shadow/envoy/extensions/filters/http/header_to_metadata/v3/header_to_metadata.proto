@@ -95,14 +95,14 @@ message Config {
     //
     // The header to be extracted.
     string header = 1 [
-       (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
-       (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
     ];
 
     // The cookie to be extracted.
     string cookie = 5 [
-       (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
-       (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
     ];
 
     // If the header or cookie is present, apply this metadata KeyValuePair.

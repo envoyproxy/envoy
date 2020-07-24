@@ -40,11 +40,11 @@ public:
 };
 
 // Get value from a header.
-class HeaderValueSelector : public ValueSelector
-{
+class HeaderValueSelector : public ValueSelector {
 public:
   // Implements ValueSelector.
-  explicit HeaderValueSelector(Http::LowerCaseString header, bool remove) : header_(std::move(header)), remove_(std::move(remove)) {}
+  explicit HeaderValueSelector(Http::LowerCaseString header, bool remove)
+      : header_(std::move(header)), remove_(std::move(remove)) {}
   absl::optional<std::string> extract(Http::HeaderMap& map) const override;
   std::string toString() const override { return fmt::format("header '{}'", header_.get()); }
   ~HeaderValueSelector() override = default;
@@ -55,8 +55,7 @@ private:
 };
 
 // Get value from a cookie.
-class CookieValueSelector : public ValueSelector
-{
+class CookieValueSelector : public ValueSelector {
 public:
   // Implements ValueSelector.
   explicit CookieValueSelector(std::string cookie) : cookie_(std::move(cookie)) {}

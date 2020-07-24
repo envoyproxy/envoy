@@ -636,7 +636,6 @@ response_rules:
   EXPECT_CALL(req_info_,
               setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
-
 }
 
 /**
@@ -721,7 +720,6 @@ request_rules:
     EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   }
-
 }
 
 } // namespace HeaderToMetadataFilter
