@@ -3,7 +3,6 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2

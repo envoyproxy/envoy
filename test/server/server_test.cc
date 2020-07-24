@@ -1,11 +1,12 @@
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
+
 <<<<<<< HEAD
 #include "envoy/network/exception.h"
 =======
 >>>>>>> 8cb2958f29af3e45e87653356b6099bd3a4cbfbf
-#include "envoy/server/bootstrap_extension_config.h"
+    #include "envoy/server/bootstrap_extension_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/version.h"
@@ -32,7 +33,7 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
-using testing::_;
+    using testing::_;
 using testing::Assign;
 using testing::HasSubstr;
 using testing::InSequence;
