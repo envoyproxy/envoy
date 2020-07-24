@@ -63,7 +63,7 @@ static_resources:
           settings:
             op_timeout: 5s
 )EOF",
-                                       TestEnvironment::nullDevicePath());
+                                                        TestEnvironment::nullDevicePath());
 
 // This is a configuration with command stats enabled.
 const std::string CONFIG_WITH_COMMAND_STATS = CONFIG + R"EOF(
@@ -277,7 +277,7 @@ static_resources:
             - prefix: "baz:"
               cluster: cluster_2
 )EOF",
-                                       TestEnvironment::nullDevicePath());
+                TestEnvironment::nullDevicePath());
 
 // This is a configuration with fault injection enabled.
 const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
