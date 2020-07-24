@@ -23,6 +23,7 @@ build --enable_platform_specific_config
 # Enable position independent code, this option is not supported on Windows and default on on macOS.
 build:linux --copt=-fPIC
 build:linux --cxxopt=-std=c++17
+build:linux --conlyopt=-fexceptions
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -116,6 +117,7 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 
 # Coverage options
 coverage --config=coverage
+coverage --build_tests_only
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
@@ -211,7 +213,7 @@ build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:736b8db2e1f0b55edb50719d2f8ddf383f46030b
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:923df85a4ba7f30dcd0cb6b0c6d8d604f0e20f48
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -242,18 +244,20 @@ build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 
 # Fuzz builds
-build:asan-fuzzer --config=clang-asan
+# -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION is passed in in the bazel build target
+# rules for fuzz tests. Passing it in the CLI will cause dependencies to be build
+# with the macro. Causing issues in RouteMatcherTest.TestRoutes that expect prod
+# behavior from RE2 library.
+build:asan-fuzzer --config=asan
 build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
-build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
 build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
-build:plain-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
+build:plain-fuzzer --define ENVOY_CONFIG_ASAN=1
 
 # Compile database generation config
 # We don't care about built binaries so always strip and use fastbuild.
