@@ -123,9 +123,17 @@ void Context::setLoggerMode(LoggerMode mode) {
   }
 }
 
-std::string Context::getFancyLogFormat() { return current_context->fancy_log_format_; }
+std::string Context::getFancyLogFormat() {
+  if (!current_context) { // Context is not instantiated in benchmark test
+    return "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+  }
+  return current_context->fancy_log_format_;
+}
 
 spdlog::level::level_enum Context::getFancyDefaultLevel() {
+  if (!current_context) {
+    return spdlog::level::info;
+  }
   return current_context->fancy_default_level_;
 }
 

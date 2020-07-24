@@ -29,7 +29,8 @@ private:
   absl::Mutex mutex_;
 };
 
-SpdLoggerSharedPtr FancyContext::getFancyLogEntry(std::string key) ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+SpdLoggerSharedPtr FancyContext::getFancyLogEntry(std::string key)
+    ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
   absl::ReaderMutexLock l(&fancy_log_lock_);
   auto it = fancy_log_map_->find(key);
   if (it != fancy_log_map_->end()) {
@@ -108,7 +109,8 @@ void FancyContext::initSink() {
 
 spdlog::logger* FancyContext::createLogger(std::string key, int level)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(fancy_log_lock_) {
-  SpdLoggerSharedPtr new_logger = std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
+  SpdLoggerSharedPtr new_logger =
+      std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
   if (!Logger::Registry::getSink()->hasLock()) { // occurs in benchmark test
     initSink();
   }
@@ -127,8 +129,6 @@ spdlog::logger* FancyContext::createLogger(std::string key, int level)
   return new_logger.get();
 }
 
-FancyContext& getFancyContext() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(FancyContext);
-}
+FancyContext& getFancyContext() { MUTABLE_CONSTRUCT_ON_FIRST_USE(FancyContext); }
 
 } // namespace Envoy

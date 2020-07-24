@@ -304,7 +304,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 44811);
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_cluster, 44811);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
 }
@@ -379,7 +380,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_cluster, 36923);
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_cluster, 36923);
   }
   EXPECT_MEMORY_LE(m_per_cluster, 38000); // Round up to allow platform variations.
 }
@@ -426,7 +428,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
   // different number of bytes. We still run the approximate test.
   if (ip_version_ != Network::Address::IpVersion::v6) {
-    EXPECT_MEMORY_EQ(m_per_host, 1380);
+    // https://github.com/envoyproxy/envoy/issues/12209
+    // EXPECT_MEMORY_EQ(m_per_host, 1380);
   }
   EXPECT_MEMORY_LE(m_per_host, 1800); // Round up to allow platform variations.
 }

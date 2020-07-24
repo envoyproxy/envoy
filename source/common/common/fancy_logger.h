@@ -2,9 +2,10 @@
 
 #include <string>
 
+#include "common/common/macros.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
-#include "common/common/macros.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
