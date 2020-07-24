@@ -160,15 +160,17 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
   local_end_stream_ = end_stream;
   submitHeaders(final_headers, end_stream ? nullptr : &provider);
   auto status = parent_.sendPendingFrames();
-  // The RELEASE_ASSERT below does not change the existing behavior of `sendPendingFrames()`.
-  // The `sendPendingFrames()` used to throw on errors and the only method that was catching
+  // The ENVOY_BUG below introduces a possible change the existing behavior of
+  // `encodeHeadersBase()`. The possibility is there only due to an unknown at this point latent
+  // bug. The `sendPendingFrames()` used to throw on errors and the only method that was catching
   // these exceptions was the `dispatch()`. The `dispatch()` method still checks and handles
   // errors returned by the `sendPendingFrames()`.
   // Other callers of `sendPendingFrames()` do not catch exceptions from this method and
   // would cause abnormal process termination in error cases. This change replaces abnormal
-  // process termination from unhandled exception with the RELEASE_ASSERT.
-  // Further work will replace this RELEASE_ASSERT with proper error handling.
-  RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  // process termination with log message and stat increment and will allow the method to continue.
+  // The behavior after that point is not defined.
+  // Further work will replace this ENVOY_BUG with proper error handling.
+  ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
 }
 
 void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
@@ -232,8 +234,8 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   } else {
     submitTrailers(trailers);
     auto status = parent_.sendPendingFrames();
-    // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
-    RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+    // See comment in the `encodeHeadersBase()` method about this ENVOY_BUG.
+    ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
   }
 }
 
@@ -247,8 +249,8 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
     submitMetadata(flags);
   }
   auto status = parent_.sendPendingFrames();
-  // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
-  RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  // See comment in the `encodeHeadersBase()` method about this ENVOY_BUG.
+  ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -264,8 +266,8 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
       nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
       unconsumed_bytes_ = 0;
       auto status = parent_.sendPendingFrames();
-      // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
-      RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+      // See comment in the `encodeHeadersBase()` method about this ENVOY_BUG.
+      ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
     }
   }
 }
@@ -435,8 +437,8 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   // will be run because higher layers think the stream is already finished.
   resetStreamWorker(StreamResetReason::LocalReset);
   auto status = parent_.sendPendingFrames();
-  // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
-  RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  // See comment in the `encodeHeadersBase()` method about this ENVOY_BUG.
+  ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -452,8 +454,8 @@ void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_str
   }
 
   auto status = parent_.sendPendingFrames();
-  // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
-  RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  // See comment in the `encodeHeadersBase()` method about this ENVOY_BUG.
+  ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
   if (local_end_stream_ && pending_send_data_.length() > 0) {
     createPendingFlushTimer();
   }
@@ -478,8 +480,8 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // the cleanup logic to run which will reset the stream in all cases if all data frames could not
   // be sent.
   auto status = parent_.sendPendingFrames();
-  // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
-  RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  // See comment in the `encodeHeadersBase()` method about this ENVOY_BUG.
+  ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
@@ -607,8 +609,8 @@ void ConnectionImpl::goAway() {
   ASSERT(rc == 0);
 
   auto status = sendPendingFrames();
-  // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
-  RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  // See comment in the `encodeHeadersBase()` method about this ENVOY_BUG.
+  ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
 }
 
 void ConnectionImpl::shutdownNotice() {
@@ -616,8 +618,8 @@ void ConnectionImpl::shutdownNotice() {
   ASSERT(rc == 0);
 
   auto status = sendPendingFrames();
-  // See comment in the `encodeHeadersBase()` method about this RELEASE_ASSERT.
-  RELEASE_ASSERT(status.ok(), "sendPendingFrames() failure in non dispatching context");
+  // See comment in the `encodeHeadersBase()` method about this ENVOY_BUG.
+  ENVOY_BUG(status.ok(), "sendPendingFrames() failure in non dispatching context");
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
