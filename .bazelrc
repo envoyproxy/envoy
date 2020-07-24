@@ -8,7 +8,7 @@
 # leave room for compiler/linker.
 # The number 2G is choosed heuristically to both support in CircleCI and large enough for RBE.
 # Startup options cannot be selected via config.
-startup --host_jvm_args=-Xmx2g
+# startup --host_jvm_args=-Xmx2g
 
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --experimental_local_memory_estimate
