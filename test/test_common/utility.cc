@@ -146,7 +146,6 @@ AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::st
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (time_system.monotonicTime() >= end_time) {
-      ENVOY_LOG_MISC(trace, "Timed out waiting for {} to be {}", name, value);
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
   }
@@ -160,7 +159,6 @@ AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::st
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (time_system.monotonicTime() >= end_time) {
-      ENVOY_LOG_MISC(trace, "Timed out waiting for {} to be {}", name, value);
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
   }
@@ -174,7 +172,6 @@ AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::stri
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (time_system.monotonicTime() >= end_time) {
-      ENVOY_LOG_MISC(trace, "Timed out waiting for {} to be {}", name, value);
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
   }
@@ -188,7 +185,6 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
     if (time_system.monotonicTime() >= end_time) {
-      ENVOY_LOG_MISC(trace, "Timed out waiting for {} to be {}", name, value);
       return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
     }
   }
