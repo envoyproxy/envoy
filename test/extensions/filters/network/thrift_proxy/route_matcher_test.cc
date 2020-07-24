@@ -3,6 +3,8 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 
+#include "common/config/metadata.h"
+
 #include "extensions/filters/network/thrift_proxy/router/config.h"
 #include "extensions/filters/network/thrift_proxy/router/router_impl.h"
 
@@ -756,6 +758,8 @@ routes:
 
     EXPECT_EQ("k2", mmc[1]->name());
     EXPECT_EQ(hv2, mmc[1]->value());
+
+    EXPECT_EQ(Http::LowerCaseString{""}, route->routeEntry()->clusterHeader());
   }
 
   // match with weighted cluster with different metadata key
@@ -887,6 +891,118 @@ routes:
     EXPECT_EQ("k2", mmc[1]->name());
     EXPECT_EQ(hv3, mmc[1]->value());
   }
+}
+
+// Test that the route entry has metadata match criteria when using a cluster header.
+TEST(ThriftRouteMatcherTest, ClusterHeaderMetadataMatch) {
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config;
+  {
+    config.set_name("config");
+    auto* route = config.add_routes();
+    route->mutable_match()->set_method_name("method1");
+    auto* action = route->mutable_route();
+    action->set_cluster_header("header_name");
+    auto* metadata = action->mutable_metadata_match();
+    Envoy::Config::Metadata::mutableMetadataValue(*metadata, "envoy.lb", "k1")
+        .set_string_value("v1");
+    Envoy::Config::Metadata::mutableMetadataValue(*metadata, "envoy.lb", "k2")
+        .set_string_value("v2");
+
+    auto* route2 = config.add_routes();
+    route2->mutable_match()->set_method_name("method2");
+    auto* action2 = route2->mutable_route();
+    action2->set_cluster("cluster2");
+  }
+
+  RouteMatcher matcher(config);
+
+  // match with metadata
+  {
+    MessageMetadata metadata;
+    metadata.setMethodName("method1");
+    metadata.headers().addCopy(Http::LowerCaseString{"header_name"}, "cluster1");
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+
+    EXPECT_EQ(Http::LowerCaseString{"header_name"}, route->routeEntry()->clusterHeader());
+
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    ProtobufWkt::Value v1, v2;
+    v1.set_string_value("v1");
+    v2.set_string_value("v2");
+    HashedValue hv1(v1), hv2(v2);
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+  }
+
+  // match with no metadata
+  {
+    MessageMetadata metadata;
+    metadata.setMethodName("method2");
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    EXPECT_EQ(nullptr, route->routeEntry()->metadataMatchCriteria());
+
+    EXPECT_EQ(Http::LowerCaseString{""}, route->routeEntry()->clusterHeader());
+  }
+}
+
+// Tests that weighted cluster route entries can be configured to strip the service name.
+TEST(RouteMatcherTest, WeightedClusterWithStripServiceEnabled) {
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config;
+  {
+    config.set_name("config");
+    auto* route = config.add_routes();
+    route->mutable_match()->set_method_name("method1");
+    auto* action = route->mutable_route();
+    auto* cluster1 = action->mutable_weighted_clusters()->add_clusters();
+    cluster1->set_name("cluster1");
+    cluster1->mutable_weight()->set_value(50);
+    auto* cluster2 = action->mutable_weighted_clusters()->add_clusters();
+    cluster2->set_name("cluster2");
+    cluster2->mutable_weight()->set_value(50);
+    action->set_strip_service_name(true);
+  }
+
+  RouteMatcher matcher(config);
+
+  MessageMetadata metadata;
+  metadata.setMethodName("method1");
+
+  EXPECT_TRUE(matcher.route(metadata, 0)->routeEntry()->stripServiceName());
+}
+
+// Tests that dynamic route entries can be configured to strip the service name.
+TEST(RouteMatcherTest, ClusterHeaderWithStripServiceEnabled) {
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config;
+  {
+    config.set_name("config");
+    auto* route = config.add_routes();
+    route->mutable_match()->set_method_name("method1");
+    auto* action = route->mutable_route();
+    action->set_cluster_header("header_name");
+    action->set_strip_service_name(true);
+  }
+
+  RouteMatcher matcher(config);
+
+  MessageMetadata metadata;
+  metadata.setMethodName("method1");
+  metadata.headers().addCopy(Http::LowerCaseString{"header_name"}, "cluster1");
+
+  EXPECT_TRUE(matcher.route(metadata, 0)->routeEntry()->stripServiceName());
 }
 
 } // namespace
