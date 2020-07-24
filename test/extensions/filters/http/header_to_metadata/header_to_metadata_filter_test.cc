@@ -444,6 +444,38 @@ TEST_F(HeaderToMetadataTest, PerRouteEmtpyRules) {
 }
 
 /**
+ * Invalid empty header or cookie should be rejected.
+ */
+TEST_F(HeaderToMetadataTest, RejectEmptyHeader) {
+  const std::string config = R"EOF(
+request_rules:
+  - header: ""
+
+)EOF";
+  auto expected = "One of Cookie or Header option needs to be specified";
+  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), EnvoyException, expected);
+}
+
+/**
+ * Rules with both header and cookie fields should be rejected.
+ */
+TEST_F(HeaderToMetadataTest, RejectBothCookieHeader) {
+  const std::string config = R"EOF(
+request_rules:
+  - header: x-something
+    cookie: something-else
+    on_header_present:
+      key: something
+      value: else
+      type: STRING
+    remove: false
+
+)EOF";
+  auto expected = "Cannot specify both header and cookie";
+  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), EnvoyException, expected);
+}
+
+/**
  * Rules with remove field should be rejected in case of a cookie.
  */
 TEST_F(HeaderToMetadataTest, RejectRemoveForCookie) {
@@ -458,11 +490,6 @@ request_rules:
 )EOF";
   auto expected = "Cannot specify remove for cookie";
   EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), EnvoyException, expected);
-}
-
-TEST_F(HeaderToMetadataTest, RejectRemoveCookieRules) {
-  envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
-  EXPECT_THROW(std::make_shared<Config>(config_proto, true), EnvoyException);
 }
 
 /**

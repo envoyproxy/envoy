@@ -7,8 +7,13 @@ Envoy Header-To-Metadata Filter
 
 This filter is configured with rules that will be matched against requests and responses.
 Each rule has either a cookie or a header and can be triggered either when the header
-is present or missing. When a rule is triggered, dynamic metadata will be added based
-on the configuration of the rule.
+or cookie is present or missing.
+
+When a rule is triggered, dynamic metadata will be added based on the configuration of the rule.
+If the header or cookie is present, it's value is extracted and used along with the specified
+key as metadata. If the header or cookie is missing, on missing case is triggered and the value
+specifed is used for adding metadata.
+
 The metadata can then be used for load balancing decisions, consumed from logs, etc.
 
 A typical use case for this filter is to dynamically match requests with load balancer
@@ -41,7 +46,8 @@ absence of a version header could be:
             remove: false
 
 As with headers, the value of the specified cookie will be extracted from the request
-and added as metdata with the key specified.
+and added as metadata with the key specified.
+`remove: true` is unsupported for cookie.
 
 .. code-block:: yaml
 
