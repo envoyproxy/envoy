@@ -20,9 +20,9 @@ echo "building using ${NUM_CPUS} CPUs"
 
 function collect_build_profile() {
   declare -g build_profile_count=${build_profile_count:-1}
-  cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
-  cp ${BUILD_DIR}/build_event.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.build_event.json" || true
-  cp ${BUILD_DIR}/execution_log.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.execution_log.json" || true
+  mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
+  mv -f ${BUILD_DIR}/build_event.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.build_event.json" || true
+  mv -f ${BUILD_DIR}/execution_log.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.execution_log.json" || true
   (($build_profile_count++))
 }
 

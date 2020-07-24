@@ -54,6 +54,7 @@ fi
 
 # Environment setup.
 export TEST_TMPDIR=${BUILD_DIR}/tmp
+export PATH=/opt/llvm/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
