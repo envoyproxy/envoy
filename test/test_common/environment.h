@@ -94,6 +94,12 @@ public:
   static const std::string& nullDevicePath();
 
   /**
+   * Obtain platform specific new line character(s)
+   * @return const std::string& platform specific new line character(s)
+   */
+  static const std::string& newLine();
+
+  /**
    * Obtain read-only test input data directory.
    * @param workspace the name of the Bazel workspace where the input data is.
    * @return const std::string& with the path to the read-only test input directory.

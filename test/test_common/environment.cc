@@ -273,6 +273,14 @@ const std::string& TestEnvironment::nullDevicePath() {
 #endif
 }
 
+const std::string& TestEnvironment::newLine() {
+#ifdef WIN32
+  CONSTRUCT_ON_FIRST_USE(std::string, "\r\n");
+#else
+  CONSTRUCT_ON_FIRST_USE(std::string, "\n");
+#endif
+}
+
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   return runfiles_->Rlocation(workspace);
