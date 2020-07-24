@@ -42,8 +42,9 @@ TEST(Logger, All) {
   // This test exists just to ensure all macros compile and run with the expected arguments provided
 
   TestFilterLog filter;
+  printf("Filter is initialized."); // for debug only
   filter.logMessage();
-
+  printf("Message printed..");  // for debug only
   // Misc logging with no facility.
   ENVOY_LOG_MISC(info, "fake message");
 }
