@@ -31,18 +31,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
-  if (!grpc_stream_.grpcStreamAvailable()) {
-    ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);
-    return; // Drop this request; the reconnect will enqueue a new one.
-  }
-
   ApiState& api_state = api_state_[type_url];
-  if (api_state.paused_) {
-    ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
-    api_state.pending_ = true;
-    return; // Drop this request; the unpause will enqueue a new one.
-  }
-
   auto& request = api_state.request_;
   request.mutable_resource_names()->Clear();
 
@@ -105,43 +94,24 @@ ScopedResume GrpcMuxImpl::pause(const std::string& type_url) {
 
 ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   for (const auto& type_url : type_urls) {
-    ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url);
     ApiState& api_state = api_state_[type_url];
-    ASSERT(!api_state.paused_);
-    ASSERT(!api_state.pending_);
-    api_state.paused_ = true;
+    ENVOY_LOG(debug, "Pausing discovery requests for {} (previous count {})", type_url,
+              api_state.pauses_);
+    ++api_state.pauses_;
   }
   return std::make_unique<Cleanup>([this, type_urls]() {
     for (const auto& type_url : type_urls) {
-      ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
       ApiState& api_state = api_state_[type_url];
-      ASSERT(api_state.paused_);
-      api_state.paused_ = false;
+      ENVOY_LOG(debug, "Resuming discovery requests for {} (previous count {})", type_url,
+                api_state.pauses_);
+      ASSERT(api_state.paused());
 
-      if (api_state.pending_) {
-        ASSERT(api_state.subscribed_);
+      if (--api_state.pauses_ == 0 && api_state.pending_ && api_state.subscribed_) {
         queueDiscoveryRequest(type_url);
         api_state.pending_ = false;
       }
     }
   });
-}
-
-bool GrpcMuxImpl::paused(const std::string& type_url) const {
-  auto entry = api_state_.find(type_url);
-  if (entry == api_state_.end()) {
-    return false;
-  }
-  return entry->second.paused_;
-}
-
-bool GrpcMuxImpl::paused(const std::vector<std::string> type_urls) const {
-  for (const auto& type_url : type_urls) {
-    if (paused(type_url)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 void GrpcMuxImpl::onDiscoveryResponse(
@@ -177,6 +147,12 @@ void GrpcMuxImpl::onDiscoveryResponse(
     }
     return;
   }
+  ScopedResume same_type_resume;
+  // We pause updates of the same type. This is necessary for SotW and GrpcMuxImpl, since unlike
+  // delta and NewGRpcMuxImpl, independent watch additions/removals trigger updates regardless of
+  // the delta state. The proper fix for this is to converge these implementations,
+  // see https://github.com/envoyproxy/envoy/issues/11477.
+  same_type_resume = pause(type_url);
   try {
     // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
     // build a map here from resource name to resource and then walk watches_.
@@ -234,6 +210,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
+  ASSERT(api_state_[type_url].paused());
   queueDiscoveryRequest(type_url);
 }
 
@@ -241,6 +218,8 @@ void GrpcMuxImpl::onWriteable() { drainRequests(); }
 
 void GrpcMuxImpl::onStreamEstablished() {
   first_stream_request_ = true;
+  grpc_stream_.maybeUpdateQueueSizeStat(0);
+  request_queue_ = std::make_unique<std::queue<std::string>>();
   for (const auto& type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
   }
@@ -256,17 +235,27 @@ void GrpcMuxImpl::onEstablishmentFailure() {
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
-  request_queue_.push(queue_item);
+  if (!grpc_stream_.grpcStreamAvailable()) {
+    ENVOY_LOG(debug, "No stream available to queueDiscoveryRequest for {}", queue_item);
+    return; // Drop this request; the reconnect will enqueue a new one.
+  }
+  ApiState& api_state = api_state_[queue_item];
+  if (api_state.paused()) {
+    ENVOY_LOG(trace, "API {} paused during queueDiscoveryRequest(), setting pending.", queue_item);
+    api_state.pending_ = true;
+    return; // Drop this request; the unpause will enqueue a new one.
+  }
+  request_queue_->push(queue_item);
   drainRequests();
 }
 
 void GrpcMuxImpl::drainRequests() {
-  while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
+  while (!request_queue_->empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
     // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-    sendDiscoveryRequest(request_queue_.front());
-    request_queue_.pop();
+    sendDiscoveryRequest(request_queue_->front());
+    request_queue_->pop();
   }
-  grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
+  grpc_stream_.maybeUpdateQueueSizeStat(request_queue_->size());
 }
 
 } // namespace Config
