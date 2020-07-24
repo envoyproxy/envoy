@@ -654,10 +654,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   ASSERT(frame->hd.type != NGHTTP2_CONTINUATION);
 
   if (frame->hd.type == NGHTTP2_DATA) {
-    auto status = trackInboundFrames(&frame->hd, frame->data.padlen);
-    if (!status.ok()) {
-      return status;
-    }
+    RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->data.padlen));
   }
 
   // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
@@ -854,15 +851,12 @@ Status ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const
   // onBeforeFrameSend callback is not called for DATA frames.
   bool is_outbound_flood_monitored_control_frame = false;
   std::swap(is_outbound_flood_monitored_control_frame, is_outbound_flood_monitored_control_frame_);
-  auto status = incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
-  if (!status.ok()) {
-    return status;
-  }
+  RETURN_IF_ERROR(incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame));
 
   output.add(data, length);
   output.addDrainTracker(is_outbound_flood_monitored_control_frame ? control_frame_buffer_releasor_
                                                                    : frame_buffer_releasor_);
-  return status;
+  return okStatus();
 }
 
 void ConnectionImpl::releaseOutboundFrame() {
@@ -1045,10 +1039,7 @@ Status ConnectionImpl::sendPendingFrames() {
         stream->resetStreamWorker(stream->deferred_reset_.value());
       }
     }
-    auto status = sendPendingFrames();
-    if (!status.ok()) {
-      return status;
-    }
+    RETURN_IF_ERROR(sendPendingFrames());
   }
   return okStatus();
 }
@@ -1366,10 +1357,7 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   // For a server connection, we should never get push promise frames.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
 
-  auto status = trackInboundFrames(&frame->hd, frame->headers.padlen);
-  if (!status.ok()) {
-    return status;
-  }
+  RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->headers.padlen));
 
   if (frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
     stats_.trailers_.inc();
@@ -1502,11 +1490,7 @@ Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   Cleanup cleanup([this]() { dispatching_downstream_data_ = false; });
 
   // Make sure downstream outbound queue was not flooded by the upstream frames.
-  auto status = checkOutboundQueueLimits();
-  if (!status.ok()) {
-    return status;
-  }
-
+  RETURN_IF_ERROR(checkOutboundQueueLimits());
   return ConnectionImpl::innerDispatch(data);
 }
 
