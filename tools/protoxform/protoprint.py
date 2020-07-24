@@ -224,8 +224,7 @@ def FormatHeaderFromFile(source_code_info, file_proto, empty_file):
     options.Extensions[migrate_pb2.file_migrate].CopyFrom(
         file_proto.options.Extensions[migrate_pb2.file_migrate])
 
-  if file_proto.options.HasExtension(
-      status_pb2.file_status) and file_proto.package.endswith('alpha'):
+  if file_proto.options.HasExtension(status_pb2.file_status):
     options.Extensions[status_pb2.file_status].CopyFrom(
         file_proto.options.Extensions[status_pb2.file_status])
 
