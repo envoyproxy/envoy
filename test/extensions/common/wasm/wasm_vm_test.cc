@@ -151,7 +151,7 @@ TEST_P(WasmVmTest, V8BadCode) {
 
 TEST_P(WasmVmTest, V8Code) {
 #ifndef NDBUG
-  // Do not execute precompilation tests in debug mode bacause V8 will fail to load because the
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
     return;
@@ -178,7 +178,7 @@ TEST_P(WasmVmTest, V8Code) {
 
 TEST_P(WasmVmTest, V8BadHostFunctions) {
 #ifndef NDBUG
-  // Do not execute precompilation tests in debug mode bacause V8 will fail to load because the
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
     return;
@@ -213,7 +213,7 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
 
 TEST_P(WasmVmTest, V8BadModuleFunctions) {
 #ifndef NDBUG
-  // Do not execute precompilation tests in debug mode bacause V8 will fail to load because the
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
     return;
@@ -248,7 +248,7 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
 
 TEST_P(WasmVmTest, V8FunctionCalls) {
 #ifndef NDBUG
-  // Do not execute precompilation tests in debug mode bacause V8 will fail to load because the
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
     return;
@@ -293,7 +293,7 @@ TEST_P(WasmVmTest, V8FunctionCalls) {
 
 TEST_P(WasmVmTest, V8Memory) {
 #ifndef NDBUG
-  // Do not execute precompilation tests in debug mode bacause V8 will fail to load because the
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
     return;
