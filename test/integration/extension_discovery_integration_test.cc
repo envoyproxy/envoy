@@ -328,6 +328,10 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameName) {
 }
 
 TEST_P(ExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
+  // If rate limiting is enabled on the config source, gRPC mux drains the requests
+  // on destruction. The drainage calls out to stats scope nested under the extension config
+  // subscription stats scope. This test verifies that the stats scope outlasts the gRPC
+  // subscription.
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", false, true);
   initialize();
