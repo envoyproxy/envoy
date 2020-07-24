@@ -571,6 +571,12 @@ Supported variable names are:
   TCP
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
 
+%DOWNSTREAM_PEER_FINGERPRINT_1%
+  HTTP
+    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+
 %DOWNSTREAM_PEER_SERIAL%
   HTTP
     The serial number of the client certificate used to establish the downstream TLS connection.

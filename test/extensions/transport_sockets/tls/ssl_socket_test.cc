@@ -142,12 +142,19 @@ public:
     return *this;
   }
 
-  TestUtilOptions& setExpectedDigest(const std::string& expected_digest) {
-    expected_digest_ = expected_digest;
+  TestUtilOptions& setExpectedSha256Digest(const std::string& expected_sha256_digest) {
+    expected_sha256_digest_ = expected_sha256_digest;
     return *this;
   }
 
-  const std::string& expectedDigest() const { return expected_digest_; }
+  const std::string& expectedSha256Digest() const { return expected_sha256_digest_; }
+
+  TestUtilOptions& setExpectedSha1Digest(const std::string& expected_sha1_digest) {
+    expected_sha1_digest_ = expected_sha1_digest;
+    return *this;
+  }
+
+  const std::string& expectedSha1Digest() const { return expected_sha1_digest_; }
 
   TestUtilOptions& setExpectedLocalUri(const std::string& expected_local_uri) {
     expected_local_uri_ = {expected_local_uri};
@@ -250,7 +257,8 @@ private:
   bool expect_no_cert_chain_;
   bool expect_private_key_method_;
   Network::ConnectionEvent expected_server_close_event_;
-  std::string expected_digest_;
+  std::string expected_sha256_digest_;
+  std::string expected_sha1_digest_;
   std::vector<std::string> expected_local_uri_;
   std::string expected_serial_number_;
   std::string expected_peer_issuer_;
@@ -338,12 +346,19 @@ void testUtil(const TestUtilOptions& options) {
   size_t connect_count = 0;
   auto connect_second_time = [&]() {
     if (++connect_count == 2) {
-      if (!options.expectedDigest().empty()) {
+      if (!options.expectedSha256Digest().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
-        EXPECT_EQ(options.expectedDigest(),
+        EXPECT_EQ(options.expectedSha256Digest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
-        EXPECT_EQ(options.expectedDigest(),
+        EXPECT_EQ(options.expectedSha256Digest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
+      }
+      if (!options.expectedSha1Digest().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSha1Digest(),
+                  server_connection->ssl()->sha1PeerCertificateDigest());
+        EXPECT_EQ(options.expectedSha1Digest(),
+                  server_connection->ssl()->sha1PeerCertificateDigest());
       }
       // Assert twice to ensure a cached value is returned and still valid.
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
@@ -398,6 +413,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_FALSE(server_connection->ssl()->validFromPeerCertificate().has_value());
         EXPECT_FALSE(server_connection->ssl()->expirationPeerCertificate().has_value());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha256PeerCertificateDigest());
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha1PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
@@ -821,8 +837,33 @@ TEST_P(SslSocketTest, GetCertDigest) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(test_options.setExpectedDigest(TEST_NO_SAN_CERT_HASH)
+  testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
+}
+
+TEST_P(SslSocketTest, GetCertDigestInvalidFiles) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
+  testUtil(
+      test_options.setExpectedSha256Digest("").setExpectedSha1Digest("").setExpectedSerialNumber(
+          ""));
 }
 
 TEST_P(SslSocketTest, GetCertDigestInline) {
@@ -894,7 +935,8 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithIntermediateCA) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(test_options.setExpectedDigest(TEST_NO_SAN_CERT_HASH)
+  testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
@@ -921,7 +963,8 @@ TEST_P(SslSocketTest, GetCertDigestServerCertWithoutCommonName) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  testUtil(test_options.setExpectedDigest(TEST_NO_SAN_CERT_HASH)
+  testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
