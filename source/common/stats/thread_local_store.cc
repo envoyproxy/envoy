@@ -191,6 +191,10 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
 void ThreadLocalStoreImpl::shutdownThreading() {
   // This will block both future cache fills as well as cache flushes.
   shutting_down_ = true;
+  Thread::LockGuard lock(hist_mutex_);
+  for (ParentHistogramImpl* histogram : histogram_set_) {
+    histogram->setShuttingDown(true);
+  }
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
@@ -580,7 +584,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
         stat = new ParentHistogramImpl(final_stat_name, unit, parent_, *this,
                                        tag_helper.tagExtractedName(), tag_helper.statNameTags(),
                                        *buckets);
-        parent_.histogram_set_.insert(stat.get());
+        if (!parent_.shutting_down_) {
+          parent_.histogram_set_.insert(stat.get());
+        }
       }
     }
 #else
@@ -738,6 +744,9 @@ ParentHistogramImpl::~ParentHistogramImpl() {
 
 bool ParentHistogramImpl::decRefCount() {
 #if HIST_SET
+  if (shutting_down_) {
+    return --ref_count_ == 0;
+  }
   return parent_.decHistogramRefCount(*this, ref_count_);
 #else
   return --ref_count_ == 0;
@@ -754,8 +763,10 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
   Thread::LockGuard lock(hist_mutex_);
   ASSERT(ref_count >= 1);
   if (--ref_count == 0) {
-    const size_t count = histogram_set_.erase(hist.statName());
-    ASSERT(shutting_down_ || count == 1);
+    if (!shutting_down_) {
+      const size_t count = histogram_set_.erase(hist.statName());
+      ASSERT(shutting_down_ || count == 1);
+    }
     return true;
   }
   return false;

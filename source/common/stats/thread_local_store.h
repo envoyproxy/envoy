@@ -118,6 +118,9 @@ public:
   bool decRefCount() override;
   uint32_t use_count() const override { return ref_count_; }
 
+  // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
+  void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
+
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
@@ -131,6 +134,7 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
   bool merged_;
+  std::atomic<bool> shutting_down_{false};
   std::atomic<uint32_t> ref_count_{0};
 };
 
