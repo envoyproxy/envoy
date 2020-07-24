@@ -106,6 +106,11 @@ FancyContext& getFancyContext();
  * Convenient macro for log flush.
  */
 #define FANCY_FLUSH_LOG()                                                                          \
-  { getFancyContext().getFancyLogEntry(FANCY_KEY)->flush(); }
+  do {                                                                                             \
+    SpdLoggerSharedPtr p = getFancyContext().getFancyLogEntry(FANCY_KEY);                          \
+    if (p) {                                                                                       \
+      p->flush();                                                                                  \
+    }                                                                                              \
+  } while (0)
 
 } // namespace Envoy
