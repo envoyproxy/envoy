@@ -16,6 +16,9 @@ public:
   ListenerFilterFuzzer(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
     ON_CALL(cb_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher_));
+    ON_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+        .WillByDefault(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
+
     try {
       socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
     } catch (const EnvoyException& e) {

@@ -68,7 +68,8 @@ private:
 };
 
 class FakeOsSysCalls : public Api::OsSysCallsImpl {
-  // Will add some methods later.
+public:
+  MOCK_METHOD(Api::SysCallSizeResult, recv, (os_fd_t, void*, size_t, int));
 };
 
 } // namespace ListenerFilters
