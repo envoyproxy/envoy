@@ -15,8 +15,6 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "absl/container/flat_hash_map.h"
-
 namespace Envoy {
 namespace Upstream {
 
