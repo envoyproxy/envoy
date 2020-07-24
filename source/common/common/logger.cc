@@ -87,6 +87,8 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
 
 static Context* current_context = nullptr;
 
+int Context::logger_mode_ = 0; // 0 for Envoy, 1 for Fancy
+
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
                  Thread::BasicLockable& lock, bool should_escape)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
@@ -111,11 +113,11 @@ void Context::activate() {
   Registry::setLogFormat(log_format_);
 }
 
-LoggerMode Context::getLoggerMode() { return current_context->logger_mode_; }
+LoggerMode Context::getLoggerMode() { return static_cast<LoggerMode>(logger_mode_); }
 
 void Context::setLoggerMode(LoggerMode mode) {
-  current_context->logger_mode_ = mode;
-  if (mode == LoggerMode::Fancy) {
+  logger_mode_ = static_cast<int>(mode);
+  if (mode == LoggerMode::Fancy && current_context) {
     getFancyContext().setDefaultFancyLevelFormat(current_context->log_level_,
                                                  current_context->log_format_);
     current_context->fancy_default_level_ = current_context->log_level_;

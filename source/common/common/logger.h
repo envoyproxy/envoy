@@ -225,8 +225,7 @@ private:
   bool should_escape_;
   Context* const save_context_;
 
-  LoggerMode logger_mode_ = LoggerMode::Envoy;
-
+  static int logger_mode_;
   std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
   spdlog::level::level_enum fancy_default_level_ = spdlog::level::info;
 };
