@@ -48,8 +48,10 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
       // mysql_proxy
       // postgres_proxy
       // tcp_proxy
+    };
   }
   return filter_names;
+  
 }
 
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
