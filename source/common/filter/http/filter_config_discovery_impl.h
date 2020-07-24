@@ -125,6 +125,8 @@ private:
   absl::flat_hash_set<DynamicFilterConfigProviderImpl*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImpl;
 
+  // This must be the last since its destructor may call out to stats to report
+  // on draining requests.
   std::unique_ptr<Config::Subscription> subscription_;
 };
 
