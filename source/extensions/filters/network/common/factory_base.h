@@ -36,7 +36,7 @@ public:
       const Protobuf::Message& proto_config,
       Server::Configuration::TransportSocketFactoryContext& factory_context) override {
     return createProtocolOptionsTyped(MessageUtil::downcastAndValidate<const ProtocolOptionsProto&>(
-                                          proto_config, factory_context.messageValidationContext()),
+                                          proto_config, factory_context.messageValidationVisitor()),
                                       factory_context);
   }
 
