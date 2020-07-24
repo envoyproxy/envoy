@@ -2235,16 +2235,24 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
   // Need to set :method and :path.
   // New and legacy codecs will behave differently on errors from processing outbound data. The
   // legacy codecs will throw an exception (that presently will be uncaught in contexts like
-  // sendLocalReply), while the new codecs temporarily RELEASE_ASSERT until Envoy handles errors on
+  // sendLocalReply), while the new codecs temporarily ENVOY_BUG until Envoy handles errors on
   // outgoing data.
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   if (GetParam()) {
-    EXPECT_DEATH_LOG_TO_STDERR(
+#ifdef NDEBUG
+    // In release mode, the error is logged at critical level.
+    EXPECT_LOG_CONTAINS(
         request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
         ":method and :path must be specified");
-    EXPECT_DEATH_LOG_TO_STDERR(
+    EXPECT_LOG_CONTAINS(
         request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
         ":method and :path must be specified");
+#else
+    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
+                 ":method and :path must be specified");
+    EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
+                 ":method and :path must be specified");
+#endif
   } else {
     EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
                  CodecClientException);
