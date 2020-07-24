@@ -63,9 +63,8 @@ public:
   /**
    * @brief Update stats_ field for the udp packet writer
    * @param quic_result is the result from Flush/WritePacket
-   * @param payload_len is the length of the current payload being written
    */
-  void updateUdpPacketWriterStats(quic::WriteResult quic_result, size_t payload_len);
+  void updateUdpPacketWriterStats(quic::WriteResult quic_result);
 
   /**
    * @brief Generate UdpPacketWriterStats object from scope

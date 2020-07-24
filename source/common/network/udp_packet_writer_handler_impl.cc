@@ -18,12 +18,13 @@ Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& bu
   if (!isWriteBlocked()) {
     Api::IoCallUint64Result result =
         Utility::writeToSocket(io_handle_, buffer, local_ip, peer_address);
-    if (result.err_ && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+    if (result.ok()) {
+      // Update UdpPacketWriter Stats
+      stats_.total_bytes_sent_.add(result.rc_);
+    } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
       // Writer is blocked when error code received is EWOULDBLOCK/EAGAIN
       write_blocked_ = true;
     }
-    // Update UdpPacketWriter Stats
-    stats_.sent_bytes_.set(result.rc_);
     return result;
   }
   // Otherwise Writer Blocked, return EAGAIN
@@ -37,7 +38,7 @@ Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& bu
 std::string UdpDefaultWriter::name() const { return UdpWriterNames::get().DefaultWriter; }
 
 Network::UdpPacketWriterStats UdpDefaultWriter::generateStats(Stats::Scope& scope) {
-  return {UDP_PACKET_WRITER_STATS(POOL_GAUGE(scope))};
+  return {UDP_PACKET_WRITER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
 
 Network::IoHandle& UdpDefaultWriter::getWriterIoHandle() const { return io_handle_; }

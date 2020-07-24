@@ -15,16 +15,17 @@ namespace Network {
 
 static const uint64_t K_MAX_OUTGOING_PACKET_SIZE = 1452; // Based on quic::kMaxOutgoingPacketSize
 
-#define UDP_PACKET_WRITER_STATS(GAUGE)                                                             \
+#define UDP_PACKET_WRITER_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
+  COUNTER(total_bytes_sent)                                                                        \
   GAUGE(internal_buffer_size, NeverImport)                                                         \
-  GAUGE(last_buffered_msg_size, NeverImport)                                                       \
-  GAUGE(sent_bytes, NeverImport)
+  GAUGE(front_buffered_pkt_size, NeverImport)                                                      \
+  HISTOGRAM(pkts_sent_per_batch, Unspecified)
 
 /**
  * Wrapper struct for udp packet writer stats. @see stats_macros.h
  */
 struct UdpPacketWriterStats {
-  UDP_PACKET_WRITER_STATS(GENERATE_GAUGE_STRUCT)
+  UDP_PACKET_WRITER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**

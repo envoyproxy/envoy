@@ -1,7 +1,23 @@
 #include <cstddef>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <vector>
+
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+// QUICHE allows unused parameters.
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+// QUICHE uses offsetof().
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#pragma GCC diagnostic ignored "-Wtype-limits"
+
+#include "quiche/quic/test_tools/quic_mock_syscall_wrapper.h"
+
+#pragma GCC diagnostic pop
+#else
+#include "quiche/quic/test_tools/quic_mock_syscall_wrapper.h"
+#endif
 
 #include "envoy/config/core/v3/base.pb.h"
 
@@ -33,6 +49,14 @@ using testing::Return;
 namespace Envoy {
 namespace Network {
 namespace {
+
+size_t getPacketLength(const msghdr* msg) {
+  size_t length = 0;
+  for (size_t i = 0; i < msg->msg_iovlen; ++i) {
+    length += msg->msg_iov[i].iov_len;
+  }
+  return length;
+}
 
 class UdpListenerImplBatchWriterTest : public UdpListenerImplTestBase {
 public:
@@ -82,8 +106,12 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
   absl::FixedArray<std::string> payloads{"length7", "length7", "len<7",
                                          "length7", "length7", "length>7"};
   std::string internal_buffer("");
-  std::string last_buffered("");
+  std::string first_buffered("");
   std::list<std::string> pkts_to_send;
+
+  // Get initial value of total_bytes_sent
+  uint64_t total_bytes_sent =
+      listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value();
 
   for (const auto& payload : payloads) {
     Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
@@ -94,66 +122,165 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
     EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_->getErrorDetails();
 
     // Verify udp_packet_writer stats for batch writing
-    if (internal_buffer.length() == 0 ||       /* internal buffer is empty*/
-        payload.compare(last_buffered) == 0) { /*len(payload) == gso_size*/
-
+    if (internal_buffer.length() == 0 ||        /* internal buffer is empty*/
+        payload.compare(first_buffered) == 0) { /*len(payload) == gso_size*/
       pkts_to_send.emplace_back(payload);
       internal_buffer.append(payload);
-      last_buffered = payload;
-
-    } else if (payload.compare(last_buffered) < 0) { /*len(payload) < gso_size*/
-
+      first_buffered = payload;
+    } else if (payload.compare(first_buffered) < 0) { /*len(payload) < gso_size*/
       pkts_to_send.emplace_back(payload);
       internal_buffer.clear();
-      last_buffered.clear();
-
+      first_buffered.clear();
     } else { /*len(payload) > gso_size*/
-
       internal_buffer = payload;
-      last_buffered = payload;
+      first_buffered = payload;
     }
 
     EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().internal_buffer_size_.value(),
               internal_buffer.length());
     EXPECT_EQ(
-        listener_->udpPacketWriter()->getUdpPacketWriterStats().last_buffered_msg_size_.value(),
-        last_buffered.size());
+        listener_->udpPacketWriter()->getUdpPacketWriterStats().front_buffered_pkt_size_.value(),
+        first_buffered.size());
 
-    if (listener_->udpPacketWriter()->getUdpPacketWriterStats().sent_bytes_.value() != 0) {
+    if (send_result.rc_ > 0) {
       // Verify Correct content is received at the client
-      size_t bytes_received = 0;
       for (const auto& pkt : pkts_to_send) {
         const uint64_t bytes_to_read = pkt.length();
         UdpRecvData data;
         client_.recv(data);
-        bytes_received += data.buffer_->length();
+        total_bytes_sent += data.buffer_->length();
         EXPECT_EQ(bytes_to_read, data.buffer_->length());
         EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
         EXPECT_EQ(data.buffer_->toString(), pkt);
       }
-      EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().sent_bytes_.value(),
-                bytes_received);
+      EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value(),
+                total_bytes_sent);
       pkts_to_send.clear();
-      if (last_buffered.length() != 0) {
-        pkts_to_send.emplace_back(last_buffered);
+      if (first_buffered.length() != 0) {
+        pkts_to_send.emplace_back(first_buffered);
       }
     }
   }
 
   // Test External Flush
   auto flush_result = listener_->udpPacketWriter()->flush();
+  EXPECT_TRUE(flush_result.ok());
   EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().internal_buffer_size_.value(),
             0);
-  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().last_buffered_msg_size_.value(),
-            0);
+  EXPECT_EQ(
+      listener_->udpPacketWriter()->getUdpPacketWriterStats().front_buffered_pkt_size_.value(), 0);
+
   const uint64_t bytes_flushed = payloads.back().length();
   UdpRecvData received_flush_data;
   client_.recv(received_flush_data);
-  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().sent_bytes_.value(),
-            received_flush_data.buffer_->length());
+  total_bytes_sent += received_flush_data.buffer_->length();
+
+  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value(),
+            total_bytes_sent);
   EXPECT_EQ(bytes_flushed, received_flush_data.buffer_->length());
   EXPECT_EQ(send_from_addr->asString(), received_flush_data.addresses_.peer_->asString());
   EXPECT_EQ(received_flush_data.buffer_->toString(), payloads.back());
+}
+
+/**
+ * Tests UDP Packet writer behavior when socket is write-blocked.
+ * 1. Setup the udp_listener and have a payload buffered in the internal buffer.
+ * 2. Then set the socket to return EWOULDBLOCK error on sendmsg and write a
+ *    different sized buffer to the packet writer.
+ *    - Ensure that a buffer shorter than the initial buffer is added to the
+ *      Internal Buffer.
+ *    - A buffer longer than the initial buffer should not get appended to the
+ *      Internal Buffer.
+ */
+TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
+  // Quic Mock Objects
+  quic::test::MockQuicSyscallWrapper os_sys_calls;
+  quic::ScopedGlobalSyscallWrapperOverride os_calls(&os_sys_calls);
+
+  // The initial payload to be buffered
+  std::string initial_payload("length7");
+  Buffer::InstancePtr initial_buffer(new Buffer::OwnedImpl());
+  initial_buffer->add(initial_payload);
+  UdpSendData initial_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
+                                *initial_buffer};
+
+  // Get initial value of total_bytes_sent
+  uint64_t total_bytes_sent =
+      listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value();
+
+  // Possible followup payloads to be sent after the initial payload
+  absl::FixedArray<std::string> followup_payloads{"length<7", "len<7"};
+
+  for (const auto& followup_payload : followup_payloads) {
+    std::string internal_buffer("");
+
+    // First have initial payload added to the udp_packet_writer's internal buffer.
+    auto send_result = listener_->send(initial_send_data);
+    internal_buffer.append(initial_payload);
+
+    // Verify the packet is buffered successfully
+    EXPECT_TRUE(send_result.ok());
+    EXPECT_FALSE(listener_->udpPacketWriter()->isWriteBlocked());
+    EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().internal_buffer_size_.value(),
+              initial_payload.length());
+    EXPECT_EQ(
+        listener_->udpPacketWriter()->getUdpPacketWriterStats().front_buffered_pkt_size_.value(),
+        initial_payload.length());
+    EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value(),
+              total_bytes_sent);
+
+    // Now send the followup payload
+    Buffer::InstancePtr followup_buffer(new Buffer::OwnedImpl());
+    followup_buffer->add(followup_payload);
+    UdpSendData followup_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
+                                   *followup_buffer};
+
+    // Mock the socket to be write blocked on sendmsg syscall
+    EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
+        .WillOnce(Invoke([](int /*sockfd*/, const msghdr* /*msg*/, int /*flags*/) {
+          errno = EWOULDBLOCK;
+          return -1;
+        }));
+
+    // Now Send followup_send_data
+    send_result = listener_->send(followup_send_data);
+
+    // The followup payload should only get buffered if it is shorter than initial payload
+    if (followup_payload.length() < initial_payload.length()) {
+      EXPECT_TRUE(send_result.ok());
+      // TODO(yugant): Verify with Bin why we not set isWriteBlocked here!
+      EXPECT_FALSE(listener_->udpPacketWriter()->isWriteBlocked());
+      internal_buffer.append(followup_payload);
+    } else if (followup_payload.length() > initial_payload.length()) {
+      EXPECT_FALSE(send_result.ok());
+      EXPECT_TRUE(listener_->udpPacketWriter()->isWriteBlocked());
+    }
+    EXPECT_EQ(
+        listener_->udpPacketWriter()->getUdpPacketWriterStats().front_buffered_pkt_size_.value(),
+        initial_payload.length());
+    EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value(),
+              total_bytes_sent);
+    EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().internal_buffer_size_.value(),
+              internal_buffer.length());
+
+    // Mock the socket implement successful sendmsg
+    EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
+        .WillOnce(Invoke([&](int /*sockfd*/, const msghdr* msg, int /*flags*/) {
+          EXPECT_EQ(internal_buffer.length(), getPacketLength(msg));
+          return internal_buffer.length();
+        }));
+
+    // Reset write blocked status, and call external flush
+    listener_->udpPacketWriter()->setWritable();
+    auto flush_result = listener_->udpPacketWriter()->flush();
+    EXPECT_TRUE(flush_result.ok());
+    EXPECT_FALSE(listener_->udpPacketWriter()->isWriteBlocked());
+    EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().internal_buffer_size_.value(),
+              0);
+    total_bytes_sent += internal_buffer.length();
+    EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value(),
+              total_bytes_sent);
+  }
 }
 
 } // namespace
