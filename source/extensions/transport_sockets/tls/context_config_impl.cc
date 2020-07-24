@@ -216,7 +216,7 @@ ContextConfigImpl::ContextConfigImpl(
   }
 
   if (config.has_custom_listener_handshaker()) {
-    auto& handshaker_config = config.custom_listener_handshaker().typed_config();
+    auto& handshaker_config = config.custom_listener_handshaker();
     handshaker_factory_ =
         Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
     handshaker_factory_.get().setConfig(Config::Utility::translateAnyToFactoryConfig(

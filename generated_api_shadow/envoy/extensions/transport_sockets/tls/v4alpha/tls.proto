@@ -214,5 +214,5 @@ message CommonTlsContext {
   repeated string alpn_protocols = 4;
 
   // Custom TLS handshaker. If empty, defaults to native TLS handshaker.
-  CustomListenerHandshaker custom_listener_handshaker = 11;
+  config.core.v4alpha.TypedExtensionConfig custom_listener_handshaker = 11;
 }
