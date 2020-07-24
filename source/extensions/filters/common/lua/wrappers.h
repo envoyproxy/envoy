@@ -112,7 +112,7 @@ private:
  */
 class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
 public:
-  explicit SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr info)
+  explicit SslConnectionWrapper(const Ssl::ConnectionInfo& info)
       : connection_info_{info} {}
   static ExportedFunctions exportedFunctions() {
     return {{"peerCertificatePresented", static_luaPeerCertificatePresented},
@@ -251,7 +251,7 @@ private:
 
   // TODO(dio): Add luaX509Extension if required, since currently it is used out of tree.
 
-  const Ssl::ConnectionInfoConstSharedPtr connection_info_;
+  const Ssl::ConnectionInfo& connection_info_;
 };
 
 /**

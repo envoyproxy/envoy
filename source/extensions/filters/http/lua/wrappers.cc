@@ -120,7 +120,7 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
       downstream_ssl_connection_.pushStack();
     } else {
       downstream_ssl_connection_.reset(
-          Filters::Common::Lua::SslConnectionWrapper::create(state, ssl), true);
+          Filters::Common::Lua::SslConnectionWrapper::create(state, *ssl), true);
     }
   } else {
     lua_pushnil(state);
