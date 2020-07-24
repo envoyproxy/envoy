@@ -227,9 +227,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_google_benchmark = dict(
-        sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
-        strip_prefix = "benchmark-1.5.0",
-        urls = ["https://github.com/google/benchmark/archive/v1.5.0.tar.gz"],
+        sha256 = "23082937d1663a53b90cb5b61df4bcc312f6dee7018da78ba00dd6bd669dfef2",
+        strip_prefix = "benchmark-1.5.1",
+        urls = ["https://github.com/google/benchmark/archive/v1.5.1.tar.gz"],
         use_category = ["test"],
     ),
     com_github_libevent_libevent = dict(
