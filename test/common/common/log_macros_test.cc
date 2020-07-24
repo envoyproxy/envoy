@@ -208,8 +208,8 @@ TEST(Fancy, Context) {
   printf(" --> Logger Mode: %d\n", LOGGER_MODE);
   EXPECT_EQ(mode, compile_mode);
   if (LOGGER_MODE) {
-    TestFilterLog filter;
-    filter.logMessage();
+    // TestFilterLog filter;
+    // filter.logMessage();
     FANCY_LOG(critical, "Compile option set: it's a Fancy Log printed by ENVOY_LOG!");
   }
   Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
