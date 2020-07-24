@@ -723,8 +723,10 @@ TEST_F(LightStepDriverTest, GetAndSetBaggage) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
-  span->setBaggage("key1", "value1");
-  EXPECT_EQ(span->getBaggage("key1"), "value1");
+  std::string key = "key1";
+  std::string value = "value1";
+  span->setBaggage(key, value);
+  EXPECT_EQ(span->getBaggage(key), value);
 }
 
 } // namespace
