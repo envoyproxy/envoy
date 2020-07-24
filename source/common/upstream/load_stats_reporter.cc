@@ -140,9 +140,9 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& me
 void LoadStatsReporter::onReceiveMessage(
     std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
-  stats_.requests_.inc();
   message_ = std::move(message);
   startLoadReportPeriod();
+  stats_.requests_.inc();
 }
 
 void LoadStatsReporter::startLoadReportPeriod() {
