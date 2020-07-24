@@ -158,6 +158,9 @@ private:
     void newConnection(Network::ConnectionSocketPtr&& socket,
                        const envoy::config::core::v3::Metadata& dynamic_metadata);
 
+    void retryConnection(Network::ConnectionSocketPtr&& socket,
+                       const envoy::config::core::v3::Metadata& dynamic_metadata);
+
     /**
      * Return the active connections container attached with the given filter chain.
      */

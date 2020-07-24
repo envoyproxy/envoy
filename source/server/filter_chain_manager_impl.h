@@ -90,7 +90,9 @@ public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)) {}
+        filters_factory_(std::move(filters_factory)), is_fake_placeholder_(false) {}
+  
+  FilterChainImpl() { is_fake_placeholder_ = true; }
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -106,11 +108,16 @@ public:
     ASSERT(factory_context_ == nullptr);
     factory_context_ = std::move(filter_chain_factory_context);
   }
+  bool isFakeFilterChain() const {
+    return is_fake_placeholder_;
+  }
 
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
+  
+  bool is_fake_placeholder_;
 };
 
 /**
@@ -191,6 +198,14 @@ public:
   void addFilterChain(
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
+
+  void addFakeFilterChain(
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span);
+
+  void rebuildFilterChain(
+      const envoy::config::listener::v3::FilterChain*& filter_chain_span,
+      FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
+
   static bool isWildcardServerName(const std::string& name);
 
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning

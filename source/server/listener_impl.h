@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -345,6 +346,9 @@ private:
   void createListenerFilterFactories(Network::Socket::Type socket_type);
   void validateFilterChains(Network::Socket::Type socket_type);
   void buildFilterChains();
+  void buildFakeFilterChains();
+  void loadRealFilterChains(const envoy::config::listener::v3::FilterChain *&filter_chain);
+  std::unordered_map<const envoy::config::listener::v3::FilterChain *&, std::unique_ptr<Init::Manager>> filter_chain_specific_init_manager_map_;
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();

@@ -391,6 +391,52 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
+  // which listener???
+
+  // config_ = config_; // listenerImpl
+  // parent_.dispatcher_.name(); // this should be worker.name()
+  // auto worker_name = parent_.dispatcher_.name();
+  // parent_.listeners_.
+  // const auto &ptr = listener();
+  
+  // parent_.dispatcher_.post([this, worker_name, std::move(socket), dynamic_metadata]() {
+  //   // parent_.dispatcher_.
+  //   auto cb = this->retry(socket, dynamic_metadata);
+  //   listenerManager().updateFilterChain(workerID, ..., cb);
+  // });
+
+
+  // if filter_chain == fake {
+  //   master = findMaster();
+  //   // parent.dispatcher is connection_handler_impl
+  //   parent_.
+  //   parent_.dispatcher_.post(worker, share_ptr<filter_chain>, Cb) {
+  //     lm = master.listenerManager() {
+  //     lm.update(listernID, filter_chain, cb);
+      
+  //     }
+  //   }
+  // }
+
+
+  //   // after post
+  //   // clean this connection, ready for retry
+  // }
+  //     filterchain.cb() {
+  //       listenerManger.updateReady();
+  //     }
+
+
+  //     listenerManager.updateReady(workerID, workerCb retry) {
+  //       worker.dispatcher.post([, ]) {
+  //         worker.retry(listenerID, filter_chain);
+  //       }
+  //     }
+
+  // should not go below if fake
+  // if fake: cleanup
+
+
   if (filter_chain == nullptr) {
     ENVOY_LOG(debug, "closing connection: no matching filter chain found");
     stats_.no_filter_chain_match_.inc();
@@ -425,6 +471,59 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
   }
 }
+
+
+void ConnectionHandlerImpl::ActiveTcpListener::retryConnection(
+    Network::ConnectionSocketPtr&& socket, const envoy::config::core::v3::Metadata& dynamic_metadata) {
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
+      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
+  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
+
+  // merge from the given dynamic metadata if it's not empty
+  if (dynamic_metadata.filter_metadata_size() > 0) {
+    stream_info->dynamicMetadata().MergeFrom(dynamic_metadata);
+  }
+
+  // Find matching filter chain.
+  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
+  if (filter_chain == nullptr) {
+    ENVOY_LOG(debug, "closing connection: no matching filter chain found");
+    stats_.no_filter_chain_match_.inc();
+    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+    emitLogs(*config_, *stream_info);
+    socket->close();
+    return;
+  }
+
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  stream_info->setDownstreamSslConnection(transport_socket->ssl());
+  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
+  auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
+      std::move(socket), std::move(transport_socket), *stream_info);
+  ActiveTcpConnectionPtr active_connection(
+      new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
+                              parent_.dispatcher_.timeSource(), std::move(stream_info)));
+  active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
+
+  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
+      *active_connection->connection_, filter_chain->networkFilterFactories());
+  if (empty_filter_chain) {
+    ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
+    active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  // If the connection is already closed, we can just let this connection immediately die.
+  if (active_connection->connection_->state() != Network::Connection::State::Closed) {
+    ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
+    active_connection->connection_->addConnectionCallbacks(*active_connection);
+    active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
+  }
+}
+
+
 
 ConnectionHandlerImpl::ActiveConnections&
 ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(

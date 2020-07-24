@@ -279,6 +279,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
+  // buildFakeFilterChains();
   if (socket_type == Network::Socket::Type::Datagram) {
     return;
   }
@@ -334,6 +335,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
+  // buildFakeFilterChains();
   // In place update is tcp only so it's safe to apply below tcp only initialization.
   buildSocketOptions();
   buildOriginalDstListenerFilter();
@@ -459,6 +461,28 @@ void ListenerImpl::buildFilterChains() {
   // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
   filter_chain_manager_.addFilterChain(config_.filter_chains(), builder, filter_chain_manager_);
+}
+
+
+void ListenerImpl::buildFakeFilterChains() {
+  filter_chain_manager_.addFakeFilterChain(config_.filter_chains()); // return fake
+}
+
+void ListenerImpl::loadRealFilterChains(const envoy::config::listener::v3::FilterChain *&filter_chain) {
+  auto init_manager = filter_chain_specific_init_manager_map_.find(filter_chain);
+  if (init_manager == filter_chain_specific_init_manager_map_.end()) {
+    init_manager = std::make_unique<Init::ManagerImpl>(
+          fmt::format("filter-chain-init-manager {} {}", "name", "hash"));
+  }
+  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
+      parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
+      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
+      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
+      parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
+  transport_factory_context.setInitManager(*init_manager);
+
+  ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+  filter_chain_manager_.rebuildFilterChain(filter_chain, builder, filter_chain_manager_);
 }
 
 void ListenerImpl::buildSocketOptions() {

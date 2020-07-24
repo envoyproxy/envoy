@@ -215,6 +215,133 @@ void FilterChainManagerImpl::addFilterChain(
             fc_contexts_.size(), new_filter_chain_size);
 }
 
+void FilterChainManagerImpl::addFakeFilterChain(
+    absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span) {
+  Cleanup cleanup([this]() { origin_ = absl::nullopt; });
+  std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
+      filter_chains;
+  uint32_t new_filter_chain_size = 0;
+  for (const auto& filter_chain : filter_chain_span) {
+    const auto& filter_chain_match = filter_chain->filter_chain_match();
+    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+                                       "unimplemented fields",
+                                       address_->asString()));
+    }
+    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                       "the same matching rules are defined",
+                                       address_->asString()));
+    }
+    filter_chains.insert(filter_chain_match);
+
+    // Validate IP addresses.
+    std::vector<std::string> destination_ips;
+    destination_ips.reserve(filter_chain_match.prefix_ranges().size());
+    for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
+      const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
+      destination_ips.push_back(cidr_range.asString());
+    }
+
+    std::vector<std::string> source_ips;
+    source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
+    for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
+      const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
+      source_ips.push_back(cidr_range.asString());
+    }
+
+    // Reject partial wildcards, we don't match on them.
+    for (const auto& server_name : filter_chain_match.server_names()) {
+      if (server_name.find('*') != std::string::npos &&
+          !FilterChainManagerImpl::isWildcardServerName(server_name)) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': partial wildcards are not supported in "
+                        "\"server_names\"",
+                        address_->asString()));
+      }
+    }
+
+    // Reuse created filter chain if possible.
+    // FilterChainManager maintains the lifetime of FilterChainFactoryContext
+    // ListenerImpl maintains the dependencies of FilterChainFactoryContext
+    auto filter_chain_impl = findExistingFilterChain(*filter_chain);
+    if (filter_chain_impl == nullptr) {
+
+      filter_chain_impl = std::make_unique<FilterChainImpl>(); // fake filter chain placeholder
+      ++new_filter_chain_size;
+    }
+
+    addFilterChainForDestinationPorts(
+        destination_ports_map_,
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+        filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
+        filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
+        filter_chain_match.source_ports(), filter_chain_impl);
+    fc_contexts_[*filter_chain] = filter_chain_impl;
+  }
+  convertIPsToTries();
+  ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
+            fc_contexts_.size(), new_filter_chain_size);
+}
+
+
+void FilterChainManagerImpl::rebuildFilterChain(
+    const envoy::config::listener::v3::FilterChain*& filter_chain,
+    FilterChainFactoryBuilder& filter_chain_factory_builder,
+    FilterChainFactoryContextCreator& context_creator) {
+  Cleanup cleanup([this]() { origin_ = absl::nullopt; });
+  std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
+      filter_chains;
+
+  const auto& filter_chain_match = filter_chain->filter_chain_match();
+  if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
+    throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+                                      "unimplemented fields",
+                                      address_->asString()));
+  }
+  if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
+    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                      "the same matching rules are defined",
+                                      address_->asString()));
+  }
+
+  // Validate IP addresses.
+  std::vector<std::string> destination_ips;
+  destination_ips.reserve(filter_chain_match.prefix_ranges().size());
+  for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
+    const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
+    destination_ips.push_back(cidr_range.asString());
+  }
+
+  std::vector<std::string> source_ips;
+  source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
+  for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
+    const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
+    source_ips.push_back(cidr_range.asString());
+  }
+
+  // Reject partial wildcards, we don't match on them.
+  for (const auto& server_name : filter_chain_match.server_names()) {
+    if (server_name.find('*') != std::string::npos &&
+        !FilterChainManagerImpl::isWildcardServerName(server_name)) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': partial wildcards are not supported in "
+                      "\"server_names\"",
+                      address_->asString()));
+    }
+  }
+
+  // Reuse created filter chain if possible.
+  // FilterChainManager maintains the lifetime of FilterChainFactoryContext
+  // ListenerImpl maintains the dependencies of FilterChainFactoryContext
+  auto filter_chain_impl = findExistingFilterChain(*filter_chain);
+  if (filter_chain_impl == nullptr) {
+    filter_chain_impl =
+        filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
+  }
+  fc_contexts_[*filter_chain] = filter_chain_impl;
+}
+
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
     DestinationPortsMap& destination_ports_map, uint16_t destination_port,
     const std::vector<std::string>& destination_ips,
