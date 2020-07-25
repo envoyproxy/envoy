@@ -52,17 +52,17 @@ public:
   /**
    * @return the span's parent id as an integer.
    */
-  uint64_t parent_id() const { return parent_id_; }
+  uint64_t parentId() const { return parent_id_; }
 
   /**
    * @return the high 64 bits of the trace id as an integer.
    */
-  uint64_t trace_id_high() const { return trace_id_high_; }
+  uint64_t traceIdHigh() const { return trace_id_high_; }
 
   /**
    * @return the low 64 bits of the trace id as an integer.
    */
-  uint64_t trace_id() const { return trace_id_; }
+  uint64_t traceId() const { return trace_id_; }
 
   /**
    * @return whether using 128 bit trace id.
