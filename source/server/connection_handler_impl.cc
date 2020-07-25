@@ -394,7 +394,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   // Find matching filter chain.
   // const Network::FilterChain* filter_chain
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
-  auto filter_chain_impl = dynamic_cast<const FilterChainImpl*>(filter_chain);
+  auto filter_chain_impl = dynamic_cast<const Server::FilterChainImpl*>(filter_chain);
   bool is_fake_filter_chain = filter_chain_impl->isFakeFilterChain();
   if (is_fake_filter_chain) {
 
