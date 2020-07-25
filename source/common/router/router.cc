@@ -1025,7 +1025,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
 void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                              absl::string_view transport_failure_reason,
                              UpstreamRequest& upstream_request) {
-  ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {} transport failure reason {}",
+  ENVOY_STREAM_LOG(debug, "upstream reset: reset reason: {}, transport failure reason: {}",
                    *callbacks_, Http::Utility::resetReasonToString(reset_reason),
                    transport_failure_reason);
 
@@ -1054,7 +1054,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
                    Http::Utility::resetReasonToString(reset_reason),
-                   transport_failure_reason.empty() ? "" : " transport failure reason: ",
+                   transport_failure_reason.empty() ? "" : ", transport failure reason: ",
                    transport_failure_reason);
   callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure_reason);
   const std::string& basic_details =
