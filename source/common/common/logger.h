@@ -342,8 +342,10 @@ protected:
  * Convenience macro to log to the class' logger (migrating to fine-grained Fancy Logger).
  */
 #ifndef FANCY
+#define LOGGER_MODE 0
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
 #else
+#define LOGGER_MODE 1
 #define ENVOY_LOG(LEVEL, ...) FANCY_LOG(LEVEL, ##__VA_ARGS__)
 #endif
 

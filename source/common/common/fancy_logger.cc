@@ -5,12 +5,6 @@
 
 #include "common/common/logger.h"
 
-#ifndef FANCY
-#define LOGGER_MODE 0
-#else
-#define LOGGER_MODE 1
-#endif
-
 using spdlog::level::level_enum;
 
 namespace Envoy {
@@ -41,6 +35,11 @@ SpdLoggerSharedPtr FancyContext::getFancyLogEntry(std::string key)
 
 void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
     ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
+  if (LOGGER_MODE && Logger::Context::getLoggerMode() == Logger::LoggerMode::Envoy) {
+    // Enabled by compile option, but using FANCY_LOG w/o mode being set is also possible
+    Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
+  }
+
   absl::WriterMutexLock l(&fancy_log_lock_);
   auto it = fancy_log_map_->find(key);
   spdlog::logger* target;
@@ -113,10 +112,6 @@ spdlog::logger* FancyContext::createLogger(std::string key, int level)
       std::make_shared<spdlog::logger>(key, Logger::Registry::getSink());
   if (!Logger::Registry::getSink()->hasLock()) { // occurs in benchmark test
     initSink();
-  }
-  if (LOGGER_MODE && Logger::Context::getLoggerMode() == Logger::LoggerMode::Envoy) {
-    // Enabled by compile option, but using FANCY_LOG w/o mode being set is also possible
-    Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
   }
   level_enum lv = Logger::Context::getFancyDefaultLevel();
   if (level > -1) {

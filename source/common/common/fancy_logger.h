@@ -38,7 +38,9 @@ public:
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);
 
   /**
-   * Sets the default logger level and format when updating context.
+   * Sets the default logger level and format when updating context. It should only be used in
+   * Context, otherwise the fancy_default_level will possibly be inconsistent with the actual
+   * logger level.
    */
   void setDefaultFancyLevelFormat(spdlog::level::level_enum level, std::string format)
       ABSL_LOCKS_EXCLUDED(fancy_log_lock_);

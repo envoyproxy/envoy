@@ -111,6 +111,9 @@ void Context::activate() {
   Registry::getSink()->setShouldEscape(should_escape_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
+
+  fancy_default_level_ = log_level_;
+  fancy_log_format_ = log_format_;
 }
 
 LoggerMode Context::getLoggerMode() { return static_cast<LoggerMode>(logger_mode_); }
