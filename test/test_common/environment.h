@@ -95,7 +95,7 @@ public:
 
   /**
    * Obtain platform specific new line character(s)
-   * @return const std::string& platform specific new line character(s)
+   * @return absl::string_view platform specific new line character(s)
    */
   static constexpr absl::string_view newLine() {
 #ifdef WIN32
