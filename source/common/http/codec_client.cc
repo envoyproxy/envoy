@@ -125,24 +125,23 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 }
 
 void CodecClient::onData(Buffer::Instance& data) {
-  bool protocol_error = false;
+  protocol_error_ = false;
   const Status status = codec_->dispatch(data);
 
   if (isCodecProtocolError(status)) {
     ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
+    protocol_error_ = true;
     close();
-    protocol_error = true;
   } else if (isPrematureResponseError(status)) {
-    ENVOY_CONN_LOG(debug, "premature response", *connection_);
-    close();
-
     // Don't count 408 responses where we have no active requests as protocol errors
     if (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout) {
-      protocol_error = true;
+      protocol_error_ = true;
     }
+    ENVOY_CONN_LOG(debug, "premature response", *connection_);
+    close();
   }
 
-  if (protocol_error) {
+  if (protocol_error_) {
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
   }
 }

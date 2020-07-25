@@ -25,6 +25,7 @@ const std::string ResponseFlagUtils::RATELIMIT_SERVICE_ERROR = "RLSE";
 const std::string ResponseFlagUtils::STREAM_IDLE_TIMEOUT = "SI";
 const std::string ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS = "IH";
 const std::string ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR = "DPE";
+const std::string ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR = "UPE";
 const std::string ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED = "UMSDR";
 const std::string ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER = "RFCF";
 const std::string ResponseFlagUtils::NO_FILTER_CONFIG_FOUND = "NFCF";
@@ -40,7 +41,7 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
 const std::string ResponseFlagUtils::toShortString(const StreamInfo& stream_info) {
   std::string result;
 
-  static_assert(ResponseFlag::LastFlag == 0x200000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x400000, "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
@@ -155,6 +156,7 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
       {ResponseFlagUtils::STREAM_IDLE_TIMEOUT, ResponseFlag::StreamIdleTimeout},
       {ResponseFlagUtils::INVALID_ENVOY_REQUEST_HEADERS, ResponseFlag::InvalidEnvoyRequestHeaders},
       {ResponseFlagUtils::DOWNSTREAM_PROTOCOL_ERROR, ResponseFlag::DownstreamProtocolError},
+      {ResponseFlagUtils::UPSTREAM_PROTOCOL_ERROR, ResponseFlag::UpstreamProtocolError},
       {ResponseFlagUtils::UPSTREAM_MAX_STREAM_DURATION_REACHED,
        ResponseFlag::UpstreamMaxStreamDurationReached},
       {ResponseFlagUtils::RESPONSE_FROM_CACHE_FILTER, ResponseFlag::ResponseFromCacheFilter},
