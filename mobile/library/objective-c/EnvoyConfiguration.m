@@ -9,7 +9,7 @@
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
-                        filterChain:(NSArray<EnvoyHTTPFilter *> *)httpFilters
+                        filterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpFilterFactories
                   statsFlushSeconds:(UInt32)statsFlushSeconds
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId
@@ -24,7 +24,7 @@
   self.dnsRefreshSeconds = dnsRefreshSeconds;
   self.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
   self.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
-  self.httpFilters = httpFilters;
+  self.httpFilterFactories = httpFilterFactories;
   self.statsFlushSeconds = statsFlushSeconds;
   self.appVersion = appVersion;
   self.appId = appId;

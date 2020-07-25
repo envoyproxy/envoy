@@ -58,22 +58,34 @@ extern "C" { // function pointers
 #endif
 
 /**
+ * Function signature for filter factory. Implementations must return a instance_context
+ * capable of dispatching envoy_http_filter calls (below) to a platform filter instance.
+ */
+typedef const void* (*envoy_filter_init_f)(const void* context);
+
+/**
  * Function signature for on-headers filter invocations.
  */
 typedef envoy_filter_headers_status (*envoy_filter_on_headers_f)(envoy_headers headers,
-                                                                 bool end_stream, void* context);
+                                                                 bool end_stream,
+                                                                 const void* context);
 
 /**
  * Function signature for on-data filter invocations.
  */
 typedef envoy_filter_data_status (*envoy_filter_on_data_f)(envoy_data data, bool end_stream,
-                                                           void* context);
+                                                           const void* context);
 
 /**
  * Function signature for on-trailers filter invocations.
  */
 typedef envoy_filter_trailers_status (*envoy_filter_on_trailers_f)(envoy_headers trailers,
-                                                                   void* context);
+                                                                   const void* context);
+
+/**
+ * Function signature to release a filter instance once the filter chain is finished with it.
+ */
+typedef void (*envoy_filter_release_f)(const void* context);
 
 #ifdef __cplusplus
 } // function pointers
@@ -84,11 +96,14 @@ typedef envoy_filter_trailers_status (*envoy_filter_on_trailers_f)(envoy_headers
  * PlatformBridgeFilter.
  */
 typedef struct {
+  envoy_filter_init_f init_filter;
   envoy_filter_on_headers_f on_request_headers;
   envoy_filter_on_data_f on_request_data;
   envoy_filter_on_trailers_f on_request_trailers;
   envoy_filter_on_headers_f on_response_headers;
   envoy_filter_on_data_f on_response_data;
   envoy_filter_on_trailers_f on_response_trailers;
-  void* context;
+  envoy_filter_release_f release_filter;
+  const void* static_context;
+  const void* instance_context;
 } envoy_http_filter;

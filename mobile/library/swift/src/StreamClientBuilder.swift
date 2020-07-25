@@ -21,7 +21,7 @@ public final class StreamClientBuilder: NSObject {
   private var statsFlushSeconds: UInt32 = 60
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var filterChain: [EnvoyHTTPFilter] = []
+  private var filterChain: [EnvoyHTTPFilterFactory] = []
   private var virtualClusters: String = "[]"
 
   // MARK: - Public
@@ -117,9 +117,8 @@ public final class StreamClientBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addFilter(_ filter: Filter) -> StreamClientBuilder {
-    // TODO(goaway): Update types here for per-stream instances.
-    self.filterChain.append(EnvoyHTTPFilter(filter: filter))
+  public func addFilter(_ filterType: Filter.Type) -> StreamClientBuilder {
+    self.filterChain.append(EnvoyHTTPFilterFactory(filterType: filterType))
     return self
   }
 

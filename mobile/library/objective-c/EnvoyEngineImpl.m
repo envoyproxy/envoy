@@ -11,10 +11,6 @@ static void ios_on_exit() {
   NSLog(@"[Envoy] library is exiting");
 }
 
-typedef struct {
-  __unsafe_unretained EnvoyHTTPFilter *filter;
-} ios_http_filter_context;
-
 // TODO(goaway): The mapping code below contains a great deal of duplication from
 // EnvoyHTTPStreamImpl.m, however retain/release semantics are slightly different and need to be
 // reconciled before this can be factored into a generic set of utility functions.
@@ -66,11 +62,17 @@ static envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
   return (envoy_headers){length, header_array};
 }
 
+static const void *ios_http_filter_init(const void *context) {
+  EnvoyHTTPFilterFactory *filterFactory = (__bridge EnvoyHTTPFilterFactory *)context;
+  EnvoyHTTPFilter *filter = filterFactory.create();
+  return CFBridgingRetain(filter);
+}
+
 static envoy_filter_headers_status
-ios_http_filter_on_request_headers(envoy_headers headers, bool end_stream, void *context) {
+ios_http_filter_on_request_headers(envoy_headers headers, bool end_stream, const void *context) {
   // TODO(goaway): optimize unmodified case
-  ios_http_filter_context *c = (ios_http_filter_context *)context;
-  if (c->filter.onRequestHeaders == nil) {
+  EnvoyHTTPFilter *filter = (__bridge EnvoyHTTPFilter *)context;
+  if (filter.onRequestHeaders == nil) {
     return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusContinue,
                                          /*headers*/ headers};
   }
@@ -78,16 +80,16 @@ ios_http_filter_on_request_headers(envoy_headers headers, bool end_stream, void 
   EnvoyHeaders *platformHeaders = to_ios_headers(headers);
   release_envoy_headers(headers);
   // TODO(goaway): consider better solution for compound return
-  NSArray *result = c->filter.onRequestHeaders(platformHeaders, end_stream);
+  NSArray *result = filter.onRequestHeaders(platformHeaders, end_stream);
   return (envoy_filter_headers_status){/*status*/ [result[0] intValue],
                                        /*headers*/ toNativeHeaders(result[1])};
 }
 
 static envoy_filter_headers_status
-ios_http_filter_on_response_headers(envoy_headers headers, bool end_stream, void *context) {
+ios_http_filter_on_response_headers(envoy_headers headers, bool end_stream, const void *context) {
   // TODO(goaway): optimize unmodified case
-  ios_http_filter_context *c = (ios_http_filter_context *)context;
-  if (c->filter.onResponseHeaders == nil) {
+  EnvoyHTTPFilter *filter = (__bridge EnvoyHTTPFilter *)context;
+  if (filter.onResponseHeaders == nil) {
     return (envoy_filter_headers_status){/*status*/ kEnvoyFilterHeadersStatusContinue,
                                          /*headers*/ headers};
   }
@@ -95,9 +97,14 @@ ios_http_filter_on_response_headers(envoy_headers headers, bool end_stream, void
   EnvoyHeaders *platformHeaders = to_ios_headers(headers);
   release_envoy_headers(headers);
   // TODO(goaway): consider better solution for compound return
-  NSArray *result = c->filter.onResponseHeaders(platformHeaders, end_stream);
+  NSArray *result = filter.onResponseHeaders(platformHeaders, end_stream);
   return (envoy_filter_headers_status){/*status*/ [result[0] intValue],
                                        /*headers*/ toNativeHeaders(result[1])};
+}
+
+static void ios_http_filter_release(const void *context) {
+  CFRelease(context);
+  return;
 }
 
 @implementation EnvoyEngineImpl {
@@ -119,19 +126,20 @@ ios_http_filter_on_response_headers(envoy_headers headers, bool end_stream, void
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (int)registerFilter:(EnvoyHTTPFilter *)filter {
+- (int)registerFilterFactory:(EnvoyHTTPFilterFactory *)filterFactory {
   // TODO(goaway): Everything here leaks, but it's all be tied to the life of the engine.
   // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332
-  ios_http_filter_context *context = safe_malloc(sizeof(ios_http_filter_context));
-  CFBridgingRetain(filter);
-  context->filter = filter;
   envoy_http_filter *api = safe_malloc(sizeof(envoy_http_filter));
+  api->init_filter = ios_http_filter_init;
   api->on_request_headers = ios_http_filter_on_request_headers;
   api->on_request_data = NULL;
   api->on_response_headers = ios_http_filter_on_response_headers;
   api->on_response_data = NULL;
-  api->context = context;
-  register_platform_api(filter.name.UTF8String, api);
+  api->release_filter = ios_http_filter_release;
+  api->static_context = CFBridgingRetain(filterFactory);
+  api->instance_context = NULL;
+
+  register_platform_api(filterFactory.filterName.UTF8String, api);
   return kEnvoySuccess;
 }
 
@@ -142,8 +150,8 @@ ios_http_filter_on_response_headers(envoy_headers headers, bool end_stream, void
     return kEnvoyFailure;
   }
 
-  for (EnvoyHTTPFilter *filter in config.httpFilters) {
-    [self registerFilter:filter];
+  for (EnvoyHTTPFilterFactory *filterFactory in config.httpFilterFactories) {
+    [self registerFilterFactory:filterFactory];
   }
 
   return [self runWithConfigYAML:resolvedYAML logLevel:logLevel];
