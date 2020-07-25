@@ -99,6 +99,31 @@ Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool
   return status;
 }
 
+Http::FilterTrailersStatus
+PlatformBridgeFilter::onTrailers(Http::HeaderMap& trailers,
+                                 envoy_filter_on_trailers_f on_trailers) {
+  // Allow nullptr to act as no-op.
+  if (on_trailers == nullptr) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+
+  envoy_headers in_trailers = Http::Utility::toBridgeHeaders(trailers);
+  envoy_filter_trailers_status result = on_trailers(in_trailers, platform_filter_.instance_context);
+  Http::FilterTrailersStatus status = static_cast<Http::FilterTrailersStatus>(result.status);
+  // TODO(goaway): Current platform implementations expose immutable trailers, thus any modification
+  // necessitates a full copy. Add 'modified' bit to determine when we can elide the copy. See also
+  // https://github.com/lyft/envoy-mobile/issues/949 for potential future optimization.
+  trailers.clear();
+  for (envoy_header_size_t i = 0; i < result.trailers.length; i++) {
+    trailers.addCopy(
+        Http::LowerCaseString(Http::Utility::convertToString(result.trailers.headers[i].key)),
+        Http::Utility::convertToString(result.trailers.headers[i].value));
+  }
+  // The C envoy_trailers struct can be released now because the trailers have been copied.
+  release_envoy_headers(result.trailers);
+  return status;
+}
+
 Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   // Delegate to shared implementation for request and response path.
@@ -110,9 +135,9 @@ Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data, 
   return onData(data, end_stream, platform_filter_.on_request_data);
 }
 
-Http::FilterTrailersStatus
-PlatformBridgeFilter::decodeTrailers(Http::RequestTrailerMap& /*trailers*/) {
-  return Http::FilterTrailersStatus::Continue;
+Http::FilterTrailersStatus PlatformBridgeFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  // Delegate to shared implementation for request and response path.
+  return onTrailers(trailers, platform_filter_.on_request_trailers);
 }
 
 Http::FilterMetadataStatus PlatformBridgeFilter::decodeMetadata(Http::MetadataMap& /*metadata*/) {
@@ -136,8 +161,9 @@ Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data, 
 }
 
 Http::FilterTrailersStatus
-PlatformBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& /*trailers*/) {
-  return Http::FilterTrailersStatus::Continue;
+PlatformBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  // Delegate to shared implementation for request and response path.
+  return onTrailers(trailers, platform_filter_.on_response_trailers);
 }
 
 Http::FilterMetadataStatus PlatformBridgeFilter::encodeMetadata(Http::MetadataMap& /*metadata*/) {

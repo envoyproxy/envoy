@@ -60,6 +60,8 @@ private:
                                       envoy_filter_on_headers_f on_headers);
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream,
                                 envoy_filter_on_data_f on_data);
+  Http::FilterTrailersStatus onTrailers(Http::HeaderMap& trailers,
+                                        envoy_filter_on_trailers_f on_trailers);
   const std::string filter_name_;
   envoy_http_filter platform_filter_;
 };
