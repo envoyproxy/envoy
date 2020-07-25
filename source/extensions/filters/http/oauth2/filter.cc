@@ -292,10 +292,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
 }
 
-// Set the legacy Oauth headers.
-void OAuth2Filter::setXForwardedOauthHeaders(Http::RequestHeaderMap& headers,
-                                             const std::string& token) {
-  // Add the x-forwarded headers after inspecting the corresponding cookie values.
+void OAuth2Filter::setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
   headers.setInline(authorization_handle.handle(), absl::StrCat("Bearer ", token));
 }
 
@@ -307,7 +304,7 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   validator_->setParams(headers, config_->tokenSecret());
   if (validator_->isValid()) {
     config_->stats().oauth_success_.inc();
-    setXForwardedOauthHeaders(headers, validator_->token());
+    setBearerToken(headers, validator_->token());
     return true;
   }
 
@@ -357,7 +354,7 @@ void OAuth2Filter::finishFlow() {
   // We have fully completed the entire OAuth flow, whether through Authorization header or from
   // user redirection to the auth server.
   if (found_bearer_token_) {
-    setXForwardedOauthHeaders(*request_headers_, access_token_);
+    setBearerToken(*request_headers_, access_token_);
     config_->stats().oauth_success_.inc();
     decoder_callbacks_->continueDecoding();
     return;
@@ -384,12 +381,10 @@ void OAuth2Filter::finishFlow() {
   const std::string cookie_tail_http_only =
       fmt::format(CookieTailHttpOnlyFormatString, new_expires_);
 
-  /**
-   * At this point we have all of the pieces needed to authenticate a user that did not originally
-   * have a bearer access token. Now, we construct a redirect request to return the user to their
-   * previous state and additionally set the OAuth cookies in browser.
-   * The redirection should result in successfully passing this filter.
-   */
+  // At this point we have all of the pieces needed to authenticate a user that did not originally
+  // have a bearer access token. Now, we construct a redirect request to return the user to their
+  // previous state and additionally set the OAuth cookies in browser.
+  // The redirection should result in successfully passing this filter.
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 

@@ -399,7 +399,7 @@ TEST_F(OAuth2Test, OAuthTestSetOAuthHeaders) {
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
   cookie_validator->setParams(request_headers, "mock-secret");
-  filter_->setXForwardedOauthHeaders(request_headers, cookie_validator->token());
+  filter_->setBearerToken(request_headers, cookie_validator->token());
 
   EXPECT_EQ(request_headers, expected_headers);
 }

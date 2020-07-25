@@ -176,8 +176,8 @@ public:
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
-  // Set the x-forwarded-user after successfully validating the client cookies.
-  static void setXForwardedOauthHeaders(Http::RequestHeaderMap& headers, const std::string& token);
+  // Sets the auth token as the Bearer token in the authorization header.
+  static void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token);
 
   void finishFlow();
 
