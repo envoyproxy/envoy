@@ -394,7 +394,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   // Find matching filter chain.
   // const Network::FilterChain* filter_chain
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
-
   auto filter_chain_impl = dynamic_cast<const FilterChainImpl*>(filter_chain);
   bool is_fake_filter_chain = filter_chain_impl->isFakeFilterChain();
   if (is_fake_filter_chain) {
@@ -403,6 +402,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // const auto& ptr = listener(); // Network::ListenerPtr listener_.get()
 
     // parent.dispatcher is connection_handler_impl.dispatcher
+
     auto worker_name = parent_.dispatcher_.name();
     auto listener_name = config_->name();
     filter_chain->networkFilterFactories();
@@ -417,10 +417,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // master_dispatcher.post([worker_name, listener_name, filter_chain_impl_ptr, cb]() {
     //   // master.listenerManager().update(worker_name, listener_name, filter_chain_impl_ptr, cb);
     // });
-
-    //     filterchain.cb() {
-    //       listenerManger.updateReady();
-    //     }
 
     //     listenerManager.updateReady(workerID, workerCb retry) {
     //       worker[workerID].dispatcher.post([, ]) {
