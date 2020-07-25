@@ -66,11 +66,28 @@ extern const int kEnvoyFilterHeadersStatusStopIteration;
 extern const int kEnvoyFilterHeadersStatusContinueAndEndStream;
 extern const int kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
 
+/// Return codes for on-data filter invocations. @see envoy/http/filter.h
+extern const int kEnvoyFilterDataStatusContinue;
+extern const int kEnvoyFilterDataStatusStopIterationAndBuffer;
+extern const int kEnvoyFilterDataStatusStopIterationNoBuffer;
+
+/// Return codes for on-trailers filter invocations. @see envoy/http/filter.h
+extern const int kEnvoyFilterTrailersStatusContinue;
+extern const int kEnvoyFilterTrailersStatusStopIteration;
+
 @interface EnvoyHTTPFilter : NSObject
 
 @property (nonatomic, strong) NSArray * (^onRequestHeaders)(EnvoyHeaders *headers, BOOL endStream);
 
+@property (nonatomic, strong) NSArray * (^onRequestData)(NSData *data, BOOL endStream);
+
+@property (nonatomic, strong) NSArray * (^onRequestTrailers)(EnvoyHeaders *trailers);
+
 @property (nonatomic, strong) NSArray * (^onResponseHeaders)(EnvoyHeaders *headers, BOOL endStream);
+
+@property (nonatomic, strong) NSArray * (^onResponseData)(NSData *data, BOOL endStream);
+
+@property (nonatomic, strong) NSArray * (^onResponseTrailers)(EnvoyHeaders *trailers);
 
 @end
 

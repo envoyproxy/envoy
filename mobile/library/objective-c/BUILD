@@ -26,5 +26,16 @@ objc_library(
         "UIKit",
     ],
     visibility = ["//visibility:public"],
-    deps = ["//library/common:envoy_main_interface_lib"],
+    deps = [
+        ":envoy_objc_bridge_lib",
+        "//library/common:envoy_main_interface_lib",
+    ],
+)
+
+objc_library(
+    name = "envoy_objc_bridge_lib",
+    hdrs = ["EnvoyBridgeUtility.h"],
+    deps = [
+        "//library/common/types:c_types_lib",
+    ],
 )
