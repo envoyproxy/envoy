@@ -1921,7 +1921,8 @@ ResponseTrailerMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
 }
 
 void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilter& filter,
-                                                         Buffer::Instance& data, bool streaming) {
+                                                         Buffer::Instance& data, bool streaming,
+                                                         bool end_stream) {
   if (state_.filter_call_state_ == 0 ||
       (state_.filter_call_state_ & FilterCallState::EncodeHeaders) ||
       (state_.filter_call_state_ & FilterCallState::EncodeData) ||
@@ -1934,7 +1935,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
-    encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
+    encodeData(&filter, data, end_stream, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -2051,17 +2052,6 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
       return;
     }
-  }
-
-  // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
-  // a problem with processing empty trailers (END_STREAM | END_HEADERS with zero length HEADERS) of
-  // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514.
-  const bool skip_encoding_empty_trailers =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_encoding_empty_trailers");
-  if (trailers.empty() && skip_encoding_empty_trailers) {
-    Buffer::OwnedImpl empty_buffer;
-    encodeDataInternal(empty_buffer, /*end_stream=*/true);
-    return;
   }
 
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
@@ -2626,8 +2616,9 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::handleMetadataAfterHeader
   iterate_from_current_filter_ = saved_state;
 }
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
-                                                                      bool streaming) {
-  return parent_.addEncodedData(*this, data, streaming);
+                                                                      bool streaming,
+                                                                      bool end_stream) {
+  return parent_.addEncodedData(*this, data, streaming, end_stream);
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(

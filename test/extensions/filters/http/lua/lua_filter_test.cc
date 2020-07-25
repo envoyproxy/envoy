@@ -59,9 +59,9 @@ public:
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
 
-    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
+    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _, /*end_stream=*/false))
         .Times(AtLeast(0))
-        .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
+        .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool, bool) {
           if (encoder_callbacks_.buffer_ == nullptr) {
             encoder_callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
           }

@@ -792,8 +792,9 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
   {
     // Last call should prefix the buffer with the size and insert the gRPC status into trailers.
     Envoy::Buffer::OwnedImpl buffer;
-    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-        .WillOnce(Invoke([&](Envoy::Buffer::Instance& buf, bool) -> void { buffer.move(buf); }));
+    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, /*streaming=*/false, /*end_stream=*/false))
+        .WillOnce(
+            Invoke([&](Envoy::Buffer::Instance& buf, bool, bool) -> void { buffer.move(buf); }));
     Http::TestResponseTrailerMapImpl trailers({{"foo", "bar"}, {"one", "two"}, {"three", "four"}});
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
     EXPECT_THAT(trailers, HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));

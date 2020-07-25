@@ -228,7 +228,7 @@ public:
   MOCK_METHOD(uint32_t, encoderBufferLimit, ());
 
   // Http::StreamEncoderFilterCallbacks
-  MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
+  MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming, bool end_stream));
   MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(ResponseTrailerMap&, addEncodedTrailers, ());
   MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr &&));

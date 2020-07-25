@@ -211,7 +211,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
     return Http::HeaderMap::Iterate::Continue;
   });
 
-  // Clear out the trailers so they don't get added since it is now in the body
+  // Clears out the trailers so they don't get added since it is now in the body.
   trailers.clear();
   Buffer::OwnedImpl buffer;
   // Adds the trailers frame head.
@@ -222,11 +222,11 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
   buffer.move(temp);
   if (is_text_response_) {
     Buffer::OwnedImpl encoded(Base64::encode(buffer, buffer.length()));
-    encoder_callbacks_->addEncodedData(encoded, true);
+    encoder_callbacks_->addEncodedData(encoded, /*streaming=*/true, /*end_stream=*/true);
   } else {
-    encoder_callbacks_->addEncodedData(buffer, true);
+    encoder_callbacks_->addEncodedData(buffer, /*streaming=*/true, /*end_stream=*/true);
   }
-  return Http::FilterTrailersStatus::Continue;
+  return Http::FilterTrailersStatus::StopIteration;
 }
 
 void GrpcWebFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {

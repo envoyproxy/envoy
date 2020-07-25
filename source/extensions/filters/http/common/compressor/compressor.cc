@@ -154,7 +154,7 @@ Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTraile
     Buffer::OwnedImpl empty_buffer;
     compressor_->compress(empty_buffer, Envoy::Compression::Compressor::State::Finish);
     config_->stats().total_compressed_bytes_.add(empty_buffer.length());
-    encoder_callbacks_->addEncodedData(empty_buffer, true);
+    encoder_callbacks_->addEncodedData(empty_buffer, /*streaming=*/true, /*end_stream=*/false);
   }
   return Http::FilterTrailersStatus::Continue;
 }

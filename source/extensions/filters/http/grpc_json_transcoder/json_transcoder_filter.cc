@@ -598,7 +598,7 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
     Buffer::OwnedImpl data;
     readToBuffer(*transcoder_->ResponseOutput(), data);
     if (data.length()) {
-      encoder_callbacks_->addEncodedData(data, true);
+      encoder_callbacks_->addEncodedData(data, /*streaming=*/true, /*end_stream=*/false);
     }
   }
 
@@ -796,7 +796,7 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   response_headers_->setContentLength(json_status.length());
 
   Buffer::OwnedImpl status_data(json_status);
-  encoder_callbacks_->addEncodedData(status_data, false);
+  encoder_callbacks_->addEncodedData(status_data, /*streaming=*/false, /*end_stream=*/false);
   return true;
 }
 

@@ -144,8 +144,8 @@ protected:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
     if (with_trailers) {
       Buffer::OwnedImpl trailers_buffer;
-      EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-          .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
+      EXPECT_CALL(encoder_callbacks_, addEncodedData(_, /*streaming=*/true, /*end_stream=*/false))
+          .WillOnce(Invoke([&](Buffer::Instance& data, bool, bool) { data_.move(data); }));
       Http::TestResponseTrailerMapImpl trailers;
       EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
     }

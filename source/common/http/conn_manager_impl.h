@@ -381,7 +381,7 @@ private:
     bool hasTrailers() override { return parent_.response_trailers_ != nullptr; }
 
     // Http::StreamEncoderFilterCallbacks
-    void addEncodedData(Buffer::Instance& data, bool streaming) override;
+    void addEncodedData(Buffer::Instance& data, bool streaming, bool end_stream) override;
     void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
     ResponseTrailerMap& addEncodedTrailers() override;
     void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
@@ -487,7 +487,8 @@ private:
     void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
     void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
-    void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
+    void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming,
+                        bool end_stream);
     ResponseTrailerMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,

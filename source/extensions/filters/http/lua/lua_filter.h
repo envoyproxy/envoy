@@ -473,7 +473,7 @@ private:
 
     // FilterCallbacks
     void addData(Buffer::Instance& data) override {
-      return callbacks_->addEncodedData(data, false);
+      return callbacks_->addEncodedData(data, /*streaming=*/false, /*end_stream=*/false);
     }
     const Buffer::Instance* bufferedBody() override { return callbacks_->encodingBuffer(); }
     void continueIteration() override { return callbacks_->continueEncoding(); }
