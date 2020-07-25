@@ -97,7 +97,13 @@ public:
    * Obtain platform specific new line character(s)
    * @return const std::string& platform specific new line character(s)
    */
-  static const std::string& newLine();
+  static constexpr absl::string_view newLine() {
+#ifdef WIN32
+    return {"\r\n", 2};
+#else
+    return {"\n", 2};
+#endif
+  }
 
   /**
    * Obtain read-only test input data directory.
