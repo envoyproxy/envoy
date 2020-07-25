@@ -110,7 +110,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
+  [[ "$(uname -m)" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
   echo "bazel release build with tests..."
@@ -272,6 +272,13 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
 
   test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
+  collect_build_profile coverage
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
+  setup_clang_toolchain
+  echo "bazel coverage build with fuzz tests ${COVERAGE_TEST_TARGETS}"
+
+  FUZZ_COVERAGE=true test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
