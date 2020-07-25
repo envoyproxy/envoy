@@ -5,6 +5,7 @@ package envoy.extensions.filters.network.http_connection_manager.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/config/route/v3/route.proto";
@@ -36,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 40]
+// [#next-free-field: 41]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -543,6 +544,23 @@ message HttpConnectionManager {
   // of `HTTP spec <https://tools.ietf.org/html/rfc3986>`_ and is provided for convenience.
   bool strip_matching_host_port = 39;
 
+  // Governs Envoy's behavior when receiving invalid HTTP from downstream.
+  // If this option is false (default), Envoy will err on the conservative side handling HTTP
+  // errors, terminating both HTTP/1.1 and HTTP/2 connections when receiving an invalid request.
+  // If this option is set to true, Envoy will be more permissive, only resetting the invalid
+  // stream in the case of HTTP/2 and leaving the connection open where possible (if the entire
+  // request is read for HTTP/1.1)
+  // In general this should be true for deployments receiving trusted traffic (L2 Envoys,
+  // company-internal mesh) and false when receiving untrusted traffic (edge deployments).
+  //
+  // If different behaviors for invalid_http_message for HTTP/1 and HTTP/2 are
+  // desired, one *must* use the new HTTP/2 option
+  // :ref:`override_stream_error_on_invalid_http_message
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>`
+  // *not* the deprecated but similarly named :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
+  google.protobuf.BoolValue stream_error_on_invalid_http_message = 40;
+
   google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
@@ -593,6 +611,7 @@ message LocalReplyConfig {
 }
 
 // The configuration to filter and change local response.
+// [#next-free-field: 6]
 message ResponseMapper {
   // Filter to determine if this mapper should apply.
   config.accesslog.v3.AccessLogFilter filter = 1 [(validate.rules).message = {required: true}];
@@ -601,12 +620,17 @@ message ResponseMapper {
   google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
   // The new local reply body text if specified. It will be used in the `%LOCAL_REPLY_BODY%`
-  // command operator in the `body_foramt`.
+  // command operator in the `body_format`.
   config.core.v3.DataSource body = 3;
 
   // A per mapper `body_format` to override the :ref:`body_format <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.LocalReplyConfig.body_format>`.
   // It will be used when this mapper is matched.
   config.core.v3.SubstitutionFormatString body_format_override = 4;
+
+  // HTTP headers to add to a local reply. This allows the response mapper to append, to add
+  // or to override headers of any local reply before it is sent to a downstream client.
+  repeated config.core.v3.HeaderValueOption headers_to_add = 5
+      [(validate.rules).repeated = {max_items: 1000}];
 }
 
 message Rds {
@@ -779,36 +803,11 @@ message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
 
-  // [#not-implemented-hide:] Configuration source specifier for the late-bound
-  // filter configuration. The HTTP Listener is warmed until all the initial
-  // filter configurations are received, unless the flag to apply the default
-  // configuration is set. Subsequent filter updates are atomic on a per-worker
-  // basis, and apply to new streams while the active streams continue using
-  // the older filter configurations. If the initial delivery of the filter
-  // configuration fails, due to a timeout for example, the optional default
-  // configuration is applied. Without a default configuration, the filter is
-  // disabled, and the HTTP listener responds with 500 immediately. After the
-  // failure, the listener continues subscribing to the subsequent filter
-  // configurations.
-  message HttpFilterConfigSource {
-    config.core.v3.ConfigSource config_source = 1;
-
-    // Optional default configuration to use as the initial configuration if
-    // there is a failure to receive the initial filter configuration or if
-    // `apply_default_config_without_warming` flag is set.
-    google.protobuf.Any default_config = 2;
-
-    // Use the default config as the initial configuration without warming and
-    // waiting for the first xDS response. Requires the default configuration
-    // to be supplied.
-    bool apply_default_config_without_warming = 3;
-  }
-
   reserved 3;
 
   // The name of the filter configuration. The name is used as a fallback to
   // select an extension if the type of the configuration proto is not
-  // sufficient. It also serves as a resource name in FilterConfigDS.
+  // sufficient. It also serves as a resource name in ExtensionConfigDS.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
@@ -816,8 +815,10 @@ message HttpFilter {
   oneof config_type {
     google.protobuf.Any typed_config = 4;
 
-    // [#not-implemented-hide:] Configuration source specifier for FilterConfigDS.
-    HttpFilterConfigSource filter_config_ds = 5;
+    // Configuration source specifier for an extension configuration discovery service.
+    // In case of a failure and without the default configuration, the HTTP listener responds with 500.
+    // Extension configs delivered through this mechanism are not expected to require warming (see https://github.com/envoyproxy/envoy/issues/12061).
+    config.core.v3.ExtensionConfigSource config_discovery = 5;
 
     google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
   }

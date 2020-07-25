@@ -196,6 +196,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         request_headers_->appendCopy(header.first, header.second);
       }
     }
+
+    if (!response->dynamic_metadata.fields().empty()) {
+      callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
+                                                  response->dynamic_metadata);
+    }
+
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     }

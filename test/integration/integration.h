@@ -191,6 +191,7 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
+  void setLegacyCodecs() { config_helper_.setLegacyCodecs(); }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
@@ -239,6 +240,10 @@ public:
   void createXdsUpstream();
   void createXdsConnection();
   void cleanUpXdsConnection();
+
+  // See if a port can be successfully bound within the given timeout.
+  ABSL_MUST_USE_RESULT AssertionResult waitForPortAvailable(
+      uint32_t port, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Helpers for setting up expectations and making the internal gears turn for xDS request/response
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
@@ -396,14 +401,6 @@ public:
   }
 
 protected:
-  // Create the envoy server in another thread and start it.
-  // Will not return until that server is listening.
-  virtual IntegrationTestServerPtr
-  createIntegrationTestServer(const std::string& bootstrap_path,
-                              std::function<void(IntegrationTestServer&)> on_server_ready_function,
-                              std::function<void()> on_server_init_function,
-                              Event::TestTimeSystem& time_system);
-
   bool initialized() const { return initialized_; }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;

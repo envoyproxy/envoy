@@ -115,18 +115,15 @@ void CheckRequestUtils::setHttpRequest(
   }
 
   // Fill in the headers.
-  auto mutable_headers = httpreq.mutable_headers();
-  headers.iterate(
-      [](const Envoy::Http::HeaderEntry& e, void* ctx) {
-        // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
-        if (e.key().getStringView() != Http::Headers::get().EnvoyAuthPartialBody.get()) {
-          auto* mutable_headers = static_cast<Envoy::Protobuf::Map<std::string, std::string>*>(ctx);
-          (*mutable_headers)[std::string(e.key().getStringView())] =
-              std::string(e.value().getStringView());
-        }
-        return Envoy::Http::HeaderMap::Iterate::Continue;
-      },
-      mutable_headers);
+  auto* mutable_headers = httpreq.mutable_headers();
+  headers.iterate([mutable_headers](const Envoy::Http::HeaderEntry& e) {
+    // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
+    if (e.key().getStringView() != Http::Headers::get().EnvoyAuthPartialBody.get()) {
+      (*mutable_headers)[std::string(e.key().getStringView())] =
+          std::string(e.value().getStringView());
+    }
+    return Envoy::Http::HeaderMap::Iterate::Continue;
+  });
 
   // Set request body.
   if (max_request_bytes > 0 && decoding_buffer != nullptr) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -58,6 +59,8 @@ private:
   std::vector<Http::LowerCaseString> response_trailers_to_log_;
   std::vector<std::string> filter_states_to_log_;
 };
+
+using HttpGrpcAccessLogPtr = std::unique_ptr<HttpGrpcAccessLog>;
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers
