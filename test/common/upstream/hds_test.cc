@@ -107,6 +107,47 @@ protected:
     return msg;
   }
 
+   // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
+   // with only one health check type.
+  envoy::service::health::v3::HealthCheckSpecifier* createComplexSpecifier() {
+    // start with the simple message with 1 cluster, locality, and endpoint.
+    envoy::service::health::v3::HealthCheckSpecifier* msg = createSimpleMessage();
+
+    auto* health_check = msg->add_cluster_health_checks();
+    health_check->set_cluster_name("billy");
+    health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+    health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
+    health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
+    health_check->mutable_health_checks(0)->mutable_grpc_health_check();
+    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
+        envoy::type::v3::HTTP1);
+    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+    auto* locality_endpoints = health_check->add_locality_endpoints();
+    locality_endpoints->mutable_locality()->set_region("middle_earth");
+    locality_endpoints->mutable_locality()->set_zone("rhovanion");
+    locality_endpoints->mutable_locality()->set_sub_zone("dale");
+    auto* socket_address =
+        locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+    socket_address->set_address("127.0.0.1");
+    socket_address->set_port_value(1235);
+    socket_address = locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+    socket_address->set_address("127.0.0.2");
+    socket_address->set_port_value(1236);
+    locality_endpoints = health_check->add_locality_endpoints();
+    locality_endpoints->mutable_locality()->set_region("middle_earth");
+    locality_endpoints->mutable_locality()->set_zone("rhovanion");
+    locality_endpoints->mutable_locality()->set_sub_zone("erebor");
+    socket_address = locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+    socket_address->set_address("127.0.0.3");
+    socket_address->set_port_value(1237);
+    socket_address = locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+    socket_address->set_address("127.0.0.4");
+    socket_address->set_port_value(1238);
+
+    return msg;
+  }
+
   Event::SimulatedTimeSystem time_system_;
   envoy::config::core::v3::Node node_;
   Event::MockDispatcher dispatcher_;
@@ -298,6 +339,44 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
 
   // Ensure that the timer is enabled since there was a previous valid specifier.
   EXPECT_TRUE(server_response_timer_->enabled_);
+
+  // read the response and check that it is pinging the old
+  // address 127.0.0.0 instead of the new 9.9.9.9
+  auto response = hds_delegate_->sendResponse();
+  EXPECT_EQ(response.endpoint_health_response()
+                .endpoints_health(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.0");
+
+  // Check Correctness by verifying one request and one error has been generated in stat_
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
+  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
+}
+
+// Test if processMessage exits gracefully upon receiving a malformed message
+// There was a previous valid config, so we go back to that.
+TEST_F(HdsTest, TestSendResponseByCluster) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(createComplexSpecifier());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_)).Times(3);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+
+  // Set config
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   // read the response and check that it is pinging the old
   // address 127.0.0.0 instead of the new 9.9.9.9
