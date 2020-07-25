@@ -6,6 +6,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/init/watcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
@@ -18,6 +19,7 @@
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
+#include "common/init/watcher_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
 
@@ -329,6 +331,7 @@ public:
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
   SystemTime last_updated_;
+  Init::WatcherImpl defineWatcher(const envoy::config::listener::v3::FilterChain*& filter_chain);
 
 private:
   /**
@@ -347,8 +350,15 @@ private:
   void validateFilterChains(Network::Socket::Type socket_type);
   void buildFilterChains();
   void buildFakeFilterChains();
-  void loadRealFilterChains(const envoy::config::listener::v3::FilterChain *&filter_chain);
-  std::unordered_map<const envoy::config::listener::v3::FilterChain *&, std::unique_ptr<Init::Manager>> filter_chain_specific_init_manager_map_;
+  void loadRealFilterChains(const envoy::config::listener::v3::FilterChain*& filter_chain);
+  // std::unordered_map<const envoy::config::listener::v3::FilterChain*&,
+  //                    std::unique_ptr<Init::ManagerImpl>>
+  //     filter_chain_specific_init_manager_map_;
+
+  // std::unordered_map<const envoy::config::listener::v3::FilterChain*&,
+  //                    std::unique_ptr<Init::WatcherImpl>>
+  //     filter_chain_specific_init_watcher_map_;`
+
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();

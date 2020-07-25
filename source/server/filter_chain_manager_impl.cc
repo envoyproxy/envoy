@@ -284,7 +284,6 @@ void FilterChainManagerImpl::addFakeFilterChain(
             fc_contexts_.size(), new_filter_chain_size);
 }
 
-
 void FilterChainManagerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain*& filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
@@ -296,13 +295,13 @@ void FilterChainManagerImpl::rebuildFilterChain(
   const auto& filter_chain_match = filter_chain->filter_chain_match();
   if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
     throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
-                                      "unimplemented fields",
-                                      address_->asString()));
+                                     "unimplemented fields",
+                                     address_->asString()));
   }
   if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
     throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                      "the same matching rules are defined",
-                                      address_->asString()));
+                                     "the same matching rules are defined",
+                                     address_->asString()));
   }
 
   // Validate IP addresses.

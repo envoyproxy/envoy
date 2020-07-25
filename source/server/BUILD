@@ -62,6 +62,7 @@ envoy_cc_library(
     srcs = ["connection_handler_impl.cc"],
     hdrs = ["connection_handler_impl.h"],
     deps = [
+        ":filter_chain_manager_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",

@@ -12,6 +12,8 @@
 #include "common/network/utility.h"
 #include "common/stats/timespan_impl.h"
 
+#include "server/filter_chain_manager_impl.h"
+
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -390,52 +392,47 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 
   // Find matching filter chain.
+  // const Network::FilterChain* filter_chain
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
-  // which listener???
 
-  // config_ = config_; // listenerImpl
-  // parent_.dispatcher_.name(); // this should be worker.name()
-  // auto worker_name = parent_.dispatcher_.name();
-  // parent_.listeners_.
-  // const auto &ptr = listener();
-  
-  // parent_.dispatcher_.post([this, worker_name, std::move(socket), dynamic_metadata]() {
-  //   // parent_.dispatcher_.
-  //   auto cb = this->retry(socket, dynamic_metadata);
-  //   listenerManager().updateFilterChain(workerID, ..., cb);
-  // });
+  auto filter_chain_impl = dynamic_cast<const FilterChainImpl*>(filter_chain);
+  bool is_fake_filter_chain = filter_chain_impl->isFakeFilterChain();
+  if (is_fake_filter_chain) {
 
+    // parent_.listeners_
+    // const auto& ptr = listener(); // Network::ListenerPtr listener_.get()
 
-  // if filter_chain == fake {
-  //   master = findMaster();
-  //   // parent.dispatcher is connection_handler_impl
-  //   parent_.
-  //   parent_.dispatcher_.post(worker, share_ptr<filter_chain>, Cb) {
-  //     lm = master.listenerManager() {
-  //     lm.update(listernID, filter_chain, cb);
-      
-  //     }
-  //   }
-  // }
+    // parent.dispatcher is connection_handler_impl.dispatcher
+    auto worker_name = parent_.dispatcher_.name();
+    auto listener_name = config_->name();
+    filter_chain->networkFilterFactories();
 
+    // auto filter_chain_manager = config_->filterChainManager();
+    // filter_chain_manager.
+    // config_ = config_; // listenerImpl
 
-  //   // after post
-  //   // clean this connection, ready for retry
-  // }
-  //     filterchain.cb() {
-  //       listenerManger.updateReady();
-  //     }
+    // cb = retryConnection()
+    // auto cb = []() {};
+    // auto master_dispatcher = std::move(dispatcher_); // this should be master.dispatcher
+    // master_dispatcher.post([worker_name, listener_name, filter_chain_impl_ptr, cb]() {
+    //   // master.listenerManager().update(worker_name, listener_name, filter_chain_impl_ptr, cb);
+    // });
 
+    //     filterchain.cb() {
+    //       listenerManger.updateReady();
+    //     }
 
-  //     listenerManager.updateReady(workerID, workerCb retry) {
-  //       worker.dispatcher.post([, ]) {
-  //         worker.retry(listenerID, filter_chain);
-  //       }
-  //     }
+    //     listenerManager.updateReady(workerID, workerCb retry) {
+    //       worker[workerID].dispatcher.post([, ]) {
+    //         worker[workerID].retry(listenerID, filter_chain);
+    //       }
+    //     }
 
-  // should not go below if fake
-  // if fake: cleanup
-
+    // after post
+    // clean this connection, ready for retry
+    // should not go below if fake
+    // cleanup
+  }
 
   if (filter_chain == nullptr) {
     ENVOY_LOG(debug, "closing connection: no matching filter chain found");
@@ -472,9 +469,9 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 }
 
-
 void ConnectionHandlerImpl::ActiveTcpListener::retryConnection(
-    Network::ConnectionSocketPtr&& socket, const envoy::config::core::v3::Metadata& dynamic_metadata) {
+    Network::ConnectionSocketPtr&& socket,
+    const envoy::config::core::v3::Metadata& dynamic_metadata) {
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
       parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
   stream_info->setDownstreamLocalAddress(socket->localAddress());
@@ -522,8 +519,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::retryConnection(
     active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
   }
 }
-
-
 
 ConnectionHandlerImpl::ActiveConnections&
 ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
