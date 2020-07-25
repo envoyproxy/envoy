@@ -19,7 +19,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
@@ -37,9 +37,10 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
-envoy::config::accesslog::v3::AccessLog parseAccessLogFromV2Yaml(const std::string& yaml) {
+envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::string& yaml,
+                                                                 bool avoid_boosting = true) {
   envoy::config::accesslog::v3::AccessLog access_log;
-  TestUtility::loadFromYamlAndValidate(yaml, access_log);
+  TestUtility::loadFromYamlAndValidate(yaml, access_log, false, avoid_boosting);
   return access_log;
 }
 
@@ -72,7 +73,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
   stream_info_.response_flags_ = StreamInfo::ResponseFlag::UpstreamConnectionFailure;
@@ -95,7 +96,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
 
@@ -118,7 +119,7 @@ typed_config:
   format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
   stream_info_.route_name_ = "route-test-name";
@@ -144,7 +145,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
   response_headers_.addCopy(Http::Headers::get().EnvoyUpstreamServiceTime, "999");
@@ -163,7 +164,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -183,7 +184,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -215,7 +216,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -253,7 +254,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(3);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -279,7 +280,7 @@ typed_config:
   )EOF";
 
   Random::RandomGeneratorImpl random;
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // Value is taken from random generator.
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
@@ -322,7 +323,7 @@ typed_config:
   )EOF";
 
   Random::RandomGeneratorImpl random;
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // Value is taken from random generator.
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
@@ -365,7 +366,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // Value should not be taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
@@ -392,7 +393,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -411,7 +412,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   Http::TestRequestHeaderMapImpl header_map{};
   stream_info_.health_check_request_ = true;
@@ -430,7 +431,7 @@ typed_config:
   path: "/dev/null"
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   Http::TestRequestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
@@ -450,7 +451,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   {
     Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
@@ -487,7 +488,7 @@ typed_config:
   path: /dev/null
     )EOF";
 
-    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context),
+    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context),
                  EnvoyException);
   }
 
@@ -501,7 +502,7 @@ typed_config:
   path: /dev/null
     )EOF";
 
-    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context),
+    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context),
                  EnvoyException);
   }
 }
@@ -524,7 +525,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
   stream_info_.response_code_ = 500;
 
   {
@@ -560,7 +561,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
   stream_info_.response_code_ = 500;
 
   {
@@ -603,7 +604,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
   stream_info_.response_code_ = 500;
 
   {
@@ -703,7 +704,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   stream_info_.response_code_ = 499;
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
@@ -728,7 +729,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -752,7 +753,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -782,7 +783,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -817,7 +818,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -857,7 +858,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -879,7 +880,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -906,7 +907,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -947,12 +948,13 @@ filter:
       - DPE
       - UMSDR
       - RFCF
+      - NFCF
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x100000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x200000,
                 "A flag has been added. Fix this code.");
 
   const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -976,9 +978,10 @@ typed_config:
       StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders,
       StreamInfo::ResponseFlag::DownstreamProtocolError,
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
-      StreamInfo::ResponseFlag::ResponseFromCacheFilter};
+      StreamInfo::ResponseFlag::ResponseFromCacheFilter,
+      StreamInfo::ResponseFlag::NoFilterConfigFound};
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   for (const auto response_flag : all_response_flags) {
     TestStreamInfo stream_info;
@@ -1001,14 +1004,15 @@ typed_config:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
       ProtoValidationException,
       "Proto constraint validation failed (AccessLogValidationError.Filter: [\"embedded message "
       "failed validation\"] | caused by AccessLogFilterValidationError.ResponseFlagFilter: "
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\"]]): name: \"accesslog\"\nfilter {\n "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\"]]): name: "
+      "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
@@ -1028,14 +1032,15 @@ typed_config:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
       ProtoValidationException,
       "Proto constraint validation failed (AccessLogValidationError.Filter: [\"embedded message "
       "failed validation\"] | caused by AccessLogFilterValidationError.ResponseFlagFilter: "
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\"]]): name: \"accesslog\"\nfilter {\n "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\"]]): name: "
+      "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
@@ -1051,7 +1056,7 @@ typed_config:
   format: "%GRPC_STATUS%\n"
   )EOF";
 
-  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
   {
     EXPECT_CALL(*file_, write(_));
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
@@ -1060,7 +1065,7 @@ typed_config:
     response_trailers_.remove(Http::Headers::get().GrpcStatus);
   }
   {
-    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
     EXPECT_CALL(*file_, write(_));
     response_headers_.addCopy(Http::Headers::get().GrpcStatus, "1");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -1068,7 +1073,7 @@ typed_config:
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
   {
-    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
     EXPECT_CALL(*file_, write(_));
     response_headers_.addCopy(Http::Headers::get().GrpcStatus, "-1");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -1098,7 +1103,7 @@ typed_config:
 
   for (int i = 0; i < desc->value_count(); i++) {
     InstanceSharedPtr log = AccessLogFactory::fromProto(
-        parseAccessLogFromV2Yaml(fmt::format(yaml_template, desc->value(i)->name())), context_);
+        parseAccessLogFromV3Yaml(fmt::format(yaml_template, desc->value(i)->name())), context_);
 
     EXPECT_CALL(*file_, write(_));
 
@@ -1120,7 +1125,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
                           EnvoyException, ".*\"NOT_A_VALID_CODE\" for type TYPE_ENUM.*");
 }
 
@@ -1137,7 +1142,7 @@ typed_config:
   )EOF";
 
   const InstanceSharedPtr log =
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "1");
 
@@ -1170,7 +1175,7 @@ typed_config:
     stream_info_.response_code_ = pair.second;
 
     const InstanceSharedPtr log = AccessLogFactory::fromProto(
-        parseAccessLogFromV2Yaml(fmt::format(yaml_template, pair.first)), context_);
+        parseAccessLogFromV3Yaml(fmt::format(yaml_template, pair.first)), context_);
 
     EXPECT_CALL(*file_, write(_));
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -1190,7 +1195,7 @@ typed_config:
   )EOF";
 
   const InstanceSharedPtr log =
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -1210,7 +1215,7 @@ typed_config:
   )EOF";
 
   const InstanceSharedPtr log =
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   for (int i = 0; i <= static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown); i++) {
     EXPECT_CALL(*file_, write(_)).Times(i == 0 ? 0 : 1);
@@ -1235,7 +1240,7 @@ typed_config:
   )EOF";
 
   const InstanceSharedPtr log =
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
 
@@ -1256,7 +1261,7 @@ typed_config:
   )EOF";
 
   const InstanceSharedPtr log =
-      AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_));
 
@@ -1303,7 +1308,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
   logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -1380,7 +1385,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
   // For rate=5 expect 1st request to be recorded, 2nd-5th skipped, and 6th recorded.
   EXPECT_CALL(*file_, write(_));
   logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -1408,7 +1413,7 @@ typed_config:
   path: /dev/null
   )EOF";
 
-    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
                  EnvoyException);
   }
 
@@ -1423,7 +1428,7 @@ typed_config:
   path: /dev/null
     )EOF";
 
-    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_),
+    EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
                  EnvoyException);
   }
 }

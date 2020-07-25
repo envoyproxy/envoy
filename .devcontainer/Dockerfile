@@ -1,4 +1,4 @@
-FROM gcr.io/envoy-ci/envoy-build:f21773ab398a879f976936f72c78c9dd3718ca1e
+FROM gcr.io/envoy-ci/envoy-build:923df85a4ba7f30dcd0cb6b0c6d8d604f0e20f48
 
 ARG USERNAME=vscode
 ARG USER_UID=501
@@ -10,8 +10,6 @@ ENV ENVOY_STDLIB=libstdc++
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update \
   && apt-get -y install --no-install-recommends libpython2.7 net-tools psmisc vim 2>&1 \
-  # Change pcap gid to some larger number which doesn't conflict with common gid (1000)
-  && groupmod -g 65515 pcap && chgrp pcap /usr/sbin/tcpdump \
   # Create a non-root user to use if preferred - see https://aka.ms/vscode-remote/containers/non-root-user.
   && groupadd --gid $USER_GID $USERNAME \
   && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME -G pcap -d /build \

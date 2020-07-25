@@ -187,6 +187,9 @@ public:
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
+  bool streamErrorOnInvalidHttpMessaging() const override {
+    return stream_error_on_invalid_http_messaging_;
+  }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
@@ -234,6 +237,7 @@ public:
   Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
+  bool stream_error_on_invalid_http_messaging_ = false;
   bool preserve_external_request_id_{false};
   Http::Http1Settings http1_settings_;
   Http::DefaultInternalAddressConfig internal_address_config_;
@@ -251,7 +255,12 @@ public:
   // course, it's the codecs must be robust to wire-level violations. We
   // explore these violations via MutateAction and SwapAction at the connection
   // buffer level.
-  enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
+  enum class StreamState {
+    PendingHeaders,
+    PendingNonInformationalHeaders,
+    PendingDataOrTrailers,
+    Closed
+  };
 
   FuzzStream(ConnectionManagerImpl& conn_manager, FuzzConfig& config,
              const HeaderMap& request_headers,
@@ -451,11 +460,15 @@ public:
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
         decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
+        // We don't allow multiple 100-continue headers in HCM, UpstreamRequest is responsible
+        // for coalescing.
+        state = StreamState::PendingNonInformationalHeaders;
       }
       break;
     }
     case test::common::http::ResponseAction::kHeaders: {
-      if (state == StreamState::PendingHeaders) {
+      if (state == StreamState::PendingHeaders ||
+          state == StreamState::PendingNonInformationalHeaders) {
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.headers()));
         // The client codec will ensure we always have a valid :status.

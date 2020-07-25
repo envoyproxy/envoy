@@ -26,7 +26,7 @@ of the software used to build it.::
 
   $ pwd
   src/envoy/
-  $ docker build -f ci/Dockerfile-envoy-image -t envoy .
+  $ docker build -f ci/Dockerfile-envoy -t envoy .
 
 Now you can use this ``envoy`` image to build the any of the sandboxes if you change
 the ``FROM`` line in any Dockerfile.

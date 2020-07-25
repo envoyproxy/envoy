@@ -2,10 +2,10 @@
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 
-#include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 #include "common/stats/histogram_impl.h"
+#include "common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -110,9 +110,8 @@ public:
         if (metrics_family.name() == "cluster.cluster_0.upstream_rq_time" &&
             metrics_family.type() == ::io::prometheus::client::MetricType::HISTOGRAM) {
           known_histogram_exists = true;
-          Stats::HistogramStatisticsImpl empty_statistics;
           EXPECT_EQ(metrics_family.metric(0).histogram().bucket_size(),
-                    empty_statistics.supportedBuckets().size());
+                    Stats::HistogramSettingsImpl::defaultBuckets().size());
         }
         ASSERT(metrics_family.metric(0).has_timestamp_ms());
         if (known_counter_exists && known_gauge_exists && known_histogram_exists) {
