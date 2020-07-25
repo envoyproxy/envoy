@@ -25,6 +25,7 @@ envoy_cc_library(
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//include/envoy/http:filter_interface",
+        "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )

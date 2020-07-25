@@ -3,7 +3,7 @@ import Foundation
 
 struct DemoFilter: ResponseFilter {
   // TODO(goaway): Update once dynamic registration is in place.
-  let name = "PlatformStub"
+  static let name = "PlatformStub"
 
   func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool)
     -> FilterHeaderStatus<ResponseHeaders>

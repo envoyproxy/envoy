@@ -15,7 +15,7 @@ final class ViewController: UITableViewController {
     super.viewDidLoad()
     do {
       NSLog("starting Envoy...")
-      self.client = try StreamClientBuilder().addFilter(DemoFilter()).build()
+      self.client = try StreamClientBuilder().addFilter(DemoFilter.self).build()
     } catch let error {
       NSLog("starting Envoy failed: \(error)")
     }

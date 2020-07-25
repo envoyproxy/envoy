@@ -68,11 +68,19 @@ extern const int kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
 
 @interface EnvoyHTTPFilter : NSObject
 
-@property (nonatomic, strong) NSString *name;
-
 @property (nonatomic, strong) NSArray * (^onRequestHeaders)(EnvoyHeaders *headers, BOOL endStream);
 
 @property (nonatomic, strong) NSArray * (^onResponseHeaders)(EnvoyHeaders *headers, BOOL endStream);
+
+@end
+
+#pragma mark - EnvoyHTTPFilterFactory
+
+@interface EnvoyHTTPFilterFactory : NSObject
+
+@property (nonatomic, strong) NSString *filterName;
+
+@property (nonatomic, strong) EnvoyHTTPFilter * (^create)();
 
 @end
 
@@ -143,7 +151,7 @@ extern const int kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
-@property (nonatomic, strong) NSArray<EnvoyHTTPFilter *> *httpFilters;
+@property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpFilterFactories;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, strong) NSString *appVersion;
 @property (nonatomic, strong) NSString *appId;
@@ -157,7 +165,7 @@ extern const int kEnvoyFilterHeadersStatusStopAllIterationAndBuffer;
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
-                        filterChain:(NSArray<EnvoyHTTPFilter *> *)httpFilters
+                        filterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpFilterFactories
                   statsFlushSeconds:(UInt32)statsFlushSeconds
                          appVersion:(NSString *)appVersion
                               appId:(NSString *)appId
