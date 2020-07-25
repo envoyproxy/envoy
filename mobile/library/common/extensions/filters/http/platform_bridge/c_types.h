@@ -40,10 +40,9 @@ typedef struct {
 /**
  * Return codes for on-trailers filter invocations. @see envoy/http/filter.h
  */
-typedef enum {
-  ENVOY_FILTER_TRAILERS_STATUS_CONTINUE = 0,
-  ENVOY_FILTER_TRAILERS_STATUS_STOP_ITERATION,
-} envoy_filter_trailers_status_t;
+typedef int envoy_filter_trailers_status_t;
+extern const envoy_filter_trailers_status_t kEnvoyFilterTrailersStatusContinue;
+extern const envoy_filter_trailers_status_t kEnvoyFilterTrailersStatusStopIteration;
 
 /**
  * Compound return type for on-trailers filter invocations.
