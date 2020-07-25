@@ -161,7 +161,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
   // so disable handling that signal.
   signal(SIGABRT, SIG_DFL);
 #endif
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       []() {
         // Allocating a fixed-size large array that results in OOM on gcc
         // results in a compile-time error on clang of "array size too big",
