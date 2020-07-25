@@ -49,11 +49,12 @@ private:
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
   // Precondition: lookup_result_ points to a cache lookup result that requires validation
-  //               validating_cache_entry_ is true (a stale cache entry was being validated)
+  //               filter_state_ is ValidatingCachedResponse
   // Serves a validated cached response after updating it with a 304 response
-  Http::FilterHeadersStatus processSuccessfulValidation(Http::ResponseHeaderMap& response_headers);
+  void processSuccessfulValidation(Http::ResponseHeaderMap& response_headers);
 
   // Precondition: lookup_result_ points to a cache lookup result that requires validation
+  //               filter_state_ is ValidatingCachedResponse
   // Checks if a cached entry should be updated with a 304 response
   bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
 
@@ -64,13 +65,14 @@ private:
   void injectValidationHeaders(Http::RequestHeaderMap& request_headers);
 
   // Precondition: lookup_result_ points to a fresh or validated cache look up result
+  //               filter_state_ is ValidatingCachedResponse
   // Adds a cache lookup result to the response encoding stream
   // Can be called during decoding if a valid cache hit is found
   // or during encoding if a cache entry was validated successfully
   void encodeCachedResponse();
 
   // Precondition: finished adding a response from cache to the response encoding stream
-  // Updates the encode_cached_response_state_ and continue encoding filter iteration if necessary
+  // Updates the filter_state_ and continues the encoding stream if necessary
   void finishedEncodingCachedResponse();
 
   TimeSource& time_source_;
@@ -91,21 +93,33 @@ private:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability
   bool request_allows_inserts_ = false;
 
-  // True if the CacheFilter injected validation headers and should check for 304 responses
-  bool validating_cache_entry_ = false;
+  enum class FilterState {
+    Initial,
 
-  // True if CacheFilter::encodeHeaders & CacheFilter::encodeData should be skipped
-  bool skip_encoding_ = false;
+    // DecodingWaitingForCache: CacheFilter::decodeHeaders called lookup->getHeaders() but onHeaders
+    // is not called yet (lookup result not ready) -- the decoding stream should be stopped until
+    // the cache lookup result is ready
+    DecodingWaitingForCache,
 
-  // Used for coordinating between decodeHeaders and onHeaders.
-  enum class GetHeadersState { Initial, FinishedGetHeadersCall, GetHeadersResultUnusable };
-  GetHeadersState get_headers_state_ = GetHeadersState::Initial;
+    // NoCachedResponseFound: Cache lookup did not find a cached response for this request
+    NoCachedResponseFound,
 
-  // Used for coordinating between encodeHeaders/encodeData and onBody/onTrailers
-  enum class EncodeCachedResponseState { Initial, FinishedEncoding, IterationStopped };
-  EncodeCachedResponseState encode_cached_response_state_ = EncodeCachedResponseState::Initial;
+    // ValidatingCachedResponse: Cache lookup found a cached response that requires validation
+    ValidatingCachedResponse,
 
-  enum class FilterState { Initial, Decoding, Encoding };
+    // DecodeServingFromCache: Cache lookup found a fresh cached response and it is being added to
+    // the encoding stream
+    DecodeServingFromCache,
+
+    // EncodeWaitingForCache: CacheFilter::encodeHeaders called encodeCachedResponse() but encoding
+    // the cached response is not finished yet -- the encoding stream should be stopped until it is
+    // finished
+    EncodeWaitingForCache,
+
+    // ResponseServedFromCache: The cached response was successfully added to the encoding stream
+    // (either during decoding or encoding)
+    ResponseServedFromCache
+  };
   FilterState filter_state_ = FilterState::Initial;
 };
 
