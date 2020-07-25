@@ -381,7 +381,6 @@ protected:
   const uint64_t seed_;
 
 private:
-  void refresh(uint32_t priority);
   virtual void refreshHostSource(const HostsSource& source, const HostVector& hosts) PURE;
   virtual double hostWeight(const Host& host) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
