@@ -138,8 +138,8 @@ jobs:
       - task: DownloadBuildArtifacts@0
         inputs:
           buildType: current
-          artifactName: "bazel.release.server_only.arm64"
-          itemPattern: "bazel.release.server_only.arm64/envoy_binary.tar.gz"
+          artifactName: "bazel.release.arm64"
+          itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
           downloadType: single
           targetPath: $(Build.StagingDirectory)
       - bash: |
