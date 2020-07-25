@@ -40,12 +40,11 @@ public:
 
 private:
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions
-  void inline getHeaders();
-  void inline getBody();
-  void inline getTrailers();
+  void getBody();
+  void getTrailers();
 
   // Callbacks for HttpCache to call when headers/body/trailers are ready
-  void onHeaders(LookupResult&& result);
+  void onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers);
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
@@ -58,12 +57,11 @@ private:
   // Checks if a cached entry should be updated with a 304 response
   bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
 
-  // Precondition: request_headers_ points to the RequestHeadersMap of the current request
-  //               lookup_result_ points to a cache lookup result that requires validation
+  // Precondition: lookup_result_ points to a cache lookup result that requires validation
   // Should only be called during onHeaders as it modifies RequestHeaderMap
   // Adds required conditional headers for cache validation to the request headers
   // according to the present cache lookup result headers
-  void injectValidationHeaders();
+  void injectValidationHeaders(Http::RequestHeaderMap& request_headers);
 
   // Precondition: lookup_result_ points to a fresh or validated cache look up result
   // Adds a cache lookup result to the response encoding stream
@@ -81,11 +79,6 @@ private:
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
 
-  // Used exclusively to store a reference to the request header map passed to decodeHeaders to be
-  // used in onHeaders afterwards the pointer must not be used and is set back to null
-  // This Http::RequestHeaderMap is NOT owned by the CacheFilter
-  Http::RequestHeaderMap* request_headers_ = nullptr;
-
   // Tracks what body bytes still need to be read from the cache. This is currently only one Range,
   // but will expand when full range support is added. Initialized by encodeCachedResponse.
   std::vector<AdjustedByteRange> remaining_body_;
@@ -98,7 +91,7 @@ private:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability
   bool request_allows_inserts_ = false;
 
-  // True if the CacheFilter is injected validation headers and should check for 304 responses
+  // True if the CacheFilter injected validation headers and should check for 304 responses
   bool validating_cache_entry_ = false;
 
   // True if CacheFilter::encodeHeaders & CacheFilter::encodeData should be skipped

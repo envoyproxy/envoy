@@ -60,9 +60,8 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   ASSERT(lookup_);
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
 
-  // Used exclusively to access the RequestHeaderMap in onHeaders
-  request_headers_ = &headers;
-  getHeaders();
+  lookup_->getHeaders(
+      [this, &headers](LookupResult&& result) { onHeaders(std::move(result), headers); });
 
   if (get_headers_state_ == GetHeadersState::GetHeadersResultUnusable) {
     // onHeaders has already been called, and no usable cache entry was found--continue iteration.
@@ -91,11 +90,10 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     return processSuccessfulValidation(headers);
   }
 
-  // Either a cache miss or a cache entry is no longer valid
+  // Either a cache miss or a cache entry that is no longer valid
   // Check if the new response can be cached
   if (request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers)) {
     // TODO(#12140): Add date internal header or metadata to cached responses
-    ASSERT(lookup_, "CacheFilter::encodeHeaders no LookupContext to use to insert data");
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
@@ -122,11 +120,6 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::Continue;
 }
 
-void CacheFilter::getHeaders() {
-  ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
-  lookup_->getHeaders([this](LookupResult&& result) { onHeaders(std::move(result)); });
-}
-
 void CacheFilter::getBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
@@ -141,7 +134,7 @@ void CacheFilter::getTrailers() {
       [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailers(std::move(trailers)); });
 }
 
-void CacheFilter::onHeaders(LookupResult&& result) {
+void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
   // TODO(yosrym93): Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
@@ -153,7 +146,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
     // status should be 304 (unmodified), and the cache entry will be injected in the response body
     validating_cache_entry_ = true;
     lookup_result_ = std::make_unique<LookupResult>(std::move(result));
-    injectValidationHeaders();
+    injectValidationHeaders(request_headers);
     FALLTHRU;
   case CacheEntryStatus::Unusable:
     if (get_headers_state_ == GetHeadersState::FinishedGetHeadersCall) {
@@ -163,14 +156,11 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       // decodeHeader hasn't yet returned--tell it to return Http::FilterHeadersStatus::Continue.
       get_headers_state_ = GetHeadersState::GetHeadersResultUnusable;
     }
-    break;
+    return;
   case CacheEntryStatus::Ok:
     lookup_result_ = std::make_unique<LookupResult>(std::move(result));
     encodeCachedResponse();
   }
-  // All switch case paths should lead to this line
-  // Stored pointer to RequestHeaderMap is no longer needed
-  request_headers_ = nullptr;
 }
 
 // TODO(toddmgreer): Handle downstream backpressure.
@@ -280,19 +270,19 @@ bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& respons
   // and assuming a single cached response per key:
   // If the 304 response contains a strong validator (etag) that does not match the cached response
   // the cached response should not be updated
-  const auto response_etag_ptr = response_headers.get(Http::CustomHeaders::get().Etag);
-  const auto cached_etag_ptr = lookup_result_->headers_->get(Http::CustomHeaders::get().Etag);
-  return !response_etag_ptr || (cached_etag_ptr && cached_etag_ptr->value().getStringView() ==
-                                                       response_etag_ptr->value().getStringView());
+  const Http::HeaderEntry* response_etag = response_headers.get(Http::CustomHeaders::get().Etag);
+  const Http::HeaderEntry* cached_etag =
+      lookup_result_->headers_->get(Http::CustomHeaders::get().Etag);
+  return !response_etag || (cached_etag && cached_etag->value().getStringView() ==
+                                               response_etag->value().getStringView());
 }
 
-void CacheFilter::injectValidationHeaders() {
+void CacheFilter::injectValidationHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_result_, "injectValidationHeaders precondition unsatisfied: lookup_result_ "
                          "does not point to a cache lookup result");
   ASSERT(validating_cache_entry_, "injectValidationHeaders precondition unsatisfied: the "
                                   "CacheFilter is not validating a cache lookup result");
-  ASSERT(request_headers_, "injectValidationHeaders precondition unsatisfied: request_headers_ "
-                           "does not point to the RequestHeadersMap of the current request");
+
   const Http::HeaderEntry* etag_header =
       lookup_result_->headers_->get(Http::CustomHeaders::get().Etag);
   const Http::HeaderEntry* last_modified_header =
@@ -300,16 +290,16 @@ void CacheFilter::injectValidationHeaders() {
 
   if (etag_header) {
     absl::string_view etag = etag_header->value().getStringView();
-    request_headers_->setReferenceKey(Http::CustomHeaders::get().IfNonMatch, etag);
+    request_headers.setReferenceKey(Http::CustomHeaders::get().IfNonMatch, etag);
   }
   if (CacheHeadersUtils::httpTime(last_modified_header) != SystemTime()) {
     // Valid Last-Modified header exists
     absl::string_view last_modified = last_modified_header->value().getStringView();
-    request_headers_->setCopy(Http::CustomHeaders::get().IfModifiedSince, last_modified);
+    request_headers.setReferenceKey(Http::CustomHeaders::get().IfModifiedSince, last_modified);
   } else {
     // Either Last-Modified is missing or invalid, fallback to Date
     absl::string_view date = lookup_result_->headers_->getDateValue();
-    request_headers_->setCopy(Http::CustomHeaders::get().IfModifiedSince, date);
+    request_headers.setReferenceKey(Http::CustomHeaders::get().IfModifiedSince, date);
   }
 }
 

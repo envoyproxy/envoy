@@ -43,18 +43,16 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   // This behavior does not cause any incorrect results but may reduce the cache effectiveness
   // If needed to be handled properly refer to:
   // https://httpwg.org/specs/rfc7234.html#validation.received
-  bool contains_conditional_headers = false;
   for (auto conditional_header : conditionalHeaders()) {
     if (headers.get(*conditional_header)) {
-      contains_conditional_headers = true;
-      break;
+      return false;
     }
   }
 
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // Cache-related headers are checked in HttpCache::LookupRequest
   return headers.Path() && headers.Host() && !headers.getInline(authorization_handle.handle()) &&
-         !contains_conditional_headers && (method == header_values.MethodValues.Get) &&
+         (method == header_values.MethodValues.Get) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
 }
