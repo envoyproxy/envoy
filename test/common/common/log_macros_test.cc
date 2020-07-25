@@ -11,12 +11,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#ifndef FANCY
-#define LOGGER_MODE 0
-#else
-#define LOGGER_MODE 1
-#endif
-
 namespace Envoy {
 
 class TestFilterLog : public Logger::Loggable<Logger::Id::filter> {
@@ -44,7 +38,7 @@ TEST(Logger, All) {
   TestFilterLog filter;
   printf("Filter is initialized."); // for debug only
   filter.logMessage();
-  printf("Message printed..");  // for debug only
+  printf("Message printed.."); // for debug only
   // Misc logging with no facility.
   ENVOY_LOG_MISC(info, "fake message");
 }
@@ -194,10 +188,13 @@ TEST(Fancy, Iteration) {
   FANCY_LOG(info, "Info: iteration test begins.");
   FANCY_LOG(info, getFancyContext().listFancyLoggers());
   std::string log_format = "[%T.%e][%t][%l][%n] %v";
-  getFancyContext().setDefaultFancyLevelFormat(spdlog::level::warn, log_format);
-  FANCY_LOG(warn, "Warning: now level is warn, format changed (Date removed).");
+  getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
+  getFancyContext().setDefaultFancyLevelFormat(spdlog::level::warn,
+                                               log_format); // default warn will be changed to err
+  FANCY_LOG(warn, "Warning: now level is warning, format changed (Date removed).");
   FANCY_LOG(warn, getFancyContext().listFancyLoggers());
-  EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
+  EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(),
+            spdlog::level::warn); // note fancy_default_level isn't changed
 }
 
 TEST(Fancy, Context) {
@@ -208,9 +205,7 @@ TEST(Fancy, Context) {
   printf(" --> Logger Mode: %d\n", LOGGER_MODE);
   EXPECT_EQ(mode, compile_mode);
   if (LOGGER_MODE) {
-    // TestFilterLog filter;
-    // filter.logMessage();
-    FANCY_LOG(critical, "Compile option set: it's a Fancy Log printed by ENVOY_LOG!");
+    ENVOY_LOG(critical, "Compile option set: it's a Fancy Log printed by ENVOY_LOG!");
   }
   Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
   EXPECT_EQ(Logger::Context::getLoggerMode(), Logger::LoggerMode::Fancy);
