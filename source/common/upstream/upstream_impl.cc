@@ -1179,6 +1179,12 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
   absl::optional<double> budget_percent;
   absl::optional<uint32_t> min_retry_concurrency;
   if (it != thresholds.cend()) {
+    // Catch case where max_retries is set but will be ignored!
+    if (it->has_max_retries() && it->has_retry_budget()) {
+      throw EnvoyException(fmt::format(
+          "Cannot use both max_retries and retry_budget in cluster: '{}'", cluster_name));
+    }
+
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
     max_pending_requests =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_pending_requests, max_pending_requests);

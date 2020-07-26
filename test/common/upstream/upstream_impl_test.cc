@@ -2516,6 +2516,42 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(4U, high_remaining_retries.value());
 }
 
+TEST_F(StrictDnsClusterImplTest, CircuitBreakersMaxRetriesAndRetryBudgetExclusionValidation) {
+  const std::string yaml = R"EOF(
+    name: my-cluster
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_retries: 10
+        retry_budget:
+          budget_percent:
+            value: 12
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_);
+  EXPECT_THROW_WITH_REGEX(StrictDnsClusterImpl(cluster_config, runtime_, dns_resolver_,
+                                               factory_context, std::move(scope), false),
+                          EnvoyException,
+                          "Cannot use both max_retries and retry_budget in cluster: 'my-cluster'");
+}
+
 TEST_F(ClusterInfoImplTest, Timeouts) {
   const std::string yaml = R"EOF(
     name: name
