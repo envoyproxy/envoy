@@ -411,7 +411,14 @@ def _io_opentracing_cpp():
     )
 
 def _com_lightstep_tracer_cpp():
-    _repository_impl("com_lightstep_tracer_cpp")
+    _repository_impl(
+        name = "com_lightstep_tracer_cpp",
+        patch_args = ["-p1"],
+        # Workaround for GCC architecture specific optimization about 'char' type
+        # on different arches: arm64, ia64, ppc64, ...
+        # Ref: https://wiki.debian.org/ArchitectureSpecificsMemo
+        patches = ["@envoy//bazel:com_lightstep_tracer_cpp.patch"],
+    )
     native.bind(
         name = "lightstep",
         actual = "@com_lightstep_tracer_cpp//:manual_tracer_lib",

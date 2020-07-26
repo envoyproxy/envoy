@@ -1,0 +1,12 @@
+diff --git a/bazel/lightstep_build_system.bzl b/bazel/lightstep_build_system.bzl
+index cd896c8..bdbba6d 100644
+--- a/bazel/lightstep_build_system.bzl
++++ b/bazel/lightstep_build_system.bzl
+@@ -46,6 +46,7 @@ def lightstep_copts(is_3rd_party=False):
+       "-Wno-overloaded-virtual",
+       "-Wvla",
+       "-std=c++11",
++      "-fsigned-char",
+   ]
+ 
+ def lightstep_linkopts():
