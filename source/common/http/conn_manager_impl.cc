@@ -1580,10 +1580,12 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
                 modify_headers(*response_headers);
               }
               response_headers_ = std::move(response_headers);
-              filter_manager_.encodeHeadersInternal(*response_headers_, end_stream);
+              encodeHeadersInternal(*response_headers_, end_stream);
+              filter_manager_.maybeEndEncode(end_stream);
             },
             [&](Buffer::Instance& data, bool end_stream) -> void {
-              filter_manager_.encodeDataInternal(data, end_stream);
+              encodeDataInternal(data, end_stream);
+              filter_manager_.maybeEndEncode(end_stream);
             }},
         Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*request_headers_), code, body,
                                 grpc_status, state_.is_head_request_});
@@ -1746,15 +1748,16 @@ void ConnectionManagerImpl::FilterManager::encodeHeaders(ActiveStreamEncoderFilt
 
   const bool modified_end_stream = parent_.state_.encoding_headers_only_ ||
                                    (end_stream && continue_data_entry == encoder_filters_.end());
-  encodeHeadersInternal(headers, modified_end_stream);
+  parent_.encodeHeadersInternal(headers, modified_end_stream);
+  maybeEndEncode(modified_end_stream);
 
   if (!modified_end_stream) {
     maybeContinueEncoding(continue_data_entry);
   }
 }
 
-void ConnectionManagerImpl::FilterManager::encodeHeadersInternal(ResponseHeaderMap& headers,
-                                                                 bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMap& headers,
+                                                                bool end_stream) {
   // Base headers.
 
   // By default, always preserve the upstream date response header if present. If we choose to
@@ -1762,103 +1765,101 @@ void ConnectionManagerImpl::FilterManager::encodeHeadersInternal(ResponseHeaderM
   // is not from cache
   const bool should_preserve_upstream_date =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.preserve_upstream_date") ||
-      parent_.stream_info_.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter);
+      stream_info_.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter);
   if (!should_preserve_upstream_date || !headers.Date()) {
-    parent_.connection_manager_.config_.dateProvider().setDateHeader(headers);
+    connection_manager_.config_.dateProvider().setDateHeader(headers);
   }
 
   // Following setReference() is safe because serverName() is constant for the life of the listener.
-  const auto transformation = parent_.connection_manager_.config_.serverHeaderTransformation();
+  const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
       (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT &&
        headers.Server() == nullptr)) {
-    headers.setReferenceServer(parent_.connection_manager_.config_.serverName());
+    headers.setReferenceServer(connection_manager_.config_.serverName());
   }
-  ConnectionManagerUtility::mutateResponseHeaders(headers, parent_.request_headers_.get(),
-                                                  parent_.connection_manager_.config_,
-                                                  parent_.connection_manager_.config_.via());
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
+                                                  connection_manager_.config_,
+                                                  connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
-  if (parent_.connection_manager_.drain_state_ == DrainState::NotDraining &&
-      parent_.connection_manager_.drain_close_.drainClose()) {
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      connection_manager_.drain_close_.drainClose()) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
     // of time to race with incoming requests. It mainly just keeps the logic the same between
     // HTTP/1.1 and HTTP/2.
-    parent_.connection_manager_.startDrainSequence();
-    parent_.connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
-    ENVOY_STREAM_LOG(debug, "drain closing connection", parent_);
+    connection_manager_.startDrainSequence();
+    connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
+    ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
   }
 
-  if (parent_.connection_manager_.codec_->protocol() == Protocol::Http10) {
+  if (connection_manager_.codec_->protocol() == Protocol::Http10) {
     // As HTTP/1.0 and below can not do chunked encoding, if there is no content
     // length the response will be framed by connection close.
     if (!headers.ContentLength()) {
-      parent_.state_.saw_connection_close_ = true;
+      state_.saw_connection_close_ = true;
     }
     // If the request came with a keep-alive and no other factor resulted in a
     // connection close header, send an explicit keep-alive header.
-    if (!parent_.state_.saw_connection_close_) {
+    if (!state_.saw_connection_close_) {
       headers.setConnection(Headers::get().ConnectionValues.KeepAlive);
     }
   }
 
-  if (parent_.connection_manager_.drain_state_ == DrainState::NotDraining &&
-      parent_.state_.saw_connection_close_) {
-    ENVOY_STREAM_LOG(debug, "closing connection due to connection close header", parent_);
-    parent_.connection_manager_.drain_state_ = DrainState::Closing;
+  if (connection_manager_.drain_state_ == DrainState::NotDraining && state_.saw_connection_close_) {
+    ENVOY_STREAM_LOG(debug, "closing connection due to connection close header", *this);
+    connection_manager_.drain_state_ = DrainState::Closing;
   }
 
-  if (parent_.connection_manager_.drain_state_ == DrainState::NotDraining &&
-      parent_.connection_manager_.overload_disable_keepalive_ref_ ==
-          Server::OverloadActionState::Active) {
-    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", parent_);
-    parent_.connection_manager_.drain_state_ = DrainState::Closing;
-    parent_.connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      connection_manager_.overload_disable_keepalive_ref_ == Server::OverloadActionState::Active) {
+    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
+    connection_manager_.drain_state_ = DrainState::Closing;
+    connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
 
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
-  if (!parent_.state_.remote_complete_) {
-    if (parent_.connection_manager_.codec_->protocol() < Protocol::Http2) {
-      parent_.connection_manager_.drain_state_ = DrainState::Closing;
+  if (!state_.remote_complete_) {
+    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+      connection_manager_.drain_state_ = DrainState::Closing;
     }
 
-    parent_.connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
+    connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
-  if (parent_.connection_manager_.drain_state_ != DrainState::NotDraining &&
-      parent_.connection_manager_.codec_->protocol() < Protocol::Http2) {
+  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
+      connection_manager_.codec_->protocol() < Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
     // payload is no longer HTTP/1.1)
     if (!Utility::isUpgrade(headers) &&
-        !HeaderUtility::isConnectResponse(parent_.request_headers_, *parent_.response_headers_)) {
+        !HeaderUtility::isConnectResponse(request_headers_, *response_headers_)) {
       headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
     }
   }
 
-  if (parent_.connection_manager_.config_.tracingConfig()) {
-    if (parent_.connection_manager_.config_.tracingConfig()->operation_name_ ==
+  if (connection_manager_.config_.tracingConfig()) {
+    if (connection_manager_.config_.tracingConfig()->operation_name_ ==
         Tracing::OperationName::Ingress) {
       // For ingress (inbound) responses, if the request headers do not include a
       // decorator operation (override), and the decorated operation should be
       // propagated, then pass the decorator's operation name (if defined)
       // as a response header to enable the client service to use it in its client span.
-      if (parent_.decorated_operation_ && parent_.state_.decorated_propagate_) {
-        headers.setEnvoyDecoratorOperation(*parent_.decorated_operation_);
+      if (decorated_operation_ && state_.decorated_propagate_) {
+        headers.setEnvoyDecoratorOperation(*decorated_operation_);
       }
-    } else if (parent_.connection_manager_.config_.tracingConfig()->operation_name_ ==
+    } else if (connection_manager_.config_.tracingConfig()->operation_name_ ==
                Tracing::OperationName::Egress) {
       const HeaderEntry* resp_operation_override = headers.EnvoyDecoratorOperation();
 
       // For Egress (outbound) response, if a decorator operation name has been provided, it
       // should be used to override the active span's operation.
       if (resp_operation_override) {
-        if (!resp_operation_override->value().empty() && parent_.active_span_) {
-          parent_.active_span_->setOperation(resp_operation_override->value().getStringView());
+        if (!resp_operation_override->value().empty() && active_span_) {
+          active_span_->setOperation(resp_operation_override->value().getStringView());
         }
         // Remove header so not propagated to service.
         headers.removeEnvoyDecoratorOperation();
@@ -1867,16 +1868,15 @@ void ConnectionManagerImpl::FilterManager::encodeHeadersInternal(ResponseHeaderM
   }
 
   // 100-continue headers are handled via encode100ContinueHeaders.
-  parent_.state_.non_100_response_headers_encoded_ = true;
-  parent_.chargeStats(headers);
+  state_.non_100_response_headers_encoded_ = true;
+  chargeStats(headers);
 
-  ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", parent_, end_stream,
+  ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
 
   // Now actually encode via the codec.
-  parent_.stream_info_.onFirstDownstreamTxByteSent();
-  parent_.response_encoder_->encodeHeaders(headers, end_stream);
-  maybeEndEncode(end_stream);
+  stream_info_.onFirstDownstreamTxByteSent();
+  response_encoder_->encodeHeaders(headers, end_stream);
 }
 
 void ConnectionManagerImpl::FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
@@ -2015,7 +2015,8 @@ void ConnectionManagerImpl::FilterManager::encodeData(
   }
 
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
-  encodeDataInternal(data, modified_end_stream);
+  parent_.encodeDataInternal(data, modified_end_stream);
+  maybeEndEncode(modified_end_stream);
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
@@ -2024,15 +2025,14 @@ void ConnectionManagerImpl::FilterManager::encodeData(
   }
 }
 
-void ConnectionManagerImpl::FilterManager::encodeDataInternal(Buffer::Instance& data,
-                                                              bool end_stream) {
-  ASSERT(!parent_.state_.encoding_headers_only_);
-  ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", parent_, data.length(),
+void ConnectionManagerImpl::ActiveStream::encodeDataInternal(Buffer::Instance& data,
+                                                             bool end_stream) {
+  ASSERT(!state_.encoding_headers_only_);
+  ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
 
-  parent_.stream_info_.addBytesSent(data.length());
-  parent_.response_encoder_->encodeData(data, end_stream);
-  maybeEndEncode(end_stream);
+  stream_info_.addBytesSent(data.length());
+  response_encoder_->encodeData(data, end_stream);
 }
 
 void ConnectionManagerImpl::FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
