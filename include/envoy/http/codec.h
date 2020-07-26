@@ -376,6 +376,10 @@ struct Http1Settings {
   //  - Is neither a HEAD only request nor a HTTP Upgrade
   //  - Not a HEAD request
   bool enable_trailers_{false};
+  // Allow serving requests with both Content-Length and Transfer-Encoding: chunked.
+  // In enabled and such request served - Content-Length is ignored and removed from request
+  // headers.
+  bool allow_chunked_length{false};
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy

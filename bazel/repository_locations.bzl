@@ -283,9 +283,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_github_nodejs_http_parser = dict(
-        sha256 = "8fa0ab8770fd8425a9b431fdbf91623c4d7a9cdb842b9339289bd2b0b01b0d3d",
-        strip_prefix = "http-parser-2.9.3",
-        urls = ["https://github.com/nodejs/http-parser/archive/v2.9.3.tar.gz"],
+        sha256 = "6a12896313ce1ca630cf516a0ee43a79b5f13f5a5d8143f56560ac0b21c98fac",
+        strip_prefix = "http-parser-4f15b7d510dc7c6361a26a7c6d2f7c3a17f8d878",
+        urls = ["https://github.com/nodejs/http-parser/archive/4f15b7d510dc7c6361a26a7c6d2f7c3a17f8d878.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:nodejs:node.js:*",
     ),

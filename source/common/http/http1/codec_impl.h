@@ -220,7 +220,8 @@ public:
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
+                 HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers,
+                 bool allow_chunked_lenght);
 
   bool resetStreamCalled() { return reset_stream_called_; }
   void onMessageBeginBase();
