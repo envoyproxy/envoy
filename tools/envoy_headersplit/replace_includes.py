@@ -17,8 +17,7 @@ this script need to be executed in the Envoy directory
 from pathlib import Path
 import argparse
 
-
-def replace_includes(mock_name):
+def get_classnames(mock_name):
   dir = Path("test/mocks/{}/".format(mock_name))
   filenames = list(map(str, dir.glob('*.h')))
   classnames = []
@@ -32,7 +31,10 @@ def replace_includes(mock_name):
     bazelname = "//test/mocks/{}:".format(mock_name) + filename.split('/')[-1].replace(
         '.h', '') + '_mocks'.format(mock_name)
     classname2bazelname[classname] = bazelname
+  return classnames,classname2bazelname,classname2filename
 
+def replace_includes(mock_name):
+  classnames,classname2bazelname,classname2filename = get_classnames(mock_name)
   print(classnames)
 
   p = Path('./test')
