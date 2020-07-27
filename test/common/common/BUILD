@@ -121,8 +121,8 @@ envoy_cc_benchmark_binary(
     srcs = ["logger_perf_test.cc"],
     external_deps = ["benchmark"],
     deps = [
-        "//source/common/common:minimal_logger_lib",
         "//source/common/common:fancy_logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
