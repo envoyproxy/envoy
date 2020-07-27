@@ -66,7 +66,7 @@ A simple example of configuring Lua HTTP filter that contains only :ref:`inline_
 
   name: envoy.filters.http.lua
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.lua
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
     inline_code: |
       -- Called on the request path.
       function envoy_on_request(request_handle)
@@ -93,7 +93,7 @@ As a concrete example, given the following Lua filter configuration:
 
   name: envoy.filters.http.lua
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.lua
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
     inline_code: |
       function envoy_on_request(request_handle)
         -- do something
