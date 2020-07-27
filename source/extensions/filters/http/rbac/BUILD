@@ -16,6 +16,7 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",
+        "//source/extensions/filters/common/matcher:matcher_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
@@ -31,6 +32,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/http:utility_lib",
+        "//source/extensions/filters/common/matcher:matcher_lib",
         "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http:well_known_names",

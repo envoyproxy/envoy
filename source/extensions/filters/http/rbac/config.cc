@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "extensions/filters/common/matcher/matcher.h"
 #include "extensions/filters/http/rbac/rbac_filter.h"
 
 namespace Envoy {
@@ -11,10 +12,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
+const std::vector<envoy::extensions::filters::common::matcher::v3::MatchPredicate::RuleCase>
+    allowed{
+        envoy::extensions::filters::common::matcher::v3::MatchPredicate::kHttpRequestHeadersMatch,
+        envoy::extensions::filters::common::matcher::v3::MatchPredicate::kExtraMatch,
+    };
+
 Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-
+  if (!Envoy::Extensions::Filters::Common::Matcher::validate(proto_config.matcher(), allowed)) {
+    throw EnvoyException("Found unsupported matcher rule");
+  }
   auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, stats_prefix,
                                                                      context.scope());
 

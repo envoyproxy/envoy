@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.rbac.v4alpha;
 
 import "envoy/config/rbac/v4alpha/rbac.proto";
+import "envoy/extensions/filters/common/matcher/v4alpha/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -30,6 +31,12 @@ message RBAC {
   // but will emit stats and logs and can be used for rule testing.
   // If absent, no shadow RBAC policy will be applied.
   config.rbac.v4alpha.RBAC shadow_rules = 2;
+
+  // Proof-of-concept of unified matching API.
+  // The following match rules are supported:
+  //   OrMatch, AndMatch, NotMatch, AnyMatch, HttpRequestHeadersMatch and ExtraMatch.
+  // Envoy will throw an exception upon receiving the config if unsupported match rule is used.
+  common.matcher.v4alpha.MatchPredicate matcher = 3;
 }
 
 message RBACPerRoute {

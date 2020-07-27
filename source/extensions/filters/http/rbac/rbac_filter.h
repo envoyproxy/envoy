@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/filters/common/matcher/matcher.h"
 #include "extensions/filters/common/rbac/engine_impl.h"
 #include "extensions/filters/common/rbac/utility.h"
 
@@ -48,6 +49,8 @@ public:
   engine(const Router::RouteConstSharedPtr route,
          Filters::Common::RBAC::EnforcementMode mode) const;
 
+  Filters::Common::Matcher::RequestMatcher* matcher() const { return matcher_.get(); };
+
 private:
   const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
@@ -59,6 +62,7 @@ private:
 
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
   std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  std::unique_ptr<Filters::Common::Matcher::RequestMatcher> matcher_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =

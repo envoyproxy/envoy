@@ -1,0 +1,123 @@
+static_resources:
+  listeners:
+  - address:
+      # Tells Envoy to listen on 0.0.0.0:15001
+      socket_address:
+        address: 0.0.0.0
+        port_value: 15001
+    filter_chains:
+    # Any requests received on this address are sent through this chain of filters
+    - filters:
+      # If the request is HTTP it will pass through this HTTP filter
+      - name: envoy.http_connection_manager 
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          codec_type: auto
+          stat_prefix: http
+          access_log:
+            name: envoy.file_access_log
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+              path: /dev/stdout
+          route_config:
+            name: search_route
+            virtual_hosts:
+            - name: backend
+              domains:
+              - "*"
+              routes:
+              # Match on host (:authority in HTTP2) headers
+              - match:
+                  prefix: "/"
+                  headers:
+                    - name: ":authority"
+                      exact_match: "google.com"
+                route:
+                  # Send request to an endpoint in the Google cluster
+                  cluster: google
+                  host_rewrite: www.google.com
+              - match:
+                  prefix: "/"
+                  headers:
+                    - name: ":authority"
+                      exact_match: "httpbin.org"
+                route:
+                  # Send request to an endpoint in the Httpbin cluster
+                  cluster: httpbin
+                  host_rewrite: www.httpbin.org
+          http_filters:
+          - name: envoy.filters.http.header_to_metadata
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+              request_rules:
+              - header: foo
+                on_header_present:
+                  metadata_namespace: headers_to_metadata
+                  key: foo
+                  type: STRING
+                remove: false
+          - name: envoy.filters.http.rbac
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+              rules:
+                action: ALLOW
+                policies:
+                  "allow-all":
+                     permissions:
+                     - any: true
+                     principals:
+                     - any: true
+              matcher:
+                orMatch:
+                  rules:
+                  - httpRequestHeadersMatch:
+                      headers:
+                      - name: bla
+                        exactMatch: bla
+                  - extraMatch:
+                      metadata:
+                        filter: headers_to_metadata
+                        path:
+                        - key: foo
+                        value:
+                          stringMatch:
+                            exact: foo
+          - name: envoy.router
+            typed_config: {}
+  clusters:
+  - name: google
+    connect_timeout: 1s
+    # Instruct Envoy to continouously resolve DNS of www.google.com asynchronously
+    type: logical_dns 
+    dns_lookup_family: V4_ONLY
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: google
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: www.google.com
+                port_value: 80
+  - name: httpbin
+    connect_timeout: 1s
+    # Instruct Envoy to continouously resolve DNS of www.httpbin.org asynchronously
+    type: logical_dns
+    dns_lookup_family: V4_ONLY
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: httpbin
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: www.httpbin.org
+                port_value: 80
+admin:
+  access_log_path: "/dev/stdout"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 15000
