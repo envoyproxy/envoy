@@ -430,24 +430,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  int socket_v6only = 0;
-  if (ss.ss_family == AF_INET6) {
-    socklen_t size_int = sizeof(socket_v6only);
-    result = os_sys_calls.getsockopt(fd_, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int);
-#ifdef WIN32
-    // On Windows, it is possible for this getsockopt() call to fail.
-    // This can happen if the address we are trying to connect to has nothing
-    // listening. So we can't use RELEASE_ASSERT and instead must throw an
-    // exception
-    if (SOCKET_FAILURE(result.rc_)) {
-      throw EnvoyException(fmt::format("getsockopt failed for '{}': ({}) {}", fd_, result.errno_,
-                                       errorDetails(result.errno_)));
-    }
-#else
-    RELEASE_ASSERT(result.rc_ == 0, "");
-#endif
-  }
-  return Address::addressFromSockAddr(ss, ss_len, socket_v6only);
+  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
