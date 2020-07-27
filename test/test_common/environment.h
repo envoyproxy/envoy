@@ -99,9 +99,9 @@ public:
    */
   static constexpr absl::string_view newLine
 #ifdef WIN32
-    {"\r\n"};
+      {"\r\n"};
 #else
-    {"\n"};
+      {"\n"};
 #endif
 
   /**
