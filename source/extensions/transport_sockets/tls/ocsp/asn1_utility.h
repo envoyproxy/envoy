@@ -191,7 +191,8 @@ std::vector<T> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parse_e
 }
 
 template <typename T>
-absl::optional<T> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag) {
+absl::optional<T> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
+                                             unsigned tag) {
   CBS data;
   if (isOptionalPresent(cbs, &data, tag)) {
     return parse_data(data);
