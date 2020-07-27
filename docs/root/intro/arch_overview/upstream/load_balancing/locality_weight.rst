@@ -60,9 +60,11 @@ picked. The load balancer follows these steps:
 Locality weighted load balancing is configured by setting
 :ref:`locality_weighted_lb_config
 <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.locality_weighted_lb_config>` in the
-cluster configuration and providing weights in :ref:`LocalityLbEndpoints
-<envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>` via :ref:`load_balancing_weight
-<envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.load_balancing_weight>`.
+cluster configuration and by providing weights via :ref:`load_balancing_weight
+<envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.load_balancing_weight>` and
+identifying the location of the upstream hosts via :ref:`locality
+<envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>` in
+:ref:`LocalityLbEndpoints <envoy_v3_api_msg_config.endpoint.v3.LocalityLbEndpoints>`.
 
 This feature is not compatible with :ref:`load balancer subsetting
 <arch_overview_load_balancer_subsets>`, since it is not straightforward to
