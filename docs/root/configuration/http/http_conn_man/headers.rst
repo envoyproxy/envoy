@@ -621,7 +621,7 @@ Supported variable names are:
     Upstream metadata cannot be added to request headers as the upstream host has not been selected
     when custom request headers are generated.
 
-%REQUEST_METADATA(["namespace", "key", ...])%
+%DYNAMIC_METADATA(["namespace", "key", ...])%
     Similar to UPSTREAM_METADATA, populates the header with dynamic metadata available in a request
     (e.g.: added by filters like the header-to-metadata filter).
 

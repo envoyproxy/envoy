@@ -346,9 +346,9 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     };
   } else if (absl::StartsWith(field_name, "UPSTREAM_METADATA")) {
     field_extractor_ = parseMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
-  } else if (absl::StartsWith(field_name, "REQUEST_METADATA")) {
+  } else if (absl::StartsWith(field_name, "DYNAMIC_METADATA")) {
     field_extractor_ =
-        parseMetadataField(field_name.substr(STATIC_STRLEN("REQUEST_METADATA")), false);
+        parseMetadataField(field_name.substr(STATIC_STRLEN("DYNAMIC_METADATA")), false);
   } else if (absl::StartsWith(field_name, "PER_REQUEST_STATE")) {
     field_extractor_ =
         parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));

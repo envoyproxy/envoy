@@ -627,7 +627,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestMetadata) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
-  testFormatting(stream_info, "REQUEST_METADATA([\"envoy.lb\", \"foo\"])", "bar");
+  testFormatting(stream_info, "DYNAMIC_METADATA([\"envoy.lb\", \"foo\"])", "bar");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
