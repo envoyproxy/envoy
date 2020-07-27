@@ -134,6 +134,27 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
         parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
       })) {}
 
+ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProviderHelper(
+    ScopedRdsConfigSubscription& parent, std::string scope_name,
+    envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds)
+    : parent_(parent), scope_name_(scope_name), rds_(rds) {}
+
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdateCallback(
+    std::function<void()> callback) {
+  if (routeConfig()) {
+    callback();
+    return;
+  }
+  on_demand_update_callbacks_.push_back(callback);
+}
+
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::runOnDemandUpdateCallback() {
+  for (auto& callback : on_demand_update_callbacks_) {
+    callback();
+  }
+  on_demand_update_callbacks_.clear();
+}
+
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
     const std::string& version_info, std::vector<std::string>& exception_msgs) {
@@ -301,6 +322,7 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
     thread_local_scoped_config->addOrUpdateRoutingScope(new_scoped_route_info);
     return config;
   });
+  route_provider_by_scope_[scope_name]->runOnDemandUpdateCallback();
 }
 
 // TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
@@ -341,6 +363,24 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     *to_remove_repeated.Add() = scoped_route.first;
   }
   onConfigUpdate(resources, to_remove_repeated, version_info);
+}
+
+void ScopedRdsConfigSubscription::onDemandRdsUpdate(
+    uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  auto iter = scope_name_by_hash_.find(key_hash);
+  if (iter == scope_name_by_hash_.end()) {
+    (*route_config_updated_cb)(false);
+    return;
+  }
+  std::function<void()> thread_local_updated_callback = [route_config_updated_cb,
+                                                         &thread_local_dispatcher]() {
+    thread_local_dispatcher.post([route_config_updated_cb] { (*route_config_updated_cb)(true); });
+  };
+  std::string scope_name = iter->second;
+  factory_context_.dispatcher().post([this, thread_local_updated_callback, scope_name]() {
+    route_provider_by_scope_[scope_name]->addOnDemandUpdateCallback(thread_local_updated_callback);
+  });
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(

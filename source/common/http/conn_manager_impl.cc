@@ -525,10 +525,18 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
-    uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  scoped_route_config_provider_->requestRdsUpdate(key_hash, thread_local_dispatcher,
-                                                  std::move(route_config_updated_cb));
+    uint64_t key_hash, Event::Dispatcher&, Http::RouteConfigUpdatedCallbackSharedPtr) {
+  /*
+  Router::ScopedRdsConfigProvider* scoped_route_config_provider =
+      dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider_);
+  scoped_route_config_provider->subscription->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
+                                                                route_config_updated_cb);
+                                                                */
+  int x = 1, y = 2;
+  if (scoped_route_config_provider_->config<Router::ScopedConfig>() == nullptr) {
+    x += y;
+    x = key_hash;
+  }
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
@@ -1546,8 +1554,15 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
   } else if (snapped_scoped_routes_config_ != nullptr) {
     uint64_t key_hash = snapped_scoped_routes_config_->computeKeyHash(*request_headers_);
     if (snapped_scoped_routes_config_->scopeExistsButNotLoaded(key_hash)) {
+      Http::RouteConfigUpdatedCallbackSharedPtr scoped_route_config_updated_cb =
+          std::make_shared<Http::RouteConfigUpdatedCallback>(
+              [this, route_config_updated_cb](bool route_exist) {
+                if (route_exist)
+                  refreshCachedRoute();
+                (*route_config_updated_cb)(route_exist);
+              });
       route_config_update_requester_->requestSrdsUpdate(key_hash, thread_local_dispatcher,
-                                                        std::move(route_config_updated_cb));
+                                                        scoped_route_config_updated_cb);
     } else {
       (*route_config_updated_cb)(false);
       return;
