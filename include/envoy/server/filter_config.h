@@ -90,9 +90,9 @@ public:
    * @param validation_visitor message validation visitor instance.
    * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
    */
-  virtual Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsConfig(
-      const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context) {
+  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& config,
+                              ProtocolOptionsFactoryContext& factory_context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(factory_context);
     throw EnvoyException("not implemented");

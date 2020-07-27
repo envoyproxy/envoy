@@ -262,6 +262,11 @@ public:
   virtual const Network::ListenerConfig& listenerConfig() const PURE;
 };
 
+/**
+ * FactoryContext for ProtocolOptionsFactory.
+ */
+using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFactoryContext;
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

@@ -139,7 +139,7 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             const ProtobufWkt::Struct& config,
-                            Server::Configuration::TransportSocketFactoryContext& factory_context) {
+                            Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           name);
@@ -168,7 +168,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
 
 std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
     const envoy::config::cluster::v3::Cluster& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+    Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   if (!config.typed_extension_protocol_options().empty() &&
       !config.hidden_envoy_deprecated_extension_protocol_options().empty()) {
     throw EnvoyException("Only one of typed_extension_protocol_options or "

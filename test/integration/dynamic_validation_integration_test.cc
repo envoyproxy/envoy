@@ -40,7 +40,7 @@ private:
 
   Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsTyped(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy&,
-                             Server::Configuration::TransportSocketFactoryContext&) override {
+                             Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return nullptr;
   }
 };

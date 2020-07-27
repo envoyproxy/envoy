@@ -53,7 +53,7 @@ private:
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
       const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions&
           proto_config,
-      Server::Configuration::TransportSocketFactoryContext&) override {
+      Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
 };

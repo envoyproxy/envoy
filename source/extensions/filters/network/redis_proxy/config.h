@@ -78,7 +78,7 @@ private:
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions&
           proto_config,
-      Server::Configuration::TransportSocketFactoryContext&) override {
+      Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
 };
