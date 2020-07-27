@@ -183,8 +183,11 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
   OpCodes opcode;
 
   if (xid_code != XidCodes::WatchXid) {
-    // If this fails, it's a server-side bug.
-    ASSERT(it != requests_by_xid_.end());
+    // If this fails, it's either a server-side bug or a malformed packet.
+    if (it == requests_by_xid_.end()) {
+      throw EnvoyException("xid not found");
+    }
+
     latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_source_.monotonicTime() -
                                                                     it->second.start_time);
     opcode = it->second.opcode;
