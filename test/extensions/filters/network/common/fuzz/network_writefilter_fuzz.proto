@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package test.extensions.filters.network;
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+import "envoy/config/listener/v3/listener_components.proto";
+
+message OnData {
+  bytes data = 1;
+  bool end_stream = 2;
+}
+
+message WriteAction {
+  oneof action_selector {
+    option (validate.required) = true;
+    // Call onData()
+    OnData on_write = 2;
+  }
+}
+
+message FilterFuzzTestCase {
+  // This is actually a protobuf type for the config of network filters.
+  envoy.config.listener.v3.Filter config = 1;
+  repeated WriteAction actions = 2;
+}

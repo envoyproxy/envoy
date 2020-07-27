@@ -40,8 +40,8 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
       NetworkFilterNames::get().HttpConnectionManager,
       NetworkFilterNames::get().SniDynamicForwardProxy,
       NetworkFilterNames::get().KafkaBroker,
-      NetworkFilterNames::get().RocketmqProxy, // fix the assert
-      NetworkFilterNames::get().RateLimit,     // ratelimit
+      NetworkFilterNames::get().RocketmqProxy, // need to fix the assert
+      NetworkFilterNames::get().RateLimit,
       NetworkFilterNames::get().Rbac
 
       // mongo_proxy
