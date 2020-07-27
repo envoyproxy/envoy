@@ -18,7 +18,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -102,7 +102,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -122,14 +122,24 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
           "connect_timeout": "0.01s",
           "per_connection_buffer_limit_bytes": 8192,
           "lb_policy": "round_robin",
-          "hosts": [
-            {
-              "socket_address" : {
-                "address": "127.0.0.1",
-                "port_value": 9999
+          "load_assignment": {
+    "endpoints": [
+      {
+        "lb_endpoints": [
+          {
+            "endpoint": {
+              "address": {
+                "socket_address": {
+                  "address": "127.0.0.1",
+                  "port_value": 9999
+                }
               }
             }
-          ]
+          }
+        ]
+      }
+    ]
+  }
         }
       ]
     },
@@ -145,7 +155,7 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -189,7 +199,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -229,7 +239,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -281,7 +291,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
@@ -307,7 +317,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
@@ -338,7 +348,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   envoy::config::metrics::v3::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
@@ -368,7 +378,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   bootstrap.mutable_stats_sinks()->Add();
 
@@ -397,7 +407,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   udpa::type::v1::TypedStruct typed_struct;
@@ -530,7 +540,7 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   InitialImpl config(bootstrap);
   Network::MockListenSocket socket_mock;
 
@@ -616,7 +626,7 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(
@@ -722,7 +732,7 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(

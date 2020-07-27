@@ -14,6 +14,7 @@ import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -39,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 24]
+// [#next-free-field: 26]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -222,6 +223,17 @@ message Bootstrap {
   // other resolution fails.
   // [#not-implemented-hide:]
   core.v3.ConfigSource default_config_source = 23;
+
+  // Optional overriding of default socket interface. The value must be the name of one of the
+  // socket interface factories initialized through a bootstrap extension
+  string default_socket_interface = 24;
+
+  // Global map of CertificateProvider instances. These instances are referred to by name in the
+  // :ref:`CommonTlsContext.CertificateProviderInstance.instance_name
+  // <envoy_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProviderInstance.instance_name>`
+  // field.
+  // [#not-implemented-hide:]
+  map<string, core.v3.TypedExtensionConfig> certificate_provider_instances = 25;
 }
 
 // Administration interface :ref:`operations documentation
@@ -293,6 +305,7 @@ message ClusterManager {
 // Envoy process watchdog configuration. When configured, this monitors for
 // nonresponsive threads and kills the process after the configured thresholds.
 // See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
+// [#next-free-field: 6]
 message Watchdog {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Watchdog";
 
@@ -310,10 +323,16 @@ message Watchdog {
   // kill behavior. If not specified the default is 0 (disabled).
   google.protobuf.Duration kill_timeout = 3;
 
-  // If at least two watched threads have been nonresponsive for at least this
-  // duration assume a true deadlock and kill the entire Envoy process. Set to 0
-  // to disable this behavior. If not specified the default is 0 (disabled).
+  // If max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))
+  // threads have been nonresponsive for at least this duration kill the entire
+  // Envoy process. Set to 0 to disable this behavior. If not specified the
+  // default is 0 (disabled).
   google.protobuf.Duration multikill_timeout = 4;
+
+  // Sets the threshold for *multikill_timeout* in terms of the percentage of
+  // nonresponsive threads required for the *multikill_timeout*.
+  // If not specified the default is 0.
+  type.v3.Percent multikill_threshold = 5;
 }
 
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).

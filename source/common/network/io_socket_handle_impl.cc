@@ -245,11 +245,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
   output.msg_[0].peer_address_ = getAddressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
+  output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
-    // Get overflow, local address from control message.
+    // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+
       if (output.msg_[0].local_address_ == nullptr) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port, fd_);
         if (addr != nullptr) {
@@ -262,10 +264,17 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
           *output.dropped_packets_ = *maybe_dropped;
+          continue;
         }
       }
+#ifdef UDP_GRO
+      if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
+        output.msg_[0].gso_size_ = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
+      }
+#endif
     }
   }
+
   return sysCallResultToIoCallResult(result);
 }
 
@@ -366,6 +375,10 @@ bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
 
+bool IoSocketHandleImpl::supportsUdpGro() const {
+  return Api::OsSysCallsSingleton::get().supportsUdpGro();
+}
+
 Api::SysCallIntResult IoSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
   return Api::OsSysCallsSingleton::get().bind(fd_, address->sockAddr(), address->sockAddrLen());
 }
@@ -417,24 +430,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  int socket_v6only = 0;
-  if (ss.ss_family == AF_INET6) {
-    socklen_t size_int = sizeof(socket_v6only);
-    result = os_sys_calls.getsockopt(fd_, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int);
-#ifdef WIN32
-    // On Windows, it is possible for this getsockopt() call to fail.
-    // This can happen if the address we are trying to connect to has nothing
-    // listening. So we can't use RELEASE_ASSERT and instead must throw an
-    // exception
-    if (SOCKET_FAILURE(result.rc_)) {
-      throw EnvoyException(fmt::format("getsockopt failed for '{}': ({}) {}", fd_, result.errno_,
-                                       errorDetails(result.errno_)));
-    }
-#else
-    RELEASE_ASSERT(result.rc_ == 0, "");
-#endif
-  }
-  return Address::addressFromSockAddr(ss, ss_len, socket_v6only);
+  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {

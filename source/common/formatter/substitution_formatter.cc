@@ -424,7 +424,7 @@ public:
   }
 
 private:
-  absl::optional<uint32_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
+  absl::optional<int64_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
     const auto time = field_extractor_(stream_info);
     if (time) {
       return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
@@ -715,6 +715,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
         [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.sha256PeerCertificateDigest();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_1") {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.sha1PeerCertificateDigest();
         });
   } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
     field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(

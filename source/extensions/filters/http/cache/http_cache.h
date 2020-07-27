@@ -14,6 +14,8 @@
 
 #include "source/extensions/filters/http/cache/key.pb.h"
 
+#include "extensions/filters/http/cache/cache_headers_utils.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -162,6 +164,8 @@ public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp);
 
+  const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
+
   // Caches may modify the key according to local needs, though care must be
   // taken to ensure that meaningfully distinct responses have distinct keys.
   const Key& key() const { return key_; }
@@ -179,7 +183,7 @@ public:
                                 uint64_t content_length) const;
 
 private:
-  bool isFresh(const Http::ResponseHeaderMap& response_headers) const;
+  bool requiresValidation(const Http::ResponseHeaderMap& response_headers) const;
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
@@ -191,7 +195,8 @@ private:
   // headers, that server may need to see these headers. For local implementations, it may be
   // simpler to instead call makeLookupResult with each potential response.
   HeaderVector vary_headers_;
-  const std::string request_cache_control_;
+
+  const RequestCacheControl request_cache_control_;
 };
 
 // Statically known information about a cache.
@@ -214,7 +219,7 @@ public:
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
   // data into cache too fast for the cache to handle, clients should wait for
-  // the cache to call ready_for_next_chunk() before streaming the next chunk.
+  // the cache to call readyForNextChunk() before streaming the next chunk.
   //
   // The client can abort the streaming insertion by dropping the
   // InsertContextPtr. A cache can abort the insertion by passing 'false' into
