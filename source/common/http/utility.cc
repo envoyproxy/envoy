@@ -1,4 +1,4 @@
-#include "common/common/utility.h"
+#include "common/http/utility.h"
 
 #include <cstdint>
 #include <string>
@@ -13,12 +13,12 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/grpc/status.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
-#include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
