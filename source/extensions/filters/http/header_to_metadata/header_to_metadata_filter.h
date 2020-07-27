@@ -30,6 +30,7 @@ public:
   /**
    * Called to extract the value of a given header or cookie.
    * @param http header map.
+   * @return absl::optional<std::string> the extracted header or cookie.
    */
   virtual absl::optional<std::string> extract(Http::HeaderMap& map) const PURE;
 

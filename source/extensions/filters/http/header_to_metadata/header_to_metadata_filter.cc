@@ -22,12 +22,12 @@ namespace HeaderToMetadataFilter {
 absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) const {
   const Http::HeaderEntry* header_entry = map.get(header_);
   if (header_entry == nullptr) {
-    return absl::nullopt; // no value
+    return absl::nullopt;
   }
   // Catch the value in the header before removing.
   absl::optional<std::string> value = std::string(header_entry->value().getStringView());
   if (remove_) {
-    map.remove(header_); // remove the header
+    map.remove(header_);
   }
   return value;
 }
@@ -38,7 +38,7 @@ absl::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) c
   if (!value.empty()) {
     return absl::optional<std::string>(value);
   }
-  return absl::nullopt; // no value
+  return absl::nullopt;
 }
 
 Rule::Rule(const ProtoRule& rule) : rule_(rule) {
@@ -164,10 +164,9 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     return false;
   }
 
-  std::string decodedValue = value;
   if (encode == envoy::extensions::filters::http::header_to_metadata::v3::Config::BASE64) {
-    decodedValue = Base64::decodeWithoutPadding(value);
-    if (decodedValue.empty()) {
+    value = Base64::decodeWithoutPadding(value);
+    if (value.empty()) {
       ENVOY_LOG(debug, "Base64 decode failed");
       return false;
     }
@@ -176,11 +175,11 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   // Sane enough, add the key/value.
   switch (type) {
   case envoy::extensions::filters::http::header_to_metadata::v3::Config::STRING:
-    val.set_string_value(std::move(decodedValue));
+    val.set_string_value(std::move(value));
     break;
   case envoy::extensions::filters::http::header_to_metadata::v3::Config::NUMBER: {
     double dval;
-    if (absl::SimpleAtod(StringUtil::trim(decodedValue), &dval)) {
+    if (absl::SimpleAtod(StringUtil::trim(value), &dval)) {
       val.set_number_value(dval);
     } else {
       ENVOY_LOG(debug, "value to number conversion failed");
@@ -189,7 +188,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     break;
   }
   case envoy::extensions::filters::http::header_to_metadata::v3::Config::PROTOBUF_VALUE: {
-    if (!val.ParseFromString(decodedValue)) {
+    if (!val.ParseFromString(value)) {
       ENVOY_LOG(debug, "parse from decoded string failed");
       return false;
     }

@@ -47,7 +47,7 @@ absence of a version header could be:
 
 As with headers, the value of the specified cookie will be extracted from the request
 and added as metadata with the key specified.
-`remove: true` is unsupported for cookie.
+Removing a cookie when a rule matches is unsupported.
 
 .. code-block:: yaml
 

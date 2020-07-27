@@ -90,8 +90,7 @@ message Config {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
 
-    // Specifies that one of the header or cookie match will be performed on
-    // the value of the header or cookie.
+    // Specifies that a match will be performed on the value of a header or a cookie.
     //
     // The header to be extracted.
     string header = 1 [
