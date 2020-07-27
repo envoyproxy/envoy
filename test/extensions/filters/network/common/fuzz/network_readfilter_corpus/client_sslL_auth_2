@@ -1,0 +1,47 @@
+config {
+  name: "envoy.filters.network.client_ssl_auth"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth"
+    value: "\n\010\177\177_p\000O\002@\022\007x-clien"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 524288
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 524288
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 524288
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+    data: "ppu"
+    end_stream: true
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 524288
+  }
+}
+actions {
+  on_data {
+    data: "type.googleapis.com/envoy.extensions.filters.network.client_ssl_auth.v3.ClientSSLAuth"
+    end_stream: true
+  }
+}
