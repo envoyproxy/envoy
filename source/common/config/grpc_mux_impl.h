@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <queue>
 #include <unordered_map>
@@ -41,8 +42,6 @@ public:
   // GrpcMux
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
-  bool paused(const std::string& type_url) const override;
-  bool paused(const std::vector<std::string> type_urls) const override;
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
@@ -50,8 +49,6 @@ public:
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
-
-  void sendDiscoveryRequest(const std::string& type_url);
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
@@ -70,6 +67,7 @@ public:
 private:
   void drainRequests();
   void setRetryTimer();
+  void sendDiscoveryRequest(const std::string& type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
@@ -83,14 +81,14 @@ private:
     ~GrpcMuxWatchImpl() override {
       watches_.remove(this);
       if (!resources_.empty()) {
-        parent_.sendDiscoveryRequest(type_url_);
+        parent_.queueDiscoveryRequest(type_url_);
       }
     }
 
     void update(const std::set<std::string>& resources) override {
       watches_.remove(this);
       if (!resources_.empty()) {
-        parent_.sendDiscoveryRequest(type_url_);
+        parent_.queueDiscoveryRequest(type_url_);
       }
       resources_ = resources;
       // move this watch to the beginning of the list
@@ -110,12 +108,14 @@ private:
 
   // Per muxed API state.
   struct ApiState {
+    bool paused() const { return pauses_ > 0; }
+
     // Watches on the returned resources for the API;
     std::list<GrpcMuxWatchImpl*> watches_;
     // Current DiscoveryRequest for API.
     envoy::service::discovery::v3::DiscoveryRequest request_;
-    // Paused via pause()?
-    bool paused_{};
+    // Count of unresumed pause() invocations.
+    uint32_t pauses_{};
     // Was a DiscoveryRequest elided during a pause?
     bool pending_{};
     // Has this API been tracked in subscriptions_?
@@ -138,7 +138,7 @@ private:
   // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
   // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
   // This string is a type URL.
-  std::queue<std::string> request_queue_;
+  std::unique_ptr<std::queue<std::string>> request_queue_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
@@ -155,8 +155,6 @@ public:
   ScopedResume pause(const std::vector<std::string>) override {
     return std::make_unique<Cleanup>([] {});
   }
-  bool paused(const std::string&) const override { return false; }
-  bool paused(const std::vector<std::string>) const override { return false; }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
                            OpaqueResourceDecoder&) override {
