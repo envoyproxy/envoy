@@ -90,8 +90,8 @@ TEST(XdsVerifier, UpdateWarmingListener) {
   XdsVerifier verifier(test::server::config_validation::Config::SOTW);
   verifier.listenerAdded(buildListener("listener_0", "route_config_0"));
   verifier.listenerUpdated(buildListener("listener_0", "route_config_1"));
-  // the new listener should just silently delete the old since it's warming
-  EXPECT_EQ(verifier.numModified(), 0);
+  // the new listener should directly replace the old listener since it's warming
+  EXPECT_EQ(verifier.numModified(), 1);
   EXPECT_EQ(verifier.numAdded(), 1);
 
   // send the route for the old listener, which should have been replaced with the update
