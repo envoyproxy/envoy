@@ -97,13 +97,12 @@ public:
    * Obtain platform specific new line character(s)
    * @return absl::string_view platform specific new line character(s)
    */
-  static constexpr absl::string_view newLine() {
+  static constexpr absl::string_view newLine
 #ifdef WIN32
-    return {"\r\n", 2};
+    {"\r\n"};
 #else
-    return {"\n", 2};
+    {"\n"};
 #endif
-  }
 
   /**
    * Obtain read-only test input data directory.
