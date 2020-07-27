@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "envoy/server/configuration.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
