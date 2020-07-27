@@ -186,7 +186,7 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseDataBadResponderIdVariantTest) {
       0,
       1,
       0,
-      // Invalid Responeder ID tag 3
+      // Invalid Responder ID tag 3
       3,
       1,
       0,

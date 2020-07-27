@@ -15,6 +15,7 @@ API
 ARN
 ASAN
 ASCII
+ASN
 ASSERTs
 AST
 AWS
@@ -67,6 +68,7 @@ DNS
 DQUOTE
 DRYs
 DS
+DSA
 DST
 DW
 EADDRINUSE
@@ -119,6 +121,7 @@ GCE
 GCM
 GCOVR
 GCP
+GENERALIZEDTIME
 GETting
 GLB
 GOAWAY
@@ -210,6 +213,7 @@ NUL
 Nilsson
 Nonhashable
 OCSP
+OID
 OK
 OOM
 OOMs
@@ -417,8 +421,10 @@ bazel
 behaviour
 benchmarked
 bidi
+bignum
 bitfield
 bitset
+bitstring
 bitwise
 blackhole
 blackholed
@@ -437,6 +443,7 @@ bulkstrings
 bursty
 bytecode
 bytestream
+bytestring
 cacheable
 cacheability
 callee
@@ -807,6 +814,7 @@ num
 numkeys
 observability
 ocagent
+octetstring
 offsetof
 oneof
 oneway

@@ -12,7 +12,7 @@
 #include "openssl/ssl.h"
 
 /**
- * Data structures and functions for unmarshalling OCSP responses
+ * Data structures and functions for unmarshaling OCSP responses
  * according to the RFC6960 B.2 spec. See: https://tools.ietf.org/html/rfc6960#appendix-B
  */
 
@@ -245,22 +245,22 @@ using OcspResponseWrapperPtr = std::unique_ptr<OcspResponseWrapper>;
  * ASN.1 DER-encoded parsing functions similar to Asn1Utility but specifically
  * for structures related to OCSP.
  *
- * Each function must advance |cbs| across the element it refers to.
+ * Each function must advance `cbs` across the element it refers to.
  */
 class Asn1OcspUtility {
 public:
   /**
    * @param cbs a CBS& that refers to an ASN.1 OcspResponse element
-   * @returns std::unique_ptr<OcspResponse> the OCSP response encoded in |cbs|
-   * @throws Envoy::EnvoyException if |cbs| does not contain a well-formed OcspResponse
+   * @returns std::unique_ptr<OcspResponse> the OCSP response encoded in `cbs`
+   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed OcspResponse
    * element.
    */
   static std::unique_ptr<OcspResponse> parseOcspResponse(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 OcspResponseStatus element
-   * @returns OcspResponseStatus the OCSP response encoded in |cbs|
-   * @throws Envoy::EnvoyException if |cbs| does not contain a well-formed
+   * @returns OcspResponseStatus the OCSP response encoded in `cbs`
+   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * OcspResponseStatus element.
    */
   static OcspResponseStatus parseResponseStatus(CBS& cbs);
@@ -268,7 +268,7 @@ public:
   /**
    * @param cbs a CBS& that refers to an ASN.1 Response element
    * @returns Response containing the content of an OCSP response
-   * @throws Envoy::EnvoyException if |cbs| does not contain a well-formed
+   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * structure that is a valid Response type.
    */
   static ResponsePtr parseResponseBytes(CBS& cbs);
@@ -276,7 +276,7 @@ public:
   /**
    * @param cbs a CBS& that refers to an ASN.1 BasicOcspResponse element
    * @returns BasicOcspResponse containing the content of an OCSP response
-   * @throws Envoy::EnvoyException if |cbs| does not contain a well-formed
+   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * BasicOcspResponse element.
    */
   static std::unique_ptr<BasicOcspResponse> parseBasicOcspResponse(CBS& cbs);
@@ -285,7 +285,7 @@ public:
    * @param cbs a CBS& that refers to an ASN.1 ResponseData element
    * @returns ResponseData containing the content of an OCSP response relating
    * to certificate statuses.
-   * @throws Envoy::EnvoyException if |cbs| does not contain a well-formed
+   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * ResponseData element.
    */
   static ResponseData parseResponseData(CBS& cbs);
@@ -294,7 +294,7 @@ public:
    * @param cbs a CBS& that refers to an ASN.1 SingleResponse element
    * @returns SingleResponse containing the id and revocation status of
    * a single certificate.
-   * @throws Envoy::EnvoyException if |cbs| does not contain a well-formed
+   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * SingleResponse element.
    */
   static SingleResponse parseSingleResponse(CBS& cbs);
@@ -303,7 +303,7 @@ public:
    * @param cbs a CBS& that refers to an ASN.1 CertId element
    * @returns CertId containing the information necessary to uniquely identify
    * an SSL certificate.
-   * @throws Envoy::EnvoyException if |cbs| does not contain a well-formed
+   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * CertId element.
    */
   static CertId parseCertId(CBS& cbs);
@@ -311,7 +311,7 @@ public:
   /**
    * @param cbs a CBS& that refers to an ASN.1 CertStatus element
    * @returns CertStatus the revocation status of a given certificate.
-   * @throws Envoy::EnvoyException if |cbs| does not contain a well-formed
+   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * CertStatus element.
    */
   static CertStatus parseCertStatus(CBS& cbs);

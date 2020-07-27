@@ -264,7 +264,7 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
 CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
   // CertID ::= SEQUENCE {
   //    hashAlgorithm       AlgorithmIdentifier,
-  //    issuerNameHash      OCTET STRING, -- Hash of issuer's DN
+  //    issuerNameHash      OCTET STRING, -- Hash of issuer's `DN`
   //    issuerKeyHash       OCTET STRING, -- Hash of issuer's public key
   //    serialNumber        CertificateSerialNumber
   // }
