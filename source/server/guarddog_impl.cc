@@ -51,7 +51,6 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
               .statName())),
       events_to_actions_([&](const Server::Configuration::Main& config) -> EventToActionsMap {
         EventToActionsMap map;
-
         Configuration::GuardDogActionFactoryContext context = {api};
 
         const auto& actions = config.wdActions();
