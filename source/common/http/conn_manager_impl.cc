@@ -1546,25 +1546,27 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
   Event::Dispatcher& thread_local_dispatcher =
       connection_manager_.read_callbacks_->connection().dispatcher();
   if (route_config.has_value() && route_config.value()->usesVhds()) {
+    // On demand vhds
     ASSERT(!request_headers_->Host()->value().empty());
     const auto& host_header = absl::AsciiStrToLower(request_headers_->getHostValue());
     route_config_update_requester_->requestVhdsUpdate(host_header, thread_local_dispatcher,
                                                       std::move(route_config_updated_cb));
     return;
   } else if (snapped_scoped_routes_config_ != nullptr) {
+    // On demand srds
     uint64_t key_hash = snapped_scoped_routes_config_->computeKeyHash(*request_headers_);
     if (snapped_scoped_routes_config_->scopeExistsButNotLoaded(key_hash)) {
       Http::RouteConfigUpdatedCallbackSharedPtr scoped_route_config_updated_cb =
           std::make_shared<Http::RouteConfigUpdatedCallback>(
               [this, route_config_updated_cb](bool route_exist) {
-                if (route_exist)
+                // Refresh the route before continue the filter chain.
+                if (route_exist) {
                   refreshCachedRoute();
+                }
                 (*route_config_updated_cb)(route_exist);
               });
       route_config_update_requester_->requestSrdsUpdate(key_hash, thread_local_dispatcher,
                                                         scoped_route_config_updated_cb);
-    } else {
-      (*route_config_updated_cb)(false);
       return;
     }
   }

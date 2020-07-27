@@ -142,6 +142,8 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
 
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdateCallback(
     std::function<void()> callback) {
+  // If route table has been initialized, run the callback to continue in filter chain, otherwise
+  // cache it and wait for the route table to be initialized.
   if (routeConfig()) {
     callback();
     return;
@@ -406,11 +408,13 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
     (*route_config_updated_cb)(false);
     return;
   }
+  // Wrap the thread local dispatcher inside the callback.
   std::function<void()> thread_local_updated_callback = [route_config_updated_cb,
                                                          &thread_local_dispatcher]() {
     thread_local_dispatcher.post([route_config_updated_cb] { (*route_config_updated_cb)(true); });
   };
   std::string scope_name = iter->second;
+  // On demand initialization inside main thread.
   factory_context_.dispatcher().post([this, thread_local_updated_callback, scope_name]() {
     route_provider_by_scope_[scope_name]->addOnDemandUpdateCallback(thread_local_updated_callback);
   });
