@@ -422,7 +422,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
 
 TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfFalse) {
   initialize();
-  
+
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
@@ -436,7 +436,7 @@ TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfFalse) {
 TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfTrue) {
   stream_error_on_invalid_http_messaging_ = true;
   initialize();
-  
+
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));

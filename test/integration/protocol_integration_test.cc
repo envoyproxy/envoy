@@ -1167,6 +1167,76 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
   }
 }
 
+TEST_P(DownstreamProtocolIntegrationTest,
+       Http1ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIsTrue) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(false);
+        hcm.mutable_http_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest,
+       Http1ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNotSet) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_FALSE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest,
+       Http1ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverrideNotSet) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_stream_error_on_invalid_http_message()->set_value(false);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/test/long/url"}, {"content-length", "0"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
   config_helper_.addConfigModifier(
