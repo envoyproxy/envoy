@@ -4,7 +4,7 @@ import Foundation
 @objcMembers
 public final class ResponseHeadersBuilder: HeadersBuilder {
   /// Initialize a new instance of the builder.
-  public convenience init() {
+  public override convenience init() {
     self.init(headers: [:])
   }
 
