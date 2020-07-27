@@ -42,7 +42,7 @@ public:
   const std::string& body() { return body_; }
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
-  Http::StreamResetReason reset_reason() { return reset_reason_; }
+  Http::StreamResetReason resetReason() { return reset_reason_; }
   const Http::ResponseHeaderMap* continueHeaders() { return continue_headers_.get(); }
   const Http::ResponseHeaderMap& headers() { return *headers_; }
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
