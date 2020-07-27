@@ -150,6 +150,15 @@ public:
   }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    return wrapped_scope_->iterate(fn);
+  }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return wrapped_scope_->iterate(fn);
+  }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
@@ -333,10 +342,16 @@ public:
     return store_.textReadouts();
   }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
+
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}
   void setStatsMatcher(StatsMatcherPtr&&) override {}
+  void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}

@@ -102,6 +102,7 @@ def envoy_cc_fuzz_test(
         name = test_lib_name,
         deps = deps + envoy_stdlib_deps() + [
             repository + "//test/fuzz:fuzz_runner_lib",
+            repository + "//test/test_common:test_version_linkstamp",
         ],
         repository = repository,
         tags = tags,
@@ -179,6 +180,7 @@ def envoy_cc_test(
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
             repository + "//test:main",
+            repository + "//test/test_common:test_version_linkstamp",
         ],
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
@@ -232,16 +234,21 @@ def envoy_cc_test_library(
 def envoy_cc_test_binary(
         name,
         tags = [],
+        deps = [],
         **kargs):
     envoy_cc_binary(
         name,
         testonly = 1,
         linkopts = _envoy_test_linkopts(),
         tags = tags + ["compilation_db_dep"],
+        deps = deps + [
+            "@envoy//test/test_common:test_version_linkstamp",
+        ],
         **kargs
     )
 
-# Envoy benchmark binaries should be specified with this function.
+# Envoy benchmark binaries should be specified with this function. bazel run
+# these targets to measure performance.
 def envoy_cc_benchmark_binary(
         name,
         deps = [],
@@ -252,7 +259,9 @@ def envoy_cc_benchmark_binary(
         **kargs
     )
 
-# Tests to validate that Envoy benchmarks run successfully should be specified with this function.
+# Tests to validate that Envoy benchmarks run successfully should be specified
+# with this function. Not for actual performance measurements: iteratons and
+# expensive benchmarks will be skipped in the interest of execution time.
 def envoy_benchmark_test(
         name,
         benchmark_binary,

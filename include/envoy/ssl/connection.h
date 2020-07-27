@@ -48,6 +48,12 @@ public:
   virtual const std::string& sha256PeerCertificateDigest() const PURE;
 
   /**
+   * @return std::string the SHA1 digest of the peer certificate. Returns "" if there is no peer
+   *         certificate which can happen in TLS (non mTLS) connections.
+   */
+  virtual const std::string& sha1PeerCertificateDigest() const PURE;
+
+  /**
    * @return std::string the serial number field of the peer certificate. Returns "" if
    *         there is no peer certificate, or no serial number.
    **/

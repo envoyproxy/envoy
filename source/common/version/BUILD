@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_basic_cc_library",
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_boringssl",
@@ -14,11 +15,12 @@ genrule(
     srcs = ["//:VERSION"],
     outs = ["version_number.h"],
     cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
+    visibility = ["//visibility:private"],
 )
 
 genrule(
     name = "generate_version_linkstamp",
-    outs = ["lib/version_linkstamp.h"],
+    outs = ["manual_linkstamp.cc"],
     cmd = select({
         # Only iOS builds typically follow this logic, OS/X is built as a normal binary
         "//bazel:apple": "$(location :generate_version_linkstamp.sh) Library >> $@",
@@ -29,12 +31,7 @@ genrule(
     # Used here because generate_version_linkstamp.sh depends on the workspace status files.
     stamp = 1,
     tools = [":generate_version_linkstamp.sh"],
-)
-
-genrule(
-    name = "generate_version_linkstamp_empty",
-    outs = ["empty/version_linkstamp.h"],
-    cmd = """>$@""",
+    visibility = ["//visibility:private"],
 )
 
 envoy_cc_library(
@@ -52,24 +49,35 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
-    hdrs = select({
-        "//bazel:manual_stamp": [":generate_version_linkstamp"],
-        # By default the header file is empty.
-        # This is done so that the definitions linked via the linkstamp rule don't cause collisions.
-        "//conditions:default": [":generate_version_linkstamp_empty"],
-    }),
     copts = envoy_select_boringssl(
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
     ),
-    linkstamp = "version_linkstamp.cc",
-    strip_include_prefix = select({
-        "//bazel:manual_stamp": "lib",
-        "//conditions:default": "empty",
-    }),
     deps = [
         ":version_includes",
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
     ],
+)
+
+envoy_basic_cc_library(
+    name = "manual_version_linkstamp",
+    srcs = [":generate_version_linkstamp"],
+    visibility = ["//visibility:private"],
+)
+
+envoy_basic_cc_library(
+    name = "version_linkstamp",
+    linkstamp = select({
+        "//bazel:manual_stamp": None,
+        "//conditions:default": "version_linkstamp.cc",
+    }),
+    # Linking this library makes build cache inefficient, limiting this to //source/exe package only.
+    # Tests are linked with //test/test_common:test_version_linkstamp.
+    visibility = ["//source/exe:__pkg__"],
+    deps = select({
+        "//bazel:manual_stamp": [":manual_version_linkstamp"],
+        "//conditions:default": [],
+    }),
+    alwayslink = 1,
 )
