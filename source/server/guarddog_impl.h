@@ -102,10 +102,10 @@ private:
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
 
-  using WatchDogEvent = envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent;
+  using WatchDogAction = envoy::config::bootstrap::v3::Watchdog::WatchdogAction;
   // Helper function to invoke all the GuardDogActions registered for an Event.
   void
-  invokeGuardDogActions(WatchDogEvent event,
+  invokeGuardDogActions(WatchDogAction::WatchdogEvent event,
                         std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
                         MonotonicTime now);
 
@@ -133,8 +133,8 @@ private:
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
-  using EventToActionsMap =
-      std::unordered_map<WatchDogEvent, std::vector<Configuration::GuardDogActionPtr>>;
+  using EventToActionsMap = std::unordered_map<WatchDogAction::WatchdogEvent,
+                                               std::vector<Configuration::GuardDogActionPtr>>;
   EventToActionsMap events_to_actions_;
   std::vector<WatchedDogPtr> watched_dogs_ ABSL_GUARDED_BY(wd_lock_);
   Thread::MutexBasicLockable wd_lock_;
