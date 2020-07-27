@@ -401,8 +401,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   if (filter_chain_rebuild_info_.find(filter_chain) != filter_chain_rebuild_info_.end()) {
     // this filter chain is under rebuilding, ignore this connection. There will be reconnection
-    // what if multiple sockets are requesting the same filterchain??
-    // the current hashmap<filter_chain, FilterChainRebuildInfo> only contains one socket
+    // what if multiple sockets are requesting the same filter chain??
+    // the current hash map<filter_chain, FilterChainRebuildInfo> only contains one socket
     // reconnection.. option 1: return
   }
 
