@@ -107,8 +107,8 @@ envoy_cc_test(
     srcs = ["log_macros_test.cc"],
     external_deps = ["benchmark"],
     deps = [
-        "//source/common/common:minimal_logger_lib",
         "//source/common/common:fancy_logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
