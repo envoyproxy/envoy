@@ -42,6 +42,7 @@ public:
   MOCK_METHOD(bool, peerCertificateValidated, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, sha256PeerCertificateDigest, (), (const));
+  MOCK_METHOD(const std::string&, sha1PeerCertificateDigest, (), (const));
   MOCK_METHOD(const std::string&, serialNumberPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, issuerPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, subjectPeerCertificate, (), (const));

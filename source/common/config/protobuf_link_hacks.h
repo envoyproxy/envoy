@@ -13,6 +13,7 @@
 #include "envoy/service/discovery/v2/sds.pb.h"
 #include "envoy/service/discovery/v3/ads.pb.h"
 #include "envoy/service/endpoint/v3/eds.pb.h"
+#include "envoy/service/extension/v3/config_discovery.pb.h"
 #include "envoy/service/listener/v3/lds.pb.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/service/ratelimit/v3/rls.pb.h"
