@@ -46,6 +46,8 @@ StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink)
   setDelegate();
 }
 
+StderrSinkDelegate::~StderrSinkDelegate() { restoreDelegate(); }
+
 void StderrSinkDelegate::log(absl::string_view msg) {
   Thread::OptionalLockGuard guard(lock_);
   std::cerr << msg;
@@ -76,6 +78,10 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
 
   // Hold the sink mutex while performing the actual logging. This prevents the sink from being
   // swapped during an individual log event.
+  // TODO(mattklein123): In production this lock will never be contended. In practice, thread
+  // protection is really only needed in tests. It would be nice to figure out a test-only
+  // mechanism for this that does not require extra locking that we don't explicitly need in the
+  // prod code.
   absl::ReaderMutexLock sink_lock(&sink_mutex_);
   if (should_escape_) {
     sink_->log(escapeLogLine(msg_view));

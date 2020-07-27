@@ -21,7 +21,7 @@ class FileSinkDelegate : public SinkDelegate {
 public:
   FileSinkDelegate(const std::string& log_path, AccessLog::AccessLogManager& log_manager,
                    DelegatingLogSinkSharedPtr log_sink);
-  ~FileSinkDelegate();
+  ~FileSinkDelegate() override;
 
   // SinkDelegate
   void log(absl::string_view msg) override;

@@ -128,6 +128,7 @@ private:
 class StderrSinkDelegate : public SinkDelegate {
 public:
   explicit StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink);
+  ~StderrSinkDelegate() override;
 
   // SinkDelegate
   void log(absl::string_view msg) override;

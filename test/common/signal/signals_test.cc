@@ -30,6 +30,7 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
       []() -> void {
         // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
+        // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
         *(nasty_ptr) = 0;
       }(),
       "backtrace.*Segmentation fault");
@@ -48,6 +49,7 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
       []() -> void {
         // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
+        // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
         *(nasty_ptr) = 0;
       }(),
       "HERE");
