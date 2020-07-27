@@ -584,8 +584,8 @@ private:
   // the response is complete. The existence of this variable is hard to reason about and it should
   // be combined with pending_response_ somehow in a follow up cleanup.
   bool pending_response_done_{true};
-  // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
-  bool ignore_message_complete_for_100_continue_{};
+  // Set true between receiving non-101 1xx headers and receiving the spurious onMessageComplete.
+  bool ignore_message_complete_for_1xx_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated when the switch to trailer processing is
