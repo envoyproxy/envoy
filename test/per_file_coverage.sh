@@ -38,7 +38,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/grpc_json_transcoder:93.3"
 "source/extensions/filters/http/aws_lambda:96.4"
-"source/extensions/filters/http/aws_request_signing:93.3"
 "source/extensions/filters/listener:96.0"
 "source/extensions/filters/listener/tls_inspector:92.4"
 "source/extensions/filters/listener/http_inspector:93.3"
