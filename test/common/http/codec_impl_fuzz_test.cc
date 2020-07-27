@@ -203,7 +203,7 @@ public:
     case test::common::http::DirectionalAction::kContinueHeaders: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingHeaders) {
         auto headers =
-            fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.continueHeaders());
+            fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
         state.response_encoder_->encode100ContinueHeaders(headers);
       }
