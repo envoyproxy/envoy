@@ -6,6 +6,8 @@
 
 #include "test/mocks/server/mocks.h"
 
+#include "common/http/message_impl.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {

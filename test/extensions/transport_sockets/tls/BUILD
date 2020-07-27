@@ -36,6 +36,7 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:transport_socket_options_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",

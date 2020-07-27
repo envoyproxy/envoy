@@ -18,7 +18,9 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/retry/priority:well_known_names",
         "//source/extensions/retry/priority/previous_priorities:config",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:host_mocks","//test/mocks/upstream:host_set_mocks","//test/mocks/upstream:priority_set_mocks",
+                "//source/common/protobuf:message_validator_lib",
+
         "@envoy_api//envoy/config/retry/previous_priorities:pkg_cc_proto",
     ],
 )

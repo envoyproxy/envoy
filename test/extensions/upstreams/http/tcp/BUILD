@@ -14,6 +14,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/router:router_lib",
+        "//source/common/network:address_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/upstreams/http/tcp:upstream_request_lib",

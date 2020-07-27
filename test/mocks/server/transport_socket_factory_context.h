@@ -5,7 +5,9 @@
 #include "common/secret/secret_manager_impl.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster.h"
+
 
 #include "config_tracker.h"
 #include "gmock/gmock.h"

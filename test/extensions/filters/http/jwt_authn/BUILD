@@ -24,7 +24,8 @@ envoy_cc_mock(
     deps = [
         "//source/extensions/filters/http/jwt_authn:authenticator_lib",
         "//source/extensions/filters/http/jwt_authn:verifier_lib",
-        "//test/mocks/server:server_mocks",
+        "//source/common/http:message_lib",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 

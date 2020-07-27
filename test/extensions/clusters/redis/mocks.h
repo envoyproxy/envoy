@@ -6,7 +6,8 @@
 
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster.h"
+
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

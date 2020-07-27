@@ -142,7 +142,6 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/ratelimit/v3:pkg_cc_proto",

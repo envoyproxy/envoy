@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/common/utility.h"
+#include "common/network/address_impl.h"
 #include "common/formatter/substitution_formatter.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
@@ -15,7 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+
 #include "test/test_common/printers.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"

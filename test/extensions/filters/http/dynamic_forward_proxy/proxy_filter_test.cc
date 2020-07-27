@@ -6,7 +6,11 @@
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/basic_resource_limit.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/cluster.h"
+#include "test/mocks/upstream/transport_socket_match.h"
+
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/test_runtime.h"
 

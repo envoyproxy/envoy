@@ -5,7 +5,9 @@
 #include "extensions/filters/network/common/redis/client.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/cluster.h"
+
 
 using testing::Return;
 

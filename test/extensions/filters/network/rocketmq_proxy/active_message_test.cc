@@ -4,6 +4,8 @@
 #include "extensions/filters/network/rocketmq_proxy/protocol.h"
 #include "extensions/filters/network/rocketmq_proxy/well_known_names.h"
 
+#include "common/network/address_impl.h"
+
 #include "test/extensions/filters/network/rocketmq_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"

@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
+#include "test/mocks/upstream/thread_aware_load_balancer.h"
 
 using testing::_;
 using testing::Eq;

@@ -7,7 +7,11 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/health_check_event_logger.h"
+#include "test/mocks/upstream/cluster.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_checker.h"
+
 
 #include "gmock/gmock.h"
 

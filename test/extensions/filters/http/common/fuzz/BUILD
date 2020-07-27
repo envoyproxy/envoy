@@ -35,6 +35,7 @@ envoy_cc_test_library(
         "//source/common/config:utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:utility_lib",
         "//test/fuzz:utility_lib",

@@ -32,8 +32,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:transport_socket_match_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_info_mocks","//test/mocks/upstream:cluster_mocks","//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
@@ -65,7 +64,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_info_mocks","//test/mocks/upstream:cluster_mocks","//test/mocks/upstream:transport_socket_match_mocks",
     ],
 )
 

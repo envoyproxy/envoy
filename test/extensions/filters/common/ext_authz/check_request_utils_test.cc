@@ -7,9 +7,10 @@
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

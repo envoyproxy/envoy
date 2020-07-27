@@ -21,7 +21,7 @@ envoy_cc_mock(
         "//source/extensions/filters/network/rocketmq_proxy:config",
         "//source/extensions/filters/network/rocketmq_proxy/router:router_lib",
         "//test/mocks/server:server_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks","//test/mocks/upstream:cluster_mocks",
     ],
 )
 
@@ -92,6 +92,7 @@ envoy_extension_cc_test(
     deps = [
         ":utility_lib",
         "//source/extensions/filters/network/rocketmq_proxy:config",
+        "//source/common/network:address_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

@@ -19,6 +19,7 @@
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

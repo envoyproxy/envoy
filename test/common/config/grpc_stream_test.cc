@@ -7,7 +7,8 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/runtime/mocks.h"
+
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

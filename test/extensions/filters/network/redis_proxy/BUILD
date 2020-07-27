@@ -70,7 +70,7 @@ envoy_extension_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],

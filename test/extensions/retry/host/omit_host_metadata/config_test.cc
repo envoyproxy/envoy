@@ -5,7 +5,9 @@
 #include "extensions/retry/host/omit_host_metadata/omit_host_metadata.h"
 #include "extensions/retry/host/well_known_names.h"
 
-#include "test/mocks/upstream/mocks.h"
+#include "test/test_common/utility.h"
+#include "test/mocks/upstream/host.h"
+
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

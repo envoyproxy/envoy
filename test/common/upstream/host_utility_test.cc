@@ -3,7 +3,9 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/cluster.h"
+
 
 #include "gtest/gtest.h"
 

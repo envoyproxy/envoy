@@ -16,6 +16,7 @@ envoy_cc_test(
     deps = [
         "//include/envoy/http:request_id_extension_interface",
         "//source/common/common:base64_lib",
+        "//source/common/network:address_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -29,7 +30,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
