@@ -20,6 +20,8 @@ public:
 
   Network::IoHandle& ioHandle() override { return *io_handle_; }
 
+  const Network::IoHandle& ioHandle() const override { return *io_handle_; }
+
   void setLocalAddress(const Network::Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
     if (local_address_ != nullptr) {
@@ -45,6 +47,17 @@ public:
     return local_address_->ip()->version();
   }
 
+  void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) override {
+    application_protocols_.clear();
+    for (const auto& protocol : protocols) {
+      application_protocols_.emplace_back(protocol);
+    }
+  }
+
+  const std::vector<std::string>& requestedApplicationProtocols() const override {
+    return application_protocols_;
+  }
+
   Api::SysCallIntResult getSocketOption(int level, int, void* optval, socklen_t*) const override {
     switch (level) {
     case SOL_IPV6:
@@ -65,6 +78,7 @@ private:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   Network::Address::Type addr_type_;
+  std::vector<std::string> application_protocols_;
 };
 
 class FakeOsSysCalls : public Api::OsSysCallsImpl {

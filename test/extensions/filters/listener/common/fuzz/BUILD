@@ -16,7 +16,6 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "listener_filter_fuzzer_lib",
-    srcs = ["listener_filter_fuzzer.cc"],
     hdrs = ["listener_filter_fuzzer.h"],
     deps = [
         ":listener_filter_fuzzer_proto_cc_proto",
@@ -32,6 +31,7 @@ envoy_cc_test_library(
     hdrs = ["listener_filter_fakes.h"],
     deps = [
         "//source/common/api:os_sys_calls_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
     ],
 )
