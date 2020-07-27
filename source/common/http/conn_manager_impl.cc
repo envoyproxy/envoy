@@ -1933,7 +1933,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
     // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
-    if (end_stream && response_trailers_ != nullptr) {
+    if (end_stream) {
       response_trailers_ = nullptr;
     }
 
