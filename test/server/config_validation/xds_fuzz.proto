@@ -23,11 +23,6 @@ message RemoveListener {
   uint32 listener_num = 1;
 }
 
-message RemoveRoute {
-  // removes route_y
-  uint32 route_num = 1;
-}
-
 message Action {
   oneof action_selector {
     option (validate.required) = true;
@@ -35,7 +30,6 @@ message Action {
     AddListener add_listener = 1;
     AddRoute add_route = 2;
     RemoveListener remove_listener = 3;
-    RemoveRoute remove_route = 4;
   }
 }
 
