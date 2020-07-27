@@ -51,12 +51,11 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
               .statName())),
       events_to_actions_([&](const Server::Configuration::Main& config) -> EventToActionsMap {
         EventToActionsMap map;
-
         Configuration::GuardDogActionFactoryContext context = {api};
 
         const auto& actions = config.wdActions();
         for (const auto& action : actions) {
-          if (action.event() == WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_UNKNOWN) {
+          if (action.event() == WatchDogAction::UNKNOWN) {
             ENVOY_LOG_MISC(error, "WatchDogAction specified with UNKNOWN event");
           } else {
             // Get factory and add the created cb
@@ -128,8 +127,7 @@ void GuardDogImpl::step() {
         }
       }
       if (killEnabled() && delta > kill_timeout_) {
-        invokeGuardDogActions(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_KILL,
-                              {{tid, ltt}}, now);
+        invokeGuardDogActions(WatchDogAction::KILL, {{tid, ltt}}, now);
 
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
                           watched_dog->dog_->threadId().debugString()));
@@ -138,8 +136,7 @@ void GuardDogImpl::step() {
         multi_kill_threads.emplace_back(tid, ltt);
 
         if (multi_kill_threads.size() >= required_for_multi_kill) {
-          invokeGuardDogActions(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MULTIKILL,
-                                multi_kill_threads, now);
+          invokeGuardDogActions(WatchDogAction::MULTIKILL, multi_kill_threads, now);
 
           PANIC(fmt::format("GuardDog: At least {} threads ({},...) stuck for more than "
                             "watchdog_multikill_timeout",
@@ -151,13 +148,11 @@ void GuardDogImpl::step() {
 
   // Run megamiss and miss handlers
   if (!mega_miss_threads.empty()) {
-    invokeGuardDogActions(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MEGAMISS,
-                          mega_miss_threads, now);
+    invokeGuardDogActions(WatchDogAction::MEGAMISS, mega_miss_threads, now);
   }
 
   if (!miss_threads.empty()) {
-    invokeGuardDogActions(WatchDogEvent::Watchdog_WatchdogAction_WatchdogEvent_MISS, miss_threads,
-                          now);
+    invokeGuardDogActions(WatchDogAction::MISS, miss_threads, now);
   }
 
   {
@@ -220,8 +215,8 @@ void GuardDogImpl::stop() {
 }
 
 void GuardDogImpl::invokeGuardDogActions(
-    WatchDogEvent event, std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
-    MonotonicTime now) {
+    WatchDogAction::WatchdogEvent event,
+    std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs, MonotonicTime now) {
   const auto& registered_actions = events_to_actions_.find(event);
   if (registered_actions != events_to_actions_.end()) {
     for (auto& action : registered_actions->second) {

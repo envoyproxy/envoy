@@ -1,5 +1,6 @@
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <memory>
 #include <vector>
 
@@ -24,12 +25,23 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::ElementsAre;
 using testing::InSequence;
+using testing::KilledBySignal;
 using testing::NiceMock;
 
 namespace Envoy {
 namespace Server {
 namespace {
+
+// Kill has an explict value that disables the feature.
+const int DISABLE_KILL = 0;
+const int DISABLE_MULTIKILL = 0;
+
+// Miss / Megamiss don't have an explict value that disables them
+// so set a timeout larger than those used in tests for 'disable' it.
+const int DISABLE_MISS = 1000000;
+const int DISABLE_MEGAMISS = 1000000;
 
 class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
 public:
@@ -426,11 +438,15 @@ TEST_P(GuardDogTestBase, AtomicIsAtomicTest) {
   ASSERT_EQ(atomic_time.is_lock_free(), true);
 }
 
-class TestGuardDogAction : public Configuration::GuardDogAction {
+// A GuardDogAction used for testing the GuardDog.
+// It's primary use is dumping string of the format EVENT_TYPE : tid1,.., tidN to
+// the events vector passed to it.
+// Instances of this class will be registered for GuardDogEvent through
+// TestGuardDogActionFactory.
+class LogGuardDogAction : public Configuration::GuardDogAction {
 public:
-  TestGuardDogAction(std::vector<std::string>& events) : events_(events) {}
+  LogGuardDogAction(std::vector<std::string>& events) : events_(events) {}
 
-  // Appends a string of the form: EVENT_TYPE : tid1,.., tidN to the events vector.
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
            std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
            MonotonicTime /*now*/) override {
@@ -451,18 +467,33 @@ protected:
   std::vector<std::string>& events_; // not owned
 };
 
-// Test class used for GuardDogAction generation.
-template <class ConfigType>
-class TestGuardDogActionFactory : public Configuration::GuardDogActionFactory {
+// A GuardDogAction that raises the specified signal.
+class AssertGuardDogAction : public Configuration::GuardDogAction {
 public:
-  TestGuardDogActionFactory(const std::string& name, std::vector<std::string>& events)
+  AssertGuardDogAction(const std::string& message) : message_(message) {}
+
+  void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
+           std::vector<std::pair<Thread::ThreadId, MonotonicTime>> /*thread_ltt_pairs*/,
+           MonotonicTime /*now*/) override {
+    RELEASE_ASSERT(false, message_);
+  }
+
+protected:
+  const std::string message_;
+};
+
+// Test factory for consuming Watchdog configs and creating GuardDogActions.
+template <class ConfigType>
+class LogGuardDogActionFactory : public Configuration::GuardDogActionFactory {
+public:
+  LogGuardDogActionFactory(const std::string& name, std::vector<std::string>& events)
       : name_(name), events_(events) {}
 
-  // The GuardDogAction generated will add string in the config into the events vector.
   Configuration::GuardDogActionPtr createGuardDogActionFromProto(
-      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& /*config */,
+      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& /*config*/,
       Configuration::GuardDogActionFactoryContext& /*context*/) override {
-    return std::make_unique<TestGuardDogAction>(events_);
+    // Return different actions depending on the config.
+    return std::make_unique<LogGuardDogAction>(events_);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -475,43 +506,100 @@ public:
   std::vector<std::string>& events_; // not owned
 };
 
+// Test factory for consuming Watchdog configs and creating GuardDogActions.
+template <class ConfigType>
+class AssertGuardDogActionFactory : public Configuration::GuardDogActionFactory {
+public:
+  AssertGuardDogActionFactory(const std::string& name) : name_(name) {}
+
+  Configuration::GuardDogActionPtr createGuardDogActionFromProto(
+      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
+      Configuration::GuardDogActionFactoryContext& /*context*/) override {
+    // Return different actions depending on the config.
+    return std::make_unique<AssertGuardDogAction>(config.config().typed_config().value());
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ConfigType()};
+  }
+
+  std::string name() const override { return name_; }
+
+  const std::string name_;
+};
+
 /**
  * Tests that various actions registered for the guarddog get called upon.
  */
 class GuardDogActionsTest : public GuardDogTestBase {
 protected:
   GuardDogActionsTest()
-      : actions_({getActionsConfig()}), f_("TestAction", events_), register_factory_(f_),
-        config_miss_(100, 200, 0, 0, 0, actions_), config_mega_(100, 200, 0, 0, 0, actions_) {}
+      : log_factory_("LogFactory", events_), register_log_factory_(log_factory_),
+        assert_factory_("AssertFactory"), register_assert_factory_(assert_factory_) {}
 
-  std::string getActionsConfig() {
-    return R"EOF(
-      {
-        "config": {
-          "name": "TestAction",
-          "typed_config": {
-            "@type": "type.googleapis.com/google.protobuf.Empty"
-          }
-        },
-        "event": "MISS"
-      }
-    )EOF";
+  std::vector<std::string> getActionsConfig() {
+    return {
+        R"EOF(
+        {
+          "config": {
+            "name": "AssertFactory",
+            "typed_config": {
+              "@type": "type.googleapis.com/google.protobuf.StringValue",
+              "value": "MultiKill conditions triggered."
+            }
+          },
+          "event": "MULTIKILL"
+        }
+      )EOF",
+        R"EOF(
+        {
+          "config": {
+            "name": "AssertFactory",
+            "typed_config": {
+              "@type": "type.googleapis.com/google.protobuf.StringValue",
+              "value": "Kill conditions triggered."
+            }
+          },
+          "event": "KILL"
+        }
+      )EOF",
+        R"EOF(
+        {
+          "config": {
+            "name": "LogFactory",
+            "typed_config": {
+              "@type": "type.googleapis.com/google.protobuf.Empty"
+            }
+          },
+          "event": "MEGAMISS"
+        }
+      )EOF",
+        R"EOF(
+        {
+          "config": {
+            "name": "LogFactory",
+            "typed_config": {
+              "@type": "type.googleapis.com/google.protobuf.Empty"
+            }
+          },
+          "event": "MISS"
+        }
+      )EOF"};
   }
 
-  void SetupForMiss() {
-    initGuardDog(fake_stats_, config_miss_);
+  void SetupFirstDog(const NiceMock<Configuration::MockMain>& config) {
+    initGuardDog(fake_stats_, config);
     first_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
     guard_dog_->forceCheckForTest();
-    time_system_->advanceTimeWait(std::chrono::milliseconds(99));
   }
 
   std::vector<std::string> actions_;
   std::vector<std::string> events_;
-  TestGuardDogActionFactory<Envoy::ProtobufWkt::Struct> f_;
-  Registry::InjectFactory<Configuration::GuardDogActionFactory> register_factory_;
+  LogGuardDogActionFactory<Envoy::ProtobufWkt::Empty> log_factory_;
+  Registry::InjectFactory<Configuration::GuardDogActionFactory> register_log_factory_;
+  AssertGuardDogActionFactory<Envoy::ProtobufWkt::StringValue> assert_factory_;
+  Registry::InjectFactory<Configuration::GuardDogActionFactory> register_assert_factory_;
   NiceMock<Stats::MockStore> fake_stats_;
-  NiceMock<Configuration::MockMain> config_miss_;
-  NiceMock<Configuration::MockMain> config_mega_;
   WatchDogSharedPtr first_dog_;
   WatchDogSharedPtr second_dog_;
 };
@@ -519,13 +607,207 @@ protected:
 INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogActionsTest,
                          testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
 
-TEST_P(GuardDogActionsTest, CanHitTheCb) {
-  SetupForMiss();
+TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
+  const NiceMock<Configuration::MockMain> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
+                                                 DISABLE_MULTIKILL, 0, getActionsConfig());
+  SetupFirstDog(config);
+  second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  time_system_->advanceTimeWait(std::chrono::milliseconds(99));
+  second_dog_->touch();
   ASSERT_EQ(events_.size(), 0);
+
   time_system_->advanceTimeWait(std::chrono::milliseconds(2));
   guard_dog_->forceCheckForTest();
-  EXPECT_EQ(events_.size(), 1);
-  std::cout << events_[0];
+
+  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
+                           "MISS : ", api_->threadFactory().currentThreadId().debugString())));
+}
+
+TEST_P(GuardDogActionsTest, MissShouldBeAbleToReportMultipleThreads) {
+  const NiceMock<Configuration::MockMain> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
+                                                 DISABLE_MULTIKILL, 0, getActionsConfig());
+  initGuardDog(fake_stats_, config);
+  first_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+
+  first_dog_->touch();
+  second_dog_->touch();
+
+  ASSERT_EQ(events_.size(), 0);
+
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
+                           "MISS : ", api_->threadFactory().currentThreadId().debugString(), ",",
+                           api_->threadFactory().currentThreadId().debugString())));
+}
+
+TEST_P(GuardDogActionsTest, MissShouldSaturateOnMissEvent) {
+  const NiceMock<Configuration::MockMain> config(100, DISABLE_MISS, DISABLE_KILL, DISABLE_MULTIKILL,
+                                                 0, getActionsConfig());
+  SetupFirstDog(config);
+
+  ASSERT_EQ(events_.size(), 0);
+
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
+                           "MISS : ", api_->threadFactory().currentThreadId().debugString())));
+
+  // Should saturate and not add an additional "event_"
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
+                           "MISS : ", api_->threadFactory().currentThreadId().debugString())));
+
+  // Touch the watchdog, which should allow the event to trigger again.
+  first_dog_->touch();
+
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(
+      events_,
+      ElementsAre(absl::StrCat("MISS : ", api_->threadFactory().currentThreadId().debugString()),
+                  absl::StrCat("MISS : ", api_->threadFactory().currentThreadId().debugString())));
+}
+
+TEST_P(GuardDogActionsTest, MegaMissShouldOnlyReportRelevantThreads) {
+  const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
+                                                 0, getActionsConfig());
+  SetupFirstDog(config);
+  second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  time_system_->advanceTimeWait(std::chrono::milliseconds(99));
+  second_dog_->touch();
+  ASSERT_EQ(events_.size(), 0);
+
+  time_system_->advanceTimeWait(std::chrono::milliseconds(2));
+  guard_dog_->forceCheckForTest();
+
+  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
+                           "MEGAMISS : ", api_->threadFactory().currentThreadId().debugString())));
+}
+
+TEST_P(GuardDogActionsTest, MegaMissShouldBeAbleToReportMultipleThreads) {
+  const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
+                                                 0, getActionsConfig());
+  initGuardDog(fake_stats_, config);
+  first_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+  second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+
+  first_dog_->touch();
+  second_dog_->touch();
+
+  ASSERT_EQ(events_.size(), 0);
+
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
+                           "MEGAMISS : ", api_->threadFactory().currentThreadId().debugString(),
+                           ",", api_->threadFactory().currentThreadId().debugString())));
+}
+
+TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
+  const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
+                                                 0, getActionsConfig());
+  SetupFirstDog(config);
+
+  ASSERT_EQ(events_.size(), 0);
+
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
+                           "MEGAMISS : ", api_->threadFactory().currentThreadId().debugString())));
+
+  // Should saturate and not add an additional "event_"
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(events_, ElementsAre(absl::StrCat(
+                           "MEGAMISS : ", api_->threadFactory().currentThreadId().debugString())));
+
+  // Touch the watchdog, which should allow the event to trigger again.
+  first_dog_->touch();
+
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(
+      events_,
+      ElementsAre(
+          absl::StrCat("MEGAMISS : ", api_->threadFactory().currentThreadId().debugString()),
+          absl::StrCat("MEGAMISS : ", api_->threadFactory().currentThreadId().debugString())));
+}
+
+TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
+  // Priority of events are KILL, MULTIKILL, MEGAMISS and MISS
+
+  // Kill event should fire before the others
+  auto kill_function = [&]() -> void {
+    const NiceMock<Configuration::MockMain> config(100, 100, 100, 100, 0, getActionsConfig());
+    initGuardDog(fake_stats_, config);
+    auto first_dog =
+        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    auto second_dog =
+        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+    guard_dog_->forceCheckForTest();
+  };
+
+  // We expect only the kill action to have fired
+  EXPECT_DEATH(kill_function(), "Kill conditions triggered.");
+
+  // Multikill event should fire before the others
+  auto multikill_function = [&]() -> void {
+    const NiceMock<Configuration::MockMain> config(100, 100, DISABLE_KILL, 100, 0,
+                                                   getActionsConfig());
+    initGuardDog(fake_stats_, config);
+    auto first_dog =
+        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    auto second_dog =
+        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+    guard_dog_->forceCheckForTest();
+  };
+
+  EXPECT_DEATH(multikill_function(), "MultiKill conditions triggered.");
+
+  // We expect megamiss to fire before miss
+  const NiceMock<Configuration::MockMain> config(100, 100, DISABLE_KILL, DISABLE_MULTIKILL, 0,
+                                                 getActionsConfig());
+  SetupFirstDog(config);
+  ASSERT_EQ(events_.size(), 0);
+  time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+  guard_dog_->forceCheckForTest();
+  EXPECT_THAT(
+      events_,
+      ElementsAre(
+          absl::StrCat("MEGAMISS : ", api_->threadFactory().currentThreadId().debugString()),
+          absl::StrCat("MISS : ", api_->threadFactory().currentThreadId().debugString())));
+}
+
+TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
+  auto die_function = [&]() -> void {
+    const NiceMock<Configuration::MockMain> config(DISABLE_MISS, DISABLE_MEGAMISS, 100, 0, 0,
+                                                   getActionsConfig());
+    SetupFirstDog(config);
+    time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+    guard_dog_->forceCheckForTest();
+  };
+
+  EXPECT_DEATH(die_function(), "Kill conditions triggered.");
+}
+
+TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
+  auto die_function = [&]() -> void {
+    const NiceMock<Configuration::MockMain> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
+                                                   100, 0, getActionsConfig());
+    SetupFirstDog(config);
+    second_dog_ =
+        guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    guard_dog_->forceCheckForTest();
+    time_system_->advanceTimeWait(std::chrono::milliseconds(101));
+    guard_dog_->forceCheckForTest();
+  };
+
+  EXPECT_DEATH(die_function(), "MultiKill conditions triggered.");
 }
 
 } // namespace
