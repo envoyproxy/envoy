@@ -77,6 +77,11 @@ message ScopedRouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.ScopedRouteConfiguration";
 
+  enum ScopePriority {
+    Primary = 0;
+    Secondary = 1;
+  }
+
   // Specifies a key which is matched against the output of the
   // :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.ScopedRoutes.scope_key_builder>`
   // specified in the HttpConnectionManager. The matching is done per HTTP

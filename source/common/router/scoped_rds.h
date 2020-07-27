@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <list>
 
 #include "envoy/common/callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -111,6 +112,9 @@ public:
 
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
+  void onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+                         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+
 private:
   // A helper class that takes care of the life cycle management of a RDS route provider and the
   // update callback handle.
@@ -119,15 +123,23 @@ private:
         ScopedRdsConfigSubscription& parent, std::string scope_name,
         envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
         Init::Manager& init_manager);
+
+    RdsRouteConfigProviderHelper(
+        ScopedRdsConfigSubscription& parent, std::string scope_name,
+        envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds);
+
     ~RdsRouteConfigProviderHelper() { rds_update_callback_handle_->remove(); }
     ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
-
+    void addOnDemandUpdateCallback(std::function<void()> callback);
+    void runOnDemandUpdateCallback();
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
     RdsRouteConfigProviderImplSharedPtr route_provider_;
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
+    std::list<std::function<void()>> on_demand_update_callbacks_;
+    absl::optional<envoy::extensions::filters::network::http_connection_manager::v3::Rds> rds_;
   };
 
   using RdsRouteConfigProviderHelperPtr = std::unique_ptr<RdsRouteConfigProviderHelper>;
