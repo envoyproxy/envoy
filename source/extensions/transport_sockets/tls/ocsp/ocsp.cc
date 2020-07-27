@@ -152,17 +152,17 @@ OcspResponseStatus Asn1OcspUtility::parseResponseStatus(CBS& cbs) {
   auto status_ordinal = *CBS_data(&status);
   switch (status_ordinal) {
   case 0:
-    return OcspResponseStatus::SUCCESSFUL;
+    return OcspResponseStatus::Successful;
   case 1:
-    return OcspResponseStatus::MALFORMED_REQUEST;
+    return OcspResponseStatus::MalformedRequest;
   case 2:
-    return OcspResponseStatus::INTERNAL_ERROR;
+    return OcspResponseStatus::InternalError;
   case 3:
-    return OcspResponseStatus::TRY_LATER;
+    return OcspResponseStatus::TryLater;
   case 5:
-    return OcspResponseStatus::SIG_REQUIRED;
+    return OcspResponseStatus::SigRequired;
   case 6:
-    return OcspResponseStatus::UNAUTHORIZED;
+    return OcspResponseStatus::Unauthorized;
   default:
     throw EnvoyException(absl::StrCat("Unknown OCSP Response Status variant: ", status_ordinal));
   }

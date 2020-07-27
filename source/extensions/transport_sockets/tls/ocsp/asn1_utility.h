@@ -58,30 +58,30 @@ public:
   static std::string cbsToString(CBS& cbs);
 
   /**
-   * Parses all elements of an ASN.1 SEQUENCE OF. |parseElement| must
+   * Parses all elements of an ASN.1 SEQUENCE OF. |parse_element| must
    * advance its input CBS& over the entire element.
    *
    * @param cbs a CBS& that refers to an ASN.1 SEQUENCE OF object
-   * @param parseElement an Asn1ParsingFunc<T> used to parse each element
+   * @param parse_element an Asn1ParsingFunc<T> used to parse each element
    * @returns std::vector<T> containing the parsed elements of the sequence.
    * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
    * SEQUENCE OF object.
    */
   template <typename T>
-  static std::vector<T> parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parseElement);
+  static std::vector<T> parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parse_element);
 
   /**
    * Checks if an explicitly tagged optional element of |tag| is present and
-   * if so parses its value with |parseData|. If the element is not present,
+   * if so parses its value with |parse_data|. If the element is not present,
    * `cbs` is not advanced.
    *
    * @param cbs a CBS& that refers to the current document position
-   * @param parseData an Asn1ParsingFunc<T> used to parse the data if present
+   * @param parse_data an Asn1ParsingFunc<T> used to parse the data if present
    * @return absl::optional<T> with a T if `cbs` is of the specified tag,
    * else nullopt
    */
   template <typename T>
-  static absl::optional<T> parseOptional(CBS& cbs, Asn1ParsingFunc<T> parseData, unsigned tag);
+  static absl::optional<T> parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag);
 
   /**
    * Returns whether or not an element explicitly tagged with |tag| is present
@@ -170,7 +170,7 @@ public:
 };
 
 template <typename T>
-std::vector<T> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parseElement) {
+std::vector<T> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parse_element) {
   CBS seq_elem;
   std::vector<T> vec;
 
@@ -180,8 +180,8 @@ std::vector<T> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parseEl
   }
 
   while (CBS_data(&seq_elem) < CBS_data(&cbs)) {
-    // parseElement MUST advance seq_elem
-    vec.push_back(parseElement(seq_elem));
+    // parse_element MUST advance seq_elem
+    vec.push_back(parse_element(seq_elem));
   }
 
   RELEASE_ASSERT(CBS_data(&cbs) == CBS_data(&seq_elem),
@@ -191,10 +191,10 @@ std::vector<T> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parseEl
 }
 
 template <typename T>
-absl::optional<T> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parseData, unsigned tag) {
+absl::optional<T> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag) {
   CBS data;
   if (isOptionalPresent(cbs, &data, tag)) {
-    return parseData(data);
+    return parse_data(data);
   }
 
   return absl::nullopt;

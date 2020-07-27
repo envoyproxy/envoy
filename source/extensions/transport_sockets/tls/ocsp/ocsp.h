@@ -36,12 +36,12 @@ enum class OcspResponseStatus {
   //    sigRequired           (5),  -- Must sign the request
   //    unauthorized          (6)   -- Request unauthorized
   // }
-  SUCCESSFUL = 0,
-  MALFORMED_REQUEST = 1,
-  INTERNAL_ERROR = 2,
-  TRY_LATER = 3,
-  SIG_REQUIRED = 5,
-  UNAUTHORIZED = 6
+  Successful = 0,
+  MalformedRequest = 1,
+  InternalError = 2,
+  TryLater = 3,
+  SigRequired = 5,
+  Unauthorized = 6
 };
 
 /**

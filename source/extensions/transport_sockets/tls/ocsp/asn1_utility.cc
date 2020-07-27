@@ -72,7 +72,7 @@ std::string Asn1Utility::parseInteger(CBS& cbs) {
   }
 
   auto head = CBS_data(&num);
-  const ASN1_INTEGER* asn1_serial_number = c2i_ASN1_INTEGER(nullptr, &head, CBS_len(&num));
+  ASN1_INTEGER* asn1_serial_number = c2i_ASN1_INTEGER(nullptr, &head, CBS_len(&num));
   if (asn1_serial_number != nullptr) {
     BIGNUM num_bn;
     BN_init(&num_bn);
@@ -80,7 +80,9 @@ std::string Asn1Utility::parseInteger(CBS& cbs) {
 
     char* char_serial_number = BN_bn2hex(&num_bn);
     BN_free(&num_bn);
-    M_ASN1_INTEGER_free(asn1_serial_number);
+    // M_ASN1_INTEGER_free performs a c-style cast which the linters don't
+    // like, so we're doing the equivalent here with a static_cast
+    ASN1_STRING_free(static_cast<ASN1_STRING*>(asn1_serial_number));
 
     if (char_serial_number != nullptr) {
       std::string serial_number(char_serial_number);

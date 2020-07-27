@@ -255,7 +255,7 @@ TEST_F(Asn1UtilityTest, ParseIntegerTest) {
   CBS cbs;
   uint8_t* buf;
   size_t buf_len;
-  for (auto int_and_hex : integers) {
+  for (auto const& int_and_hex : integers) {
     ASSERT_TRUE(CBB_init(cbb.get(), 0));
     ASSERT_TRUE(CBB_add_asn1_int64(cbb.get(), int_and_hex.first));
     ASSERT_TRUE(CBB_finish(cbb.get(), &buf, &buf_len));
