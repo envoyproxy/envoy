@@ -159,7 +159,7 @@ uint64_t ScopedConfigImpl::computeKeyHash(const Http::HeaderMap& headers) const 
 
 bool ScopedConfigImpl::scopeExistsButNotLoaded(const uint64_t key_hash) const {
   auto iter = scoped_route_info_by_key_.find(key_hash);
-  return iter != scoped_route_info_by_key_.end() && iter->second == nullptr;
+  return iter != scoped_route_info_by_key_.end() && iter->second->routeConfig() == nullptr;
 }
 
 } // namespace Router

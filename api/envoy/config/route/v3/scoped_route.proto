@@ -109,6 +109,8 @@ message ScopedRouteConfiguration {
     repeated Fragment fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
+  ScopePriority priority = 4;
+
   // The name assigned to the routing scope.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 

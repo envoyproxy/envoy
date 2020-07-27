@@ -172,10 +172,23 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
     // TODO(stevenzzz): Creating a new RdsRouteConfigProvider likely expensive, migrate RDS to
     // config-provider-framework to make it light weight.
     rds.set_route_config_name(scoped_route_config.route_configuration_name());
-    auto rds_config_provider_helper =
-        std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
-    auto scoped_route_info = std::make_shared<ScopedRouteInfo>(
-        std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
+    std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
+    std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
+    if (scoped_route_config.priority() ==
+        envoy::config::route::v3::ScopedRouteConfiguration::Primary) {
+      // For primary scopes, create a rds helper with rds provider initialized.
+      rds_config_provider_helper =
+          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
+      scoped_route_info = std::make_shared<ScopedRouteInfo>(
+          std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
+    } else {
+      // For secondary scopes, create a rds helper with rds provider uninitialized.
+      rds_config_provider_helper =
+          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds);
+      // scope_route_info->routeConfig() will be nullptr
+      scoped_route_info =
+          std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
+    }
     route_provider_by_scope_.insert({scope_name, std::move(rds_config_provider_helper)});
     scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
     scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
