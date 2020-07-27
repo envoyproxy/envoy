@@ -23,7 +23,11 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
 }
 
 quic::QuicSocketAddress envoyAddressIpToQuicSocketAddress(const Network::Address::Ip* envoy_ip) {
-  ASSERT(envoy_ip != nullptr);
+  if (envoy_ip == nullptr) {
+    // Return null socket addr
+    return quic::QuicSocketAddress();
+  }
+
   uint32_t port = envoy_ip->port();
   sockaddr_storage ss;
 
@@ -44,18 +48,6 @@ quic::QuicSocketAddress envoyAddressIpToQuicSocketAddress(const Network::Address
     *reinterpret_cast<absl::uint128*>(ipv6_addr->sin6_addr.s6_addr) = envoy_ip->ipv6()->address();
   }
   return quic::QuicSocketAddress(ss);
-}
-
-quic::QuicSocketAddress
-envoyAddressInstanceToQuicSocketAddress(const Network::Address::Instance& envoy_address) {
-  ASSERT(envoy_address.type() == Network::Address::Type::Ip);
-  return envoyAddressIpToQuicSocketAddress(envoy_address.ip());
-}
-
-quic::QuicSocketAddress envoyAddressInstancePtrToQuicSocketAddress(
-    const Network::Address::InstanceConstSharedPtr& envoy_address) {
-  ASSERT(envoy_address != nullptr);
-  return envoyAddressInstanceToQuicSocketAddress(*envoy_address);
 }
 
 spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {

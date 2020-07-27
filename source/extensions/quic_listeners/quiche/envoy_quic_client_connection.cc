@@ -41,7 +41,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     Network::ConnectionSocketPtr&& connection_socket)
     : EnvoyQuicConnection(
           server_connection_id,
-          envoyAddressInstancePtrToQuicSocketAddress(connection_socket->remoteAddress()), helper,
+          envoyAddressIpToQuicSocketAddress(connection_socket->remoteAddress()->ip()), helper,
           alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT, supported_versions,
           std::move(connection_socket)),
       dispatcher_(dispatcher) {}
@@ -64,8 +64,8 @@ void EnvoyQuicClientConnection::processPacket(
                                   timestamp, /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
-  ProcessUdpPacket(envoyAddressInstancePtrToQuicSocketAddress(local_address),
-                   envoyAddressInstancePtrToQuicSocketAddress(peer_address), packet);
+  ProcessUdpPacket(envoyAddressIpToQuicSocketAddress(local_address->ip()),
+                   envoyAddressIpToQuicSocketAddress(peer_address->ip()), packet);
 }
 
 uint64_t EnvoyQuicClientConnection::maxPacketSize() const {

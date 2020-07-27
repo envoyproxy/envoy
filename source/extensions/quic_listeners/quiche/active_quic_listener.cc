@@ -87,9 +87,9 @@ void ActiveQuicListener::onListenerShutdown() {
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
   quic::QuicSocketAddress peer_address(
-      envoyAddressInstancePtrToQuicSocketAddress(data.addresses_.peer_));
+      envoyAddressIpToQuicSocketAddress(data.addresses_.peer_->ip()));
   quic::QuicSocketAddress self_address(
-      envoyAddressInstancePtrToQuicSocketAddress(data.addresses_.local_));
+      envoyAddressIpToQuicSocketAddress(data.addresses_.local_->ip()));
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(
@@ -114,8 +114,6 @@ void ActiveQuicListener::onReadReady() {
 }
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
-  // Clear write_blocked_ status for udpPacketWriter
-  udp_listener_->udpPacketWriter()->setWritable();
   quic_dispatcher_->OnCanWrite();
 }
 
