@@ -38,3 +38,12 @@ def envoy_all_http_filters():
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
     return [v for k, v in all_extensions.items() if k.startswith(_http_filter_prefix)]
+
+# All network-layer filters are extensions with names that have the following prefix.
+_network_filter_prefix = "envoy.filters.network"
+
+# Return all network-layer filter extensions to be compiled into network-layer filter generic fuzzer.
+def envoy_all_network_filters():
+    all_extensions = dicts.add(_required_extensions, EXTENSIONS)
+
+    return [v for k, v in all_extensions.items() if k.startswith(_network_filter_prefix)]
