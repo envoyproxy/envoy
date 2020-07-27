@@ -63,6 +63,7 @@ envoy_cc_library(
     hdrs = ["connection_handler_impl.h"],
     deps = [
         ":filter_chain_manager_lib",
+        ":listener_manager_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",

@@ -104,6 +104,27 @@ private:
   class ActiveConnections;
   using ActiveConnectionsPtr = std::unique_ptr<ActiveConnections>;
 
+  // filter_chain_rebuild_info that will be accessed by master thread
+  struct FilterChainRebuildInfo {
+    FilterChainRebuildInfo(
+        const envoy::config::listener::v3::FilterChain* const& protobuf_filter_chain,
+        const std::string& worker_name, const std::string& listener_name,
+        Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& socket,
+        const envoy::config::core::v3::Metadata& metadata)
+        : protobuf_filter_chain_(protobuf_filter_chain), worker_name_(worker_name),
+          listener_name_(listener_name), worker_dispatcher_(dispatcher), socket_(std::move(socket)),
+          dynamic_metadata(metadata) {}
+
+    const envoy::config::listener::v3::FilterChain* const& protobuf_filter_chain_;
+    const std::string& worker_name_;
+    const std::string& listener_name_;
+    Event::Dispatcher& worker_dispatcher_;
+    Network::ConnectionSocketPtr&& socket_;
+    const envoy::config::core::v3::Metadata& dynamic_metadata;
+    // callback
+  };
+  using FilterChainRebuildInfoPtr = std::unique_ptr<FilterChainRebuildInfo>;
+
   /**
    * Wrapper for an active tcp listener owned by this handler.
    */
@@ -185,6 +206,9 @@ private:
     const bool continue_on_listener_filters_timeout_;
     std::list<ActiveTcpSocketPtr> sockets_;
     std::unordered_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
+
+    std::unordered_map<const Network::FilterChain*, FilterChainRebuildInfoPtr>
+        filter_chain_rebuild_info_;
 
     // The number of connections currently active on this listener. This is typically used for
     // connection balancing across per-handler listeners.

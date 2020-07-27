@@ -6,6 +6,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/init/watcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -332,6 +333,7 @@ public:
 
   SystemTime last_updated_;
   Init::WatcherImpl defineWatcher(const envoy::config::listener::v3::FilterChain*& filter_chain);
+  Event::Dispatcher& dispatcher() { return listener_factory_context_->dispatcher(); }
 
 private:
   /**

@@ -90,9 +90,11 @@ public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)), is_fake_placeholder_(false) {}
+        filters_factory_(std::move(filters_factory)), protobuf_filter_chain_(nullptr),
+        is_fake_placeholder_(false) {}
 
-  FilterChainImpl() { is_fake_placeholder_ = true; }
+  FilterChainImpl(const envoy::config::listener::v3::FilterChain* filter_chain)
+      : protobuf_filter_chain_(filter_chain), is_fake_placeholder_(true) {}
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -110,11 +112,16 @@ public:
   }
   bool isFakeFilterChain() const { return is_fake_placeholder_; }
 
+  const envoy::config::listener::v3::FilterChain* const& getProtobufFilterChain() {
+    return protobuf_filter_chain_;
+  }
+
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
 
+  const envoy::config::listener::v3::FilterChain* protobuf_filter_chain_;
   bool is_fake_placeholder_;
 };
 
@@ -200,7 +207,7 @@ public:
   void addFakeFilterChain(
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span);
 
-  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain*& filter_chain_span,
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           FilterChainFactoryBuilder& b,
                           FilterChainFactoryContextCreator& context_creator);
 

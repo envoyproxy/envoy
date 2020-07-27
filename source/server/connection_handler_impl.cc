@@ -1,5 +1,7 @@
 #include "server/connection_handler_impl.h"
 
+#include <memory>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/exception.h"
@@ -13,6 +15,7 @@
 #include "common/stats/timespan_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
+#include "server/listener_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
 
@@ -393,32 +396,47 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   // Find matching filter chain.
   // const Network::FilterChain* filter_chain
-  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
+  const auto& filter_chain = config_->filterChainManager().findFilterChain(*socket);
   auto filter_chain_impl = dynamic_cast<const Server::FilterChainImpl*>(filter_chain);
+
+  if (filter_chain_rebuild_info_.find(filter_chain) != filter_chain_rebuild_info_.end()) {
+    // this filter chain is under rebuilding, ignore this connection. There will be reconnection
+    // what if multiple sockets are requesting the same filterchain??
+    // the current hashmap<filter_chain, FilterChainRebuildInfo> only contains one socket
+    // reconnection.. option 1: return
+  }
+
   bool is_fake_filter_chain = filter_chain_impl->isFakeFilterChain();
   if (is_fake_filter_chain) {
 
-    // parent_.listeners_
-    // const auto& ptr = listener(); // Network::ListenerPtr listener_.get()
+    auto worker_name = parent_.dispatcher_.name();
+    auto listener_name = config_->name();
+
+    auto& listener = dynamic_cast<ListenerImpl&>(*config_);
+    auto& server_dispatcher = listener.dispatcher();
+    auto& worker_dispatcher = parent_.dispatcher_;
+
+    auto rb = std::make_unique<FilterChainRebuildInfo>(filter_chain, worker_name, listener_name,
+                                                       worker_dispatcher, socket, dynamic_metadata);
+    filter_chain_rebuild_info_[filter_chain] = std::move(rb);
+
+    // auto& listener_manager = listener.list
+    // auto retry = [this]() {
+    //   auto x = this->filter_chain_rebuild_info_;
+    // };
+
+    server_dispatcher.post([]() {});
+    // server_dispatcher.post([this, listener_name, &worker_dispatcher, retry]() {
+    //   // worker_dispatcher.
+    //   // this.
+    // });
 
     // parent.dispatcher is connection_handler_impl.dispatcher
 
-    auto worker_name = parent_.dispatcher_.name();
-    auto listener_name = config_->name();
-    filter_chain->networkFilterFactories();
-
     // auto filter_chain_manager = config_->filterChainManager();
     // filter_chain_manager.
-    // config_ = config_; // listenerImpl
 
-    // cb = retryConnection()
-    // auto cb = []() {};
-    // auto master_dispatcher = std::move(dispatcher_); // this should be master.dispatcher
-    // master_dispatcher.post([worker_name, listener_name, filter_chain_impl_ptr, cb]() {
-    //   // master.listenerManager().update(worker_name, listener_name, filter_chain_impl_ptr, cb);
-    // });
-
-    //     listenerManager.updateReady(workerID, workerCb retry) {
+    //     listenerManager.updateReady(FilterChainRebuildInfo) {
     //       worker[workerID].dispatcher.post([, ]) {
     //         worker[workerID].retry(listenerID, filter_chain);
     //       }

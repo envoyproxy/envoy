@@ -266,8 +266,8 @@ void FilterChainManagerImpl::addFakeFilterChain(
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
     auto filter_chain_impl = findExistingFilterChain(*filter_chain);
     if (filter_chain_impl == nullptr) {
-
-      filter_chain_impl = std::make_unique<FilterChainImpl>(); // fake filter chain placeholder
+      filter_chain_impl =
+          std::make_unique<FilterChainImpl>(filter_chain); // fake filter chain placeholder
       ++new_filter_chain_size;
     }
 
@@ -285,7 +285,7 @@ void FilterChainManagerImpl::addFakeFilterChain(
 }
 
 void FilterChainManagerImpl::rebuildFilterChain(
-    const envoy::config::listener::v3::FilterChain*& filter_chain,
+    const envoy::config::listener::v3::FilterChain* const& filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
