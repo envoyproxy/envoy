@@ -221,7 +221,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
     --define use_legacy_codecs_in_integration_tests=true \
-    --define --cxxopt=-std=c++14 \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
