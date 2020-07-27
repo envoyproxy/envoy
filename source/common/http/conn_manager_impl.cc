@@ -516,7 +516,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
-    : connection_manager_(connection_manager), filter_manager_(*this),
+    : connection_manager_(connection_manager), filter_manager_(*this, *this),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
@@ -1016,7 +1016,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     traceRequest();
   }
 
-  filter_manager_.decodeHeaders(nullptr, *request_headers_, end_stream);
+  filter_manager_.decodeHeaders(*request_headers_, end_stream);
 
   // Reset it here for both global and overridden cases.
   resetIdleTimer();
@@ -1159,8 +1159,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   filter_manager_.maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
 
-  filter_manager_.decodeData(nullptr, data, end_stream,
-                             FilterManager::FilterIterationStartState::CanStartFromCurrent);
+  filter_manager_.decodeData(data, end_stream);
 }
 
 void ConnectionManagerImpl::FilterManager::decodeData(
@@ -1324,7 +1323,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
   resetIdleTimer();
   filter_manager_.maybeEndDecode(true);
   request_trailers_ = std::move(trailers);
-  filter_manager_.decodeTrailers(nullptr, *request_trailers_);
+  filter_manager_.decodeTrailers(*request_trailers_);
 }
 
 void ConnectionManagerImpl::FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter,
@@ -1373,7 +1372,7 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metada
   // After going through filters, the ownership of metadata_map will be passed to terminal filter.
   // The terminal filter may encode metadata_map to the next hop immediately or store metadata_map
   // and encode later when connection pool is ready.
-  filter_manager_.decodeMetadata(nullptr, *metadata_map);
+  filter_manager_.decodeMetadata(*metadata_map);
 }
 
 void ConnectionManagerImpl::FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter,
@@ -1586,11 +1585,11 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
                 modify_headers(*response_headers);
               }
               response_headers_ = std::move(response_headers);
-              encodeHeadersInternal(*response_headers_, end_stream);
+              encodeHeaders(*response_headers_, end_stream);
               filter_manager_.maybeEndEncode(end_stream);
             },
             [&](Buffer::Instance& data, bool end_stream) -> void {
-              encodeDataInternal(data, end_stream);
+              encodeData(data, end_stream);
               filter_manager_.maybeEndEncode(end_stream);
             }},
         Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*request_headers_), code, body,
@@ -1676,6 +1675,11 @@ void ConnectionManagerImpl::FilterManager::encode100ContinueHeaders(
     }
   }
 
+  callbacks_.encode100ContinueHeaders(headers);
+}
+
+void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
+    ResponseHeaderMap& response_headers) {
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(headers, active_stream_.request_headers_.get(),
@@ -1759,7 +1763,7 @@ void ConnectionManagerImpl::FilterManager::encodeHeaders(ActiveStreamEncoderFilt
 
   const bool modified_end_stream = active_stream_.state_.encoding_headers_only_ ||
                                    (end_stream && continue_data_entry == encoder_filters_.end());
-  active_stream_.encodeHeadersInternal(headers, modified_end_stream);
+  callbacks_.encodeHeaders(headers, modified_end_stream);
   maybeEndEncode(modified_end_stream);
 
   if (!modified_end_stream) {
@@ -1767,8 +1771,8 @@ void ConnectionManagerImpl::FilterManager::encodeHeaders(ActiveStreamEncoderFilt
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMap& headers,
-                                                                bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& headers,
+                                                        bool end_stream) {
   // Base headers.
 
   // By default, always preserve the upstream date response header if present. If we choose to
@@ -1915,10 +1919,9 @@ void ConnectionManagerImpl::FilterManager::encodeMetadata(ActiveStreamEncoderFil
 
   // Now encode metadata via the codec.
   if (!metadata_map_ptr->empty()) {
-    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", active_stream_, *metadata_map_ptr);
     MetadataMapVector metadata_map_vector;
     metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
-    active_stream_.response_encoder_->encodeMetadata(metadata_map_vector);
+    callbacks_.encodeMetadata(metadata_map_vector);
   }
 }
 
@@ -2028,7 +2031,7 @@ void ConnectionManagerImpl::FilterManager::encodeData(
   }
 
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
-  active_stream_.encodeDataInternal(data, modified_end_stream);
+  callbacks_.encodeData(data, modified_end_stream);
   maybeEndEncode(modified_end_stream);
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
@@ -2038,8 +2041,7 @@ void ConnectionManagerImpl::FilterManager::encodeData(
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::encodeDataInternal(Buffer::Instance& data,
-                                                             bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!state_.encoding_headers_only_);
   ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
@@ -2079,9 +2081,7 @@ void ConnectionManagerImpl::FilterManager::encodeTrailers(ActiveStreamEncoderFil
     }
   }
 
-  ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", active_stream_, trailers);
-
-  active_stream_.response_encoder_->encodeTrailers(trailers);
+  callbacks_.encodeTrailers(trailers);
   maybeEndEncode(true);
 }
 

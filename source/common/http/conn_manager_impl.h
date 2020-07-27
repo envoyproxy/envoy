@@ -17,6 +17,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -387,9 +388,22 @@ private:
     NullRouteConfigUpdateRequester() = default;
   };
 
+  class FilterManagerCallbacks {
+  public:
+    virtual ~FilterManagerCallbacks() = default;
+
+    // The resulting data will be provided through the following callbacks.
+    virtual void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) PURE;
+    virtual void encode100ContinueHeaders(ResponseHeaderMap& response_headers) PURE;
+    virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+    virtual void encodeTrailers(ResponseTrailerMap& trailers) PURE;
+    virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
+  };
+
   class FilterManager {
   public:
-    explicit FilterManager(ActiveStream& active_stream) : active_stream_(active_stream) {}
+    FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& callbacks)
+        : active_stream_(active_stream), callbacks_(callbacks) {}
     void destroyFilters() {
       for (auto& filter : decoder_filters_) {
         filter->handle_->onDestroy();
@@ -402,11 +416,31 @@ private:
         }
       }
     }
-    // Indicates which filter to start the iteration with.
-    enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
+
+    void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
+      decodeHeaders(nullptr, headers, end_stream);
+    }
+    void decodeData(Buffer::Instance& data, bool end_stream) {
+      decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
+    }
+    void decodeTrailers(RequestTrailerMap& trailers) { decodeTrailers(nullptr, trailers); }
+    void decodeMetadata(MetadataMap& metadata_map) { decodeMetadata(nullptr, metadata_map); }
 
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
+
+    void disarmRequestTimeout();
+    void maybeEndDecode(bool end_stream);
+    void maybeEndEncode(bool end_stream);
+
+    void sendLocalReplyViaFilterChain(
+        bool is_grpc_request, Code code, absl::string_view body,
+        const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+        const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  private:
+    // Indicates which filter to start the iteration with.
+    enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
     // Returns the encoder filter to start iteration with.
     std::list<ActiveStreamEncoderFilterPtr>::iterator
@@ -431,8 +465,6 @@ private:
                     FilterIterationStartState filter_iteration_start_state);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers);
     void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
-    void disarmRequestTimeout();
-    void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     ResponseTrailerMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
@@ -440,10 +472,6 @@ private:
                         bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details);
-    void sendLocalReplyViaFilterChain(
-        bool is_grpc_request, Code code, absl::string_view body,
-        const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-        const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
     // As with most of the encode functions, this runs encodeHeaders on various
     // filters before calling encodeHeadersInternal which does final header munging and passes the
@@ -460,7 +488,6 @@ private:
     void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
 
-    void maybeEndEncode(bool end_stream);
     // Returns true if new metadata is decoded. Otherwise, returns false.
     bool processNewlyAddedMetadata();
 
@@ -472,9 +499,14 @@ private:
 
     ActiveStream& active_stream_;
 
-  private:
+    FilterManagerCallbacks& callbacks_;
+
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
+
+    friend ActiveStreamFilterBase;
+    friend ActiveStreamDecoderFilter;
+    friend ActiveStreamEncoderFilter;
   };
 
   /**
@@ -487,7 +519,8 @@ private:
                         public RequestDecoder,
                         public FilterChainFactoryCallbacks,
                         public Tracing::Config,
-                        public ScopeTrackedObject {
+                        public ScopeTrackedObject,
+                        public FilterManagerCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream() override;
 
@@ -556,6 +589,20 @@ private:
       DUMP_DETAILS(response_headers_);
       DUMP_DETAILS(response_trailers_);
       DUMP_DETAILS(&stream_info_);
+    }
+
+    // FilterManagerCallbacks
+    void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
+    void encode100ContinueHeaders(ResponseHeaderMap& response_headers) override;
+    void encodeData(Buffer::Instance& data, bool end_stream) override;
+    void encodeTrailers(ResponseTrailerMap& trailers) override {
+      ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
+
+      response_encoder_->encodeTrailers(trailers);
+    }
+    void encodeMetadata(MetadataMapVector& metadata) override {
+      ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
+      response_encoder_->encodeMetadata(metadata);
     }
 
     void traceRequest();
