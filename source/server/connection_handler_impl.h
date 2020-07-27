@@ -363,6 +363,11 @@ public:
   void resumeListening() override { udp_listener_->enable(); }
   void shutdownListener() override {
     // The read_filter_ should be deleted before the udp_listener_ is deleted.
+    if (read_filter_.get() != nullptr && udp_listener_.get() == nullptr) {
+      throw Envoy::EnvoyException(
+          fmt::format("The read_filter should be deleted before the udp_listener is deleted: {} ",
+                      config_->name()));
+    }
     read_filter_.reset();
     udp_listener_.reset();
   }
