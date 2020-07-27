@@ -1929,6 +1929,7 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_response_for_timeout",
                                     "false");
   config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
@@ -1947,6 +1948,7 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
   test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
   response->waitForReset();
   EXPECT_FALSE(response->complete());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("max_duration_timeout"));
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.

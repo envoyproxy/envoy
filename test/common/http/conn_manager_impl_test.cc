@@ -2018,6 +2018,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamDisconnectAccessLog) {
         EXPECT_TRUE(stream_info.hasAnyResponseFlag());
         EXPECT_TRUE(
             stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination));
+        EXPECT_EQ("downstream_remote_disconnect", stream_info.responseCodeDetails().value());
       }));
 
   NiceMock<MockResponseEncoder> encoder;
