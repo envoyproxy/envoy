@@ -176,13 +176,13 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
   const auto xid = helper_.peekInt32(data, offset);
   const auto xid_code = static_cast<XidCodes>(xid);
 
-  // Find the corresponding request for this XID.
-  const auto it = requests_by_xid_.find(xid);
-
   std::chrono::milliseconds latency;
   OpCodes opcode;
 
   if (xid_code != XidCodes::WatchXid) {
+    // Find the corresponding request for this XID.
+    const auto it = requests_by_xid_.find(xid);
+
     // If this fails, it's either a server-side bug or a malformed packet.
     if (it == requests_by_xid_.end()) {
       throw EnvoyException("xid not found");
