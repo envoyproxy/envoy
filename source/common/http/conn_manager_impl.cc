@@ -1933,6 +1933,10 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
     // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
+    if (end_stream && response_trailers_ != nullptr) {
+      response_trailers_ = nullptr;
+    }
+
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
     encodeData(&filter, data, end_stream, FilterIterationStartState::AlwaysStartFromNext);
@@ -1981,7 +1985,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(
 
     recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
 
-    (*entry)->end_stream_ = end_stream && !response_trailers_;
+    (*entry)->end_stream_ = end_stream && response_trailers_ == nullptr;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->encodeComplete();
