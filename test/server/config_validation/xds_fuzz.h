@@ -77,6 +77,8 @@ private:
   envoy::config::core::v3::ApiVersion api_version_;
 
   Network::Address::IpVersion ip_version_;
+
+  uint64_t lds_update_success_{0};
 };
 
 } // namespace Envoy

@@ -133,6 +133,7 @@ bool XdsFuzzTest::hasRoute(const std::string& route_name) {
  */
 void XdsFuzzTest::addListener(const std::string& listener_name, const std::string& route_name) {
   ENVOY_LOG_MISC(debug, "Adding {} with reference to {}", listener_name, route_name);
+  lds_update_success_++;
   bool removed = eraseListener(listener_name);
   auto listener = buildListener(listener_name, route_name);
   listeners_.push_back(listener);
@@ -157,6 +158,7 @@ void XdsFuzzTest::removeListener(const std::string& listener_name) {
   bool removed = eraseListener(listener_name);
 
   if (removed) {
+    lds_update_success_++;
     updateListener(listeners_, {}, {listener_name});
     EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
     verifier_.listenerRemoved(listener_name);
@@ -280,6 +282,7 @@ void XdsFuzzTest::replay() {
       test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified());
       test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded());
       test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved());
+      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_);
     }
     ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})",
                    verifier_.numWarming(),
