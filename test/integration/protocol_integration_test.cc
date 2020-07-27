@@ -1117,6 +1117,9 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
         hcm.mutable_http2_protocol_options()
             ->mutable_override_stream_error_on_invalid_http_message()
             ->set_value(true);
+        hcm.mutable_http_protocol_options()
+            ->mutable_override_stream_error_on_invalid_http_message()
+            ->set_value(true);
       });
 
   initialize();
