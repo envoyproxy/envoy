@@ -114,6 +114,9 @@ void Context::activate() {
 
   fancy_default_level_ = log_level_;
   fancy_log_format_ = log_format_;
+  if (logger_mode_ == 1) {
+    getFancyContext().setDefaultFancyLevelFormat(log_level_, log_format_);
+  }
 }
 
 LoggerMode Context::getLoggerMode() { return static_cast<LoggerMode>(logger_mode_); }
