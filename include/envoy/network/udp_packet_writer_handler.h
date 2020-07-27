@@ -107,21 +107,6 @@ public:
    * @return Api::IoCallUint64Result
    */
   virtual Api::IoCallUint64Result flush() PURE;
-
-  /**
-   * @return std::string the name of the udp_packet_writer
-   */
-  virtual std::string name() const PURE;
-
-  /**
-   * @brief Get the io handle associated with the udp_packet_writer
-   */
-  virtual Network::IoHandle& getWriterIoHandle() const PURE;
-
-  /**
-   * @brief Get the Udp Packet Writer Stats object
-   */
-  virtual UdpPacketWriterStats getUdpPacketWriterStats() PURE;
 };
 
 using UdpPacketWriterPtr = std::unique_ptr<UdpPacketWriter>;

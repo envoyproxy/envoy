@@ -95,7 +95,7 @@ udp_writer_config:
   Network::UdpPacketWriterPtr udp_packet_writer =
       manager_->listeners().front().get().udpPacketWriterFactory()->createUdpPacketWriter(
           listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
-  EXPECT_EQ(Network::UdpWriterNames::get().GsoBatchWriter, udp_packet_writer->name());
+  EXPECT_TRUE(udp_packet_writer->isBatchMode());
 
   // No filter chain found with non-matching transport protocol.
   EXPECT_EQ(nullptr, findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111));

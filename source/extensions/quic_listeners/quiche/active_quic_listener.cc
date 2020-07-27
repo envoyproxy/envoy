@@ -69,7 +69,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       per_worker_stats_, dispatcher, listen_socket_);
 
   auto udp_packet_writer = udp_listener_->udpPacketWriter();
-  if (udp_packet_writer->name() == Network::UdpWriterNames::get().GsoBatchWriter) {
+  if (udp_packet_writer->isBatchMode()) {
     quic_dispatcher_->InitializeWithWriter(
         dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer));
   } else {

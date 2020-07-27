@@ -51,7 +51,7 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result) {
 // Initialize QuicGsoBatchWriter, set io_handle_ and stats_
 UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope)
     : quic::QuicGsoBatchWriter(std::make_unique<quic::QuicBatchWriterBuffer>(), io_handle.fd()),
-      io_handle_(io_handle), stats_(generateStats(scope)) {}
+      stats_(generateStats(scope)) {}
 
 // Do Nothing in the Destructor For now
 UdpGsoBatchWriter::~UdpGsoBatchWriter() = default;

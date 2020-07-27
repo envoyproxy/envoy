@@ -36,10 +36,6 @@ public:
         /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
   }
 
-  std::string name() const override;
-  Network::IoHandle& getWriterIoHandle() const override;
-  Network::UdpPacketWriterStats getUdpPacketWriterStats() override { return stats_; }
-
   Network::UdpPacketWriterStats generateStats(Stats::Scope& scope);
 
 private:

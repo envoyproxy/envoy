@@ -32,8 +32,6 @@
 namespace Envoy {
 namespace Quic {
 
-const std::string GsoBatchWriterName{"udp_gso_batch_writer"};
-
 class UdpGsoBatchWriter : public quic::QuicGsoBatchWriter, public Network::UdpPacketWriter {
 public:
   UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope);
@@ -55,11 +53,6 @@ public:
                        const Network::Address::Instance& peer_address) override;
   Api::IoCallUint64Result flush() override;
 
-  // UdpPacketWriter Implementations
-  std::string name() const override { return GsoBatchWriterName; }
-  Network::IoHandle& getWriterIoHandle() const override { return io_handle_; }
-  Network::UdpPacketWriterStats getUdpPacketWriterStats() override { return stats_; }
-
   /**
    * @brief Update stats_ field for the udp packet writer
    * @param quic_result is the result from Flush/WritePacket
@@ -74,7 +67,6 @@ public:
   Network::UdpPacketWriterStats generateStats(Stats::Scope& scope);
 
 private:
-  Network::IoHandle& io_handle_;
   Network::UdpPacketWriterStats stats_;
 };
 

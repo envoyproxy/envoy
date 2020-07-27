@@ -253,5 +253,6 @@ message Listener {
   // UdpWriterProto in Listener Config
   // This field specifies the udp_writer_name, e.g. "udp_default_writer" or
   // "udp_gso_batch_writer", that can be used to instantiate udp_writer.
+  // If no configuration is specified, Envoy will use "udp_default_writer".
   core.v3.TypedExtensionConfig udp_writer_config = 23;
 }

@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace Quic {
 
+const std::string GsoBatchWriterName{"udp_gso_batch_writer"};
+
 // A factory to create UdpGsoBatchWriterFactory based on given protobuf.
 class UdpGsoBatchWriterConfigFactory : public Network::UdpPacketWriterConfigFactory {
 public:

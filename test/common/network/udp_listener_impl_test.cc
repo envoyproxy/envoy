@@ -300,7 +300,6 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
  */
 TEST_P(UdpListenerImplTest, SendData) {
   EXPECT_FALSE(listener_->udpPacketWriter()->isBatchMode());
-  EXPECT_EQ(Network::UdpWriterNames::get().DefaultWriter, listener_->udpPacketWriter()->name());
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
@@ -310,7 +309,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   UdpSendData send_data{send_from_addr->ip(), *client_.localAddress(), *buffer};
 
   uint64_t total_bytes_sent =
-      listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value();
+      listener_config_.listenerScope().counterFromString("total_bytes_sent").value();
 
   auto send_result = listener_->send(send_data);
 
@@ -320,7 +319,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   total_bytes_sent += bytes_to_read;
   UdpRecvData data;
   client_.recv(data);
-  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value(),
+  EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
             total_bytes_sent);
   EXPECT_EQ(bytes_to_read, data.buffer_->length());
   EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
@@ -330,7 +329,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   auto flush_result = listener_->udpPacketWriter()->flush();
   EXPECT_TRUE(flush_result.ok());
   EXPECT_EQ(0, flush_result.rc_);
-  EXPECT_EQ(listener_->udpPacketWriter()->getUdpPacketWriterStats().total_bytes_sent_.value(),
+  EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
             total_bytes_sent);
 }
 

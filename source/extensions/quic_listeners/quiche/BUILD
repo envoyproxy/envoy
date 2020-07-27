@@ -295,7 +295,6 @@ envoy_cc_library(
         ":quic_envoy_packet_writer_lib",
         "//include/envoy/network:listener_interface",
         "//source/common/network:listener_lib",
-        "//source/common/network:well_known_names_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/server:connection_handler_lib",
