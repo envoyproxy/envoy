@@ -11,7 +11,7 @@ android_artifacts(
     archive_name = "envoy",
     manifest = "EnvoyManifest.xml",
     native_deps = [
-        "//library/common:libenvoy_jni.so",
+        "//library/common/jni:libenvoy_jni.so",
     ],
     proguard_rules = "//library:proguard_rules",
     visibility = ["//visibility:public"],
