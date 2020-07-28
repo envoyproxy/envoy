@@ -52,7 +52,8 @@ void DynamicFilterConfigProviderImpl::validateConfig(
 }
 
 void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryCb config,
-                                                     const std::string&, Config::ConfigAppliedCb cb) {
+                                                     const std::string&,
+                                                     Config::ConfigAppliedCb cb) {
   tls_->runOnAllThreads([config, cb](ThreadLocal::ThreadLocalObjectSharedPtr previous)
                             -> ThreadLocal::ThreadLocalObjectSharedPtr {
     auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
@@ -129,13 +130,11 @@ void FilterConfigSubscription::onConfigUpdate(
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-  const auto pending_update =
-      std::make_shared<std::atomic<uint64_t>>(factory_context_.admin().concurrency() * filter_config_providers_.size());
+  const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
+      factory_context_.admin().concurrency() * filter_config_providers_.size());
   for (auto* provider : filter_config_providers_) {
-    provider->onConfigUpdate(factory_callback, version_info, [this, version_info, pending_update]() {
-      std::cout << "UPDATING CONFIG " << version_info << std::endl;
+    provider->onConfigUpdate(factory_callback, version_info, [this, pending_update]() {
       if (--(*pending_update) == 0) {
-        std::cout << "STAT INCREMENT UPDATING CONFIG " << version_info << std::endl;
         stats_.config_reload_.inc();
       }
     });

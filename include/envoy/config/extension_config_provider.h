@@ -49,7 +49,8 @@ public:
    * @param version_info is the version of the new extension configuration.
    * @param cb the continuation callback for a completed configuration application.
    */
-  virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info, ConfigAppliedCb cb) PURE;
+  virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info,
+                              ConfigAppliedCb cb) PURE;
 };
 
 } // namespace Config
