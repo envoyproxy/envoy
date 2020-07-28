@@ -105,6 +105,19 @@ private:
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
 };
 
+class TestSignatureCallback : public quic::ProofSource::SignatureCallback {
+public:
+  TestSignatureCallback(bool expect_success) : expect_success_(expect_success) {}
+
+  // quic::ProofSource::SignatureCallback
+  void Run(bool ok, std::string, std::unique_ptr<quic::ProofSource::Details>) override {
+    EXPECT_EQ(expect_success_, ok);
+  }
+
+private:
+  bool expect_success_;
+};
+
 class EnvoyQuicProofSourceTest : public ::testing::Test {
 public:
   EnvoyQuicProofSourceTest()
@@ -164,6 +177,29 @@ TEST_F(EnvoyQuicProofSourceTest, TestGetProof) {
   proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
                          chlo_hash_, std::move(callback));
   EXPECT_TRUE(called);
+}
+
+TEST_F(EnvoyQuicProofSourceTest, InvalidPrivateKey) {
+  EXPECT_CALL(listen_socket_, ioHandle());
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+      .WillOnce(Invoke(
+          [&](const Network::ConnectionSocket& connection_socket) { return &filter_chain_; }));
+  auto server_context_config = std::make_unique<Ssl::MockServerContextConfig>();
+  auto server_context_config_ptr = server_context_config.get();
+  QuicServerTransportSocketFactory transport_socket_factory(std::move(server_context_config));
+  EXPECT_CALL(filter_chain_, transportSocketFactory())
+      .WillRepeatedly(ReturnRef(transport_socket_factory));
+
+  Ssl::MockTlsCertificateConfig tls_cert_config;
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
+      std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config)};
+  EXPECT_CALL(*server_context_config_ptr, tlsCertificates())
+      .WillRepeatedly(Return(tls_cert_configs));
+  std::string invalid_pkey("abcdefg");
+  EXPECT_CALL(tls_cert_config, privateKey()).WillOnce(ReturnRef(invalid_pkey));
+  proof_source_.ComputeTlsSignature(server_address_, client_address_, hostname_,
+                                    SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
+                                    std::make_unique<TestSignatureCallback>(false));
 }
 
 } // namespace Quic

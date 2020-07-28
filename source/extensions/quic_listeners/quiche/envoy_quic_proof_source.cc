@@ -50,7 +50,7 @@ void EnvoyQuicProofSource::signPayload(
       res.cert_config_;
   if (!cert_config_ref.has_value()) {
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
-    callback->Run(false, "", nullptr);
+    callback->Run(false, "No matching filter chain found for handshake.", nullptr);
     return;
   }
   auto& cert_config = cert_config_ref.value().get();
@@ -59,7 +59,11 @@ void EnvoyQuicProofSource::signPayload(
   std::stringstream pem_str(pkey);
   std::unique_ptr<quic::CertificatePrivateKey> pem_key =
       quic::CertificatePrivateKey::LoadPemFromStream(&pem_str);
-
+  if (pem_key == nullptr) {
+    ENVOY_LOG(warn, "Failed to load private key.");
+    callback->Run(false, "", nullptr);
+    return;
+  }
   // Sign.
   std::string sig = pem_key->Sign(in, signature_algorithm);
 
