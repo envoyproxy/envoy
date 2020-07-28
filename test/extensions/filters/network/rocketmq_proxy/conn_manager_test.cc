@@ -647,12 +647,14 @@ TEST_F(RocketmqConnectionManagerTest, OnDataWithUnsupportedCode) {
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 }
 
-TEST_F(RocketmqConnectionManagerTest, AssertFailure) {
+TEST_F(RocketmqConnectionManagerTest, OnDataInvalidFrameLength) {
+  // Test against the invalid input where frame_length <= header_length.
   const std::string yaml = R"EOF(
   stat_prefix: test
   )EOF";
   initializeFilter(yaml);
-  buffer_.add(std::string({'\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00'}));
+  buffer_.add(
+      std::string({'\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00'}));
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
 
