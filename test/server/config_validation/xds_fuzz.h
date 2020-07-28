@@ -77,6 +77,7 @@ private:
   envoy::config::core::v3::ApiVersion api_version_;
 
   Network::Address::IpVersion ip_version_;
+  std::chrono::seconds timeout_{5};
 };
 
 } // namespace Envoy
