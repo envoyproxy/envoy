@@ -344,6 +344,7 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     external_deps = [
+        "abseil_node_hash_set",
         "abseil_optional",
         "nghttp2",
     ],

@@ -249,7 +249,7 @@ protected:
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
-    virtual void decodeHeaders(bool allow_waiting_for_informational_headers) PURE;
+    virtual void decodeHeaders() PURE;
     virtual void decodeTrailers() PURE;
 
     // Get MetadataEncoder for this stream.
@@ -281,7 +281,7 @@ protected:
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
     bool data_deferred_ : 1;
-    bool waiting_for_non_informational_headers_ : 1;
+    bool received_noninformational_headers_ : 1;
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
@@ -306,7 +306,7 @@ protected:
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     StreamDecoder& decoder() override { return response_decoder_; }
-    void decodeHeaders(bool allow_waiting_for_informational_headers) override;
+    void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
@@ -318,10 +318,10 @@ protected:
     void allocTrailers() override {
       // If we are waiting for informational headers, make a new response header map, otherwise
       // we are about to receive trailers. The codec makes sure this is the only valid sequence.
-      if (waiting_for_non_informational_headers_) {
-        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
-      } else {
+      if (received_noninformational_headers_) {
         headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
+      } else {
+        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
       }
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
@@ -356,7 +356,7 @@ protected:
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     StreamDecoder& decoder() override { return *request_decoder_; }
-    void decodeHeaders(bool allow_waiting_for_informational_headers) override;
+    void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {

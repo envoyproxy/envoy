@@ -814,7 +814,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   // Remove the duplicated hosts from both resolve targets and ensure that we don't see the same
   // host multiple times.
-  std::unordered_set<HostSharedPtr> removed_hosts;
+  absl::node_hash_set<HostSharedPtr> removed_hosts;
   cluster.prioritySet().addPriorityUpdateCb(
       [&](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
         for (const auto& host : hosts_removed) {
