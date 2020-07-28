@@ -210,7 +210,7 @@ public:
    */
   static AssertionResult waitForCounterEq(Stats::Store& store, const std::string& name,
                                           uint64_t value, Event::TestTimeSystem& time_system,
-                                          std::chrono::milliseconds timeout = DefaultTimeout);
+                                          absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
 
   /**
    * Wait for a counter to >= a given value.
@@ -224,7 +224,7 @@ public:
    */
   static AssertionResult waitForCounterGe(Stats::Store& store, const std::string& name,
                                           uint64_t value, Event::TestTimeSystem& time_system,
-                                          std::chrono::milliseconds timeout = DefaultTimeout);
+                                          absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
 
   /**
    * Wait for a gauge to >= a given value.
@@ -238,7 +238,7 @@ public:
    */
   static AssertionResult waitForGaugeGe(Stats::Store& store, const std::string& name,
                                         uint64_t value, Event::TestTimeSystem& time_system,
-                                        std::chrono::milliseconds timeout = DefaultTimeout);
+                                        absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
 
   /**
    * Wait for a gauge to == a given value.
@@ -252,7 +252,7 @@ public:
    */
   static AssertionResult waitForGaugeEq(Stats::Store& store, const std::string& name,
                                         uint64_t value, Event::TestTimeSystem& time_system,
-                                        std::chrono::milliseconds timeout = DefaultTimeout);
+                                        absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
 
   /**
    * Find a readout in a stats store.

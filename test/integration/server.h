@@ -412,20 +412,20 @@ public:
              Server::FieldValidationConfig validation_config, uint32_t concurrency,
              std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
-  void waitForCounterEq(const std::string& name, uint64_t value) override {
-    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_));
+  void waitForCounterEq(const std::string& name, uint64_t value, absl::optional<std::chrono::milliseconds> timeout = absl::nullopt) override {
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForCounterGe(const std::string& name, uint64_t value) override {
-    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_));
+  void waitForCounterGe(const std::string& name, uint64_t value, absl::optional<std::chrono::milliseconds> timeout = absl::nullopt) override {
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_));
+  void waitForGaugeGe(const std::string& name, uint64_t value, absl::optional<std::chrono::milliseconds> timeout = absl::nullopt) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_));
+  void waitForGaugeEq(const std::string& name, uint64_t value, absl::optional<std::chrono::milliseconds> timeout = absl::nullopt) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/stats/stats.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -14,28 +15,28 @@ public:
    * @param name counter name.
    * @param value target value.
    */
-  virtual void waitForCounterEq(const std::string& name, uint64_t value) PURE;
+  virtual void waitForCounterEq(const std::string& name, uint64_t value, absl::optional<std::chrono::milliseconds> timeout = absl::nullopt) PURE;
 
   /**
    * Wait for a counter to >= a given value.
    * @param name counter name.
    * @param value target value.
    */
-  virtual void waitForCounterGe(const std::string& name, uint64_t value) PURE;
+  virtual void waitForCounterGe(const std::string& name, uint64_t value, absl::optional<std::chrono::milliseconds> timeout = absl::nullopt) PURE;
 
   /**
    * Wait for a gauge to >= a given value.
    * @param name gauge name.
    * @param value target value.
    */
-  virtual void waitForGaugeGe(const std::string& name, uint64_t value) PURE;
+  virtual void waitForGaugeGe(const std::string& name, uint64_t value, absl::optional<std::chrono::milliseconds> timeout = absl::nullopt) PURE;
 
   /**
    * Wait for a gauge to == a given value.
    * @param name gauge name.
    * @param value target value.
    */
-  virtual void waitForGaugeEq(const std::string& name, uint64_t value) PURE;
+  virtual void waitForGaugeEq(const std::string& name, uint64_t value, absl::optional<std::chrono::milliseconds> timeout = absl::nullopt) PURE;
 
   /**
    * Counter lookup. This is not thread safe, since we don't get a consistent
