@@ -389,7 +389,7 @@ private:
 
   class FilterManager {
   public:
-    explicit FilterManager(ActiveStream& parent) : parent_(parent) {}
+    explicit FilterManager(ActiveStream& active_stream) : active_stream_(active_stream) {}
     void destroyFilters() {
       for (auto& filter : decoder_filters_) {
         filter->handle_->onDestroy();
@@ -470,7 +470,7 @@ private:
     bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
                              bool& filter_streaming);
 
-    ActiveStream& parent_;
+    ActiveStream& active_stream_;
 
   private:
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
