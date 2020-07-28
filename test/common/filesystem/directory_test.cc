@@ -1,13 +1,13 @@
 #include <fstream>
 #include <stack>
 #include <string>
-#include <unordered_set>
 
 #include "common/filesystem/directory.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -66,7 +66,7 @@ struct EntryHash {
   }
 };
 
-using EntrySet = std::unordered_set<DirectoryEntry, EntryHash>;
+using EntrySet = absl::node_hash_set<DirectoryEntry, EntryHash>;
 
 EntrySet getDirectoryContents(const std::string& dir_path, bool recursive) {
   Directory directory(dir_path);

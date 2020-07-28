@@ -24,10 +24,15 @@ public:
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
 
+  envoy::config::cluster::v3::Cluster buildTlsCluster(const std::string& name);
+
   envoy::config::cluster::v3::Cluster buildRedisCluster(const std::string& name);
 
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name);
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildTlsClusterLoadAssignment(const std::string& name);
 
   envoy::config::listener::v3::Listener buildListener(const std::string& name,
                                                       const std::string& route_config,
