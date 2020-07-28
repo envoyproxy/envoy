@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_alarm_lib",
     srcs = ["envoy_quic_alarm.cc"],
     hdrs = ["envoy_quic_alarm.h"],
@@ -23,7 +23,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_alarm_factory_lib",
     srcs = ["envoy_quic_alarm_factory.cc"],
     hdrs = ["envoy_quic_alarm_factory.h"],
@@ -37,7 +37,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_connection_helper_lib",
     hdrs = ["envoy_quic_connection_helper.h"],
     tags = ["nofips"],
@@ -49,7 +49,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_packet_writer_lib",
     srcs = ["envoy_quic_packet_writer.cc"],
     hdrs = ["envoy_quic_packet_writer.h"],
@@ -61,7 +61,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_fake_proof_source_lib",
     hdrs = ["envoy_quic_fake_proof_source.h"],
     external_deps = ["quiche_quic_platform"],
@@ -72,7 +72,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_proof_source_lib",
     srcs = ["envoy_quic_proof_source.cc"],
     hdrs = ["envoy_quic_proof_source.h"],
@@ -90,7 +90,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_proof_verifier_lib",
     hdrs = ["envoy_quic_fake_proof_verifier.h"],
     external_deps = ["quiche_quic_platform"],
@@ -101,7 +101,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "spdy_server_push_utils_for_envoy_lib",
     srcs = ["spdy_server_push_utils_for_envoy.cc"],
     tags = ["nofips"],
@@ -112,7 +112,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_stream_lib",
     hdrs = ["envoy_quic_stream.h"],
     tags = ["nofips"],
@@ -125,7 +125,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -141,7 +141,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "quic_filter_manager_connection_lib",
     srcs = ["quic_filter_manager_connection_impl.cc"],
     hdrs = ["quic_filter_manager_connection_impl.h"],
@@ -160,7 +160,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_server_session_lib",
     srcs = [
         "envoy_quic_server_session.cc",
@@ -184,7 +184,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_client_session_lib",
     srcs = [
         "envoy_quic_client_session.cc",
@@ -208,7 +208,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "quic_io_handle_wrapper_lib",
     hdrs = ["quic_io_handle_wrapper.h"],
     deps = [
@@ -217,7 +217,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_connection_lib",
     srcs = ["envoy_quic_connection.cc"],
     hdrs = ["envoy_quic_connection.h"],
@@ -232,7 +232,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_server_connection_lib",
     srcs = ["envoy_quic_server_connection.cc"],
     hdrs = ["envoy_quic_server_connection.h"],
@@ -243,7 +243,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_client_connection_lib",
     srcs = ["envoy_quic_client_connection.cc"],
     hdrs = ["envoy_quic_client_connection.h"],
@@ -257,7 +257,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_dispatcher_lib",
     srcs = ["envoy_quic_dispatcher.cc"],
     hdrs = ["envoy_quic_dispatcher.h"],
@@ -274,13 +274,13 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_simulated_watermark_buffer_lib",
     hdrs = ["envoy_quic_simulated_watermark_buffer.h"],
     deps = ["//source/common/common:assert_lib"],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "active_quic_listener_lib",
     srcs = ["active_quic_listener.cc"],
     hdrs = ["active_quic_listener.h"],
@@ -301,11 +301,17 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "active_quic_listener_config_lib",
     srcs = ["active_quic_listener_config.cc"],
     hdrs = ["active_quic_listener_config.h"],
     tags = ["nofips"],
+    # TODO(#9953) this should be cleaned up
+    visibility = [
+        "//source/extensions:__subpackages__",
+        "//test/extensions:__subpackages__",
+        "//test/server:__subpackages__",
+    ],
     deps = [
         ":active_quic_listener_lib",
         "//include/envoy/registry",
@@ -313,7 +319,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_utils_lib",
     srcs = ["envoy_quic_utils.cc"],
     hdrs = ["envoy_quic_utils.h"],
@@ -347,7 +353,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "envoy_quic_crypto_server_stream_lib",
     srcs = ["envoy_quic_crypto_server_stream.cc"],
     hdrs = ["envoy_quic_crypto_server_stream.h"],

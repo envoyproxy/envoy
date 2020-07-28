@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -12,10 +12,16 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
+    # Legacy test use. TODO(#9953) clean up.
+    visibility = [
+        "//source/extensions:__subpackages__",
+        "//test/common/network:__pkg__",
+        "//test/extensions:__subpackages__",
+    ],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",

@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -12,19 +12,19 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "bson_interface",
     hdrs = ["bson.h"],
     deps = ["//include/envoy/buffer:buffer_interface"],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [":bson_interface"],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "bson_lib",
     srcs = ["bson_impl.cc"],
     hdrs = ["bson_impl.h"],
@@ -39,7 +39,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -52,7 +52,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "proxy_lib",
     srcs = ["proxy.cc"],
     hdrs = ["proxy.h"],
@@ -82,7 +82,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "mongo_stats_lib",
     srcs = ["mongo_stats.cc"],
     hdrs = ["mongo_stats.h"],
@@ -93,7 +93,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

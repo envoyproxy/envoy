@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -26,7 +26,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "ssl_socket_lib",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
@@ -37,6 +37,8 @@ envoy_cc_library(
         "abseil_synchronization",
         "ssl",
     ],
+    # TLS is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         ":context_config_lib",
         ":context_lib",
@@ -55,13 +57,15 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
     external_deps = [
         "ssl",
     ],
+    # TLS is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_provider_interface",
@@ -80,7 +84,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "context_lib",
     srcs = [
         "context_impl.cc",
@@ -95,6 +99,8 @@ envoy_cc_library(
         "abseil_synchronization",
         "ssl",
     ],
+    # TLS is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         ":utility_lib",
         "//include/envoy/ssl:context_config_interface",
@@ -119,7 +125,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

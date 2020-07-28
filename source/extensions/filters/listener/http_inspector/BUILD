@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "http_inspector_lib",
     srcs = ["http_inspector.cc"],
     hdrs = ["http_inspector.h"],

@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -12,10 +12,12 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "file_access_log_lib",
     srcs = ["file_access_log_impl.cc"],
     hdrs = ["file_access_log_impl.h"],
+    # The file based access logger is core code.
+    visibility = ["//visibility:public"],
     deps = [
         "//source/extensions/access_loggers/common:access_log_base",
     ],

@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "extractor_lib",
     srcs = ["extractor.cc"],
     hdrs = ["extractor.h"],
@@ -19,7 +19,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "jwks_cache_lib",
     srcs = ["jwks_cache.cc"],
     hdrs = ["jwks_cache.h"],
@@ -34,7 +34,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "authenticator_lib",
     srcs = ["authenticator.cc"],
     hdrs = ["authenticator.h"],
@@ -49,7 +49,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
@@ -80,7 +80,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "matchers_lib",
     srcs = ["matcher.cc"],
     hdrs = ["matcher.h"],
@@ -94,7 +94,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "verifier_lib",
     srcs = ["verifier.cc"],
     hdrs = ["verifier.h"],
@@ -106,7 +106,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "filter_config_interface",
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],

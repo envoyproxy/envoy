@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
     "envoy_select_google_grpc",
 )
@@ -24,7 +24,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "opencensus_tracer_impl",
     srcs = ["opencensus_tracer_impl.cc"],
     hdrs = ["opencensus_tracer_impl.h"],

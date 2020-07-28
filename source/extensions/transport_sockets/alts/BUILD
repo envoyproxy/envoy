@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -12,7 +12,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "grpc_tsi_wrapper",
     hdrs = [
         "grpc_tsi.h",
@@ -49,7 +49,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "tsi_frame_protector",
     srcs = [
         "tsi_frame_protector.cc",
@@ -63,7 +63,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "tsi_handshaker",
     srcs = [
         "tsi_handshaker.cc",
@@ -78,7 +78,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "tsi_socket",
     srcs = [
         "tsi_socket.cc",
@@ -101,7 +101,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "noop_transport_socket_callbacks_lib",
     hdrs = ["noop_transport_socket_callbacks.h"],
     deps = [

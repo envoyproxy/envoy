@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -18,7 +18,7 @@ envoy_proto_library(
     srcs = ["request_response.proto"],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "aws_lambda_filter_lib",
     srcs = ["aws_lambda_filter.cc"],
     hdrs = ["aws_lambda_filter.h"],

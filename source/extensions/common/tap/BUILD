@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "tap_interface",
     hdrs = ["tap.h"],
     deps = [
@@ -19,7 +19,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "tap_config_base",
     srcs = ["tap_config_base.cc"],
     hdrs = ["tap_config_base.h"],
@@ -33,7 +33,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "tap_matcher",
     srcs = ["tap_matcher.cc"],
     hdrs = ["tap_matcher.h"],
@@ -45,7 +45,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "admin",
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
@@ -60,7 +60,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "extension_config_base",
     srcs = ["extension_config_base.cc"],
     hdrs = ["extension_config_base.h"],

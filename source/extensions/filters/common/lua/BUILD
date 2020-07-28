@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 load("//bazel:envoy_internal.bzl", "envoy_external_dep_path")
@@ -22,7 +22,7 @@ config_setting(
     },
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "lua_lib",
     srcs = ["lua.cc"],
     hdrs = ["lua.h"],
@@ -37,7 +37,7 @@ envoy_cc_library(
     }),
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "wrappers_lib",
     srcs = ["wrappers.cc"],
     hdrs = ["wrappers.h"],

@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -13,7 +13,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "adaptive_concurrency_filter_lib",
     srcs = ["adaptive_concurrency_filter.cc"],
     hdrs = ["adaptive_concurrency_filter.h"],

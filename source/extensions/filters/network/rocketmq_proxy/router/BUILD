@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "router_interface",
     hdrs = ["router.h"],
     deps = [
@@ -18,7 +18,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "router_lib",
     srcs = ["router_impl.cc"],
     hdrs = ["router_impl.h"],
@@ -31,7 +31,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "route_matcher",
     srcs = ["route_matcher.cc"],
     hdrs = ["route_matcher.h"],

@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [
@@ -17,13 +17,13 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "utility_interface",
     hdrs = ["utility.h"],
     deps = [":codec_interface"],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -35,7 +35,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "supported_commands_lib",
     hdrs = ["supported_commands.h"],
     deps = [
@@ -43,7 +43,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "client_interface",
     hdrs = ["client.h"],
     deps = [
@@ -53,7 +53,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "client_lib",
     srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
@@ -75,7 +75,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -85,7 +85,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "redis_command_stats_lib",
     srcs = ["redis_command_stats.cc"],
     hdrs = ["redis_command_stats.h"],
@@ -101,7 +101,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "fault_interface",
     hdrs = ["fault.h"],
     deps = [
@@ -109,7 +109,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "fault_lib",
     srcs = ["fault_impl.cc"],
     hdrs = ["fault_impl.h"],

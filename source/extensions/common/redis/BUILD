@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -12,14 +12,14 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "cluster_refresh_manager_interface",
     hdrs = ["cluster_refresh_manager.h"],
     deps = [
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "cluster_refresh_manager_lib",
     srcs = ["cluster_refresh_manager_impl.cc"],
     hdrs = ["cluster_refresh_manager_impl.h"],

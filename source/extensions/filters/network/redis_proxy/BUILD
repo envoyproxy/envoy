@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -13,7 +13,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "command_splitter_interface",
     hdrs = ["command_splitter.h"],
     deps = [
@@ -22,7 +22,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "config_interface",
     hdrs = ["config.h"],
     deps = [
@@ -34,7 +34,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
@@ -44,13 +44,13 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "router_interface",
     hdrs = ["router.h"],
     deps = [":conn_pool_interface"],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "command_splitter_lib",
     srcs = ["command_splitter_impl.cc"],
     hdrs = ["command_splitter_impl.h"],
@@ -71,7 +71,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "conn_pool_lib",
     srcs = ["conn_pool_impl.cc"],
     hdrs = ["conn_pool_impl.h"],
@@ -98,7 +98,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
@@ -138,7 +138,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "router_lib",
     srcs = ["router_impl.cc"],
     hdrs = ["router_impl.h"],

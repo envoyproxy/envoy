@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "app_exception_lib",
     srcs = ["app_exception_impl.cc"],
     hdrs = ["app_exception_impl.h"],
@@ -20,7 +20,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "buffer_helper_lib",
     srcs = ["buffer_helper.cc"],
     hdrs = ["buffer_helper.h"],
@@ -60,7 +60,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "conn_manager_lib",
     srcs = ["conn_manager.cc"],
     hdrs = ["conn_manager.h"],
@@ -89,7 +89,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "decoder_events_lib",
     hdrs = ["decoder_events.h"],
     deps = [
@@ -98,7 +98,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "decoder_lib",
     srcs = ["decoder.cc"],
     hdrs = ["decoder.h"],
@@ -112,7 +112,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "metadata_lib",
     hdrs = ["metadata.h"],
     external_deps = ["abseil_optional"],
@@ -125,14 +125,14 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "tracing_interface",
     hdrs = ["tracing.h"],
     external_deps = ["abseil_optional"],
     deps = [],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "protocol_converter_lib",
     hdrs = [
         "protocol_converter.h",
@@ -144,7 +144,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "protocol_interface",
     hdrs = [
         "protocol.h",
@@ -166,7 +166,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "auto_protocol_lib",
     srcs = [
         "auto_protocol_impl.cc",
@@ -184,7 +184,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "binary_protocol_lib",
     srcs = [
         "binary_protocol_impl.cc",
@@ -199,7 +199,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "compact_protocol_lib",
     srcs = [
         "compact_protocol_impl.cc",
@@ -215,7 +215,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "twitter_protocol_lib",
     srcs = [
         "twitter_protocol_impl.cc",
@@ -232,7 +232,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "stats_lib",
     hdrs = ["stats.h"],
     deps = [
@@ -241,7 +241,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "transport_interface",
     hdrs = ["transport.h"],
     external_deps = ["abseil_optional"],
@@ -258,7 +258,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "conn_state_lib",
     hdrs = ["conn_state.h"],
     deps = [
@@ -266,7 +266,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "thrift_lib",
     hdrs = ["thrift.h"],
     deps = [
@@ -275,7 +275,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "thrift_object_interface",
     hdrs = ["thrift_object.h"],
     deps = [
@@ -284,7 +284,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "thrift_object_lib",
     srcs = ["thrift_object_impl.cc"],
     hdrs = ["thrift_object_impl.h"],
@@ -297,7 +297,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "auto_transport_lib",
     srcs = [
         "auto_transport_impl.cc",
@@ -318,7 +318,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "framed_transport_lib",
     srcs = [
         "framed_transport_impl.cc",
@@ -333,7 +333,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "header_transport_lib",
     srcs = [
         "header_transport_impl.cc",
@@ -349,7 +349,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "unframed_transport_lib",
     srcs = [
         "unframed_transport_impl.cc",

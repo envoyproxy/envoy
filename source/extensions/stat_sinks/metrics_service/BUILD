@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "metrics_service_grpc_lib",
     srcs = ["grpc_metrics_service_impl.cc"],
     hdrs = ["grpc_metrics_service_impl.h"],
@@ -26,7 +26,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "metrics_proto_descriptors_lib",
     srcs = ["grpc_metrics_proto_descriptors.cc"],
     hdrs = ["grpc_metrics_proto_descriptors.h"],

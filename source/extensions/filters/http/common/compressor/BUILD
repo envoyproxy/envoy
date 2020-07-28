@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension_library",
     "envoy_package",
 )
 
@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 # TODO(rojkov): move this library to source/extensions/filters/http/compressor/.
-envoy_cc_library(
+envoy_cc_extension_library(
     name = "compressor_lib",
     srcs = ["compressor.cc"],
     hdrs = ["compressor.h"],

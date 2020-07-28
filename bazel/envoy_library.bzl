@@ -77,6 +77,34 @@ def envoy_cc_extension(
         fail("Unknown extension status: " + status)
     envoy_cc_library(name, tags = tags, **kwargs)
 
+def envoy_cc_extension_library(
+        name,
+        srcs = [],
+        hdrs = [],
+        copts = [],
+        visibility = ["//source/extensions:__subpackages__", "//test/extensions:__subpackages__"],
+        external_deps = [],
+        tcmalloc_dep = None,
+        repository = "",
+        tags = [],
+        deps = [],
+        strip_include_prefix = None,
+        textual_hdrs = None):
+    envoy_cc_library(
+        name = name,
+        srcs = srcs,
+        hdrs = hdrs,
+        copts = copts,
+        visibility = visibility,
+        external_deps = external_deps,
+        tcmalloc_dep = tcmalloc_dep,
+        repository = repository,
+        tags = tags,
+        deps = deps,
+        strip_include_prefix = strip_include_prefix,
+        textual_hdrs = textual_hdrs,
+    )
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
         name,
