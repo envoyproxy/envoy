@@ -13,6 +13,7 @@ public:
    * Wait for a counter to == a given value.
    * @param name counter name.
    * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    */
   virtual void
   waitForCounterEq(const std::string& name, uint64_t value,
@@ -22,6 +23,7 @@ public:
    * Wait for a counter to >= a given value.
    * @param name counter name.
    * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    */
   virtual void
   waitForCounterGe(const std::string& name, uint64_t value,
@@ -31,6 +33,7 @@ public:
    * Wait for a gauge to >= a given value.
    * @param name gauge name.
    * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    */
   virtual void
   waitForGaugeGe(const std::string& name, uint64_t value,
@@ -40,6 +43,7 @@ public:
    * Wait for a gauge to == a given value.
    * @param name gauge name.
    * @param value target value.
+   * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
    */
   virtual void
   waitForGaugeEq(const std::string& name, uint64_t value,
