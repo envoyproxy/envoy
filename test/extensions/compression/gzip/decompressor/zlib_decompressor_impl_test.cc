@@ -87,7 +87,7 @@ protected:
 // Test different failures by passing bad initialization params or by calling decompress before
 // init.
 TEST_F(ZlibDecompressorImplFailureTest, DecompressorFailureTest) {
-  EXPECT_DEATH_LOG_TO_STDERR(decompressorBadInitTestHelper(100), "assert failure: result >= 0");
+  EXPECT_DEATH(decompressorBadInitTestHelper(100), "assert failure: result >= 0");
   uninitializedDecompressorTestHelper();
 }
 

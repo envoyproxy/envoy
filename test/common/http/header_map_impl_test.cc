@@ -1005,14 +1005,14 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
 TEST(TestHeaderMapImplDeathTest, TestHeaderLengthChecks) {
   HeaderString value;
   value.setCopy("some;");
-  EXPECT_DEATH_LOG_TO_STDERR(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
-                             "Trying to allocate overly large headers.");
+  EXPECT_DEATH(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
+               "Trying to allocate overly large headers.");
 
   std::string source("hello");
   HeaderString reference;
   reference.setReference(source);
-  EXPECT_DEATH_LOG_TO_STDERR(reference.append(nullptr, std::numeric_limits<uint32_t>::max()),
-                             "Trying to allocate overly large headers.");
+  EXPECT_DEATH(reference.append(nullptr, std::numeric_limits<uint32_t>::max()),
+               "Trying to allocate overly large headers.");
 }
 
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {
