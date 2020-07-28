@@ -22,33 +22,28 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // Will extend to cover other network filters one by one.
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
-    filter_names = {        
-      NetworkFilterNames::get().ExtAuthorization,
-      NetworkFilterNames::get().LocalRateLimit,
-      NetworkFilterNames::get().RedisProxy,
-      NetworkFilterNames::get().ClientSslAuth,
-      NetworkFilterNames::get().Echo,
-      NetworkFilterNames::get().DirectResponse,
-      NetworkFilterNames::get().DubboProxy,
-      NetworkFilterNames::get().SniCluster,
+    filter_names = {
+        NetworkFilterNames::get().ExtAuthorization,
+        NetworkFilterNames::get().LocalRateLimit,
+        NetworkFilterNames::get().RedisProxy,
+        NetworkFilterNames::get().ClientSslAuth,
+        NetworkFilterNames::get().Echo,
+        NetworkFilterNames::get().DirectResponse,
+        NetworkFilterNames::get().DubboProxy,
+        NetworkFilterNames::get().SniCluster,
 
-      NetworkFilterNames::get().ThriftProxy,
-      NetworkFilterNames::get().ZooKeeperProxy,
-      NetworkFilterNames::get().HttpConnectionManager,
-      NetworkFilterNames::get().SniDynamicForwardProxy,
-      NetworkFilterNames::get().KafkaBroker,
-      NetworkFilterNames::get().RocketmqProxy, // fix the assert
-      NetworkFilterNames::get().RateLimit,     // ratelimit
-      NetworkFilterNames::get().Rbac
-
-      // mongo_proxy
-      // mysql_proxy
-      // postgres_proxy
-      // tcp_proxy
+        NetworkFilterNames::get().ThriftProxy,
+        NetworkFilterNames::get().ZooKeeperProxy,
+        NetworkFilterNames::get().HttpConnectionManager,
+        NetworkFilterNames::get().SniDynamicForwardProxy,
+        NetworkFilterNames::get().KafkaBroker,
+        NetworkFilterNames::get().RocketmqProxy, // fix the assert
+        NetworkFilterNames::get().RateLimit,
+        NetworkFilterNames::get().Rbac
+        //TODO(Jianwen Dong): cover mongo_proxy, mysql_proxy, postgres_proxy, tcp_proxy.
     };
   }
   return filter_names;
-  
 }
 
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
