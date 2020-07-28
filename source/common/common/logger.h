@@ -334,22 +334,6 @@ protected:
 #define ENVOY_LOGGER() __log_do_not_use_read_comment()
 
 /**
- * Convenience macro to flush logger.
- */
-#define ENVOY_FLUSH_LOG() ENVOY_LOGGER().flush()
-
-/**
- * Convenience macro to log to the class' logger (migrating to fine-grained Fancy Logger).
- */
-#ifndef FANCY
-#define LOGGER_MODE 0
-#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
-#else
-#define LOGGER_MODE 1
-#define ENVOY_LOG(LEVEL, ...) FANCY_LOG(LEVEL, ##__VA_ARGS__)
-#endif
-
-/**
  * Convenience macro to log to the misc logger, which allows for logging without of direct access to
  * a logger.
  */
@@ -362,9 +346,6 @@ protected:
 #define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
   ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
 
-#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
-
 /**
  * Convenience macros for logging with a stream ID and a connection ID.
  */
@@ -373,9 +354,30 @@ protected:
                       (STREAM).connection() ? (STREAM).connection()->id() : 0,                     \
                       (STREAM).streamId(), ##__VA_ARGS__)
 
+// TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
+
+#ifndef FANCY
+/**
+ * Convenient macros to flush log, log with connection/stream in Envoy.
+ */
+#define LOGGER_MODE 0
+#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+#define ENVOY_FLUSH_LOG() ENVOY_LOGGER().flush()
+#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
+  ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
   ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
-
-// TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
+#else
+/**
+ * Macros of Fancy Logger.
+ */
+#define LOGGER_MODE 1
+#define ENVOY_LOG(LEVEL, ...) FANCY_LOG(LEVEL, ##__VA_ARGS__)
+#define ENVOY_FLUSH_LOG() FANCY_FLUSH_LOG()
+#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
+  FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
+#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
+  FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
+#endif
 
 } // namespace Envoy

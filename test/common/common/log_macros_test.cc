@@ -23,6 +23,8 @@ public:
     ENVOY_LOG(critical, "fake message");
     ENVOY_CONN_LOG(info, "fake message", connection_);
     ENVOY_STREAM_LOG(info, "fake message", stream_);
+    ENVOY_CONN_LOG(error, "fake error", connection_);
+    ENVOY_STREAM_LOG(error, "fake error", stream_);
   }
 
   void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }
@@ -36,9 +38,8 @@ TEST(Logger, All) {
   // This test exists just to ensure all macros compile and run with the expected arguments provided
 
   TestFilterLog filter;
-  printf("Filter is initialized."); // for debug only
   filter.logMessage();
-  printf("Message printed.."); // for debug only
+  
   // Misc logging with no facility.
   ENVOY_LOG_MISC(info, "fake message");
 }
