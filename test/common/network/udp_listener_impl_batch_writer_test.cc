@@ -64,20 +64,11 @@ public:
     // Set listening socket options and set UdpGsoBatchWriter
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
-
-    ON_CALL(listener_config_, udpPacketWriterFactory())
-        .WillByDefault(Return(&udp_packet_writer_factory_));
-    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
-        .WillByDefault(Invoke(
-            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
-              UdpPacketWriterPtr udp_packet_writer =
-                  std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
-              return udp_packet_writer;
-            }));
-
-    listener_ =
-        std::make_unique<UdpListenerImpl>(dispatcherImpl(), server_socket_, listener_callbacks_,
-                                          dispatcherImpl().timeSource(), listener_config_);
+    listener_ = std::make_unique<UdpListenerImpl>(
+        dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
+    udp_packet_writer_ = std::make_unique<Quic::UdpGsoBatchWriter>(
+        listener_->ioHandle(), listener_config_.listenerScope());
+    ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(Return(udp_packet_writer_.get()));
   }
 };
 
@@ -100,7 +91,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplBatchWriterTest,
  *       are delivered to the client.
  */
 TEST_P(UdpListenerImplBatchWriterTest, SendData) {
-  EXPECT_TRUE(listener_->udpPacketWriter()->isBatchMode());
+  EXPECT_TRUE(udp_packet_writer_->isBatchMode());
   Address::InstanceConstSharedPtr send_from_addr = getUnlikelySourceAddress();
 
   absl::FixedArray<std::string> payloads{"length7", "length7", "len<7",
@@ -166,7 +157,7 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
   }
 
   // Test External Flush
-  auto flush_result = listener_->udpPacketWriter()->flush();
+  auto flush_result = udp_packet_writer_->flush();
   EXPECT_TRUE(flush_result.ok());
   EXPECT_EQ(listener_config_.listenerScope()
                 .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
@@ -225,7 +216,7 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
     auto send_result = listener_->send(initial_send_data);
     internal_buffer.append(initial_payload);
     EXPECT_TRUE(send_result.ok());
-    EXPECT_FALSE(listener_->udpPacketWriter()->isWriteBlocked());
+    EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope()
                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
                   .value(),
@@ -256,11 +247,11 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
       EXPECT_TRUE(send_result.ok());
       // TODO(yugant): This flag should be true here, but currently it is incorrectly set in
       // quiche code. Change this to True, once this issue is fixed in quiche.
-      EXPECT_FALSE(listener_->udpPacketWriter()->isWriteBlocked());
+      EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
       internal_buffer.append(followup_payload);
     } else if (followup_payload.length() > initial_payload.length()) {
       EXPECT_FALSE(send_result.ok());
-      EXPECT_TRUE(listener_->udpPacketWriter()->isWriteBlocked());
+      EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
     }
     EXPECT_EQ(listener_config_.listenerScope()
                   .gaugeFromString("front_buffered_pkt_size", Stats::Gauge::ImportMode::NeverImport)
@@ -281,10 +272,10 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
         }));
 
     // Reset write blocked status, and verify correct buffer is flushed
-    listener_->udpPacketWriter()->setWritable();
-    auto flush_result = listener_->udpPacketWriter()->flush();
+    udp_packet_writer_->setWritable();
+    auto flush_result = udp_packet_writer_->flush();
     EXPECT_TRUE(flush_result.ok());
-    EXPECT_FALSE(listener_->udpPacketWriter()->isWriteBlocked());
+    EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope()
                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
                   .value(),

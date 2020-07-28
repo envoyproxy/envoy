@@ -356,6 +356,7 @@ public:
   void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
+  Network::UdpPacketWriter* udpPacketWriter() override { return udp_packet_writer_.get(); }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
@@ -372,6 +373,7 @@ public:
 private:
   Network::UdpListenerPtr udp_listener_;
   Network::UdpListenerReadFilterPtr read_filter_;
+  Network::UdpPacketWriterPtr udp_packet_writer_;
 };
 
 } // namespace Server

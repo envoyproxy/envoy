@@ -142,6 +142,7 @@ public:
   MOCK_METHOD(void, onReadReady, ());
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
+  MOCK_METHOD(Network::UdpPacketWriter*, udpPacketWriter, ());
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -489,7 +490,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
-  MOCK_METHOD(Network::UdpPacketWriter*, udpPacketWriter, ());
+  MOCK_METHOD(Network::IoHandle&, ioHandle, ());
   MOCK_METHOD(Network::UdpPacketWriterFactory*, udpPacketWriterFactory, ());
 
   Event::MockDispatcher dispatcher_;

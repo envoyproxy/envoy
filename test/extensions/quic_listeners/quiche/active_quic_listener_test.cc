@@ -26,7 +26,6 @@
 #include "common/common/logger.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_proof_source.h"
@@ -44,6 +43,7 @@
 #include "extensions/quic_listeners/quiche/active_quic_listener_config.h"
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -112,14 +112,14 @@ protected:
     ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
     ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
 
-    // Use UdpDefaultWriter to perform non-batched writes for the purpose of this test
+    // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test
     ON_CALL(listener_config_, udpPacketWriterFactory())
         .WillByDefault(Return(&udp_packet_writer_factory_));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
         .WillByDefault(Invoke(
             [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
               Network::UdpPacketWriterPtr udp_packet_writer =
-                  std::make_unique<Network::UdpDefaultWriter>(io_handle, scope);
+                  std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
               return udp_packet_writer;
             }));
 

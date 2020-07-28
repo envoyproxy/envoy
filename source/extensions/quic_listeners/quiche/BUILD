@@ -293,6 +293,7 @@ envoy_cc_library(
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_utils_lib",
         ":quic_envoy_packet_writer_lib",
+        ":udp_gso_batch_writer_lib",
         "//include/envoy/network:listener_interface",
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",

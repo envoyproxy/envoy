@@ -47,6 +47,7 @@ public:
   void onReceiveError(Api::IoError::IoErrorCode /*error_code*/) override {
     // No-op. Quic can't do anything upon listener error.
   }
+  Network::UdpPacketWriter* udpPacketWriter() override { return udp_packet_writer_.get(); }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
@@ -65,6 +66,7 @@ private:
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   Network::Socket& listen_socket_;
   Runtime::FeatureFlag enabled_;
+  Network::UdpPacketWriterPtr udp_packet_writer_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

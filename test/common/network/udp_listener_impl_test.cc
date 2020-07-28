@@ -57,19 +57,11 @@ public:
     if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
       server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
     }
-    ON_CALL(listener_config_, udpPacketWriterFactory())
-        .WillByDefault(Return(&udp_packet_writer_factory_));
-    ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
-        .WillByDefault(Invoke(
-            [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {
-              UdpPacketWriterPtr udp_packet_writer =
-                  std::make_unique<Network::UdpDefaultWriter>(io_handle, scope);
-              return udp_packet_writer;
-            }));
-
-    listener_ =
-        std::make_unique<UdpListenerImpl>(dispatcherImpl(), server_socket_, listener_callbacks_,
-                                          dispatcherImpl().timeSource(), listener_config_);
+    listener_ = std::make_unique<UdpListenerImpl>(
+        dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
+    udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(
+        listener_->ioHandle(), listener_config_.listenerScope());
+    ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(Return(udp_packet_writer_.get()));
   }
 
   NiceMock<MockSupportsUdpGro> udp_gro_syscall_;
@@ -90,7 +82,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
-                           dispatcherImpl().timeSource(), listener_config_);
+                           dispatcherImpl().timeSource());
 
 #ifdef SO_RXQ_OVFL
   // Verify that overflow detection is enabled.
@@ -299,7 +291,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
  * address.
  */
 TEST_P(UdpListenerImplTest, SendData) {
-  EXPECT_FALSE(listener_->udpPacketWriter()->isBatchMode());
+  EXPECT_FALSE(udp_packet_writer_->isBatchMode());
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
@@ -326,7 +318,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   EXPECT_EQ(data.buffer_->toString(), payload);
 
   // Verify External Flush is a No-op
-  auto flush_result = listener_->udpPacketWriter()->flush();
+  auto flush_result = udp_packet_writer_->flush();
   EXPECT_TRUE(flush_result.ok());
   EXPECT_EQ(0, flush_result.rc_);
   EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
@@ -356,11 +348,11 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   // Failed write shouldn't drain the data.
   EXPECT_EQ(payload.length(), buffer->length());
   // Verify the writer is set to blocked
-  EXPECT_TRUE(listener_->udpPacketWriter()->isWriteBlocked());
+  EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
 
   // Reset write_blocked status
-  listener_->udpPacketWriter()->setWritable();
-  EXPECT_FALSE(listener_->udpPacketWriter()->isWriteBlocked());
+  udp_packet_writer_->setWritable();
+  EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
 
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));

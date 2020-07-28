@@ -23,7 +23,7 @@ class UdpListenerImpl : public BaseListenerImpl,
                         protected Logger::Loggable<Logger::Id::udp> {
 public:
   UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                  UdpListenerCallbacks& cb, TimeSource& time_source, ListenerConfig& config);
+                  UdpListenerCallbacks& cb, TimeSource& time_source);
 
   ~UdpListenerImpl() override;
 
@@ -34,6 +34,7 @@ public:
   // Network::UdpListener Interface
   Event::Dispatcher& dispatcher() override;
   const Address::InstanceConstSharedPtr& localAddress() const override;
+  IoHandle& ioHandle() override { return socket_->ioHandle(); }
   Api::IoCallUint64Result send(const UdpSendData& data) override;
 
   void processPacket(Address::InstanceConstSharedPtr local_address,
@@ -44,8 +45,6 @@ public:
     // TODO(danzh) make this variable configurable to support jumbo frames.
     return MAX_UDP_PACKET_SIZE;
   }
-
-  UdpPacketWriter* udpPacketWriter() override { return udp_packet_writer_.get(); }
 
 protected:
   void handleWriteCallback();
@@ -59,7 +58,6 @@ private:
 
   TimeSource& time_source_;
   Event::FileEventPtr file_event_;
-  UdpPacketWriterPtr udp_packet_writer_;
 };
 
 } // namespace Network

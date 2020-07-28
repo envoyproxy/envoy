@@ -112,11 +112,11 @@ protected:
   SocketSharedPtr server_socket_;
   Network::Test::UdpSyncPeer client_{GetParam()};
   Address::InstanceConstSharedPtr send_to_addr_;
-  MockUdpListenerCallbacks listener_callbacks_;
+  NiceMock<MockUdpListenerCallbacks> listener_callbacks_;
   NiceMock<MockListenerConfig> listener_config_;
-  NiceMock<MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   std::unique_ptr<UdpListenerImpl> listener_;
   size_t num_packets_received_by_listener_{0};
+  Network::UdpPacketWriterPtr udp_packet_writer_;
 };
 
 } // namespace Network

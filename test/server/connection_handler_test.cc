@@ -165,9 +165,9 @@ public:
             return listener;
           }));
     } else {
-      EXPECT_CALL(dispatcher_, createUdpListener_(_, _, _))
-          .WillOnce(Invoke([listener](Network::SocketSharedPtr&&, Network::UdpListenerCallbacks&,
-                                      Network::ListenerConfig&) -> Network::UdpListener* {
+      EXPECT_CALL(dispatcher_, createUdpListener_(_, _))
+          .WillOnce(Invoke([listener](Network::SocketSharedPtr&&,
+                                      Network::UdpListenerCallbacks&) -> Network::UdpListener* {
             return dynamic_cast<Network::UdpListener*>(listener);
           }));
     }

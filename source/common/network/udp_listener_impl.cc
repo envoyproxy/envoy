@@ -30,8 +30,7 @@ namespace Envoy {
 namespace Network {
 
 UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                                 UdpListenerCallbacks& cb, TimeSource& time_source,
-                                 ListenerConfig& config)
+                                 UdpListenerCallbacks& cb, TimeSource& time_source)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
   file_event_ = dispatcher_.createFileEvent(
       socket_->ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
@@ -44,9 +43,6 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
                                               socket_->localAddress()->asString()));
   }
-  // Create udp_packet_writer
-  udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(
-      socket_->ioHandle(), config.listenerScope());
 }
 
 UdpListenerImpl::~UdpListenerImpl() {
@@ -115,7 +111,7 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   Buffer::Instance& buffer = send_data.buffer_;
 
   Api::IoCallUint64Result send_result =
-      udpPacketWriter()->writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
+      cb_.udpPacketWriter()->writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
 
   // The send_result normalizes the rc_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.

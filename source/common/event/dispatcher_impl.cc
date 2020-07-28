@@ -150,11 +150,9 @@ Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& s
 }
 
 Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedPtr&& socket,
-                                                          Network::UdpListenerCallbacks& cb,
-                                                          Network::ListenerConfig& config) {
+                                                          Network::UdpListenerCallbacks& cb) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource(),
-                                                    config);
+  return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
 }
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {

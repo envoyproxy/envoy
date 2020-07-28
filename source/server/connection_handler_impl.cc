@@ -545,10 +545,10 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(parent,
-                           dispatcher.createUdpListener(
-                               config.listenSocketFactory().getListenSocket(), *this, config),
-                           config) {}
+    : ActiveRawUdpListener(
+          parent,
+          dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
+          config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
                                            Network::UdpListenerPtr&& listener,
@@ -564,6 +564,10 @@ ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
         fmt::format("Cannot create listener as no read filter registered for the udp listener: {} ",
                     config_->name()));
   }
+
+  // Create udp_packet_writer
+  udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(
+      udp_listener_->ioHandle(), config.listenerScope());
 }
 
 void ActiveRawUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
@@ -576,7 +580,7 @@ void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
   // data
 
   // Clear write_blocked_ status for udpPacketWriter
-  udp_listener_->udpPacketWriter()->setWritable();
+  udp_packet_writer_->setWritable();
 }
 
 void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {

@@ -177,6 +177,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_utils_lib",
+        "//source/extensions/quic_listeners/quiche:udp_gso_batch_writer_lib",
         "//source/server:configuration_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",

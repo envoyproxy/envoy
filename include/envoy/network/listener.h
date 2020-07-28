@@ -261,6 +261,13 @@ public:
    * @param error_code supplies the received error on the listener.
    */
   virtual void onReceiveError(Api::IoError::IoErrorCode error_code) PURE;
+
+  /**
+   * Returns the pointer to the udp_packet_writer associated with the
+   * UdpListenerCallback
+   *
+   */
+  virtual UdpPacketWriter* udpPacketWriter() PURE;
 };
 
 /**
@@ -314,9 +321,10 @@ public:
   virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
 
   /**
-   * @return The udp packet writer used by this listener.
-   * */
-  virtual Network::UdpPacketWriter* udpPacketWriter() PURE;
+   * @brief the io handle of the socket
+   *
+   */
+  virtual Network::IoHandle& ioHandle() PURE;
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;

@@ -15,6 +15,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/quic_envoy_packet_writer.h"
+#include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
 namespace Envoy {
 namespace Quic {
@@ -49,7 +50,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     }
     listen_socket_.addOptions(options);
   }
-  udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this, listener_config);
+  udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
@@ -68,12 +69,16 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_);
 
-  auto udp_packet_writer = udp_listener_->udpPacketWriter();
-  if (udp_packet_writer->isBatchMode()) {
+  // Create udp_packet_writer
+  udp_packet_writer_ = listener_config.udpPacketWriterFactory()->createUdpPacketWriter(
+      udp_listener_->ioHandle(), listener_config.listenerScope());
+  if (udp_packet_writer_->isBatchMode()) {
     quic_dispatcher_->InitializeWithWriter(
-        dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer));
+        dynamic_cast<Quic::UdpGsoBatchWriter*>(udp_packet_writer_.get()));
+    // Quic Dispatcher takes the ownership of udp_packet_writer_
+    udp_packet_writer_.release();
   } else {
-    quic_dispatcher_->InitializeWithWriter(new QuicEnvoyPacketWriter(*udp_packet_writer));
+    quic_dispatcher_->InitializeWithWriter(new QuicEnvoyPacketWriter(*udp_packet_writer_));
   }
 }
 
