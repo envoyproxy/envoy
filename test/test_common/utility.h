@@ -87,22 +87,6 @@ namespace Envoy {
     ADD_FAILURE() << "Unexpected exception: " << std::string(e.what());                            \
   }
 
-/*
-  Macro to use instead of EXPECT_DEATH when stderr is produced by a logger.
-  It temporarily installs stderr sink and restores the original logger sink after the test
-  completes and stderr_sink object goes of of scope.
-  EXPECT_DEATH(statement, regex) test passes when statement causes crash and produces error message
-  matching regex. Test fails when statement does not crash or it crashes but message does not
-  match regex. If a message produced during crash is redirected away from strerr, the test fails.
-  By installing StderrSinkDelegate, the macro forces EXPECT_DEATH to send any output produced by
-  statement to stderr.
-*/
-#define EXPECT_DEATH_LOG_TO_STDERR(statement, message)                                             \
-  do {                                                                                             \
-    Envoy::Logger::StderrSinkDelegate stderr_sink(Envoy::Logger::Registry::getSink());             \
-    EXPECT_DEATH(statement, message);                                                              \
-  } while (false)
-
 #define VERIFY_ASSERTION(statement)                                                                \
   do {                                                                                             \
     ::testing::AssertionResult status = statement;                                                 \
