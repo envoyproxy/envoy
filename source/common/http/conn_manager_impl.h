@@ -388,19 +388,53 @@ private:
     NullRouteConfigUpdateRequester() = default;
   };
 
+  /**
+   * Callbacks invoked by the FilterManager to pass filter data/events back to the caller.
+   */
   class FilterManagerCallbacks {
   public:
     virtual ~FilterManagerCallbacks() = default;
 
-    // The resulting data will be provided through the following callbacks.
+    /**
+     * Called with the fully encoded response headers.
+     * @param response_headers the encoded headers.
+     * @param end_stream whether this is a header only response.
+     */
     virtual void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) PURE;
+
+    /**
+     * Called with the fully encoded 100 Continue response headers.
+     * @param response_headers the encoded headers.
+     */
     virtual void encode100ContinueHeaders(ResponseHeaderMap& response_headers) PURE;
+
+    /**
+     * Called with a fully encoded data buffer.
+     * @param data the encoded data.
+     * @param end_stream whether this is the end of the response.
+     */
     virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+
+    /**
+     * Called with a fully encoded trailers.
+     * @param trailers the encoded trailers.
+     */
     virtual void encodeTrailers(ResponseTrailerMap& trailers) PURE;
+
+    /**
+     * Called with a fully encoded trailers.
+     * @param trailers the encoded trailers.
+     */
     virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
 
-    // Buffer watermark handling callbacks.
+    /**
+     * Called when the stream write buffer is no longer above the low watermark.
+     */
     virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+
+    /**
+     * Called when the stream write buffer is above above the high watermark.
+     */
     virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
   };
 
@@ -410,8 +444,9 @@ private:
    */
   class FilterManager {
   public:
-    FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& callbacks)
-        : active_stream_(active_stream), callbacks_(callbacks) {}
+    FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& callbacks,
+                  uint32_t buffer_limit)
+        : active_stream_(active_stream), callbacks_(callbacks), buffer_limit_(buffer_limit) {}
     void destroyFilters() {
       for (auto& filter : decoder_filters_) {
         filter->handle_->onDestroy();
@@ -480,7 +515,6 @@ private:
         const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
         const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
 
-    void setInitialBufferLimit(uint32_t limit) { buffer_limit_ = limit; }
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
 
@@ -585,7 +619,7 @@ private:
                         public Tracing::Config,
                         public ScopeTrackedObject,
                         public FilterManagerCallbacks {
-    ActiveStream(ConnectionManagerImpl& connection_manager);
+    ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
     ~ActiveStream() override;
 
     void chargeStats(const ResponseHeaderMap& headers);

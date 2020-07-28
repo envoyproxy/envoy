@@ -246,13 +246,11 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   }
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
-  ActiveStreamPtr new_stream(new ActiveStream(*this));
+  ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit()));
   new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
-  new_stream->filter_manager_.setInitialBufferLimit(
-      new_stream->response_encoder_->getStream().bufferLimit());
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
@@ -516,8 +514,8 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
                                                     std::move(route_config_updated_cb));
 }
 
-ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
-    : connection_manager_(connection_manager), filter_manager_(*this, *this),
+ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit)
+    : connection_manager_(connection_manager), filter_manager_(*this, *this, buffer_limit),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
