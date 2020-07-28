@@ -69,6 +69,9 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
 
+  // avoid listeners draining during the test
+  drain_time_ = std::chrono::seconds(60);
+
   if (input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
   } else {
@@ -130,6 +133,7 @@ bool XdsFuzzTest::hasRoute(const std::string& route_name) {
  */
 void XdsFuzzTest::addListener(const std::string& listener_name, const std::string& route_name) {
   ENVOY_LOG_MISC(debug, "Adding {} with reference to {}", listener_name, route_name);
+  lds_update_success_++;
   bool removed = eraseListener(listener_name);
   auto listener = buildListener(listener_name, route_name);
   listeners_.push_back(listener);
@@ -154,6 +158,7 @@ void XdsFuzzTest::removeListener(const std::string& listener_name) {
   bool removed = eraseListener(listener_name);
 
   if (removed) {
+    lds_update_success_++;
     updateListener(listeners_, {}, {listener_name});
     EXPECT_TRUE(waitForAck(Config::TypeUrl::get().Listener, std::to_string(version_)));
     verifier_.listenerRemoved(listener_name);
@@ -165,18 +170,14 @@ void XdsFuzzTest::removeListener(const std::string& listener_name) {
  */
 void XdsFuzzTest::addRoute(const std::string& route_name) {
   ENVOY_LOG_MISC(debug, "Adding {}", route_name);
-  bool has_route = hasRoute(route_name);
   auto route = buildRouteConfig(route_name);
-  routes_.push_back(route);
 
-  if (has_route) {
-    // if the route was already in routes_, don't send a duplicate add in delta request
-    updateRoute(routes_, {}, {});
-    verifier_.routeUpdated(route);
-  } else {
-    updateRoute(routes_, {route}, {});
-    verifier_.routeAdded(route);
+  if (!hasRoute(route_name)) {
+    routes_.push_back(route);
   }
+
+  updateRoute(routes_, {route}, {});
+  verifier_.routeAdded(route);
 
   EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
 }
@@ -277,6 +278,7 @@ void XdsFuzzTest::replay() {
       test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified());
       test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded());
       test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved());
+      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_);
     }
     ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})",
                    verifier_.numWarming(),

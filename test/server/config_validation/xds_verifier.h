@@ -49,12 +49,16 @@ public:
 
   void dumpState();
 
+  bool hasListener(const std::string& name, ListenerState state);
+  bool hasRoute(const envoy::config::listener::v3::Listener& listener);
+  bool hasRoute(const std::string& name);
+  bool hasActiveRoute(const envoy::config::listener::v3::Listener& listener);
+  bool hasActiveRoute(const std::string& name);
+
 private:
   enum SotwOrDelta { SOTW, DELTA };
 
   std::string getRoute(const envoy::config::listener::v3::Listener& listener);
-  bool hasRoute(const envoy::config::listener::v3::Listener& listener);
-  bool hasActiveRoute(const envoy::config::listener::v3::Listener& listener);
   void updateSotwListeners();
   void updateDeltaListeners(const envoy::config::route::v3::RouteConfiguration& route);
   void markForRemoval(ListenerRepresentation& rep);

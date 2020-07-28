@@ -42,6 +42,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/tap:extension_config_base",
+        "//source/extensions/transport_sockets/common:passthrough_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
     ],
 )
