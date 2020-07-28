@@ -243,6 +243,7 @@ private:
     ConfigConstSharedPtr getConfig() const override { return config_; }
     ApiType apiType() const override { return ApiType::Full; }
     ConfigProtoVector getConfigProtos() const override { return {}; }
+    bool isMutable() const override { return true; }
 
     Router::ScopedConfigConstSharedPtr config_;
     TimeSource& time_source_;

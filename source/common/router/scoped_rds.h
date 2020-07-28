@@ -113,7 +113,7 @@ public:
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
   void onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-                         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+                         Http::RouteConfigUpdatedCallback route_config_updated_cb);
 
 private:
   // A helper class that takes care of the life cycle management of a RDS route provider and the

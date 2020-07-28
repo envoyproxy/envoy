@@ -38,6 +38,7 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
+#include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
@@ -65,8 +66,8 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 
   // We want to keep this pointing at the latest filter in the filter list that has received the
   // onData callback. To do so, we compare the current latest with the *previous* filter. If they
-  // match, then we must be processing a new filter for the first time. We omit this check if we're
-  // the first filter, since the above check handles that case.
+  // match, then we must be processing a new filter for the first time. We omit this check if
+  // we're the first filter, since the above check handles that case.
   //
   // We compare against the previous filter to avoid multiple filter iterations from resetting the
   // pointer: If we just set latest to current, then the first onData filter iteration would
@@ -187,10 +188,10 @@ void ConnectionManagerImpl::checkForDeferredClose() {
 void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // The order of what happens in this routine is important and a little complicated. We first see
   // if the stream needs to be reset. If it needs to be, this will end up invoking reset callbacks
-  // and then moving the stream to the deferred destruction list. If the stream has not been reset,
-  // we move it to the deferred deletion list here. Then, we potentially close the connection. This
-  // must be done after deleting the stream since the stream refers to the connection and must be
-  // deleted first.
+  // and then moving the stream to the deferred destruction list. If the stream has not been
+  // reset, we move it to the deferred deletion list here. Then, we potentially close the
+  // connection. This must be done after deleting the stream since the stream refers to the
+  // connection and must be deleted first.
   bool reset_stream = false;
   // If the response encoder is still associated with the stream, reset the stream. The exception
   // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
@@ -198,8 +199,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // Envoy-internal stream instance being ended.
   if (stream.response_encoder_ != nullptr &&
       (!stream.state_.remote_complete_ || !stream.state_.codec_saw_local_complete_)) {
-    // Indicate local is complete at this point so that if we reset during a continuation, we don't
-    // raise further data or trailers.
+    // Indicate local is complete at this point so that if we reset during a continuation, we
+    // don't raise further data or trailers.
     ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
     stream.state_.local_complete_ = true;
     stream.state_.codec_saw_local_complete_ = true;
@@ -407,14 +408,13 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
-    // a local connection close, so we still guard against that here. A better solution would be to
-    // have some type of "pre-close" callback that we could hook for cleanup that would get called
-    // regardless of where local close is invoked from.
-    // NOTE: that this will cause doConnectionClose() to get called twice in the common local close
-    // cases, but the method protects against that.
-    // NOTE: In the case where a local close comes from outside the filter, this will cause any
-    // stream closures to increment remote close stats. We should do better here in the future,
-    // via the pre-close callback mentioned above.
+    // a local connection close, so we still guard against that here. A better solution would be
+    // to have some type of "pre-close" callback that we could hook for cleanup that would get
+    // called regardless of where local close is invoked from. NOTE: that this will cause
+    // doConnectionClose() to get called twice in the common local close cases, but the method
+    // protects against that. NOTE: In the case where a local close comes from outside the filter,
+    // this will cause any stream closures to increment remote close stats. We should do better
+    // here in the future, via the pre-close callback mentioned above.
     doConnectionClose(absl::nullopt, absl::nullopt);
   }
 }
@@ -525,17 +525,13 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
-    uint64_t key_hash, Event::Dispatcher&, Http::RouteConfigUpdatedCallbackSharedPtr) {
-  /*
-  Router::ScopedRdsConfigProvider* scoped_route_config_provider =
-      dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider_);
-  scoped_route_config_provider->subscription->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
-                                                                route_config_updated_cb);
-                                                                */
-  int x = 1, y = 2;
-  if (scoped_route_config_provider_->config<Router::ScopedConfig>() == nullptr) {
-    x += y;
-    x = key_hash;
+    uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallback route_config_updated_cb) {
+  if (scoped_route_config_provider_->isMutable()) {
+    Router::ScopedRdsConfigProvider* scoped_route_config_provider =
+        dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider_);
+    scoped_route_config_provider->subscription().onDemandRdsUpdate(
+        key_hash, thread_local_dispatcher, route_config_updated_cb);
   }
 }
 
@@ -634,8 +630,8 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     }
   }
 
-  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
-  // response code and when no other response flags are set.
+  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a
+  // 0 response code and when no other response flags are set.
   if (!stream_info_.hasAnyResponseFlag() && !stream_info_.responseCode()) {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
   }
@@ -710,8 +706,8 @@ void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
-  // This means that if filters are configured in the following order (assume all three filters are
-  // both decoder/encoder filters):
+  // This means that if filters are configured in the following order (assume all three filters
+  // are both decoder/encoder filters):
   //   http_filters:
   //     - A
   //     - B
@@ -725,8 +721,8 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
   // Note: configured encoder filters are prepended to encoder_filters_.
-  // This means that if filters are configured in the following order (assume all three filters are
-  // both decoder/encoder filters):
+  // This means that if filters are configured in the following order (assume all three filters
+  // are both decoder/encoder filters):
   //   http_filters:
   //     - A
   //     - B
@@ -927,8 +923,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   // Check for the existence of the :path header for non-CONNECT requests, or present-but-empty
   // :path header for CONNECT requests. We expect the codec to have broken the path into pieces if
-  // applicable. NOTE: Currently the HTTP/1.1 codec only does this when the allow_absolute_url flag
-  // is enabled on the HCM.
+  // applicable. NOTE: Currently the HTTP/1.1 codec only does this when the allow_absolute_url
+  // flag is enabled on the HCM.
   if ((!HeaderUtility::isConnect(*request_headers_) || request_headers_->Path()) &&
       request_headers_->getPathValue().empty()) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
@@ -1020,7 +1016,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       idle_timeout_ms_ = route_entry->idleTimeout().value();
       response_encoder_->getStream().setFlushTimeout(idle_timeout_ms_);
       if (idle_timeout_ms_.count()) {
-        // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
+        // If we have a route-level idle timeout but no global stream idle timeout, create a
+        // timer.
         if (stream_idle_timer_ == nullptr) {
           stream_idle_timer_ =
               connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -1137,9 +1134,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     const bool new_metadata_added = processNewlyAddedMetadata();
-    // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
-    // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
-    // after the new metadata.
+    // If end_stream is set in headers, and a filter adds new metadata, we need to delay
+    // end_stream in headers by inserting an empty data frame with end_stream set. The empty data
+    // frame is sent after the new metadata.
     if ((*entry)->end_stream_ && new_metadata_added && !buffered_request_data_) {
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(
@@ -1247,8 +1244,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
-    // is called in decodeData during a previous filter invocation, at which point we communicate to
-    // the current and future filters that the stream has not yet ended.
+    // is called in decodeData during a previous filter invocation, at which point we communicate
+    // to the current and future filters that the stream has not yet ended.
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
@@ -1556,14 +1553,17 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     // On demand srds
     uint64_t key_hash = snapped_scoped_routes_config_->computeKeyHash(*request_headers_);
     if (snapped_scoped_routes_config_->scopeExistsButNotLoaded(key_hash)) {
-      Http::RouteConfigUpdatedCallbackSharedPtr scoped_route_config_updated_cb =
-          std::make_shared<Http::RouteConfigUpdatedCallback>(
-              [this, route_config_updated_cb](bool route_exist) {
+      Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
+          Http::RouteConfigUpdatedCallback(
+              [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
+                         route_config_updated_cb)](bool route_exist) {
                 // Refresh the route before continue the filter chain.
-                if (route_exist) {
-                  refreshCachedRoute();
+                if (auto cb = weak_route_config_updated_cb.lock()) {
+                  if (route_exist) {
+                    refreshCachedRoute();
+                  }
+                  (*cb)(route_exist);
                 }
-                (*route_config_updated_cb)(route_exist);
               });
       route_config_update_requester_->requestSrdsUpdate(key_hash, thread_local_dispatcher,
                                                         scoped_route_config_updated_cb);
@@ -1735,7 +1735,8 @@ void ConnectionManagerImpl::ActiveStream::maybeContinueEncoding(
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         ResponseHeaderMap& headers,
                                                         bool end_stream) {
-  // See encodeHeaders() comments in include/envoy/http/filter.h for why the 1xx precondition holds.
+  // See encodeHeaders() comments in include/envoy/http/filter.h for why the 1xx precondition
+  // holds.
   ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
          Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols));
   resetIdleTimer();
@@ -1806,7 +1807,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     connection_manager_.config_.dateProvider().setDateHeader(headers);
   }
 
-  // Following setReference() is safe because serverName() is constant for the life of the listener.
+  // Following setReference() is safe because serverName() is constant for the life of the
+  // listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
       (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT &&
@@ -2010,8 +2012,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
     // We check the response_trailers_ pointer here in case addEncodedTrailers
-    // is called in encodeData during a previous filter invocation, at which point we communicate to
-    // the current and future filters that the stream has not yet ended.
+    // is called in encodeData during a previous filter invocation, at which point we communicate
+    // to the current and future filters that the stream has not yet ended.
     state_.filter_call_state_ |= FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
@@ -2218,8 +2220,8 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
 
-    // We must check if the 'cached_route_' optional is populated since this function can be called
-    // early via sendLocalReply(), before the cached route is populated.
+    // We must check if the 'cached_route_' optional is populated since this function can be
+    // called early via sendLocalReply(), before the cached route is populated.
     if (hasCachedRoute() && cached_route_.value()->routeEntry()) {
       upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
     }
