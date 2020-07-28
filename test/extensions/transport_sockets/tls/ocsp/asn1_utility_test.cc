@@ -13,6 +13,8 @@ namespace TransportSockets {
 namespace Tls {
 namespace Ocsp {
 
+namespace {
+
 class Asn1UtilityTest : public testing::Test {
 public:
   // DER encoding of a single TLV ASN.1 element.
@@ -359,6 +361,8 @@ TEST_F(Asn1UtilityTest, SkipOptionalMalformedTagTest) {
   EXPECT_THROW_WITH_MESSAGE(Asn1Utility::skipOptional(cbs, CBS_ASN1_SEQUENCE), EnvoyException,
                             "Failed to parse ASN.1 element tag");
 }
+
+} // namespace
 
 } // namespace Ocsp
 } // namespace Tls

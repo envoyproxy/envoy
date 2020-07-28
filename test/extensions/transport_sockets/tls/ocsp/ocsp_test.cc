@@ -18,6 +18,8 @@ namespace TransportSockets {
 namespace Tls {
 namespace Ocsp {
 
+namespace {
+
 namespace CertUtility = Envoy::Extensions::TransportSockets::Tls::Utility;
 
 class OcspFullResponseParsingTest : public testing::Test {
@@ -283,6 +285,8 @@ TEST_F(Asn1OcspUtilityTest, ParseCertStatusInvalidByteStringTest) {
   EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseCertStatus(cbs), EnvoyException,
                             "Failed to parse ASN.1 element tag");
 }
+
+} // namespace
 
 } // namespace Ocsp
 } // namespace Tls
