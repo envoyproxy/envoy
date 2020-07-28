@@ -66,6 +66,8 @@ constexpr absl::string_view Destination = "destination";
 
 // Upstream properties
 constexpr absl::string_view Upstream = "upstream";
+constexpr absl::string_view UpstreamLocalAddress = "upstream_local_address";
+constexpr absl::string_view UpstreamTransportFailureReason = "upstream_transport_failure_reason";
 
 class RequestWrapper;
 
