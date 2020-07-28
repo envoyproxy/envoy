@@ -398,6 +398,10 @@ private:
     virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
     virtual void encodeTrailers(ResponseTrailerMap& trailers) PURE;
     virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
+
+    // Buffer watermark handling callbacks.
+    virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+    virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
   };
 
   class FilterManager {
@@ -437,6 +441,17 @@ private:
         bool is_grpc_request, Code code, absl::string_view body,
         const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
         const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+    // Possibly increases buffer_limit_ to the value of limit.
+    void setInitialBufferLimit(uint32_t limit) { buffer_limit_ = limit; }
+    void setBufferLimit(uint32_t limit);
+
+    bool aboveWatermark() { return high_watermark_count_ != 0; }
+
+    // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
+    // events for this stream and the downstream connection to the router filter.
+    void callHighWatermarkCallbacks();
+    void callLowWatermarkCallbacks();
 
   private:
     // Indicates which filter to start the iteration with.
@@ -503,6 +518,12 @@ private:
 
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
+
+    Buffer::WatermarkBufferPtr buffered_response_data_;
+    Buffer::WatermarkBufferPtr buffered_request_data_;
+    uint32_t buffer_limit_{0};
+    uint32_t high_watermark_count_{0};
+    std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
 
     friend ActiveStreamFilterBase;
     friend ActiveStreamDecoderFilter;
@@ -604,6 +625,20 @@ private:
       ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
       response_encoder_->encodeMetadata(metadata);
     }
+    void onDecoderFilterBelowWriteBufferLowWatermark() override {
+      ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", *this);
+      // If the state is destroyed, the codec's stream is already torn down. On
+      // teardown the codec will unwind any remaining read disable calls.
+      if (!state_.destroyed_) {
+        response_encoder_->getStream().readDisable(false);
+      }
+      connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
+    }
+    void onDecoderFilterAboveWriteBufferHighWatermark() override {
+      ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
+      response_encoder_->getStream().readDisable(true);
+      connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
+    }
 
     void traceRequest();
 
@@ -619,11 +654,6 @@ private:
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
     void refreshCachedTracingCustomTags();
-
-    // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
-    // events for this stream and the downstream connection to the router filter.
-    void callHighWatermarkCallbacks();
-    void callLowWatermarkCallbacks();
 
     /**
      * Flags that keep track of which filter calls are currently in progress.
@@ -695,8 +725,6 @@ private:
       ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
     };
 
-    // Possibly increases buffer_limit_ to the value of limit.
-    void setBufferLimit(uint32_t limit);
     // Set up the Encoder/Decoder filter chain.
     bool createFilterChain();
     // Per-stream idle timeout callback.
@@ -740,10 +768,8 @@ private:
     ResponseEncoder* response_encoder_{};
     ResponseHeaderMapPtr continue_headers_;
     ResponseHeaderMapPtr response_headers_;
-    Buffer::WatermarkBufferPtr buffered_response_data_;
     ResponseTrailerMapPtr response_trailers_{};
     RequestHeaderMapPtr request_headers_;
-    Buffer::WatermarkBufferPtr buffered_request_data_;
     RequestTrailerMapPtr request_trailers_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_response_timespan_;
@@ -758,13 +784,10 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
     // Stores metadata added in the decoding filter that is being processed. Will be cleared before
     // processing the next filter. The storage is created on demand. We need to store metadata
     // temporarily in the filter in case the filter has stopped all while processing headers.
     std::unique_ptr<MetadataMapVector> request_metadata_map_vector_{nullptr};
-    uint32_t buffer_limit_{0};
-    uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};
     Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
