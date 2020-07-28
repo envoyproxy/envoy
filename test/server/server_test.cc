@@ -294,8 +294,9 @@ private:
 class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&, Server::Instance& server) override {
-    return std::make_unique<CustomStatsSink>(server.stats());
+  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
+                                 Server::Configuration::ServerFactoryContext& server) override {
+    return std::make_unique<CustomStatsSink>(server.scope());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -1184,7 +1185,7 @@ TEST_P(StaticValidationTest, ClusterUnknownField) {
 // Custom StatsSink that registers both a Cluster update callback and Server lifecycle callback.
 class CallbacksStatsSink : public Stats::Sink, public Upstream::ClusterUpdateCallbacks {
 public:
-  CallbacksStatsSink(Server::Instance& server)
+  CallbacksStatsSink(Server::Configuration::ServerFactoryContext& server)
       : cluster_removal_cb_handle_(
             server.clusterManager().addThreadLocalClusterUpdateCallbacks(*this)),
         lifecycle_cb_handle_(server.lifecycleNotifier().registerCallback(
@@ -1207,7 +1208,8 @@ private:
 class CallbacksStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&, Server::Instance& server) override {
+  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
+                                 Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CallbacksStatsSink>(server);
   }
 
