@@ -28,6 +28,7 @@
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -51,6 +52,7 @@ public:
     ON_CALL(init_manager_, initialize(_))
         .WillByDefault(Invoke(
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
+    EXPECT_CALL(factory_context_.admin_, concurrency()).WillRepeatedly(Return(0));
   }
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
