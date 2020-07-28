@@ -36,8 +36,8 @@ Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& bu
   return result;
 }
 
-Network::UdpPacketWriterStats UdpDefaultWriter::generateStats(Stats::Scope& scope) {
-  return {UDP_PACKET_WRITER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
+Network::UdpDefaultWriterStats UdpDefaultWriter::generateStats(Stats::Scope& scope) {
+  return {UDP_DEFAULT_WRITER_STATS(POOL_COUNTER(scope))};
 }
 
 } // namespace Network

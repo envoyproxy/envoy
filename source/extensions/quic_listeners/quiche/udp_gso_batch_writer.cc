@@ -70,7 +70,7 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
   quic::WriteResult quic_result =
       WritePacket(buffer.toString().c_str(), payload_len, self_addr.host(), peer_addr,
                   /*quic::PerPacketOptions=*/nullptr);
-  updateUdpPacketWriterStats(quic_result);
+  updateUdpGsoBatchWriterStats(quic_result);
 
   return convertQuicWriteResult(quic_result, payload_len);
 }
@@ -91,12 +91,12 @@ UdpGsoBatchWriter::getNextWriteLocation(const Network::Address::Ip* local_ip,
 
 Api::IoCallUint64Result UdpGsoBatchWriter::flush() {
   quic::WriteResult quic_result = Flush();
-  updateUdpPacketWriterStats(quic_result);
+  updateUdpGsoBatchWriterStats(quic_result);
 
   return convertQuicWriteResult(quic_result, /*payload_len=*/0);
 }
 
-void UdpGsoBatchWriter::updateUdpPacketWriterStats(quic::WriteResult quic_result) {
+void UdpGsoBatchWriter::updateUdpGsoBatchWriterStats(quic::WriteResult quic_result) {
   if (quic_result.status == quic::WRITE_STATUS_OK && quic_result.bytes_written > 0) {
     if (stats_.front_buffered_pkt_size_.value() > 0u) {
       uint64_t num_pkts_in_batch = std::ceil(static_cast<float>(quic_result.bytes_written) /
@@ -110,8 +110,9 @@ void UdpGsoBatchWriter::updateUdpPacketWriterStats(quic::WriteResult quic_result
       buffered_writes().empty() ? 0u : buffered_writes().front().buf_len);
 }
 
-Network::UdpPacketWriterStats UdpGsoBatchWriter::generateStats(Stats::Scope& scope) {
-  return {UDP_PACKET_WRITER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
+UdpGsoBatchWriterStats UdpGsoBatchWriter::generateStats(Stats::Scope& scope) {
+  return {
+      UDP_GSO_BATCH_WRITER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
 
 UdpGsoBatchWriterFactory::UdpGsoBatchWriterFactory() = default;

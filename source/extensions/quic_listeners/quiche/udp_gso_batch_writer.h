@@ -32,6 +32,20 @@
 namespace Envoy {
 namespace Quic {
 
+#define UDP_GSO_BATCH_WRITER_STATS(COUNTER, GAUGE, HISTOGRAM)                                      \
+  COUNTER(total_bytes_sent)                                                                        \
+  GAUGE(internal_buffer_size, NeverImport)                                                         \
+  GAUGE(front_buffered_pkt_size, NeverImport)                                                      \
+  HISTOGRAM(pkts_sent_per_batch, Unspecified)
+
+/**
+ * Wrapper struct for udp gso batch writer stats. @see stats_macros.h
+ */
+struct UdpGsoBatchWriterStats {
+  UDP_GSO_BATCH_WRITER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                             GENERATE_HISTOGRAM_STRUCT)
+};
+
 /**
  * UdpPacketWriter implementation based on quic::QuicGsoBatchWriter to send packets
  * in batches, using UDP socket's generic segmentation offload(GSO) capability.
@@ -61,17 +75,17 @@ public:
    * @brief Update stats_ field for the udp packet writer
    * @param quic_result is the result from Flush/WritePacket
    */
-  void updateUdpPacketWriterStats(quic::WriteResult quic_result);
+  void updateUdpGsoBatchWriterStats(quic::WriteResult quic_result);
 
   /**
-   * @brief Generate UdpPacketWriterStats object from scope
+   * @brief Generate UdpGsoBatchWriterStats object from scope
    * @param scope for stats
-   * @return UdpPacketWriterStats for scope
+   * @return UdpGsoBatchWriterStats for scope
    */
-  Network::UdpPacketWriterStats generateStats(Stats::Scope& scope);
+  UdpGsoBatchWriterStats generateStats(Stats::Scope& scope);
 
 private:
-  Network::UdpPacketWriterStats stats_;
+  UdpGsoBatchWriterStats stats_;
 };
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {
