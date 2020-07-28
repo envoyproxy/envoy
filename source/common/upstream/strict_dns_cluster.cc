@@ -118,7 +118,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         if (status == Network::DnsResolver::ResolutionStatus::Success) {
           parent_.info_->stats().update_success_.inc();
 
-          std::unordered_map<std::string, HostSharedPtr> updated_hosts;
+          absl::node_hash_map<std::string, HostSharedPtr> updated_hosts;
           HostVector new_hosts;
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
           for (const auto& resp : response) {
