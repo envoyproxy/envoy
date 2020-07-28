@@ -131,7 +131,7 @@ public:
 
   /**
    * Trim trailing whitespaces from the HeaderString.
-   * v1.12: Support all implementation.
+   * v1.12 supports both Inline and Dynamic, but not Reference type.
    */
   void rtrim();
 
