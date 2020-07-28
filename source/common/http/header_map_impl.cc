@@ -151,22 +151,11 @@ void HeaderString::append(const char* data, uint32_t size) {
 }
 
 void HeaderString::rtrim() {
-  switch (type_) {
-  case Type::Reference: {
-    RELEASE_ASSERT("false", "rtrim does not support header string in reference type.");
-  }
-  case Type::Dynamic: {
-    // rtrim only manipulate length_. Share the same code with Inline.
-    FALLTHRU;
-  }
-  case Type::Inline: {
-    absl::string_view original = getStringView();
-    absl::string_view rtrimmed = StringUtil::rtrim(original);
-    if (original.size() != rtrimmed.size()) {
-      string_length_ = rtrimmed.size();
-    }
-    break;
-  }
+  ASSERT(type() == Type::Inline || type() == Type::Dynamic);
+  absl::string_view original = getStringView();
+  absl::string_view rtrimmed = StringUtil::rtrim(original);
+  if (original.size() != rtrimmed.size()) {
+    string_length_ = rtrimmed.size();
   }
 }
 
