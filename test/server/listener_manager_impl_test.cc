@@ -612,7 +612,7 @@ drain_type: modify_only
                                     "", true),
       EnvoyException,
       "error updating listener: 'foo' has a different address "
-      "'127.0.0.1:1235' from existing listener");
+      "'127.0.0.1:1235' from existing listener address '127.0.0.1:1234'");
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -766,6 +766,15 @@ address:
 filter_chains: {}
   )EOF";
 
+  const std::string listener_foo_address_update_yaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1235
+filter_chains: {}
+  )EOF";
+
   Init::ManagerImpl server_init_mgr("server-init-manager");
   Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
   { // Add and remove a listener before starting workers.
@@ -849,6 +858,17 @@ static_listeners:
           seconds: 2002002002
           nanos: 2000000
   )EOF");
+
+    // While it is in warming state, try updating the address. It should fail.
+    ListenerHandle* listener_foo3 = expectListenerCreate(true, true);
+    EXPECT_CALL(*listener_foo3, onDestroy());
+    EXPECT_THROW_WITH_MESSAGE(
+        manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_address_update_yaml),
+                                      "version3", true),
+        EnvoyException,
+        "error updating listener: 'foo' has a different address "
+        "'127.0.0.1:1235' from existing listener address '127.0.0.1:1234'");
+
     // Delete foo-listener again.
     EXPECT_CALL(*listener_foo2, onDestroy());
     EXPECT_TRUE(manager_->removeListener("foo"));
