@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -42,7 +41,8 @@ public:
    * @param config supplies the custom proto configuration for the Stats::Sink
    * @param server supplies the server instance
    */
-  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
+  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
+                                         Server::Configuration::ServerFactoryContext& server) PURE;
 
   std::string category() const override { return "envoy.stats_sinks"; }
 };
