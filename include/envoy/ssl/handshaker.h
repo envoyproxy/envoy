@@ -83,7 +83,6 @@ using HandshakerFactoryCb = std::function<HandshakerPtr(bssl::UniquePtr<SSL>)>;
 
 class HandshakerFactory : public Config::TypedFactory {
 public:
-
   /**
    * @returns a callback (of type HandshakerFactoryCb). Accepts the |config| and
    * |validation_visitor| for early config validation. This virtual base doesn't
