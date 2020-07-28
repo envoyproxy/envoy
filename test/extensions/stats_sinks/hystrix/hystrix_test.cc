@@ -243,7 +243,7 @@ public:
   ClusterTestInfo cluster2_{cluster2_name_};
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  NiceMock<Server::MockInstance> server_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_;
   Upstream::ClusterManager::ClusterInfoMap cluster_map_;
 
   std::unique_ptr<HystrixSink> sink_;
