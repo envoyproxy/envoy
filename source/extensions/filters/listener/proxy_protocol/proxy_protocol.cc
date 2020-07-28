@@ -21,7 +21,23 @@
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "extensions/filters/listener/well_known_names.h"
+
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_INET;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_INET6;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_AF_INET;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_AF_INET6;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_LOCAL;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ONBEHALF_OF;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_SIGNATURE_LEN;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_TRANSPORT_DGRAM;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_TRANSPORT_STREAM;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_VERSION;
 
 namespace Envoy {
 namespace Extensions {

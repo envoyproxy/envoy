@@ -15,10 +15,11 @@ namespace TransportSockets {
 class TransportSocketNameValues {
 public:
   const std::string Alts = "envoy.transport_sockets.alts";
-  const std::string Tap = "envoy.transport_sockets.tap";
-  const std::string RawBuffer = "envoy.transport_sockets.raw_buffer";
-  const std::string Tls = "envoy.transport_sockets.tls";
   const std::string Quic = "envoy.transport_sockets.quic";
+  const std::string RawBuffer = "envoy.transport_sockets.raw_buffer";
+  const std::string Tap = "envoy.transport_sockets.tap";
+  const std::string Tls = "envoy.transport_sockets.tls";
+  const std::string UpstreamProxyProtocol = "envoy.transport_sockets.upstream_proxy_protocol";
 };
 
 using TransportSocketNames = ConstSingleton<TransportSocketNameValues>;

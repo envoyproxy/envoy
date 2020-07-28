@@ -29,6 +29,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/listener:well_known_names",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],
