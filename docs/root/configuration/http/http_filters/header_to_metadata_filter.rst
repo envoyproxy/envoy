@@ -12,7 +12,7 @@ or cookie is present or missing.
 When a rule is triggered, dynamic metadata will be added based on the configuration of the rule.
 If the header or cookie is present, it's value is extracted and used along with the specified
 key as metadata. If the header or cookie is missing, on missing case is triggered and the value
-specifed is used for adding metadata.
+specified is used for adding metadata.
 
 The metadata can then be used for load balancing decisions, consumed from logs, etc.
 

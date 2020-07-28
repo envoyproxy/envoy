@@ -86,6 +86,7 @@ message Config {
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.
+  // [#next-free-field: 6]
   message Rule {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
