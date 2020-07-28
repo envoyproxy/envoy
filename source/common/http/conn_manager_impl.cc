@@ -2770,13 +2770,15 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedMetadata(
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
     onEncoderFilterAboveWriteBufferHighWatermark() {
-  ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.", parent_.active_stream_);
+  ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.",
+                   parent_.active_stream_);
   parent_.callHighWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
     onEncoderFilterBelowWriteBufferLowWatermark() {
-  ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", parent_.active_stream_);
+  ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.",
+                   parent_.active_stream_);
   parent_.callLowWatermarkCallbacks();
 }
 
