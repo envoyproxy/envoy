@@ -647,6 +647,15 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use strptime; use absl::FormatTime instead")
   if tokenInLine("strerror", line):
     reportError("Don't use strerror; use Envoy::errorDetails instead")
+  # Prefer using abseil hash maps/sets over std::unordered_map/set for performance optimizations and
+  # non-deterministic iteration order that exposes faulty assertions.
+  # See: https://abseil.io/docs/cpp/guides/container#hash-tables
+  if "std::unordered_map" in line:
+    reportError("Don't use std::unordered_map; use absl::flat_hash_map instead or "
+                "absl::node_hash_map if pointer stability of keys/values is required")
+  if "std::unordered_set" in line:
+    reportError("Don't use std::unordered_set; use absl::flat_hash_set instead or "
+                "absl::node_hash_set if pointer stability of keys/values is required")
   if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.

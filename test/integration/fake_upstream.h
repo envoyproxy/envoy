@@ -200,8 +200,8 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
-  Http::MetadataMap& metadata_map() { return metadata_map_; }
-  std::unordered_map<std::string, uint64_t>& duplicated_metadata_key_count() {
+  Http::MetadataMap& metadataMap() { return metadata_map_; }
+  absl::node_hash_map<std::string, uint64_t>& duplicatedMetadataKeyCount() {
     return duplicated_metadata_key_count_;
   }
 
@@ -222,7 +222,7 @@ private:
   bool add_served_by_header_{};
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
-  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool received_data_{false};
 };
 

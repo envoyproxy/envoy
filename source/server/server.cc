@@ -5,7 +5,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"

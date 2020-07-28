@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/network/address.h"
@@ -10,6 +9,7 @@
 
 #include "common/json/json_loader.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -18,9 +18,9 @@
 namespace Envoy {
 class TestEnvironment {
 public:
-  using PortMap = std::unordered_map<std::string, uint32_t>;
+  using PortMap = absl::node_hash_map<std::string, uint32_t>;
 
-  using ParamMap = std::unordered_map<std::string, std::string>;
+  using ParamMap = absl::node_hash_map<std::string, std::string>;
 
   /**
    * Perform common initialization steps needed to run a test binary. This

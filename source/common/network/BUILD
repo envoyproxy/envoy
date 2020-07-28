@@ -163,7 +163,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "lc_trie_lib",
     hdrs = ["lc_trie.h"],
-    external_deps = ["abseil_int128"],
+    external_deps = [
+        "abseil_node_hash_set",
+        "abseil_int128",
+    ],
     deps = [
         ":address_lib",
         ":cidr_range_lib",

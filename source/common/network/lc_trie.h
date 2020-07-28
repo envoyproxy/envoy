@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <climits>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -14,6 +13,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/numeric/int128.h"
 #include "fmt/format.h"
 
@@ -230,7 +230,7 @@ private:
   using Ipv4 = uint32_t;
   using Ipv6 = absl::uint128;
 
-  using DataSet = std::unordered_set<T>;
+  using DataSet = absl::node_hash_set<T>;
   using DataSetSharedPtr = std::shared_ptr<DataSet>;
 
   /**

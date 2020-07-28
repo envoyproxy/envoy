@@ -55,7 +55,7 @@ public:
   }
 
 private:
-  std::unordered_map<int32_t, uint32_t> settings_;
+  absl::node_hash_map<int32_t, uint32_t> settings_;
 };
 
 struct ServerCodecFacade : public virtual Connection {

@@ -60,7 +60,7 @@ public:
     data_[key] = std::move(value);
   }
 
-  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
+  absl::node_hash_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
     return data_;
   }
 };
