@@ -8,6 +8,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::Pair;
 using testing::UnorderedElementsAre;
 
@@ -110,9 +111,10 @@ TEST(GoogleGrpcUtilsTest, ChannelArgsFromConfig) {
       int_args[arg.key] = arg.value.integer;
     }
   }
-  EXPECT_THAT(string_args, UnorderedElementsAre(Pair("grpc.ssl_target_name_override", "bar"),
-                                                Pair("grpc.primary_user_agent", "grpc-c++/1.25.0"),
-                                                Pair("grpc.default_authority", "foo")));
+  EXPECT_THAT(string_args,
+              UnorderedElementsAre(Pair("grpc.ssl_target_name_override", "bar"),
+                                   Pair("grpc.primary_user_agent", HasSubstr("grpc-c++/")),
+                                   Pair("grpc.default_authority", "foo")));
   EXPECT_THAT(int_args, UnorderedElementsAre(Pair("grpc.http2.max_ping_strikes", 5),
                                              Pair("grpc.http2.max_pings_without_data", 3)));
 }
