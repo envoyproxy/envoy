@@ -404,6 +404,10 @@ private:
     virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
   };
 
+  /**
+   * FilterManager manages decoding a request through a series of decoding filter and the encoding
+   * of the resulting response.
+   */
   class FilterManager {
   public:
     FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& callbacks)
@@ -421,20 +425,54 @@ private:
       }
     }
 
+    /**
+     * Decodes the provided headers starting at the first filter in the chain.
+     * @param headers the headers to decode.
+     * @param end_stream whether the request is header only.
+     */
     void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
       decodeHeaders(nullptr, headers, end_stream);
     }
+
+    /**
+     * Decodes the provided data starting at the first filter in the chain.
+     * @param data the data to decode.
+     * @param end_stream whether this data is the end of the request.
+     */
     void decodeData(Buffer::Instance& data, bool end_stream) {
       decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
     }
+
+    /**
+     * Decodes the provided trailers starting at the first filter in the chain.
+     * @param trailers the trailers to decode.
+     */
     void decodeTrailers(RequestTrailerMap& trailers) { decodeTrailers(nullptr, trailers); }
+
+    /**
+     * Decodes the provided metadata starting at the first filter in the chain.
+     * @param metadata_map the metadata to decode.
+     */
     void decodeMetadata(MetadataMap& metadata_map) { decodeMetadata(nullptr, metadata_map); }
 
+    // TODO(snowp): Make private as filter chain construction is moved into FM.
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
 
     void disarmRequestTimeout();
+
+    /**
+     * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false,
+     * which helps DRY up the if checks.
+     * @param end_stream whether decoding is complete.
+     */
     void maybeEndDecode(bool end_stream);
+
+    /**
+     * If end_stream is true, marks encoding as complete. This is a noop if end_stream is false,
+     * which helps DRY up the if checks.
+     * @param end_stream whether encoding is complete.
+     */
     void maybeEndEncode(bool end_stream);
 
     void sendLocalReplyViaFilterChain(
@@ -442,11 +480,14 @@ private:
         const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
         const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
 
-    // Possibly increases buffer_limit_ to the value of limit.
     void setInitialBufferLimit(uint32_t limit) { buffer_limit_ = limit; }
+    // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
 
-    bool aboveWatermark() { return high_watermark_count_ != 0; }
+    /**
+     * @return bool whether any above high watermark triggers are currently active
+     */
+    bool aboveHighWatermark() { return high_watermark_count_ != 0; }
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
@@ -525,6 +566,8 @@ private:
     uint32_t high_watermark_count_{0};
     std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
 
+    // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
+    // at which point they no longer need to be friends.
     friend ActiveStreamFilterBase;
     friend ActiveStreamDecoderFilter;
     friend ActiveStreamEncoderFilter;
