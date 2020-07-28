@@ -1,3 +1,5 @@
+#include "envoy/http/header_map.h"
+
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
@@ -42,8 +44,32 @@ protected:
 TEST_F(CacheFilterTest, UncacheableRequest) {
   request_headers_.setHost("UncacheableRequest");
 
-  // POST requests are not cacheable
+  // POST requests are uncacheable
   request_headers_.setMethod(Http::Headers::get().MethodValues.Post);
+
+  for (int i = 0; i < 2; i++) {
+    // Create filter for request i
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    // Decode request i header
+    // Make sure the filter did not encode any headers or data
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
+    // In the first request was cached the second request would return StopAllIterationAndWatermark
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+}
+
+TEST_F(CacheFilterTest, UncacheableResponse) {
+  request_headers_.setHost("UncacheableResponse");
+
+  // Responses with "Cache-Control: no-store" are uncacheable
+  response_headers_.setCopy(Http::LowerCaseString("cache-control"), "no-store");
 
   for (int i = 0; i < 2; i++) {
     // Create filter for request i
