@@ -15,6 +15,8 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "requires_trusted_downstream_and_upstream",
+    # This is core Envoy config.
+    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/registry",

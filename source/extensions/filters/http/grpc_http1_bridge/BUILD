@@ -33,6 +33,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # Legacy test use. TODO(#9953) clean up.
+    extra_visibility = [
+        "//source/exe:__pkg__",
+        "//test/server:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     security_posture = "unknown",
     deps = [
         "//include/envoy/registry",

@@ -16,6 +16,8 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream_and_upstream",
+    # TLS is core functionality.
+    visibility = ["//visibility:public"],
     deps = [
         ":ssl_socket_lib",
         "//include/envoy/network:transport_socket_interface",

@@ -51,6 +51,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    # TODO(#9953) clean up.
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+        "//test/common/access_log:__subpackages__",
+    ],
     security_posture = "requires_trusted_downstream_and_upstream",
     status = "alpha",
     deps = [
