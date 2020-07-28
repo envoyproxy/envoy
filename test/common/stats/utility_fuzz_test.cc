@@ -60,9 +60,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     Stats::Utility::counterFromStatNames(*scope, {});
     Stats::Utility::counterFromElements(*scope, {});
   } else {
-    // add random length string in each loop
-    size_t iteration = 0;
-    while (provider.remaining_bytes() > 3 && iteration < MaxIterations) {
+    // Run until either running out of strings to process or a maximal number of
+    // iterations is reached.
+    for (size_t iter = 0; iter < MaxIterations && provider.remaining_bytes() > 3; iter++) {
+      // add random length string in each loop
       if (provider.ConsumeBool()) {
         absl::string_view str = make_string(
             provider.ConsumeRandomLengthString(std::min(max_len, provider.remaining_bytes())));
@@ -77,7 +78,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       }
       Stats::Utility::counterFromStatNames(*scope, sn_vec, tags);
       Stats::Utility::counterFromElements(*scope, ele_vec, tags);
-      iteration++;
     }
   }
 }
