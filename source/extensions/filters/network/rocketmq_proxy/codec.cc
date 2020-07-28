@@ -37,7 +37,7 @@ RemotingCommandPtr Decoder::decode(Buffer::Instance& buffer, bool& underflow, bo
 
   auto mark = buffer.peekBEInt<uint32_t>();
   uint32_t header_length = adjustHeaderLength(mark);
- if(frame_length <= header_length){
+  if (frame_length <= header_length) {
     has_error = true;
     return nullptr;
   }
