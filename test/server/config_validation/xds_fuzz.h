@@ -63,7 +63,7 @@ private:
   std::vector<envoy::api::v2::RouteConfiguration> getRoutesConfigDump();
 
   bool eraseListener(const std::string& listener_name);
-  bool hasRoute(const std::string& route_num);
+  bool hasRoute(const std::string& route_name);
   AssertionResult waitForAck(const std::string& expected_type_url,
                              const std::string& expected_version);
 

@@ -170,18 +170,14 @@ void XdsFuzzTest::removeListener(const std::string& listener_name) {
  */
 void XdsFuzzTest::addRoute(const std::string& route_name) {
   ENVOY_LOG_MISC(debug, "Adding {}", route_name);
-  bool has_route = hasRoute(route_name);
   auto route = buildRouteConfig(route_name);
-  routes_.push_back(route);
 
-  if (has_route) {
-    // if the route was already in routes_, don't send a duplicate add in delta request
-    updateRoute(routes_, {route}, {});
-    verifier_.routeUpdated(route);
-  } else {
-    updateRoute(routes_, {route}, {});
-    verifier_.routeAdded(route);
+  if (!hasRoute(route_name)) {
+    routes_.push_back(route);
   }
+
+  updateRoute(routes_, {route}, {});
+  verifier_.routeAdded(route);
 
   EXPECT_TRUE(waitForAck(Config::TypeUrl::get().RouteConfiguration, std::to_string(version_)));
 }
