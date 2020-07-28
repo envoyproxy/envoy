@@ -74,7 +74,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
       ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")),
-      require_certificates_(config.handshakerFactory().requireCertificates()) {
+      require_certificates_(config.requireCertificates()) {
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
@@ -985,7 +985,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      const std::vector<std::string>& server_names,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()) {
-  if (config.tlsCertificates().empty() && config.handshakerFactory().requireCertificates()) {
+  if (config.tlsCertificates().empty() && config.requireCertificates()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
 

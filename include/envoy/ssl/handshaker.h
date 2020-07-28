@@ -4,6 +4,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/ssl/socket_state.h"
 
 #include "openssl/ssl.h"
@@ -74,17 +75,22 @@ public:
   virtual absl::string_view alpnProtocols() const PURE;
 };
 
+using HandshakerFactoryCb = std::function<HandshakerPtr(bssl::UniquePtr<SSL>)>;
+
 class HandshakerFactory : public Config::TypedFactory {
 public:
-  virtual HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl,
-                                         HandshakerFactoryContext& context) PURE;
-
-  std::string category() const override { return "envoy.tls_handshakers"; }
 
   /**
-   * Set a config for use when creating handshakers.
+   * @returns a callback (of type HandshakerFactoryCb). Accepts the |config| and
+   * |validation_visitor| for early config validation. This virtual base doesn't
+   * perform MessageUtil::downcastAndValidate, but an implementation should.
    */
-  virtual void setConfig(ProtobufTypes::MessagePtr message) PURE;
+  virtual HandshakerFactoryCb
+  createHandshakerCb(const Protobuf::Message& message,
+                     HandshakerFactoryContext& handshaker_factory_context,
+                     ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+
+  std::string category() const override { return "envoy.tls_handshakers"; }
 
   /**
    * Implementations should return true if the tls context accompanying this

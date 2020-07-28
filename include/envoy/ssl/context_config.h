@@ -81,9 +81,10 @@ public:
   virtual Ssl::HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl) const PURE;
 
   /**
-   * @return the handshaker factory for attribute evaluation.
+   * @return whether or not this context requires certificates for TLS
+   * handshakes.
    */
-  virtual const Ssl::HandshakerFactory& handshakerFactory() const PURE;
+  virtual bool requireCertificates() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

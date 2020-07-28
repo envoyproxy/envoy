@@ -53,12 +53,13 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
-  Ssl::HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl,
-                                      Ssl::HandshakerFactoryContext&) override {
-    return std::make_unique<HandshakerImpl>(std::move(ssl));
+  Ssl::HandshakerFactoryCb createHandshakerCb(const Protobuf::Message&,
+                                              Ssl::HandshakerFactoryContext&,
+                                              ProtobufMessage::ValidationVisitor&) override {
+    // The default HandshakerImpl doesn't take a config or use the HandshakerFactoryContext.
+    return
+        [](bssl::UniquePtr<SSL> ssl) { return std::make_unique<HandshakerImpl>(std::move(ssl)); };
   }
-
-  void setConfig(ProtobufTypes::MessagePtr) override {}
 
   bool requireCertificates() const override {
     // The default HandshakerImpl does require certificates.

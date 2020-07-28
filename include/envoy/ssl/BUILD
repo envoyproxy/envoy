@@ -78,6 +78,7 @@ envoy_cc_library(
         ":socket_state",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/protobuf:message_validator_interface",
     ],
 )
 

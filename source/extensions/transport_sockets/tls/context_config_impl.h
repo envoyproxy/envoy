@@ -64,7 +64,7 @@ public:
 
   Ssl::HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl) const override;
 
-  const Ssl::HandshakerFactory& handshakerFactory() const override { return handshaker_factory_; }
+  bool requireCertificates() const override { return require_certificates_; }
 
 protected:
   ContextConfigImpl(const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
@@ -101,8 +101,8 @@ private:
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 
-  // This reference must be reseatable.
-  std::reference_wrapper<Ssl::HandshakerFactory> handshaker_factory_;
+  Ssl::HandshakerFactoryCb handshaker_factory_cb_;
+  bool require_certificates_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

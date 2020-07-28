@@ -179,7 +179,15 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
-      handshaker_factory_(*HandshakerFactoryImpl::getDefaultHandshakerFactory()) {
+      handshaker_factory_cb_([&]() {
+        auto* factory = HandshakerFactoryImpl::getDefaultHandshakerFactory();
+        auto handshaker_factory_context = HandshakerFactoryContextImpl(api_, alpnProtocols());
+        return factory->createHandshakerCb(*factory->createEmptyConfigProto(),
+                                           handshaker_factory_context,
+                                           factory_context.messageValidationVisitor());
+      }()),
+      require_certificates_(
+          HandshakerFactoryImpl::getDefaultHandshakerFactory()->requireCertificates()) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -217,11 +225,13 @@ ContextConfigImpl::ContextConfigImpl(
 
   if (config.has_custom_listener_handshaker()) {
     auto& handshaker_config = config.custom_listener_handshaker();
-    handshaker_factory_ =
+    Ssl::HandshakerFactory& handshaker_factory =
         Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
-    handshaker_factory_.get().setConfig(Config::Utility::translateAnyToFactoryConfig(
-        handshaker_config.typed_config(), factory_context.messageValidationVisitor(),
-        handshaker_factory_.get()));
+    HandshakerFactoryContextImpl handshaker_factory_context(api_, alpnProtocols());
+    handshaker_factory_cb_ = handshaker_factory.createHandshakerCb(
+        handshaker_config.typed_config(), handshaker_factory_context,
+        factory_context.messageValidationVisitor());
+    require_certificates_ = handshaker_factory.requireCertificates();
   }
 }
 
@@ -235,8 +245,7 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
 }
 
 Ssl::HandshakerPtr ContextConfigImpl::createHandshaker(bssl::UniquePtr<SSL> ssl) const {
-  HandshakerFactoryContextImpl context(api_, alpnProtocols());
-  return handshaker_factory_.get().createHandshaker(std::move(ssl), context);
+  return handshaker_factory_cb_(std::move(ssl));
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
@@ -419,7 +428,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
   if ((config.common_tls_context().tls_certificates().size() +
        config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
-    if (handshakerFactory().requireCertificates()) {
+    if (requireCertificates()) {
       throw EnvoyException("No TLS certificates found for server context");
     }
   } else if (!config.common_tls_context().tls_certificates().empty() &&

@@ -174,10 +174,9 @@ public:
   HandshakerImplForTest(bssl::UniquePtr<SSL> ssl, std::function<void()> requested_cert_cb)
       : ssl_(std::move(ssl)), requested_cert_cb_(requested_cert_cb) {
     SSL_set_cert_cb(
-      ssl_.get(), [](SSL*, void* arg) -> int { return *static_cast<bool*>(arg) ? 1 : -1; },
-      &cert_cb_ok_);
+        ssl_.get(), [](SSL*, void* arg) -> int { return *static_cast<bool*>(arg) ? 1 : -1; },
+        &cert_cb_ok_);
   }
-
 
   Network::PostIoAction doHandshake(Ssl::SocketState& state,
                                     Ssl::HandshakerCallbacks& callbacks) override {
