@@ -26,10 +26,11 @@ namespace Envoy {
 #ifndef ASANITIZED
 TEST(SignalsDeathTest, InvalidAddressDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       []() -> void {
         // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
+        // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
         *(nasty_ptr) = 0;
       }(),
       "backtrace.*Segmentation fault");
@@ -44,10 +45,11 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
   SignalAction::registerFatalErrorHandler(handler);
   SignalAction actions;
   // Make sure the fatal error log "HERE" registered above is logged on fatal error.
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       []() -> void {
         // Oops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
+        // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
         *(nasty_ptr) = 0;
       }(),
       "HERE");
@@ -56,7 +58,7 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
 
 TEST(SignalsDeathTest, BusDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       []() -> void {
         // Bus error is tricky. There's one way that can work on POSIX systems
         // described below but it depends on mmaping a file. Just make it easy and
@@ -72,7 +74,7 @@ TEST(SignalsDeathTest, BusDeathTest) {
 
 TEST(SignalsDeathTest, BadMathDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       []() -> void {
         // It turns out to be really hard to not have the optimizer get rid of a
         // division by zero. Just raise the signal for this test.
@@ -85,7 +87,7 @@ TEST(SignalsDeathTest, BadMathDeathTest) {
 // Unfortunately we don't have a reliable way to do this on other platforms
 TEST(SignalsDeathTest, IllegalInstructionDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       []() -> void {
         // Intel defines the "ud2" opcode to be an invalid instruction:
         __asm__("ud2");
@@ -96,7 +98,7 @@ TEST(SignalsDeathTest, IllegalInstructionDeathTest) {
 
 TEST(SignalsDeathTest, AbortDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH_LOG_TO_STDERR([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
+  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 
 TEST(SignalsDeathTest, RestoredPreviousHandlerDeathTest) {
@@ -108,7 +110,7 @@ TEST(SignalsDeathTest, RestoredPreviousHandlerDeathTest) {
     // goes out of scope, NOT the default.
   }
   // Outer SignalAction should be active again:
-  EXPECT_DEATH_LOG_TO_STDERR([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
+  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 
 #endif

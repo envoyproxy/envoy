@@ -161,7 +161,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
   // so disable handling that signal.
   signal(SIGABRT, SIG_DFL);
 #endif
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       []() {
         // Allocating a fixed-size large array that results in OOM on gcc
         // results in a compile-time error on clang of "array size too big",
@@ -172,6 +172,7 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
              size *= 1000) {
           int* p = new int[size];
           // Use the pointer to prevent clang from optimizing the allocation away in opt mode.
+          // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
           ENVOY_LOG_MISC(debug, "p={}", reinterpret_cast<intptr_t>(p));
         }
       }(),

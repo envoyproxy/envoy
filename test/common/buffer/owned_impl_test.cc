@@ -1034,7 +1034,6 @@ TEST_F(OwnedImplTest, ReadReserveAndCommit) {
 }
 
 TEST(OverflowDetectingUInt64, Arithmetic) {
-  Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   OverflowDetectingUInt64 length;
   length += 1;
   length -= 1;
