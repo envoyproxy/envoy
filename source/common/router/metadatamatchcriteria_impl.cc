@@ -9,7 +9,7 @@ MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCrite
 
   // Track locations of each name (from the parent) in v to make it
   // easier to replace them when the same name exists in matches.
-  std::unordered_map<std::string, std::size_t> existing;
+  absl::node_hash_map<std::string, std::size_t> existing;
 
   if (parent) {
     for (const auto& it : parent->metadata_match_criteria_) {

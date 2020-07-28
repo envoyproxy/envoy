@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -23,6 +22,8 @@
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
+#include "absl/container/node_hash_map.h"
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 
@@ -232,7 +233,7 @@ void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
   entry.fractional_percent_value_ = converted_fractional_percent;
 }
 
-void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+void AdminLayer::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   for (const auto& kv : values) {
     values_.erase(kv.first);
     if (!kv.second.empty()) {
@@ -350,7 +351,7 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
     : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()),
       config_(config), service_cluster_(local_info.clusterName()), api_(api),
       init_watcher_("RTDS", [this]() { onRtdsReady(); }), store_(store) {
-  std::unordered_set<std::string> layer_names;
+  absl::node_hash_set<std::string> layer_names;
   for (const auto& layer : config_.layers()) {
     auto ret = layer_names.insert(layer.name());
     if (!ret.second) {
@@ -488,7 +489,7 @@ SnapshotConstSharedPtr LoaderImpl::threadsafeSnapshot() {
   }
 }
 
-void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>& values) {
   if (admin_layer_ == nullptr) {
     throw EnvoyException("No admin layer specified");
   }

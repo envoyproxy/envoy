@@ -136,7 +136,7 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstra
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
-    stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
+    stats_sinks_.emplace_back(factory.createStatsSink(*message, server.serverFactoryContext()));
   }
 }
 

@@ -11,10 +11,6 @@
 namespace Envoy {
 namespace Network {
 
-SocketImpl::SocketImpl(Socket::Type type, Address::Type addr_type, Address::IpVersion version)
-    : io_handle_(SocketInterfaceSingleton::get().socket(type, addr_type, version)),
-      sock_type_(type), addr_type_(addr_type) {}
-
 SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
     : io_handle_(SocketInterfaceSingleton::get().socket(sock_type, addr)), sock_type_(sock_type),
       addr_type_(addr->type()) {}
