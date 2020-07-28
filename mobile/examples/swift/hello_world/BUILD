@@ -14,6 +14,6 @@ ios_application(
     bundle_id = "io.envoyproxy.envoymobile.helloworld",
     families = ["iphone"],
     infoplists = ["Info.plist"],
-    minimum_os_version = "10.0",
+    minimum_os_version = "11.0",
     deps = ["appmain"],
 )

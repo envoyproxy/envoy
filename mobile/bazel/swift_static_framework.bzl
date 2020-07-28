@@ -7,7 +7,7 @@ load("@build_bazel_apple_support//lib:apple_support.bzl", "apple_support")
 load("@build_bazel_rules_swift//swift:swift.bzl", "SwiftInfo", "swift_library")
 load("@build_bazel_rules_apple//apple/internal:transition_support.bzl", "transition_support")
 
-MINIMUM_IOS_VERSION = "10.0"
+MINIMUM_IOS_VERSION = "11.0"
 
 _PLATFORM_TO_SWIFTMODULE = {
     "ios_armv7": "arm",
