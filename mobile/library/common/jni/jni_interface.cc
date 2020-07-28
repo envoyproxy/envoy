@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "main_interface.h"
+#include "library/common/main_interface.h"
 
 static JavaVM* static_jvm = nullptr;
 static JNIEnv* static_env = nullptr;
