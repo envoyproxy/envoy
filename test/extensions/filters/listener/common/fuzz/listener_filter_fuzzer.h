@@ -18,8 +18,6 @@ public:
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
     ON_CALL(cb_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher_));
 
-    EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(testing::Return("raw_buffer"));
-
     try {
       socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
     } catch (const EnvoyException& e) {
@@ -31,29 +29,37 @@ public:
       // If fuzzed remote address is malformed or missing, socket's remote address will be nullptr
     }
 
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
+    if (!header_.empty()) {
+      EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(testing::Return("raw_buffer"));
 
-    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::FileTriggerType::Edge,
-                                          Event::FileReadyType::Read | Event::FileReadyType::Closed))
-        .WillOnce(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
-                                 testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
+
+      EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::FileTriggerType::Edge,
+                                                Event::FileReadyType::Read | Event::FileReadyType::Closed))
+          .WillOnce(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
+                                   testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
+    }
   }
 
   void fuzz(Network::ListenerFilter& filter) {
     filter.onAccept(cb_);
 
-    auto& header = header_;
+    if (!header_.empty()) {
+      auto& header = header_;
 
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(
-          Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length >= header.size());
-            memcpy(buffer, header.data(), header.size());
-            return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-          }));
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+        .WillOnce(
+            Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+              ASSERT(length >= header.size());
+              memcpy(buffer, header.data(), header.size());
+              return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+            }));
+    }
 
-    file_event_callback_(Event::FileReadyType::Read);
+    if (file_event_callback_ != nullptr) {
+      file_event_callback_(Event::FileReadyType::Read);
+    }
   }
 
 private:
