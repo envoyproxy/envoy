@@ -146,7 +146,11 @@ JsonTranscoderConfig::JsonTranscoderConfig(
                                                        &descriptor_pool_));
 
   PathMatcherBuilder<MethodInfoSharedPtr> pmb;
+  // clang-format off
+  // We cannot convert this to a absl hash set as PathMatcherUtility::RegisterByHttpRule takes a
+  // std::unordered_set as an argument
   std::unordered_set<std::string> ignored_query_parameters;
+  // clang-format on
   for (const auto& query_param : proto_config.ignored_query_parameters()) {
     ignored_query_parameters.insert(query_param);
   }

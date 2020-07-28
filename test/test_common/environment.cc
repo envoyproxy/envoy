@@ -5,7 +5,6 @@
 #include <regex>
 #include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/platform.h"
@@ -16,6 +15,8 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
+
+#include "absl/container/node_hash_map.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
@@ -289,7 +290,7 @@ const std::string TestEnvironment::unixDomainSocketDirectory() {
 
 std::string TestEnvironment::substitute(const std::string& str,
                                         Network::Address::IpVersion version) {
-  const std::unordered_map<std::string, std::string> path_map = {
+  const absl::node_hash_map<std::string, std::string> path_map = {
       {"test_tmpdir", TestEnvironment::temporaryDirectory()},
       {"test_udsdir", TestEnvironment::unixDomainSocketDirectory()},
       {"test_rundir", runfiles_ != nullptr ? TestEnvironment::runfilesDirectory() : "invalid"},

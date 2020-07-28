@@ -1,7 +1,5 @@
 #include "server/lds_api.h"
 
-#include <unordered_map>
-
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/api/v2/listener.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -15,6 +13,7 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -57,7 +56,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
   }
 
   ListenerManager::FailureStates failure_state;
-  std::unordered_set<std::string> listener_names;
+  absl::node_hash_set<std::string> listener_names;
   std::string message;
   for (const auto& resource : added_resources) {
     envoy::config::listener::v3::Listener listener;
@@ -97,7 +96,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
                                 const std::string& version_info) {
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
-  std::unordered_set<std::string> listeners_to_remove;
+  absl::node_hash_set<std::string> listeners_to_remove;
   for (const auto& listener : listener_manager_.listeners()) {
     listeners_to_remove.insert(listener.get().name());
   }

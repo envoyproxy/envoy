@@ -974,7 +974,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefa
     response->waitForReset();
     codec_client_->close();
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
 }
@@ -1115,7 +1115,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
     test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
   }
 }
 
@@ -1152,7 +1152,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
 }
 
@@ -1173,7 +1173,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
   }
 }
 
@@ -1208,7 +1208,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
 }
 

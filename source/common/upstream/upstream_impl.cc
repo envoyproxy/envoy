@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/config/cluster/v3/circuit_breaker.pb.h"
@@ -53,6 +52,7 @@
 #include "extensions/filters/network/common/utility.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -233,8 +233,8 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
 // Converts a set of hosts into a HostVector, excluding certain hosts.
 // @param hosts hosts to convert
 // @param excluded_hosts hosts to exclude from the resulting vector.
-HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
-                       const std::unordered_set<HostSharedPtr>& excluded_hosts) {
+HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
+                       const absl::node_hash_set<HostSharedPtr>& excluded_hosts) {
   HostVector net_hosts;
   net_hosts.reserve(hosts.size());
 
@@ -1360,7 +1360,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
-  std::unordered_set<std::string> existing_hosts_for_current_priority(
+  absl::node_hash_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {

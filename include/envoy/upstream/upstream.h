@@ -211,7 +211,7 @@ using HostVector = std::vector<HostSharedPtr>;
 using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
-using HostMap = std::unordered_map<std::string, Upstream::HostSharedPtr>;
+using HostMap = absl::node_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -221,7 +221,7 @@ using ExcludedHostVectorConstSharedPtr = std::shared_ptr<const ExcludedHostVecto
 
 using HostListPtr = std::unique_ptr<HostVector>;
 using LocalityWeightsMap =
-    std::unordered_map<envoy::config::core::v3::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
+    absl::node_hash_map<envoy::config::core::v3::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
 using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
 
 /**

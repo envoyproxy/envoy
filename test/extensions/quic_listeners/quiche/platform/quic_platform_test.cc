@@ -7,7 +7,6 @@
 #include <netinet/in.h>
 
 #include <fstream>
-#include <unordered_set>
 
 #include "common/memory/stats.h"
 #include "common/network/socket_impl.h"

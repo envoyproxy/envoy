@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
@@ -85,7 +86,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
       SpecifierOffsets specifier_offsets;
     };
     // A map is used to keep different formatted format strings at a given second.
-    std::unordered_map<std::string, const Formatted> formatted;
+    absl::node_hash_map<std::string, const Formatted> formatted;
   };
   static thread_local CachedTime cached_time;
 
@@ -101,9 +102,11 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // Remove all the expired cached items.
     for (auto it = cached_time.formatted.cbegin(); it != cached_time.formatted.cend();) {
       if (it->second.epoch_time_seconds != epoch_time_seconds) {
-        it = cached_time.formatted.erase(it);
+        auto next_it = std::next(it);
+        cached_time.formatted.erase(it);
+        it = next_it;
       } else {
-        it++;
+        ++it;
       }
     }
 

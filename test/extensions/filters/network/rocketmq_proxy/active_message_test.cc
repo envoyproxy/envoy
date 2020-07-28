@@ -75,7 +75,7 @@ TEST_F(ActiveMessageTest, ClusterName) {
 
 TEST_F(ActiveMessageTest, FillBrokerData) {
 
-  std::unordered_map<int64_t, std::string> address;
+  absl::node_hash_map<int64_t, std::string> address;
   address.emplace(0, "1.2.3.4:10911");
   BrokerData broker_data("DefaultCluster", "broker-a", std::move(address));
 
