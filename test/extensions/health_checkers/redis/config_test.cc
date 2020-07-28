@@ -9,10 +9,8 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/cluster.h"
-#include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/health_checker.h"
-
+#include "test/mocks/upstream/priority_set.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -7,13 +7,11 @@
 #include "common/router/retry_state_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/upstream/cluster_info.h"
-#include "test/mocks/upstream/cluster.h"
-
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"

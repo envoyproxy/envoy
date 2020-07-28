@@ -44,9 +44,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
-
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"

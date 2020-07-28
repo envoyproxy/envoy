@@ -19,7 +19,6 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
-
 #include "test/test_common/utility.h"
 
 #include "absl/types/optional.h"

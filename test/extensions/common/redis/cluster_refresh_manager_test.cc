@@ -12,9 +12,7 @@
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/priority_set.h"
-
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 

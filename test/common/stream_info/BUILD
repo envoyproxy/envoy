@@ -28,7 +28,7 @@ envoy_cc_test(
         "//source/common/stream_info:stream_info_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:host_mocks","//test/mocks/upstream:cluster_info_mocks","//test/mocks/upstream:cluster_mocks",
+        "//test/mocks/upstream:host_mocks","//test/mocks/upstream:cluster_info_mocks",
     ],
 )
 

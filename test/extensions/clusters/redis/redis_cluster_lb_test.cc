@@ -6,8 +6,6 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/cluster_info.h"
-#include "test/mocks/upstream/cluster.h"
-
 
 using testing::Return;
 

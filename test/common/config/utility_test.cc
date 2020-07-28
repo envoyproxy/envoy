@@ -17,9 +17,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
-
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"

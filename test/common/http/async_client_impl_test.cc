@@ -21,8 +21,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
-
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"

@@ -6,7 +6,6 @@
 
 #include "test/mocks/upstream/host.h"
 
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

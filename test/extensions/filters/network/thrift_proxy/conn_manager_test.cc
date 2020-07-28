@@ -17,7 +17,6 @@
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
-
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"

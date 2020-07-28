@@ -22,8 +22,6 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
-
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

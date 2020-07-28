@@ -7,10 +7,10 @@
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
-#include "common/network/address_impl.h"
 #include "common/config/utility.h"
-#include "common/router/header_formatter.h"
 #include "common/http/header_utility.h"
+#include "common/network/address_impl.h"
+#include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
 #include "common/stream_info/filter_state_impl.h"
@@ -21,7 +21,6 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
-
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 

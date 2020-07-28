@@ -2,16 +2,14 @@
 #include "envoy/config/core/v3/base.pb.validate.h"
 
 #include "common/common/empty_string.h"
-#include "common/http/message_impl.h"
 #include "common/config/datasource.h"
+#include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
-
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

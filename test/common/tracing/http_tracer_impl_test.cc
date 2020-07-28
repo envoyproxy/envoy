@@ -7,11 +7,11 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "common/common/base64.h"
-#include "common/network/address_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/request_id_extension_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -23,7 +23,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"

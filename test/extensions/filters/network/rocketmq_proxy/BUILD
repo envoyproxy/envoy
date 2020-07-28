@@ -21,7 +21,7 @@ envoy_cc_mock(
         "//source/extensions/filters/network/rocketmq_proxy:config",
         "//source/extensions/filters/network/rocketmq_proxy/router:router_lib",
         "//test/mocks/server:server_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks","//test/mocks/upstream:cluster_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 

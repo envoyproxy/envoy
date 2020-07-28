@@ -8,7 +8,6 @@
 
 #include "test/mocks/http/mocks.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace Filters {

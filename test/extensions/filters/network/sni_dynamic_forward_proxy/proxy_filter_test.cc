@@ -8,8 +8,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/basic_resource_limit.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
-
 #include "test/mocks/upstream/transport_socket_match.h"
 
 using testing::AtLeast;

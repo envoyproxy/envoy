@@ -83,7 +83,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/stats:fake_symbol_table_lib",
         "//test/mocks/upstream:cluster_info_mocks",
-        "//test/mocks/upstream:cluster_mocks",
+        
         "//test/test_common:global_lib",
     ],
 )

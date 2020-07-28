@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
 #include "common/tracing/http_tracer_impl.h"
+
 #include "extensions/filters/http/common/utility.h"
 #include "extensions/filters/http/well_known_names.h"
 

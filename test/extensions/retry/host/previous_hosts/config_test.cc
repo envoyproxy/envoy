@@ -1,12 +1,12 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
+
 #include "common/network/address_impl.h"
 
 #include "extensions/retry/host/previous_hosts/config.h"
 #include "extensions/retry/host/well_known_names.h"
 
 #include "test/mocks/upstream/host.h"
-
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

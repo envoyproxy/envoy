@@ -19,11 +19,11 @@
 #include "common/http/context_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/exception.h"
+#include "common/http/header_utility.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/symbol_table_creator.h"
-#include "common/http/header_utility.h"
 
 #include "test/common/http/conn_manager_impl_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -38,8 +38,6 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
-
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"

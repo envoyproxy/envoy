@@ -6,8 +6,8 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/ratelimit/ratelimit.h"
 
-#include "common/protobuf/utility.h"
 #include "common/network/address_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/filters/network/thrift_proxy/config.h"
 #include "extensions/filters/network/thrift_proxy/metadata.h"

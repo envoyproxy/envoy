@@ -5,8 +5,6 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
-
 
 #include "gmock/gmock.h"
 

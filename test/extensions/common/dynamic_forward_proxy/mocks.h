@@ -6,7 +6,6 @@
 
 #include "test/mocks/upstream/basic_resource_limit.h"
 
-
 #include "gmock/gmock.h"
 
 using testing::NiceMock;

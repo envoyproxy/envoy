@@ -8,8 +8,6 @@
 #include "common/stats/fake_symbol_table_impl.h"
 
 #include "test/mocks/upstream/cluster_info.h"
-#include "test/mocks/upstream/cluster.h"
-
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"
 

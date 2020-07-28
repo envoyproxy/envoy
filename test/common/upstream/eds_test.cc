@@ -22,9 +22,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/health_checker.h"
-
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

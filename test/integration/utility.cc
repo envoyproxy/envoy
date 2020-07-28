@@ -20,8 +20,6 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
-#include "test/mocks/upstream/cluster.h"
-
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"

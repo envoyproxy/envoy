@@ -6,8 +6,6 @@
 #include "common/router/shadow_writer_impl.h"
 
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/cluster.h"
-
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
