@@ -402,16 +402,16 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
 
 void ScopedRdsConfigSubscription::onDemandRdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+    Http::RouteConfigUpdatedCallback route_config_updated_cb) {
   auto iter = scope_name_by_hash_.find(key_hash);
   if (iter == scope_name_by_hash_.end()) {
-    (*route_config_updated_cb)(false);
+    route_config_updated_cb(false);
     return;
   }
   // Wrap the thread local dispatcher inside the callback.
   std::function<void()> thread_local_updated_callback = [route_config_updated_cb,
                                                          &thread_local_dispatcher]() {
-    thread_local_dispatcher.post([route_config_updated_cb] { (*route_config_updated_cb)(true); });
+    thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(true); });
   };
   std::string scope_name = iter->second;
   // On demand initialization inside main thread.

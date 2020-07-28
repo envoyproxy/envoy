@@ -110,6 +110,8 @@ class ImmutableConfigProviderBase : public ConfigProvider {
 public:
   ~ImmutableConfigProviderBase() override;
 
+  bool isMutable() const override { return false; }
+
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return last_updated_; }
   ApiType apiType() const override { return api_type_; }
@@ -343,6 +345,8 @@ protected:
  */
 class MutableConfigProviderCommonBase : public ConfigProvider {
 public:
+  bool isMutable() const override { return true; }
+
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
   ApiType apiType() const override { return api_type_; }

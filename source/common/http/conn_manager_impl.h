@@ -421,8 +421,7 @@ private:
                                    Http::RouteConfigUpdatedCallbackSharedPtr) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     };
-    virtual void requestSrdsUpdate(uint64_t, Event::Dispatcher&,
-                                   Http::RouteConfigUpdatedCallbackSharedPtr) {
+    virtual void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     };
   };
@@ -436,8 +435,7 @@ private:
     void
     requestVhdsUpdate(const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
                       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-    void requestSrdsUpdate(uint64_t, Event::Dispatcher&,
-                           Http::RouteConfigUpdatedCallbackSharedPtr) override;
+    void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback) override;
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
