@@ -69,7 +69,8 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     EXPECT_THAT(request->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(request->headers().get(Http::Headers::get().Age), nullptr);
     EXPECT_EQ(request->body(), std::string(42, 'a'));
-    EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
+    EXPECT_EQ(waitForAccessLog(access_log_name_),
+              fmt::format("- via_upstream{}", TestEnvironment::newLine));
   }
 
   // Advance time, to verify the original date header is preserved.
@@ -84,7 +85,8 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   EXPECT_NE(request->headers().get(Http::Headers::get().Age), nullptr);
   // Advance time to force a log flush.
   simTime().advanceTimeWait(std::chrono::seconds(1));
-  EXPECT_EQ(waitForAccessLog(access_log_name_, 1), "RFCF cache.response_from_cache_filter\n");
+  EXPECT_EQ(waitForAccessLog(access_log_name_, 1),
+            fmt::format("RFCF cache.response_from_cache_filter{}", TestEnvironment::newLine));
 }
 
 // Send the same GET request twice with body and trailers twice, then check that the response

@@ -94,6 +94,17 @@ public:
   static const std::string& nullDevicePath();
 
   /**
+   * Obtain platform specific new line character(s)
+   * @return absl::string_view platform specific new line character(s)
+   */
+  static constexpr absl::string_view newLine
+#ifdef WIN32
+      {"\r\n"};
+#else
+      {"\n"};
+#endif
+
+  /**
    * Obtain read-only test input data directory.
    * @param workspace the name of the Bazel workspace where the input data is.
    * @return const std::string& with the path to the read-only test input directory.
