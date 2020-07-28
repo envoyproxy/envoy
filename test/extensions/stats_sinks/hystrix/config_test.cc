@@ -35,7 +35,7 @@ TEST(StatsConfigTest, ValidHystrixSink) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Hystrix::HystrixSink*>(sink.get()), nullptr);

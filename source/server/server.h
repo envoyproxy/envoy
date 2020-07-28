@@ -173,6 +173,9 @@ public:
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
+  std::chrono::milliseconds statsFlushInterval() const override {
+    return server_.statsFlushInterval();
+  }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }

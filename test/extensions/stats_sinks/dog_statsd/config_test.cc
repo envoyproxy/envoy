@@ -49,7 +49,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
@@ -60,7 +60,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
 
 // Negative test for protoc-gen-validate constraints for dog_statsd.
 TEST(DogStatsdConfigTest, ValidateFail) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   EXPECT_THROW(
       DogStatsdSinkFactory().createStatsSink(envoy::config::metrics::v3::DogStatsdSink(), server),
       ProtoValidationException);
@@ -86,7 +86,7 @@ TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
@@ -113,7 +113,7 @@ TEST_P(DogStatsdConfigLoopbackTest, DefaultBufferSize) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
@@ -144,7 +144,7 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());

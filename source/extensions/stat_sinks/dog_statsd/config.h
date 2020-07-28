@@ -16,7 +16,7 @@ class DogStatsdSinkFactory : Logger::Loggable<Logger::Id::config>,
                              public Server::Configuration::StatsSinkFactory {
 public:
   Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                 Server::Instance& server) override;
+                                 Server::Configuration::ServerFactoryContext& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
