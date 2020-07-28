@@ -675,7 +675,7 @@ bool ContextImpl::matchSubjectAltName(
       if (general_name->type == GEN_DNS &&
                   config_san_matcher.matcher().match_pattern_case() ==
                       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-              ? dnsNameMatch(config_san_matcher.matcher().exact(), std::string_view(san.c_str()))
+              ? dnsNameMatch(config_san_matcher.matcher().exact(), std::string_view(san))
               : config_san_matcher.match(san)) {
         return true;
       }
@@ -714,9 +714,9 @@ bool ContextImpl::dnsNameMatch(const std::string& dns_name, const std::string_vi
       const size_t off = dns_name.length() - pattern_len + 1;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_wildcard_matching")) {
         return dns_name.substr(0, off).find('.') == std::string::npos &&
-               dns_name.compare(off, pattern_len - 1, pattern.data() + 1, pattern_len - 1) == 0;
+               dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
       } else {
-        return dns_name.compare(off, pattern_len - 1, pattern.data() + 1, pattern_len - 1) == 0;
+        return dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
       }
     }
   }
