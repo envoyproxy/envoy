@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_set>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/config/subscription.h"
@@ -18,6 +17,8 @@
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -59,7 +60,7 @@ public:
   size_t size() const { return allowed_sha256_digests_.size(); }
 
 private:
-  std::unordered_set<std::string> allowed_sha256_digests_;
+  absl::node_hash_set<std::string> allowed_sha256_digests_;
 };
 
 using AllowedPrincipalsSharedPtr = std::shared_ptr<AllowedPrincipals>;
