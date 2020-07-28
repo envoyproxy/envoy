@@ -574,7 +574,7 @@ message Cluster {
     //
     // This is limited somewhat arbitrarily to 3 because prefetching connections too aggressively can
     // harm latency more than the prefetching helps.
-    double prefetch_ratio = 1 [(validate.rules).double = {lte: 3.0 gte: 1.0}];
+    google.protobuf.DoubleValue prefetch_ratio = 1 [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
   reserved 12, 15, 7, 11, 35, 47;
