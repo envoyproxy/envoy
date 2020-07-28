@@ -208,9 +208,10 @@ public:
    * @return AssertionSuccess() if the counter was == to the value within the timeout, else
    * AssertionFailure().
    */
-  static AssertionResult waitForCounterEq(Stats::Store& store, const std::string& name,
-                                          uint64_t value, Event::TestTimeSystem& time_system,
-                                          absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
+  static AssertionResult
+  waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+                   Event::TestTimeSystem& time_system,
+                   absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
 
   /**
    * Wait for a counter to >= a given value.
@@ -222,9 +223,10 @@ public:
    * @return AssertionSuccess() if the counter was == to the value within the timeout, else
    * AssertionFailure().
    */
-  static AssertionResult waitForCounterGe(Stats::Store& store, const std::string& name,
-                                          uint64_t value, Event::TestTimeSystem& time_system,
-                                          absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
+  static AssertionResult
+  waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                   Event::TestTimeSystem& time_system,
+                   absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
 
   /**
    * Wait for a gauge to >= a given value.
@@ -236,9 +238,10 @@ public:
    * @return AssertionSuccess() if the counter was == to the value within the timeout, else
    * AssertionFailure().
    */
-  static AssertionResult waitForGaugeGe(Stats::Store& store, const std::string& name,
-                                        uint64_t value, Event::TestTimeSystem& time_system,
-                                        absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
+  static AssertionResult
+  waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                 Event::TestTimeSystem& time_system,
+                 absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
 
   /**
    * Wait for a gauge to == a given value.
@@ -250,9 +253,10 @@ public:
    * @return AssertionSuccess() if the counter was == to the value within the timeout, else
    * AssertionFailure().
    */
-  static AssertionResult waitForGaugeEq(Stats::Store& store, const std::string& name,
-                                        uint64_t value, Event::TestTimeSystem& time_system,
-                                        absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
+  static AssertionResult
+  waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                 Event::TestTimeSystem& time_system,
+                 absl::optional<std::chrono::milliseconds> timeout = absl::nullopt);
 
   /**
    * Find a readout in a stats store.

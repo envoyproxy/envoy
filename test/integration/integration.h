@@ -481,6 +481,8 @@ protected:
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
 
+  absl::optional<std::chrono::milliseconds> stat_timeout_{absl::nullopt};
+
 private:
   // The type for the Envoy-to-backend connection
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};

@@ -61,14 +61,15 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-    bool use_real_stats) {
+    bool use_real_stats, absl::optional<std::chrono::milliseconds> stat_timeout) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path, use_real_stats)};
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization,
-                process_object, validation_config, concurrency, drain_time, drain_strategy);
+                process_object, validation_config, concurrency, drain_time, drain_strategy,
+                stat_timeout);
   return server;
 }
 
@@ -88,7 +89,8 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
                                   ProcessObjectOptRef process_object,
                                   Server::FieldValidationConfig validator_config,
                                   uint32_t concurrency, std::chrono::seconds drain_time,
-                                  Server::DrainStrategy drain_strategy) {
+                                  Server::DrainStrategy drain_strategy,
+                                  absl::optional<std::chrono::milliseconds> stat_timeout) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ =
@@ -135,6 +137,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
         tap_path.value() + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}) + "_server.pcap";
     tcp_dump_ = std::make_unique<TcpDump>(pcap_path, "lo", ports);
   }
+  stat_timeout_ = stat_timeout;
 }
 
 IntegrationTestServer::~IntegrationTestServer() {

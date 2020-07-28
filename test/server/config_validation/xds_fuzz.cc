@@ -69,6 +69,8 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
 
+  stat_timeout_ = std::chrono::seconds(5);
+
   if (input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
   } else {
