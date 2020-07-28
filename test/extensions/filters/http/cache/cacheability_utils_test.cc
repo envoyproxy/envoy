@@ -109,12 +109,22 @@ TEST_F(IsCacheableResponseTest, UncacheableStatusCode) {
 
 TEST_F(IsCacheableResponseTest, ValidationData) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
-  response_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "s-maxage=1000");
-  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
-  response_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "public, no-transform");
-  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  // No cache control headers or expires header
   response_headers_.remove(Http::CustomHeaders::get().CacheControl);
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  // No max-age data or expires header
+  response_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "public, no-transform");
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  // Max-age data available
+  response_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "s-maxage=1000");
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  // Max-age data available with no date
+  response_headers_.removeDate();
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  // No date, but the response requires revalidation anyway
+  response_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "no-cache");
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
+  // No cache control headers or date, but there is an expires header
   response_headers_.setCopy(Http::Headers::get().Expires, "Sun, 06 Nov 1994 09:49:37 GMT");
   EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers_));
 }
