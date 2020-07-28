@@ -88,8 +88,12 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
                              absl::optional<std::chrono::milliseconds>(options_.timeout));
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
-    headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
-                                        header_value.value());
+    if (Http::LowerCaseString(header_value.key()).get() == Http::Headers::get().Host.get()) {
+      headers_message_->headers().setHost(header_value.value());
+    } else {
+      headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
+                                          header_value.value());
+    }
   }
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
