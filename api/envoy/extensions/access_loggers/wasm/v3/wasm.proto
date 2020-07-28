@@ -15,6 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Wasm access log]
 // [#extension: envoy.access_loggers.wasm]
 
+// [[#not-implemented-hide:]
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`
 // that calls into a WASM VM.
 message WasmAccessLog {
