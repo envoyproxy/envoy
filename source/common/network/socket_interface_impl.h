@@ -12,9 +12,8 @@ class SocketInterfaceImpl : public SocketInterfaceBase {
 public:
   // SocketInterface
   IoHandlePtr socket(Socket::Type socket_type, Address::Type addr_type, Address::IpVersion version,
-                     bool socket_v6only) const override;
-  IoHandlePtr socket(Socket::Type socket_type,
-                     const Address::InstanceConstSharedPtr addr) const override;
+                     bool socket_v6only) override;
+  IoHandlePtr socket(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr) override;
   IoHandlePtr socket(os_fd_t fd) override;
   bool ipFamilySupported(int domain) override;
 

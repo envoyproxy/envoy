@@ -345,6 +345,7 @@ envoy_cc_test(
         "//test/integration/filters:request_metadata_filter_config_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/integration/filters:stop_iteration_and_continue",
+        "//test/integration/filters:test_socket_interface_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

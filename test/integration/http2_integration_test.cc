@@ -12,6 +12,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/network/socket_option_impl.h"
 
+#include "test/integration/filters/test_socket_interface.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -1575,6 +1576,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
 
 namespace {
 const int64_t TransmitThreshold = 100 * 1024 * 1024;
+const uint32_t ControlFrameFloodLimit = 100;
+const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
@@ -1596,10 +1599,11 @@ void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
 }
 
 void Http2FloodMitigationTest::beginSession() {
+  Envoy::Network::TestSocketInterface::Install();
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   // set lower outbound frame limits to make tests run faster
-  config_helper_.setOutboundFramesLimits(1000, 100);
+  config_helper_.setOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
   // Set up a raw connection to easily send requests without reading responses. Also, set a small
   // TCP receive buffer to speed up connection backup.
@@ -1612,26 +1616,29 @@ void Http2FloodMitigationTest::beginSession() {
 }
 
 // Verify that the server detects the flood of the given frame.
-void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::string& flood_stat) {
-  // pack the as many frames as we can into 16k buffer
-  const int FrameCount = (16 * 1024) / frame.size();
-  std::vector<char> buf(FrameCount * frame.size());
+void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::string& flood_stat,
+                                           uint32_t num_frames) {
+  // make sure all frames can fit into 16k buffer
+  ASSERT_LE(num_frames, (16u * 1024u) / frame.size());
+  std::vector<char> buf(num_frames * frame.size());
   for (auto pos = buf.begin(); pos != buf.end();) {
     pos = std::copy(frame.begin(), frame.end(), pos);
   }
 
-  tcp_client_->readDisable(true);
-  int64_t total_bytes_sent = 0;
-  // If the flood protection is not working this loop will keep going
-  // forever until it is killed by blaze timer or run out of memory.
-  // Add early stop if we have sent more than 100M of frames, as it this
-  // point it is obvious something is wrong.
-  while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
-    ASSERT_TRUE(tcp_client_->write({buf.begin(), buf.end()}, false, false));
-    total_bytes_sent += buf.size();
-  }
+  auto* io_handle = Envoy::Network::TestSocketInterface::GetSingleton().waitForAcceptedSocket(0);
+  // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
+  // to accumulate in the transport socket buffer.
+  io_handle->setWritevOverride([](const Buffer::RawSlice*, uint64_t) {
+    return Api::IoCallUint64Result(
+        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                           Network::IoSocketError::deleteIoError));
+  });
 
-  EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
+  ASSERT_TRUE(tcp_client_->write({buf.begin(), buf.end()}, false, false));
+
+  // Envoy's flood mitigation should kill the connection
+  tcp_client_->waitForDisconnect();
+
   EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
   test_server_->waitForCounterGe("http.config_test.downstream_cx_delayed_close_timeout", 1);
 }
@@ -1668,13 +1675,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
 TEST_P(Http2FloodMitigationTest, Ping) {
   setNetworkConnectionBufferSize();
   beginSession();
-  floodServer(Http2Frame::makePingFrame(), "http2.outbound_control_flood");
+  floodServer(Http2Frame::makePingFrame(), "http2.outbound_control_flood",
+              ControlFrameFloodLimit + 1);
 }
 
 TEST_P(Http2FloodMitigationTest, Settings) {
   setNetworkConnectionBufferSize();
   beginSession();
-  floodServer(Http2Frame::makeEmptySettingsFrame(), "http2.outbound_control_flood");
+  floodServer(Http2Frame::makeEmptySettingsFrame(), "http2.outbound_control_flood",
+              ControlFrameFloodLimit + 1);
 }
 
 // Verify that the server can detect flood of internally generated 404 responses.
@@ -1687,7 +1696,7 @@ TEST_P(Http2FloodMitigationTest, 404) {
   floodServer("host", "/notfound", Http2Frame::ResponseStatus::NotFound, "http2.outbound_flood");
 }
 
-// Verify that the server can detect flood of DATA frames
+// Verify that the server can detect flood of response DATA frames
 TEST_P(Http2FloodMitigationTest, Data) {
   // Set large buffer limits so the test is not affected by the flow control.
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
@@ -1696,7 +1705,43 @@ TEST_P(Http2FloodMitigationTest, Data) {
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-  floodServer("host", "/test/long/url", Http2Frame::ResponseStatus::Ok, "http2.outbound_flood");
+  // Do not read from the socket and send request that causes autonomous upstream
+  // to respond with 1000 DATA frames. The Http2FloodMitigationTest::beginSession()
+  // sets 1000 flood limit for all frame types. Including 1 HEADERS response frame
+  // 1000 DATA frames should trigger flood protection.
+  uint32_t request_idx = 0;
+  auto* io_handle = Envoy::Network::TestSocketInterface::GetSingleton().waitForAcceptedSocket(0);
+
+  // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
+  // to accumulate in the transport socket buffer.
+  io_handle->setWritevOverride([](const Buffer::RawSlice*, uint64_t) {
+    return Api::IoCallUint64Result(
+        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                           Network::IoSocketError::deleteIoError));
+  });
+  auto request = Http2Frame::makeRequest(request_idx, "host", "/test/long/url",
+                                         {Http2Frame::Header("response_data_blocks", "1000")});
+  sendFrame(request);
+
+  // Wait for 19077 bytes to arrive from upstream (1K DATA frames of size 10 + HEADERS frame)
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 19077);
+
+  // If the server codec incorrectly thrown an exception on flood detection it would cause
+  // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
+  // connections.
+  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
+
+  // Server codec should be flooded. However it is not disconnected until client sends it
+  // some bytes. Verify that it is still connected and send 1 byte. Flood detection
+  // happens before data is parsed so it does not matter what is being sent.
+  ASSERT_TRUE(tcp_client_->connected());
+  ASSERT_TRUE(tcp_client_->write(std::string("a"), false, false));
+  // Now wait for client to be disconnected and verify it is due to flood checks.
+  tcp_client_->waitForDisconnect();
+  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
 }
 
 // Verify that the server can detect flood of RST_STREAM frames.
@@ -1711,23 +1756,27 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
       });
   beginSession();
 
-  int i = 0;
-  auto request = Http::Http2::Http2Frame::makeMalformedRequest(i);
+  uint32_t stream_index = 0;
+  auto request = Http::Http2::Http2Frame::makeMalformedRequest(stream_index);
   sendFrame(request);
   auto response = readFrame();
   // Make sure we've got RST_STREAM from the server
   EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
 
-  // Disable reading to make sure that the RST_STREAM frames stack up on the server.
-  tcp_client_->readDisable(true);
+  auto* io_handle = Envoy::Network::TestSocketInterface::GetSingleton().waitForAcceptedSocket(0);
+  // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
+  // to accumulate in the transport socket buffer.
+  io_handle->setWritevOverride([](const Buffer::RawSlice*, uint64_t) {
+    return Api::IoCallUint64Result(
+        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                           Network::IoSocketError::deleteIoError));
+  });
 
-  uint64_t total_bytes_sent = 0;
-  while (total_bytes_sent < TransmitThreshold && tcp_client_->connected()) {
-    request = Http::Http2::Http2Frame::makeMalformedRequest(++i);
+  for (++stream_index; stream_index < ControlFrameFloodLimit + 2; ++stream_index) {
+    request = Http::Http2::Http2Frame::makeMalformedRequest(stream_index);
     sendFrame(request);
-    total_bytes_sent += request.size();
   }
-  EXPECT_LE(total_bytes_sent, TransmitThreshold) << "Flood mitigation is broken.";
+  tcp_client_->waitForDisconnect();
   EXPECT_EQ(1, test_server_->counter("http2.outbound_control_flood")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value());
@@ -1816,7 +1865,8 @@ TEST_P(Http2FloodMitigationTest, EmptyData) {
 TEST_P(Http2FloodMitigationTest, PriorityIdleStream) {
   beginSession();
 
-  floodServer(Http2Frame::makePriorityFrame(0, 1), "http2.inbound_priority_frames_flood");
+  floodServer(Http2Frame::makePriorityFrame(0, 1), "http2.inbound_priority_frames_flood",
+              Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM + 1);
 }
 
 TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
@@ -1829,7 +1879,9 @@ TEST_P(Http2FloodMitigationTest, PriorityOpenStream) {
   sendFrame(request);
 
   floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
-              "http2.inbound_priority_frames_flood");
+              "http2.inbound_priority_frames_flood",
+              Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 +
+                  1);
 }
 
 TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
@@ -1846,7 +1898,9 @@ TEST_P(Http2FloodMitigationTest, PriorityClosedStream) {
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
 
   floodServer(Http2Frame::makePriorityFrame(request_idx, request_idx + 1),
-              "http2.inbound_priority_frames_flood");
+              "http2.inbound_priority_frames_flood",
+              Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 +
+                  1);
 }
 
 TEST_P(Http2FloodMitigationTest, WindowUpdate) {
@@ -1858,8 +1912,10 @@ TEST_P(Http2FloodMitigationTest, WindowUpdate) {
   auto request = Http2Frame::makeRequest(request_idx, "host", "/");
   sendFrame(request);
 
+  // Since we do not send any DATA frames, only 4 sequential WINDOW_UPDATE frames should
+  // trigger flood protection.
   floodServer(Http2Frame::makeWindowUpdateFrame(request_idx, 1),
-              "http2.inbound_window_update_frames_flood");
+              "http2.inbound_window_update_frames_flood", 4);
 }
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.

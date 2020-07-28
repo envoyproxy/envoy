@@ -339,3 +339,23 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "test_socket_interface_lib",
+    srcs = [
+        "test_socket_interface.cc",
+    ],
+    hdrs = [
+        "test_socket_interface.h",
+    ],
+    deps = [
+        "//include/envoy/network:socket_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:socket_lib",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
+    ],
+)
