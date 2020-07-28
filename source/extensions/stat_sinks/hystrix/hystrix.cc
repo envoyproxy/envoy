@@ -342,7 +342,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
 
   // Save a map of the relevant histograms per cluster in a convenient format.
-  std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
+  absl::node_hash_map<std::string, QuantileLatencyMap> time_histograms;
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().tagExtractedStatName() == cluster_upstream_rq_time_) {
       absl::optional<Stats::StatName> value =
@@ -410,7 +410,9 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   if (clusters.size() < cluster_stats_cache_map_.size()) {
     for (auto it = cluster_stats_cache_map_.begin(); it != cluster_stats_cache_map_.end();) {
       if (clusters.find(it->first) == clusters.end()) {
-        it = cluster_stats_cache_map_.erase(it);
+        auto next_it = std::next(it);
+        cluster_stats_cache_map_.erase(it);
+        it = next_it;
       } else {
         ++it;
       }
