@@ -129,6 +129,15 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test(
+    name = "xds_verifier_test",
+    srcs = ["xds_verifier_test.cc"],
+    deps = [
+        ":xds_verifier_lib",
+        "//test/config:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
