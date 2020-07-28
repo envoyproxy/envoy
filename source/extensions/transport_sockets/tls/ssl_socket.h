@@ -60,6 +60,7 @@ public:
   bool peerCertificateValidated() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
+  const std::string& sha1PeerCertificateDigest() const override;
   const std::string& serialNumberPeerCertificate() const override;
   const std::string& issuerPeerCertificate() const override;
   const std::string& subjectPeerCertificate() const override;
@@ -83,6 +84,7 @@ public:
 private:
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
+  mutable std::string cached_sha_1_peer_certificate_digest_;
   mutable std::string cached_serial_number_peer_certificate_;
   mutable std::string cached_issuer_peer_certificate_;
   mutable std::string cached_subject_peer_certificate_;

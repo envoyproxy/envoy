@@ -842,9 +842,9 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  ASSERT(response->continue_headers() != nullptr);
-  EXPECT_EQ("100", response->continue_headers()->getStatusValue());
-  EXPECT_EQ(nullptr, response->continue_headers()->Via());
+  ASSERT(response->continueHeaders() != nullptr);
+  EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
+  EXPECT_EQ(nullptr, response->continueHeaders()->Via());
   EXPECT_EQ("200", response->headers().getStatusValue());
   if (via.empty()) {
     EXPECT_EQ(nullptr, response->headers().Via());
@@ -853,8 +853,9 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   }
 }
 
-void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upstream_complete,
-                                                       bool with_encoder_filter) {
+void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_complete,
+                                               bool with_encoder_filter,
+                                               bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
     config_helper_.addFilter("name: envoy.filters.http.cors");
@@ -891,6 +892,13 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   if (continue_before_upstream_complete) {
+    if (with_multiple_1xx_headers) {
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    }
     // This case tests sending on 100-Continue headers before the client has sent all the
     // request data.
     upstream_request_->encode100ContinueHeaders(
@@ -902,6 +910,13 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   if (!continue_before_upstream_complete) {
+    if (with_multiple_1xx_headers) {
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
+      upstream_request_->encode100ContinueHeaders(
+          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    }
     // This case tests forwarding 100-Continue after the client has sent all data.
     upstream_request_->encode100ContinueHeaders(
         Http::TestResponseHeaderMapImpl{{":status", "100"}});
@@ -911,8 +926,8 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  ASSERT(response->continue_headers() != nullptr);
-  EXPECT_EQ("100", response->continue_headers()->getStatusValue());
+  ASSERT(response->continueHeaders() != nullptr);
+  EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -1253,10 +1268,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
   // This does not work for HTTP/3 because the port is not closed until the listener is completely
   // destroyed. TODO(danzh) Match TCP behavior as much as possible.
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
-    EXPECT_NO_THROW(Network::TcpListenSocket(
-        Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
-                                             http_port),
-        nullptr, true));
+    ASSERT_TRUE(waitForPortAvailable(http_port));
   }
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <memory>
 
@@ -138,6 +139,11 @@ public:
    * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
    */
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
+
+  /**
+   * @return std::chrono::milliseconds the flush interval of stats sinks.
+   */
+  virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 };
 
 /**
