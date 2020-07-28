@@ -4,6 +4,7 @@ package envoy.config.accesslog.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -51,7 +52,7 @@ message AccessLog {
   }
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message AccessLogFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.AccessLogFilter";
@@ -91,6 +92,9 @@ message AccessLogFilter {
 
     // Extension filter.
     ExtensionFilter extension_filter = 11;
+
+    // Metadata Filter
+    MetadataFilter metadata_filter = 12;
   }
 }
 
@@ -278,6 +282,19 @@ message GrpcStatusFilter {
   // If included and set to true, the filter will instead block all responses with a gRPC status or
   // inferred gRPC status enumerated in statuses, and allow all other responses.
   bool exclude = 2;
+}
+
+// Filters based on matching dynamic metadata.
+message MetadataFilter {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.accesslog.v2.MetadataFilter";
+
+  // Matcher to check metadata for specified value. For example, to match on the access_log_hint metadata,
+  // set the filter to "envoy.common" and the path to "access_log_hint".
+  type.matcher.v3.MetadataMatcher matcher = 1;
+
+  // Default result if the key does not exist in dynamic metadata: if true, then log; if false, then don't log.
+  bool no_key_default = 2;
 }
 
 // Extension filter is statically registered at runtime.
