@@ -319,7 +319,7 @@ message Watchdog {
   // enabled. Enabling this feature would help to reduce risk of synchronized
   // watchdog kill events across proxies due to external triggers. Set to 0 to
   // disable. If not specified the default is 0 (disabled).
-  google.protobuf.Duration max_kill_timeout_jitter = 6;
+  google.protobuf.Duration max_kill_timeout_jitter = 6 [(validate.rules).duration = {gte {}}];
 
   // If max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))
   // threads have been nonresponsive for at least this duration kill the entire
