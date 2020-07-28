@@ -221,7 +221,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/stats:stats_lib",
         "//source/common/upstream:load_stats_reporter_lib",
@@ -529,7 +528,8 @@ envoy_cc_test_library(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",

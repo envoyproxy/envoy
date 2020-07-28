@@ -1,5 +1,3 @@
-#include <unordered_set>
-
 #include "envoy/api/v2/cluster.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
@@ -23,13 +21,14 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/proto/deprecated.pb.h"
 #include "test/proto/sensitive.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
@@ -1142,7 +1141,7 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
 
   HashedValue hv1(v1), hv2(v2), hv3(v3);
 
-  std::unordered_set<HashedValue> set;
+  absl::node_hash_set<HashedValue> set;
   set.emplace(hv1);
   set.emplace(hv2);
   set.emplace(hv3);

@@ -8,8 +8,10 @@
 #include <string>
 
 #include "envoy/config/config_provider_manager.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/filter/http/filter_config_provider.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -88,11 +90,12 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager);
+      Tracing::HttpTracerManager& http_tracer_manager,
+      Filter::Http::FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
+  using FilterFactoriesList = std::list<Filter::Http::FilterConfigProviderPtr>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
@@ -157,6 +160,9 @@ public:
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
+  bool streamErrorOnInvalidHttpMessaging() const override {
+    return stream_error_on_invalid_http_messaging_;
+  }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
@@ -175,6 +181,13 @@ private:
                     proto_config,
                 int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
                 const char* filter_chain_type, bool last_filter_in_current_config);
+  void
+  processDynamicFilterConfig(const std::string& name,
+                             const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
+                             FilterFactoriesList& filter_factories, const char* filter_chain_type,
+                             bool last_filter_in_current_config);
+  void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
+                                     const FilterFactoriesList& filter_factories);
 
   /**
    * Determines what tracing provider to use for a given
@@ -203,6 +216,7 @@ private:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
+  Filter::Http::FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
@@ -228,6 +242,7 @@ private:
   Http::DateProvider& date_provider_;
   Http::ConnectionManagerListenerStats listener_stats_;
   const bool proxy_100_continue_;
+  const bool stream_error_on_invalid_http_messaging_;
   std::chrono::milliseconds delayed_close_timeout_;
   const bool normalize_path_;
   const bool merge_slashes_;
@@ -260,10 +275,10 @@ class Utility {
 public:
   struct Singletons {
     std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
-    std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager_;
-    std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
-        scoped_routes_config_provider_manager_;
+    Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
+    Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager_;
     Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
+    std::shared_ptr<Filter::Http::FilterConfigProviderManager> filter_config_provider_manager_;
   };
 
   /**
@@ -290,7 +305,8 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager);
+      Tracing::HttpTracerManager& http_tracer_manager,
+      Filter::Http::FilterConfigProviderManager& filter_config_provider_manager);
 };
 
 } // namespace HttpConnectionManager

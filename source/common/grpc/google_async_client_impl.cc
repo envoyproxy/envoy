@@ -112,7 +112,7 @@ AsyncRequest* GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name
                                              const Http::AsyncClient::RequestOptions& options) {
   auto* const async_request = new GoogleAsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
-  std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
+  GoogleAsyncStreamImplPtr grpc_stream{async_request};
 
   grpc_stream->initialize(true);
   if (grpc_stream->callFailed()) {
@@ -173,14 +173,11 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   // copy headers here.
   auto initial_metadata = Http::RequestHeaderMapImpl::create();
   callbacks_.onCreateInitialMetadata(*initial_metadata);
-  initial_metadata->iterate(
-      [](const Http::HeaderEntry& header, void* ctxt) {
-        auto* client_context = static_cast<grpc::ClientContext*>(ctxt);
-        client_context->AddMetadata(std::string(header.key().getStringView()),
-                                    std::string(header.value().getStringView()));
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &ctxt_);
+  initial_metadata->iterate([this](const Http::HeaderEntry& header) {
+    ctxt_.AddMetadata(std::string(header.key().getStringView()),
+                      std::string(header.value().getStringView()));
+    return Http::HeaderMap::Iterate::Continue;
+  });
   // Invoke stub call.
   rw_ = parent_.stub_->PrepareCall(&ctxt_, "/" + service_full_name_ + "/" + method_name_,
                                    &parent_.tls_.completionQueue());
@@ -381,7 +378,7 @@ void GoogleAsyncStreamImpl::deferredDelete() {
   // Hence, it is safe here to create a unique_ptr to this and transfer
   // ownership to dispatcher_.deferredDelete(). After this call, no further
   // methods may be invoked on this object.
-  dispatcher_.deferredDelete(std::unique_ptr<GoogleAsyncStreamImpl>(this));
+  dispatcher_.deferredDelete(GoogleAsyncStreamImplPtr(this));
 }
 
 void GoogleAsyncStreamImpl::cleanup() {

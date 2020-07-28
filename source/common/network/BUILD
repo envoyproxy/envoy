@@ -17,10 +17,10 @@ envoy_cc_library(
     hdrs = [
         "address_impl.h",
         "io_socket_handle_impl.h",
-        "socket_interface_impl.h",
     ],
     deps = [
         ":io_socket_error_lib",
+        ":socket_interface_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:io_handle_interface",
@@ -163,12 +163,26 @@ envoy_cc_library(
 envoy_cc_library(
     name = "lc_trie_lib",
     hdrs = ["lc_trie.h"],
-    external_deps = ["abseil_int128"],
+    external_deps = [
+        "abseil_node_hash_set",
+        "abseil_int128",
+    ],
     deps = [
         ":address_lib",
         ":cidr_range_lib",
         ":utility_lib",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_interface_lib",
+    hdrs = ["socket_interface.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:socket_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:bootstrap_extension_config_interface",
     ],
 )
 
@@ -184,10 +198,11 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
+        ":socket_interface_lib",
         "//include/envoy/network:socket_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "//source/common/singleton:threadsafe_singleton",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )
 

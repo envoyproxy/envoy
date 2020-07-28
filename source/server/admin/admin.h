@@ -4,7 +4,6 @@
 #include <functional>
 #include <list>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -78,7 +77,7 @@ public:
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
-  Network::Socket& mutable_socket() { return *socket_; }
+  Network::Socket& mutableSocket() { return *socket_; }
 
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
@@ -170,6 +169,7 @@ public:
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
+  bool streamErrorOnInvalidHttpMessaging() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
