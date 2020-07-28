@@ -37,9 +37,13 @@ public:
   /**
    * Do the handshake.
    *
+   * NB:
    *  * |state| is a mutable reference.
-   *  * |callbacks| may not exist throughout the lifetime of the Handshaker, and
-   *    should not be stored in an implementation.
+   *  * |callbacks| is only expected to exist for the duration of the
+   *    doHandshake() call. If the handshake was successful,
+   *    HandshakerCallbacks::OnSuccessCb() should be called within the execution
+   *    of doHandshake(). |callbacks| should not be cached in the
+   *    HandshakerImpl.
    */
   virtual Network::PostIoAction doHandshake(SocketState& state,
                                             HandshakerCallbacks& callbacks) PURE;
