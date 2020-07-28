@@ -105,7 +105,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
-    external_deps = ["benchmark"],
     deps = [
         "//source/common/common:fancy_logger_lib",
         "//source/common/common:minimal_logger_lib",
@@ -117,8 +116,8 @@ envoy_cc_test(
 )
 
 envoy_cc_benchmark_binary(
-    name = "logger_perf_test",
-    srcs = ["logger_perf_test.cc"],
+    name = "logger_speed_test",
+    srcs = ["logger_speed_test.cc"],
     external_deps = ["benchmark"],
     deps = [
         "//source/common/common:fancy_logger_lib",
@@ -127,8 +126,8 @@ envoy_cc_benchmark_binary(
 )
 
 envoy_benchmark_test(
-    name = "logger_perf_test_benchmark_test",
-    benchmark_binary = "logger_perf_test",
+    name = "logger_speed_test_benchmark_test",
+    benchmark_binary = "logger_speed_test",
 )
 
 envoy_cc_test(
