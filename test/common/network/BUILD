@@ -341,6 +341,7 @@ envoy_cc_test(
     name = "transport_socket_options_impl_test",
     srcs = ["transport_socket_options_impl_test.cc"],
     deps = [
+        "//source/common/network:address_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:filter_state_lib",
     ],
