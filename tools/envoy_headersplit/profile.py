@@ -26,7 +26,8 @@ def get_compilation_performance(test):
   subprocess.run(["bazel", "clean", "--expunge"])
   subprocess.run(["bazel", "build", "//source/exe:envoy-static"])
 
-  output = subprocess.run(["bazel", "build", test, "--noremote_accept_cached"], capture_output=True).stderr
+  output = subprocess.run(["bazel", "build", test, "--noremote_accept_cached"],
+                          capture_output=True).stderr
   output = output.decode().split('\n')
   # rerun building to download output to get binary size (download output
   # will affect building time profiling
@@ -41,6 +42,7 @@ def get_compilation_performance(test):
       target_filename = line.strip()
       target_size = os.path.getsize(target_filename)
   return building_time, target_size
+
 
 def main():
   current_branch = get_active_branch_name()
@@ -67,10 +69,11 @@ def main():
 
       d[test] = [building_time_before, building_time_after, target_size_before, target_size_after]
       print(test, d[test])
-      with open("result.txt","a") as f:
-        f.write(test+" "+str(d[test])+'\n')
+      with open("result.txt", "a") as f:
+        f.write(test + " " + str(d[test]) + '\n')
 
   print(d)
+
 
 if __name__ == '__main__':
   main()

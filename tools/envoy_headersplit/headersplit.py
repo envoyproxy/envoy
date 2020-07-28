@@ -38,7 +38,7 @@ def to_filename(classname: str) -> str:
   return ret.lower()
 
 
-def get_headers(translation_unit:Type[TranslationUnit]) -> str:
+def get_headers(translation_unit: Type[TranslationUnit]) -> str:
   """
     extracts all head includes statements from the target code file (translation_unit)
 
