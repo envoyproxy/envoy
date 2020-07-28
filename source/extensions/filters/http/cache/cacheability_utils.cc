@@ -23,7 +23,7 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
   // As defined by: https://httpwg.org/specs/rfc7232.html#preconditions
   CONSTRUCT_ON_FIRST_USE(
       std::vector<const Http::LowerCaseString*>, &Http::CustomHeaders::get().IfMatch,
-      &Http::CustomHeaders::get().IfNonMatch, &Http::CustomHeaders::get().IfModifiedSince,
+      &Http::CustomHeaders::get().IfNoneMatch, &Http::CustomHeaders::get().IfModifiedSince,
       &Http::CustomHeaders::get().IfUnmodifiedSince, &Http::CustomHeaders::get().IfRange);
 }
 } // namespace

@@ -65,7 +65,7 @@ public:
   const LowerCaseString Etag{"etag"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString IfMatch{"if-match"};
-  const LowerCaseString IfNonMatch{"if-none-match"};
+  const LowerCaseString IfNoneMatch{"if-none-match"};
   const LowerCaseString IfModifiedSince{"if-modified-since"};
   const LowerCaseString IfUnmodifiedSince{"if-unmodified-since"};
   const LowerCaseString IfRange{"if-range"};

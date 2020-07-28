@@ -72,8 +72,8 @@ private:
   void encodeCachedResponse();
 
   // Precondition: finished adding a response from cache to the response encoding stream
-  // Updates the filter_state_ and continues the encoding stream if necessary
-  void finishedEncodingCachedResponse();
+  // Updates filter_state_ and continues the encoding stream if necessary
+  void finalizeEncodingCachedResponse();
 
   TimeSource& time_source_;
   HttpCache& cache_;
@@ -96,28 +96,26 @@ private:
   enum class FilterState {
     Initial,
 
-    // DecodingWaitingForCache: CacheFilter::decodeHeaders called lookup->getHeaders() but onHeaders
-    // is not called yet (lookup result not ready) -- the decoding stream should be stopped until
-    // the cache lookup result is ready
-    DecodingWaitingForCache,
+    // CacheFilter::decodeHeaders called lookup->getHeaders() but onHeaders was not called yet
+    // (lookup result not ready) -- the decoding stream should be stopped until the cache lookup
+    // result is ready
+    WaitingForCacheLookup,
 
-    // NoCachedResponseFound: Cache lookup did not find a cached response for this request
+    // CacheFilter::encodeHeaders called encodeCachedResponse() but encoding the cached response is
+    // not finished yet -- the encoding stream should be stopped until it is finished
+    WaitingForCacheBody,
+
+    // Cache lookup did not find a cached response for this request
     NoCachedResponseFound,
 
-    // ValidatingCachedResponse: Cache lookup found a cached response that requires validation
+    // Cache lookup found a cached response that requires validation
     ValidatingCachedResponse,
 
-    // DecodeServingFromCache: Cache lookup found a fresh cached response and it is being added to
-    // the encoding stream
+    // Cache lookup found a fresh cached response and it is being added to the encoding stream
     DecodeServingFromCache,
 
-    // EncodeWaitingForCache: CacheFilter::encodeHeaders called encodeCachedResponse() but encoding
-    // the cached response is not finished yet -- the encoding stream should be stopped until it is
-    // finished
-    EncodeWaitingForCache,
-
-    // ResponseServedFromCache: The cached response was successfully added to the encoding stream
-    // (either during decoding or encoding)
+    // The cached response was successfully added to the encoding stream (either during decoding or
+    // encoding)
     ResponseServedFromCache
   };
   FilterState filter_state_ = FilterState::Initial;
