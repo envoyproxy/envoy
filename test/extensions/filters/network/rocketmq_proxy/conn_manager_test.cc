@@ -645,6 +645,9 @@ TEST_F(RocketmqConnectionManagerTest, OnDataWithUnsupportedCode) {
 
   BufferUtility::fillRequestBuffer(buffer_, RequestCode::Unsupported);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+
+  buffer_.drain(buffer_.length());
 }
 
 TEST_F(RocketmqConnectionManagerTest, OnDataInvalidFrameLength) {
