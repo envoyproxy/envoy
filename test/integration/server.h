@@ -387,8 +387,7 @@ public:
          Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
          uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
          Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-         bool use_real_stats = false,
-         absl::optional<std::chrono::milliseconds> stat_timeout = absl::nullopt);
+         bool use_real_stats = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -411,25 +410,30 @@ public:
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization, ProcessObjectOptRef process_object,
              Server::FieldValidationConfig validation_config, uint32_t concurrency,
-             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-             absl::optional<std::chrono::milliseconds> stat_timeout);
+             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
-  void waitForCounterEq(const std::string& name, uint64_t value) override {
-    ASSERT_TRUE(
-        TestUtility::waitForCounterGe(statStore(), name, value, time_system_, stat_timeout_));
+  void
+  waitForCounterEq(const std::string& name, uint64_t value,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForCounterGe(const std::string& name, uint64_t value) override {
-    ASSERT_TRUE(
-        TestUtility::waitForCounterGe(statStore(), name, value, time_system_, stat_timeout_));
+  void
+  waitForCounterGe(const std::string& name, uint64_t value,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, stat_timeout_));
+  void
+  waitForGaugeGe(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, stat_timeout_));
+  void
+  waitForGaugeEq(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {
@@ -515,7 +519,6 @@ private:
   TcpDumpPtr tcp_dump_;
   std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
   bool use_admin_interface_to_quit_{};
-  absl::optional<std::chrono::milliseconds> stat_timeout_;
 };
 
 // Default implementation of IntegrationTestServer
