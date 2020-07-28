@@ -121,18 +121,16 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
     percent = default_value;
   }
 
-#ifndef NDEBUG
+
   // When numerator > denominator condition is always evaluates to TRUE
   // It becomes hard to debug why configuration does not work in case of wrong numerator.
   // Log debug message that numerator is invalid.
-  uint64_t denominator_value =
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator());
+  uint64_t denominator_value = ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent.denominator());
   if (percent.numerator() > denominator_value) {
-    throw EnvoyException(fmt::format("runtime key '{}': numerator ({}) > denominator ({}), "
-                                     "condition always evaluates to true",
-                                     key, percent.numerator(), denominator_value));
+    ENVOY_LOG(debug,
+              "WARNING runtime key '{}': numerator ({}) > denominator ({}), condition always evaluates to true",
+              key, percent.numerator(), denominator_value);
   }
-#endif
 
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
 }
