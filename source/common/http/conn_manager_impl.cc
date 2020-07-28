@@ -2047,6 +2047,33 @@ void ConnectionManagerImpl::ActiveStream::encodeData(Buffer::Instance& data, boo
   response_encoder_->encodeData(data, end_stream);
 }
 
+void ConnectionManagerImpl::ActiveStream::encodeTrailers(ResponseTrailerMap& trailers) {
+  ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
+
+  response_encoder_->encodeTrailers(trailers);
+}
+
+void ConnectionManagerImpl::ActiveStream::encodeMetadata(MetadataMapVector& metadata) {
+  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
+  response_encoder_->encodeMetadata(metadata);
+}
+
+void ConnectionManagerImpl::ActiveStream::onDecoderFilterBelowWriteBufferLowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", *this);
+  // If the state is destroyed, the codec's stream is already torn down. On
+  // teardown the codec will unwind any remaining read disable calls.
+  if (!state_.destroyed_) {
+    response_encoder_->getStream().readDisable(false);
+  }
+  connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
+}
+
+void ConnectionManagerImpl::ActiveStream::onDecoderFilterAboveWriteBufferHighWatermark() {
+  ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
+  response_encoder_->getStream().readDisable(true);
+  connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
+}
+
 void ConnectionManagerImpl::FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
                                                           ResponseTrailerMap& trailers) {
   active_stream_.resetIdleTimer();

@@ -513,8 +513,8 @@ private:
     void maybeEndEncode(bool end_stream);
 
     /**
-     * Sends a local reply by constructing a response and passing it through all the encoder filters.
-     * The resulting response will be passed out via the FilterManagerCallbacks.
+     * Sends a local reply by constructing a response and passing it through all the encoder
+     * filters. The resulting response will be passed out via the FilterManagerCallbacks.
      */
     void sendLocalReplyViaFilterChain(
         bool is_grpc_request, Code code, absl::string_view body,
@@ -699,29 +699,10 @@ private:
     void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
     void encode100ContinueHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
-    void encodeTrailers(ResponseTrailerMap& trailers) override {
-      ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
-
-      response_encoder_->encodeTrailers(trailers);
-    }
-    void encodeMetadata(MetadataMapVector& metadata) override {
-      ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
-      response_encoder_->encodeMetadata(metadata);
-    }
-    void onDecoderFilterBelowWriteBufferLowWatermark() override {
-      ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", *this);
-      // If the state is destroyed, the codec's stream is already torn down. On
-      // teardown the codec will unwind any remaining read disable calls.
-      if (!state_.destroyed_) {
-        response_encoder_->getStream().readDisable(false);
-      }
-      connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
-    }
-    void onDecoderFilterAboveWriteBufferHighWatermark() override {
-      ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
-      response_encoder_->getStream().readDisable(true);
-      connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
-    }
+    void encodeTrailers(ResponseTrailerMap& trailers) override;
+    void encodeMetadata(MetadataMapVector& metadata) override;
+    void onDecoderFilterBelowWriteBufferLowWatermark() override;
+    void onDecoderFilterAboveWriteBufferHighWatermark() override;
 
     void traceRequest();
 
