@@ -526,17 +526,16 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
   return impl->doVerifyCertChain(
       store_ctx,
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
           SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
-      bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl)),
-      static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl)));
+      *cert, static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl)));
 }
 
 int ContextImpl::doVerifyCertChain(
-    X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
-    bssl::UniquePtr<X509> leaf_cert,
+    X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
     const Network::TransportSocketOptions* transport_socket_options) {
   if (verify_trusted_ca_) {
     int ret = X509_verify_cert(store_ctx);
@@ -553,7 +552,7 @@ int ContextImpl::doVerifyCertChain(
   }
 
   Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(
-      leaf_cert.get(),
+      &leaf_cert,
       transport_socket_options &&
               !transport_socket_options->verifySubjectAltNameListOverride().empty()
           ? transport_socket_options->verifySubjectAltNameListOverride()
@@ -676,7 +675,7 @@ bool ContextImpl::matchSubjectAltName(
       if (general_name->type == GEN_DNS &&
                   config_san_matcher.matcher().match_pattern_case() ==
                       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-              ? dnsNameMatch(config_san_matcher.matcher().exact(), san.c_str())
+              ? dnsNameMatch(config_san_matcher.matcher().exact(), std::string_view(san.c_str()))
               : config_san_matcher.match(san)) {
         return true;
       }
@@ -704,20 +703,20 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool ContextImpl::dnsNameMatch(const std::string& dns_name, const char* pattern) {
+bool ContextImpl::dnsNameMatch(const std::string& dns_name, const std::string_view pattern) {
   if (dns_name == pattern) {
     return true;
   }
 
-  size_t pattern_len = strlen(pattern);
+  size_t pattern_len = pattern.length();
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
     if (dns_name.length() > pattern_len - 1) {
       const size_t off = dns_name.length() - pattern_len + 1;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_wildcard_matching")) {
         return dns_name.substr(0, off).find('.') == std::string::npos &&
-               dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+               dns_name.compare(off, pattern_len - 1, pattern.data() + 1, pattern_len - 1) == 0;
       } else {
-        return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+        return dns_name.compare(off, pattern_len - 1, pattern.data() + 1, pattern_len - 1) == 0;
       }
     }
   }
@@ -1395,19 +1394,18 @@ bool ServerContextImpl::TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t
   return false;
 }
 
-bool ContextImpl::verifyCertChain(bssl::UniquePtr<X509> leaf_cert,
-                                  bssl::UniquePtr<STACK_OF(X509)> intermediates,
+bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates,
                                   std::string& error_details) {
   bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
   // It doesn't matter which SSL context is used, because they share the same
   // cert validation config.
   X509_STORE* store = SSL_CTX_get_cert_store(tls_contexts_[0].ssl_ctx_.get());
-  if (!X509_STORE_CTX_init(ctx.get(), store, leaf_cert.get(), intermediates.get())) {
+  if (!X509_STORE_CTX_init(ctx.get(), store, &leaf_cert, &intermediates)) {
     error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
     return false;
   }
 
-  int res = doVerifyCertChain(ctx.get(), nullptr, std::move(leaf_cert), nullptr);
+  int res = doVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
   if (res <= 0) {
     const int n = X509_STORE_CTX_get_error(ctx.get());
     const int depth = X509_STORE_CTX_get_error_depth(ctx.get());

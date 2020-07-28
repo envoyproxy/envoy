@@ -84,7 +84,7 @@ public:
    * @param pattern the pattern to match against (*.example.com)
    * @return true if the san matches pattern
    */
-  static bool dnsNameMatch(const std::string& dns_name, const char* pattern);
+  static bool dnsNameMatch(const std::string& dns_name, const std::string_view pattern);
 
   SslStats& stats() { return stats_; }
 
@@ -101,8 +101,7 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
-  bool verifyCertChain(bssl::UniquePtr<X509> leaf_cert,
-                       bssl::UniquePtr<STACK_OF(X509)> intermediates, std::string& error_details);
+  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -122,7 +121,7 @@ protected:
 
   // Called by verifyCallback to do the actual cert chain verification.
   int doVerifyCertChain(X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info,
-                        bssl::UniquePtr<X509> leaf_cert,
+                        X509& leaf_cert,
                         const Network::TransportSocketOptions* transport_socket_options);
 
   Envoy::Ssl::ClientValidationStatus

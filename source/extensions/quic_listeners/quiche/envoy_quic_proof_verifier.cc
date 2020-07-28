@@ -29,8 +29,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
       sk_X509_push(intermediates.get(), cert.release());
     }
   }
-  bool success =
-      context_impl_.verifyCertChain(std::move(leaf), std::move(intermediates), *error_details);
+  bool success = context_impl_.verifyCertChain(*leaf, *intermediates, *error_details);
   if (!success) {
     return quic::QUIC_FAILURE;
   }
@@ -38,9 +37,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(certs[0]);
   ASSERT(cert_view != nullptr);
-  std::string wildcard = absl::StrCat("*", hostname.substr(hostname.find_first_of('.')));
   for (const absl::string_view config_san : cert_view->subject_alt_name_domains()) {
-    if (config_san == hostname || config_san == wildcard) {
+    if (Extensions::TransportSockets::Tls::ContextImpl::dnsNameMatch(hostname, config_san)) {
       return quic::QUIC_SUCCESS;
     }
   }

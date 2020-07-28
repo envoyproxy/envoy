@@ -135,7 +135,7 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes,
     return nullptr;
   }
   if (data < orig_data || static_cast<size_t>(data - orig_data) != der_bytes.size()) {
-    *error_details = "There is railing garbage in DER.";
+    *error_details = "There is trailing garbage in DER.";
     return nullptr;
   }
   return cert;
@@ -176,11 +176,9 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
 #endif
     sign_alg = SSL_SIGN_RSA_PSS_RSAE_SHA256;
   } break;
-#ifdef BORINGSSL_FIPS
   default:
     *error_details =
         "Invalid leaf cert, only RSA and ECDSA certificates are supported in FIPS mode";
-#endif
   }
   return sign_alg;
 }
