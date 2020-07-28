@@ -150,7 +150,7 @@ TEST_P(WasmVmTest, V8BadCode) {
 }
 
 TEST_P(WasmVmTest, V8Code) {
-#ifndef NDBUG
+#ifndef NDEBUG
   // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
@@ -177,7 +177,7 @@ TEST_P(WasmVmTest, V8Code) {
 }
 
 TEST_P(WasmVmTest, V8BadHostFunctions) {
-#ifndef NDBUG
+#ifndef NDEBUG
   // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
@@ -212,7 +212,7 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
 }
 
 TEST_P(WasmVmTest, V8BadModuleFunctions) {
-#ifndef NDBUG
+#ifndef NDEBUG
   // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
@@ -247,7 +247,7 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
 }
 
 TEST_P(WasmVmTest, V8FunctionCalls) {
-#ifndef NDBUG
+#ifndef NDEBUG
   // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
@@ -292,7 +292,7 @@ TEST_P(WasmVmTest, V8FunctionCalls) {
 }
 
 TEST_P(WasmVmTest, V8Memory) {
-#ifndef NDBUG
+#ifndef NDEBUG
   // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
   // flags do not match. TODO: restore this test when the rust toolchain is integrated.
   if (GetParam() == 1) {
