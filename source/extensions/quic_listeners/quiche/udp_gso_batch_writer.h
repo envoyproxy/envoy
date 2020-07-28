@@ -32,6 +32,10 @@
 namespace Envoy {
 namespace Quic {
 
+/**
+ * UdpPacketWriter implementation based on quic::QuicGsoBatchWriter to send packets
+ * in batches, using UDP socket's generic segmentation offload(GSO) capability.
+ */
 class UdpGsoBatchWriter : public quic::QuicGsoBatchWriter, public Network::UdpPacketWriter {
 public:
   UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope);
@@ -43,7 +47,7 @@ public:
                                       const Network::Address::Ip* local_ip,
                                       const Network::Address::Instance& peer_address) override;
 
-  // QuicGsoBatchWriter Implementations
+  // UdpPacketWriter Implementations
   bool isWriteBlocked() const override { return IsWriteBlocked(); }
   void setWritable() override { return SetWritable(); }
   bool isBatchMode() const override { return IsBatchMode(); }

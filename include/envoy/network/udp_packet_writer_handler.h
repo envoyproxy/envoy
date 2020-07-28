@@ -66,8 +66,7 @@ public:
   virtual bool isWriteBlocked() const PURE;
 
   /**
-   * @brief Records that the socket has become writable, for example when an EPOLLOUT
-   * is received or an asynchronous write completes.
+   * @brief mark the socket as writable when the socket is unblocked.
    */
   virtual void setWritable() PURE;
 

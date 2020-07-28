@@ -296,7 +296,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
 
-  Address::InstanceConstSharedPtr send_from_addr = getUnlikelySourceAddress();
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
 
   UdpSendData send_data{send_from_addr->ip(), *client_.localAddress(), *buffer};
 

@@ -109,8 +109,8 @@ void UdpGsoBatchWriter::updateUdpPacketWriterStats(quic::WriteResult quic_result
     stats_.total_bytes_sent_.add(quic_result.bytes_written);
   }
   stats_.internal_buffer_size_.set(batch_buffer().SizeInUse());
-  stats_.front_buffered_pkt_size_.set(!buffered_writes().empty() ? buffered_writes().front().buf_len
-                                                                 : 0u);
+  stats_.front_buffered_pkt_size_.set(
+      buffered_writes().empty() ? 0u : buffered_writes().front().buf_len);
 }
 
 Network::UdpPacketWriterStats UdpGsoBatchWriter::generateStats(Stats::Scope& scope) {

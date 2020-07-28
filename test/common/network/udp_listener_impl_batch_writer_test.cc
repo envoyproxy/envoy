@@ -92,7 +92,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplBatchWriterTest,
  */
 TEST_P(UdpListenerImplBatchWriterTest, SendData) {
   EXPECT_TRUE(udp_packet_writer_->isBatchMode());
-  Address::InstanceConstSharedPtr send_from_addr = getUnlikelySourceAddress();
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
 
   absl::FixedArray<std::string> payloads{"length7", "length7", "len<7",
                                          "length7", "length7", "length>7"};
@@ -207,9 +207,9 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
       listener_config_.listenerScope().counterFromString("total_bytes_sent").value();
 
   // Possible followup payloads to be sent after the initial payload
-  absl::FixedArray<std::string> followup_payloads{"length<7", "len<7"};
+  absl::FixedArray<std::string> following_payloads{"length<7", "len<7"};
 
-  for (const auto& followup_payload : followup_payloads) {
+  for (const auto& following_payload : following_payloads) {
     std::string internal_buffer("");
 
     // First have initial payload added to the udp_packet_writer's internal buffer.
@@ -237,19 +237,19 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
 
     // Now send the followup payload
     Buffer::InstancePtr followup_buffer(new Buffer::OwnedImpl());
-    followup_buffer->add(followup_payload);
+    followup_buffer->add(following_payload);
     UdpSendData followup_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
                                    *followup_buffer};
     send_result = listener_->send(followup_send_data);
 
     // The followup payload should only get buffered if it is shorter than initial payload
-    if (followup_payload.length() < initial_payload.length()) {
+    if (following_payload.length() < initial_payload.length()) {
       EXPECT_TRUE(send_result.ok());
       // TODO(yugant): This flag should be true here, but currently it is incorrectly set in
       // quiche code. Change this to True, once this issue is fixed in quiche.
       EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
-      internal_buffer.append(followup_payload);
-    } else if (followup_payload.length() > initial_payload.length()) {
+      internal_buffer.append(following_payload);
+    } else if (following_payload.length() > initial_payload.length()) {
       EXPECT_FALSE(send_result.ok());
       EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
     }

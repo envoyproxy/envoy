@@ -56,7 +56,7 @@ protected:
                                              bind);
   }
 
-  Address::InstanceConstSharedPtr getUnlikelySourceAddress() {
+  Address::InstanceConstSharedPtr getNonDefaultSourceAddress() {
     // Use a self address that is unlikely to be picked by source address discovery
     // algorithm if not specified in recvmsg/recvmmsg. Port is not taken into
     // consideration.
