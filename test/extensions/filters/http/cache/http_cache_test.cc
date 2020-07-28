@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
 
@@ -107,6 +109,21 @@ TEST_F(LookupRequestTest, MakeLookupResultBody) {
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
+TEST_F(LookupRequestTest, FutureResponseTime) {
+  const LookupRequest lookup_request(request_headers_, current_time_);
+  const SystemTime response_time = current_time_ + std::chrono::seconds(1);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(response_time)}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
 TEST_F(LookupRequestTest, PrivateResponse) {
   const LookupRequest lookup_request(request_headers_, current_time_);
   const Http::TestResponseHeaderMapImpl response_headers(
@@ -126,12 +143,184 @@ TEST_F(LookupRequestTest, PrivateResponse) {
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
-TEST_F(LookupRequestTest, Expired) {
+TEST_F(LookupRequestTest, RequestRequiresValidation) {
+  // Make sure the request requires validation (even though the response is fresh)
+  request_headers_.addCopy("cache-control", "no-cache");
   const LookupRequest lookup_request(request_headers_, current_time_);
   const Http::TestResponseHeaderMapImpl response_headers(
-      {{"cache-control", "public, max-age=3600"}, {"date", "Thu, 01 Jan 2019 00:00:00 GMT"}});
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
 
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, ResponseRequiresValidation) {
+  const LookupRequest lookup_request(request_headers_, current_time_);
+  // The response requires revalidation on every request
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, no-cache"}, {"date", formatter_.fromTime(current_time_)}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, RequestMaxAgeSatisfied) {
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
+  // The request will not accept responses with age higher than 10 s, even if they are still fresh
+  request_headers_.addCopy("cache-control", "max-age=10");
+  const SystemTime request_time = current_time_ + std::chrono::seconds(9);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, RequestMaxAgeUnsatisfied) {
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
+  // The request will not accept responses with age higher than 10 s, even if they are still fresh
+  request_headers_.addCopy("cache-control", "max-age=10");
+  const SystemTime request_time = current_time_ + std::chrono::seconds(20);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, RequestMinFreshSatisfied) {
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
+  // The request will not accept responses that have less than 1000 s left to be expired
+  request_headers_.addCopy("cache-control", "min-fresh=1000");
+  const SystemTime request_time = current_time_ + std::chrono::seconds(2599);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, RequestMinFreshUnsatisfied) {
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
+  // The request will not accept responses that have less than 1000 s left to be expired
+  request_headers_.addCopy("cache-control", "min-fresh=1000");
+  const SystemTime request_time = current_time_ + std::chrono::seconds(2601);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, RequestMaxAgeSatisfiedMinFreshUnsatisfied) {
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
+  // The request will not accept responses with age higher than 3000 s, even if they are still fresh
+  // The request will not accept responses that have less than 1000 s left to be expired
+  request_headers_.addCopy("cache-control", "max-age=3000, min-fresh=1000");
+  const SystemTime request_time = current_time_ + std::chrono::seconds(2601);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, Expired) {
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
+  const SystemTime request_time = current_time_ + std::chrono::seconds(3601);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, RequestMaxStaleSatisfied) {
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
+  // The request will accept a stale response if it has been expired for less than 500 s
+  request_headers_.addCopy("cache-control", "max-stale=500");
+  const SystemTime request_time = current_time_ + std::chrono::seconds(4099);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, RequestMaxStaleUnatisfied) {
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600"}, {"date", formatter_.fromTime(current_time_)}});
+  // The request will accept a stale response if it has been expired for less than 500 s
+  request_headers_.addCopy("cache-control", "max-stale=500");
+  const SystemTime request_time = current_time_ + std::chrono::seconds(4101);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, RequestMaxStaleResponseMustRevalidate) {
+  // The response does not allow being served stale
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"cache-control", "public, max-age=3600, must-revalidate"},
+       {"date", formatter_.fromTime(current_time_)}});
+  // The request will accept a stale response if it has been expired for less than 500 s
+  request_headers_.addCopy("cache-control", "max-stale=500");
+  const SystemTime request_time = current_time_ + std::chrono::seconds(4099);
+  const LookupRequest lookup_request(request_headers_, request_time);
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+
+  // The response should be revalidated even though the request would accept it
   EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
