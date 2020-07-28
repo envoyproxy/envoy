@@ -444,9 +444,11 @@ private:
    */
   class FilterManager {
   public:
-    FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& callbacks,
+    FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& filter_manager_callbacks,
                   uint32_t buffer_limit)
-        : active_stream_(active_stream), callbacks_(callbacks), buffer_limit_(buffer_limit) {}
+        : active_stream_(active_stream), filter_manager_callbacks_(filter_manager_callbacks),
+          buffer_limit_(buffer_limit) {}
+
     void destroyFilters() {
       for (auto& filter : decoder_filters_) {
         filter->handle_->onDestroy();
@@ -510,6 +512,10 @@ private:
      */
     void maybeEndEncode(bool end_stream);
 
+    /**
+     * Sends a local reply by constructing a response and passing it through all the encoder filters.
+     * The resulting response will be passed out via the FilterManagerCallbacks.
+     */
     void sendLocalReplyViaFilterChain(
         bool is_grpc_request, Code code, absl::string_view body,
         const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
@@ -589,7 +595,7 @@ private:
 
     ActiveStream& active_stream_;
 
-    FilterManagerCallbacks& callbacks_;
+    FilterManagerCallbacks& filter_manager_callbacks_;
 
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;

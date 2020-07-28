@@ -514,7 +514,8 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
                                                     std::move(route_config_updated_cb));
 }
 
-ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit)
+ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
+                                                  uint32_t buffer_limit)
     : connection_manager_(connection_manager), filter_manager_(*this, *this, buffer_limit),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
@@ -1673,7 +1674,7 @@ void ConnectionManagerImpl::FilterManager::encode100ContinueHeaders(
     }
   }
 
-  callbacks_.encode100ContinueHeaders(headers);
+  filter_manager_callbacks_.encode100ContinueHeaders(headers);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -1759,7 +1760,7 @@ void ConnectionManagerImpl::FilterManager::encodeHeaders(ActiveStreamEncoderFilt
 
   const bool modified_end_stream = active_stream_.state_.encoding_headers_only_ ||
                                    (end_stream && continue_data_entry == encoder_filters_.end());
-  callbacks_.encodeHeaders(headers, modified_end_stream);
+  filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
   maybeEndEncode(modified_end_stream);
 
   if (!modified_end_stream) {
@@ -1917,7 +1918,7 @@ void ConnectionManagerImpl::FilterManager::encodeMetadata(ActiveStreamEncoderFil
   if (!metadata_map_ptr->empty()) {
     MetadataMapVector metadata_map_vector;
     metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
-    callbacks_.encodeMetadata(metadata_map_vector);
+    filter_manager_callbacks_.encodeMetadata(metadata_map_vector);
   }
 }
 
@@ -2027,7 +2028,7 @@ void ConnectionManagerImpl::FilterManager::encodeData(
   }
 
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
-  callbacks_.encodeData(data, modified_end_stream);
+  filter_manager_callbacks_.encodeData(data, modified_end_stream);
   maybeEndEncode(modified_end_stream);
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
@@ -2077,7 +2078,7 @@ void ConnectionManagerImpl::FilterManager::encodeTrailers(ActiveStreamEncoderFil
     }
   }
 
-  callbacks_.encodeTrailers(trailers);
+  filter_manager_callbacks_.encodeTrailers(trailers);
   maybeEndEncode(true);
 }
 
@@ -2582,7 +2583,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterAboveWriteBufferHighWatermark() {
-  parent_.callbacks_.onDecoderFilterAboveWriteBufferHighWatermark();
+  parent_.filter_manager_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark();
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
@@ -2604,7 +2605,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataDrained() {
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
     onDecoderFilterBelowWriteBufferLowWatermark() {
-  parent_.callbacks_.onDecoderFilterBelowWriteBufferLowWatermark();
+  parent_.filter_manager_callbacks_.onDecoderFilterBelowWriteBufferLowWatermark();
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
