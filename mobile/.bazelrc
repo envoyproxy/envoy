@@ -21,6 +21,8 @@ build --xcode_version=11.5
 build --javabase=@bazel_tools//tools/jdk:jdk
 build --define disable_known_issue_asserts=true
 build --define cxxopts=-std=c++17
+# https://github.com/bazelbuild/bazel/issues/10674#issuecomment-658208918
+build --incompatible_objc_compile_info_migration
 
 # Default flags for builds targeting iOS
 # Manual Stamping is necessary in order to get versioning information in the ios
@@ -28,11 +30,9 @@ build --define cxxopts=-std=c++17
 # More information on stamping can be found here:
 # https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
 build:ios --define=manual_stamp=manual_stamp
-# https://github.com/bazelbuild/bazel/issues/10674#issuecomment-658208918
-build:ios --incompatible_objc_compile_info_migration
 
 # Default flags for builds targeting Android
-build:android --define logger=android
+build:android --define=logger=android
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
