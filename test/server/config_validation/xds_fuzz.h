@@ -63,7 +63,7 @@ private:
   std::vector<envoy::api::v2::RouteConfiguration> getRoutesConfigDump();
 
   bool eraseListener(const std::string& listener_name);
-  bool hasRoute(const std::string& route_num);
+  bool hasRoute(const std::string& route_name);
   AssertionResult waitForAck(const std::string& expected_type_url,
                              const std::string& expected_version);
 
@@ -77,6 +77,8 @@ private:
   envoy::config::core::v3::ApiVersion api_version_;
 
   Network::Address::IpVersion ip_version_;
+
+  uint64_t lds_update_success_{0};
 };
 
 } // namespace Envoy
