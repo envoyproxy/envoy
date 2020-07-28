@@ -433,6 +433,7 @@ bool
 boolean
 booleans
 bools
+boringssl
 borks
 broadcasted
 buf

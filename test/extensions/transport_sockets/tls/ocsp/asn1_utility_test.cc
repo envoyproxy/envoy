@@ -246,7 +246,7 @@ TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeInvalidTime) {
 
 // Taken from
 // https://boringssl.googlesource.com/boringssl/+/master/crypto/bytestring/cbb.c#531
-// because boringssl_fips does not yet implement CBB_add_asn1_int64
+// because boringssl_fips does not yet implement `CBB_add_asn1_int64`
 void cbbAddAsn1Int64(CBB* cbb, int64_t value) {
   if (value >= 0) {
     ASSERT_TRUE(CBB_add_asn1_uint64(cbb, value));
