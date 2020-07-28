@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/common/pure.h"
 #include "envoy/thread_local/thread_local.h"

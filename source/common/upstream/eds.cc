@@ -47,7 +47,7 @@ EdsClusterImpl::EdsClusterImpl(
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
-  std::unordered_map<std::string, HostSharedPtr> updated_hosts;
+  absl::node_hash_map<std::string, HostSharedPtr> updated_hosts;
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb);
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
     parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
@@ -234,7 +234,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,
     LocalityWeightsMap& locality_weights_map, LocalityWeightsMap& new_locality_weights_map,
     PriorityStateManager& priority_state_manager,
-    std::unordered_map<std::string, HostSharedPtr>& updated_hosts) {
+    absl::node_hash_map<std::string, HostSharedPtr>& updated_hosts) {
   const auto& host_set = priority_set_.getOrCreateHostSet(priority, overprovisioning_factor);
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 

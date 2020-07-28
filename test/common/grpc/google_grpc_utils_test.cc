@@ -99,8 +99,8 @@ TEST(GoogleGrpcUtilsTest, ChannelArgsFromConfig) {
   )EOF");
   const grpc::ChannelArguments channel_args = GoogleGrpcUtils::channelArgsFromConfig(config);
   grpc_channel_args effective_args = channel_args.c_channel_args();
-  std::unordered_map<std::string, std::string> string_args;
-  std::unordered_map<std::string, int> int_args;
+  absl::node_hash_map<std::string, std::string> string_args;
+  absl::node_hash_map<std::string, int> int_args;
   for (uint32_t n = 0; n < effective_args.num_args; ++n) {
     const grpc_arg arg = effective_args.args[n];
     ASSERT_TRUE(arg.type == GRPC_ARG_STRING || arg.type == GRPC_ARG_INTEGER);

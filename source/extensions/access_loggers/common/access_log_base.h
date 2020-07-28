@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"

@@ -3,7 +3,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"

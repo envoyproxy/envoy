@@ -13,6 +13,8 @@
 #include "common/config/pausable_ack_queue.h"
 #include "common/config/watch_map.h"
 
+#include "absl/container/node_hash_map.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -81,7 +83,7 @@ private:
   // names we are currently interested in. Those in the waitingForServer state currently don't have
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
-  std::unordered_map<std::string, ResourceVersion> resource_versions_;
+  absl::node_hash_map<std::string, ResourceVersion> resource_versions_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
   // iterator into just its keys, e.g. for use in std::set_difference.
   std::set<std::string> resource_names_;
@@ -94,8 +96,8 @@ private:
   bool any_request_sent_yet_in_current_stream_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
-  // Can't use unordered_set due to ordering issues in gTest expectation matching.
-  // Feel free to change to unordered if you can figure out how to make it work.
+  // TODO: Can't use absl::flat_hash_set due to ordering issues in gTest expectation matching.
+  // Feel free to change to an unordered container once we figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
 };

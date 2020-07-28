@@ -1,8 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -16,6 +14,9 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+
+#include "absl/container/node_hash_map.h"
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Server {
@@ -45,8 +46,8 @@ public:
   using TriggerPtr = std::unique_ptr<Trigger>;
 
 private:
-  std::unordered_map<std::string, TriggerPtr> triggers_;
-  std::unordered_set<std::string> fired_triggers_;
+  absl::node_hash_map<std::string, TriggerPtr> triggers_;
+  absl::node_hash_set<std::string> fired_triggers_;
   Stats::Gauge& active_gauge_;
 };
 
@@ -104,8 +105,8 @@ private:
   ThreadLocal::SlotPtr tls_;
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
-  std::unordered_map<std::string, Resource> resources_;
-  std::unordered_map<std::string, OverloadAction> actions_;
+  absl::node_hash_map<std::string, Resource> resources_;
+  absl::node_hash_map<std::string, OverloadAction> actions_;
 
   using ResourceToActionMap = std::unordered_multimap<std::string, std::string>;
   ResourceToActionMap resource_to_actions_;

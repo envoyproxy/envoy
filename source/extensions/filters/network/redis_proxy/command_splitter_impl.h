@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/stats/scope.h"

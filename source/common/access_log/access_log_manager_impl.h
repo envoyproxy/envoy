@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
@@ -13,6 +12,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 
@@ -51,7 +52,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Thread::BasicLockable& lock_;
   AccessLogFileStats file_stats_;
-  std::unordered_map<std::string, AccessLogFileSharedPtr> access_logs_;
+  absl::node_hash_map<std::string, AccessLogFileSharedPtr> access_logs_;
 };
 
 /**

@@ -5,7 +5,6 @@
 #include <set>
 #include <sstream>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/interval_set.h"

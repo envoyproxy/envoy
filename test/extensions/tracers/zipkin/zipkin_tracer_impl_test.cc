@@ -2,7 +2,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 

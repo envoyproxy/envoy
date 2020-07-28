@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
@@ -13,6 +12,8 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/shared_pool/shared_pool.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Config {
@@ -123,7 +124,7 @@ protected:
     }
   }
 
-  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>> data_;
+  absl::node_hash_map<std::string, std::unique_ptr<const TypedMetadata::Object>> data_;
 };
 
 } // namespace Config

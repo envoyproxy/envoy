@@ -1,7 +1,6 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"

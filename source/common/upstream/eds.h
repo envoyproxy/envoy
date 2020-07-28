@@ -47,13 +47,13 @@ private:
                       const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  using LocalityWeightsMap = std::unordered_map<envoy::config::core::v3::Locality, uint32_t,
-                                                LocalityHash, LocalityEqualTo>;
+  using LocalityWeightsMap = absl::node_hash_map<envoy::config::core::v3::Locality, uint32_t,
+                                                 LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
                               const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
                               PriorityStateManager& priority_state_manager,
-                              std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
+                              absl::node_hash_map<std::string, HostSharedPtr>& updated_hosts);
   bool validateUpdateSize(int num_resources);
 
   // ClusterImplBase

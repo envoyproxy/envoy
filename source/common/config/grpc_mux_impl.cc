@@ -1,7 +1,5 @@
 #include "common/config/grpc_mux_impl.h"
 
-#include <unordered_set>
-
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/decoded_resource_impl.h"
@@ -11,6 +9,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/container/btree_map.h"
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Config {
@@ -36,7 +35,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   request.mutable_resource_names()->Clear();
 
   // Maintain a set to avoid dupes.
-  std::unordered_set<std::string> resources;
+  absl::node_hash_set<std::string> resources;
   for (const auto* watch : api_state.watches_) {
     for (const std::string& resource : watch->resources_) {
       if (resources.count(resource) == 0) {

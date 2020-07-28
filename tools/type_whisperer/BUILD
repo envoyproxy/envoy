@@ -101,6 +101,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//tools/type_whisperer:api_type_db_proto_cc_proto",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 

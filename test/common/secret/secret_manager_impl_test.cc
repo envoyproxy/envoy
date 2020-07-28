@@ -43,7 +43,8 @@ protected:
         dynamic_cast<const envoy::admin::v3::SecretsConfigDump&>(*message_ptr);
     envoy::admin::v3::SecretsConfigDump expected_secrets_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_secrets_config_dump);
-    EXPECT_EQ(expected_secrets_config_dump.DebugString(), secrets_config_dump.DebugString());
+    EXPECT_THAT(secrets_config_dump,
+                ProtoEqIgnoreRepeatedFieldOrdering(expected_secrets_config_dump));
   }
 
   void setupSecretProviderContext() {}

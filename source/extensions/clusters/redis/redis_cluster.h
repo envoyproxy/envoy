@@ -247,7 +247,7 @@ private:
     Event::Dispatcher& dispatcher_;
     std::string current_host_address_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
-    std::unordered_map<std::string, RedisDiscoveryClientPtr> client_map_;
+    absl::node_hash_map<std::string, RedisDiscoveryClientPtr> client_map_;
 
     std::list<Network::Address::InstanceConstSharedPtr> discovery_address_list_;
 

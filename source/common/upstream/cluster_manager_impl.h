@@ -327,7 +327,7 @@ private:
       Network::ClientConnection& connection_;
     };
     using TcpConnectionsMap =
-        std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
+        absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
 
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
@@ -387,9 +387,9 @@ private:
 
     // These maps are owned by the ThreadLocalClusterManagerImpl instead of the ClusterEntry
     // to prevent lifetime/ownership issues when a cluster is dynamically removed.
-    std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
-    std::unordered_map<HostConstSharedPtr, TcpConnPoolsContainer> host_tcp_conn_pool_map_;
-    std::unordered_map<HostConstSharedPtr, TcpConnectionsMap> host_tcp_conn_map_;
+    absl::node_hash_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    absl::node_hash_map<HostConstSharedPtr, TcpConnPoolsContainer> host_tcp_conn_pool_map_;
+    absl::node_hash_map<HostConstSharedPtr, TcpConnectionsMap> host_tcp_conn_map_;
 
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
@@ -468,9 +468,9 @@ private:
   };
 
   using PendingUpdatesPtr = std::unique_ptr<PendingUpdates>;
-  using PendingUpdatesByPriorityMap = std::unordered_map<uint32_t, PendingUpdatesPtr>;
+  using PendingUpdatesByPriorityMap = absl::node_hash_map<uint32_t, PendingUpdatesPtr>;
   using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
-  using ClusterUpdatesMap = std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr>;
+  using ClusterUpdatesMap = absl::node_hash_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
   void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable,

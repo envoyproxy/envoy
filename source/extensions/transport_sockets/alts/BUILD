@@ -34,6 +34,9 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
+    external_deps = [
+        "abseil_node_hash_set",
+    ],
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":tsi_handshaker",

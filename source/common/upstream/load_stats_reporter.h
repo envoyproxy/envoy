@@ -66,7 +66,7 @@ private:
   envoy::service::load_stats::v3::LoadStatsRequest request_;
   std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse> message_;
   // Map from cluster name to start of measurement interval.
-  std::unordered_map<std::string, std::chrono::steady_clock::duration> clusters_;
+  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;
 };
 

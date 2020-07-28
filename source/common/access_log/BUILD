@@ -12,7 +12,9 @@ envoy_cc_library(
     name = "access_log_lib",
     srcs = ["access_log_impl.cc"],
     hdrs = ["access_log_impl.h"],
-    external_deps = ["abseil_hash"],
+    external_deps = [
+        "abseil_hash",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/config:typed_config_interface",

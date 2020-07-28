@@ -154,7 +154,7 @@ private:
   const std::chrono::milliseconds unhealthy_interval_;
   const std::chrono::milliseconds unhealthy_edge_interval_;
   const std::chrono::milliseconds healthy_edge_interval_;
-  std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
+  absl::node_hash_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
   const MetadataConstSharedPtr transport_socket_match_metadata_;
 };

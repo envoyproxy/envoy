@@ -5,7 +5,6 @@
 #include <memory>
 #include <stack>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/exception.h"

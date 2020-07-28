@@ -1,7 +1,5 @@
 #include "common/config/utility.h"
 
-#include <unordered_set>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"

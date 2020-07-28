@@ -75,13 +75,13 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   LeastRequestLoadBalancer lb_{
       priority_set, nullptr, stats, runtime, random, common_config, least_request_lb_config};
 
-  std::unordered_map<HostConstSharedPtr, uint64_t> host_hits;
+  absl::node_hash_map<HostConstSharedPtr, uint64_t> host_hits;
   const uint64_t total_requests = 100;
   for (uint64_t i = 0; i < total_requests; i++) {
     host_hits[lb_.chooseHost(nullptr)]++;
   }
 
-  std::unordered_map<uint64_t, double> weight_to_percent;
+  absl::node_hash_map<uint64_t, double> weight_to_percent;
   for (const auto& host : host_hits) {
     std::cout << fmt::format("url:{}, weight:{}, hits:{}, percent_of_total:{}\n",
                              host.first->address()->asString(), host.first->weight(), host.second,

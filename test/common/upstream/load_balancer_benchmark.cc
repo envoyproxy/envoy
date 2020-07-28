@@ -214,7 +214,7 @@ public:
 };
 
 void computeHitStats(benchmark::State& state,
-                     const std::unordered_map<std::string, uint64_t>& hit_counter) {
+                     const absl::node_hash_map<std::string, uint64_t>& hit_counter) {
   double mean = 0;
   for (const auto& pair : hit_counter) {
     mean += pair.second;
@@ -240,7 +240,7 @@ void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
     const uint64_t choice_count = state.range(1);
     const uint64_t keys_to_simulate = state.range(2);
     LeastRequestTester tester(num_hosts, choice_count);
-    std::unordered_map<std::string, uint64_t> hit_counter;
+    absl::node_hash_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
     state.ResumeTiming();
 
@@ -273,12 +273,12 @@ void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     RingHashTester tester(num_hosts, min_ring_size);
     tester.ring_hash_lb_->initialize();
     LoadBalancerPtr lb = tester.ring_hash_lb_->factory()->create();
-    std::unordered_map<std::string, uint64_t> hit_counter;
+    absl::node_hash_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
     state.ResumeTiming();
 
     // Note: To a certain extent this is benchmarking the performance of xxhash as well as
-    // std::unordered_map. However, it should be roughly equivalent to the work done when
+    // absl::node_hash_map. However, it should be roughly equivalent to the work done when
     // comparing different hashing algorithms.
     // TODO(mattklein123): When Maglev is a real load balancer, further share code with the
     //                     other test.
@@ -311,12 +311,12 @@ void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
     MaglevTester tester(num_hosts);
     tester.maglev_lb_->initialize();
     LoadBalancerPtr lb = tester.maglev_lb_->factory()->create();
-    std::unordered_map<std::string, uint64_t> hit_counter;
+    absl::node_hash_map<std::string, uint64_t> hit_counter;
     TestLoadBalancerContext context;
     state.ResumeTiming();
 
     // Note: To a certain extent this is benchmarking the performance of xxhash as well as
-    // std::unordered_map. However, it should be roughly equivalent to the work done when
+    // absl::node_hash_map. However, it should be roughly equivalent to the work done when
     // comparing different hashing algorithms.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);

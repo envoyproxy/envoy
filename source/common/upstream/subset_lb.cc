@@ -1,7 +1,6 @@
 #include "common/upstream/subset_lb.h"
 
 #include <memory>
-#include <unordered_set>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -14,6 +13,8 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
+
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -366,7 +367,7 @@ void SubsetLoadBalancer::processSubsets(
     const HostVector& hosts_added, const HostVector& hosts_removed,
     std::function<void(LbSubsetEntryPtr)> update_cb,
     std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&)> new_cb) {
-  std::unordered_set<LbSubsetEntryPtr> subsets_modified;
+  absl::node_hash_set<LbSubsetEntryPtr> subsets_modified;
 
   std::pair<const HostVector&, bool> steps[] = {{hosts_added, true}, {hosts_removed, false}};
   for (const auto& step : steps) {
@@ -602,11 +603,15 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
         stats_.lb_subsets_removed_.inc();
       }
 
-      it = subset_it->second.erase(it);
+      auto next_it = std::next(it);
+      subset_it->second.erase(it);
+      it = next_it;
     }
 
     if (subset_it->second.empty()) {
-      subset_it = subsets.erase(subset_it);
+      auto next_subset_it = std::next(subset_it);
+      subsets.erase(subset_it);
+      subset_it = next_subset_it;
     } else {
       subset_it++;
     }
@@ -691,8 +696,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   // that we maintain a consistent view of the metadata and saves on computation
   // since metadata lookups can be expensive.
   //
-  // We use an unordered_set because this can potentially be in the tens of thousands.
-  std::unordered_set<const Host*> matching_hosts;
+  // We use an unordered container because this can potentially be in the tens of thousands.
+  absl::node_hash_set<const Host*> matching_hosts;
 
   auto cached_predicate = [&matching_hosts](const auto& host) {
     return matching_hosts.count(&host) == 1;

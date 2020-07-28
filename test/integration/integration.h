@@ -42,11 +42,11 @@ public:
   const std::string& body() { return body_; }
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
-  Http::StreamResetReason reset_reason() { return reset_reason_; }
-  const Http::ResponseHeaderMap* continue_headers() { return continue_headers_.get(); }
+  Http::StreamResetReason resetReason() { return reset_reason_; }
+  const Http::ResponseHeaderMap* continueHeaders() { return continue_headers_.get(); }
   const Http::ResponseHeaderMap& headers() { return *headers_; }
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
-  const Http::MetadataMap& metadata_map() { return *metadata_map_; }
+  const Http::MetadataMap& metadataMap() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
   void waitForHeaders();
@@ -79,7 +79,7 @@ private:
   Http::ResponseHeaderMapPtr headers_;
   Http::ResponseTrailerMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
-  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;

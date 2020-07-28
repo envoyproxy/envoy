@@ -181,7 +181,7 @@ private:
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::list<ActiveTcpSocketPtr> sockets_;
-    std::unordered_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
+    absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
 
     // The number of connections currently active on this listener. This is typically used for
     // connection balancing across per-handler listeners.

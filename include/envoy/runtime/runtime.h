@@ -5,7 +5,6 @@
 #include <limits>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/pure.h"
@@ -17,6 +16,7 @@
 #include "common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -253,7 +253,7 @@ public:
    * a key, use an empty string as the value.
    * @param values the values to merge
    */
-  virtual void mergeValues(const std::unordered_map<std::string, std::string>& values) PURE;
+  virtual void mergeValues(const absl::node_hash_map<std::string, std::string>& values) PURE;
 
   /**
    * Initiate all RTDS subscriptions. The `on_done` callback is invoked when all RTDS requests

@@ -1,12 +1,12 @@
 #pragma once
 
-#include <unordered_map>
-
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/dubbo_proxy/message.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,7 +22,7 @@ public:
     template <typename T> std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
   };
 
-  using ProtocolTypeNameMap = std::unordered_map<ProtocolType, std::string, ProtocolTypeHash>;
+  using ProtocolTypeNameMap = absl::node_hash_map<ProtocolType, std::string, ProtocolTypeHash>;
 
   const ProtocolTypeNameMap protocolTypeNameMap = {
       {ProtocolType::Dubbo, "dubbo"},
@@ -47,7 +47,7 @@ public:
   };
 
   using SerializerTypeNameMap =
-      std::unordered_map<SerializationType, std::string, SerializationTypeHash>;
+      absl::node_hash_map<SerializationType, std::string, SerializationTypeHash>;
 
   const SerializerTypeNameMap serializerTypeNameMap = {
       {SerializationType::Hessian2, "hessian2"},
@@ -77,7 +77,7 @@ public:
 
 #define GENERATE_PAIR(X, Y) generateKey(X, Y), generateValue(X, Y)
 
-  using ProtocolSerializerTypeNameMap = std::unordered_map<uint8_t, std::string>;
+  using ProtocolSerializerTypeNameMap = absl::node_hash_map<uint8_t, std::string>;
 
   const ProtocolSerializerTypeNameMap protocolSerializerTypeNameMap = {
       {GENERATE_PAIR(ProtocolType::Dubbo, SerializationType::Hessian2)},

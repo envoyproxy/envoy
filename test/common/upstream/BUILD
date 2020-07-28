@@ -221,7 +221,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_stats_reporter_test",
     srcs = ["load_stats_reporter_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/stats:stats_lib",
         "//source/common/upstream:load_stats_reporter_lib",

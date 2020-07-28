@@ -102,7 +102,7 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
     }
   }
 
-  std::unordered_map<std::string, Upstream::HostSharedPtr> updated_hosts;
+  absl::node_hash_map<std::string, Upstream::HostSharedPtr> updated_hosts;
   Upstream::HostVector hosts_added;
   Upstream::HostVector hosts_removed;
   const bool host_updated = updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,

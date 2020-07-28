@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"

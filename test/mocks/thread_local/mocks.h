@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <unordered_map>
 
 #include "envoy/thread_local/thread_local.h"
 

@@ -7,6 +7,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -88,7 +89,7 @@ enum class RpcResponseType : uint8_t {
 
 class Context {
 public:
-  using AttachmentMap = std::unordered_map<std::string, std::string>;
+  using AttachmentMap = absl::node_hash_map<std::string, std::string>;
 
   bool hasAttachments() const { return !attachments_.empty(); }
   const AttachmentMap& attachments() const { return attachments_; }

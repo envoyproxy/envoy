@@ -128,6 +128,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "metadata_interface",
     hdrs = ["metadata_interface.h"],
+    external_deps = ["abseil_node_hash_map"],
 )
 
 envoy_cc_library(

@@ -14,6 +14,7 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -63,7 +64,7 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& a
             removed_resources.size());
 
   std::vector<std::string> exception_msgs;
-  std::unordered_set<std::string> cluster_names;
+  absl::node_hash_set<std::string> cluster_names;
   bool any_applied = false;
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster;

@@ -1,7 +1,5 @@
 #include "extensions/filters/network/thrift_proxy/decoder.h"
 
-#include <unordered_map>
-
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"

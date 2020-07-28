@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"

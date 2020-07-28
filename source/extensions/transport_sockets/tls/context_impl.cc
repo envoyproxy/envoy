@@ -24,6 +24,7 @@
 
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "openssl/evp.h"
@@ -268,7 +269,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-  std::unordered_set<int> cert_pkey_ids;
+  absl::node_hash_set<int> cert_pkey_ids;
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     // Load certificate chain.
