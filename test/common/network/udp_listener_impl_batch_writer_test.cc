@@ -97,8 +97,9 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
   absl::FixedArray<std::string> payloads{"length7", "length7", "len<7",
                                          "length7", "length7", "length>7"};
   std::string internal_buffer("");
-  std::string first_buffered("");
+  std::string last_buffered("");
   std::list<std::string> pkts_to_send;
+  bool send_buffered_pkts = false;
 
   // Get initial value of total_bytes_sent
   uint64_t total_bytes_sent =
@@ -111,20 +112,23 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
 
     auto send_result = listener_->send(send_data);
     EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_->getErrorDetails();
+    EXPECT_EQ(send_result.rc_, payload.length());
 
     // Verify udp_packet_writer stats for batch writing
-    if (internal_buffer.length() == 0 ||        /* internal buffer is empty*/
-        payload.compare(first_buffered) == 0) { /*len(payload) == gso_size*/
+    if (internal_buffer.length() == 0 ||       /* internal buffer is empty*/
+        payload.compare(last_buffered) == 0) { /*len(payload) == gso_size*/
       pkts_to_send.emplace_back(payload);
       internal_buffer.append(payload);
-      first_buffered = payload;
-    } else if (payload.compare(first_buffered) < 0) { /*len(payload) < gso_size*/
+      last_buffered = payload;
+    } else if (payload.compare(last_buffered) < 0) { /*len(payload) < gso_size*/
       pkts_to_send.emplace_back(payload);
       internal_buffer.clear();
-      first_buffered.clear();
+      last_buffered.clear();
+      send_buffered_pkts = true;
     } else { /*len(payload) > gso_size*/
       internal_buffer = payload;
-      first_buffered = payload;
+      last_buffered = payload;
+      send_buffered_pkts = true;
     }
 
     EXPECT_EQ(listener_config_.listenerScope()
@@ -134,26 +138,21 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
     EXPECT_EQ(listener_config_.listenerScope()
                   .gaugeFromString("front_buffered_pkt_size", Stats::Gauge::ImportMode::NeverImport)
                   .value(),
-              first_buffered.size());
+              last_buffered.size());
 
-    if (send_result.rc_ > 0) {
+    if (send_buffered_pkts) {
       // Verify Correct content is received at the client
       for (const auto& pkt : pkts_to_send) {
-        const uint64_t bytes_to_read = pkt.length();
-        UdpRecvData data;
-        client_.recv(data);
-        total_bytes_sent += data.buffer_->length();
-        EXPECT_EQ(bytes_to_read, data.buffer_->length());
-        EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
-        EXPECT_EQ(data.buffer_->toString(), pkt);
+        total_bytes_sent += pkt.length();
       }
-      EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
-                total_bytes_sent);
       pkts_to_send.clear();
-      if (first_buffered.length() != 0) {
-        pkts_to_send.emplace_back(first_buffered);
+      if (last_buffered.length() != 0) {
+        pkts_to_send.emplace_back(last_buffered);
       }
+      send_buffered_pkts = false;
     }
+    EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
+              total_bytes_sent);
   }
 
   // Test External Flush
@@ -167,17 +166,10 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
                 .gaugeFromString("front_buffered_pkt_size", Stats::Gauge::ImportMode::NeverImport)
                 .value(),
             0);
-
-  const uint64_t bytes_flushed = payloads.back().length();
-  UdpRecvData received_flush_data;
-  client_.recv(received_flush_data);
-  total_bytes_sent += received_flush_data.buffer_->length();
+  total_bytes_sent += payloads.back().length();
 
   EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
             total_bytes_sent);
-  EXPECT_EQ(bytes_flushed, received_flush_data.buffer_->length());
-  EXPECT_EQ(send_from_addr->asString(), received_flush_data.addresses_.peer_->asString());
-  EXPECT_EQ(received_flush_data.buffer_->toString(), payloads.back());
 }
 
 /**
@@ -197,25 +189,26 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
 
   // The initial payload to be buffered
   std::string initial_payload("length7");
-  Buffer::InstancePtr initial_buffer(new Buffer::OwnedImpl());
-  initial_buffer->add(initial_payload);
-  UdpSendData initial_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
-                                *initial_buffer};
 
   // Get initial value of total_bytes_sent
   uint64_t total_bytes_sent =
       listener_config_.listenerScope().counterFromString("total_bytes_sent").value();
 
-  // Possible followup payloads to be sent after the initial payload
+  // Possible following payloads to be sent after the initial payload
   absl::FixedArray<std::string> following_payloads{"length<7", "len<7"};
 
   for (const auto& following_payload : following_payloads) {
     std::string internal_buffer("");
 
     // First have initial payload added to the udp_packet_writer's internal buffer.
+    Buffer::InstancePtr initial_buffer(new Buffer::OwnedImpl());
+    initial_buffer->add(initial_payload);
+    UdpSendData initial_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
+                                  *initial_buffer};
     auto send_result = listener_->send(initial_send_data);
     internal_buffer.append(initial_payload);
     EXPECT_TRUE(send_result.ok());
+    EXPECT_EQ(send_result.rc_, initial_payload.length());
     EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope()
                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
@@ -235,22 +228,22 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
           return -1;
         }));
 
-    // Now send the followup payload
-    Buffer::InstancePtr followup_buffer(new Buffer::OwnedImpl());
-    followup_buffer->add(following_payload);
-    UdpSendData followup_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
-                                   *followup_buffer};
-    send_result = listener_->send(followup_send_data);
+    // Now send the following payload
+    Buffer::InstancePtr following_buffer(new Buffer::OwnedImpl());
+    following_buffer->add(following_payload);
+    UdpSendData following_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
+                                    *following_buffer};
+    send_result = listener_->send(following_send_data);
 
-    // The followup payload should only get buffered if it is shorter than initial payload
+    // The following payload should only get buffered if it is shorter than initial payload
     if (following_payload.length() < initial_payload.length()) {
       EXPECT_TRUE(send_result.ok());
-      // TODO(yugant): This flag should be true here, but currently it is incorrectly set in
-      // quiche code. Change this to True, once this issue is fixed in quiche.
+      EXPECT_EQ(send_result.rc_, following_payload.length());
       EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
       internal_buffer.append(following_payload);
     } else if (following_payload.length() > initial_payload.length()) {
       EXPECT_FALSE(send_result.ok());
+      EXPECT_EQ(send_result.rc_, 0);
       EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
     }
     EXPECT_EQ(listener_config_.listenerScope()
@@ -275,6 +268,7 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
     udp_packet_writer_->setWritable();
     auto flush_result = udp_packet_writer_->flush();
     EXPECT_TRUE(flush_result.ok());
+    EXPECT_EQ(flush_result.rc_, 0);
     EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope()
                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
