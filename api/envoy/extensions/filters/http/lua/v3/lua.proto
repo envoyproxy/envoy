@@ -27,7 +27,7 @@ message Lua {
   // strings so complex scripts can be easily expressed inline in the configuration.
   string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // Map of named Lua source codes that can be referenced in :ref:` LuaPerRoute
+  // Map of named Lua source codes that can be referenced in :ref:`LuaPerRoute
   // <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>`. The Lua source codes can be
   // loaded from inline string or local files.
   //
