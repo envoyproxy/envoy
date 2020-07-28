@@ -477,8 +477,7 @@ private:
                          "failed to restore deprecated factory name");
           factories().emplace(mapped_name, deprecated_factory);
 
-          ENVOY_LOG(info, "Restored deprecated name '{}' (mapped to '{}'", name,
-                    mapped_name);
+          ENVOY_LOG(info, "Restored deprecated name '{}' (mapped to '{}'", name, mapped_name);
         }
       }
 
