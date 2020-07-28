@@ -79,7 +79,7 @@ void UberWriteFilterFuzzer::fuzz(
   //   PANIC("A case is found!");
   // }
   for (const auto& action : actions) {
-    ENVOY_LOG_MISC(trace, "action {}", action.DebugString());
+    ENVOY_LOG_MISC(info, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
     case test::extensions::filters::network::WriteAction::kOnWrite: {
       ASSERT(write_filter_ != nullptr);

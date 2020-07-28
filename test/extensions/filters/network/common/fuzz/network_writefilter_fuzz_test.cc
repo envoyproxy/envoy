@@ -27,7 +27,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          filter_name = NetworkFilterNames::get().KafkaBroker;
+          filter_name = NetworkFilterNames::get().Postgres;
           input->mutable_config()->set_name(std::string(filter_name));
         }
         // Set the corresponding type_url for Any.
@@ -36,7 +36,6 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
             absl::StrCat("type.googleapis.com/",
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
       }};
-  // UberFilterFuzzer::setThriftFilters(nullptr);
   try {
     TestUtility::validate(input);
     // Check the filter's name in case some filters are not supported yet.
