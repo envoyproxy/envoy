@@ -85,7 +85,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
   StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource());
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), stream_info, false),
