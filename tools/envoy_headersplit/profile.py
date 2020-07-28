@@ -18,6 +18,30 @@ def get_active_branch_name():
       return line.partition("refs/heads/")[2]
 
 
+def get_compilation_performance(test):
+  """
+  return building time (in seconds) and target binary size(in bytes) for specific test
+  """
+
+  subprocess.run(["bazel", "clean", "--expunge"])
+  subprocess.run(["bazel", "build", "//source/exe:envoy-static"])
+
+  output = subprocess.run(["bazel", "build", test, "--noremote_accept_cached"], capture_output=True).stderr
+  output = output.decode().split('\n')
+  # rerun building to download output to get binary size (download output
+  # will affect building time profiling
+  subprocess.run(["bazel", "build", test, "--remote_download_outputs=all"])
+
+  building_time = 0.
+  target_size = 0
+  for line in output:
+    if "Elapse" in line:
+      building_time = line.split('s,')[0].split(' ')[-1]
+    if "bazel-bin/test" in line:
+      target_filename = line.strip()
+      target_size = os.path.getsize(target_filename)
+  return building_time, target_size
+
 def main():
   current_branch = get_active_branch_name()
 
@@ -37,42 +61,16 @@ def main():
       test[last_slash] = ':'
       test = ''.join(test)
       os.system("git checkout {}".format(current_branch))
-      os.system("bazel clean --expunge")
-      os.system("bazel build //source/exe:envoy-static")
+      building_time_after, target_size_after = get_compilation_performance(test)
+      os.system("git checkout upstream/master")
+      building_time_before, target_size_before = get_compilation_performance(test)
 
-      # download output to get binary size
-      output = subprocess.run(["bazel", "build", test, "--noremote_accept_cached", "--remote_download_outputs=all"], capture_output=True).stderr 
-      output = output.decode().split('\n')
-
-      d[test] = [0, 0, 0, 0]
-      for line in output:
-        if "Elapse" in line:
-          d[test][0] = line.split('s,')[0].split(' ')[-1]
-        if "bazel-bin/test" in line:
-          target_filename = line.strip()
-          d[test][2] = os.path.getsize(target_filename)
-      os.system("git checkout origin/master")
-      os.system("bazel clean --expunge")
-      os.system("bazel build //source/exe:envoy-static")
-
-      output = subprocess.run(["bazel", "build", test, "--noremote_accept_cached"], capture_output=True).stderr  #.split('\n')
-      output = output.decode().split('\n')
-
-      for line in output:
-        if "Elapse" in line:
-          d[test][1] = line.split('s,')[0].split(' ')[-1]
-        if "bazel-bin/test" in line:
-          target_filename = line.strip()
-          d[test][3] = os.path.getsize(target_filename)
-
+      d[test] = [building_time_before, building_time_after, target_size_before, target_size_after]
       print(test, d[test])
       with open("result.txt","a") as f:
         f.write(test+" "+str(d[test])+'\n')
 
   print(d)
-
-  with open("result.txt", "w") as f:
-    f.write(str(d))
 
 if __name__ == '__main__':
   main()
