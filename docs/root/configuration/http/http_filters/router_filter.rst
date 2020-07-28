@@ -51,8 +51,6 @@ A few notes on how Envoy does retries:
   upstream.base_retry_backoff_ms runtime parameter. The back-off intervals can also be modified
   by configuring the retry policy's
   :ref:`retry back-off <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_back_off>`.
-* If max retries is set both by header as well as in the route configuration, the maximum value is
-  taken when determining the max retries to use for the request.
 
 .. _config_http_filters_router_x-envoy-retry-on:
 
