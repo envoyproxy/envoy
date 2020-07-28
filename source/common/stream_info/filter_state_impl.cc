@@ -108,24 +108,24 @@ void FilterStateImpl::maybeCreateParent(ParentAccessMode parent_access_mode) {
   }
 
   auto lazy_create_ancestor = absl::get<LazyCreateAncestor>(ancestor_);
+  auto& [ancestor_ptr, ancestor_lifespan] = lazy_create_ancestor;
   // If we're only going to read data from our parent, we don't need to create lazy ancestor,
   // because they're empty anyways.
-  if (parent_access_mode == ParentAccessMode::ReadOnly && lazy_create_ancestor.first == nullptr) {
+  if (parent_access_mode == ParentAccessMode::ReadOnly && ancestor_ptr == nullptr) {
     return;
   }
 
   // Lazy ancestor is not our immediate parent.
-  if (lazy_create_ancestor.second != life_span_ + 1) {
+  if (ancestor_lifespan != life_span_ + 1) {
     parent_ = std::make_shared<FilterStateImpl>(lazy_create_ancestor,
                                                 FilterState::LifeSpan(life_span_ + 1));
     return;
   }
   // Lazy parent is our immediate parent.
-  if (lazy_create_ancestor.first == nullptr) {
-    lazy_create_ancestor.first =
-        std::make_shared<FilterStateImpl>(FilterState::LifeSpan(life_span_ + 1));
+  if (ancestor_ptr == nullptr) {
+    ancestor_ptr = std::make_shared<FilterStateImpl>(FilterState::LifeSpan(life_span_ + 1));
   }
-  parent_ = lazy_create_ancestor.first;
+  parent_ = ancestor_ptr;
 }
 
 } // namespace StreamInfo

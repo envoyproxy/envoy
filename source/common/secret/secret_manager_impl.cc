@@ -159,38 +159,36 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   // are the use of v2 Struct config() and verify_subject_alt_name.
   auto config_dump = std::make_unique<envoy::admin::v3::SecretsConfigDump>();
   // Handle static tls key/cert providers.
-  for (const auto& cert_iter : static_tls_certificate_providers_) {
-    const auto& tls_cert = cert_iter.second;
+  for (const auto& [cert_name, tls_cert] : static_tls_certificate_providers_) {
     auto static_secret = config_dump->mutable_static_secrets()->Add();
-    static_secret->set_name(cert_iter.first);
+    static_secret->set_name(cert_name);
     ASSERT(tls_cert != nullptr);
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
-    dump_secret.set_name(cert_iter.first);
+    dump_secret.set_name(cert_name);
     dump_secret.mutable_tls_certificate()->MergeFrom(*tls_cert->secret());
     MessageUtil::redact(dump_secret);
     static_secret->mutable_secret()->PackFrom(dump_secret);
   }
 
   // Handle static certificate validation context providers.
-  for (const auto& context_iter : static_certificate_validation_context_providers_) {
-    const auto& validation_context = context_iter.second;
+  for (const auto& [iter_name, validation_context] :
+       static_certificate_validation_context_providers_) {
     auto static_secret = config_dump->mutable_static_secrets()->Add();
-    static_secret->set_name(context_iter.first);
+    static_secret->set_name(iter_name);
     ASSERT(validation_context != nullptr);
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
-    dump_secret.set_name(context_iter.first);
+    dump_secret.set_name(iter_name);
     dump_secret.mutable_validation_context()->MergeFrom(*validation_context->secret());
     static_secret->mutable_secret()->PackFrom(dump_secret);
   }
 
   // Handle static session keys providers.
-  for (const auto& context_iter : static_session_ticket_keys_providers_) {
-    const auto& session_ticket_keys = context_iter.second;
+  for (const auto& [iter_name, session_ticket_keys] : static_session_ticket_keys_providers_) {
     auto static_secret = config_dump->mutable_static_secrets()->Add();
-    static_secret->set_name(context_iter.first);
+    static_secret->set_name(iter_name);
     ASSERT(session_ticket_keys != nullptr);
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
-    dump_secret.set_name(context_iter.first);
+    dump_secret.set_name(iter_name);
     for (const auto& key : session_ticket_keys->secret()->keys()) {
       dump_secret.mutable_session_ticket_keys()->add_keys()->MergeFrom(key);
     }
@@ -199,13 +197,12 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   }
 
   // Handle static generic secret providers.
-  for (const auto& secret_iter : static_generic_secret_providers_) {
-    const auto& generic_secret = secret_iter.second;
+  for (const auto& [iter_name, generic_secret] : static_generic_secret_providers_) {
     auto static_secret = config_dump->mutable_static_secrets()->Add();
-    static_secret->set_name(secret_iter.first);
+    static_secret->set_name(iter_name);
     ASSERT(generic_secret != nullptr);
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
-    dump_secret.set_name(secret_iter.first);
+    dump_secret.set_name(iter_name);
     dump_secret.mutable_generic_secret()->MergeFrom(*generic_secret->secret());
     MessageUtil::redact(dump_secret);
     static_secret->mutable_secret()->PackFrom(dump_secret);

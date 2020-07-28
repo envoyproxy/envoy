@@ -33,9 +33,9 @@ void WarningValidationVisitorImpl::setUnknownCounter(Stats::Counter& counter) {
 
 void WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
   const uint64_t hash = HashUtil::xxHash64(description);
-  auto it = descriptions_.insert(hash);
+  auto [it, insert_status] = descriptions_.insert(hash);
   // If we've seen this before, skip.
-  if (!it.second) {
+  if (!insert_status) {
     return;
   }
 

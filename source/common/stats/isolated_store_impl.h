@@ -84,8 +84,8 @@ public:
   std::vector<RefcountPtr<Base>> toVector() const {
     std::vector<RefcountPtr<Base>> vec;
     vec.reserve(stats_.size());
-    for (auto& stat : stats_) {
-      vec.push_back(stat.second);
+    for (auto& [stat_name, stat] : stats_) {
+      vec.push_back(stat);
     }
 
     return vec;

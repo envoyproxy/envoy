@@ -377,8 +377,8 @@ ClusterManagerImpl::ClusterManagerImpl(
   // Proceed to add all static bootstrap clusters to the init manager. This will immediately
   // initialize any primary clusters. Post-init processing further initializes any thread
   // aware load balancer and sets up the per-worker host set updates.
-  for (auto& cluster : active_clusters_) {
-    init_helper_.addCluster(*cluster.second->cluster_);
+  for (auto& [cluser_name, cluster] : active_clusters_) {
+    init_helper_.addCluster(*cluster->cluster_);
   }
 
   // Potentially move to secondary initialization on the static bootstrap clusters if all primary
@@ -714,7 +714,7 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
                                      ClusterMap& cluster_map) {
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
-  auto& new_cluster = new_cluster_pair.first;
+  auto& [new_cluster, load_balancer_ptr] = new_cluster_pair;
   Cluster& cluster_reference = *new_cluster;
 
   if (!added_via_api) {
@@ -725,14 +725,14 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
   }
 
   if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided &&
-      new_cluster_pair.second == nullptr) {
+      load_balancer_ptr == nullptr) {
     throw EnvoyException(fmt::format("cluster manager: cluster provided LB specified but cluster "
                                      "'{}' did not provide one. Check cluster documentation.",
                                      new_cluster->info()->name()));
   }
 
   if (cluster_reference.info()->lbType() != LoadBalancerType::ClusterProvided &&
-      new_cluster_pair.second != nullptr) {
+      load_balancer_ptr != nullptr) {
     throw EnvoyException(
         fmt::format("cluster manager: cluster provided LB not specified but cluster "
                     "'{}' provided one. Check cluster documentation.",
@@ -779,7 +779,7 @@ void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& 
           cluster_reference.info()->lbConfig());
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
-    cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
+    cluster_entry_it->second->thread_aware_lb_ = std::move(load_balancer_ptr);
   }
 
   updateClusterCounts();
@@ -970,16 +970,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
                             ? &thread_local_clusters_[local_cluster_name.value()]->priority_set_
                             : nullptr;
 
-  for (auto& cluster : parent.active_clusters_) {
+  for (auto& [active_cluster_name, cluster_data] : parent.active_clusters_) {
     // If local cluster name is set then we already initialized this cluster.
-    if (local_cluster_name && local_cluster_name.value() == cluster.first) {
+    if (local_cluster_name && local_cluster_name.value() == active_cluster_name) {
       continue;
     }
 
-    ENVOY_LOG(debug, "adding TLS initial cluster {}", cluster.first);
-    ASSERT(thread_local_clusters_.count(cluster.first) == 0);
-    thread_local_clusters_[cluster.first] = std::make_unique<ClusterEntry>(
-        *this, cluster.second->cluster_->info(), cluster.second->loadBalancerFactory());
+    ENVOY_LOG(debug, "adding TLS initial cluster {}", active_cluster_name);
+    ASSERT(thread_local_clusters_.count(active_cluster_name) == 0);
+    thread_local_clusters_[active_cluster_name] = std::make_unique<ClusterEntry>(
+        *this, cluster_data->cluster_->info(), cluster_data->loadBalancerFactory());
   }
 }
 
@@ -993,9 +993,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   host_http_conn_pool_map_.clear();
   host_tcp_conn_pool_map_.clear();
   ASSERT(host_tcp_conn_map_.empty());
-  for (auto& cluster : thread_local_clusters_) {
-    if (&cluster.second->priority_set_ != local_priority_set_) {
-      cluster.second.reset();
+  for (auto& [cluster_name, cluster] : thread_local_clusters_) {
+    if (&cluster->priority_set_ != local_priority_set_) {
+      cluster.reset();
     }
   }
   thread_local_clusters_.clear();
@@ -1067,8 +1067,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
     HostSharedPtr old_host, TcpConnPoolsContainer& container) {
   container.drains_remaining_ += container.pools_.size();
 
-  for (const auto& pair : container.pools_) {
-    pair.second->addDrainedCallback([this, old_host]() -> void {
+  for (const auto& [key, pool] : container.pools_) {
+    pool->addDrainedCallback([this, old_host]() -> void {
       if (destroying_) {
         // It is possible for a connection pool to fire drain callbacks during destruction. Instead
         // of checking if old_host actually exists in the map, it's clearer and cleaner to keep
@@ -1081,8 +1081,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
       ASSERT(container.drains_remaining_ > 0);
       container.drains_remaining_--;
       if (container.drains_remaining_ == 0) {
-        for (auto& pair : container.pools_) {
-          thread_local_dispatcher_.deferredDelete(std::move(pair.second));
+        for (auto& [key, pool] : container.pools_) {
+          thread_local_dispatcher_.deferredDelete(std::move(pool));
         }
         host_tcp_conn_pool_map_.erase(old_host);
       }
@@ -1170,8 +1170,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // active connections.
     const auto& container = config.host_tcp_conn_pool_map_.find(host);
     if (container != config.host_tcp_conn_pool_map_.end()) {
-      for (const auto& pair : container->second.pools_) {
-        const Tcp::ConnectionPool::InstancePtr& pool = pair.second;
+      for (const auto& [key, pool] : container->second.pools_) {
         if (host->cluster().features() &
             ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
           pool->closeConnections();

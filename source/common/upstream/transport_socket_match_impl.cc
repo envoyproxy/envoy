@@ -25,8 +25,8 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
     FactoryMatch factory_match(
         socket_match.name(), config_factory.createTransportSocketFactory(*message, factory_context),
         generateStats(absl::StrCat(socket_match.name(), ".")));
-    for (const auto& kv : socket_match.match().fields()) {
-      factory_match.label_set.emplace_back(kv.first, kv.second);
+    for (const auto& [label_key, label_val] : socket_match.match().fields()) {
+      factory_match.label_set.emplace_back(label_key, label_val);
     }
     matches_.emplace_back(std::move(factory_match));
   }

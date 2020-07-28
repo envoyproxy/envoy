@@ -113,21 +113,22 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       createClusterImpl(cluster, context, factory_context, std::move(stats_scope));
+  auto& [new_cluster_ptr, load_balance_ptr] = new_cluster_pair;
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
     if (cluster.health_checks().size() != 1) {
       throw EnvoyException("Multiple health checks not supported");
     } else {
-      new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(), context.random(),
+      new_cluster_ptr->setHealthChecker(HealthCheckerFactory::create(
+          cluster.health_checks()[0], *new_cluster_ptr, context.runtime(), context.random(),
           context.dispatcher(), context.logManager(), context.messageValidationVisitor(),
           context.api()));
     }
   }
 
-  new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster_pair.first, cluster, context.dispatcher(), context.runtime(),
+  new_cluster_ptr->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
+      *new_cluster_ptr, cluster, context.dispatcher(), context.runtime(),
       context.outlierEventLogger()));
   return new_cluster_pair;
 }

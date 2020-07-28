@@ -50,10 +50,10 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
   const size_t nvlen = metadata_map.size();
   absl::FixedArray<nghttp2_nv> nva(nvlen);
   size_t i = 0;
-  for (const auto& header : metadata_map) {
-    nva[i++] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.first.data())),
-                const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.second.data())),
-                header.first.size(), header.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
+  for (const auto& [key, val] : metadata_map) {
+    nva[i++] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(key.data())),
+                const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(val.data())), key.size(),
+                val.size(), NGHTTP2_NV_FLAG_NO_INDEX};
   }
 
   // Estimates the upper bound of output payload.

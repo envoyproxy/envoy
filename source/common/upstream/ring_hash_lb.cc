@@ -145,8 +145,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
   double target_hashes = 0.0;
   uint64_t min_hashes_per_host = ring_size;
   uint64_t max_hashes_per_host = 0;
-  for (const auto& entry : normalized_host_weights) {
-    const auto& host = entry.first;
+  for (const auto& [host, host_weight] : normalized_host_weights) {
     const std::string& address_string =
         use_hostname_for_hashing ? host->hostname() : host->address()->asString();
     ASSERT(!address_string.empty());
@@ -157,7 +156,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
 
     // As noted above: maintain current_hashes and target_hashes as running sums across the entire
     // host set. `i` is needed only to construct the hash key, and tally min/max hashes per host.
-    target_hashes += scale * entry.second;
+    target_hashes += scale * host_weight;
     uint64_t i = 0;
     while (current_hashes < target_hashes) {
       const std::string i_str = absl::StrCat("", i);

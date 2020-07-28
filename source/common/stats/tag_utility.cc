@@ -41,9 +41,9 @@ SymbolTable::StoragePtr TagStatNameJoiner::joinNameAndTags(StatName name,
   stat_names.reserve(1 + 2 * tags.size());
   stat_names.emplace_back(name);
 
-  for (const auto& tag : tags) {
-    stat_names.emplace_back(tag.first);
-    stat_names.emplace_back(tag.second);
+  for (const auto& [tag_name, tag] : tags) {
+    stat_names.emplace_back(tag_name);
+    stat_names.emplace_back(tag);
   }
 
   return symbol_table.join(stat_names);

@@ -137,19 +137,18 @@ void SymbolTableImpl::Encoding::decodeTokens(
       ASSERT(size > 1);
       ++array;
       --size;
-      std::pair<uint64_t, size_t> length_consumed = decodeNumber(array);
-      uint64_t length = length_consumed.first;
-      array += length_consumed.second;
-      size -= length_consumed.second;
+      auto const [length, num_bytes_consumed] = decodeNumber(array);
+      array += num_bytes_consumed;
+      size -= num_bytes_consumed;
       ASSERT(size >= length);
       string_view_token_fn(absl::string_view(reinterpret_cast<const char*>(array), length));
       size -= length;
       array += length;
     } else {
-      std::pair<uint64_t, size_t> symbol_consumed = decodeNumber(array);
-      symbol_token_fn(symbol_consumed.first);
-      size -= symbol_consumed.second;
-      array += symbol_consumed.second;
+      auto const [symbol, num_bytes_consumed] = decodeNumber(array);
+      symbol_token_fn(symbol);
+      size -= num_bytes_consumed;
+      array += num_bytes_consumed;
     }
   }
 }
@@ -303,12 +302,12 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
   using LookupCount = std::pair<uint64_t, absl::string_view>;
   std::vector<LookupCount> lookup_data;
   lookup_data.reserve(name_count_map.size());
-  for (const auto& iter : name_count_map) {
-    lookup_data.emplace_back(LookupCount(iter.second, iter.first));
+  for (const auto& [name, count] : name_count_map) {
+    lookup_data.emplace_back(LookupCount(count, name));
   }
   std::sort(lookup_data.begin(), lookup_data.end());
-  for (const LookupCount& lookup_count : lookup_data) {
-    iter(lookup_count.second, lookup_count.first);
+  for (const auto& [count, name] : lookup_data) {
+    iter(name, count);
   }
   return total;
 }
@@ -318,12 +317,10 @@ DynamicSpans SymbolTableImpl::getDynamicSpans(StatName stat_name) const {
 
   uint32_t index = 0;
   auto record_dynamic = [&dynamic_spans, &index](absl::string_view str) {
-    DynamicSpan span;
-    span.first = index;
+    uint32_t left_bound = index, right_bound;
     index += std::count(str.begin(), str.end(), '.');
-    span.second = index;
-    ++index;
-    dynamic_spans.push_back(span);
+    right_bound = index++;
+    dynamic_spans.push_back(DynamicSpan(left_bound, right_bound));
   };
 
   // Use decodeTokens to suss out which components of stat_name are
@@ -425,8 +422,8 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
 void SymbolTableImpl::debugPrint() const {
   Thread::LockGuard lock(lock_);
   std::vector<Symbol> symbols;
-  for (const auto& p : decode_map_) {
-    symbols.push_back(p.first);
+  for (const auto& [key, val] : decode_map_) {
+    symbols.push_back(key);
   }
   std::sort(symbols.begin(), symbols.end());
   for (Symbol symbol : symbols) {

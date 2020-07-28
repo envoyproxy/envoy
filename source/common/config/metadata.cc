@@ -81,8 +81,8 @@ bool Metadata::metadataLabelMatch(const LabelSet& label_set,
   }
   const ProtobufWkt::Struct& data_struct = filter_it->second;
   const auto& fields = data_struct.fields();
-  for (const auto& kv : label_set) {
-    const auto entry_it = fields.find(kv.first);
+  for (const auto& [key, val] : label_set) {
+    const auto entry_it = fields.find(key);
     if (entry_it == fields.end()) {
       return false;
     }
@@ -90,7 +90,7 @@ bool Metadata::metadataLabelMatch(const LabelSet& label_set,
     if (list_as_any && entry_it->second.kind_case() == ProtobufWkt::Value::kListValue) {
       bool any_match = false;
       for (const auto& v : entry_it->second.list_value().values()) {
-        if (ValueUtil::equal(v, kv.second)) {
+        if (ValueUtil::equal(v, val)) {
           any_match = true;
           break;
         }
@@ -98,7 +98,7 @@ bool Metadata::metadataLabelMatch(const LabelSet& label_set,
       if (!any_match) {
         return false;
       }
-    } else if (!ValueUtil::equal(entry_it->second, kv.second)) {
+    } else if (!ValueUtil::equal(entry_it->second, val)) {
       return false;
     }
   }

@@ -115,10 +115,10 @@ protected:
    */
   void populateFrom(const envoy::config::core::v3::Metadata& metadata) {
     auto& data_by_key = metadata.filter_metadata();
-    for (const auto& it : Registry::FactoryRegistry<factoryClass>::factories()) {
-      const auto& meta_iter = data_by_key.find(it.first);
+    for (const auto& [name, factory_base] : Registry::FactoryRegistry<factoryClass>::factories()) {
+      const auto& meta_iter = data_by_key.find(name);
       if (meta_iter != data_by_key.end()) {
-        data_[it.second->name()] = it.second->parse(meta_iter->second);
+        data_[factory_base->name()] = factory_base->parse(meta_iter->second);
       }
     }
   }

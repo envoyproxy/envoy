@@ -177,27 +177,30 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
 
   std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
-  for (const auto& it : config.typed_extension_protocol_options()) {
+  for (const auto& [config_name, protocol_config] : config.typed_extension_protocol_options()) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
     // We only handle deprecated network filter names here because no existing HTTP filter has
     // protocol options.
-    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+    auto& name =
+        Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(config_name);
 
     auto object = createProtocolOptionsConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
+        name, protocol_config, ProtobufWkt::Struct::default_instance(), validation_visitor);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
   }
 
-  for (const auto& it : config.hidden_envoy_deprecated_extension_protocol_options()) {
+  for (const auto& [config_name, protocol_config] :
+       config.hidden_envoy_deprecated_extension_protocol_options()) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
     // We only handle deprecated network filter names here because no existing HTTP filter has
     // protocol options.
-    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+    auto& name =
+        Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(config_name);
 
-    auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
-                                              validation_visitor);
+    auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(),
+                                              protocol_config, validation_visitor);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -1219,11 +1222,12 @@ void PriorityStateManager::initializePriorityFor(
   if (priority_state_.size() <= priority) {
     priority_state_.resize(priority + 1);
   }
-  if (priority_state_[priority].first == nullptr) {
-    priority_state_[priority].first = std::make_unique<HostVector>();
+  auto& [hosts, hosts_weight_map] = priority_state_[priority];
+  if (hosts == nullptr) {
+    hosts = std::make_unique<HostVector>();
   }
   if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
-    priority_state_[priority].second[locality_lb_endpoint.locality()] =
+    hosts_weight_map[locality_lb_endpoint.locality()] =
         locality_lb_endpoint.load_balancing_weight().value();
   }
 }
@@ -1247,8 +1251,9 @@ void PriorityStateManager::registerHostForPriority(
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) {
   const uint32_t priority = locality_lb_endpoint.priority();
   // Should be called after initializePriorityFor.
-  ASSERT(priority_state_[priority].first);
-  priority_state_[priority].first->emplace_back(host);
+  const auto& [hosts, hosts_weight_map] = priority_state_[priority];
+  ASSERT(hosts);
+  hosts->emplace_back(host);
 }
 
 void PriorityStateManager::updateClusterPrioritySet(
@@ -1304,11 +1309,11 @@ void PriorityStateManager::updateClusterPrioritySet(
 
   // After the local locality hosts (if any), we place the remaining locality host groups in
   // lexicographic order. This provides a stable ordering for zone aware routing.
-  for (auto& entry : hosts_per_locality) {
-    if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
-      per_locality.emplace_back(entry.second);
+  for (auto& [host_locality, hosts] : hosts_per_locality) {
+    if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, host_locality)) {
+      per_locality.emplace_back(hosts);
       if (locality_weighted_lb) {
-        locality_weights->emplace_back(locality_weights_map[entry.first]);
+        locality_weights->emplace_back(locality_weights_map[host_locality]);
       }
     }
   }

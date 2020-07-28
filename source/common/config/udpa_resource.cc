@@ -37,10 +37,10 @@ std::string encodeIdPath(const Protobuf::RepeatedPtrField<std::string>& id) {
 std::string encodeContextParams(const udpa::core::v1::ContextParams& context_params,
                                 bool sort_context_params) {
   std::vector<std::string> query_param_components;
-  for (const auto& context_param : context_params.params()) {
+  for (const auto& [context_param_key, context_param_val] : context_params.params()) {
     query_param_components.emplace_back(
-        absl::StrCat(PercentEncoding::encode(context_param.first, "%#[]&="), "=",
-                     PercentEncoding::encode(context_param.second, "%#[]&=")));
+        absl::StrCat(PercentEncoding::encode(context_param_key, "%#[]&="), "=",
+                     PercentEncoding::encode(context_param_val, "%#[]&=")));
   }
   if (sort_context_params) {
     std::sort(query_param_components.begin(), query_param_components.end());
@@ -132,9 +132,9 @@ void decodeQueryParams(absl::string_view query_params,
                        udpa::core::v1::ContextParams& context_params) {
   Http::Utility::QueryParams query_params_components =
       Http::Utility::parseQueryString(query_params);
-  for (const auto& it : query_params_components) {
-    (*context_params.mutable_params())[PercentEncoding::decode(it.first)] =
-        PercentEncoding::decode(it.second);
+  for (const auto& [component_key, component_value] : query_params_components) {
+    (*context_params.mutable_params())[PercentEncoding::decode(component_key)] =
+        PercentEncoding::decode(component_value);
   }
 }
 

@@ -196,23 +196,19 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // We start of with a total load of 100 and distribute it between priorities based on
   // availability. We first attempt to distribute this load to healthy priorities based on healthy
   // availability.
-  const auto first_healthy_and_remaining =
+  const auto [first_healthy, remaining_load_for_degraded] =
       distributeLoad(per_priority_load.healthy_priority_load_, per_priority_health, 100,
                      normalized_total_availability);
 
   // Using the remaining load after allocating load to healthy priorities, distribute it based on
   // degraded availability.
-  const auto remaining_load_for_degraded = first_healthy_and_remaining.second;
-  const auto first_degraded_and_remaining =
+  const auto [first_degraded, remaining_load] =
       distributeLoad(per_priority_load.degraded_priority_load_, per_priority_degraded,
                      remaining_load_for_degraded, normalized_total_availability);
 
   // Anything that remains should just be rounding errors, so allocate that to the first available
   // priority, either as healthy or degraded.
-  const auto remaining_load = first_degraded_and_remaining.second;
   if (remaining_load != 0) {
-    const auto first_healthy = first_healthy_and_remaining.first;
-    const auto first_degraded = first_degraded_and_remaining.first;
     ASSERT(first_healthy != -1 || first_degraded != -1);
 
     // Attempt to allocate the remainder to the first healthy priority first. If no such priority
@@ -326,18 +322,16 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
     const auto priority_loads = context->determinePriorityLoad(
         priority_set_, per_priority_load_, Upstream::RetryPriority::defaultPriorityMapping);
 
-    const auto priority_and_source =
+    const auto [priority, host_availability] =
         choosePriority(random_.random(), priority_loads.healthy_priority_load_,
                        priority_loads.degraded_priority_load_);
-    return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
-            priority_and_source.second};
+    return {*priority_set_.hostSetsPerPriority()[priority], host_availability};
   }
 
-  const auto priority_and_source =
+  const auto [priority, host_availability] =
       choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
                      per_priority_load_.degraded_priority_load_);
-  return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
-          priority_and_source.second};
+  return {*priority_set_.hostSetsPerPriority()[priority], host_availability};
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
@@ -609,11 +603,9 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 
 absl::optional<ZoneAwareLoadBalancerBase::HostsSource>
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
-  auto host_set_and_source = chooseHostSet(context);
-
   // The second argument tells us which availability we should target from the selected host set.
-  const auto host_availability = host_set_and_source.second;
-  auto& host_set = host_set_and_source.first;
+  auto [host_set, host_availability] = chooseHostSet(context);
+
   HostsSource hosts_source;
   hosts_source.priority_ = host_set.priority();
 

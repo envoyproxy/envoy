@@ -187,8 +187,8 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
 }
 
 bool HttpHealthCheckerImpl::HttpStatusChecker::inRange(uint64_t http_status) const {
-  for (const auto& range : ranges_) {
-    if (http_status >= range.first && http_status < range.second) {
+  for (const auto& [start, end] : ranges_) {
+    if (http_status >= start && http_status < end) {
       return true;
     }
   }

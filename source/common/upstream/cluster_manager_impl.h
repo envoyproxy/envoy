@@ -216,8 +216,8 @@ public:
   ClusterInfoMap clusters() override {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     ClusterInfoMap clusters_map;
-    for (auto& cluster : active_clusters_) {
-      clusters_map.emplace(cluster.first, *cluster.second->cluster_);
+    for (auto& [cluster_name, cluster_data] : active_clusters_) {
+      clusters_map.emplace(cluster_name, *cluster_data->cluster_);
     }
 
     return clusters_map;

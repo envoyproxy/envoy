@@ -44,12 +44,13 @@ void StaticClusterImpl::startPreInit() {
 
   auto& priority_state = priority_state_manager_->priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
-    if (priority_state[i].first == nullptr) {
-      priority_state[i].first = std::make_unique<HostVector>();
+    auto& hosts = priority_state[i].first;
+    if (hosts == nullptr) {
+      hosts = std::make_unique<HostVector>();
     }
-    priority_state_manager_->updateClusterPrioritySet(
-        i, std::move(priority_state[i].first), absl::nullopt, absl::nullopt, health_checker_flag,
-        overprovisioning_factor_);
+    priority_state_manager_->updateClusterPrioritySet(i, std::move(hosts), absl::nullopt,
+                                                      absl::nullopt, health_checker_flag,
+                                                      overprovisioning_factor_);
   }
   priority_state_manager_.reset();
 

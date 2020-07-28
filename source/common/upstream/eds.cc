@@ -76,10 +76,11 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
     if (parent_.locality_weights_map_.size() <= i) {
       parent_.locality_weights_map_.resize(i + 1);
     }
-    if (priority_state[i].first != nullptr) {
+    auto& [host_list_ptr, locality_weights_map] = priority_state[i];
+    if (host_list_ptr != nullptr) {
       cluster_rebuilt |= parent_.updateHostsPerLocality(
-          i, overprovisioning_factor, *priority_state[i].first, parent_.locality_weights_map_[i],
-          priority_state[i].second, priority_state_manager, updated_hosts);
+          i, overprovisioning_factor, *host_list_ptr, parent_.locality_weights_map_[i],
+          locality_weights_map, priority_state_manager, updated_hosts);
     } else {
       // If the new update contains a priority with no hosts, call the update function with an empty
       // set of hosts.

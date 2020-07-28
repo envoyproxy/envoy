@@ -67,10 +67,10 @@ void validateCustomSettingsParameters(
   for (const auto& it : options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     // Check for custom parameter inconsistencies.
-    const auto result = custom_parameters.insert(
+    const auto [result_it, status] = custom_parameters.insert(
         {static_cast<int32_t>(it.identifier().value()), it.value().value()});
-    if (!result.second) {
-      if (result.first->value != it.value().value()) {
+    if (!status) {
+      if (result_it->value != it.value().value()) {
         custom_parameter_collisions.push_back(
             absl::StrCat("0x", absl::Hex(it.identifier().value(), absl::kZeroPad2)));
         // Fall through to allow unbatched exceptions to throw first.
@@ -707,8 +707,8 @@ RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri
 std::string Utility::queryParamsToString(const QueryParams& params) {
   std::string out;
   std::string delim = "?";
-  for (const auto& p : params) {
-    absl::StrAppend(&out, delim, p.first, "=", p.second);
+  for (const auto& [name, value] : params) {
+    absl::StrAppend(&out, delim, name, "=", value);
     delim = "&";
   }
   return out;

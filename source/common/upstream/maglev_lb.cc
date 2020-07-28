@@ -24,14 +24,13 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
   // Implementation of pseudocode listing 1 in the paper (see header file for more info).
   std::vector<TableBuildEntry> table_build_entries;
   table_build_entries.reserve(normalized_host_weights.size());
-  for (const auto& host_weight : normalized_host_weights) {
-    const auto& host = host_weight.first;
+  for (const auto& [host, host_weight] : normalized_host_weights) {
     const std::string& address =
         use_hostname_for_hashing ? host->hostname() : host->address()->asString();
     ASSERT(!address.empty());
     table_build_entries.emplace_back(host, HashUtil::xxHash64(address) % table_size_,
                                      (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
-                                     host_weight.second);
+                                     host_weight);
   }
 
   table_.resize(table_size_);

@@ -277,32 +277,31 @@ void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
   }
   case Type::Object: {
     value.SetObject();
-    for (const auto& item : field.value_.object_value_) {
-      auto name = rapidjson::StringRef(item.first.c_str());
+    for (const auto& [key, val] : field.value_.object_value_) {
+      auto name = rapidjson::StringRef(key.c_str());
 
-      switch (item.second->type_) {
+      switch (val->type_) {
       case Type::Array:
       case Type::Object: {
         rapidjson::Value nested_value;
-        buildRapidJsonDocument(*item.second, nested_value, allocator);
+        buildRapidJsonDocument(*val, nested_value, allocator);
         value.AddMember(name, nested_value, allocator);
         break;
       }
       case Type::Boolean:
-        value.AddMember(name, item.second->value_.boolean_value_, allocator);
+        value.AddMember(name, val->value_.boolean_value_, allocator);
         break;
       case Type::Double:
-        value.AddMember(name, item.second->value_.double_value_, allocator);
+        value.AddMember(name, val->value_.double_value_, allocator);
         break;
       case Type::Integer:
-        value.AddMember(name, item.second->value_.integer_value_, allocator);
+        value.AddMember(name, val->value_.integer_value_, allocator);
         break;
       case Type::Null:
         value.AddMember(name, rapidjson::Value(), allocator);
         break;
       case Type::String:
-        value.AddMember(name, rapidjson::StringRef(item.second->value_.string_value_.c_str()),
-                        allocator);
+        value.AddMember(name, rapidjson::StringRef(val->value_.string_value_.c_str()), allocator);
         break;
       }
     }
@@ -502,8 +501,8 @@ bool Field::hasObject(const std::string& name) const {
 
 void Field::iterate(const ObjectCallback& callback) const {
   checkType(Type::Object);
-  for (const auto& item : value_.object_value_) {
-    bool stop_iteration = !callback(item.first, *item.second);
+  for (const auto& [name, field_shared_ptr] : value_.object_value_) {
+    bool stop_iteration = !callback(name, *field_shared_ptr);
     if (stop_iteration) {
       break;
     }

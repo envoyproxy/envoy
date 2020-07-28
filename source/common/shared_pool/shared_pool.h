@@ -79,10 +79,10 @@ public:
 
     // When inserted, it is possible that the old elements still exist before they can be deleted,
     // and the insertion will fail and therefore need to be overwritten.
-    auto ret = object_pool_.try_emplace(hashed_value, obj_shared);
-    if (!ret.second) {
-      ASSERT(ret.first->second.use_count() == 0);
-      ret.first->second = obj_shared;
+    auto [iter, status] = object_pool_.try_emplace(hashed_value, obj_shared);
+    if (!status) {
+      ASSERT(iter->second.use_count() == 0);
+      iter->second = obj_shared;
     }
     return obj_shared;
   }

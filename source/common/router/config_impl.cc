@@ -125,20 +125,20 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
 std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
   std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
 
-  for (const auto& config : retry_host_predicate_configs_) {
-    predicates.emplace_back(config.first.createHostPredicate(*config.second, num_retries_));
+  for (const auto& [config_factory, msg_ptr] : retry_host_predicate_configs_) {
+    predicates.emplace_back(config_factory.createHostPredicate(*msg_ptr, num_retries_));
   }
 
   return predicates;
 }
 
 Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
-  if (retry_priority_config_.first == nullptr) {
+  auto const& [retry_priority_factory, msg_ptr] = retry_priority_config_;
+  if (retry_priority_factory == nullptr) {
     return nullptr;
   }
 
-  return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
-                                                           *validation_visitor_, num_retries_);
+  return retry_priority_factory->createRetryPriority(*msg_ptr, *validation_visitor_, num_retries_);
 }
 
 InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
@@ -160,9 +160,9 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
 
 std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::predicates() const {
   std::vector<InternalRedirectPredicateSharedPtr> predicates;
-  for (const auto& predicate_factory : predicate_factories_) {
-    predicates.emplace_back(predicate_factory.first->createInternalRedirectPredicate(
-        *predicate_factory.second, current_route_name_));
+  for (const auto& [predicate_factory, msg_ptr] : predicate_factories_) {
+    predicates.emplace_back(
+        predicate_factory->createInternalRedirectPredicate(*msg_ptr, current_route_name_));
   }
   return predicates;
 }
@@ -734,9 +734,9 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
           "http filter", DEPRECATED_ROUTER_NAME,
           Extensions::HttpFilters::HttpFilterNames::get().Router);
     }
-    for (const auto& it : filter_metadata->second.fields()) {
-      if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
-        ret.emplace(it.first, it.second.string_value());
+    for (const auto& [key, val] : filter_metadata->second.fields()) {
+      if (val.kind_case() == ProtobufWkt::Value::kStringValue) {
+        ret.emplace(key, val.string_value());
       }
     }
   }
@@ -1168,11 +1168,9 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
   // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
   // wildcards). This is done by scanning the length => wildcards map looking for every wildcard
   // whose size is < length.
-  for (const auto& iter : wildcard_virtual_hosts) {
-    const uint32_t wildcard_length = iter.first;
-    const auto& wildcard_map = iter.second;
+  for (const auto& [wildcard_length, wildcard_map] : wildcard_virtual_hosts) {
     // >= because *.foo.com shouldn't match .foo.com.
-    if (wildcard_length >= host.size()) {
+    if (static_cast<const uint32_t>(wildcard_length) >= host.size()) {
       continue;
     }
     const auto& match = wildcard_map.find(substring_function(host, wildcard_length));
@@ -1395,25 +1393,25 @@ PerFilterConfigs::PerFilterConfigs(
     throw EnvoyException("Only one of typed_configs or configs can be specified");
   }
 
-  for (const auto& it : typed_configs) {
+  for (const auto& [typed_name, typed_config] : typed_configs) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
     const auto& name =
-        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(typed_name);
 
     auto object = createRouteSpecificFilterConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
+        name, typed_config, ProtobufWkt::Struct::default_instance(), factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
     }
   }
 
-  for (const auto& it : configs) {
+  for (const auto& [config_name, config] : configs) {
     // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
     const auto& name =
-        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(config_name);
 
     auto object = createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(),
-                                                  it.second, factory_context, validator);
+                                                  config, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
     }

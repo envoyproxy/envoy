@@ -359,14 +359,14 @@ void GoogleAsyncStreamImpl::metadataTranslate(
     Http::HeaderMap& header_map) {
   // More painful copying, this time due to the mismatch in header
   // representation data structures in Envoy and Google gRPC.
-  for (const auto& it : grpc_metadata) {
-    auto key = Http::LowerCaseString(std::string(it.first.data(), it.first.size()));
+  for (const auto& [metadata_key, metadata_val] : grpc_metadata) {
+    auto key = Http::LowerCaseString(std::string(metadata_key.data(), metadata_key.size()));
     if (absl::EndsWith(key.get(), "-bin")) {
-      auto value = Base64::encode(it.second.data(), it.second.size());
+      auto value = Base64::encode(metadata_val.data(), metadata_val.size());
       header_map.addCopy(key, value);
       continue;
     }
-    header_map.addCopy(key, std::string(it.second.data(), it.second.size()));
+    header_map.addCopy(key, std::string(metadata_val.data(), metadata_val.size()));
   }
 }
 

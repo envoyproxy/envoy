@@ -63,8 +63,8 @@ public:
     // produce a new list of up to 2*N prefixes to insert in the LC trie. And the LC trie can
     // use up to 2*N/fill_factor nodes.
     size_t num_prefixes = 0;
-    for (const auto& pair_data : data) {
-      num_prefixes += pair_data.second.size();
+    for (const auto& [key, cidr_ranges] : data) {
+      num_prefixes += cidr_ranges.size();
     }
     const size_t max_prefixes = MaxLcTrieNodes * fill_factor / 2;
     if (num_prefixes > max_prefixes) {
@@ -101,15 +101,15 @@ public:
 
     BinaryTrie<Ipv4> ipv4_temp(exclusive);
     BinaryTrie<Ipv6> ipv6_temp(exclusive);
-    for (const auto& pair_data : data) {
-      for (const auto& cidr_range : pair_data.second) {
+    for (const auto& [key, cidr_ranges] : data) {
+      for (const auto& cidr_range : cidr_ranges) {
         if (cidr_range.ip()->version() == Address::IpVersion::v4) {
           IpPrefix<Ipv4> ip_prefix(ntohl(cidr_range.ip()->ipv4()->address()), cidr_range.length(),
-                                   pair_data.first);
+                                   key);
           ipv4_temp.insert(ip_prefix);
         } else {
           IpPrefix<Ipv6> ip_prefix(Utility::Ip6ntohl(cidr_range.ip()->ipv6()->address()),
-                                   cidr_range.length(), pair_data.first);
+                                   cidr_range.length(), key);
           ipv6_temp.insert(ip_prefix);
         }
       }

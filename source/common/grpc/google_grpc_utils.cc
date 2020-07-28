@@ -116,14 +116,14 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
 grpc::ChannelArguments
 GoogleGrpcUtils::channelArgsFromConfig(const envoy::config::core::v3::GrpcService& config) {
   grpc::ChannelArguments args;
-  for (const auto& channel_arg : config.google_grpc().channel_args().args()) {
-    switch (channel_arg.second.value_specifier_case()) {
+  for (const auto& [key, value] : config.google_grpc().channel_args().args()) {
+    switch (value.value_specifier_case()) {
     case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kStringValue: {
-      args.SetString(channel_arg.first, channel_arg.second.string_value());
+      args.SetString(key, value.string_value());
       break;
     }
     case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kIntValue: {
-      args.SetInt(channel_arg.first, channel_arg.second.int_value());
+      args.SetInt(key, value.int_value());
       break;
     }
     default:

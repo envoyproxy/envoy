@@ -56,8 +56,8 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
     new_pool->addDrainedCallback(cb);
   }
 
-  auto inserted = active_pools_.emplace(key, std::move(new_pool));
-  return std::ref(*inserted.first->second);
+  auto [inserted_iter, status] = active_pools_.emplace(key, std::move(new_pool));
+  return std::ref(*inserted_iter->second);
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -67,8 +67,8 @@ size_t ConnPoolMap<KEY_TYPE, POOL_TYPE>::size() const {
 
 template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL_TYPE>::clear() {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
-  for (auto& pool_pair : active_pools_) {
-    thread_local_dispatcher_.deferredDelete(std::move(pool_pair.second));
+  for (auto& [pool_key, pool] : active_pools_) {
+    thread_local_dispatcher_.deferredDelete(std::move(pool));
   }
   clearActivePools();
 }
@@ -76,8 +76,8 @@ template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL
 template <typename KEY_TYPE, typename POOL_TYPE>
 void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
-  for (auto& pool_pair : active_pools_) {
-    pool_pair.second->addDrainedCallback(cb);
+  for (auto& [pool_key, pool] : active_pools_) {
+    pool->addDrainedCallback(cb);
   }
 
   cached_callbacks_.emplace_back(std::move(cb));
@@ -86,8 +86,8 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
 template <typename KEY_TYPE, typename POOL_TYPE>
 void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
-  for (auto& pool_pair : active_pools_) {
-    pool_pair.second->drainConnections();
+  for (auto& [pool_key, pool] : active_pools_) {
+    pool->drainConnections();
   }
 }
 

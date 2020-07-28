@@ -74,9 +74,9 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
 template <class StatMapClass, class StatListClass>
 void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
   StatNameVec remove_list;
-  for (auto& stat : map) {
-    if (rejects(stat.first)) {
-      remove_list.push_back(stat.first);
+  for (auto& [stat_name, stat_val] : map) {
+    if (rejects(stat_name)) {
+      remove_list.push_back(stat_name);
     }
   }
   for (StatName stat_name : remove_list) {
@@ -107,9 +107,9 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto& counter : scope->central_cache_->counters_) {
-      if (names.insert(counter.first).second) {
-        ret.push_back(counter.second);
+    for (auto& [counter_name, counter_ptr] : scope->central_cache_->counters_) {
+      if (names.insert(counter_name).second) {
+        ret.push_back(counter_ptr);
       }
     }
   }
@@ -130,10 +130,9 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto& gauge_iter : scope->central_cache_->gauges_) {
-      const GaugeSharedPtr& gauge = gauge_iter.second;
+    for (const auto& [gauge_name, gauge] : scope->central_cache_->gauges_) {
       if (gauge->importMode() != Gauge::ImportMode::Uninitialized &&
-          names.insert(gauge_iter.first).second) {
+          names.insert(gauge_name).second) {
         ret.push_back(gauge);
       }
     }
@@ -148,9 +147,9 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto& text_readout : scope->central_cache_->text_readouts_) {
-      if (names.insert(text_readout.first).second) {
-        ret.push_back(text_readout.second);
+    for (auto& [text_readout_name, text_readout_ptr] : scope->central_cache_->text_readouts_) {
+      if (names.insert(text_readout_name).second) {
+        ret.push_back(text_readout_ptr);
       }
     }
   }
@@ -167,8 +166,7 @@ std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   // in histograms with duplicate names, but until shared storage is implemented it's ultimately
   // less confusing for users who have such configs.
   for (ScopeImpl* scope : scopes_) {
-    for (const auto& name_histogram_pair : scope->central_cache_->histograms_) {
-      const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
+    for (const auto& [name, parent_hist] : scope->central_cache_->histograms_) {
       ret.push_back(parent_hist);
     }
   }
@@ -197,10 +195,9 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
         [this]() -> void {
-          for (const auto& scope : tls_->getTyped<TlsCache>().scope_cache_) {
-            const TlsCacheEntry& tls_cache_entry = scope.second;
-            for (const auto& name_histogram_pair : tls_cache_entry.histograms_) {
-              const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
+          for (const auto& [scope_name, tls_cache_entry] :
+               tls_->getTyped<TlsCache>().scope_cache_) {
+            for (const auto& [tls_hist_name, tls_hist] : tls_cache_entry.histograms_) {
               tls_hist->beginMerge();
             }
           }

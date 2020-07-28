@@ -62,8 +62,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
-  for (const auto& cluster_name_and_timestamp : clusters_) {
-    const std::string& cluster_name = cluster_name_and_timestamp.first;
+  for (const auto& [cluster_name, cluster_timestamp] : clusters_) {
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {
@@ -104,7 +103,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     cluster_stats->set_total_dropped_requests(
         cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
     const auto now = time_source_.monotonicTime().time_since_epoch();
-    const auto measured_interval = now - cluster_name_and_timestamp.second;
+    const auto measured_interval = now - cluster_timestamp;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
             std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
@@ -154,8 +153,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // converge.
   std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
-    for (const auto& p : cm_.clusters()) {
-      const std::string& cluster_name = p.first;
+    for (const auto& [cluster_name, cluster_data] : cm_.clusters()) {
       if (clusters_.count(cluster_name) > 0) {
         existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
       }
@@ -193,8 +191,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
   };
   if (message_->send_all_clusters()) {
-    for (const auto& p : cm_.clusters()) {
-      const std::string& cluster_name = p.first;
+    for (const auto& [cluster_name, cluster_data] : cm_.clusters()) {
       handle_cluster_func(cluster_name);
     }
   } else {

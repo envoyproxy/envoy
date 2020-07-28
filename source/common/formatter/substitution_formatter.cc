@@ -112,8 +112,8 @@ std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
 JsonFormatterImpl::JsonFormatterImpl(
     const absl::flat_hash_map<std::string, std::string>& format_mapping, bool preserve_types)
     : preserve_types_(preserve_types) {
-  for (const auto& pair : format_mapping) {
-    json_output_format_.emplace(pair.first, SubstitutionFormatParser::parse(pair.second));
+  for (const auto& [key, format] : format_mapping) {
+    json_output_format_.emplace(key, SubstitutionFormatParser::parse(format));
   }
 }
 
@@ -136,8 +136,7 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
                                                 absl::string_view local_reply_body) const {
   ProtobufWkt::Struct output;
   auto* fields = output.mutable_fields();
-  for (const auto& pair : json_output_format_) {
-    const auto& providers = pair.second;
+  for (const auto& [key, providers] : json_output_format_) {
     ASSERT(!providers.empty());
 
     if (providers.size() == 1) {
@@ -148,7 +147,7 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
                           : ValueUtil::stringValue(
                                 provider->format(request_headers, response_headers,
                                                  response_trailers, stream_info, local_reply_body));
-      (*fields)[pair.first] = val;
+      (*fields)[key] = val;
     } else {
       // Multiple providers forces string output.
       std::string str;
@@ -156,7 +155,7 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& re
         str += provider->format(request_headers, response_headers, response_trailers, stream_info,
                                 local_reply_body);
       }
-      (*fields)[pair.first] = ValueUtil::stringValue(str);
+      (*fields)[key] = ValueUtil::stringValue(str);
     }
   }
   return output;

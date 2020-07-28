@@ -9,11 +9,11 @@ namespace {
 absl::flat_hash_map<std::string, std::string>
 convertJsonFormatToMap(const ProtobufWkt::Struct& json_format) {
   absl::flat_hash_map<std::string, std::string> output;
-  for (const auto& pair : json_format.fields()) {
-    if (pair.second.kind_case() != ProtobufWkt::Value::kStringValue) {
+  for (const auto& [key, value] : json_format.fields()) {
+    if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
       throw EnvoyException("Only string values are supported in the JSON access log format.");
     }
-    output.emplace(pair.first, pair.second.string_value());
+    output.emplace(key, value.string_value());
   }
   return output;
 }

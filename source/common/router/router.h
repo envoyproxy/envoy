@@ -103,8 +103,8 @@ public:
                                                  const ParseRetryFlagsFunc& parse_fn) {
       HeaderCheckResult r;
       if (header_entry) {
-        const auto flags_and_validity = parse_fn(header_entry->value().getStringView());
-        r.valid_ = flags_and_validity.second;
+        const auto [flags, validity] = parse_fn(header_entry->value().getStringView());
+        r.valid_ = validity;
         r.entry_ = header_entry;
       }
       return r;

@@ -266,8 +266,8 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
 }
 
 DetectorImpl::~DetectorImpl() {
-  for (const auto& host : host_monitors_) {
-    if (host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+  for (const auto& [host_shared_ptr, host_monitor] : host_monitors_) {
+    if (host_shared_ptr->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
       ASSERT(ejections_active_helper_.value() > 0);
       ejections_active_helper_.dec();
     }
@@ -613,31 +613,31 @@ void DetectorImpl::processSuccessRateEjections(
   valid_success_rate_hosts.reserve(host_monitors_.size());
   valid_failure_percentage_hosts.reserve(host_monitors_.size());
 
-  for (const auto& host : host_monitors_) {
+  for (const auto& [host_shared_ptr, host_monitor] : host_monitors_) {
     // Don't do work if the host is already ejected.
-    if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+    if (!host_shared_ptr->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
       absl::optional<std::pair<double, uint64_t>> host_success_rate_and_volume =
-          host.second->getSRMonitor(monitor_type)
+          host_monitor->getSRMonitor(monitor_type)
               .successRateAccumulator()
               .getSuccessRateAndVolume();
 
       if (!host_success_rate_and_volume) {
         continue;
       }
-      double success_rate = host_success_rate_and_volume.value().first;
-      double request_volume = host_success_rate_and_volume.value().second;
+      auto [success_rate, request_volume] = host_success_rate_and_volume.value();
 
       if (request_volume >=
           std::min(success_rate_request_volume, failure_percentage_request_volume)) {
-        host.second->successRate(monitor_type, success_rate);
+        host_monitor->successRate(monitor_type, success_rate);
       }
 
       if (request_volume >= success_rate_request_volume) {
-        valid_success_rate_hosts.emplace_back(HostSuccessRatePair(host.first, success_rate));
+        valid_success_rate_hosts.emplace_back(HostSuccessRatePair(host_shared_ptr, success_rate));
         success_rate_sum += success_rate;
       }
       if (request_volume >= failure_percentage_request_volume) {
-        valid_failure_percentage_hosts.emplace_back(HostSuccessRatePair(host.first, success_rate));
+        valid_failure_percentage_hosts.emplace_back(
+            HostSuccessRatePair(host_shared_ptr, success_rate));
       }
     }
   }
@@ -689,15 +689,15 @@ void DetectorImpl::processSuccessRateEjections(
 void DetectorImpl::onIntervalTimer() {
   MonotonicTime now = time_source_.monotonicTime();
 
-  for (auto host : host_monitors_) {
-    checkHostForUneject(host.first, host.second, now);
+  for (auto [host_shared_ptr, host_monitor] : host_monitors_) {
+    checkHostForUneject(host_shared_ptr, host_monitor, now);
 
     // Need to update the writer bucket to keep the data valid.
-    host.second->updateCurrentSuccessRateBucket();
+    host_monitor->updateCurrentSuccessRateBucket();
     // Refresh host success rate stat for the /clusters endpoint. If there is a new valid value, it
     // will get updated in processSuccessRateEjections().
-    host.second->successRate(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin, -1);
-    host.second->successRate(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin, -1);
+    host_monitor->successRate(DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin, -1);
+    host_monitor->successRate(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin, -1);
   }
 
   processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin);

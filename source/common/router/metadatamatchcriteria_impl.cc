@@ -20,12 +20,12 @@ MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCrite
   }
 
   // Add values from matches, replacing name/values copied from parent.
-  for (const auto& it : matches.fields()) {
-    const auto index_it = existing.find(it.first);
+  for (const auto& [name, hashed_value] : matches.fields()) {
+    const auto index_it = existing.find(name);
     if (index_it != existing.end()) {
-      v[index_it->second] = std::make_shared<MetadataMatchCriterionImpl>(it.first, it.second);
+      v[index_it->second] = std::make_shared<MetadataMatchCriterionImpl>(name, hashed_value);
     } else {
-      v.emplace_back(std::make_shared<MetadataMatchCriterionImpl>(it.first, it.second));
+      v.emplace_back(std::make_shared<MetadataMatchCriterionImpl>(name, hashed_value));
     }
   }
 

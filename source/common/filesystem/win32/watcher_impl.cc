@@ -43,9 +43,9 @@ WatcherImpl::~WatcherImpl() {
 
   watch_thread_->join();
 
-  for (auto& entry : callback_map_) {
-    ::CloseHandle(entry.second->dir_handle_);
-    ::CloseHandle(entry.second->overlapped_.hEvent);
+  for (auto& [entry_name, directory_watch_entry] : callback_map_) {
+    ::CloseHandle(directory_watch_entry->dir_handle_);
+    ::CloseHandle(directory_watch_entry->overlapped_.hEvent);
   }
   ::CloseHandle(thread_exit_event_);
   ::closesocket(event_read_);
@@ -240,8 +240,8 @@ void WatcherImpl::watchLoop() {
     }
   }
 
-  for (auto& entry : callback_map_) {
-    ::CancelIoEx(entry.second->dir_handle_, nullptr);
+  for (auto& [entry_name, directory_watch_entry] : callback_map_) {
+    ::CancelIoEx(directory_watch_entry->dir_handle_, nullptr);
   }
 
   const int num_directories = dir_watch_complete_events_.size();

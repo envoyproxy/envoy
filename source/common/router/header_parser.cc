@@ -275,13 +275,13 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
     headers.remove(header);
   }
 
-  for (const auto& formatter : headers_to_add_) {
-    const std::string value = formatter.second->format(stream_info);
+  for (const auto& [key, formatter] : headers_to_add_) {
+    const std::string value = formatter->format(stream_info);
     if (!value.empty()) {
-      if (formatter.second->append()) {
-        headers.addReferenceKey(formatter.first, value);
+      if (formatter->append()) {
+        headers.addReferenceKey(key, value);
       } else {
-        headers.setReferenceKey(formatter.first, value);
+        headers.setReferenceKey(key, value);
       }
     }
   }

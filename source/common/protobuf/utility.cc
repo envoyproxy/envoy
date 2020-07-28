@@ -629,9 +629,9 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const st
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std::string>& fields) {
   ProtobufWkt::Struct struct_obj;
   ProtobufWkt::Value val;
-  for (const auto& pair : fields) {
-    val.set_string_value(pair.second);
-    (*struct_obj.mutable_fields())[pair.first] = val;
+  for (const auto& [field_key, field_val] : fields) {
+    val.set_string_value(field_val);
+    (*struct_obj.mutable_fields())[field_key] = val;
   }
   return struct_obj;
 }
@@ -825,13 +825,13 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
     if (s1.fields_size() != s2.fields_size()) {
       return false;
     }
-    for (const auto& it1 : s1.fields()) {
-      const auto& it2 = s2.fields().find(it1.first);
+    for (const auto& [s1_key, s1_val] : s1.fields()) {
+      const auto& it2 = s2.fields().find(s1_key);
       if (it2 == s2.fields().end()) {
         return false;
       }
 
-      if (!equal(it1.second, it2->second)) {
+      if (!equal(s1_val, it2->second)) {
         return false;
       }
     }

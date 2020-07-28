@@ -73,8 +73,8 @@ MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
 HealthCheckerImplBase::~HealthCheckerImplBase() {
   // ASSERTs inside the session destructor check to make sure we have been previously deferred
   // deleted. Unify that logic here before actual destruction happens.
-  for (auto& session : active_sessions_) {
-    session.second->onDeferredDeleteBase();
+  for (auto& [host, active_session] : active_sessions_) {
+    active_session->onDeferredDeleteBase();
   }
 }
 

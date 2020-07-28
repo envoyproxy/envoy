@@ -97,8 +97,8 @@ private:
 
     std::vector<std::shared_ptr<SecretType>> allSecretProviders() {
       std::vector<std::shared_ptr<SecretType>> providers;
-      for (const auto& secret_entry : dynamic_secret_providers_) {
-        std::shared_ptr<SecretType> secret_provider = secret_entry.second.lock();
+      for (const auto& [map_key, secret_provider_entry] : dynamic_secret_providers_) {
+        std::shared_ptr<SecretType> secret_provider = secret_provider_entry.lock();
         if (secret_provider) {
           providers.push_back(std::move(secret_provider));
         }

@@ -367,8 +367,8 @@ std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
 RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
   auto config_dump = std::make_unique<envoy::admin::v3::RoutesConfigDump>();
 
-  for (const auto& element : dynamic_route_config_providers_) {
-    const auto& subscription = element.second.lock()->subscription_;
+  for (const auto& [identifier, route_config_provider] : dynamic_route_config_providers_) {
+    const auto& subscription = route_config_provider.lock()->subscription_;
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
     // in the RdsRouteConfigSubscription destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.

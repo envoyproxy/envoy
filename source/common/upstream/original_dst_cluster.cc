@@ -123,9 +123,8 @@ OriginalDstCluster::OriginalDstCluster(
 
 void OriginalDstCluster::addHost(HostSharedPtr& host) {
   HostMapSharedPtr new_host_map = std::make_shared<HostMap>(*getCurrentHostMap());
-  auto pair = new_host_map->emplace(host->address()->asString(), host);
-  bool added = pair.second;
-  if (added) {
+  auto [it, add_status] = new_host_map->emplace(host->address()->asString(), host);
+  if (add_status) {
     ENVOY_LOG(debug, "addHost() adding {}", host->address()->asString());
     setHostMap(new_host_map);
     // Given the current config, only EDS clusters support multiple priorities.
@@ -146,9 +145,7 @@ void OriginalDstCluster::cleanup() {
   auto host_map = getCurrentHostMap();
   if (!host_map->empty()) {
     ENVOY_LOG(trace, "Cleaning up stale original dst hosts.");
-    for (const auto& pair : *host_map) {
-      const std::string& addr = pair.first;
-      const HostSharedPtr& host = pair.second;
+    for (const auto& [addr, host] : *host_map) {
       if (host->used()) {
         ENVOY_LOG(trace, "Keeping active host {}.", addr);
         keeping_hosts->emplace_back(host);

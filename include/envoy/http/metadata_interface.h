@@ -28,8 +28,8 @@ public:
 
   friend std::ostream& operator<<(std::ostream& out, const MetadataMap& metadata_map) {
     out << "metadata map:";
-    for (const auto& metadata : metadata_map) {
-      out << "\nkey: " << metadata.first << ", value: " << metadata.second << std::endl;
+    for (const auto& [key, val] : metadata_map) {
+      out << "\nkey: " << key << ", value: " << val << std::endl;
     }
     return out;
   }
