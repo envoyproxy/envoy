@@ -244,6 +244,33 @@ TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeInvalidTime) {
                           "Error parsing timestamp 20070601Z with format %E4Y%m%d%H%M%SZ");
 }
 
+// Taken from
+// https://boringssl.googlesource.com/boringssl/+/master/crypto/bytestring/cbb.c#531
+// because boringssl_fips does not yet implement CBB_add_asn1_int64
+void cbbAddAsn1Int64(CBB* cbb, int64_t value) {
+  if (value >= 0) {
+    ASSERT_TRUE(CBB_add_asn1_uint64(cbb, value));
+  }
+
+  union {
+    int64_t i;
+    uint8_t bytes[sizeof(int64_t)];
+  } u;
+  u.i = value;
+  int start = 7;
+  // Skip leading sign-extension bytes unless they are necessary.
+  while (start > 0 && (u.bytes[start] == 0xff && (u.bytes[start - 1] & 0x80))) {
+    start--;
+  }
+
+  CBB child;
+  ASSERT_TRUE(CBB_add_asn1(cbb, &child, CBS_ASN1_INTEGER));
+  for (int i = start; i >= 0; i--) {
+    ASSERT_TRUE(CBB_add_u8(&child, u.bytes[i]));
+  }
+  CBB_flush(cbb);
+}
+
 TEST_F(Asn1UtilityTest, ParseIntegerTest) {
   std::vector<std::pair<int64_t, std::string>> integers = {
       {1, "01"},
@@ -257,7 +284,7 @@ TEST_F(Asn1UtilityTest, ParseIntegerTest) {
   size_t buf_len;
   for (auto const& int_and_hex : integers) {
     ASSERT_TRUE(CBB_init(cbb.get(), 0));
-    ASSERT_TRUE(CBB_add_asn1_int64(cbb.get(), int_and_hex.first));
+    cbbAddAsn1Int64(cbb.get(), int_and_hex.first);
     ASSERT_TRUE(CBB_finish(cbb.get(), &buf, &buf_len));
 
     CBS_init(&cbs, buf, buf_len);
