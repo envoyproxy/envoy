@@ -15,7 +15,7 @@ static void fancySlowPath(benchmark::State& state) {
   FANCY_LOG(info, "Slow path test begins.");
   std::atomic<spdlog::logger*> logger;
   for (auto _ : state) {
-    (void)_;
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
       std::string key = "k" + std::to_string(i + (state.thread_index << 8));
       getFancyContext().initFancyLogger(key, logger);
@@ -46,7 +46,7 @@ static void fancySlowPath(benchmark::State& state) {
 static void fancyMediumPath(benchmark::State& state) {
   FANCY_LOG(info, "Medium path test begins.");
   for (auto _ : state) {
-    (void)_;
+    UNREFERENCED_PARAMETER(_);
     // create different call sites for medium path
     for (int i = 0; i < state.range(0); i++) {
       FL_1024
@@ -63,7 +63,7 @@ static void fancyFastPath(benchmark::State& state) {
   spdlog::level::level_enum lv = state.range(1) ? spdlog::level::trace : spdlog::level::info;
   getFancyContext().setFancyLogger(FANCY_KEY, lv);
   for (auto _ : state) {
-    (void)_;
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
       FANCY_LOG(trace, "Fast path: {}", msg);
     }
@@ -78,7 +78,7 @@ static void envoyNormal(benchmark::State& state) {
   std::string msg(100, '.');
   GET_MISC_LOGGER().set_level(lv);
   for (auto _ : state) {
-    (void)_;
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
       ENVOY_LOG_MISC(trace, "Fast path: {}", msg);
     }
@@ -91,7 +91,7 @@ static void envoyNormal(benchmark::State& state) {
 static void fancyLevelSetting(benchmark::State& state) {
   FANCY_LOG(info, "Level setting test begins.");
   for (auto _ : state) {
-    (void)_;
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
       getFancyContext().setFancyLogger(__FILE__, spdlog::level::warn);
     }
@@ -104,7 +104,7 @@ static void fancyLevelSetting(benchmark::State& state) {
 static void envoyLevelSetting(benchmark::State& state) {
   ENVOY_LOG_MISC(info, "Envoy's level setting begins.");
   for (auto _ : state) {
-    (void)_;
+    UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
       GET_MISC_LOGGER().set_level(spdlog::level::warn);
     }

@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "common/common/fancy_logger.h"
 #include "common/common/lock_guard.h"
 
 #include "absl/strings/ascii.h"

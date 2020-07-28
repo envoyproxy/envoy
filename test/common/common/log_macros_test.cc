@@ -205,7 +205,7 @@ TEST(Fancy, Context) {
   printf(" --> Logger Mode: %d\n", LOGGER_MODE);
   EXPECT_EQ(mode, compile_mode);
   if (LOGGER_MODE) {
-    ENVOY_LOG(critical, "Compile option set: it's a Fancy Log printed by ENVOY_LOG!");
+    FANCY_LOG(critical, "Compile option set: all previous Envoy Log should be converted now!");
   }
   Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
   EXPECT_EQ(Logger::Context::getLoggerMode(), Logger::LoggerMode::Fancy);
