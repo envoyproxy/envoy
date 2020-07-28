@@ -15,59 +15,103 @@ this script need to be executed in the Envoy directory
 """
 
 from pathlib import Path
+from headersplit import to_filename
+from typing import List
 import argparse
 
-def get_classnames(mock_name):
-  dir = Path("test/mocks/{}/".format(mock_name))
-  filenames = list(map(str, dir.glob('*.h')))
-  classnames = []
-  classname2filename = dict()
-  classname2bazelname = dict()
-  for filename in filenames:
-    classname_tokens = filename.split('/')[-1].replace('.h', '').split('_')
-    classname = "Mock" + ''.join(map(lambda x: x[:1].upper() + x[1:], classname_tokens))
-    classnames.append(classname)
-    classname2filename[classname] = filename
-    bazelname = "//test/mocks/{}:".format(mock_name) + filename.split('/')[-1].replace(
-        '.h', '') + '_mocks'.format(mock_name)
-    classname2bazelname[classname] = bazelname
-  return classnames,classname2bazelname,classname2filename
+def to_classname(filename: str) -> str:
+  """
+    maps divided mock class file name to class names
 
-def replace_includes(mock_name):
-  classnames,classname2bazelname,classname2filename = get_classnames(mock_name)
-  print(classnames)
+    inverse function of headersplit.to_filename
+
+    e.g. map "test/mocks/server/admin_stream.h" to "MockAdminStream"
+
+    Args:
+        filename: string, mock class header file name (might be the whole path instead of the base name)
+
+    Returns:
+        corresponding class name
+    """
+  classname_tokens = filename.split('/')[-1].replace('.h','').split('_')
+  classname = "Mock" + ''.join(map(lambda x: x[:1].upper() + x[1:], classname_tokens))
+  return classname
+def to_bazelname(filename:str, mockname: str) -> str:
+  """
+    maps divided mock class file name to bazel target name
+
+    e.g. map "test/mocks/server/admin_stream.h" to "//test/mocks/server:admin_stream_mocks"
+
+    Args:
+        filename: string, mock class header file name (might be the whole path instead of the base name)
+        mockname: string, mock directory name
+
+    Returns:
+        corresponding bazel target name
+    """
+  bazelname = "//test/mocks/{}:".format(mockname)
+  bazelname += filename.split('/')[-1].replace('.h', '') + '_mocks'.format(mockname)
+  return bazelname
+
+
+
+def get_filenames(mockname:str) -> List[str]:
+  """
+    scans all headers in test/mocks/{mockname}, return corresponding file names
+
+    Args:
+      mockname: string, mock directory name
+    
+    Returns:
+      List of file name for the headers in test/mock/{mocksname}
+  """
+  dir = Path("test/mocks/{}/".format(mockname))
+  filenames = list(map(str, dir.glob('*.h')))
+  return filenames 
+
+def replace_includes(mockname):
+  filenames = get_filenames(mockname)
+  classnames = [to_classname(filename) for filename in filenames]
+
 
   p = Path('./test')
 
-  # walk through all files and check files that contains "{mock_name}/mocks.h"
+  # walk through all files and check files that contains "{mockname}/mocks.h"
   # don't forget change dependency on bazel
-  for i in p.glob('**/*.cc'):
+  for test_file in p.glob('**/*.cc'):
     replace_includes = ""
-    flag = False
-    used = ""
-    with i.open() as f:
+    used_mock_haeder = False
+    bazel_targets = ""
+
+    with test_file.open() as f:
       content = f.read()
-      if '#include "test/mocks/{}/mocks.h"'.format(mock_name) in content:
-        flag = True
+      if '#include "test/mocks/{}/mocks.h"'.format(mockname) in content:
+        used_mock_haeder = True
         replace_includes = ""
         for classname in classnames:
           if classname in content:
-            replace_includes += '#include "{}"\n'.format(classname2filename[classname])
-            used += '"{}",'.format(classname2bazelname[classname])
-    if flag:
-      with i.open(mode='w') as f:
+            # replace mocks.h with mock class header used by this test library
+            # limitation: if some class names in classnames are substrings of others, this part will bring over-inclusion
+            # e.g. if we have MockCluster and MockClusterFactory, and the source code only used MockClusterFactory,
+            # then the result code will also include MockCluster since it also shows in the file.
+            # TODO: use clang to analysis class usage instead by simple find and replace
+            replace_includes += '#include "test/mocks/{}/{}.h"\n'.format(mockname, to_filename(classname))
+            bazel_targets += '"{}",'.format(to_bazelname(to_filename(classname),mockname))
+
+    if used_mock_haeder:
+      with test_file.open(mode='w') as f:
         f.write(
-            content.replace('#include "test/mocks/{}/mocks.h"'.format(mock_name), replace_includes))
-      with (i.parent / 'BUILD').open() as f:
+            content.replace('#include "test/mocks/{}/mocks.h"\n'.format(mockname), replace_includes))
+      with (test_file.parent / 'BUILD').open() as f:
         # write building files
         content = f.read()
-        content = content.replace('"//test/mocks/{}:{}_mocks",'.format(mock_name, mock_name), used)
-      with (i.parent / 'BUILD').open('w') as f:
+        content = content.replace('"//test/mocks/{}:{}_mocks",'.format(mockname, mockname), bazel_targets)
+      with (test_file.parent / 'BUILD').open('w') as f:
         f.write(content)
 
 
 if __name__ == '__main__':
   PARSER = argparse.ArgumentParser()
-  PARSER.add_argument('-m', '--mock_name', default="server", help="mock folder that been divided")
-  mock_name = vars(PARSER.parse_args())['mock_name']
-  replace_includes(mock_name)
+  PARSER.add_argument('-m', '--mockname', default="server", help="mock folder that been divided")
+  mockname = vars(PARSER.parse_args())['mockname']
+  replace_includes(mockname)

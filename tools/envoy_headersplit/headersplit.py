@@ -11,14 +11,14 @@ manually.
 from __future__ import print_function
 
 import argparse
-
+from typing import Type, List, Tuple
 import clang.cindex
-from clang.cindex import TranslationUnit, Index, CursorKind
+from clang.cindex import TranslationUnit, Index, CursorKind, Cursor
 
 clang.cindex.Config.set_library_path("/opt/llvm/lib")
 
 
-def to_filename(classname):
+def to_filename(classname: str) -> str:
   """
     maps mock class name (in C++ codes) to filenames under the envoy naming convention.
     e.g. map "MockAdminStream" to "admin_stream"
@@ -38,7 +38,7 @@ def to_filename(classname):
   return ret.lower()
 
 
-def get_headers(translation_unit):
+def get_headers(translation_unit:Type[TranslationUnit]) -> str:
   """
     extracts all head includes statements from the target code file (translation_unit)
 
@@ -76,7 +76,7 @@ def get_headers(translation_unit):
   return ""
 
 
-def class_definitions(cursor):
+def class_definitions(cursor: Cursor) -> List[Cursor]:
   """
     extracts all class definitions in the file pointed by cursor. (typical mocks.h)
 
@@ -103,7 +103,7 @@ def class_definitions(cursor):
   return class_cursors
 
 
-def class_implementations(cursor):
+def class_implementations(cursor: Cursor) -> List[Cursor]:
   """
     extracts all class implementation in the file pointed by cursor. (typical mocks.cc)
 
@@ -127,7 +127,7 @@ def class_implementations(cursor):
   return impl_cursors
 
 
-def extract_definition(cursor, classnames):
+def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str, List[str]]:
   """
     extracts class definition source code pointed by the cursor parameter.
     and find dependent mock classes by naming look up.
@@ -170,7 +170,7 @@ def extract_definition(cursor, classnames):
   return class_name, class_defn, deps
 
 
-def extract_implementation(cursor):
+def extract_implementation(cursor: Cursor) -> Tuple[str, int]:
   """
     extracts class methods implementation source code pointed by the cursor parameter.
     and find dependent mock classes by naming look up.
