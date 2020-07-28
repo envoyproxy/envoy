@@ -131,7 +131,7 @@ void FilterConfigSubscription::onConfigUpdate(
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
   const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
-      factory_context_.admin().concurrency() * filter_config_providers_.size());
+      (factory_context_.admin().concurrency() + 1) * filter_config_providers_.size());
   for (auto* provider : filter_config_providers_) {
     provider->onConfigUpdate(factory_callback, version_info, [this, pending_update]() {
       if (--(*pending_update) == 0) {
