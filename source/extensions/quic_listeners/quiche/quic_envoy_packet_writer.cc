@@ -19,8 +19,8 @@ quic::WriteResult convertToQuicWriteResult(Api::IoCallUint64Result& result) {
 
 } // namespace
 
-QuicEnvoyPacketWriter::QuicEnvoyPacketWriter(Network::UdpPacketWriter& envoy_udp_packet_writer)
-    : envoy_udp_packet_writer_(envoy_udp_packet_writer) {}
+QuicEnvoyPacketWriter::QuicEnvoyPacketWriter(Network::UdpPacketWriterPtr envoy_udp_packet_writer)
+    : envoy_udp_packet_writer_(std::move(envoy_udp_packet_writer)) {}
 
 quic::WriteResult QuicEnvoyPacketWriter::WritePacket(const char* buffer, size_t buf_len,
                                                      const quic::QuicIpAddress& self_ip,
@@ -37,7 +37,7 @@ quic::WriteResult QuicEnvoyPacketWriter::WritePacket(const char* buffer, size_t 
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
 
-  Api::IoCallUint64Result result = envoy_udp_packet_writer_.writePacket(
+  Api::IoCallUint64Result result = envoy_udp_packet_writer_->writePacket(
       *buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
 
   return convertToQuicWriteResult(result);
@@ -47,7 +47,7 @@ quic::QuicByteCount
 QuicEnvoyPacketWriter::GetMaxPacketSize(const quic::QuicSocketAddress& peer_address) const {
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
-  return static_cast<quic::QuicByteCount>(envoy_udp_packet_writer_.getMaxPacketSize(*remote_addr));
+  return static_cast<quic::QuicByteCount>(envoy_udp_packet_writer_->getMaxPacketSize(*remote_addr));
 }
 
 quic::QuicPacketBuffer
@@ -58,13 +58,13 @@ QuicEnvoyPacketWriter::GetNextWriteLocation(const quic::QuicIpAddress& self_ip,
       quicAddressToEnvoyAddressInstance(self_address);
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
-  Network::UdpPacketWriterBuffer write_location = envoy_udp_packet_writer_.getNextWriteLocation(
+  Network::UdpPacketWriterBuffer write_location = envoy_udp_packet_writer_->getNextWriteLocation(
       local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
   return quic::QuicPacketBuffer(write_location.buffer_, write_location.release_buffer_);
 }
 
 quic::WriteResult QuicEnvoyPacketWriter::Flush() {
-  Api::IoCallUint64Result result = envoy_udp_packet_writer_.flush();
+  Api::IoCallUint64Result result = envoy_udp_packet_writer_->flush();
   return convertToQuicWriteResult(result);
 }
 

@@ -17,7 +17,7 @@ namespace Quic {
 
 class QuicEnvoyPacketWriter : public quic::QuicPacketWriter {
 public:
-  QuicEnvoyPacketWriter(Network::UdpPacketWriter& envoy_udp_packet_writer);
+  QuicEnvoyPacketWriter(Network::UdpPacketWriterPtr envoy_udp_packet_writer);
 
   quic::WriteResult WritePacket(const char* buffer, size_t buf_len,
                                 const quic::QuicIpAddress& self_address,
@@ -25,9 +25,9 @@ public:
                                 quic::PerPacketOptions* options) override;
 
   // quic::QuicPacketWriter
-  bool IsWriteBlocked() const override { return envoy_udp_packet_writer_.isWriteBlocked(); }
-  void SetWritable() override { envoy_udp_packet_writer_.setWritable(); }
-  bool IsBatchMode() const override { return envoy_udp_packet_writer_.isBatchMode(); }
+  bool IsWriteBlocked() const override { return envoy_udp_packet_writer_->isWriteBlocked(); }
+  void SetWritable() override { envoy_udp_packet_writer_->setWritable(); }
+  bool IsBatchMode() const override { return envoy_udp_packet_writer_->isBatchMode(); }
   // Currently this writer doesn't support pacing offload.
   bool SupportsReleaseTime() const override { return false; }
 
@@ -37,7 +37,7 @@ public:
   quic::WriteResult Flush() override;
 
 private:
-  Network::UdpPacketWriter& envoy_udp_packet_writer_;
+  Network::UdpPacketWriterPtr envoy_udp_packet_writer_;
 };
 
 } // namespace Quic

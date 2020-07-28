@@ -59,8 +59,7 @@ public:
     }
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
-    udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(
-        listener_->ioHandle(), listener_config_.listenerScope());
+    udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(listener_->ioHandle());
     ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(Return(udp_packet_writer_.get()));
   }
 
@@ -300,19 +299,13 @@ TEST_P(UdpListenerImplTest, SendData) {
 
   UdpSendData send_data{send_from_addr->ip(), *client_.localAddress(), *buffer};
 
-  uint64_t total_bytes_sent =
-      listener_config_.listenerScope().counterFromString("total_bytes_sent").value();
-
   auto send_result = listener_->send(send_data);
 
   EXPECT_TRUE(send_result.ok()) << "send() failed : " << send_result.err_->getErrorDetails();
 
   const uint64_t bytes_to_read = payload.length();
-  total_bytes_sent += bytes_to_read;
   UdpRecvData data;
   client_.recv(data);
-  EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
-            total_bytes_sent);
   EXPECT_EQ(bytes_to_read, data.buffer_->length());
   EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
   EXPECT_EQ(data.buffer_->toString(), payload);
@@ -321,8 +314,6 @@ TEST_P(UdpListenerImplTest, SendData) {
   auto flush_result = udp_packet_writer_->flush();
   EXPECT_TRUE(flush_result.ok());
   EXPECT_EQ(0, flush_result.rc_);
-  EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
-            total_bytes_sent);
 }
 
 /**

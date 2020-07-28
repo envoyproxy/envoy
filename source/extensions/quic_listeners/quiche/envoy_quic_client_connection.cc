@@ -6,9 +6,10 @@
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 
-#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+#include "extensions/quic_listeners/quiche/quic_envoy_packet_writer.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -31,8 +32,10 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
     Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket)
     : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory,
-                                new EnvoyQuicPacketWriter(*connection_socket), true,
-                                supported_versions, dispatcher, std::move(connection_socket)) {}
+                                new QuicEnvoyPacketWriter(std::unique_ptr<Network::UdpPacketWriter>(
+                                    new Network::UdpDefaultWriter(connection_socket->ioHandle()))),
+                                true, supported_versions, dispatcher,
+                                std::move(connection_socket)) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
@@ -94,7 +97,8 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
 
 void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
-  auto writer = std::make_unique<EnvoyQuicPacketWriter>(*connection_socket);
+  auto writer = std::make_unique<QuicEnvoyPacketWriter>(
+      std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle()));
   // Destroy the old file_event before closing the old socket. Otherwise the socket might be picked
   // up by another socket() call while file_event is still operating on it.
   file_event_.reset();

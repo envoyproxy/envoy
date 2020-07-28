@@ -9,18 +9,9 @@
 namespace Envoy {
 namespace Network {
 
-#define UDP_DEFAULT_WRITER_STATS(COUNTER) COUNTER(total_bytes_sent)
-
-/**
- * Wrapper struct for udp default writer stats. @see stats_macros.h
- */
-struct UdpDefaultWriterStats {
-  UDP_DEFAULT_WRITER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
 class UdpDefaultWriter : public UdpPacketWriter {
 public:
-  UdpDefaultWriter(Network::IoHandle& io_handle, Stats::Scope& scope);
+  UdpDefaultWriter(Network::IoHandle& io_handle);
 
   ~UdpDefaultWriter() override;
 
@@ -45,12 +36,9 @@ public:
         /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
   }
 
-  Network::UdpDefaultWriterStats generateStats(Stats::Scope& scope);
-
 private:
   bool write_blocked_;
   Network::IoHandle& io_handle_;
-  Network::UdpDefaultWriterStats stats_;
 };
 
 } // namespace Network

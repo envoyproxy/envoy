@@ -50,18 +50,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_packet_writer_lib",
-    srcs = ["envoy_quic_packet_writer.cc"],
-    hdrs = ["envoy_quic_packet_writer.h"],
-    external_deps = ["quiche_quic_platform"],
-    tags = ["nofips"],
-    deps = [
-        ":envoy_quic_utils_lib",
-        "@com_googlesource_quiche//:quic_core_packet_writer_interface_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "envoy_quic_fake_proof_source_lib",
     hdrs = ["envoy_quic_fake_proof_source.h"],
     external_deps = ["quiche_quic_platform"],
@@ -250,9 +238,10 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":envoy_quic_connection_lib",
-        ":envoy_quic_packet_writer_lib",
+        ":quic_envoy_packet_writer_lib",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/network:socket_option_factory_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -289,7 +278,6 @@ envoy_cc_library(
         ":envoy_quic_alarm_factory_lib",
         ":envoy_quic_connection_helper_lib",
         ":envoy_quic_dispatcher_lib",
-        ":envoy_quic_packet_writer_lib",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_utils_lib",
         ":quic_envoy_packet_writer_lib",

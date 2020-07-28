@@ -12,7 +12,6 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "extensions/quic_listeners/quiche/quic_envoy_packet_writer.h"
 #include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
@@ -78,7 +77,8 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     // Quic Dispatcher takes the ownership of udp_packet_writer_
     udp_packet_writer_.release();
   } else {
-    quic_dispatcher_->InitializeWithWriter(new QuicEnvoyPacketWriter(*udp_packet_writer_));
+    quic_dispatcher_->InitializeWithWriter(
+        new QuicEnvoyPacketWriter(std::move(udp_packet_writer_)));
   }
 }
 
