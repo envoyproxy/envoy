@@ -390,7 +390,6 @@ TEST_P(UdpListenerImplTest, SendData) {
  * The send fails because the server_socket is created with bind=false.
  */
 TEST_P(UdpListenerImplTest, SendDataError) {
-  Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
