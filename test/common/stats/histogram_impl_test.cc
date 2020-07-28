@@ -38,6 +38,19 @@ TEST_F(HistogramSettingsImplTest, Basic) {
   EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({0.1, 2}));
 }
 
+// Test that buckets are correctly sorted.
+TEST_F(HistogramSettingsImplTest, Sorted) {
+  envoy::config::metrics::v3::HistogramBucketSettings setting;
+  setting.mutable_match()->set_exact("a");
+  setting.mutable_buckets()->Add(0.1);
+  setting.mutable_buckets()->Add(2);
+  setting.mutable_buckets()->Add(1); // Out-of-order
+  buckets_configs_.push_back(setting);
+
+  initialize();
+  EXPECT_EQ(settings_->buckets("a"), ConstSupportedBuckets({0.1, 1, 2}));
+}
+
 // Test that only matching configurations are applied.
 TEST_F(HistogramSettingsImplTest, Matching) {
   {
