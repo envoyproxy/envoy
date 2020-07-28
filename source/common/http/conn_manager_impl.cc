@@ -1086,7 +1086,6 @@ void ConnectionManagerImpl::FilterManager::maybeContinueDecoding(
     // We use the continueDecoding() code since it will correctly handle not calling
     // decodeHeaders() again. Fake setting StopSingleIteration since the continueDecoding() code
     // expects it.
-    ASSERT(active_stream_.buffered_request_data_);
     ASSERT(buffered_request_data_);
     (*continue_data_entry)->iteration_state_ =
         ActiveStreamFilterBase::IterationState::StopSingleIteration;
@@ -1683,17 +1682,16 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ResponseHeaderMap& response_headers) {
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(headers, active_stream_.request_headers_.get(),
-                                                  active_stream_.connection_manager_.config_,
-                                                  EMPTY_STRING);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers_.get(),
+                                                  connection_manager_.config_, EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
-  active_stream_.chargeStats(headers);
+  chargeStats(response_headers);
 
-  ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", active_stream_, headers);
+  ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", *this, response_headers);
 
   // Now actually encode via the codec.
-  active_stream_.response_encoder_->encode100ContinueHeaders(headers);
+  response_encoder_->encode100ContinueHeaders(response_headers);
 }
 
 void ConnectionManagerImpl::FilterManager::maybeContinueEncoding(
@@ -2180,7 +2178,7 @@ void ConnectionManagerImpl::FilterManager::callLowWatermarkCallbacks() {
 }
 
 void ConnectionManagerImpl::FilterManager::setBufferLimit(uint32_t new_limit) {
-  ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", parent_, new_limit);
+  ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", active_stream_, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
     buffered_request_data_->setWatermarks(buffer_limit_);
@@ -2537,7 +2535,7 @@ const Buffer::Instance* ConnectionManagerImpl::ActiveStreamDecoderFilter::decodi
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::modifyDecodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
-  ASSERT(parent_.parent_.state_.latest_data_decoding_filter_ == this);
+  ASSERT(parent_.active_stream_.state_.latest_data_decoding_filter_ == this);
   callback(*parent_.buffered_request_data_.get());
 }
 
@@ -2772,13 +2770,13 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedMetadata(
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
     onEncoderFilterAboveWriteBufferHighWatermark() {
-  ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.", parent_.parent_);
+  ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.", parent_.active_stream_);
   parent_.callHighWatermarkCallbacks();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
     onEncoderFilterBelowWriteBufferLowWatermark() {
-  ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", parent_.parent_);
+  ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", parent_.active_stream_);
   parent_.callLowWatermarkCallbacks();
 }
 
@@ -2798,7 +2796,7 @@ const Buffer::Instance* ConnectionManagerImpl::ActiveStreamEncoderFilter::encodi
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::modifyEncodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
-  ASSERT(parent_.parent_.state_.latest_data_encoding_filter_ == this);
+  ASSERT(parent_.active_stream_.state_.latest_data_encoding_filter_ == this);
   callback(*parent_.buffered_response_data_.get());
 }
 
