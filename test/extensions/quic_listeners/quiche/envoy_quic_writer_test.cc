@@ -7,7 +7,7 @@
 #include "common/network/io_socket_error_impl.h"
 #include "common/network/udp_packet_writer_handler_impl.h"
 
-#include "extensions/quic_listeners/quiche/quic_envoy_packet_writer.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -53,7 +53,7 @@ protected:
   testing::NiceMock<Network::MockListenSocket> socket_;
   quic::QuicIpAddress self_address_;
   quic::QuicSocketAddress peer_address_;
-  QuicEnvoyPacketWriter envoy_quic_writer_;
+  EnvoyQuicPacketWriter envoy_quic_writer_;
 };
 
 TEST_F(EnvoyQuicWriterTest, AssertOnNonNullPacketOption) {

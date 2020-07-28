@@ -13,7 +13,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_source.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
-#include "extensions/quic_listeners/quiche/quic_envoy_packet_writer.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
 namespace Envoy {
@@ -78,7 +78,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     udp_packet_writer_.release();
   } else {
     quic_dispatcher_->InitializeWithWriter(
-        new QuicEnvoyPacketWriter(std::move(udp_packet_writer_)));
+        new EnvoyQuicPacketWriter(std::move(udp_packet_writer_)));
   }
 }
 

@@ -35,7 +35,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:io_socket_error_lib",
         "//source/common/network:udp_packet_writer_handler_lib",
-        "//source/extensions/quic_listeners/quiche:quic_envoy_packet_writer_lib",
+        "//source/extensions/quic_listeners/quiche:envoy_quic_packet_writer_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",

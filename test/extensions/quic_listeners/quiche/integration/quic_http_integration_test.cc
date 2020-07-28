@@ -26,7 +26,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_verifier.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
-#include "extensions/quic_listeners/quiche/quic_envoy_packet_writer.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 #include "test/extensions/quic_listeners/quiche/test_utils.h"
 
