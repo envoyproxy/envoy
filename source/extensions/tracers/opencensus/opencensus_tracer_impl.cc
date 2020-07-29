@@ -73,7 +73,7 @@ public:
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
 
-  // opencensus doesn't support baggage, so noop these OpenTracing functions
+  // OpenCensus doesn't support baggage, so noop these OpenTracing functions.
   void setBaggage(absl::string_view, absl::string_view) override;
   std::string getBaggage(absl::string_view) override;
 

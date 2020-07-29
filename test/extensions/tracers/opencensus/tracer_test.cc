@@ -124,7 +124,7 @@ TEST(OpenCensusTracerTest, Span) {
     span->setSampled(false); // Abandon tracer.
     span->finishSpan();
 
-    // baggage methods are noop for opencensus and won't affect events
+    // Baggage methods are a noop in opencensus and won't affect events.
     span->setBaggage("baggage_key", "baggage_value");
     ASSERT_EQ("", span->getBaggage("baggage_key"));
   }
