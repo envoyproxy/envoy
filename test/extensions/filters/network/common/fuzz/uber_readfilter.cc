@@ -6,6 +6,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
+  
 void UberFilterFuzzer::reset() {
   // Reset some changes made by current filter on some mock objects.
 
