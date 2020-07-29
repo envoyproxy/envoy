@@ -258,7 +258,12 @@ Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
 }
 
 MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config)
-    : matcher_config_(filter_config.matcher()), default_res_(filter_config.no_key_default()) {}
+    : matcher_config_(filter_config.matcher()) {
+  default_res_ = true;
+  if (filter_config.has_no_key_default()) {
+    default_res_ = filter_config.no_key_default().value();
+  }
+}
 
 bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
                               const Http::ResponseHeaderMap&,

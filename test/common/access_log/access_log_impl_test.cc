@@ -1323,7 +1323,6 @@ filter:
         - key: "c"
       value:
         bool_match: true
-    no_key_default: true
 
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
@@ -1342,7 +1341,8 @@ filter:
         - key: "c"
       value:
         bool_match: true
-    no_key_default: false
+    no_key_default:
+      value: false
 
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
