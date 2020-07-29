@@ -182,8 +182,7 @@ TEST_F(EnvoyQuicProofSourceTest, TestGetProof) {
 TEST_F(EnvoyQuicProofSourceTest, InvalidPrivateKey) {
   EXPECT_CALL(listen_socket_, ioHandle());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillOnce(Invoke(
-          [&](const Network::ConnectionSocket& connection_socket) { return &filter_chain_; }));
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
   auto server_context_config = std::make_unique<Ssl::MockServerContextConfig>();
   auto server_context_config_ptr = server_context_config.get();
   QuicServerTransportSocketFactory transport_socket_factory(std::move(server_context_config));
