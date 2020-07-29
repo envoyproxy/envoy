@@ -95,7 +95,6 @@ public:
                               ProtocolOptionsFactoryContext& factory_context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(factory_context);
-    throw EnvoyException("not implemented");
     return nullptr;
   }
 
