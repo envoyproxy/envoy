@@ -379,7 +379,7 @@ struct Http1Settings {
   // Allow serving requests with both Content-Length and Transfer-Encoding: chunked.
   // If enabled and such a request is served - Content-Length is ignored and removed from
   // the request headers.
-  bool allow_chunked_length{false};
+  bool allow_chunked_length_{false};
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy
