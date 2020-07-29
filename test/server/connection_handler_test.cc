@@ -37,16 +37,6 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-class MockUpstreamUdpFilter : public Network::UdpListenerReadFilter {
-public:
-  MockUpstreamUdpFilter(Network::UdpReadFilterCallbacks& callbacks)
-      : UdpListenerReadFilter(callbacks) {}
-
-  // Network::UdpListenerReadFilter
-  void onData(Network::UdpRecvData&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void onReceiveError(Api::IoError::IoErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-};
-
 class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ConnectionHandlerTest()
@@ -138,6 +128,39 @@ public:
 
   using TestListenerPtr = std::unique_ptr<TestListener>;
 
+  class MockUpstreamUdpFilter : public Network::UdpListenerReadFilter {
+  public:
+    MockUpstreamUdpFilter(ConnectionHandlerTest& parent, Network::UdpReadFilterCallbacks& callbacks)
+        : UdpListenerReadFilter(callbacks), parent_(parent) {}
+    ~MockUpstreamUdpFilter() override { deleted_before_listener_ = !parent_.udp_listener_deleted; }
+
+    MOCK_METHOD(void, onData, (Network::UdpRecvData&), (override));
+    MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode), (override));
+
+    bool deleted_before_listener_ = false;
+
+  private:
+    ConnectionHandlerTest& parent_;
+  };
+
+  class MockUpstreamUdpListener : public Network::UdpListener {
+  public:
+    explicit MockUpstreamUdpListener(ConnectionHandlerTest& parent) : parent_(parent) {
+      ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    }
+    ~MockUpstreamUdpListener() override { parent_.udp_listener_deleted = true; }
+
+    MOCK_METHOD(void, enable, (), (override));
+    MOCK_METHOD(void, disable, (), (override));
+    MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
+    MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
+    MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
+
+  private:
+    ConnectionHandlerTest& parent_;
+    Event::MockDispatcher dispatcher_;
+  };
+
   TestListener* addListener(
       uint64_t tag, bool bind_to_port, bool hand_off_restored_destination_connections,
       const std::string& name, Network::Listener* listener,
@@ -148,14 +171,13 @@ public:
       std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
       bool continue_on_listener_filters_timeout = false,
       std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
-          nullptr,
-      bool return_null_listener = false) {
+          nullptr) {
     listeners_.emplace_back(std::make_unique<TestListener>(
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
         listener_filters_timeout, continue_on_listener_filters_timeout, socket_factory_,
         overridden_filter_chain_manager));
     EXPECT_CALL(*socket_factory_, socketType()).WillOnce(Return(socket_type));
-    if (listener == nullptr && return_null_listener == false) {
+    if (listener == nullptr) {
       // Expecting listener config in place update.
       // If so, dispatcher would not create new network listener.
       return listeners_.back().get();
@@ -201,6 +223,7 @@ public:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
+  bool udp_listener_deleted = false;
 };
 
 // Verify that if a listener is removed while a rebalanced connection is in flight, we correctly
@@ -1031,26 +1054,28 @@ TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
 TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
   InSequence s;
 
-  TestListener* test_listener = addListener(1, true, false, "test_listener", nullptr, nullptr,
-                                            nullptr, nullptr, Network::Socket::Type::Datagram,
-                                            std::chrono::milliseconds(), false, nullptr, true);
+  Network::MockUdpReadFilterCallbacks dummy_callbacks;
+  auto listener = new NiceMock<MockUpstreamUdpListener>(*this);
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, nullptr, nullptr, nullptr,
+                  Network::Socket::Type::Datagram, std::chrono::milliseconds(), false, nullptr);
+  auto filter = std::make_unique<NiceMock<MockUpstreamUdpFilter>>(*this, dummy_callbacks);
+  auto filter_ptr = filter.get();
 
   EXPECT_CALL(factory_, createUdpListenerFilterChain(_, _))
       .WillOnce(Invoke([&](Network::UdpListenerFilterManager& udp_listener,
-                           Network::UdpReadFilterCallbacks& callbacks) -> bool {
-        udp_listener.addReadFilter(std::make_unique<MockUpstreamUdpFilter>(callbacks));
+                           Network::UdpReadFilterCallbacks&) -> bool {
+        udp_listener.addReadFilter(std::move(filter));
         return true;
       }));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(local_address_));
-  handler_->addListener(absl::nullopt, *test_listener);
+  EXPECT_CALL(dummy_callbacks.udp_listener_, onDestroy());
 
-  try {
-    handler_->stopListeners();
-    FAIL();
-  } catch (const Envoy::EnvoyException& e) {
-    EXPECT_THAT(e.what(),
-                HasSubstr("The read_filter should be deleted before the udp_listener is deleted"));
-  }
+  handler_->addListener(absl::nullopt, *test_listener);
+  handler_->stopListeners();
+
+  ASSERT_TRUE(filter_ptr->deleted_before_listener_)
+      << "The read_filter_ should be deleted before the udp_listener_ is deleted.";
 }
 
 } // namespace
