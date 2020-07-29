@@ -153,6 +153,7 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
     if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
       *error_details = "Invalid leaf cert, only P-256 ECDSA certificates are supported";
+      break;
     }
     // QUICHE uses SHA-256 as hash function in cert signature.
     sign_alg = SSL_SIGN_ECDSA_SECP256R1_SHA256;
@@ -167,11 +168,13 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
       *error_details = "Invalid leaf cert, only RSA certificates with 2048-bit or 3072-bit keys "
                        "are supported in FIPS mode";
+      break;
     }
 #else
     if (rsa_key_length < 2048 / 8) {
       *error_details =
           "Invalid leaf cert, only RSA certificates with 2048-bit or larger keys are supported";
+      break;
     }
 #endif
     sign_alg = SSL_SIGN_RSA_PSS_RSAE_SHA256;
