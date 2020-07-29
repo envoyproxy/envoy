@@ -257,9 +257,11 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     return true;
   }
 
-  if (header_.additional_rrs &&
-      !parseAnswerRecords(context->additional_, header_.additional_rrs, buffer, offset)) {
-    return false;
+  if (header_.additional_rrs) {
+    // We may encounter additional resource records that we do not support. Since the filter
+    // operates on queries, we can skip any additional records that we cannot parse since
+    // they will not affect responses.
+    parseAnswerRecords(context->additional_, header_.additional_rrs, buffer, offset);
   }
 
   return true;
@@ -408,7 +410,11 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::Instance
   offset += sizeof(uint16_t);
   available_bytes -= sizeof(uint16_t);
 
-  // We support A, AAAA and SRV record types
+  // TODO(abaptiste): Support EDNS records
+  //
+  // We may see optional records indicating EDNS support. We need to skip these
+  // records until we have proper EDNS support. Encountering one of these records
+  // does not indicate a failure. We support A, AAAA and SRV record types
   if (record_type != DNS_RECORD_TYPE_A && record_type != DNS_RECORD_TYPE_AAAA &&
       record_type != DNS_RECORD_TYPE_SRV) {
     ENVOY_LOG(debug, "Unsupported record type [{}] found in answer", record_type);

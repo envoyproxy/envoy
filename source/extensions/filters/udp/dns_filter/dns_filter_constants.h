@@ -7,9 +7,10 @@ namespace DnsFilter {
 
 constexpr uint16_t DNS_RECORD_CLASS_IN = 1;
 
-constexpr uint16_t DNS_RECORD_TYPE_A = 1;
-constexpr uint16_t DNS_RECORD_TYPE_AAAA = 28;
-constexpr uint16_t DNS_RECORD_TYPE_SRV = 33;
+constexpr uint16_t DNS_RECORD_TYPE_A = 0x01;
+constexpr uint16_t DNS_RECORD_TYPE_AAAA = 0x12;
+constexpr uint16_t DNS_RECORD_TYPE_SRV = 0x21;
+constexpr uint16_t DNS_RECORD_TYPE_OPT = 0x29;
 
 constexpr uint16_t DNS_RESPONSE_CODE_NO_ERROR = 0;
 constexpr uint16_t DNS_RESPONSE_CODE_FORMAT_ERROR = 1;
