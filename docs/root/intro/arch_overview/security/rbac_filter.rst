@@ -108,6 +108,8 @@ The following attributes are exposed to the language runtime:
    upstream.dns_san_peer_certificate, string, The first DNS entry in the SAN field of the peer certificate in the upstream TLS connection
    upstream.uri_san_local_certificate, string, The first URI entry in the SAN field of the local certificate in the upstream TLS connection
    upstream.uri_san_peer_certificate, string, The first URI entry in the SAN field of the peer certificate in the upstream TLS connection
+   upstream.local_address, string, The local address of the upstream connection
+   upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
 
 
 Most attributes are optional and provide the default value based on the type of the attribute.

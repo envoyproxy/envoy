@@ -367,6 +367,8 @@ TEST(Context, ConnectionAttributes) {
       Network::Utility::parseInternetAddress("10.20.30.40", 456, false);
   Network::Address::InstanceConstSharedPtr upstream_address =
       Network::Utility::parseInternetAddress("10.1.2.3", 679, false);
+  Network::Address::InstanceConstSharedPtr upstream_local_address =
+      Network::Utility::parseInternetAddress("10.1.2.3", 1000, false);
   const std::string sni_name = "kittens.com";
   EXPECT_CALL(info, downstreamLocalAddress()).WillRepeatedly(ReturnRef(local));
   EXPECT_CALL(info, downstreamRemoteAddress()).WillRepeatedly(ReturnRef(remote));
@@ -374,6 +376,10 @@ TEST(Context, ConnectionAttributes) {
   EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
   EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
+  EXPECT_CALL(info, upstreamLocalAddress()).WillRepeatedly(ReturnRef(upstream_local_address));
+  const std::string upstream_transport_failure_reason = "ConnectionTermination";
+  EXPECT_CALL(info, upstreamTransportFailureReason())
+      .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
 
@@ -576,6 +582,20 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(subject_peer, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(UpstreamLocalAddress)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(upstream_local_address->asStringView(), value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(UpstreamTransportFailureReason)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(upstream_transport_failure_reason, value.value().StringOrDie().value());
   }
 }
 

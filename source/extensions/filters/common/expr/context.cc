@@ -190,6 +190,13 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
         upstream_host->address()->ip() != nullptr) {
       return CelValue::CreateInt64(upstream_host->address()->ip()->port());
     }
+  } else if (value == UpstreamLocalAddress) {
+    auto upstream_local_address = info_.upstreamLocalAddress();
+    if (upstream_local_address != nullptr) {
+      return CelValue::CreateStringView(upstream_local_address->asStringView());
+    }
+  } else if (value == UpstreamTransportFailureReason) {
+    return CelValue::CreateStringView(info_.upstreamTransportFailureReason());
   }
 
   auto ssl_info = info_.upstreamSslConnection();
