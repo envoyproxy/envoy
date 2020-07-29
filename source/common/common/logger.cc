@@ -126,11 +126,30 @@ Context::~Context() {
   }
 }
 
-void Context::activate() {
+void Context::activate(LoggerMode mode) {
   Registry::getSink()->setLock(lock_);
   Registry::getSink()->setShouldEscape(should_escape_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
+
+  if (mode == LoggerMode::Fancy) {
+    fancy_default_level_ = log_level_;
+    fancy_log_format_ = log_format_;
+  }
+}
+
+std::string Context::getFancyLogFormat() {
+  if (!current_context) { // Context is not instantiated in benchmark test
+    return "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+  }
+  return current_context->fancy_log_format_;
+}
+
+spdlog::level::level_enum Context::getFancyDefaultLevel() {
+  if (!current_context) {
+    return spdlog::level::info;
+  }
+  return current_context->fancy_default_level_;
 }
 
 std::vector<Logger>& Registry::allLoggers() {

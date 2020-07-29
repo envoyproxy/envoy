@@ -106,12 +106,28 @@ envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
     deps = [
+        "//source/common/common:fancy_logger_lib",
         "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "logger_speed_test",
+    srcs = ["logger_speed_test.cc"],
+    external_deps = ["benchmark"],
+    deps = [
+        "//source/common/common:fancy_logger_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "logger_speed_test_benchmark_test",
+    benchmark_binary = "logger_speed_test",
 )
 
 envoy_cc_test(
