@@ -54,6 +54,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -498,12 +499,12 @@ private:
                      const HostVector& hosts_removed,
                      absl::optional<uint32_t> overprovisioning_factor) override;
 
-    std::unordered_set<HostSharedPtr> all_hosts_added_;
-    std::unordered_set<HostSharedPtr> all_hosts_removed_;
+    absl::node_hash_set<HostSharedPtr> all_hosts_added_;
+    absl::node_hash_set<HostSharedPtr> all_hosts_removed_;
 
   private:
     PrioritySetImpl& parent_;
-    std::unordered_set<uint32_t> priorities_;
+    absl::node_hash_set<uint32_t> priorities_;
   };
 };
 
@@ -535,6 +536,7 @@ public:
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
+  float prefetchRatio() const override { return prefetch_ratio_; }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -654,6 +656,7 @@ private:
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const float prefetch_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopePtr stats_scope_;

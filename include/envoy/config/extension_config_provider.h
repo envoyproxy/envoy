@@ -9,6 +9,8 @@
 namespace Envoy {
 namespace Config {
 
+using ConfigAppliedCb = std::function<void()>;
+
 /**
  * A provider for extension configurations obtained either statically or via
  * the extension configuration discovery service. Dynamically updated extension
@@ -45,8 +47,10 @@ public:
    * Update the provider with a new configuration.
    * @param config is an extension factory callback to replace the existing configuration.
    * @param version_info is the version of the new extension configuration.
+   * @param cb the continuation callback for a completed configuration application.
    */
-  virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info) PURE;
+  virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info,
+                              ConfigAppliedCb cb) PURE;
 };
 
 } // namespace Config
