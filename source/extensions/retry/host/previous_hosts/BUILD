@@ -26,7 +26,6 @@ envoy_cc_extension(
         ":previous_hosts_predicate_lib",
         "//include/envoy/registry",
         "//include/envoy/upstream:retry_interface",
-        "//source/extensions/retry/host:well_known_names",
         "@envoy_api//envoy/config/retry/previous_hosts/v2:pkg_cc_proto",
     ],
 )
