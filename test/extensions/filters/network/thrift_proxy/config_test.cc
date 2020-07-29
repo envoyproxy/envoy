@@ -122,7 +122,7 @@ TEST_F(ThriftFilterConfigTest, ThriftProxyWithEmptyProto) {
   testConfig(config);
 }
 
-// Test config with an explicitly defined router filter.
+// Test config with an invalid cluster_header.
 TEST_F(ThriftFilterConfigTest, RouterConfigWithInvalidClusterHeader) {
   const std::string yaml = R"EOF(
 stat_prefix: thrift
@@ -140,7 +140,7 @@ thrift_filters:
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
       parseThriftProxyFromV2Yaml(yaml);
   std::string header = "A";
-  header.push_back('\000');
+  header.push_back('\000'); // Add an invalid charater for http header.
   config.mutable_route_config()->mutable_routes()->at(0).mutable_route()->set_cluster_header(
       header);
   EXPECT_THROW(factory_.createFilterFactoryFromProto(config, context_), ProtoValidationException);
