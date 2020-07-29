@@ -139,7 +139,7 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             const ProtobufWkt::Struct& config,
-                            ProtobufMessage::ValidationVisitor& validation_visitor) {
+                            Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           name);
@@ -160,15 +160,15 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
-                                                *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(
+      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
 
-  return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
+  return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
-std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
-parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
-                              ProtobufMessage::ValidationVisitor& validation_visitor) {
+std::map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
+    const envoy::config::cluster::v3::Cluster& config,
+    Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   if (!config.typed_extension_protocol_options().empty() &&
       !config.hidden_envoy_deprecated_extension_protocol_options().empty()) {
     throw EnvoyException("Only one of typed_extension_protocol_options or "
@@ -184,7 +184,7 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object = createProtocolOptionsConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
+        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -197,7 +197,7 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
     auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
-                                              validation_visitor);
+                                              factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -677,7 +677,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope, bool added_via_api,
-    ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       max_requests_per_connection_(
@@ -702,7 +701,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
       common_http_protocol_options_(config.common_http_protocol_options()),
-      extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
+      extension_protocol_options_(parseExtensionProtocolOptions(config, factory_context)),
       resource_managers_(config, runtime, name_, *stats_scope_),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
@@ -898,10 +897,9 @@ ClusterImplBase::ClusterImplBase(
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
-  info_ = std::make_unique<ClusterInfoImpl>(
-      cluster, factory_context.clusterManager().bindConfig(), runtime, std::move(socket_matcher),
-      std::move(stats_scope), added_via_api, factory_context.messageValidationVisitor(),
-      factory_context);
+  info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
+                                            runtime, std::move(socket_matcher),
+                                            std::move(stats_scope), added_via_api, factory_context);
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);

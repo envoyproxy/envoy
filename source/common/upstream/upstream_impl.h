@@ -516,8 +516,7 @@ public:
   ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopePtr&& stats_scope,
-                  bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Server::Configuration::TransportSocketFactoryContext&);
+                  bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
