@@ -71,6 +71,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.fix_wildcard_matching",
     "envoy.reloadable_features.fixed_connection_close",
     "envoy.reloadable_features.http_default_alpn",
+    "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.listener_in_place_filterchain_update",
     "envoy.reloadable_features.new_codec_behavior",
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
