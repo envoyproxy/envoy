@@ -150,6 +150,15 @@ void HeaderString::append(const char* data, uint32_t size) {
   string_length_ += size;
 }
 
+void HeaderString::rtrim() {
+  ASSERT(type() == Type::Inline || type() == Type::Dynamic);
+  absl::string_view original = getStringView();
+  absl::string_view rtrimmed = StringUtil::rtrim(original);
+  if (original.size() != rtrimmed.size()) {
+    string_length_ = rtrimmed.size();
+  }
+}
+
 void HeaderString::clear() {
   switch (type_) {
   case Type::Reference: {
