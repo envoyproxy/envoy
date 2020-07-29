@@ -57,7 +57,7 @@ public:
   virtual SSL* ssl() PURE;
 };
 
-using HandshakerPtr = std::shared_ptr<Handshaker>;
+using HandshakerSharedPtr = std::shared_ptr<Handshaker>;
 
 class HandshakerFactoryContext {
 public:
@@ -74,7 +74,7 @@ public:
   virtual absl::string_view alpnProtocols() const PURE;
 };
 
-using HandshakerFactoryCb = std::function<HandshakerPtr(bssl::UniquePtr<SSL>)>;
+using HandshakerFactoryCb = std::function<HandshakerSharedPtr(bssl::UniquePtr<SSL>)>;
 
 class HandshakerFactory : public Config::TypedFactory {
 public:

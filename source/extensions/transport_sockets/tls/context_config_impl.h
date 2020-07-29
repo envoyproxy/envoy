@@ -62,7 +62,7 @@ public:
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
           dynamic_cvc);
 
-  Ssl::HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl) const override;
+  Ssl::HandshakerSharedPtr createHandshaker(bssl::UniquePtr<SSL> ssl) const override;
 
   bool requireCertificates() const override { return require_certificates_; }
 

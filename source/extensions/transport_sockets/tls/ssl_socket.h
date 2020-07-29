@@ -55,7 +55,7 @@ private:
 
 class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 public:
-  SslSocketInfo(Ssl::HandshakerPtr handshaker, ContextImplSharedPtr ctx);
+  SslSocketInfo(Ssl::HandshakerSharedPtr handshaker, ContextImplSharedPtr ctx);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -83,7 +83,7 @@ public:
 
   // Owns a shared ptr to the Handshaker for access to the SSL*, even after
   // SslSocket is destroyed.
-  Ssl::HandshakerPtr handshaker_;
+  Ssl::HandshakerSharedPtr handshaker_;
 
 private:
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
@@ -152,7 +152,7 @@ private:
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
-  Ssl::HandshakerPtr handshaker_;
+  Ssl::HandshakerSharedPtr handshaker_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
   Envoy::Ssl::SocketState state_;

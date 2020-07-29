@@ -78,7 +78,7 @@ public:
   /**
    * @return the handshaker to use for TLS handshakes.
    */
-  virtual Ssl::HandshakerPtr createHandshaker(bssl::UniquePtr<SSL> ssl) const PURE;
+  virtual Ssl::HandshakerSharedPtr createHandshaker(bssl::UniquePtr<SSL> ssl) const PURE;
 
   /**
    * @return whether or not this context requires certificates for TLS

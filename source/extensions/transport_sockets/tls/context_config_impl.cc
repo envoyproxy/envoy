@@ -243,7 +243,7 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
   return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc, api_);
 }
 
-Ssl::HandshakerPtr ContextConfigImpl::createHandshaker(bssl::UniquePtr<SSL> ssl) const {
+Ssl::HandshakerSharedPtr ContextConfigImpl::createHandshaker(bssl::UniquePtr<SSL> ssl) const {
   return handshaker_factory_cb_(std::move(ssl));
 }
 

@@ -289,7 +289,7 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
   return certificate_validation_status_;
 }
 
-SslSocketInfo::SslSocketInfo(Ssl::HandshakerPtr handshaker, ContextImplSharedPtr ctx)
+SslSocketInfo::SslSocketInfo(Ssl::HandshakerSharedPtr handshaker, ContextImplSharedPtr ctx)
     : handshaker_(handshaker) {
   SSL_set_ex_data(ssl(), ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
 }
