@@ -16,7 +16,7 @@ std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
         NetworkFilterNames::get().ZooKeeperProxy, // assert error in onWrite()
         NetworkFilterNames::get().KafkaBroker, NetworkFilterNames::get().MongoProxy,
         NetworkFilterNames::get().MySQLProxy,
-        // TODO(Jianwen Dong) Add "NetworkFilterNames::get().Postgres" after its issues are fixed.
+        // TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after its issues are fixed.
     };
   }
   return filter_names;
