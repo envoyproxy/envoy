@@ -85,7 +85,7 @@ public:
   };
 
   ActiveTcpClient(ConnPoolImpl& parent, const Upstream::HostConstSharedPtr& host,
-                  uint64_t concurrent_request_limit);
+                  uint64_t concurrent_stream_limit);
   ~ActiveTcpClient() override;
 
   // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
@@ -137,11 +137,11 @@ public:
     // Legacy behavior for the TCP connection pool marks all connecting clients
     // as draining.
     for (auto& connecting_client : connecting_clients_) {
-      if (connecting_client->remaining_requests_ > 1) {
+      if (connecting_client->remaining_streams_ > 1) {
         uint64_t old_limit = connecting_client->effectiveConcurrentRequestLimit();
-        connecting_client->remaining_requests_ = 1;
+        connecting_client->remaining_streams_ = 1;
         if (connecting_client->effectiveConcurrentRequestLimit() < old_limit) {
-          connecting_request_capacity_ -=
+          connecting_stream_capacity_ -=
               (old_limit - connecting_client->effectiveConcurrentRequestLimit());
         }
       }
@@ -162,10 +162,10 @@ public:
 
   ConnectionPool::Cancellable*
   newPendingRequest(Envoy::ConnectionPool::AttachContext& context) override {
-    Envoy::ConnectionPool::PendingRequestPtr pending_request =
+    Envoy::ConnectionPool::PendingRequestPtr pending_stream =
         std::make_unique<TcpPendingRequest>(*this, typedContext<TcpAttachContext>(context));
-    pending_request->moveIntoList(std::move(pending_request), pending_requests_);
-    return pending_requests_.front().get();
+    pending_stream->moveIntoList(std::move(pending_stream), pending_streams_);
+    return pending_streams_.front().get();
   }
 
   Upstream::HostDescriptionConstSharedPtr host() const override {
@@ -196,7 +196,7 @@ public:
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) {
     if (client.state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY) {
-      if (!pending_requests_.empty() && !upstream_ready_enabled_) {
+      if (!pending_streams_.empty() && !upstream_ready_enabled_) {
         upstream_ready_cb_->scheduleCallbackCurrentIteration();
       }
     }

@@ -170,7 +170,6 @@ public:
   const ScopeTrackedObject* scope_{};
   bool enabled_{};
 
-private:
   Event::TimerCb callback_;
 };
 

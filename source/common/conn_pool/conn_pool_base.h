@@ -28,8 +28,8 @@ class ActiveClient : public LinkedObject<ActiveClient>,
                      public Event::DeferredDeletable,
                      protected Logger::Loggable<Logger::Id::pool> {
 public:
-  ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_request_limit,
-               uint64_t concurrent_request_limit);
+  ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_stream_limit,
+               uint64_t concurrent_stream_limit);
   ~ActiveClient() override;
 
   void releaseResources();
@@ -42,33 +42,33 @@ public:
   // Called if the connection does not complete within the cluster's connectTimeout()
   void onConnectTimeout();
 
-  // Returns the concurrent request limit, accounting for if the total request limit
-  // is less than the concurrent request limit.
+  // Returns the concurrent stream limit, accounting for if the total stream limit
+  // is less than the concurrent stream limit.
   uint64_t effectiveConcurrentRequestLimit() const {
-    return std::min(remaining_requests_, concurrent_request_limit_);
+    return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
   // Closes the underlying connection.
   virtual void close() PURE;
   // Returns the ID of the underlying connection.
   virtual uint64_t id() const PURE;
-  // Returns true if this closed with an incomplete request, for stats tracking/ purposes.
+  // Returns true if this closed with an incomplete stream, for stats tracking/ purposes.
   virtual bool closingWithIncompleteRequest() const PURE;
-  // Returns the number of active requests on this connection.
+  // Returns the number of active streams on this connection.
   virtual size_t numActiveRequests() const PURE;
 
   enum class State {
     CONNECTING, // Connection is not yet established.
-    READY,      // Additional requests may be immediately dispatched to this connection.
-    BUSY,       // Connection is at its concurrent request limit.
-    DRAINING,   // No more requests can be dispatched to this connection, and it will be closed
-    // when all requests complete.
+    READY,      // Additional streams may be immediately dispatched to this connection.
+    BUSY,       // Connection is at its concurrent stream limit.
+    DRAINING,   // No more streams can be dispatched to this connection, and it will be closed
+    // when all streams complete.
     CLOSED // Connection is closed and object is queued for destruction.
   };
 
   ConnPoolImplBase& parent_;
-  uint64_t remaining_requests_;
-  const uint64_t concurrent_request_limit_;
+  uint64_t remaining_streams_;
+  const uint64_t concurrent_stream_limit_;
   State state_{State::CONNECTING};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
@@ -78,6 +78,7 @@ public:
   bool timed_out_{false};
 };
 
+// TODO(alyssawilk) renames for Request classes and functions -> Stream classes and functions.
 // PendingRequest is the base class for a connection which has been created but not yet established.
 class PendingRequest : public LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
 public:
@@ -98,7 +99,7 @@ using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
 using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
-// Base class that handles request queueing logic shared between connection pool implementations.
+// Base class that handles stream queueing logic shared between connection pool implementations.
 class ConnPoolImplBase : protected Logger::Loggable<Logger::Id::pool> {
 public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
@@ -128,11 +129,11 @@ public:
   // Gets a pointer to the list that currently owns this client.
   std::list<ActiveClientPtr>& owningList(ActiveClient::State state);
 
-  // Removes the PendingRequest from the list of requests. Called when the PendingRequest is
+  // Removes the PendingRequest from the list of streams. Called when the PendingRequest is
   // cancelled, e.g. when the stream is reset before a connection has been established.
-  void onPendingRequestCancel(PendingRequest& request, Envoy::ConnectionPool::CancelPolicy policy);
+  void onPendingRequestCancel(PendingRequest& stream, Envoy::ConnectionPool::CancelPolicy policy);
 
-  // Fails all pending requests, calling onPoolFailure on the associated callbacks.
+  // Fails all pending streams, calling onPoolFailure on the associated callbacks.
   void purgePendingRequests(const Upstream::HostDescriptionConstSharedPtr& host_description,
                             absl::string_view failure_reason,
                             ConnectionPool::PoolFailureReason pool_failure_reason);
@@ -151,10 +152,6 @@ public:
 
   virtual ConnectionPool::Cancellable* newPendingRequest(AttachContext& context) PURE;
 
-  // Creates a new connection if allowed by resourceManager, or if created to avoid
-  // starving this pool.
-  void tryCreateNewConnection();
-
   void attachRequestToClient(Envoy::ConnectionPool::ActiveClient& client, AttachContext& context);
 
   virtual void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
@@ -162,8 +159,8 @@ public:
                              ConnectionPool::PoolFailureReason pool_failure_reason,
                              AttachContext& context) PURE;
   virtual void onPoolReady(ActiveClient& client, AttachContext& context) PURE;
-  // Called by derived classes any time a request is completed or destroyed for any reason.
-  void onRequestClosed(Envoy::ConnectionPool::ActiveClient& client, bool delay_attaching_request);
+  // Called by derived classes any time a stream is completed or destroyed for any reason.
+  void onRequestClosed(Envoy::ConnectionPool::ActiveClient& client, bool delay_attaching_stream);
 
   const Upstream::HostConstSharedPtr& host() const { return host_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
@@ -174,6 +171,23 @@ public:
   }
 
 protected:
+  // Creates up to 3 connections, based on the prefetch ratio.
+  void tryCreateNewConnections();
+
+  // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
+  // to avoid starving this pool.
+  bool tryCreateNewConnection();
+
+  // A helper function which determines if a canceled pending connection should
+  // be closed as excess or not.
+  bool connectingConnectionIsExcess() const;
+
+  // A helper function which determines if a new incoming stream should trigger
+  // connection prefetch.
+  bool shouldCreateNewConnection() const;
+
+  float prefetchRatio() const;
+
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
 
@@ -181,30 +195,29 @@ protected:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
-protected:
   std::list<Instance::DrainedCb> drained_callbacks_;
-  std::list<PendingRequestPtr> pending_requests_;
+  std::list<PendingRequestPtr> pending_streams_;
 
-  // When calling purgePendingRequests, this list will be used to hold the requests we are about
-  // to purge. We need this if one cancelled requests cancels a different pending request
-  std::list<PendingRequestPtr> pending_requests_to_purge_;
+  // When calling purgePendingRequests, this list will be used to hold the streams we are about
+  // to purge. We need this if one cancelled streams cancels a different pending stream
+  std::list<PendingRequestPtr> pending_streams_to_purge_;
 
-  // Clients that are ready to handle additional requests.
+  // Clients that are ready to handle additional streams.
   // All entries are in state READY.
   std::list<ActiveClientPtr> ready_clients_;
 
-  // Clients that are not ready to handle additional requests due to being BUSY or DRAINING.
+  // Clients that are not ready to handle additional streams due to being BUSY or DRAINING.
   std::list<ActiveClientPtr> busy_clients_;
 
-  // Clients that are not ready to handle additional requests because they are CONNECTING.
+  // Clients that are not ready to handle additional streams because they are CONNECTING.
   std::list<ActiveClientPtr> connecting_clients_;
 
-  // The number of requests currently attached to clients.
-  uint64_t num_active_requests_{0};
+  // The number of streams currently attached to clients.
+  uint64_t num_active_streams_{0};
 
-  // The number of requests that can be immediately dispatched
+  // The number of streams that can be immediately dispatched
   // if all CONNECTING connections become connected.
-  uint64_t connecting_request_capacity_{0};
+  uint64_t connecting_stream_capacity_{0};
 };
 
 } // namespace ConnectionPool

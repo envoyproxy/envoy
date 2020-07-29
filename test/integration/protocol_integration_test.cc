@@ -1921,6 +1921,27 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_prefetch_policy()->mutable_prefetch_ratio()->set_value(1.5);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  FakeHttpConnectionPtr fake_upstream_connection_two;
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // For HTTP/1.1 there should be a prefetched connection.
+    ASSERT_TRUE(
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_two));
+  } else {
+    // For HTTP/2, the original connection can accommodate two requests.
+    ASSERT_FALSE(fake_upstreams_[0]->waitForHttpConnection(
+        *dispatcher_, fake_upstream_connection_two, std::chrono::milliseconds(5)));
+  }
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
   initialize();
