@@ -62,7 +62,7 @@ public:
   virtual SSL* ssl() PURE;
 };
 
-using HandshakerPtr = std::unique_ptr<Handshaker>;
+using HandshakerPtr = std::shared_ptr<Handshaker>;
 
 class HandshakerFactoryContext {
 public:

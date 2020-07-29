@@ -58,7 +58,7 @@ public:
                                               ProtobufMessage::ValidationVisitor&) override {
     // The default HandshakerImpl doesn't take a config or use the HandshakerFactoryContext.
     return
-        [](bssl::UniquePtr<SSL> ssl) { return std::make_unique<HandshakerImpl>(std::move(ssl)); };
+        [](bssl::UniquePtr<SSL> ssl) { return std::make_shared<HandshakerImpl>(std::move(ssl)); };
   }
 
   bool requireCertificates() const override {

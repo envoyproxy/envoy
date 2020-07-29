@@ -55,7 +55,7 @@ private:
 
 class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 public:
-  SslSocketInfo(SSL* ssl, ContextImplSharedPtr ctx);
+  SslSocketInfo(Ssl::HandshakerPtr handshaker, ContextImplSharedPtr ctx);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -79,9 +79,11 @@ public:
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
   absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
-  SSL* ssl() const { return ssl_; }
+  SSL* ssl() const { return handshaker_->ssl(); }
 
-  SSL* ssl_;
+  // Owns a shared ptr to the Handshaker for access to the SSL*, even after
+  // SslSocket is destroyed.
+  Ssl::HandshakerPtr handshaker_;
 
 private:
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
