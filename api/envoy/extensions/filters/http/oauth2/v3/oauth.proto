@@ -29,9 +29,13 @@ message OAuth2Credentials {
   transport_sockets.tls.v3.SdsSecretConfig token_secret = 2
       [(validate.rules).message = {required: true}];
 
-  // The secret used to perform the HMAC validation.
-  transport_sockets.tls.v3.SdsSecretConfig hmac_secret = 3
-      [(validate.rules).message = {required: true}];
+  // Configures how the secret token should be created.
+  oneof token_formation {
+    option (validate.required) = true;
+
+    // If present, the secret token will be a HMAC using the provided secret.
+    transport_sockets.tls.v3.SdsSecretConfig hmac_secret = 3;
+  }
 }
 
 // OAuth config
