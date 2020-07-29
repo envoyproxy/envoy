@@ -201,6 +201,7 @@ public:
   }
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
   virtual bool supportsHttp10() { return false; }
+  virtual bool allowChunkedLength() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
   virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
   CodecStats& stats() { return stats_; }
@@ -220,8 +221,7 @@ public:
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers,
-                 bool allow_chunked_lenght);
+                 HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
   bool resetStreamCalled() { return reset_stream_called_; }
   void onMessageBeginBase();
@@ -427,6 +427,7 @@ public:
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
+  bool allowChunkedLength() override { return codec_settings_.allow_chunked_length; }
 
 protected:
   /**

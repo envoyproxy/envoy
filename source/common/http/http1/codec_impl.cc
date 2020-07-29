@@ -444,8 +444,7 @@ http_parser_settings ConnectionImpl::settings_{
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
-                               HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers,
-                               bool allow_chunked_length)
+                               HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
     : connection_(connection), stats_(stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
@@ -460,9 +459,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
-  if (allow_chunked_length) {
-    parser_.allow_chunked_length = 1;
-  }
+  parser_.allow_chunked_length = 1;
   parser_.data = this;
 }
 
@@ -767,8 +764,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
-                     max_request_headers_count, formatter(settings), settings.enable_trailers_,
-                     settings.allow_chunked_length),
+                     max_request_headers_count, formatter(settings), settings.enable_trailers_),
       callbacks_(callbacks), codec_settings_(settings),
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
@@ -891,8 +887,20 @@ int ServerConnectionImpl::onHeadersComplete() {
     // (Section 9.4) and ought to be handled as an error. A sender MUST
     // remove the received Content-Length field prior to forwarding such
     // a message downstream.
-    if (parser_.flags & F_CHUNKED && headers->ContentLength()) {
-      headers->removeContentLength();
+
+    // Reject request with Http::Code::BadRequest by default or remove Content-Length header
+    // and serve request if allowed by http1 codec settings.
+    if (parser_.uses_transfer_encoding != 0 &&
+        (parser_.content_length > 0 && parser_.content_length != ULLONG_MAX)) {
+      if ((parser_.flags & F_CHUNKED) && allowChunkedLength()) {
+        headers->removeContentLength();
+      } else {
+        ENVOY_CONN_LOG(error, "Both 'Content-Length' and 'Transfer-Encdoding' are set.",
+                       connection_);
+        error_code_ = Http::Code::BadRequest;
+        sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
+        throw CodecProtocolException("Both Content-Length and Transfer-Encdoding headers are set.");
+      }
     }
 
     // Determine here whether we have a body or not. This uses the new RFC semantics where the
@@ -1073,8 +1081,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Code
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count, formatter(settings), settings.enable_trailers_,
-                     settings.allow_chunked_length) {}
+                     max_response_headers_count, formatter(settings), settings.enable_trailers_) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {
