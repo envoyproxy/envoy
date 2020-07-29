@@ -464,21 +464,21 @@ private:
                   prev_by_name->name(), prev_by_name->configType());
       }
 
-      for (auto [deprecated_name, restored_name] : prev_deprecated_names) {
+      for (auto [prev_deprecated_name, instead_name] : prev_deprecated_names) {
         deprecatedFactoryNames().erase(deprecated_name);
 
         ENVOY_LOG(info, "Removed deprecated name '{}'", deprecated_name);
 
-        if (!restored_name.empty()) {
-          deprecatedFactoryNames().emplace(std::make_pair(deprecated_name, restored_name));
+        if (!instead_name.empty()) {
+          deprecatedFactoryNames().emplace(std::make_pair(deprecated_name, instead_name));
 
-          auto* deprecated_factory = getFactory(restored_name);
+          auto* deprecated_factory = getFactory(instead_name);
           RELEASE_ASSERT(deprecated_factory != nullptr,
                          "failed to restore deprecated factory name");
-          factories().emplace(restored_name, deprecated_factory);
+          factories().emplace(instead_name, deprecated_factory);
 
           ENVOY_LOG(info, "Restored deprecated name '{}' (mapped to '{}'", deprecated_name,
-                    restored_name);
+                    instead_name);
         }
       }
 
