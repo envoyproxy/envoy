@@ -52,7 +52,8 @@ public:
     ON_CALL(init_manager_, initialize(_))
         .WillByDefault(Invoke(
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
-    EXPECT_CALL(factory_context_.admin_, concurrency()).WillRepeatedly(Return(0));
+    // Thread local storage assumes a single (master) thread with no workers.
+    ON_CALL(factory_context_.admin_, concurrency()).WillByDefault(Return(0));
   }
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
