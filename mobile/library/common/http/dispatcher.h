@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unordered_map>
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/api_listener.h"
@@ -14,6 +12,7 @@
 #include "common/common/thread_synchronizer.h"
 #include "common/http/codec_helper.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 #include "library/common/types/c_types.h"
 
@@ -237,7 +236,7 @@ private:
   // Related issue: https://github.com/lyft/envoy-mobile/issues/720
   const std::string stats_prefix_;
   absl::optional<DispatcherStats> stats_ GUARDED_BY(ready_lock_){};
-  // std::unordered_map does is not safe for concurrent access. Thus a cross-thread, concurrent find
+  // absl::flat_hash_map is not safe for concurrent access. Thus a cross-thread, concurrent find
   // in cancellation (which happens in a platform thread) with an erase (which always happens in the
   // Envoy Main thread) is not safe.
   // TODO: implement a lock-free access scheme here.
@@ -248,7 +247,7 @@ private:
   // streams_lock_ small to make it easier to remove; one could easily use the lock in the
   // Dispatcher::resetStream to avoid using shared_ptrs.
   // @see Dispatcher::resetStream.
-  std::unordered_map<envoy_stream_t, DirectStreamSharedPtr> streams_ GUARDED_BY(streams_lock_);
+  absl::flat_hash_map<envoy_stream_t, DirectStreamSharedPtr> streams_ GUARDED_BY(streams_lock_);
   std::atomic<envoy_network_t>& preferred_network_;
   // Shared synthetic address across DirectStreams.
   Network::Address::InstanceConstSharedPtr address_;

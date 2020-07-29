@@ -268,4 +268,11 @@ node:
     app_id : {{ app_id }}
     app_version : {{ app_version }}
     os: {{ device_os }}
+# Needed due to warning in https://github.com/envoyproxy/envoy/blob/6eb7e642d33f5a55b63c367188f09819925fca34/source/server/server.cc#L546
+layered_runtime:
+  layers:
+    - name: static_layer_0
+      static_layer:
+        overload:
+          global_downstream_max_connections: 50000
 )";

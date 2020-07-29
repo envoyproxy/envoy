@@ -47,6 +47,7 @@ public:
   DispatcherIntegrationTest() : BaseIntegrationTest(GetParam(), bootstrap_config()) {
     use_lds_ = false;
     autonomous_upstream_ = true;
+    defer_listener_finalization_ = true;
   }
 
   void SetUp() override {
