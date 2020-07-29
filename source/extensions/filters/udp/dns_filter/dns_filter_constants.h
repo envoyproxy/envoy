@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdint.h>
+#include "envoy/common/platform.h"
 
 namespace Envoy {
 namespace Extensions {
