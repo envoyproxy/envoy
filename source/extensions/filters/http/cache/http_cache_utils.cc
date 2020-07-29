@@ -188,7 +188,7 @@ absl::optional<uint64_t> HttpCacheUtils::readAndRemoveLeadingDigits(absl::string
   uint32_t bytes_consumed = 0;
 
   for (const char cur : str) {
-    if (cur < '0' || cur > '9') {
+    if (!absl::ascii_isdigit(cur)) {
       break;
     }
     uint64_t new_val = (val * 10) + (cur - '0');

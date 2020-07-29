@@ -238,15 +238,15 @@ std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMa
 
     // Handle suffix range (e.g., -123).
     if (!first) {
-      first = UINT64_MAX;
+      first = std::numeric_limits<uint64_t>::max();
     }
 
     // Handle optional range-end (e.g., 123-).
     if (!last) {
-      last = UINT64_MAX;
+      last = std::numeric_limits<uint64_t>::max();
     }
 
-    if (first != UINT64_MAX && first > last) {
+    if (first != std::numeric_limits<uint64_t>::max() && first > last) {
       ENVOY_LOG(debug, "Invalid format for range header: range-start and range-end out of order. "
                        "Ignoring range header.");
       return {};

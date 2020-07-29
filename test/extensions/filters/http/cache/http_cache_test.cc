@@ -343,7 +343,7 @@ TEST(ParseRangesTest, MissingLastBytePos) {
   ASSERT_EQ(1, result_vector.size());
 
   ASSERT_EQ(6, result_vector[0].firstBytePos());
-  ASSERT_EQ(UINT64_MAX, result_vector[0].lastBytePos());
+  ASSERT_EQ(std::numeric_limits<uint64_t>::max(), result_vector[0].lastBytePos());
 }
 
 TEST(ParseRangesTest, MultipleRanges) {
@@ -399,6 +399,7 @@ INSTANTIATE_TEST_SUITE_P(
                     "12",
                     "a",
                     "a1",
+                    "bytes=",
                     "bytes=-",
                     "bytes1-2",
                     "bytes=12",
@@ -422,6 +423,7 @@ INSTANTIATE_TEST_SUITE_P(
                     "bytes=1-2,3a-4",
                     "bytes=1-2,3-4a",
                     "bytes=1-2,3-4-5",
+                    "bytes=1-2,bytes=3-4",
                     "bytes=1-2,3-4,a",
                     // too many byte ranges (test sets the limit as 5)
                     "bytes=0-1,1-2,2-3,3-4,4-5,5-6",
