@@ -281,7 +281,8 @@ void XdsFuzzTest::replay() {
                                      timeout_);
       test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved(),
                                      timeout_);
-      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_, timeout_);
+      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_,
+                                     timeout_);
     }
     ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})",
                    verifier_.numWarming(),
