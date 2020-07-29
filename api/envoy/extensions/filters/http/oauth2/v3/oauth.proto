@@ -67,7 +67,7 @@ message OAuth2Config {
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 8;
 
-  // Any request that matches any of the providede matcher will be passed through without OAuth validation.
+  // Any request that matches any of the provided matchers will be passed through without OAuth validation.
   repeated config.route.v3.HeaderMatcher pass_through_matcher = 9;
 }
 
