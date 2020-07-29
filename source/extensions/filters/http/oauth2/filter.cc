@@ -14,6 +14,7 @@
 #include "common/common/matchers.h"
 #include "common/crypto/utility.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/url_utility.h"
@@ -56,6 +57,18 @@ constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
 const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
 const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
+
+template <class T>
+std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_protos) {
+  std::vector<Http::HeaderUtility::HeaderData> matchers;
+  matchers.reserve(matcher_protos.size());
+
+  for (const auto& proto : matcher_protos) {
+    matchers.emplace_back(proto);
+  }
+
+  return matchers;
+}
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -67,7 +80,7 @@ FilterConfig::FilterConfig(
       oauth_token_path_(proto_config.token_path()), signout_path_(proto_config.signout_path()),
       secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
-      pass_through_options_method_(proto_config.pass_through_options_method()) {
+      pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
   if (!cluster_manager.get(cluster_name_)) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -308,10 +321,8 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
 
   // Skip authentication for HTTP method OPTIONS for CORS preflight requests to skip forbidden
   // redirects to the auth server. Must be opted in from the proto configuration.
-  if (config_->passThroughOptionsMethod()) {
-    const Http::HeaderEntry* method_header = headers.Method();
-    if (method_header != nullptr &&
-        method_header->value().getStringView() == Http::Headers::get().MethodValues.Options) {
+  for (const auto& matcher : config_->passThroughMatchers()) {
+    if (matcher.matchesHeaders(headers)) {
       return true;
     }
   }

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.oauth2.v4alpha;
 
+import "envoy/config/route/v4alpha/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
 
 import "google/protobuf/duration.proto";
@@ -72,8 +73,8 @@ message OAuth2Config {
   // Forward the OAuth token as a Bearer to upstream web service.
   bool forward_bearer_token = 8;
 
-  // Allow HTTP OPTIONS requests to pass-through (CORS preflight workaround).
-  bool pass_through_options_method = 9;
+  // Any request that matches any of the providede matcher will be passed through without OAuth validation.
+  repeated config.route.v4alpha.HeaderMatcher pass_through_matcher = 9;
 }
 
 // Filter config.

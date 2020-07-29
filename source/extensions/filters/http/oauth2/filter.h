@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/config/datasource.h"
+#include "common/http/header_utility.h"
 #include "common/http/rest_api_fetcher.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
@@ -92,7 +93,9 @@ public:
   const std::string& clusterName() const { return cluster_name_; }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
-  bool passThroughOptionsMethod() const { return pass_through_options_method_; }
+  const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
+    return pass_through_header_matchers_;
+  }
   const std::string& oauthServerHostname() const { return oauth_server_hostname_; }
   const std::string& oauthTokenPath() const { return oauth_token_path_; }
   const std::string& callbackPath() const { return callback_path_; }
@@ -113,7 +116,7 @@ private:
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;
   const bool forward_bearer_token_ : 1;
-  const bool pass_through_options_method_ : 1;
+  const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

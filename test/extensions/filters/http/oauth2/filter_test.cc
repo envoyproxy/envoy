@@ -79,7 +79,9 @@ public:
     p.set_callback_path(TEST_CALLBACK);
     p.set_signout_path("/_signout");
     p.set_forward_bearer_token(true);
-    p.set_pass_through_options_method(true);
+    auto* matcher = p.add_pass_through_matcher();
+    matcher->set_name(":method");
+    matcher->set_exact_match("OPTIONS");
     p.mutable_credentials()->set_client_id(TEST_CLIENT_ID);
 
     // Create the OAuth config.
