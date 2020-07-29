@@ -17,7 +17,7 @@ std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
       NetworkFilterNames::get().KafkaBroker,
       NetworkFilterNames::get().MongoProxy,
       NetworkFilterNames::get().MySQLProxy,
-      NetworkFilterNames::get().Postgres
+      //TODO(Jianwen Dong) Add "NetworkFilterNames::get().Postgres" after its issues are fixed.
     };
   }
   return filter_names;
