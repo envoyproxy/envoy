@@ -69,11 +69,13 @@ public:
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Http::RequestHeaderMap& request_headers) override;
-  void setBaggage(absl::string_view, absl::string_view) override;
-  std::string getBaggage(absl::string_view) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
+
+  // opencensus doesn't support baggage, so noop these OpenTracing functions
+  void setBaggage(absl::string_view, absl::string_view) override;
+  std::string getBaggage(absl::string_view) override;
 
 private:
   ::opencensus::trace::Span span_;
