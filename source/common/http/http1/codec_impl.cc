@@ -377,12 +377,12 @@ void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end
   bool is_connect = HeaderUtility::isConnect(headers);
 
   // TODO(#10878): Include missing host header for CONNECT.
-  // The ENVOY_BUG below introduces a possible change to the existing behavior of `encodeHeaders`.
-  // The `encodeHeaders` used to throw on errors, but callers of `encodeHeaders()` do not catch
-  // exceptions and this would cause an abnormal process termination in error cases. This change
-  // replaces abnormal process termination from unhandled exception with the ENVOY_BUG. Further work
-  // will replace this RELEASE_ASSERT with proper error handling.
-  ENVOY_BUG(method && (path || is_connect), ":method and :path must be specified");
+  // The RELEASE_ASSERT below does not change the existing behavior of `encodeHeaders`.
+  // The `encodeHeaders` used to throw on errors. Callers of `encodeHeaders()` do not catch
+  // exceptions and this would cause abnormal process termination in error cases. This change
+  // replaces abnormal process termination from unhandled exception with the RELEASE_ASSERT. Further
+  // work will replace this RELEASE_ASSERT with proper error handling.
+  RELEASE_ASSERT(method && (path || is_connect), ":method and :path must be specified");
 
   if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
