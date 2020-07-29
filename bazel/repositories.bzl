@@ -862,13 +862,13 @@ filegroup(
     )
 
 def _org_unicode_icuuc():
-     location = _get_location("org_unicode_icuuc")
+    location = _get_location("org_unicode_icuuc")
 
-     _repository_impl(
-         name = "org_unicode_icuuc",
-         build_file = "@envoy//bazel/external:icuuc.BUILD",
-         patches = ["@envoy//bazel/external/icu/data:udata.patch"],
-     )
+    _repository_impl(
+        name = "org_unicode_icuuc",
+        build_file = "@envoy//bazel/external:icuuc.BUILD",
+        patches = ["@envoy//bazel/external/icu/data:udata.patch"],
+    )
 
 def _foreign_cc_dependencies():
     _repository_impl("rules_foreign_cc")

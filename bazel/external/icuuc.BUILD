@@ -43,8 +43,8 @@ cc_library(
     includes = ["source/common"],
     visibility = ["//visibility:public"],
     deps = [
+        ":data",
         ":icuuc",
-        ":data"
     ],
 )
 
