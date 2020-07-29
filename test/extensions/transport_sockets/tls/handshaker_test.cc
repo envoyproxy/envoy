@@ -39,8 +39,8 @@ int PemPasswordCallback(char* buf, int buf_size, int, void* u) {
 class MockHandshakerCallbacks : public Ssl::HandshakerCallbacks {
 public:
   ~MockHandshakerCallbacks() override{};
-  MOCK_METHOD(void, OnSuccessCb, (SSL*), (override));
-  MOCK_METHOD(void, OnFailureCb, (), (override));
+  MOCK_METHOD(void, onSuccessCb, (SSL*), (override));
+  MOCK_METHOD(void, onFailureCb, (), (override));
 };
 
 class HandshakerTest : public SslCertsTest {
@@ -118,7 +118,7 @@ TEST_F(HandshakerTest, NormalOperation) {
   handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
 
   StrictMock<MockHandshakerCallbacks> callbacks;
-  EXPECT_CALL(callbacks, OnSuccessCb).Times(1);
+  EXPECT_CALL(callbacks, onSuccessCb).Times(1);
 
   auto socket_state = Ssl::SocketState::PreHandshake;
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
@@ -151,7 +151,7 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
 
   StrictMock<MockHandshakerCallbacks> callbacks;
-  EXPECT_CALL(callbacks, OnFailureCb).Times(1);
+  EXPECT_CALL(callbacks, onFailureCb).Times(1);
 
   auto socket_state = Ssl::SocketState::PreHandshake;
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
@@ -185,7 +185,7 @@ public:
     int rc = SSL_do_handshake(ssl());
     if (rc == 1) {
       state = Ssl::SocketState::HandshakeComplete;
-      callbacks.OnSuccessCb(ssl());
+      callbacks.onSuccessCb(ssl());
       return Network::PostIoAction::Close;
     } else {
       switch (SSL_get_error(ssl(), rc)) {
@@ -198,7 +198,7 @@ public:
         requested_cert_cb_();
         return Network::PostIoAction::KeepOpen;
       default:
-        callbacks.OnFailureCb();
+        callbacks.onFailureCb();
         return Network::PostIoAction::Close;
       }
     }
@@ -230,7 +230,7 @@ TEST_F(HandshakerTest, NormalOperationWithHandshakerImplForTest) {
   handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
 
   StrictMock<MockHandshakerCallbacks> callbacks;
-  EXPECT_CALL(callbacks, OnSuccessCb).Times(1);
+  EXPECT_CALL(callbacks, onSuccessCb).Times(1);
 
   auto socket_state = Ssl::SocketState::PreHandshake;
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum

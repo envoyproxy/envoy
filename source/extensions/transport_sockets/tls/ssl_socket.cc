@@ -175,11 +175,11 @@ void SslSocket::onPrivateKeyMethodComplete() {
   }
 }
 
-void SslSocket::OnSuccessCb(SSL* ssl) {
+void SslSocket::onSuccessCb(SSL* ssl) {
   ctx_->logHandshake(ssl);
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
-void SslSocket::OnFailureCb() { drainErrorQueue(); }
+void SslSocket::onFailureCb() { drainErrorQueue(); }
 
 PostIoAction SslSocket::doHandshake() { return handshaker_->doHandshake(state_, *this); }
 

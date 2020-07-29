@@ -126,8 +126,8 @@ public:
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakerCallbacks
-  void OnSuccessCb(SSL* ssl) override;
-  void OnFailureCb() override;
+  void onSuccessCb(SSL* ssl) override;
+  void onFailureCb() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 

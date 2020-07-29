@@ -19,11 +19,11 @@ public:
   /**
    * Called when a handshake is successfully performed.
    */
-  virtual void OnSuccessCb(SSL* ssl) PURE;
+  virtual void onSuccessCb(SSL* ssl) PURE;
   /**
    * Called when a handshake fails.
    */
-  virtual void OnFailureCb() PURE;
+  virtual void onFailureCb() PURE;
 };
 
 /*
@@ -41,7 +41,7 @@ public:
    *  * |state| is a mutable reference.
    *  * |callbacks| is only expected to exist for the duration of the
    *    doHandshake() call. If the handshake was successful,
-   *    HandshakerCallbacks::OnSuccessCb() should be called within the execution
+   *    HandshakerCallbacks::onSuccessCb() should be called within the execution
    *    of doHandshake(). |callbacks| should not be cached in the
    *    HandshakerImpl.
    */
