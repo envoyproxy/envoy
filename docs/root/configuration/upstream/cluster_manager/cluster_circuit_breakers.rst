@@ -11,14 +11,14 @@ The following is an example circuit breaker configuration:
 .. code-block:: yaml
 
   circuit_breakers:
-  thresholds:
-    - priority: "DEFAULT"
-      max_requests: 75
-      max_pending_requests: 35
-      retry_budget:
-        budget_percent:
-          value: 25.0
-        min_retry_concurrency: 10
+    thresholds:
+      - priority: "DEFAULT"
+        max_requests: 75
+        max_pending_requests: 35
+        retry_budget:
+          budget_percent:
+            value: 25.0
+          min_retry_concurrency: 10
 
 Runtime
 -------
