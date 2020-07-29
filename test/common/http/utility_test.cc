@@ -1290,11 +1290,8 @@ TEST(Url, ParsingTest) {
   validateUrl("https://www.host.com:8443", "https", "www.host.com:8443", "/", 8443);
   validateUrl("http://www.host.com:8080", "http", "www.host.com:8080", "/", 8080);
 
-#if !defined(__APPLE__) && !defined(WIN32)
-  // TODO(dio): Fix the unicode data (static) linking for macOS and Windows.
   // Make sure we can parse unicode URL.
   validateUrl("https://\xe5\x85\x89.example/", "https", "xn--54q.example", "/", 443);
-#endif
 }
 
 void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port,

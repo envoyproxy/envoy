@@ -862,19 +862,13 @@ filegroup(
     )
 
 def _org_unicode_icuuc():
-    location = _get_location("org_unicode_icuuc")
-    http_archive(
-        name = "org_unicode_icuuc_default",
-        build_file_content = BUILD_ALL_CONTENT,
-        patches = ["@envoy//bazel/foreign_cc:icuuc.patch"],
-        **location
-    )
+     location = _get_location("org_unicode_icuuc")
 
-    _repository_impl(
-        name = "org_unicode_icuuc",
-        build_file = "@envoy//bazel/external:icuuc.BUILD",
-        # TODO(dio): Consider patching udata when we need to embed some data.
-    )
+     _repository_impl(
+         name = "org_unicode_icuuc",
+         build_file = "@envoy//bazel/external:icuuc.BUILD",
+         patches = ["@envoy//bazel/external/icu/data:udata.patch"],
+     )
 
 def _foreign_cc_dependencies():
     _repository_impl("rules_foreign_cc")

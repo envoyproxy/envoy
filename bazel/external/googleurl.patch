@@ -68,10 +68,10 @@ index 604cc81..87fe7ce 100644
      visibility = ["//visibility:public"],
      deps = [
 diff --git a/build_config/build_config.bzl b/build_config/build_config.bzl
-index d5fca65..dcada36 100644
+index d5fca65..0d6cc11 100644
 --- a/build_config/build_config.bzl
 +++ b/build_config/build_config.bzl
-@@ -1,8 +1,32 @@
+@@ -1,8 +1,28 @@
 -_default_copts = [
 -    "-std=c++14",
 -    "-fno-strict-aliasing",
@@ -96,11 +96,7 @@ index d5fca65..dcada36 100644
 +    "//conditions:default": ["string_util_posix.h"],
 +})
 +
-+_icuuc_deps = select({
-+    "@envoy//bazel:apple": ["@org_unicode_icuuc//:common"],
-+    "@envoy//bazel:windows_x86_64": ["@org_unicode_icuuc//:common"],
-+    "//conditions:default": ["@envoy//bazel/foreign_cc:icuuc"],
-+})
++_icuuc_deps = ["@org_unicode_icuuc//:common"]
 
  build_config = struct(
      default_copts = _default_copts,

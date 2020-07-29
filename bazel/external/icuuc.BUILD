@@ -30,7 +30,9 @@ icuuc_copts = [
 
 cc_library(
     name = "headers",
-    hdrs = glob(["source/common/unicode/*.h"]),
+    hdrs = glob([
+        "source/common/unicode/*.h",
+    ]),
     includes = ["source/common"],
     visibility = ["//visibility:public"],
 )
@@ -40,7 +42,10 @@ cc_library(
     hdrs = glob(["source/common/unicode/*.h"]),
     includes = ["source/common"],
     visibility = ["//visibility:public"],
-    deps = [":icuuc"],
+    deps = [
+        ":icuuc",
+        ":data"
+    ],
 )
 
 cc_library(
@@ -54,4 +59,11 @@ cc_library(
     copts = icuuc_copts,
     visibility = ["//visibility:private"],
     deps = [":headers"],
+)
+
+cc_library(
+    name = "data",
+    srcs = ["@envoy//bazel/external/icu/data:data.c"],
+    deps = [":headers"],
+    alwayslink = 1,
 )
