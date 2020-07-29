@@ -5,8 +5,6 @@
 #include <memory>
 #include <queue>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -35,6 +33,9 @@
 #include "common/protobuf/utility.h"
 #include "common/router/route_config_update_receiver_impl.h"
 #include "common/router/vhds.h"
+
+#include "absl/container/node_hash_map.h"
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Router {
@@ -118,7 +119,7 @@ class RdsRouteConfigSubscription
 public:
   ~RdsRouteConfigSubscription() override;
 
-  std::unordered_set<RouteConfigProvider*>& routeConfigProviders() {
+  absl::node_hash_set<RouteConfigProvider*>& routeConfigProviders() {
     ASSERT(route_config_providers_.size() == 1 || route_config_providers_.empty());
     return route_config_providers_;
   }
@@ -169,7 +170,7 @@ private:
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const uint64_t manager_identifier_;
   // TODO(lambdai): Prove that a subscription has exactly one provider and remove the container.
-  std::unordered_set<RouteConfigProvider*> route_config_providers_;
+  absl::node_hash_set<RouteConfigProvider*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
@@ -253,9 +254,9 @@ private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
   // Then the lifetime management stuff is centralized and opaque.
-  std::unordered_map<uint64_t, std::weak_ptr<RdsRouteConfigProviderImpl>>
+  absl::node_hash_map<uint64_t, std::weak_ptr<RdsRouteConfigProviderImpl>>
       dynamic_route_config_providers_;
-  std::unordered_set<RouteConfigProvider*> static_route_config_providers_;
+  absl::node_hash_set<RouteConfigProvider*> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
   friend class RdsRouteConfigSubscription;

@@ -24,6 +24,12 @@ public:
   virtual void waitForCounterGe(const std::string& name, uint64_t value) PURE;
 
   /**
+   * Wait for a counter to exist.
+   * @param name counter name.
+   */
+  virtual void waitForCounterExists(const std::string& name) PURE;
+
+  /**
    * Wait for a gauge to >= a given value.
    * @param name gauge name.
    * @param value target value.
