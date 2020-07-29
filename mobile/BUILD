@@ -47,11 +47,15 @@ genrule(
     name = "android_dist",
     srcs = [
         "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_aar",
+        "//library/kotlin/src/io/envoyproxy/envoymobile:envoy_aar_pom_xml",
     ],
     outs = ["output_in_dist_directory"],
     cmd = """
-    chmod 755 $<
-    cp $< dist/envoy.aar
+    set -- $(SRCS)
+    chmod 755 $$1
+    chmod 755 $$2
+    cp $$1 dist/envoy.aar
+    cp $$2 dist/envoy-pom.xml
     touch $@
     """,
     stamp = True,

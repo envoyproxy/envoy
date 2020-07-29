@@ -128,3 +128,27 @@ and include the following in the WORKSPACE file::
     # Relative paths are also supported.
     path = "/somewhere/on/filesystem/envoy_build_config",
   )
+
+------------------------------
+Deploying Envoy Mobile Locally
+------------------------------
+
+~~~~~~~
+Android
+~~~~~~~
+
+To deploy Envoy Mobile's aar to your local maven repository, run the following commands::
+
+    # To build Envoy Mobile. --fat_apk_cpu takes in a list of architectures: [x86|armeabi-v7a|arm64-v8a].
+    bazelisk build android_dist --config=android --fat_apk_cpu=x86
+
+    # To publish to local maven.
+    dist/sonatype_nexus_upload.py --files dist/envoy.aar dist/envoy-pom.xml --local
+
+
+The version deployed will be ``LOCAL-SNAPSHOT``. These artifacts can be found in your local maven directory (``~/.m2/repository/io/envoyproxy/envoymobile/envoy/LOCAL-SNAPSHOT/``)
+
+~~~
+iOS
+~~~
+TODO :issue:`#980 <980>`
