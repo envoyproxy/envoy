@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
@@ -30,6 +29,7 @@
 #include "common/init/target_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 
+#include "absl/container/node_hash_map.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -153,7 +153,7 @@ public:
    * Merge the provided values into our entry map. An empty value indicates that a key should be
    * removed from our map.
    */
-  void mergeValues(const std::unordered_map<std::string, std::string>& values);
+  void mergeValues(const absl::node_hash_map<std::string, std::string>& values);
 
 private:
   RuntimeStats& stats_;
@@ -238,7 +238,7 @@ public:
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
   SnapshotConstSharedPtr threadsafeSnapshot() override;
-  void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
+  void mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
   Stats::Scope& getRootScope() override;
 
@@ -250,7 +250,7 @@ private:
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
-  void onRdtsReady();
+  void onRtdsReady();
 
   Random::RandomGenerator& generator_;
   RuntimeStats stats_;
