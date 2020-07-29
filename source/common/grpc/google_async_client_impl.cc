@@ -169,7 +169,6 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   for (const auto& header_value : parent_.initial_metadata_) {
     ctxt_.AddMetadata(header_value.key(), header_value.value());
   }
-  ctxt_.set_authority("demo.com");
   // Due to the different HTTP header implementations, we effectively double
   // copy headers here.
   auto initial_metadata = Http::RequestHeaderMapImpl::create();
