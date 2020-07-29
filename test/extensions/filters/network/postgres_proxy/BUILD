@@ -36,6 +36,19 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+		name = "postgres_message_tests",
+		srcs = [
+				"postgres_message_test.cc",
+				],
+    extension_name = "envoy.filters.network.postgres_proxy",
+    deps = [
+        "//source/extensions/filters/network/postgres_proxy:filter",
+        "//source/common/buffer:buffer_lib",
+		    ],
+    )
+
+
+envoy_extension_cc_test(
     name = "postgres_filter_tests",
     srcs = [
         "postgres_filter_test.cc",

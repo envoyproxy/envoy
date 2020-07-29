@@ -24,6 +24,7 @@ envoy_cc_library(
         "postgres_decoder.h",
         "postgres_filter.h",
         "postgres_session.h",
+        "postgres_message.h",
     ],
     repository = "@envoy",
     deps = [
