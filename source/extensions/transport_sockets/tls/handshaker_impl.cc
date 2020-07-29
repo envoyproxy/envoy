@@ -14,12 +14,12 @@ namespace Tls {
 using Envoy::Ssl::SocketState;
 using Network::PostIoAction;
 
-PostIoAction HandshakerImpl::doHandshake(SocketState& state, Ssl::HandshakerCallbacks& callbacks) {
+PostIoAction HandshakerImpl::doHandshake(SocketState& state) {
   ASSERT(state != SocketState::HandshakeComplete && state != SocketState::ShutdownSent);
   int rc = SSL_do_handshake(ssl_.get());
   if (rc == 1) {
     state = SocketState::HandshakeComplete;
-    callbacks.onSuccessCb(ssl_.get());
+    handshaker_callbacks_->onSuccessCb(ssl_.get());
 
     // It's possible that we closed during the handshake callback.
     return transport_socket_callbacks_->connection().state() == Network::Connection::State::Open
@@ -34,7 +34,7 @@ PostIoAction HandshakerImpl::doHandshake(SocketState& state, Ssl::HandshakerCall
       state = SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     default:
-      callbacks.onFailureCb();
+      handshaker_callbacks_->onFailureCb();
       return PostIoAction::Close;
     }
   }

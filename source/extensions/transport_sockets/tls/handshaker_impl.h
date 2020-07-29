@@ -17,11 +17,12 @@ class HandshakerImpl : public Envoy::Ssl::Handshaker {
 public:
   HandshakerImpl(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
 
-  Network::PostIoAction doHandshake(Envoy::Ssl::SocketState& state,
-                                    Ssl::HandshakerCallbacks& callbacks) override;
+  Network::PostIoAction doHandshake(Envoy::Ssl::SocketState& state) override;
 
-  void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
-    transport_socket_callbacks_ = &callbacks;
+  void setCallbacks(Network::TransportSocketCallbacks& transport_socket_callbacks,
+                    Ssl::HandshakerCallbacks& handshaker_callbacks) override {
+    transport_socket_callbacks_ = &transport_socket_callbacks;
+    handshaker_callbacks_ = &handshaker_callbacks;
   }
 
   SSL* ssl() override { return ssl_.get(); }
@@ -29,6 +30,7 @@ public:
 private:
   bssl::UniquePtr<SSL> ssl_;
   Network::TransportSocketCallbacks* transport_socket_callbacks_{};
+  Ssl::HandshakerCallbacks* handshaker_callbacks_{};
 };
 
 class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {

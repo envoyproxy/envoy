@@ -114,11 +114,12 @@ TEST_F(HandshakerTest, NormalOperation) {
   transport_socket_callbacks.connection_.state_ = Network::Connection::State::Closed;
   EXPECT_CALL(transport_socket_callbacks, connection).Times(1);
 
-  HandshakerImpl handshaker(std::move(server_ssl_));
-  handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
+  StrictMock<MockHandshakerCallbacks> handshaker_callbacks;
+  EXPECT_CALL(handshaker_callbacks, onSuccessCb).Times(1);
 
-  StrictMock<MockHandshakerCallbacks> callbacks;
-  EXPECT_CALL(callbacks, onSuccessCb).Times(1);
+  HandshakerImpl handshaker(std::move(server_ssl_));
+
+  handshaker.setCallbacks(transport_socket_callbacks, handshaker_callbacks);
 
   auto socket_state = Ssl::SocketState::PreHandshake;
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
@@ -127,7 +128,7 @@ TEST_F(HandshakerTest, NormalOperation) {
   // we're done and returns PostIoAction::Close.
   while (post_io_action != Network::PostIoAction::Close) {
     SSL_do_handshake(client_ssl_.get());
-    post_io_action = handshaker.doHandshake(socket_state, callbacks);
+    post_io_action = handshaker.doHandshake(socket_state);
   }
 
   EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
@@ -148,17 +149,18 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   HandshakerImpl handshaker(std::move(server_ssl_));
 
   StrictMock<Network::MockTransportSocketCallbacks> transport_socket_callbacks;
-  handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
 
-  StrictMock<MockHandshakerCallbacks> callbacks;
-  EXPECT_CALL(callbacks, onFailureCb).Times(1);
+  StrictMock<MockHandshakerCallbacks> handshaker_callbacks;
+  EXPECT_CALL(handshaker_callbacks, onFailureCb).Times(1);
+
+  handshaker.setCallbacks(transport_socket_callbacks, handshaker_callbacks);
 
   auto socket_state = Ssl::SocketState::PreHandshake;
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
 
   while (post_io_action != Network::PostIoAction::Close) {
     SSL_do_handshake(client_ssl_.get());
-    post_io_action = handshaker.doHandshake(socket_state, callbacks);
+    post_io_action = handshaker.doHandshake(socket_state);
   }
 
   // In the error case, HandshakerImpl also closes the connection.
@@ -178,14 +180,13 @@ public:
         &cert_cb_ok_);
   }
 
-  Network::PostIoAction doHandshake(Ssl::SocketState& state,
-                                    Ssl::HandshakerCallbacks& callbacks) override {
+  Network::PostIoAction doHandshake(Ssl::SocketState& state) override {
     ASSERT(state != Ssl::SocketState::HandshakeComplete && state != Ssl::SocketState::ShutdownSent);
 
     int rc = SSL_do_handshake(ssl());
     if (rc == 1) {
       state = Ssl::SocketState::HandshakeComplete;
-      callbacks.onSuccessCb(ssl());
+      handshaker_callbacks_->onSuccessCb(ssl());
       return Network::PostIoAction::Close;
     } else {
       switch (SSL_get_error(ssl(), rc)) {
@@ -198,14 +199,16 @@ public:
         requested_cert_cb_();
         return Network::PostIoAction::KeepOpen;
       default:
-        callbacks.onFailureCb();
+        handshaker_callbacks_->onFailureCb();
         return Network::PostIoAction::Close;
       }
     }
   }
 
-  void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
-    transport_socket_callbacks_ = &callbacks;
+  void setCallbacks(Network::TransportSocketCallbacks& transport_socket_callbacks,
+                    Ssl::HandshakerCallbacks& handshaker_callbacks) override {
+    transport_socket_callbacks_ = &transport_socket_callbacks;
+    handshaker_callbacks_ = &handshaker_callbacks;
   }
 
   SSL* ssl() override { return ssl_.get(); }
@@ -217,6 +220,7 @@ private:
   std::function<void()> requested_cert_cb_;
   bool cert_cb_ok_{false};
   Network::TransportSocketCallbacks* transport_socket_callbacks_{};
+  Ssl::HandshakerCallbacks* handshaker_callbacks_{};
 };
 
 TEST_F(HandshakerTest, NormalOperationWithHandshakerImplForTest) {
@@ -227,17 +231,18 @@ TEST_F(HandshakerTest, NormalOperationWithHandshakerImplForTest) {
   EXPECT_CALL(requested_cert_cb, Call).WillOnce([&]() { handshaker.setCertCbOk(); });
 
   Network::MockTransportSocketCallbacks transport_socket_callbacks;
-  handshaker.setTransportSocketCallbacks(transport_socket_callbacks);
 
-  StrictMock<MockHandshakerCallbacks> callbacks;
-  EXPECT_CALL(callbacks, onSuccessCb).Times(1);
+  StrictMock<MockHandshakerCallbacks> handshaker_callbacks;
+  EXPECT_CALL(handshaker_callbacks, onSuccessCb).Times(1);
+
+  handshaker.setCallbacks(transport_socket_callbacks, handshaker_callbacks);
 
   auto socket_state = Ssl::SocketState::PreHandshake;
   auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
 
   while (post_io_action != Network::PostIoAction::Close) {
     SSL_do_handshake(client_ssl_.get());
-    post_io_action = handshaker.doHandshake(socket_state, callbacks);
+    post_io_action = handshaker.doHandshake(socket_state);
   }
 
   EXPECT_EQ(post_io_action, Network::PostIoAction::Close);

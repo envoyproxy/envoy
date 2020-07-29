@@ -64,7 +64,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
-  handshaker_->setTransportSocketCallbacks(callbacks);
+  handshaker_->setCallbacks(callbacks, *this);
 
   // Associate this SSL connection with all the certificates (with their potentially different
   // private key methods).
@@ -179,7 +179,7 @@ void SslSocket::onSuccessCb(SSL* ssl) {
 }
 void SslSocket::onFailureCb() { drainErrorQueue(); }
 
-PostIoAction SslSocket::doHandshake() { return handshaker_->doHandshake(state_, *this); }
+PostIoAction SslSocket::doHandshake() { return handshaker_->doHandshake(state_); }
 
 void SslSocket::drainErrorQueue() {
   bool saw_error = false;

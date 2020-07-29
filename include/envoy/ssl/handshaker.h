@@ -37,23 +37,18 @@ public:
   /**
    * Do the handshake.
    *
-   * NB:
-   *  * |state| is a mutable reference.
-   *  * |callbacks| is only expected to exist for the duration of the
-   *    doHandshake() call. If the handshake was successful,
-   *    HandshakerCallbacks::onSuccessCb() should be called within the execution
-   *    of doHandshake(). |callbacks| should not be cached in the
-   *    HandshakerImpl.
+   * NB: |state| is a mutable reference.
    */
-  virtual Network::PostIoAction doHandshake(SocketState& state,
-                                            HandshakerCallbacks& callbacks) PURE;
+  virtual Network::PostIoAction doHandshake(SocketState& state) PURE;
 
   /**
-   * Set an internal pointer to the Network::TransportSocketCallbacks struct.
+   * Set internal pointers to  Network::TransportSocketCallbacks and
+   * Ssl::HandshakerCallbacks.
    * Depending on impl, these callbacks can be invoked to access connection
    * state, raise connection events, etc.
    */
-  virtual void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) PURE;
+  virtual void setCallbacks(Network::TransportSocketCallbacks& callbacks,
+                            Ssl::HandshakerCallbacks& handshaker_callbacks) PURE;
 
   /*
    * Access the held SSL object as a ptr. Callsites should handle nullptr
