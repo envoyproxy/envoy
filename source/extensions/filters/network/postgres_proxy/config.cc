@@ -15,9 +15,10 @@ NetworkFilters::PostgresProxy::PostgresConfigFactory::createFilterFactoryFromPro
   ASSERT(!proto_config.stat_prefix().empty());
 
   const std::string stat_prefix = fmt::format("postgres.{}", proto_config.stat_prefix());
+  const bool enable_sql = PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_sql_parsing, true);
 
   PostgresFilterConfigSharedPtr filter_config(
-      std::make_shared<PostgresFilterConfig>(stat_prefix, context.scope()));
+      std::make_shared<PostgresFilterConfig>(stat_prefix, enable_sql, context.scope()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<PostgresFilter>(filter_config));
   };

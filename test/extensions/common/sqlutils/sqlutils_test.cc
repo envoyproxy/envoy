@@ -15,9 +15,11 @@ namespace SQLUtils {
 // The map is checked only when parsing was successful. Map is indexed by table name and points to
 // list of operations performed on the table. For example table1: "select", "insert" says that there
 // was SELECT and INSERT operations on table1.
+// DecoderAttributes is a map containing additional attributes which augment creating metadata.
 class MetadataFromSQLTest
     : public ::testing::TestWithParam<
-          std::tuple<std::string, bool, std::map<std::string, std::list<std::string>>>> {};
+          std::tuple<std::string, bool, std::map<std::string, std::list<std::string>>,
+                     SQLUtils::DecoderAttributes>> {};
 
 // Test takes SQL query as a parameter and checks if the parsing
 // produces the correct metadata.
@@ -42,7 +44,8 @@ TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
     ProtobufWkt::Struct metadata;
 
     // Check if the parsing result is what expected.
-    ASSERT_EQ(std::get<1>(GetParam()), SQLUtils::setMetadata(test_query, metadata));
+    ASSERT_EQ(std::get<1>(GetParam()),
+              SQLUtils::setMetadata(test_query, std::get<3>(GetParam()), metadata));
 
     // If parsing was expected to fail do not check parsing values.
     if (!std::get<1>(GetParam())) {
@@ -99,80 +102,86 @@ TEST_P(MetadataFromSQLTest, ParsingAndMetadataTest) {
 // before comparing. It however requires that all table names in the queries below use lowercase
 // only.
 #define TEST_VALUE(...)                                                                            \
-  std::tuple<std::string, bool, std::map<std::string, std::list<std::string>>> { __VA_ARGS__ }
+  std::tuple<std::string, bool, std::map<std::string, std::list<std::string>>,                     \
+             SQLUtils::DecoderAttributes> {                                                        \
+    __VA_ARGS__                                                                                    \
+  }
 INSTANTIATE_TEST_SUITE_P(
     SQLUtilsTestSuite, MetadataFromSQLTest,
     ::testing::Values(
-        TEST_VALUE("blahblah;", false, {}),
+        TEST_VALUE("blahblah;", false, {}, {}),
 
         TEST_VALUE("CREATE TABLE IF NOT EXISTS table1(Usr VARCHAR(40),Count INT);", true,
-                   {{"table1", {"create"}}}),
+                   {{"table1", {"create"}}}, {}),
         TEST_VALUE("CREATE TABLE IF NOT EXISTS `table number 1`(Usr VARCHAR(40),Count INT);", true,
-                   {{"table number 1", {"create"}}}),
+                   {{"table number 1.testdb", {"create"}}}, {{"database", "testdb"}}),
         TEST_VALUE(
             "CREATE TABLE IF NOT EXISTS table1(Usr VARCHAR(40),Count INT); SELECT * from table1;",
-            true, {{"table1", {"select", "create"}}}),
+            true, {{"table1", {"select", "create"}}}, {}),
         TEST_VALUE(
             "CREATE TABLE IF NOT EXISTS table1(Usr VARCHAR(40),Count INT); SELECT * from table2;",
-            true, {{"table1", {"create"}}, {"table2", {"select"}}}),
+            true, {{"table1", {"create"}}, {"table2", {"select"}}}, {{"user", "testusr"}}),
 
         TEST_VALUE("CREATE TABLE table1(Usr VARCHAR(40),Count INT);", true,
-                   {{"table1", {"create"}}}),
-        TEST_VALUE("CREATE TABLE;", false, {}),
+                   {{"table1", {"create"}}}, {}),
+        TEST_VALUE("CREATE TABLE;", false, {}, {}),
         TEST_VALUE("CREATE TEMPORARY table table1(Usr VARCHAR(40),Count INT);", true,
-                   {{"table1", {"create"}}}),
-        TEST_VALUE("DROP TABLE IF EXISTS table1", true, {{"table1", {"drop"}}}),
-        TEST_VALUE("ALTER TABLE table1 add column Id varchar (20);", true, {{"table1", {"alter"}}}),
+                   {{"table1", {"create"}}}, {}),
+        TEST_VALUE("DROP TABLE IF EXISTS table1", true, {{"table1", {"drop"}}}, {}),
+        TEST_VALUE("ALTER TABLE table1 add column Id varchar (20);", true, {{"table1", {"alter"}}},
+                   {}),
         TEST_VALUE("INSERT INTO table1 (Usr, Count) VALUES ('allsp2', 3);", true,
-                   {{"table1", {"insert"}}}),
+                   {{"table1", {"insert"}}}, {}),
         TEST_VALUE("INSERT LOW_PRIORITY INTO table1 (Usr, Count) VALUES ('allsp2', 3);", true,
-                   {{"table1", {"insert"}}}),
+                   {{"table1", {"insert"}}}, {}),
         TEST_VALUE("INSERT IGNORE INTO table1 (Usr, Count) VALUES ('allsp2', 3);", true,
-                   {{"table1", {"insert"}}}),
+                   {{"table1", {"insert"}}}, {}),
         TEST_VALUE("INSERT INTO table1 (Usr, Count) VALUES ('allsp2', 3);SELECT * from table1",
-                   true, {{"table1", {"insert", "select"}}}),
-        TEST_VALUE("DELETE FROM table1 WHERE Count > 3;", true, {{"table1", {"delete"}}}),
+                   true, {{"table1", {"insert", "select"}}}, {}),
+        TEST_VALUE("DELETE FROM table1 WHERE Count > 3;", true, {{"table1", {"delete"}}}, {}),
         TEST_VALUE("DELETE LOW_PRIORITY FROM table1 WHERE Count > 3;", true,
-                   {{"table1", {"delete"}}}),
-        TEST_VALUE("DELETE QUICK FROM table1 WHERE Count > 3;", true, {{"table1", {"delete"}}}),
-        TEST_VALUE("DELETE IGNORE FROM table1 WHERE Count > 3;", true, {{"table1", {"delete"}}}),
+                   {{"table1", {"delete"}}}, {}),
+        TEST_VALUE("DELETE QUICK FROM table1 WHERE Count > 3;", true, {{"table1", {"delete"}}}, {}),
+        TEST_VALUE("DELETE IGNORE FROM table1 WHERE Count > 3;", true, {{"table1", {"delete"}}},
+                   {}),
 
-        TEST_VALUE("SELECT * FROM table1 WHERE Count = 1;", true, {{"table1", {"select"}}}),
-        TEST_VALUE("SELECT * FROM table1 WHERE Count = 1;", true, {{"table1", {"select"}}}),
+        TEST_VALUE("SELECT * FROM table1 WHERE Count = 1;", true, {{"table1", {"select"}}}, {}),
+        TEST_VALUE("SELECT * FROM table1 WHERE Count = 1;", true, {{"table1", {"select"}}}, {}),
         TEST_VALUE("SELECT product.category FROM table1 WHERE Count = 1;", true,
-                   {{"table1", {"select"}}, {"product", {"unknown"}}}),
-        TEST_VALUE("SELECT DISTINCT Usr FROM table1;", true, {{"table1", {"select"}}}),
+                   {{"table1", {"select"}}, {"product", {"unknown"}}}, {}),
+        TEST_VALUE("SELECT DISTINCT Usr FROM table1;", true, {{"table1", {"select"}}}, {}),
         TEST_VALUE("SELECT Usr, Count FROM table1 ORDER BY Count DESC;", true,
-                   {{"table1", {"select"}}}),
-        TEST_VALUE("SELECT 12 AS a, a FROM table1 GROUP BY a;", true, {{"table1", {"select"}}}),
-        TEST_VALUE("SELECT;", false, {}), TEST_VALUE("SELECT Usr, Count FROM;", false, {}),
+                   {{"table1.testdb", {"select"}}}, {{"user", "testuser"}, {"database", "testdb"}}),
+        TEST_VALUE("SELECT 12 AS a, a FROM table1 GROUP BY a;", true, {{"table1", {"select"}}}, {}),
+        TEST_VALUE("SELECT;", false, {}, {}), TEST_VALUE("SELECT Usr, Count FROM;", false, {}, {}),
         TEST_VALUE("INSERT INTO table1 SELECT * FROM table2;", true,
-                   {{"table1", {"insert"}}, {"table2", {"select"}}}),
+                   {{"table1", {"insert"}}, {"table2", {"select"}}}, {}),
         TEST_VALUE("INSERT INTO table1 SELECT tbl_temp1.fld_order_id FROM table2;", true,
-                   {{"tbl_temp1", {"unknown"}}, {"table2", {"select"}}, {"table1", {"insert"}}}),
-        TEST_VALUE("UPDATE table1 SET col1 = col1 + 1", true, {{"table1", {"update"}}}),
-        TEST_VALUE("UPDATE LOW_PRIORITY table1 SET col1 = col1 + 1", true,
-                   {{"table1", {"update"}}}),
-        TEST_VALUE("UPDATE IGNORE table1 SET col1 = col1 + 1", true, {{"table1", {"update"}}}),
+                   {{"tbl_temp1", {"unknown"}}, {"table2", {"select"}}, {"table1", {"insert"}}},
+                   {}),
+        TEST_VALUE("UPDATE table1 SET col1 = col1 + 1", true, {{"table1", {"update"}}}, {}),
+        TEST_VALUE("UPDATE LOW_PRIORITY table1 SET col1 = col1 + 1", true, {{"table1", {"update"}}},
+                   {}),
+        TEST_VALUE("UPDATE IGNORE table1 SET col1 = col1 + 1", true, {{"table1", {"update"}}}, {}),
         TEST_VALUE("UPDATE table1 SET  column1=(SELECT * columnX from table2);", true,
-                   {{"table1", {"update"}}, {"table2", {"select"}}}),
+                   {{"table1", {"update"}}, {"table2", {"select"}}}, {}),
 
         // operations on database should not create any metadata
-        TEST_VALUE("CREATE DATABASE testdb;", true, {}),
-        TEST_VALUE("CREATE DATABASE IF NOT EXISTS testdb;", true, {}),
-        TEST_VALUE("ALTER DATABASE testdb CHARACTER SET charset_name;", true, {}),
-        TEST_VALUE("ALTER DATABASE testdb default CHARACTER SET charset_name;", true, {}),
-        TEST_VALUE("ALTER DATABASE testdb default CHARACTER SET = charset_name;", true, {}),
-        TEST_VALUE("ALTER SCHEMA testdb default CHARACTER SET = charset_name;", true, {}),
+        TEST_VALUE("CREATE DATABASE testdb;", true, {}, {}),
+        TEST_VALUE("CREATE DATABASE IF NOT EXISTS testdb;", true, {}, {}),
+        TEST_VALUE("ALTER DATABASE testdb CHARACTER SET charset_name;", true, {}, {}),
+        TEST_VALUE("ALTER DATABASE testdb default CHARACTER SET charset_name;", true, {}, {}),
+        TEST_VALUE("ALTER DATABASE testdb default CHARACTER SET = charset_name;", true, {}, {}),
+        TEST_VALUE("ALTER SCHEMA testdb default CHARACTER SET = charset_name;", true, {}, {}),
 
         // The following DROP DATABASE tests should not produce metadata.
-        TEST_VALUE("DROP DATABASE testdb;", true, {}),
-        TEST_VALUE("DROP DATABASE IF EXISTS testdb;", true, {}),
+        TEST_VALUE("DROP DATABASE testdb;", true, {}, {}),
+        TEST_VALUE("DROP DATABASE IF EXISTS testdb;", true, {}, {}),
 
         // Schema. Should be parsed fine, but should not produce any metadata
-        TEST_VALUE("SHOW databases;", true, {}), TEST_VALUE("SHOW tables;", true, {}),
-        TEST_VALUE("SELECT * FROM;", false, {}),
-        TEST_VALUE("SELECT 1 FROM tabletest1;", true, {{"tabletest1", {"select"}}})
+        TEST_VALUE("SHOW databases;", true, {}, {}), TEST_VALUE("SHOW tables;", true, {}, {}),
+        TEST_VALUE("SELECT * FROM;", false, {}, {}),
+        TEST_VALUE("SELECT 1 FROM tabletest1;", true, {{"tabletest1", {"select"}}}, {})
 
             ));
 
