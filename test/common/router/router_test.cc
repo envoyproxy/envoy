@@ -483,12 +483,12 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
-                                absl::string_view(), cm_.conn_pool_.host_);
+                                "tls version mismatch", cm_.conn_pool_.host_);
         return nullptr;
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "91"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "139"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -505,7 +505,8 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   // Pool failure, so upstream request was not initiated.
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_EQ(callbacks_.details_, "upstream_reset_before_response_started{connection failure}");
+  EXPECT_EQ(callbacks_.details_,
+            "upstream_reset_before_response_started{connection failure,tls version mismatch}");
 }
 
 TEST_F(RouterTest, Http1Upstream) {
