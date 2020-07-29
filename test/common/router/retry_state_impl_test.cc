@@ -1137,8 +1137,6 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
 
   EXPECT_EQ(2UL, cluster_.stats().upstream_rq_retry_backoff_ratelimited_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_backoff_exponential_.value());
-  EXPECT_EQ(2UL, virtual_cluster_.stats().upstream_rq_retry_backoff_ratelimited_.value());
-  EXPECT_EQ(1UL, virtual_cluster_.stats().upstream_rq_retry_backoff_exponential_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {

@@ -195,18 +195,12 @@ void RetryStateImpl::enableBackoffTimer() {
     ratelimited_backoff_strategy_.reset();
 
     cluster_.stats().upstream_rq_retry_backoff_ratelimited_.inc();
-    if (vcluster_) {
-      vcluster_->stats().upstream_rq_retry_backoff_ratelimited_.inc();
-    }
 
   } else {
     // Otherwise we use a fully jittered exponential backoff algorithm.
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 
     cluster_.stats().upstream_rq_retry_backoff_exponential_.inc();
-    if (vcluster_) {
-      vcluster_->stats().upstream_rq_retry_backoff_exponential_.inc();
-    }
   }
 }
 
