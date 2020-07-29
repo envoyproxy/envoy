@@ -26,12 +26,9 @@ std::string getProtoName(const DnsTable::DnsServiceProtocol& protocol) {
       break;
     default: {
       struct protoent* pe = getprotobynumber(protocol.number());
-      if (pe == nullptr) {
-        ENVOY_LOG_MISC(debug, "Unable to determine name for protocol number [{}]",
-                       protocol.number());
-        return EMPTY_STRING;
+      if (pe != nullptr) {
+        proto = std::string(pe->p_name);
       }
-      proto = std::string(pe->p_name);
     }
     } // end switch
   }
@@ -80,7 +77,8 @@ std::string buildServiceName(const std::string& name, const std::string& proto,
   return result;
 }
 
-absl::optional<uint16_t> getAddressType(const Network::Address::InstanceConstSharedPtr& ipaddr) {
+absl::optional<uint16_t>
+getAddressRecordType(const Network::Address::InstanceConstSharedPtr& ipaddr) {
   if (ipaddr->type() == Network::Address::Type::Ip) {
     if (ipaddr->ip()->ipv6() != nullptr) {
       return absl::make_optional<uint16_t>(DNS_RECORD_TYPE_AAAA);

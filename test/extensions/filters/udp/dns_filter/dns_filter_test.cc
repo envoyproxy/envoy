@@ -310,6 +310,13 @@ virtual_domains:
           - name: "fake_http_cluster_1"
             weight: 10
             priority: 1
+        - service_name: "for_coverage_no_protocol_defined_so_record_is_skipped"
+          ttl: 86400s
+          port: 8443
+          targets:
+          - name: "fake_http_cluster_3"
+            weight: 3
+            priority: 99
 )EOF";
 };
 
@@ -1335,6 +1342,64 @@ TEST_F(DnsFilterTest, NotImplementedQueryTest) {
   EXPECT_EQ(0, config_->stats().downstream_rx_invalid_queries_.value());
 }
 
+TEST_F(DnsFilterTest, NotImplementedAuthorityRRTest) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+  // This buffer specifies that 4 Authority Resource records exist. We should return a
+  // "not implemented" response code
+  constexpr char dns_request[] = {
+      0x36, 0x70,                               // Transaction ID
+      0x01, 0x20,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x00,                               // Answers
+      0x00, 0x04,                               // Authority RRs
+      0x00, 0x00,                               // Additional RRs
+      0x03, 0x77, 0x77, 0x77, 0x04, 0x66, 0x6f, // Query record for
+      0x6f, 0x33, 0x03, 0x63, 0x6f, 0x6d, 0x00, // www.foo3.com
+      0x00, 0x05,                               // Query Type - CNAME
+      0x00, 0x01,                               // Query Class - IN
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+  const std::string query = Utils::buildQueryFromBytes(dns_request, count);
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NOT_IMPLEMENTED, response_parser_->getQueryResponseCode());
+}
+
+TEST_F(DnsFilterTest, NoTransactionIdTest) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+  // This buffer has an invalid Transaction ID. We should return an error
+  // to the client
+  constexpr char dns_request[] = {
+      0x00, 0x00,                               // Transaction ID
+      0x01, 0x20,                               // Flags
+      0x00, 0x01,                               // Questions
+      0x00, 0x00,                               // Answers
+      0x00, 0x00,                               // Authority RRs
+      0x00, 0x00,                               // Additional RRs
+      0x03, 0x77, 0x77, 0x77, 0x04, 0x66, 0x6f, // Query record for
+      0x6f, 0x33, 0x03, 0x63, 0x6f, 0x6d, 0x00, // www.foo3.com
+      0x00, 0x05,                               // Query Type - CNAME
+      0x00, 0x01,                               // Query Class - IN
+  };
+
+  constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
+  const std::string query = Utils::buildQueryFromBytes(dns_request, count);
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_FALSE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_parser_->getQueryResponseCode());
+}
+
 TEST_F(DnsFilterTest, InvalidShortBufferTest) {
   InSequence s;
 
@@ -1488,6 +1553,33 @@ TEST_F(DnsFilterTest, SrvTargetResolution) {
   EXPECT_EQ(target_map.size(), config_->stats().known_domain_queries_.value());
   EXPECT_EQ(target_map.size(), config_->stats().local_a_record_answers_.value());
   EXPECT_EQ(target_map.size(), config_->stats().a_record_queries_.value());
+}
+
+TEST_F(DnsFilterTest, NonExistentClusterServiceLookup) {
+  InSequence s;
+
+  std::string temp_path =
+      TestEnvironment::writeStringToFileForTest("dns_table.yaml", external_dns_table_services_yaml);
+  std::string config_to_use = fmt::format(external_dns_table_config, temp_path);
+  setup(config_to_use);
+
+  const std::string service("_http._tcp.web.subzero.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode());
+  EXPECT_EQ(0, query_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+  EXPECT_EQ(0, config_->stats().local_srv_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().srv_record_queries_.value());
 }
 
 TEST_F(DnsFilterTest, SrvRecordQuery) {

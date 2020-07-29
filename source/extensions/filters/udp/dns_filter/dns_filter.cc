@@ -410,7 +410,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
                   host->address()->ip()->addressAsString(), target_name);
 
         // We have to determine the address type here so that we increment the correct counter
-        const auto type = Utils::getAddressType(host->address());
+        const auto type = Utils::getAddressRecordType(host->address());
         if (type.has_value() &&
             message_parser_.storeDnsAdditionalRecord(context, target_name, type.value(),
                                                      query.class_, ttl, host->address())) {
@@ -523,7 +523,7 @@ bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQ
                     configured_address->ip()->addressAsString(), target_name);
           const std::chrono::seconds ttl = getDomainTTL(target_name);
 
-          const auto type = Utils::getAddressType(configured_address);
+          const auto type = Utils::getAddressRecordType(configured_address);
           if (type.has_value()) {
             incrementLocalQueryTypeAnswerCount(type.value());
             message_parser_.storeDnsAdditionalRecord(context, target_name, type.value(),

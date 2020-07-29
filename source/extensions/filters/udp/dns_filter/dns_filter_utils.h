@@ -43,7 +43,8 @@ absl::string_view getProtoFromName(const absl::string_view name);
 std::string buildServiceName(const std::string& name, const std::string& proto,
                              const std::string& domain);
 
-absl::optional<uint16_t> getAddressType(const Network::Address::InstanceConstSharedPtr& ipaddr);
+absl::optional<uint16_t>
+getAddressRecordType(const Network::Address::InstanceConstSharedPtr& ipaddr);
 
 } // namespace Utils
 } // namespace DnsFilter

@@ -1,7 +1,11 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.validate.h"
 
+#include "common/network/address_impl.h"
+
 #include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
+
+#include "test/test_common/environment.h"
 
 #include "dns_filter_test_utils.h"
 #include "gtest/gtest.h"
@@ -80,6 +84,23 @@ TEST_F(DnsFilterUtilsTest, ServiceNameParsingTest) {
     const std::string proto_str(proto);
     EXPECT_STREQ(ptr.expected_proto.c_str(), proto_str.c_str());
   }
+}
+
+TEST_F(DnsFilterUtilsTest, GetAddressRecordTypeTest) {
+  const auto pipe =
+      std::make_shared<Network::Address::PipeInstance>(TestEnvironment::nullDevicePath(), 600);
+  auto addr_type = getAddressRecordType(pipe);
+  EXPECT_EQ(addr_type, absl::nullopt);
+
+  const auto ipv6addr = Network::Utility::parseInternetAddress("fec0:1::1", 0);
+  addr_type = getAddressRecordType(ipv6addr);
+  EXPECT_TRUE(addr_type.has_value());
+  EXPECT_EQ(addr_type.value(), DNS_RECORD_TYPE_AAAA);
+
+  const auto ipv4addr = Network::Utility::parseInternetAddress("127.0.0.1", 0);
+  addr_type = getAddressRecordType(ipv4addr);
+  EXPECT_TRUE(addr_type.has_value());
+  EXPECT_EQ(addr_type.value(), DNS_RECORD_TYPE_A);
 }
 
 } // namespace
