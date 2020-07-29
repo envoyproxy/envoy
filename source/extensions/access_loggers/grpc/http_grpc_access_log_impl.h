@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"

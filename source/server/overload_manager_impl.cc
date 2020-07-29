@@ -10,6 +10,7 @@
 
 #include "server/resource_monitor_config_impl.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -51,7 +52,7 @@ public:
   void setState(const std::string& action, OverloadActionState state) { actions_[action] = state; }
 
 private:
-  std::unordered_map<std::string, OverloadActionState> actions_;
+  absl::node_hash_map<std::string, OverloadActionState> actions_;
 };
 
 Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
@@ -84,7 +85,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
-    if (!triggers_.insert(std::make_pair(trigger_config.name(), std::move(trigger))).second) {
+    if (!triggers_.try_emplace(trigger_config.name(), std::move(trigger)).second) {
       throw EnvoyException(
           absl::StrCat("Duplicate trigger resource for overload action ", config.name()));
     }
@@ -132,9 +133,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     auto config = Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
     auto monitor = factory.createResourceMonitor(*config, context);
 
-    auto result =
-        resources_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                           std::forward_as_tuple(name, std::move(monitor), *this, stats_scope));
+    auto result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope);
     if (!result.second) {
       throw EnvoyException(absl::StrCat("Duplicate resource monitor ", name));
     }
@@ -143,8 +142,12 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
   for (const auto& action : config.actions()) {
     const auto& name = action.name();
     ENVOY_LOG(debug, "Adding overload action {}", name);
-    auto result = actions_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                   std::forward_as_tuple(action, stats_scope));
+    // TODO: use in place construction once https://github.com/abseil/abseil-cpp/issues/388 is
+    // addressed
+    // We cannot currently use in place construction as the OverloadAction constructor may throw,
+    // causing an inconsistent internal state of the actions_ map, which on destruction results in
+    // an invalid free.
+    auto result = actions_.try_emplace(name, OverloadAction(action, stats_scope));
     if (!result.second) {
       throw EnvoyException(absl::StrCat("Duplicate overload action ", name));
     }

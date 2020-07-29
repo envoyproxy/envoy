@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/config/cluster/v3/circuit_breaker.pb.h"
@@ -26,6 +25,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/health_checker.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -52,6 +52,7 @@
 #include "extensions/filters/network/common/utility.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -232,8 +233,8 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
 // Converts a set of hosts into a HostVector, excluding certain hosts.
 // @param hosts hosts to convert
 // @param excluded_hosts hosts to exclude from the resulting vector.
-HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
-                       const std::unordered_set<HostSharedPtr>& excluded_hosts) {
+HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
+                       const absl::node_hash_set<HostSharedPtr>& excluded_hosts) {
   HostVector net_hosts;
   net_hosts.reserve(hosts.size());
 
@@ -618,6 +619,11 @@ ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
 
+ClusterRequestResponseSizeStats
+ClusterInfoImpl::generateRequestResponseSizeStats(Stats::Scope& scope) {
+  return {ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(POOL_HISTOGRAM(scope))};
+}
+
 ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope) {
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
@@ -682,15 +688,16 @@ ClusterInfoImpl::ClusterInfoImpl(
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
+      prefetch_ratio_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.prefetch_policy(), prefetch_ratio, 1.0)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      timeout_budget_stats_(config.track_timeout_budgets()
-                                ? absl::make_optional<ClusterTimeoutBudgetStats>(
-                                      generateTimeoutBudgetStats(*stats_scope_))
-                                : absl::nullopt),
+      optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
+                                  ? std::make_unique<OptionalClusterStats>(config, *stats_scope_)
+                                  : nullptr),
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
@@ -1095,6 +1102,17 @@ void ClusterImplBase::validateEndpointsForZoneAwareRouting(
   }
 }
 
+ClusterInfoImpl::OptionalClusterStats::OptionalClusterStats(
+    const envoy::config::cluster::v3::Cluster& config, Stats::Scope& stats_scope)
+    : timeout_budget_stats_(
+          (config.track_cluster_stats().timeout_budgets() || config.track_timeout_budgets())
+              ? std::make_unique<ClusterTimeoutBudgetStats>(generateTimeoutBudgetStats(stats_scope))
+              : nullptr),
+      request_response_size_stats_(config.track_cluster_stats().request_response_sizes()
+                                       ? std::make_unique<ClusterRequestResponseSizeStats>(
+                                             generateRequestResponseSizeStats(stats_scope))
+                                       : nullptr) {}
+
 ClusterInfoImpl::ResourceManagers::ResourceManagers(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     const std::string& cluster_name, Stats::Scope& stats_scope) {
@@ -1344,7 +1362,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // do the same thing.
 
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
-  std::unordered_set<std::string> existing_hosts_for_current_priority(
+  absl::node_hash_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {

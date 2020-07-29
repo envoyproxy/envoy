@@ -371,6 +371,24 @@ const std::string& SslSocketInfo::sha256PeerCertificateDigest() const {
   return cached_sha_256_peer_certificate_digest_;
 }
 
+const std::string& SslSocketInfo::sha1PeerCertificateDigest() const {
+  if (!cached_sha_1_peer_certificate_digest_.empty()) {
+    return cached_sha_1_peer_certificate_digest_;
+  }
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  if (!cert) {
+    ASSERT(cached_sha_1_peer_certificate_digest_.empty());
+    return cached_sha_1_peer_certificate_digest_;
+  }
+
+  std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
+  unsigned int n;
+  X509_digest(cert.get(), EVP_sha1(), computed_hash.data(), &n);
+  RELEASE_ASSERT(n == computed_hash.size(), "");
+  cached_sha_1_peer_certificate_digest_ = Hex::encode(computed_hash);
+  return cached_sha_1_peer_certificate_digest_;
+}
+
 const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificate() const {
   if (!cached_url_encoded_pem_encoded_peer_certificate_.empty()) {
     return cached_url_encoded_pem_encoded_peer_certificate_;
