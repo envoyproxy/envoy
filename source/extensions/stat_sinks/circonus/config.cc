@@ -16,7 +16,7 @@ namespace StatSinks {
 namespace Circonus {
 
 Stats::SinkPtr CirconusSinkFactory::createStatsSink(const Protobuf::Message& /* config */,
-                                                    Server::Instance& server) {
+                                                    Server::Configuration::ServerFactoryContext& server) {
   return std::make_unique<CirconusStatSink>(server);
 }
 

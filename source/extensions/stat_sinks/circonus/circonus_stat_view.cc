@@ -9,6 +9,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/stats/utility.h"
+#include "envoy/stats/scope.h"
 
 #include "circllhist.h"
 
@@ -22,7 +23,7 @@ const char* METRIC_HISTOGRAM_CUMULATIVE = "H";
 const char* METRIC_HISTOGRAM = "h";
 
 const char* chooseHistogramsType(absl::string_view path_and_query) {
-  const auto qp = Envoy::Http::Utility::parseQueryString(path_and_query);
+  const auto qp = Http::Utility::parseQueryString(path_and_query);
   auto found = qp.find("histogram_type");
 
   if (found != qp.end() && found->second == "cumulative") {
@@ -33,7 +34,8 @@ const char* chooseHistogramsType(absl::string_view path_and_query) {
 }
 } // namespace
 
-CirconusStatView::CirconusStatView(Server::Instance& server) : server_(server) {
+CirconusStatView::CirconusStatView(Server::Configuration::ServerFactoryContext& server)
+    : server_(server) {
   server.admin().addHandler("/stats/circonus", "Display Circonus metrics on the admin console",
                             MAKE_ADMIN_HANDLER(handlerAdminStats), false, false);
 }
@@ -48,36 +50,29 @@ Http::Code CirconusStatView::handlerAdminStats(absl::string_view path_and_query,
 }
 
 std::string CirconusStatView::makeJsonBody(const char* histogram_type) {
-  const auto& stats = server_.stats();
-  const auto histograms = stats.histograms();
-  auto& bb = bb_;
+  const auto& stats = server_.scope();
   std::string json;
   google::protobuf::io::StringOutputStream sos{&json};
   google::protobuf::io::CodedOutputStream cos{&sos};
   google::protobuf::util::converter::JsonObjectWriter w{" ", &cos};
-
-  w.StartObject("");
-
-  for (const auto& counter : stats.counters()) {
+  Stats::IterateFn<Stats::Counter> counters_it = [&w](auto counter) {
     w.StartObject(counter->name());
     w.RenderString("_type", "L");
     w.RenderUint64("_value", counter->value());
     w.EndObject();
-  }
-
-  for (const auto& gauge : stats.gauges()) {
+    return true;
+  };
+  Stats::IterateFn<Stats::Gauge> gauges_it = [&w](auto gauge) {
     w.StartObject(gauge->name());
     w.RenderString("_type", "L");
     w.RenderUint64("_value", gauge->value());
     w.EndObject();
-  }
-
-  for (const auto& parent_histogram : stats.histograms()) {
-    const auto& stat_name = parent_histogram->statName();
-
-    if (!stat_name.empty()) {
-      const auto stat_name_as_string =
-          std::string(reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize());
+    return true;
+  };
+  Stats::IterateFn<Stats::Histogram> histograms_it = [&](auto histogram) {
+    if (auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(histogram.get())) {
+      const auto& stat_name = parent_histogram->name();
+      auto& bb = bb_;
 
       if (histogram_type == METRIC_HISTOGRAM) {
         parent_histogram->intervalHistogram(bb);
@@ -85,13 +80,19 @@ std::string CirconusStatView::makeJsonBody(const char* histogram_type) {
         parent_histogram->cumulativeHistogram(bb);
       }
 
-      w.StartObject(stat_name_as_string);
+      w.StartObject(stat_name);
       w.RenderString("_type", histogram_type);
       w.RenderString("_value", reinterpret_cast<const char*>(&bb[0]));
       w.EndObject();
     }
-  }
 
+    return true;
+  };
+
+  w.StartObject("");
+  stats.iterate(counters_it);
+  stats.iterate(gauges_it);
+  stats.iterate(histograms_it);
   w.EndObject();
   return json;
 }

@@ -20,7 +20,7 @@ namespace Circonus {
  */
 class CirconusStatSink final : public Stats::Sink {
 public:
-  explicit CirconusStatSink(Server::Instance& server)
+  explicit CirconusStatSink(Server::Configuration::ServerFactoryContext& server)
       : admin_view_(std::make_unique<CirconusStatView>(server)) {}
   virtual ~CirconusStatSink() override = default;
 

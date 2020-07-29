@@ -17,7 +17,7 @@ namespace Circonus {
 
 class CirconusStatView final {
 public:
-  explicit CirconusStatView(Server::Instance& server);
+  explicit CirconusStatView(Server::Configuration::ServerFactoryContext& server);
 
 private:
   Http::Code handlerAdminStats(absl::string_view path_and_query,
@@ -26,7 +26,7 @@ private:
   std::string makeJsonBody(const char* histogram_type);
 
 private:
-  Server::Instance& server_;
+  Server::Configuration::ServerFactoryContext& server_;
   std::vector<std::uint8_t> bb_;
 };
 

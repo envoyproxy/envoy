@@ -21,8 +21,9 @@ class CirconusSinkFactory final : Logger::Loggable<Logger::Id::config>,
 public:
   virtual ~CirconusSinkFactory() override = default;
 
-  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                         Server::Instance& server) override;
+  virtual Stats::SinkPtr
+  createStatsSink(const Protobuf::Message& config,
+                  Server::Configuration::ServerFactoryContext& server) override;
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   virtual std::string name() const override;
 };
