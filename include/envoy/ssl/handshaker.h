@@ -28,7 +28,7 @@ public:
 
 /*
  * Interface for a Handshaker which is responsible for owning the
- * bssl::UniquePtr<SSL> and performing handshakes.
+ * `bssl::UniquePtr<SSL>` and performing handshakes.
  */
 class Handshaker {
 public:

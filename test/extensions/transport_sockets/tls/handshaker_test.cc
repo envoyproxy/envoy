@@ -139,8 +139,8 @@ TEST_F(HandshakerTest, NormalOperation) {
 // return an error code without error handling, i.e. not SSL_ERROR_WANT_READ
 // or _WRITE or _PRIVATE_KEY_OPERATION.
 TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
-  // We make a new BIO, set it as the rbio/wbio for the client SSL object, and
-  // break the BIO pair connecting the two SSL objects. Now handshaking will
+  // We make a new BIO, set it as the `rbio`/`wbio` for the client SSL object,
+  // and break the BIO pair connecting the two SSL objects. Now handshaking will
   // fail, likely with SSL_ERROR_SSL.
   BIO* bio = BIO_new(BIO_s_socket());
   SSL_set_bio(client_ssl_.get(), bio, bio);
