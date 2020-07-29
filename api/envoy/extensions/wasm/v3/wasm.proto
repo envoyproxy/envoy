@@ -51,6 +51,7 @@ message VmConfig {
   bool nack_on_code_cache_miss = 6;
 }
 
+// [[#not-implemented-hide:]
 // Base Configuration for Wasm Plugins e.g. filters and services.
 // [#next-free-field: 6]
 message PluginConfig {
@@ -85,6 +86,7 @@ message PluginConfig {
   bool fail_open = 5;
 }
 
+// [[#not-implemented-hide:]
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`WasmService
 // <config_wasm_service>` This opaque configuration will be used to create a Wasm Service.
 message WasmService {
