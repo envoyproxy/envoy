@@ -468,37 +468,31 @@ protected:
 };
 
 // A GuardDogAction that raises the specified signal.
-class SignalGuardDogAction : public Configuration::GuardDogAction {
+class AssertGuardDogAction : public Configuration::GuardDogAction {
 public:
-  SignalGuardDogAction(int signal) : signal_(signal) {}
+  AssertGuardDogAction(const std::string& message) : message_(message) {}
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
            std::vector<std::pair<Thread::ThreadId, MonotonicTime>> /*thread_ltt_pairs*/,
            MonotonicTime /*now*/) override {
-    std::raise(signal_);
+    RELEASE_ASSERT(false, message_);
   }
 
 protected:
-  const int signal_;
+  const std::string message_;
 };
 
 // Test factory for consuming Watchdog configs and creating GuardDogActions.
 template <class ConfigType>
-class TestGuardDogActionFactory : public Configuration::GuardDogActionFactory {
+class LogGuardDogActionFactory : public Configuration::GuardDogActionFactory {
 public:
-  TestGuardDogActionFactory(const std::string& name, std::vector<std::string>& events)
+  LogGuardDogActionFactory(const std::string& name, std::vector<std::string>& events)
       : name_(name), events_(events) {}
 
   Configuration::GuardDogActionPtr createGuardDogActionFromProto(
-      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
+      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& /*config*/,
       Configuration::GuardDogActionFactoryContext& /*context*/) override {
     // Return different actions depending on the config.
-    if (config.event() == envoy::config::bootstrap::v3::Watchdog::WatchdogAction::KILL) {
-      return std::make_unique<SignalGuardDogAction>(SIGKILL);
-    } else if (config.event() ==
-               envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MULTIKILL) {
-      return std::make_unique<SignalGuardDogAction>(SIGTERM);
-    }
     return std::make_unique<LogGuardDogAction>(events_);
   }
 
@@ -512,21 +506,46 @@ public:
   std::vector<std::string>& events_; // not owned
 };
 
+// Test factory for consuming Watchdog configs and creating GuardDogActions.
+template <class ConfigType>
+class AssertGuardDogActionFactory : public Configuration::GuardDogActionFactory {
+public:
+  AssertGuardDogActionFactory(const std::string& name) : name_(name) {}
+
+  Configuration::GuardDogActionPtr createGuardDogActionFromProto(
+      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
+      Configuration::GuardDogActionFactoryContext& /*context*/) override {
+    // Return different actions depending on the config.
+    return std::make_unique<AssertGuardDogAction>(config.config().typed_config().value());
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ConfigType()};
+  }
+
+  std::string name() const override { return name_; }
+
+  const std::string name_;
+};
+
 /**
  * Tests that various actions registered for the guarddog get called upon.
  */
 class GuardDogActionsTest : public GuardDogTestBase {
 protected:
-  GuardDogActionsTest() : factory_("TestAction", events_), register_factory_(factory_) {}
+  GuardDogActionsTest()
+      : log_factory_("LogFactory", events_), register_log_factory_(log_factory_),
+        assert_factory_("AssertFactory"), register_assert_factory_(assert_factory_) {}
 
   std::vector<std::string> getActionsConfig() {
     return {
         R"EOF(
         {
           "config": {
-            "name": "TestAction",
+            "name": "AssertFactory",
             "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.Empty"
+              "@type": "type.googleapis.com/google.protobuf.StringValue",
+              "value": "MultiKill conditions triggered."
             }
           },
           "event": "MULTIKILL"
@@ -535,9 +554,10 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "TestAction",
+            "name": "AssertFactory",
             "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.Empty"
+              "@type": "type.googleapis.com/google.protobuf.StringValue",
+              "value": "Kill conditions triggered."
             }
           },
           "event": "KILL"
@@ -546,7 +566,7 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "TestAction",
+            "name": "LogFactory",
             "typed_config": {
               "@type": "type.googleapis.com/google.protobuf.Empty"
             }
@@ -557,7 +577,7 @@ protected:
         R"EOF(
         {
           "config": {
-            "name": "TestAction",
+            "name": "LogFactory",
             "typed_config": {
               "@type": "type.googleapis.com/google.protobuf.Empty"
             }
@@ -575,8 +595,10 @@ protected:
 
   std::vector<std::string> actions_;
   std::vector<std::string> events_;
-  TestGuardDogActionFactory<Envoy::ProtobufWkt::Empty> factory_;
-  Registry::InjectFactory<Configuration::GuardDogActionFactory> register_factory_;
+  LogGuardDogActionFactory<Envoy::ProtobufWkt::Empty> log_factory_;
+  Registry::InjectFactory<Configuration::GuardDogActionFactory> register_log_factory_;
+  AssertGuardDogActionFactory<Envoy::ProtobufWkt::StringValue> assert_factory_;
+  Registry::InjectFactory<Configuration::GuardDogActionFactory> register_assert_factory_;
   NiceMock<Stats::MockStore> fake_stats_;
   WatchDogSharedPtr first_dog_;
   WatchDogSharedPtr second_dog_;
@@ -730,7 +752,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
   };
 
   // We expect only the kill action to have fired
-  EXPECT_EXIT(kill_function(), KilledBySignal(SIGKILL), "");
+  EXPECT_DEATH(kill_function(), "Kill conditions triggered.");
 
   // Multikill event should fire before the others
   auto multikill_function = [&]() -> void {
@@ -745,7 +767,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
     guard_dog_->forceCheckForTest();
   };
 
-  EXPECT_EXIT(multikill_function(), KilledBySignal(SIGTERM), "");
+  EXPECT_DEATH(multikill_function(), "MultiKill conditions triggered.");
 
   // We expect megamiss to fire before miss
   const NiceMock<Configuration::MockMain> config(100, 100, DISABLE_KILL, DISABLE_MULTIKILL, 0,
@@ -770,9 +792,7 @@ TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
     guard_dog_->forceCheckForTest();
   };
 
-  // We expect our registered action to exit with SIGKILL (vs the SIGABRT used by the call to
-  // PANIC(..))
-  EXPECT_EXIT(die_function(), KilledBySignal(SIGKILL), "");
+  EXPECT_DEATH(die_function(), "Kill conditions triggered.");
 }
 
 TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
@@ -787,9 +807,7 @@ TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
     guard_dog_->forceCheckForTest();
   };
 
-  // We expect our registered action to exit with SIGTERM (vs the SIGABRT used by the call to
-  // PANIC(..))
-  EXPECT_EXIT(die_function(), KilledBySignal(SIGTERM), "");
+  EXPECT_DEATH(die_function(), "MultiKill conditions triggered.");
 }
 
 } // namespace
