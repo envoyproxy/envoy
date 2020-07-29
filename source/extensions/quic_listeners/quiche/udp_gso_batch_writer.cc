@@ -32,7 +32,7 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, si
     ENVOY_LOG_MISC(trace, "sendmsg blocked, message not buffered");
     return Api::IoCallUint64Result(
         /*rc=*/0,
-        /*err=*/Api::IoErrorPtr(new Network::IoSocketError(quic_result.error_code),
+        /*err=*/Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                 Network::IoSocketError::deleteIoError));
   }
   default: {
