@@ -59,7 +59,6 @@ for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     build_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}:local"
 done
 
-
 MASTER_BRANCH="refs/heads/master"
 RELEASE_BRANCH_REGEX="^refs/heads/release/v.*"
 RELEASE_TAG_REGEX="^refs/tags/v.*"
