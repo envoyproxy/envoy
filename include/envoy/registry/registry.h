@@ -261,9 +261,9 @@ public:
     absl::string_view canonicalName = canonicalFactoryName(name);
 
     // Next, disable the factory by all its deprecated names.
-    for (const auto& [name, instead_name] : deprecatedFactoryNames()) {
-      if (instead_name == canonicalName) {
-        disable(name);
+    for (const auto& [deprecated_name, mapped_canonical_name] : deprecatedFactoryNames()) {
+      if (mapped_canonical_name == canonicalName) {
+        disable(deprecated_name);
       }
     }
 
@@ -464,21 +464,22 @@ private:
                   prev_by_name->name(), prev_by_name->configType());
       }
 
-      for (auto [prev_deprecated_name, instead_name] : prev_deprecated_names) {
+      for (auto [prev_deprecated_name, mapped_canonical_name] : prev_deprecated_names) {
         deprecatedFactoryNames().erase(prev_deprecated_name);
 
         ENVOY_LOG(info, "Removed deprecated name '{}'", prev_deprecated_name);
 
-        if (!instead_name.empty()) {
-          deprecatedFactoryNames().emplace(std::make_pair(prev_deprecated_name, instead_name));
+        if (!mapped_canonical_name.empty()) {
+          deprecatedFactoryNames().emplace(
+              std::make_pair(prev_deprecated_name, mapped_canonical_name));
 
-          auto* deprecated_factory = getFactory(instead_name);
+          auto* deprecated_factory = getFactory(mapped_canonical_name);
           RELEASE_ASSERT(deprecated_factory != nullptr,
                          "failed to restore deprecated factory name");
-          factories().emplace(instead_name, deprecated_factory);
+          factories().emplace(mapped_canonical_name, deprecated_factory);
 
           ENVOY_LOG(info, "Restored deprecated name '{}' (mapped to '{}'", prev_deprecated_name,
-                    instead_name);
+                    mapped_canonical_name);
         }
       }
 
