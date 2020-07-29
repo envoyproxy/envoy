@@ -1,5 +1,7 @@
 #include "common/http/utility.h"
+#include "common/network/address_impl.h"
 #include "common/network/application_protocol.h"
+#include "common/network/proxy_protocol_filter_state.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
 #include "common/stream_info/filter_state_impl.h"
@@ -31,6 +33,14 @@ TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
   filter_state_.setData(
       UpstreamServerName::key(), std::make_unique<UpstreamServerName>("www.example.com"),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData(ProxyProtocolFilterState::key(),
+                        std::make_unique<ProxyProtocolFilterState>(Network::ProxyProtocolData{
+                            Network::Address::InstanceConstSharedPtr(
+                                new Network::Address::Ipv4Instance("202.168.0.13", 52000)),
+                            Network::Address::InstanceConstSharedPtr(
+                                new Network::Address::Ipv4Instance("174.2.2.222", 80))}),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
   EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
