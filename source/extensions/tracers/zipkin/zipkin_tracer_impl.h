@@ -75,6 +75,8 @@ public:
                               SystemTime start_time) override;
 
   void setSampled(bool sampled) override;
+
+  // TODO(#11622): Implement baggage storage for zipkin spans
   void setBaggage(absl::string_view, absl::string_view) override;
   std::string getBaggage(absl::string_view) override;
 
