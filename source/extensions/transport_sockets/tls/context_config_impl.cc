@@ -178,16 +178,7 @@ ContextConfigImpl::ContextConfigImpl(
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
-                                                default_max_protocol_version)),
-      handshaker_factory_cb_([&]() {
-        auto* factory = HandshakerFactoryImpl::getDefaultHandshakerFactory();
-        auto handshaker_factory_context = HandshakerFactoryContextImpl(api_, alpnProtocols());
-        return factory->createHandshakerCb(*factory->createEmptyConfigProto(),
-                                           handshaker_factory_context,
-                                           factory_context.messageValidationVisitor());
-      }()),
-      require_certificates_(
-          HandshakerFactoryImpl::getDefaultHandshakerFactory()->requireCertificates()) {
+                                                default_max_protocol_version)) {
   if (certificate_validation_context_provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
@@ -223,16 +214,24 @@ ContextConfigImpl::ContextConfigImpl(
     }
   }
 
+  HandshakerFactoryContextImpl handshaker_factory_context(api_, alpnProtocols());
+  Ssl::HandshakerFactory* handshaker_factory;
   if (config.has_custom_listener_handshaker()) {
-    auto& handshaker_config = config.custom_listener_handshaker();
-    Ssl::HandshakerFactory& handshaker_factory =
-        Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
-    HandshakerFactoryContextImpl handshaker_factory_context(api_, alpnProtocols());
-    handshaker_factory_cb_ = handshaker_factory.createHandshakerCb(
+    // If a custom handshaker is configured, derive the factory from the config.
+    const auto& handshaker_config = config.custom_listener_handshaker();
+    handshaker_factory =
+        &Config::Utility::getAndCheckFactory<Ssl::HandshakerFactory>(handshaker_config);
+    handshaker_factory_cb_ = handshaker_factory->createHandshakerCb(
         handshaker_config.typed_config(), handshaker_factory_context,
         factory_context.messageValidationVisitor());
-    require_certificates_ = handshaker_factory.requireCertificates();
+  } else {
+    // Otherwise, derive the config from the (default) factory).
+    handshaker_factory = HandshakerFactoryImpl::getDefaultHandshakerFactory();
+    handshaker_factory_cb_ = handshaker_factory->createHandshakerCb(
+        *handshaker_factory->createEmptyConfigProto(), handshaker_factory_context,
+        factory_context.messageValidationVisitor());
   }
+  require_certificates_ = handshaker_factory->requireCertificates();
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
