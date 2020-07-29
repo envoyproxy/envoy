@@ -111,7 +111,8 @@ As a concrete example, given the following Lua filter configuration:
           end
 
 The HTTP Lua filter can be disabled on some virtual host, route, or weighted cluster by the
-LuaPerRoute configuration as follow:
+:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration as
+follow:
 
 .. code-block:: yaml
 
