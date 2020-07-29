@@ -551,7 +551,7 @@ void HttpConnectionManagerConfig::processDynamicFilterConfig(
         config_discovery.default_config(), context_.messageValidationVisitor(), *default_factory);
     Http::FilterFactoryCb default_config =
         default_factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
-    filter_config_provider->onConfigUpdate(default_config, "");
+    filter_config_provider->onConfigUpdate(default_config, "", nullptr);
   }
   filter_factories.push_back(std::move(filter_config_provider));
 }
