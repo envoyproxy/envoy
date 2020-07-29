@@ -895,7 +895,7 @@ int ServerConnectionImpl::onHeadersComplete() {
       if ((parser_.flags & F_CHUNKED) && allowChunkedLength()) {
         headers->removeContentLength();
       } else {
-        ENVOY_CONN_LOG(error, "Both 'Content-Length' and 'Transfer-Encdoding' are set.",
+        ENVOY_CONN_LOG(debug, "Both 'Content-Length' and 'Transfer-Encdoding' are set.",
                        connection_);
         error_code_ = Http::Code::BadRequest;
         sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);

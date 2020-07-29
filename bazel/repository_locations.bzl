@@ -285,6 +285,9 @@ DEPENDENCY_REPOSITORIES = dict(
     com_github_nodejs_http_parser = dict(
         sha256 = "6a12896313ce1ca630cf516a0ee43a79b5f13f5a5d8143f56560ac0b21c98fac",
         strip_prefix = "http-parser-4f15b7d510dc7c6361a26a7c6d2f7c3a17f8d878",
+        # 2020-07-10
+        # This SHA includes fix for https://github.com/nodejs/http-parser/issues/517 which allows (opt-in) to serve
+        # requests with both Content-Legth and Transfer-Encoding: chunked headers set.
         urls = ["https://github.com/nodejs/http-parser/archive/4f15b7d510dc7c6361a26a7c6d2f7c3a17f8d878.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:nodejs:node.js:*",
