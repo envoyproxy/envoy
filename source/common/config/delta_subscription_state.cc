@@ -1,9 +1,8 @@
-#include "common/config/delta_subscription_state.h"
-
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/config/delta_subscription_state.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
@@ -124,16 +123,16 @@ DeltaSubscriptionState::getNextRequestAckless() {
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
-    for (auto const& resource : resource_versions_) {
+    for (auto const& [resource_name, resource_version] : resource_versions_) {
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource.second.waitingForServer()) {
-        (*request.mutable_initial_resource_versions())[resource.first] = resource.second.version();
+      if (!resource_version.waitingForServer()) {
+        (*request.mutable_initial_resource_versions())[resource_name] = resource_version.version();
       }
       // As mentioned above, fill resource_names_subscribe with everything, including names we
       // have yet to receive any resource for.
-      names_added_.insert(resource.first);
+      names_added_.insert(resource_name);
     }
     names_removed_.clear();
   }
