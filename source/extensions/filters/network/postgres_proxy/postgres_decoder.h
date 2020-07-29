@@ -6,8 +6,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/postgres_proxy/postgres_session.h"
 #include "extensions/filters/network/postgres_proxy/postgres_message.h"
+#include "extensions/filters/network/postgres_proxy/postgres_session.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -80,7 +80,8 @@ protected:
   // first - string with message description
   // second - vector of Decoder's methods which are invoked when the message
   // is processed.
-  using MsgProcessor = std::tuple<std::string, std::function<std::unique_ptr<MessageI>()>, std::vector<MsgAction>>;
+  using MsgProcessor =
+      std::tuple<std::string, std::function<std::unique_ptr<MessageI>()>, std::vector<MsgAction>>;
 
   // Frontend and Backend messages.
   using MsgGroup = struct {
