@@ -52,7 +52,7 @@ public:
     ON_CALL(init_manager_, initialize(_))
         .WillByDefault(Invoke(
             [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
-    // Thread local storage assumes a single (master) thread with no workers.
+    // Thread local storage assumes a single (main) thread with no workers.
     ON_CALL(factory_context_.admin_, concurrency()).WillByDefault(Return(0));
   }
 
