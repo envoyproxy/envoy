@@ -410,10 +410,10 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::Instance
   offset += sizeof(uint16_t);
   available_bytes -= sizeof(uint16_t);
 
-  // TODO(abaptiste): Support EDNS records
+  // TODO(abaptiste): Support Extension Mechanisms for DNS (RFC2671)
   //
-  // We may see optional records indicating EDNS support. We need to skip these
-  // records until we have proper EDNS support. Encountering one of these records
+  // We may see optional records indicating DNS extension support. We need to skip
+  // these records until we have proper support. Encountering one of these records
   // does not indicate a failure. We support A, AAAA and SRV record types
   if (record_type != DNS_RECORD_TYPE_A && record_type != DNS_RECORD_TYPE_AAAA &&
       record_type != DNS_RECORD_TYPE_SRV) {
