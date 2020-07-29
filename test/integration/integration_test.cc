@@ -124,12 +124,12 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 0);
 
   // Main thread admin listener stats.
-  EXPECT_NE(nullptr, test_server_->counter("listener.admin.main_thread.downstream_cx_total"));
+  test_server_->waitForCounterExists("listener.admin.main_thread.downstream_cx_total");
 
   // Per-thread watchdog stats.
-  EXPECT_NE(nullptr, test_server_->counter("server.main_thread.watchdog_miss"));
-  EXPECT_NE(nullptr, test_server_->counter("server.worker_0.watchdog_miss"));
-  EXPECT_NE(nullptr, test_server_->counter("server.worker_1.watchdog_miss"));
+  test_server_->waitForCounterExists("server.main_thread.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_0.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_1.watchdog_miss");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));

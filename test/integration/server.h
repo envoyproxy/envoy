@@ -205,7 +205,7 @@ class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
 public:
   using Stats::AllocatorImpl::AllocatorImpl;
 
-  virtual void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
+  void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
     absl::MutexLock l(&mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() != value) {
@@ -214,13 +214,22 @@ public:
     ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
   }
 
-  virtual void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
+  void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
     absl::MutexLock l(&mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() < value) {
       condvar_.Wait(&mutex_);
     }
     ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
+  }
+
+  void waitForCounterExists(const std::string& name) {
+    absl::MutexLock l(&mutex_);
+    ENVOY_LOG_MISC(trace, "waiting for {} to exist", name);
+    while (getCounterLockHeld(name) == nullptr) {
+      condvar_.Wait(&mutex_);
+    }
+    ENVOY_LOG_MISC(trace, "done waiting for {} to exist", name);
   }
 
 protected:
@@ -418,6 +427,10 @@ public:
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     notifyingStatsAllocator().waitForCounterFromStringGe(name, value);
+  }
+
+  void waitForCounterExists(const std::string& name) override {
+    notifyingStatsAllocator().waitForCounterExists(name);
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
