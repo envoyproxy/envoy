@@ -7,6 +7,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -30,6 +31,9 @@ enum class LimitStatus {
   OverLimit
 };
 
+typedef std::vector<envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus>
+    DescriptorStatusList;
+typedef std::unique_ptr<DescriptorStatusList> DescriptorStatusListPtr;
 /**
  * Async callbacks used during limit() calls.
  */
@@ -41,7 +45,8 @@ public:
    * Called when a limit request is complete. The resulting status,
    * response headers and request headers to be forwarded to the upstream are supplied.
    */
-  virtual void complete(LimitStatus status, Http::ResponseHeaderMapPtr&& response_headers_to_add,
+  virtual void complete(LimitStatus status, DescriptorStatusListPtr&& descriptor_statuses,
+                        Http::ResponseHeaderMapPtr&& response_headers_to_add,
                         Http::RequestHeaderMapPtr&& request_headers_to_add) PURE;
 };
 

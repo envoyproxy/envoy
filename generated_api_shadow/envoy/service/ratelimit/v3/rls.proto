@@ -110,6 +110,9 @@ message RateLimitResponse {
 
     // The limit remaining in the current time unit.
     uint32 limit_remaining = 3;
+
+    // Number of seconds until reset of the current limit window.
+    uint32 seconds_until_reset = 4;
   }
 
   // The overall response code which takes into account all of the descriptors that were passed
