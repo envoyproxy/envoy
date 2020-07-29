@@ -1290,7 +1290,7 @@ TEST(Url, ParsingTest) {
   validateUrl("https://www.host.com:8443", "https", "www.host.com:8443", "/", 8443);
   validateUrl("http://www.host.com:8080", "http", "www.host.com:8080", "/", 8080);
 
-  // Make sure we can parse unicode URL.
+  // Make sure we survive parsing unicode URL.
   validateUrl("https://\xe5\x85\x89.example/", "https", "xn--54q.example", "/", 443);
 }
 

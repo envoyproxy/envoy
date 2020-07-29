@@ -6,9 +6,6 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-# The "generated" ICU data here is based on https://github.com/nodejs/node "icu-small", filtered
-# by https://raw.githubusercontent.com/nodejs/node/634a9a97f4b380390352543452aed6c7c9defcb4/tools/icu/icu_small.json.
-#
 # Currently, the ICU data is manually generated using tools/icu/generate_data.sh.
 filegroup(
     name = "data_files",
