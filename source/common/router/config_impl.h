@@ -8,7 +8,6 @@
 #include <memory>
 #include <regex>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -32,6 +31,7 @@
 #include "common/router/tls_context_match_criteria_impl.h"
 #include "common/stats/symbol_table_impl.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -69,7 +69,7 @@ public:
   const RouteSpecificFilterConfig* get(const std::string& name) const;
 
 private:
-  std::unordered_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
+  absl::node_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
 };
 
 class RouteEntryImplBase;
@@ -919,14 +919,14 @@ public:
 
 private:
   using WildcardVirtualHosts =
-      std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
+      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<std::string(const std::string&, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
 
   Stats::ScopePtr vhost_scope_;
-  std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
+  absl::node_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
   // A note on using an unordered_map versus a vector of (string, VirtualHostSharedPtr) pairs:
