@@ -15,8 +15,7 @@ option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Wasm service]
-// [#extension: envoy.wasm]
+// [#protodoc-title: Wasm]
 
 // [[#not-implemented-hide:]
 // Configuration for a Wasm VM.

@@ -10,4 +10,3 @@ Bootstrap
   ../config/metrics/v3/metrics_service.proto
   ../config/overload/v3/overload.proto
   ../config/ratelimit/v3/rls.proto
-  ../extensions/wasm/v3/wasm.proto
