@@ -132,12 +132,10 @@ public:
   public:
     MockUpstreamUdpFilter(ConnectionHandlerTest& parent, Network::UdpReadFilterCallbacks& callbacks)
         : UdpListenerReadFilter(callbacks), parent_(parent) {}
-    ~MockUpstreamUdpFilter() override { deleted_before_listener_ = !parent_.udp_listener_deleted; }
+    ~MockUpstreamUdpFilter() override { parent_.deleted_before_listener_ = !parent_.udp_listener_deleted; }
 
     MOCK_METHOD(void, onData, (Network::UdpRecvData&), (override));
     MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode), (override));
-
-    bool deleted_before_listener_ = false;
 
   private:
     ConnectionHandlerTest& parent_;
@@ -224,6 +222,7 @@ public:
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
   bool udp_listener_deleted = false;
+  bool deleted_before_listener_ = false;
 };
 
 // Verify that if a listener is removed while a rebalanced connection is in flight, we correctly
@@ -1060,7 +1059,6 @@ TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
       addListener(1, true, false, "test_listener", listener, nullptr, nullptr, nullptr,
                   Network::Socket::Type::Datagram, std::chrono::milliseconds(), false, nullptr);
   auto filter = std::make_unique<NiceMock<MockUpstreamUdpFilter>>(*this, dummy_callbacks);
-  auto filter_ptr = filter.get();
 
   EXPECT_CALL(factory_, createUdpListenerFilterChain(_, _))
       .WillOnce(Invoke([&](Network::UdpListenerFilterManager& udp_listener,
@@ -1074,7 +1072,7 @@ TEST_F(ConnectionHandlerTest, ShutdownUdpListener) {
   handler_->addListener(absl::nullopt, *test_listener);
   handler_->stopListeners();
 
-  ASSERT_TRUE(filter_ptr->deleted_before_listener_)
+  ASSERT_TRUE(deleted_before_listener_)
       << "The read_filter_ should be deleted before the udp_listener_ is deleted.";
 }
 
