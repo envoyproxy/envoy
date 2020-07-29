@@ -54,8 +54,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/health_checkers/redis:95.9"
 "source/extensions/quic_listeners:84.8"
 "source/extensions/quic_listeners/quiche:84.8"
-"source/extensions/retry:95.5"
-"source/extensions/retry/host:85.7"
 "source/extensions/stat_sinks/statsd:85.2"
 "source/extensions/tracers/opencensus:91.2"
 "source/extensions/tracers/xray:95.3"
