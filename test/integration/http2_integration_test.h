@@ -83,7 +83,7 @@ protected:
 
 class Http2FloodMitigationTest : public Http2FrameIntegrationTest {
 public:
-  Http2FloodMitigationTest() : Http2FrameIntegrationTest() {
+  Http2FloodMitigationTest() {
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
