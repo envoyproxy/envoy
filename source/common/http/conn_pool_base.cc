@@ -61,18 +61,18 @@ HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {
-  return (!pending_requests_.empty() || (num_active_requests_ > 0));
+  return (!pending_streams_.empty() || (num_active_streams_ > 0));
 }
 
 ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newPendingRequest(Envoy::ConnectionPool::AttachContext& context) {
   Http::ResponseDecoder& decoder = *typedContext<HttpAttachContext>(context).decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *typedContext<HttpAttachContext>(context).callbacks_;
-  ENVOY_LOG(debug, "queueing request due to no available connections");
-  Envoy::ConnectionPool::PendingRequestPtr pending_request(
+  ENVOY_LOG(debug, "queueing stream due to no available connections");
+  Envoy::ConnectionPool::PendingRequestPtr pending_stream(
       new HttpPendingRequest(*this, decoder, callbacks));
-  pending_request->moveIntoList(std::move(pending_request), pending_requests_);
-  return pending_requests_.front().get();
+  pending_stream->moveIntoList(std::move(pending_stream), pending_streams_);
+  return pending_streams_.front().get();
 }
 
 void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& client,

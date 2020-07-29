@@ -157,6 +157,18 @@ TEST_P(ProtocolIntegrationTest, RouterRedirect) {
             response->headers().get(Http::Headers::get().Location)->value().getStringView());
 }
 
+TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "600"}};
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("600", response->headers().getStatusValue());
+}
+
 // Add a health check filter and verify correct computation of health based on upstream status.
 TEST_P(ProtocolIntegrationTest, ComputedHealthCheck) {
   config_helper_.addFilter(R"EOF(
@@ -1907,6 +1919,27 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, TestPrefetch) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_prefetch_policy()->mutable_prefetch_ratio()->set_value(1.5);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  FakeHttpConnectionPtr fake_upstream_connection_two;
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+    // For HTTP/1.1 there should be a prefetched connection.
+    ASSERT_TRUE(
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_two));
+  } else {
+    // For HTTP/2, the original connection can accommodate two requests.
+    ASSERT_FALSE(fake_upstreams_[0]->waitForHttpConnection(
+        *dispatcher_, fake_upstream_connection_two, std::chrono::milliseconds(5)));
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
