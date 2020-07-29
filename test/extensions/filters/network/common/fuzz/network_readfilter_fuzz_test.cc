@@ -30,10 +30,6 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-<<<<<<< HEAD
-          filter_name = NetworkFilterNames::get().Rbac;
-=======
->>>>>>> upstream/master
           input->mutable_config()->set_name(std::string(filter_name));
         }
         // Set the corresponding type_url for Any.
@@ -42,18 +38,10 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
             absl::StrCat("type.googleapis.com/",
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
       }};
-<<<<<<< HEAD
-  // UberFilterFuzzer::setThriftFilters(nullptr);
-  try {
-    TestUtility::validate(input);
-    // Check the filter's name in case some filters are not supported yet.
-    // TODO(jianwendong): remove this check after all filters are supported.
-=======
 
   try {
     TestUtility::validate(input);
     // Check the filter's name in case some filters are not supported yet.
->>>>>>> upstream/master
     static const auto filter_names = UberFilterFuzzer::filterNames();
     // TODO(jianwendong): remove this if block after covering all the filters.
     if (std::find(filter_names.begin(), filter_names.end(), input.config().name()) ==

@@ -1,12 +1,5 @@
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
-<<<<<<< HEAD
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-
-#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
-=======
-
->>>>>>> upstream/master
 #include "extensions/filters/network/common/utility.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -16,54 +9,16 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-<<<<<<< HEAD
-// Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
-// std::chrono::time_point.
-=======
->>>>>>> upstream/master
 namespace {
 // Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
 // std::chrono::time_point.
 static const int SecondsPerDay = 86400;
 } // namespace
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/master
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // These filters have already been covered by this fuzzer.
   // Will extend to cover other network filters one by one.
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
-<<<<<<< HEAD
-    filter_names = {        
-      NetworkFilterNames::get().ExtAuthorization,
-      NetworkFilterNames::get().LocalRateLimit,
-      NetworkFilterNames::get().RedisProxy,
-      NetworkFilterNames::get().ClientSslAuth,
-      NetworkFilterNames::get().Echo,
-      NetworkFilterNames::get().DirectResponse,
-      NetworkFilterNames::get().DubboProxy,
-      NetworkFilterNames::get().SniCluster,
-
-      NetworkFilterNames::get().ThriftProxy,
-      NetworkFilterNames::get().ZooKeeperProxy,
-      NetworkFilterNames::get().HttpConnectionManager,
-      NetworkFilterNames::get().SniDynamicForwardProxy,
-      NetworkFilterNames::get().KafkaBroker,
-      NetworkFilterNames::get().RocketmqProxy, // need to fix the assert
-      NetworkFilterNames::get().RateLimit,
-      NetworkFilterNames::get().Rbac
-
-      // mongo_proxy
-      // mysql_proxy
-      // postgres_proxy
-      // tcp_proxy
-    };
-  }
-  return filter_names;
-  
-=======
     filter_names = {NetworkFilterNames::get().ExtAuthorization,
                     NetworkFilterNames::get().LocalRateLimit,
                     NetworkFilterNames::get().RedisProxy,
@@ -74,7 +29,6 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
                     NetworkFilterNames::get().SniCluster};
   }
   return filter_names;
->>>>>>> upstream/master
 }
 
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
@@ -108,40 +62,6 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
-<<<<<<< HEAD
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
-  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
-    read_filter_callbacks_->connection_.local_address_ = ipv4_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = ipv4_addr_;
-  } else if (filter_name == NetworkFilterNames::get().RateLimit) {
-    async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
-    async_client_ = std::make_unique<Grpc::MockAsyncClient>();
-    // TODO(jianwendong): consider testing on different kinds of responses.
-    ON_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
-        .WillByDefault(testing::WithArgs<3>(Invoke([&](Grpc::RawAsyncRequestCallbacks& callbacks) {
-          Filters::Common::RateLimit::GrpcClientImpl* grpc_client_impl =
-              dynamic_cast<Filters::Common::RateLimit::GrpcClientImpl*>(&callbacks);
-          // Response OK
-          auto response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
-          // Give response to the grpc_client by calling onSuccess().
-          grpc_client_impl->onSuccess(std::move(response), span_);
-          return async_request_.get();
-        })));
-
-    EXPECT_CALL(*async_client_factory_, create()).WillOnce(Invoke([&] {
-      return std::move(async_client_);
-    }));
-
-    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          return std::move(async_client_factory_);
-        }));
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
-=======
->>>>>>> upstream/master
   }
 }
 
