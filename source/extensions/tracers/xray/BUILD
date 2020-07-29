@@ -1,7 +1,3 @@
-licenses(["notice"])  # Apache 2
-
-# Trace driver for AWS X-Ray.
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
@@ -9,6 +5,10 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Trace driver for AWS X-Ray.
 
 envoy_package()
 
@@ -61,7 +61,6 @@ envoy_cc_extension(
     deps = [
         ":xray_lib",
         "//source/common/config:datasource_lib",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",

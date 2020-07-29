@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package test.integration;
+
+message H2FramePing {
+  enum Flags {
+    NONE = 0;
+    ACK = 1;
+  }
+  Flags flags = 1;
+  bytes data = 2;
+}
+
+message H2FrameSettings {
+  enum Flags {
+    NONE = 0;
+    ACK = 1;
+  }
+  Flags flags = 1;
+}
+
+enum H2HeadersFlags {
+  NONE = 0;
+  END_STREAM = 1;
+  END_HEADERS = 4;
+}
+
+message H2FrameHeaders {
+  repeated H2HeadersFlags flags = 1;
+  uint32 stream_index = 2;
+}
+
+message H2FrameContinuation {
+  repeated H2HeadersFlags flags = 1;
+  uint32 stream_index = 2;
+}
+
+message H2FrameData {
+  enum Flags {
+    NONE = 0;
+    END_STREAM = 1;
+  }
+  Flags flags = 1;
+  uint32 stream_index = 2;
+}
+
+message H2FramePriority {
+  uint32 stream_index = 1;
+  uint32 dependent_index = 2;
+}
+
+// These map to the errors defined in: https://tools.ietf.org/html/rfc7540#section-7
+enum H2ErrorCode {
+  NO_ERROR = 0;
+  PROTOCOL_ERROR = 1;
+  INTERNAL_ERROR = 2;
+  FLOW_CONTROL_ERROR = 3;
+  SETTINGS_TIMEOUT = 4;
+  STREAM_CLOSED = 5;
+  FRAME_SIZE_ERROR = 6;
+  REFUSED_STREAM = 7;
+  CANCEL = 8;
+  COMPRESSION_ERROR = 9;
+  CONNECT_ERROR = 10;
+  ENHANCE_YOUR_CLAIM = 11;
+  INADEQUATE_SECURITY = 12;
+  HTTP_1_1_REQUIRED = 13;
+}
+
+message H2FramePushPromise {
+  repeated H2HeadersFlags flags = 1;
+  uint32 stream_index = 2;
+  uint32 promised_stream_index = 3;
+}
+
+message H2FrameResetStream {
+  uint32 stream_index = 1;
+  H2ErrorCode error_code = 2;
+}
+
+message H2FrameGoAway {
+  uint32 last_stream_index = 1;
+  H2ErrorCode error_code = 2;
+}
+
+message H2FrameWindowUpdate {
+  uint32 stream_index = 1;
+  uint32 increment = 2;
+}
+
+// A header that contains invalid status
+message H2FrameMalformedRequest {
+  uint32 stream_index = 1;
+}
+
+// A request that is comprised of a header that has HTTP GET request with a given host and path and
+// an additional zero length header (making this a malformed request)
+message H2FrameMalformedRequestWithZerolenHeader {
+  uint32 stream_index = 1;
+  string host = 2;
+  string path = 3;
+}
+
+// A request that is comprised of a header that has HTTP GET request with a given host and path
+message H2FrameRequest {
+  uint32 stream_index = 1;
+  string host = 2;
+  string path = 3;
+}
+
+// A request that is comprised of a header that has HTTP POST request with a given host and path
+message H2FramePostRequest {
+  uint32 stream_index = 1;
+  string host = 2;
+  string path = 3;
+}
+
+// A generic frame to emit a malformed frame
+message H2FrameGeneric {
+  bytes frame_bytes = 1;
+}
+
+message H2TestFrame {
+  // These values map to the frame creation methods in:
+  // test/common/http/http2/http2_frame.h
+  oneof frame_type {
+    H2FramePing ping = 1;
+    H2FrameSettings settings = 2;
+    H2FrameHeaders headers = 3;
+    H2FrameContinuation continuation = 4;
+    H2FrameData data = 5;
+    H2FramePriority priority = 6;
+    H2FramePushPromise push_promise = 7;
+    H2FrameResetStream reset_stream = 8;
+    H2FrameGoAway go_away = 9;
+    H2FrameWindowUpdate window_update = 10;
+    H2FrameMalformedRequest malformed_request = 11;
+    H2FrameMalformedRequestWithZerolenHeader malformed_request_with_zerolen_header = 12;
+    H2FrameRequest request = 13;
+    H2FramePostRequest post_request = 14;
+    H2FrameGeneric generic = 15;
+  }
+}
+
+message DownstreamSendEvent {
+  repeated H2TestFrame h2_frames = 1;
+}
+
+message UpstreamSendEvent {
+  repeated H2TestFrame h2_frames = 1;
+}
+
+message Event {
+  oneof event_selector {
+    // Downstream sent given frames.
+    DownstreamSendEvent downstream_send_event = 1;
+    // Upstream sent given frames.
+    UpstreamSendEvent upstream_send_event = 2;
+  }
+}
+
+// Test case in corpus for *_h2_capture_fuzz_test.
+message H2CaptureFuzzTestCase {
+  repeated Event events = 1;
+}

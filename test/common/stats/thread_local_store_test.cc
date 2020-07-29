@@ -1,7 +1,6 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
@@ -17,7 +16,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
@@ -58,7 +57,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   AllocatorImpl alloc_;
   MockSink sink_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  ThreadLocalStoreImplPtr store_;
 };
 
 class HistogramWrapper {
@@ -176,7 +175,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   AllocatorImpl alloc_;
   MockSink sink_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  ThreadLocalStoreImplPtr store_;
   InSequence s;
   std::vector<uint64_t> h1_cumulative_values_, h2_cumulative_values_, h1_interval_values_,
       h2_interval_values_;
@@ -587,7 +586,7 @@ public:
 
   SymbolTablePtr symbol_table_;
   AllocatorImpl alloc_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  ThreadLocalStoreImplPtr store_;
   StatNamePool pool_;
 };
 
@@ -643,6 +642,7 @@ TEST_F(LookupWithStatNameTest, NotFound) {
   EXPECT_FALSE(store_->findCounter(not_found));
   EXPECT_FALSE(store_->findGauge(not_found));
   EXPECT_FALSE(store_->findHistogram(not_found));
+  EXPECT_FALSE(store_->findTextReadout(not_found));
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
@@ -716,6 +716,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
       store_->histogramFromString("noop_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(noop_histogram.name(), "");
   EXPECT_FALSE(noop_histogram.used());
+  EXPECT_EQ(Stats::Histogram::Unit::Null, noop_histogram.unit());
   Histogram& noop_histogram_2 =
       store_->histogramFromString("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
@@ -938,6 +939,12 @@ public:
     };
   }
 
+  LookupStatFn lookupTextReadoutFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->textReadoutFromString(stat_name).name();
+    };
+  }
+
   Stats::SymbolTablePtr symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -978,6 +985,14 @@ TEST_P(RememberStatsMatcherTest, HistogramRejectOne) { testRememberMatcher(looku
 TEST_P(RememberStatsMatcherTest, HistogramRejectsAll) { testRejectsAll(lookupHistogramFn()); }
 
 TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) { testAcceptsAll(lookupHistogramFn()); }
+
+TEST_P(RememberStatsMatcherTest, TextReadoutRejectOne) {
+  testRememberMatcher(lookupTextReadoutFn());
+}
+
+TEST_P(RememberStatsMatcherTest, TextReadoutRejectsAll) { testRejectsAll(lookupTextReadoutFn()); }
+
+TEST_P(RememberStatsMatcherTest, TextReadoutAcceptsAll) { testAcceptsAll(lookupTextReadoutFn()); }
 
 TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -1064,7 +1079,7 @@ protected:
   MockSink sink_;
   SymbolTablePtr symbol_table_;
   std::unique_ptr<AllocatorImpl> alloc_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
+  ThreadLocalStoreImplPtr store_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
@@ -1097,7 +1112,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       100, [this](absl::string_view name) { store_->counterFromString(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 689648); // Jan 23, 2020
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.75 * million_);
 }
 
@@ -1107,7 +1122,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       100, [this](absl::string_view name) { store_->counterFromString(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 829232); // Apr 08, 2020
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827664); // July 2, 2020
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.9 * million_);
 }
 
@@ -1498,7 +1513,7 @@ public:
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;
   Thread::ThreadFactory& thread_factory_;
-  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
+  ThreadLocal::InstanceImplPtr tls_;
   Thread::ThreadPtr main_thread_;
   std::vector<Thread::ThreadPtr> threads_;
   StatNamePool pool_;

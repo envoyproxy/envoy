@@ -75,7 +75,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 
@@ -84,7 +84,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 
@@ -98,7 +98,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(0U, response->body().size());
 }
 
@@ -118,11 +118,11 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 1, default_response_headers_, 1);
-  codec_client_->waitForDisconnect();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  EXPECT_EQ("close", response->headers().Connection()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("close", response->headers().getConnectionValue());
 
   // Deactivate overload state and check that keepalive is not disabled
   updateResource(0.7);
@@ -132,7 +132,7 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   response = sendRequestAndWaitForResponse(request_headers, 1, default_response_headers_, 1);
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(nullptr, response->headers().Connection());
 }
 
@@ -159,7 +159,7 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 }

@@ -1,9 +1,3 @@
-licenses(["notice"])  # Apache 2
-
-# Redis proxy L4 network filter. Implements consistent hashing and observability for large redis
-# clusters.
-# Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
@@ -11,12 +5,19 @@ load(
     "envoy_package",
 )
 
+licenses(["notice"])  # Apache 2
+
+# Redis proxy L4 network filter. Implements consistent hashing and observability for large redis
+# clusters.
+# Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
+
 envoy_package()
 
 envoy_cc_library(
     name = "command_splitter_interface",
     hdrs = ["command_splitter.h"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
     ],
 )
@@ -64,6 +65,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/stats:timespan_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
     ],
@@ -125,6 +127,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:redis_command_stats_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",

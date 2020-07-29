@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <typeinfo>
 
 #include "envoy/config/route/v3/scoped_route.pb.h"
@@ -77,6 +78,8 @@ private:
   std::vector<std::unique_ptr<ScopeKeyFragmentBase>> fragments_;
 };
 
+using ScopeKeyPtr = std::unique_ptr<ScopeKey>;
+
 // String fragment.
 class StringKeyFragment : public ScopeKeyFragmentBase {
 public:
@@ -130,7 +133,7 @@ public:
   virtual ~ScopeKeyBuilderBase() = default;
 
   // Computes scope key for given headers, returns nullptr if a key can't be computed.
-  virtual std::unique_ptr<ScopeKey> computeScopeKey(const Http::HeaderMap& headers) const PURE;
+  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const PURE;
 
 protected:
   const ScopedRoutes::ScopeKeyBuilder config_;
@@ -140,7 +143,7 @@ class ScopeKeyBuilderImpl : public ScopeKeyBuilderBase {
 public:
   explicit ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config);
 
-  std::unique_ptr<ScopeKey> computeScopeKey(const Http::HeaderMap& headers) const override;
+  ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers) const override;
 
 private:
   std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;
@@ -180,8 +183,10 @@ public:
   ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
       : scope_key_builder_(std::move(scope_key_builder)) {}
 
-  void addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr& scoped_route_info);
-  void removeRoutingScope(const std::string& scope_name);
+  void
+  addOrUpdateRoutingScopes(const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos);
+
+  void removeRoutingScopes(const std::vector<std::string>& scope_names);
 
   // Envoy::Router::ScopedConfig
   Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;

@@ -1,13 +1,13 @@
-licenses(["notice"])  # Apache 2
-
-# Built-in TLS connection transport socket.
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
+
+# Built-in TLS connection transport socket.
 
 envoy_package()
 
@@ -91,6 +91,7 @@ envoy_cc_library(
         "context_manager_impl.h",
     ],
     external_deps = [
+        "abseil_node_hash_set",
         "abseil_synchronization",
         "ssl",
     ],
@@ -109,6 +110,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",

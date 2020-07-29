@@ -18,7 +18,8 @@ const uint64_t DefaultMemoryLevel = 5;
 // Default and maximum compression window size.
 const uint64_t DefaultWindowBits = 12;
 
-// When summed to window bits, this sets a gzip header and trailer around the compressed data.
+// When logical OR'ed to window bits, this sets a gzip header and trailer around the compressed
+// data.
 const uint64_t GzipHeaderValue = 16;
 
 } // namespace
@@ -27,7 +28,7 @@ GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip:
                                    const std::string& stats_prefix, Stats::Scope& scope,
                                    Runtime::Loader& runtime)
     : CompressorFilterConfig(compressorConfig(gzip), stats_prefix + "gzip.", scope, runtime,
-                             Http::Headers::get().ContentEncodingValues.Gzip),
+                             Http::CustomHeaders::get().ContentEncodingValues.Gzip),
       compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       memory_level_(memoryLevelUint(gzip.memory_level().value())),

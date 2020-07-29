@@ -1,9 +1,10 @@
 #pragma once
 
-#include <chrono>
 #include <functional>
 
+#include "envoy/common/time.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 
@@ -22,21 +23,23 @@ class DrainManagerImpl : Logger::Loggable<Logger::Id::main>, public DrainManager
 public:
   DrainManagerImpl(Instance& server, envoy::config::listener::v3::Listener::DrainType drain_type);
 
-  // Server::DrainManager
+  // Network::DrainDecision
   bool drainClose() const override;
-  void startDrainSequence(std::function<void()> completion) override;
+
+  // Server::DrainManager
+  void startDrainSequence(std::function<void()> drain_complete_cb) override;
+  bool draining() const override { return draining_; }
   void startParentShutdownSequence() override;
 
 private:
-  void drainSequenceTick();
-
   Instance& server_;
   const envoy::config::listener::v3::Listener::DrainType drain_type_;
-  Event::TimerPtr drain_tick_timer_;
+
   std::atomic<bool> draining_{false};
-  std::atomic<uint32_t> drain_time_completed_{};
+  Event::TimerPtr drain_tick_timer_;
+  MonotonicTime drain_deadline_;
+
   Event::TimerPtr parent_shutdown_timer_;
-  std::function<void()> drain_sequence_completion_;
 };
 
 } // namespace Server

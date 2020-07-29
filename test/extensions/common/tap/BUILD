@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -25,7 +25,8 @@ envoy_cc_test(
     srcs = ["admin_test.cc"],
     deps = [
         "//source/extensions/common/tap:admin",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:admin_stream_mocks",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
     ],
 )

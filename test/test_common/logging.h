@@ -8,6 +8,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/synchronization/mutex.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -58,7 +59,8 @@ public:
   const std::vector<std::string>& messages() const { return messages_; }
 
 private:
-  std::vector<std::string> messages_;
+  absl::Mutex mtx_;
+  std::vector<std::string> messages_ ABSL_GUARDED_BY(mtx_);
 };
 
 using StringPair = std::pair<std::string, std::string>;
@@ -92,7 +94,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
     ASSERT_FALSE(expected_messages.empty()) << "Expected messages cannot be empty.";               \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
-    sink_ptr->set_should_escape(escaped);                                                          \
+    sink_ptr->setShouldEscape(escaped);                                                            \
     Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
     stmt;                                                                                          \
     if (log_recorder.messages().empty()) {                                                         \

@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -61,5 +61,13 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/network:utility_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "network_fakes",
+    hdrs = ["fakes.h"],
+    deps = [
+        ":network_mocks",
     ],
 )

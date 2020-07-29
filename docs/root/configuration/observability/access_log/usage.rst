@@ -495,6 +495,12 @@ The following command operators are supported:
   TCP
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.
 
+%DOWNSTREAM_PEER_FINGERPRINT_1%
+  HTTP
+    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+  TCP
+    The hex-encoded SHA1 fingerprint of the client certificate used to establish the downstream TLS connection.
+
 %DOWNSTREAM_PEER_SERIAL%
   HTTP
     The serial number of the client certificate used to establish the downstream TLS connection.
@@ -521,3 +527,6 @@ The following command operators are supported:
 
 %HOSTNAME%
   The system hostname.
+
+%LOCAL_REPLY_BODY%
+  The body text for the requests rejected by the Envoy.

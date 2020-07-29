@@ -4,7 +4,6 @@
 #include <functional>
 #include <list>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -20,17 +19,20 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/common/assert.h"
+#include "common/common/basic_resource_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/http/utility.h"
 #include "common/network/connection_balancer_impl.h"
@@ -75,7 +77,7 @@ public:
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
-  Network::Socket& mutable_socket() { return *socket_; }
+  Network::Socket& mutableSocket() { return *socket_; }
 
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
@@ -167,6 +169,7 @@ public:
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
+  bool streamErrorOnInvalidHttpMessaging() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return true; }
   bool shouldMergeSlashes() const override { return true; }
@@ -175,6 +178,7 @@ public:
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
+  const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
   void closeSocket();
@@ -244,6 +248,39 @@ private:
   };
 
   /**
+   * Implementation of OverloadManager that is never overloaded. Using this instead of the real
+   * OverloadManager keeps the admin interface accessible even when the proxy is overloaded.
+   */
+  struct NullOverloadManager : public OverloadManager {
+    struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
+      const OverloadActionState& getState(const std::string&) override { return inactive_; }
+
+      const OverloadActionState inactive_ = OverloadActionState::Inactive;
+    };
+
+    NullOverloadManager(ThreadLocal::SlotAllocator& slot_allocator)
+        : tls_(slot_allocator.allocateSlot()) {}
+
+    void start() override {
+      tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        return std::make_shared<NullThreadLocalOverloadState>();
+      });
+    }
+
+    ThreadLocalOverloadState& getThreadLocalOverloadState() override {
+      return tls_->getTyped<NullThreadLocalOverloadState>();
+    }
+
+    bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
+      // This method shouldn't be called by the admin listener
+      NOT_REACHED_GCOVR_EXCL_LINE;
+      return false;
+    }
+
+    ThreadLocal::SlotPtr tls_;
+  };
+
+  /**
    * Helper methods for the /clusters url handler.
    */
   void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
@@ -258,7 +295,7 @@ private:
    * Helper methods for the /config_dump url handler.
    */
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                          const absl::optional<std::string>& mask) const;
+                          const absl::optional<std::string>& mask, bool include_eds) const;
   /**
    * Add the config matching the passed resource to the passed config dump.
    * @return absl::nullopt on success, else the Http::Code and an error message that should be added
@@ -266,10 +303,17 @@ private:
    */
   absl::optional<std::pair<Http::Code, std::string>>
   addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
-                    const std::string& resource) const;
+                    const std::string& resource, bool include_eds) const;
 
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
+
+  /**
+   * Helper methods for the /config_dump url handler to add endpoints config
+   */
+  void addLbEndpoint(const Upstream::HostSharedPtr& host,
+                     envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
+  ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
   /**
    * URL handlers.
    */
@@ -291,7 +335,7 @@ private:
     AdminListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
 
     // Network::ListenSocketFactory
-    Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+    Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
       return socket_->localAddress();
@@ -338,6 +382,7 @@ private:
       return envoy::config::core::v3::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+    ResourceLimit& openConnections() override { return open_connections_; }
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
@@ -347,6 +392,7 @@ private:
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
     Network::NopConnectionBalancerImpl connection_balancer_;
+    BasicResourceLimitImpl open_connections_;
 
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
@@ -378,6 +424,7 @@ private:
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
   Http::ConnectionManagerStats stats_;
+  NullOverloadManager null_overload_manager_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
   Stats::IsolatedStoreImpl no_op_store_;
@@ -409,6 +456,7 @@ private:
   Network::ListenSocketFactorySharedPtr socket_factory_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
+  const LocalReply::LocalReplyPtr local_reply_;
 };
 
 } // namespace Server

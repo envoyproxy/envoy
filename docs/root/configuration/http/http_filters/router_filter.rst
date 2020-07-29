@@ -13,8 +13,8 @@ redirection, the filter also handles retry, statistics, etc.
 
 .. _config_http_filters_router_headers_consumed:
 
-HTTP headers (consumed)
------------------------
+HTTP headers (consumed from downstreams)
+----------------------------------------
 
 The router consumes and sets various HTTP headers both on the egress/request path as well as on the
 ingress/response path. They are documented in this section.
@@ -51,15 +51,13 @@ A few notes on how Envoy does retries:
   upstream.base_retry_backoff_ms runtime parameter. The back-off intervals can also be modified
   by configuring the retry policy's
   :ref:`retry back-off <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_back_off>`.
-* If max retries is set both by header as well as in the route configuration, the maximum value is
-  taken when determining the max retries to use for the request.
 
 .. _config_http_filters_router_x-envoy-retry-on:
 
 x-envoy-retry-on
 ^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number
+Setting this header will cause Envoy to attempt to retry failed requests (number
 of retries defaults to 1 and can be controlled by :ref:`x-envoy-max-retries
 <config_http_filters_router_x-envoy-max-retries>` header or the :ref:`route config retry policy
 <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or the :ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`).
@@ -93,6 +91,12 @@ connect-failure
     :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` or via :ref:`route
     configuration <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or via
     :ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`.
+
+.. _config_http_filters_router_retry_policy-envoy-ratelimited:
+
+envoy-ratelimited
+  Envoy will retry if the header :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>`
+  is present.
 
 retriable-4xx
   Envoy will attempt a retry if the upstream server responds with a retriable 4xx response code.
@@ -132,9 +136,8 @@ By default, Envoy will *not* perform retries unless you've configured them per a
 
 x-envoy-retry-grpc-on
 ^^^^^^^^^^^^^^^^^^^^^
-Setting this header on egress requests will cause Envoy to attempt to retry failed requests (number of
-retries defaults to 1, and can be controlled by
-:ref:`x-envoy-max-retries <config_http_filters_router_x-envoy-max-retries>`
+Setting this header will cause Envoy to attempt to retry failed requests (number of retries defaults
+to 1, and can be controlled by :ref:`x-envoy-max-retries <config_http_filters_router_x-envoy-max-retries>`
 header or the :ref:`route config retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`) or the
 :ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`.
 gRPC retries are currently only supported for gRPC status codes in response headers. gRPC status codes in
@@ -203,35 +206,29 @@ This header will only be honored for requests from internal clients.
 x-envoy-upstream-alt-stat-name
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to emit upstream response code/timing
-statistics to a dual stat tree. This can be useful for application level categories that Envoy
-doesn't know about. The output tree is documented :ref:`here <config_cluster_manager_cluster_stats_alt_tree>`.
+Setting this header will cause Envoy to emit upstream response code/timing statistics to a dual stat tree.
+This can be useful for application level categories that Envoy doesn't know about. The output tree
+is documented :ref:`here <config_cluster_manager_cluster_stats_alt_tree>`.
 
 This should not be confused with :ref:`alt_stat_name <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` which
 is specified while defining the cluster and when provided specifies an alternative name for the
 cluster at the root of the statistic tree.
-
-x-envoy-upstream-canary
-^^^^^^^^^^^^^^^^^^^^^^^
-
-If an upstream host sets this header, the router will use it to generate canary specific statistics.
-The output tree is documented :ref:`here <config_cluster_manager_cluster_stats_dynamic_http>`.
 
 .. _config_http_filters_router_x-envoy-upstream-rq-timeout-alt-response:
 
 x-envoy-upstream-rq-timeout-alt-response
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to set a 204 response code (instead of 504)
-in the event of a request timeout. The actual value of the header is ignored; only its presence
-is considered. See also :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`.
+Setting this header will cause Envoy to set a 204 response code (instead of 504) in the event of a request timeout.
+The actual value of the header is ignored; only its presence is considered. See also 
+:ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`.
 
 .. _config_http_filters_router_x-envoy-upstream-rq-timeout-ms:
 
 x-envoy-upstream-rq-timeout-ms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to override the :ref:`route configuration timeout
+Setting this header will cause Envoy to override the :ref:`route configuration timeout
 <envoy_v3_api_field_config.route.v3.RouteAction.timeout>` or gRPC client timeout set via `grpc-timeout header
 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_  by specifying :ref:`max_grpc_timeout
 <envoy_v3_api_field_config.route.v3.RouteAction.timeout>`. The timeout must be specified in millisecond
@@ -242,8 +239,8 @@ units. See also :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-tim
 x-envoy-upstream-rq-per-try-timeout-ms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to set a *per try* timeout on routed
-requests. If a global route timeout is configured, this timeout must be less than the global route
+Setting this header will cause Envoy to set a *per try* timeout on routed requests.
+If a global route timeout is configured, this timeout must be less than the global route
 timeout (see :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`) or it is ignored.
 This allows a caller to set a tight per try timeout to allow for retries while maintaining a
 reasonable overall timeout. This timeout only applies before any part of the response is sent to
@@ -252,14 +249,36 @@ the downstream, which normally happens after the upstream has sent response head
 x-envoy-hedge-on-per-try-timeout
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to use a request
-hedging strategy in the case of a per try timeout. This overrides the value set
-in the :ref:`route configuration
+Setting this header will cause Envoy to use a request hedging strategy in the case of a per try timeout.
+This overrides the value set in the :ref:`route configuration
 <envoy_v3_api_field_config.route.v3.HedgePolicy.hedge_on_per_try_timeout>`. This means that a retry
 will be issued without resetting the original request, leaving multiple upstream requests
 in flight.
 
 The value of the header should be "true" or "false", and is ignored if invalid.
+
+.. _config_http_filters_router_x-envoy-decorator-operation:
+
+x-envoy-decorator-operation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The value of this header will override any locally defined operation (span) name on the
+server span generated by the tracing mechanism.
+
+HTTP response headers consumed from upstream
+--------------------------------------------
+
+x-envoy-decorator-operation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The value of this header will override any locally defined operation (span) name on the
+client span generated by the tracing mechanism.
+
+x-envoy-upstream-canary
+^^^^^^^^^^^^^^^^^^^^^^^
+
+If an upstream host sets this header, the router will use it to generate canary specific statistics.
+The output tree is documented :ref:`here <config_cluster_manager_cluster_stats_dynamic_http>`.
 
 .. _config_http_filters_router_x-envoy-immediate-health-check-fail:
 
@@ -279,24 +298,16 @@ information.
 x-envoy-ratelimited
 ^^^^^^^^^^^^^^^^^^^
 
-If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
-looked at, only its presence. This header is set by :ref:`rate limit filter<config_http_filters_rate_limit>`
-when the request is rate limited.
-
-.. _config_http_filters_router_x-envoy-decorator-operation:
-
-x-envoy-decorator-operation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If this header is present on ingress requests, its value will override any locally defined
-operation (span) name on the server span generated by the tracing mechanism. Similarly, if
-this header is present on an egress response, its value will override any locally defined
-operation (span) name on the client span.
+If this header is set by upstream, Envoy will not retry unless the retry policy
+:ref:`envoy-ratelimited<config_http_filters_router_retry_policy-envoy-ratelimited>`
+is enabled. Currently, the value of the header is not looked at, only its
+presence. This header is set by :ref:`rate limit
+filter<config_http_filters_rate_limit>` when the request is rate limited.
 
 .. _config_http_filters_router_headers_set:
 
-HTTP headers (set)
-------------------
+HTTP request headers set on upstream calls
+------------------------------------------
 
 The router sets various HTTP headers both on the egress/request path as well as on the
 ingress/response path. They are documented in this section.
@@ -331,13 +342,6 @@ timeout, e.g., early exit. This is set on internal requests and is either taken 
 :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` header or the :ref:`route timeout
 <envoy_v3_api_field_config.route.v3.RouteAction.timeout>`, in that order.
 
-x-envoy-upstream-service-time
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Contains the time in milliseconds spent by the upstream host processing the request. This is useful
-if the client wants to determine service time compared to network latency. This header is set on
-responses.
-
 .. _config_http_filters_router_x-envoy-original-path:
 
 x-envoy-original-path
@@ -347,6 +351,18 @@ If the route utilizes :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.R
 or :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
 Envoy will put the original path header in this header. This can be useful for logging and
 debugging.
+
+HTTP response headers set on downstream responses
+-------------------------------------------------
+
+.. _config_http_filters_router_x-envoy-upstream-service-time:
+
+x-envoy-upstream-service-time
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Contains the time in milliseconds spent by the upstream host processing the request. This is useful
+if the client wants to determine service time compared to network latency. This header is set on
+responses.
 
 .. _config_http_filters_router_x-envoy-overloaded_set:
 

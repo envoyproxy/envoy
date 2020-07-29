@@ -42,7 +42,9 @@ MockClusterInfo::MockClusterInfo()
       stats_(ClusterInfoImpl::generateStats(stats_store_)),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
-      timeout_budget_stats_(absl::make_optional<ClusterTimeoutBudgetStats>(
+      request_response_size_stats_(std::make_unique<ClusterRequestResponseSizeStats>(
+          ClusterInfoImpl::generateRequestResponseSizeStats(request_response_size_stats_store_))),
+      timeout_budget_stats_(std::make_unique<ClusterTimeoutBudgetStats>(
           ClusterInfoImpl::generateTimeoutBudgetStats(timeout_budget_stats_store_))),
       circuit_breakers_stats_(
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
@@ -52,7 +54,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, eds_service_name()).WillByDefault(ReturnPointee(&eds_service_name_));
+  ON_CALL(*this, edsServiceName()).WillByDefault(ReturnPointee(&eds_service_name_));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
   ON_CALL(*this, commonHttpProtocolOptions())
@@ -71,7 +73,12 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(
           Invoke([this]() -> TransportSocketMatcher& { return *transport_socket_matcher_; }));
   ON_CALL(*this, loadReportStats()).WillByDefault(ReturnRef(load_report_stats_));
-  ON_CALL(*this, timeoutBudgetStats()).WillByDefault(ReturnRef(timeout_budget_stats_));
+  ON_CALL(*this, requestResponseSizeStats())
+      .WillByDefault(Return(
+          std::reference_wrapper<ClusterRequestResponseSizeStats>(*request_response_size_stats_)));
+  ON_CALL(*this, timeoutBudgetStats())
+      .WillByDefault(
+          Return(std::reference_wrapper<ClusterTimeoutBudgetStats>(*timeout_budget_stats_)));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
@@ -81,6 +88,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
+  ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, clusterSocketOptions()).WillByDefault(ReturnRef(cluster_socket_options_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));

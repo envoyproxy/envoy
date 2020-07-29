@@ -42,7 +42,10 @@ TEST_F(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
 // can be sent, not just with pausing: rate limiting or a down gRPC stream would also do it).
 TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   startSubscription({"name1", "name2", "name3"});
-  subscription_->pause();
+  auto resume_sub = subscription_->pause();
+  // If nested pause wasn't handled correctly, the single expectedSendMessage below would be
+  // insufficient.
+  auto nested_resume_sub = subscription_->pause();
 
   expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   // If not for the pause, these updates would make the expectSendMessage fail due to too many
@@ -52,8 +55,6 @@ TEST_F(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   subscription_->updateResourceInterest({"name3", "name4"});
   subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
   subscription_->updateResourceInterest({"name3", "name4"});
-
-  subscription_->resume();
 }
 
 TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
@@ -65,7 +66,7 @@ TEST_F(DeltaSubscriptionImplTest, ResponseCausesAck) {
 // resume, *all* ACKs that arrived during the pause are sent (in order).
 TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   startSubscription({"name1", "name2", "name3"});
-  subscription_->pause();
+  auto resume_sub = subscription_->pause();
   // The server gives us our first version of resource name1.
   // subscription_ now wants to ACK name1 (but can't due to pause).
   {
@@ -78,7 +79,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message));
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // The server gives us our first version of resource name2.
   // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
@@ -92,7 +93,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message));
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // The server gives us an updated version of resource name1.
   // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
@@ -106,7 +107,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
-        ->onDiscoveryResponse(std::move(message));
+        ->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
@@ -118,7 +119,6 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
           nonce_acks_sent_.push(nonce);
         }
       }));
-  subscription_->resume();
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
 }
@@ -133,22 +133,23 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   EXPECT_CALL(local_info, node()).WillRepeatedly(testing::ReturnRef(node));
 
   NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
+  NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;
   auto* async_client = new Grpc::MockAsyncClient();
 
   const Protobuf::MethodDescriptor* method_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
-  std::shared_ptr<NewGrpcMuxImpl> xds_context = std::make_shared<NewGrpcMuxImpl>(
+  NewGrpcMuxImplSharedPtr xds_context = std::make_shared<NewGrpcMuxImpl>(
       std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
       envoy::config::core::v3::ApiVersion::AUTO, random, stats_store, rate_limit_settings,
       local_info);
 
-  std::unique_ptr<GrpcSubscriptionImpl> subscription = std::make_unique<GrpcSubscriptionImpl>(
-      xds_context, callbacks, stats, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher,
-      std::chrono::milliseconds(12345), false);
+  GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(
+      xds_context, callbacks, resource_decoder, stats, Config::TypeUrl::get().ClusterLoadAssignment,
+      dispatcher, std::chrono::milliseconds(12345), false);
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 

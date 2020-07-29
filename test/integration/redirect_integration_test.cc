@@ -93,7 +93,7 @@ TEST_P(RedirectIntegrationTest, RedirectNotConfigured) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, redirect_response_, 0);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("302", response->headers().getStatusValue());
 }
 
 // Now test a route with redirects configured on in pass-through mode.
@@ -103,7 +103,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("pass.through.internal.redirect");
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, redirect_response_, 0);
-  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ(
       0,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
@@ -129,16 +129,16 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   waitForNextUpstreamRequest();
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().EnvoyOriginalUrl()->value().getStringView());
-  EXPECT_EQ("/new/url", upstream_request_->headers().Path()->value().getStringView());
-  EXPECT_EQ("authority2", upstream_request_->headers().Host()->value().getStringView());
-  EXPECT_EQ("via_value", upstream_request_->headers().Via()->value().getStringView());
+            upstream_request_->headers().getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
 }
@@ -163,11 +163,10 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
   for (int i = 0; i < 4; i++) {
     upstream_requests.push_back(waitForNextStream());
 
-    EXPECT_EQ(fmt::format("/path{}", i),
-              upstream_requests.back()->headers().Path()->value().getStringView());
+    EXPECT_EQ(fmt::format("/path{}", i), upstream_requests.back()->headers().getPathValue());
     EXPECT_EQ("handle.internal.redirect.max.three.hop",
-              upstream_requests.back()->headers().Host()->value().getStringView());
-    EXPECT_EQ("via_value", upstream_requests.back()->headers().Via()->value().getStringView());
+              upstream_requests.back()->headers().getHostValue());
+    EXPECT_EQ("via_value", upstream_requests.back()->headers().getViaValue());
 
     auto next_location = fmt::format(HandleThreeHopLocationFormat, i + 1);
     redirect_response_.setLocation(next_location);
@@ -176,7 +175,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ(
       1,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
@@ -210,19 +209,19 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
   waitForNextUpstreamRequest();
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().EnvoyOriginalUrl()->value().getStringView());
-  EXPECT_EQ("/new/url", upstream_request_->headers().Path()->value().getStringView());
-  EXPECT_EQ("authority2", upstream_request_->headers().Host()->value().getStringView());
-  EXPECT_EQ("via_value", upstream_request_->headers().Via()->value().getStringView());
+            upstream_request_->headers().getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
 
-  Http::TestHeaderMapImpl response_with_big_body(
+  Http::TestResponseHeaderMapImpl response_with_big_body(
       {{":status", "200"}, {"content-length", "2000000"}});
   upstream_request_->encodeHeaders(response_with_big_body, false);
   upstream_request_->encodeData(2000000, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
 }
@@ -271,9 +270,9 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByPreviousRoutesPredica
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("http://handle.internal.redirect.max.three.hop/yet/another/path",
-            response->headers().Location()->value().getStringView());
+            response->headers().getLocationValue());
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
   EXPECT_EQ(
@@ -330,9 +329,9 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedByAllowListedRoutesPred
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("http://handle.internal.redirect/yet/another/path",
-            response->headers().Location()->value().getStringView());
+            response->headers().getLocationValue());
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
   EXPECT_EQ(
@@ -391,9 +390,9 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredic
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("https://handle.internal.redirect/yet/another/path",
-            response->headers().Location()->value().getStringView());
+            response->headers().getLocationValue());
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
                    ->value());
   EXPECT_EQ(
@@ -411,7 +410,7 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("handle.internal.redirect");
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, redirect_response_, 0);
-  EXPECT_EQ("302", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ(
       1,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());

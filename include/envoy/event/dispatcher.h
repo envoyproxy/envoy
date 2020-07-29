@@ -9,6 +9,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/watcher.h"
@@ -40,10 +41,14 @@ struct DispatcherStats {
   ALL_DISPATCHER_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
+using DispatcherStatsPtr = std::unique_ptr<DispatcherStats>;
+
 /**
  * Callback invoked when a dispatcher post() runs.
  */
 using PostCb = std::function<void()>;
+
+using PostCbSharedPtr = std::shared_ptr<PostCb>;
 
 /**
  * Abstract event dispatching loop.
@@ -162,6 +167,14 @@ public:
    * @param cb supplies the callback to invoke when the timer fires.
    */
   virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
+
+  /**
+   * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
+   * callback.
+   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
+   * event loop.
+   */
+  virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
 
   /**
    * Submits an item for deferred delete. @see DeferredDeletable.

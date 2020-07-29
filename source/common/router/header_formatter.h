@@ -4,8 +4,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/access_log/access_log.h"
+#include "envoy/formatter/substitution_formatter.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -45,7 +46,7 @@ public:
 private:
   FieldExtractor field_extractor_;
   const bool append_;
-  std::unordered_map<std::string, std::vector<Envoy::AccessLog::FormatterProviderPtr>>
+  absl::node_hash_map<std::string, std::vector<Envoy::Formatter::FormatterProviderPtr>>
       start_time_formatters_;
 };
 

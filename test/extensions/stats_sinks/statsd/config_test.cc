@@ -10,7 +10,7 @@
 #include "extensions/stat_sinks/statsd/config.h"
 #include "extensions/stat_sinks/well_known_names.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -39,7 +39,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
@@ -81,7 +81,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
 
@@ -113,7 +113,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
 
@@ -136,7 +136,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
 
@@ -161,7 +161,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
 
@@ -193,7 +193,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
@@ -202,7 +202,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
 
 // Negative test for protoc-gen-validate constraints for statsd.
 TEST(StatsdConfigTest, ValidateFail) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server;
   EXPECT_THROW(
       StatsdSinkFactory().createStatsSink(envoy::config::metrics::v3::StatsdSink(), server),
       ProtoValidationException);

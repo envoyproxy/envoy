@@ -194,16 +194,13 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersInvocationModeSetsHeader) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, header_result);
 
   std::string invocation_header_value;
-  headers.iterate(
-      [](const Http::HeaderEntry& entry, void* ctx) {
-        auto* out = static_cast<std::string*>(ctx);
-        if (entry.key().getStringView() == "x-amz-invocation-type") {
-          out->append(std::string(entry.value().getStringView()));
-          return Http::HeaderMap::Iterate::Break;
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &invocation_header_value);
+  headers.iterate([&invocation_header_value](const Http::HeaderEntry& entry) {
+    if (entry.key().getStringView() == "x-amz-invocation-type") {
+      invocation_header_value.append(std::string(entry.value().getStringView()));
+      return Http::HeaderMap::Iterate::Break;
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   EXPECT_EQ("RequestResponse", invocation_header_value);
 }
@@ -235,11 +232,11 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersOnlyRequestWithJsonOn) {
   ASSERT_GT(json_buf.length(), 0);
 
   ASSERT_NE(headers.ContentType(), nullptr);
-  EXPECT_EQ("application/json", headers.ContentType()->value().getStringView());
+  EXPECT_EQ("application/json", headers.getContentTypeValue());
 
   // Assert the true (post-transformation) content-length sent to the Lambda endpoint.
   ASSERT_NE(headers.ContentLength(), nullptr);
-  EXPECT_EQ(fmt::format("{}", json_buf.length()), headers.ContentLength()->value().getStringView());
+  EXPECT_EQ(fmt::format("{}", json_buf.length()), headers.getContentLengthValue());
 
   // The best way to verify the generated JSON is to deserialize it and inspect it.
   Request req;
@@ -298,12 +295,11 @@ TEST_F(AwsLambdaFilterTest, DecodeDataWithTextualBodyWithJsonOn) {
     ASSERT_GT(decoded_buf.length(), 0);
 
     ASSERT_NE(headers.ContentType(), nullptr);
-    EXPECT_EQ("application/json", headers.ContentType()->value().getStringView());
+    EXPECT_EQ("application/json", headers.getContentTypeValue());
 
     // Assert the true (post-transformation) content-length sent to the Lambda endpoint.
     ASSERT_NE(headers.ContentLength(), nullptr);
-    EXPECT_EQ(fmt::format("{}", decoded_buf.length()),
-              headers.ContentLength()->value().getStringView());
+    EXPECT_EQ(fmt::format("{}", decoded_buf.length()), headers.getContentLengthValue());
 
     // The best way to verify the generated JSON is to deserialize it and inspect it.
     Request req;
@@ -519,7 +515,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
 
   ASSERT_NE(nullptr, headers.Status());
-  EXPECT_EQ("201", headers.Status()->value().getStringView());
+  EXPECT_EQ("201", headers.getStatusValue());
 
   EXPECT_EQ(nullptr, headers.get(Http::LowerCaseString(":other")));
 
@@ -528,15 +524,12 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
   EXPECT_EQ("awesome value", custom_header->value().getStringView());
 
   std::vector<std::string> cookies;
-  headers.iterate(
-      [](const Http::HeaderEntry& entry, void* ctx) {
-        auto* list = static_cast<std::vector<std::string>*>(ctx);
-        if (entry.key().getStringView() == Http::Headers::get().SetCookie.get()) {
-          list->emplace_back(entry.value().getStringView());
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &cookies);
+  headers.iterate([&cookies](const Http::HeaderEntry& entry) {
+    if (entry.key().getStringView() == Http::Headers::get().SetCookie.get()) {
+      cookies.emplace_back(entry.value().getStringView());
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   EXPECT_THAT(cookies, ElementsAre("session-id=42; Secure; HttpOnly", "user=joe"));
 }
@@ -621,7 +614,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeInvalidJson) {
   EXPECT_EQ(0, encoded_buf.length());
 
   ASSERT_NE(nullptr, headers.Status());
-  EXPECT_EQ("500", headers.Status()->value().getStringView());
+  EXPECT_EQ("500", headers.getStatusValue());
 
   EXPECT_EQ(1ul, filter_->stats().server_error_.value());
 }

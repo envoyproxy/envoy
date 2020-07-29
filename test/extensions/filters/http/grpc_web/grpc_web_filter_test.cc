@@ -87,7 +87,7 @@ public:
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
         .WillOnce(Invoke([=](Http::ResponseHeaderMap& headers, bool) {
           uint64_t code;
-          ASSERT_TRUE(absl::SimpleAtoi(headers.Status()->value().getStringView(), &code));
+          ASSERT_TRUE(absl::SimpleAtoi(headers.getStatusValue(), &code));
           EXPECT_EQ(static_cast<uint64_t>(expected_code), code);
         }));
     EXPECT_CALL(decoder_callbacks_, encodeData(_, _))
@@ -95,15 +95,13 @@ public:
             [=](Buffer::Instance& data, bool) { EXPECT_EQ(expected_message, data.toString()); }));
   }
 
-  void expectRequiredGrpcUpstreamHeaders(const Http::RequestHeaderMap& request_headers) {
-    EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
-              request_headers.ContentType()->value().getStringView());
+  void expectRequiredGrpcUpstreamHeaders(const Http::TestRequestHeaderMapImpl& request_headers) {
+    EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
     // Ensure we never send content-length upstream
     EXPECT_EQ(nullptr, request_headers.ContentLength());
-    EXPECT_EQ(Http::Headers::get().TEValues.Trailers,
-              request_headers.TE()->value().getStringView());
-    EXPECT_EQ(Http::Headers::get().GrpcAcceptEncodingValues.Default,
-              request_headers.GrpcAcceptEncoding()->value().getStringView());
+    EXPECT_EQ(Http::Headers::get().TEValues.Trailers, request_headers.getTEValue());
+    EXPECT_EQ(Http::CustomHeaders::get().GrpcAcceptEncodingValues.Default,
+              request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
   }
 
   Stats::TestSymbolTable symbol_table_;
@@ -129,8 +127,7 @@ TEST_F(GrpcWebFilterTest, SupportedContentTypes) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
     EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
-    EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
-              request_headers.ContentType()->value().getStringView());
+    EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
   }
 }
 
@@ -264,7 +261,7 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
 TEST_P(GrpcWebFilterTest, Unary) {
   // Tests request headers.
   request_headers_.addCopy(Http::Headers::get().ContentType, request_content_type());
-  request_headers_.addCopy(Http::Headers::get().Accept, request_accept());
+  request_headers_.addCopy(Http::CustomHeaders::get().Accept, request_accept());
   request_headers_.addCopy(Http::Headers::get().ContentLength, uint64_t(8));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
@@ -318,10 +315,10 @@ TEST_P(GrpcWebFilterTest, Unary) {
   EXPECT_EQ("200", response_headers.get_(Http::Headers::get().Status.get()));
   if (accept_binary_response()) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcWebProto,
-              response_headers.ContentType()->value().getStringView());
+              response_headers.getContentTypeValue());
   } else if (accept_text_response()) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcWebTextProto,
-              response_headers.ContentType()->value().getStringView());
+              response_headers.getContentTypeValue());
   } else {
     FAIL() << "Unsupported gRPC-Web request accept: " << request_accept();
   }
@@ -352,7 +349,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
     EXPECT_EQ(std::string(B64_MESSAGE, B64_MESSAGE_SIZE), encoded_buffer.toString());
   } else {
     FAIL() << "Unsupported gRPC-Web response content-type: "
-           << response_headers.ContentType()->value().getStringView();
+           << response_headers.getContentTypeValue();
   }
 
   // Tests response trailers.
@@ -369,7 +366,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
     EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), Base64::decode(trailers_buffer.toString()));
   } else {
     FAIL() << "Unsupported gRPC-Web response content-type: "
-           << response_headers.ContentType()->value().getStringView();
+           << response_headers.getContentTypeValue();
   }
   EXPECT_EQ(0, response_trailers.size());
 }

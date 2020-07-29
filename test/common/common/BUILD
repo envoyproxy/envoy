@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_benchmark_test",
@@ -8,6 +6,8 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -35,18 +35,6 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:base64_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "substitution_format_string_test",
-    srcs = ["substitution_format_string_test.cc"],
-    deps = [
-        "//source/common/common:substitution_format_string_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/stream_info:stream_info_mocks",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -167,6 +155,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "random_generator_test",
+    srcs = ["random_generator_test.cc"],
+    # Fails on windows with cr/lf yaml file checkouts
+    tags = ["fails_on_windows"],
+    deps = [
+        "//source/common/common:random_generator_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     external_deps = [
@@ -185,6 +185,8 @@ envoy_cc_test(
     srcs = ["regex_test.cc"],
     deps = [
         "//source/common/common:regex_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -293,7 +295,7 @@ envoy_cc_test(
         "abseil_strings",
     ],
     deps = [
-        "//source/common/common:version_lib",
+        "//source/common/version:version_lib",
     ],
 )
 

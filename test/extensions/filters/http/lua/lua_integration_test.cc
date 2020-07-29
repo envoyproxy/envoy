@@ -29,15 +29,8 @@ public:
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
     config_helper_.addFilter(filter_config);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* lua_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      lua_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      lua_cluster->set_name("lua_cluster");
-
-      auto* alt_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      alt_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      alt_cluster->set_name("alt_cluster");
-    });
+    // Create static clusters.
+    createClusters();
 
     config_helper_.addConfigModifier(
         [domain](
@@ -77,6 +70,31 @@ public:
         });
 
     initialize();
+  }
+
+  void initializeWithYaml(const std::string& filter_config, const std::string& route_config) {
+    config_helper_.addFilter(filter_config);
+
+    createClusters();
+    config_helper_.addConfigModifier(
+        [route_config](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          TestUtility::loadFromYaml(route_config, *hcm.mutable_route_config(), true);
+        });
+    initialize();
+  }
+
+  void createClusters() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* lua_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      lua_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      lua_cluster->set_name("lua_cluster");
+
+      auto* alt_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      alt_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      alt_cluster->set_name("alt_cluster");
+    });
   }
 
   void cleanup() {
@@ -353,7 +371,7 @@ typed_config:
   cleanup();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("403", response->headers().getStatusValue());
   EXPECT_EQ("nope", response->body());
 }
 
@@ -404,7 +422,7 @@ typed_config:
   cleanup();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Filter alters headers and changes route.
@@ -437,7 +455,7 @@ typed_config:
   cleanup();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Should survive from 30 calls when calling streamInfo():dynamicMetadata(). This is a regression
@@ -471,7 +489,7 @@ typed_config:
     response->waitForEndStream();
 
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 
   cleanup();
@@ -571,8 +589,143 @@ typed_config:
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
+  cleanup();
+}
+
+// Test whether LuaPerRoute works properly. Since this test is mainly for configuration, the Lua
+// script can be very simple.
+TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  inline_code: |
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("code", "code_from_global")
+    end
+  source_codes:
+    hello.lua:
+      inline_string: |
+        function envoy_on_request(request_handle)
+          request_handle:headers():add("code", "code_from_hello")
+        end
+    byebye.lua:
+      inline_string: |
+        function envoy_on_request(request_handle)
+          request_handle:headers():add("code", "code_from_byebye")
+        end
+)EOF";
+  const std::string INITIAL_ROUTE_CONFIG =
+      R"EOF(
+name: basic_lua_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["lua.per.route"]
+  routes:
+  - match:
+      prefix: "/lua/per/route/default"
+    route:
+      cluster: lua_cluster
+  - match:
+      prefix: "/lua/per/route/disabled"
+    route:
+      cluster: lua_cluster
+    typed_per_filter_config:
+      envoy.filters.http.lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        disabled: true
+  - match:
+      prefix: "/lua/per/route/hello"
+    route:
+      cluster: lua_cluster
+    typed_per_filter_config:
+      envoy.filters.http.lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        name: hello.lua
+  - match:
+      prefix: "/lua/per/route/byebye"
+    route:
+      cluster: lua_cluster
+    typed_per_filter_config:
+      envoy.filters.http.lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        name: byebye.lua
+  - match:
+      prefix: "/lua/per/route/nocode"
+    route:
+      cluster: lua_cluster
+    typed_per_filter_config:
+      envoy.filters.http.lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        name: nocode.lua
+)EOF";
+
+  initializeWithYaml(FILTER_AND_CODE, INITIAL_ROUTE_CONFIG);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto check_request = [this](const Http::TestRequestHeaderMapImpl& request_headers,
+                              const std::string& expected_value) {
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    waitForNextUpstreamRequest(1);
+
+    auto* entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
+    if (!expected_value.empty()) {
+      EXPECT_EQ(expected_value, entry->value().getStringView());
+    } else {
+      EXPECT_EQ(nullptr, entry);
+    }
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForEndStream();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  };
+
+  // Lua code defined in 'inline_code' will be executed by default.
+  Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
+                                                 {":path", "/lua/per/route/default"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "lua.per.route"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+  check_request(default_headers, "code_from_global");
+
+  // Test whether LuaPerRoute can disable the Lua filter.
+  Http::TestRequestHeaderMapImpl disabled_headers{{":method", "GET"},
+                                                  {":path", "/lua/per/route/disabled"},
+                                                  {":scheme", "http"},
+                                                  {":authority", "lua.per.route"},
+                                                  {"x-forwarded-for", "10.0.0.1"}};
+  check_request(disabled_headers, "");
+
+  // Test whether LuaPerRoute can correctly reference Lua code defined in filter config.
+  Http::TestRequestHeaderMapImpl hello_headers{{":method", "GET"},
+                                               {":path", "/lua/per/route/hello"},
+                                               {":scheme", "http"},
+                                               {":authority", "lua.per.route"},
+                                               {"x-forwarded-for", "10.0.0.1"}};
+
+  check_request(hello_headers, "code_from_hello");
+
+  Http::TestRequestHeaderMapImpl byebye_headers{{":method", "GET"},
+                                                {":path", "/lua/per/route/byebye"},
+                                                {":scheme", "http"},
+                                                {":authority", "lua.per.route"},
+                                                {"x-forwarded-for", "10.0.0.1"}};
+  check_request(byebye_headers, "code_from_byebye");
+
+  // When the name referenced by LuaPerRoute does not exist, Lua filter does nothing.
+  Http::TestRequestHeaderMapImpl nocode_headers{{":method", "GET"},
+                                                {":path", "/lua/per/route/nocode"},
+                                                {":scheme", "http"},
+                                                {":authority", "lua.per.route"},
+                                                {"x-forwarded-for", "10.0.0.1"}};
+
+  check_request(nocode_headers, "");
   cleanup();
 }
 

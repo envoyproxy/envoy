@@ -39,12 +39,12 @@ public:
 
 class MockStubFactory : public GoogleStubFactory {
 public:
-  std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> /*channel*/) override {
+  GoogleStubSharedPtr createStub(std::shared_ptr<grpc::Channel> /*channel*/) override {
     return shared_stub_;
   }
 
   MockGenericStub* stub_ = new MockGenericStub();
-  std::shared_ptr<GoogleStub> shared_stub_{stub_};
+  GoogleStubSharedPtr shared_stub_{stub_};
 };
 
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
@@ -72,7 +72,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Stats::ScopeSharedPtr scope_;
-  std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
+  GoogleAsyncClientThreadLocalPtr tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   StatNames stat_names_;

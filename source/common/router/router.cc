@@ -20,11 +20,13 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracker.h"
 #include "common/common/utility.h"
+#include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
@@ -34,6 +36,7 @@
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
 #include "common/router/upstream_request.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -49,9 +52,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (downstream_headers.ForwardedProto() &&
-      downstream_headers.ForwardedProto()->value().getStringView() ==
-          Http::Headers::get().SchemeValues.Http) {
+  if (downstream_headers.getForwardedProtoValue() == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -61,20 +62,6 @@ bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
 }
 
 constexpr uint64_t TimeoutPrecisionFactor = 100;
-
-Http::ConnectionPool::Instance*
-httpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
-  return absl::get<Http::ConnectionPool::Instance*>(pool);
-}
-
-Tcp::ConnectionPool::Instance*
-tcpPool(absl::variant<Http::ConnectionPool::Instance*, Tcp::ConnectionPool::Instance*> pool) {
-  return absl::get<Tcp::ConnectionPool::Instance*>(pool);
-}
-
-const absl::string_view getPath(const Http::RequestHeaderMap& headers) {
-  return headers.Path() ? headers.Path()->value().getStringView() : "";
-}
 
 } // namespace
 
@@ -179,10 +166,10 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
   }
 
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
-  const Http::HeaderEntry* per_try_timeout_entry =
-      request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
-  if (per_try_timeout_entry) {
-    if (absl::SimpleAtoi(per_try_timeout_entry->value().getStringView(), &header_timeout)) {
+  const absl::string_view per_try_timeout_entry =
+      request_headers.getEnvoyUpstreamRequestPerTryTimeoutMsValue();
+  if (!per_try_timeout_entry.empty()) {
+    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout)) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -373,7 +360,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_ = callbacks_->route();
   if (!route_) {
     config_.stats_.no_route_.inc();
-    ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_, getPath(headers));
+    ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_, headers.getPathValue());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     callbacks_->sendLocalReply(Http::Code::NotFound, "", modify_headers, absl::nullopt,
@@ -438,7 +425,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
-                   route_entry_->clusterName(), getPath(headers));
+                   route_entry_->clusterName(), headers.getPathValue());
 
   if (config_.strict_check_headers_ != nullptr) {
     for (const auto& header : *config_.strict_check_headers_) {
@@ -488,8 +475,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
   if (upstream_http_protocol_options.has_value()) {
-    const auto parsed_authority =
-        Http::Utility::parseAuthority(headers.Host()->value().getStringView());
+    const auto parsed_authority = Http::Utility::parseAuthority(headers.getHostValue());
     if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
@@ -506,13 +492,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  Upstream::HostDescriptionConstSharedPtr host;
-  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+      *callbacks_->streamInfo().filterState());
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
 
-  if (!host) {
+  if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
+  Upstream::HostDescriptionConstSharedPtr host = generic_conn_pool->host();
 
   if (debug_config && debug_config->append_upstream_host_) {
     // The hostname and address will be appended to any local or upstream responses from this point,
@@ -599,7 +587,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -609,47 +598,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Filter::HttpOrTcpPool Filter::createConnPool(Upstream::HostDescriptionConstSharedPtr& host) {
-  Filter::HttpOrTcpPool conn_pool;
-  const bool should_tcp_proxy = route_entry_->connectConfig().has_value() &&
-                                downstream_headers_->Method()->value().getStringView() ==
-                                    Http::Headers::get().MethodValues.Connect;
-
-  if (!should_tcp_proxy) {
-    conn_pool = getHttpConnPool();
-    if (httpPool(conn_pool)) {
-      host = httpPool(conn_pool)->host();
-    }
+std::unique_ptr<GenericConnPool> Filter::createConnPool() {
+  GenericConnPoolFactory* factory = nullptr;
+  if (cluster_->upstreamConfig().has_value()) {
+    factory = &Envoy::Config::Utility::getAndCheckFactory<GenericConnPoolFactory>(
+        cluster_->upstreamConfig().value());
   } else {
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        *callbacks_->streamInfo().filterState());
-    conn_pool = config_.cm_.tcpConnPoolForCluster(route_entry_->clusterName(),
-                                                  Upstream::ResourcePriority::Default, this);
-    if (tcpPool(conn_pool)) {
-      host = tcpPool(conn_pool)->host();
-    }
+    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
+        "envoy.filters.connection_pools.http.generic");
   }
-  return conn_pool;
-}
-
-UpstreamRequestPtr Filter::createUpstreamRequest(Filter::HttpOrTcpPool conn_pool) {
-  if (absl::holds_alternative<Http::ConnectionPool::Instance*>(conn_pool)) {
-    return std::make_unique<UpstreamRequest>(*this,
-                                             std::make_unique<HttpConnPool>(*httpPool(conn_pool)));
-  }
-  return std::make_unique<UpstreamRequest>(*this,
-                                           std::make_unique<TcpConnPool>(tcpPool(conn_pool)));
-}
-
-Http::ConnectionPool::Instance* Filter::getHttpConnPool() {
-  // Choose protocol based on cluster configuration and downstream connection
-  // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
-  Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      *callbacks_->streamInfo().filterState());
-
-  return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
-                                            protocol, this);
+  const bool should_tcp_proxy =
+      route_entry_->connectConfig().has_value() &&
+      downstream_headers_->getMethodValue() == Http::Headers::get().MethodValues.Connect;
+  return factory->createGenericConnPool(config_.cm_, should_tcp_proxy, *route_entry_,
+                                        callbacks_->streamInfo().protocol(), this);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
@@ -941,13 +903,15 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.removeFromList(upstream_requests_);
   cleanup();
 
-  if (downstream_response_started_) {
+  if (downstream_response_started_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     callbacks_->streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
     callbacks_->resetStream();
   } else {
     callbacks_->streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
@@ -984,12 +948,13 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
 
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
                                     absl::string_view details) {
-  if (cluster_->timeoutBudgetStats().has_value()) {
+  Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
+  if (tb_stats.has_value()) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -1002,7 +967,8 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
                              absl::string_view body, bool dropped, absl::string_view details) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
-  if (downstream_response_started_) {
+  if (downstream_response_started_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     // This will destroy any created retry timers.
     callbacks_->streamInfo().setResponseCodeDetails(details);
     cleanup();
@@ -1013,6 +979,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
+    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         code, body,
         [dropped, this](Http::ResponseHeaderMap& headers) {
@@ -1158,7 +1125,17 @@ void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
   // the complexity until someone asks for it.
   retry_state_.reset();
 
-  callbacks_->encode100ContinueHeaders(std::move(headers));
+  // We coalesce 100-continue headers here, to prevent encoder filters and HCM from having to worry
+  // about this. This is done in the router filter, rather than UpstreamRequest, since we want to
+  // potentially coalesce across retries and multiple upstream requests in the future, even though
+  // we currently don't support retry after 100.
+  // It's plausible that this functionality might need to move to HCM in the future for internal
+  // redirects, but we would need to maintain the "only call encode100ContinueHeaders() once"
+  // invariant.
+  if (!downstream_100_continue_headers_encoded_) {
+    downstream_100_continue_headers_encoded_ = true;
+    callbacks_->encode100ContinueHeaders(std::move(headers));
+  }
 }
 
 void Filter::resetAll() {
@@ -1374,8 +1351,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-  if (cluster_->timeoutBudgetStats().has_value()) {
-    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+  Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
+  if (tb_stats.has_value()) {
+    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -1462,7 +1440,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
 
   // Make sure the redirect response contains a URL to redirect to.
-  if (internal_redirect.value().getStringView().length() == 0) {
+  if (internal_redirect.value().getStringView().empty()) {
     config_.stats_.passthrough_internal_redirect_bad_location_.inc();
     return false;
   }
@@ -1496,8 +1474,9 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
     config_.stats_.passthrough_internal_redirect_too_many_redirects_.inc();
     return false;
   }
-  std::string original_host(downstream_headers.Host()->value().getStringView());
-  std::string original_path(downstream_headers.Path()->value().getStringView());
+  // Copy the old values, so they can be restored if the redirect fails.
+  const std::string original_host(downstream_headers.getHostValue());
+  const std::string original_path(downstream_headers.getPathValue());
   const bool scheme_is_set = (downstream_headers.Scheme() != nullptr);
   Cleanup restore_original_headers(
       [&downstream_headers, original_host, original_path, scheme_is_set, scheme_is_http]() {
@@ -1551,14 +1530,14 @@ void Filter::doRetry() {
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
 
-  Upstream::HostDescriptionConstSharedPtr host;
-  Filter::HttpOrTcpPool conn_pool = createConnPool(host);
-  if (!host) {
+  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool();
+  if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request = createUpstreamRequest(conn_pool);
+  UpstreamRequestPtr upstream_request =
+      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
@@ -1592,7 +1571,7 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 RetryStatePtr
 ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             Runtime::Loader& runtime, Random::RandomGenerator& random,
                              Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority) {
   return RetryStateImpl::create(policy, request_headers, cluster, vcluster, runtime, random,
                                 dispatcher, priority);

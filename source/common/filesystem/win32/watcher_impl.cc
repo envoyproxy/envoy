@@ -31,7 +31,10 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
   thread_exit_event_ = ::CreateEvent(nullptr, false, false, nullptr);
   ASSERT(thread_exit_event_ != NULL);
   keep_watching_ = true;
-  watch_thread_ = thread_factory_.createThread([this]() -> void { watchLoop(); });
+
+  // See comments in WorkerImpl::start for the naming convention.
+  Thread::Options options{absl::StrCat("wat:", dispatcher.name())};
+  watch_thread_ = thread_factory_.createThread([this]() -> void { watchLoop(); }, options);
 }
 
 WatcherImpl::~WatcherImpl() {

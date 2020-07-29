@@ -13,7 +13,7 @@ def _protoxform_impl(target, ctx):
         ],
     )
 
-# Bazel aspect (https://docs.bazel.build/versions/master/skylark/aspects.html)
+# Bazel aspect (https://docs.bazel.build/versions/master/starlark/aspects.html)
 # that can be invoked from the CLI to perform API transforms via //tools/protoxform for
 # proto_library targets. Example use:
 #

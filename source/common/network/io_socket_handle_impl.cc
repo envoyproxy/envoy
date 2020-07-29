@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 
 #include "absl/container/fixed_array.h"
@@ -244,11 +245,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
   output.msg_[0].peer_address_ = getAddressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
+  output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
-    // Get overflow, local address from control message.
+    // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+
       if (output.msg_[0].local_address_ == nullptr) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port, fd_);
         if (addr != nullptr) {
@@ -261,10 +264,17 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
           *output.dropped_packets_ = *maybe_dropped;
+          continue;
         }
       }
+#ifdef UDP_GRO
+      if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
+        output.msg_[0].gso_size_ = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
+      }
+#endif
     }
   }
+
   return sysCallResultToIoCallResult(result);
 }
 
@@ -272,7 +282,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
                                                      RecvMsgOutput& output) {
   ASSERT(output.msg_.size() == slices.size());
   if (slices.empty()) {
-    return sysCallResultToIoCallResult(Api::SysCallIntResult{0, EAGAIN});
+    return sysCallResultToIoCallResult(Api::SysCallIntResult{0, SOCKET_ERROR_AGAIN});
   }
   const uint32_t num_packets_per_mmsg_call = slices.size();
   absl::FixedArray<mmsghdr> mmsg_hdr(num_packets_per_mmsg_call);
@@ -363,6 +373,93 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 
 bool IoSocketHandleImpl::supportsMmsg() const {
   return Api::OsSysCallsSingleton::get().supportsMmsg();
+}
+
+bool IoSocketHandleImpl::supportsUdpGro() const {
+  return Api::OsSysCallsSingleton::get().supportsUdpGro();
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
+  return Api::OsSysCallsSingleton::get().bind(fd_, address->sockAddr(), address->sockAddrLen());
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
+  return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
+  return Api::OsSysCallsSingleton::get().connect(fd_, address->sockAddr(), address->sockAddrLen());
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::setOption(int level, int optname, const void* optval,
+                                                    socklen_t optlen) {
+  return Api::OsSysCallsSingleton::get().setsockopt(fd_, level, optname, optval, optlen);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::getOption(int level, int optname, void* optval,
+                                                    socklen_t* optlen) {
+  return Api::OsSysCallsSingleton::get().getsockopt(fd_, level, optname, optval, optlen);
+}
+
+Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
+  return Api::OsSysCallsSingleton::get().setsocketblocking(fd_, blocking);
+}
+
+absl::optional<int> IoSocketHandleImpl::domain() {
+  sockaddr_storage addr;
+  socklen_t len = sizeof(addr);
+  Api::SysCallIntResult result;
+
+  result = Api::OsSysCallsSingleton::get().getsockname(
+      fd_, reinterpret_cast<struct sockaddr*>(&addr), &len);
+
+  if (result.rc_ == 0) {
+    return {addr.ss_family};
+  }
+
+  return absl::nullopt;
+}
+
+Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
+  sockaddr_storage ss;
+  socklen_t ss_len = sizeof(ss);
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+  if (result.rc_ != 0) {
+    throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
+                                     errorDetails(result.errno_)));
+  }
+  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
+}
+
+Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
+  sockaddr_storage ss;
+  socklen_t ss_len = sizeof ss;
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+  if (result.rc_ != 0) {
+    throw EnvoyException(
+        fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
+  }
+#ifdef __APPLE__
+  if (ss_len == sizeof(sockaddr) && ss.ss_family == AF_UNIX)
+#else
+  if (ss_len == sizeof(sa_family_t) && ss.ss_family == AF_UNIX)
+#endif
+  {
+    // For Unix domain sockets, can't find out the peer name, but it should match our own
+    // name for the socket (i.e. the path should match, barring any namespace or other
+    // mechanisms to hide things, of which there are many).
+    ss_len = sizeof ss;
+    result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+    if (result.rc_ != 0) {
+      throw EnvoyException(
+          fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
+    }
+  }
+  return Address::addressFromSockAddr(ss, ss_len);
 }
 
 } // namespace Network

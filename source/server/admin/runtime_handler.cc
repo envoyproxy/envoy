@@ -1,7 +1,6 @@
 #include "server/admin/runtime_handler.h"
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "common/common/empty_string.h"
@@ -9,6 +8,8 @@
 #include "common/http/utility.h"
 
 #include "server/admin/utils.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,7 +19,7 @@ RuntimeHandler::RuntimeHandler(Server::Instance& server) : HandlerContextBase(se
 Http::Code RuntimeHandler::handlerRuntime(absl::string_view url,
                                           Http::ResponseHeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
   // TODO(jsedgwick): Use proto to structure this output instead of arbitrary JSON.
@@ -80,11 +81,12 @@ Http::Code RuntimeHandler::handlerRuntime(absl::string_view url,
 Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) {
-  Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
   if (params.empty()) {
     // Check if the params are in the request's body.
     if (admin_stream.getRequestBody() != nullptr &&
-        isFormUrlEncoded(admin_stream.getRequestHeaders().ContentType())) {
+        admin_stream.getRequestHeaders().getContentTypeValue() ==
+            Http::Headers::get().ContentTypeValues.FormUrlEncoded) {
       params = Http::Utility::parseFromBody(admin_stream.getRequestBody()->toString());
     }
 
@@ -95,7 +97,7 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
       return Http::Code::BadRequest;
     }
   }
-  std::unordered_map<std::string, std::string> overrides;
+  absl::node_hash_map<std::string, std::string> overrides;
   overrides.insert(params.begin(), params.end());
   try {
     server_.runtime().mergeValues(overrides);
@@ -105,15 +107,6 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
   }
   response.add("OK\n");
   return Http::Code::OK;
-}
-
-bool RuntimeHandler::isFormUrlEncoded(const Http::HeaderEntry* content_type) {
-  if (content_type == nullptr) {
-    return false;
-  }
-
-  return content_type->value().getStringView() ==
-         Http::Headers::get().ContentTypeValues.FormUrlEncoded;
 }
 
 } // namespace Server

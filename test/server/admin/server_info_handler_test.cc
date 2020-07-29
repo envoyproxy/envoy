@@ -18,7 +18,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   // Setup a context that returns null cert details.
@@ -47,7 +47,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 }
 
 TEST_P(AdminInstanceTest, Memory) {
-  Http::ResponseHeaderMapImpl header_map;
+  Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
   const std::string output_json = response.toString();
@@ -65,37 +65,34 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/ready", "GET", response_headers, body));
     EXPECT_EQ(body, "LIVE\n");
-    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                HasSubstr("text/plain"));
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
   }
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
     EXPECT_EQ(Http::Code::ServiceUnavailable,
               admin_.request("/ready", "GET", response_headers, body));
     EXPECT_EQ(body, "PRE_INITIALIZING\n");
-    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                HasSubstr("text/plain"));
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
   }
 
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
   EXPECT_EQ(Http::Code::ServiceUnavailable,
             admin_.request("/ready", "GET", response_headers, body));
   EXPECT_EQ(body, "INITIALIZING\n");
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {
@@ -111,14 +108,13 @@ TEST_P(AdminInstanceTest, GetRequest) {
   ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
     envoy::admin::v3::ServerInfo server_info_proto;
-    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                HasSubstr("application/json"));
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
@@ -130,14 +126,13 @@ TEST_P(AdminInstanceTest, GetRequest) {
   }
 
   {
-    Http::ResponseHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
     envoy::admin::v3::ServerInfo server_info_proto;
-    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                HasSubstr("application/json"));
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
@@ -147,14 +142,13 @@ TEST_P(AdminInstanceTest, GetRequest) {
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
   }
 
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
   envoy::admin::v3::ServerInfo server_info_proto;
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("application/json"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
 
   // We only test that it parses as the proto and that some fields are correct, since
   // values such as timestamps + Envoy version are tricky to test for.
@@ -165,13 +159,12 @@ TEST_P(AdminInstanceTest, GetRequest) {
 }
 
 TEST_P(AdminInstanceTest, PostRequest) {
-  Http::ResponseHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
                            admin_.request("/healthcheck/fail", "POST", response_headers, body)));
   EXPECT_EQ(body, "OK\n");
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
 }
 
 } // namespace Server

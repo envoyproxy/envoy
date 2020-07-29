@@ -42,6 +42,7 @@ public:
   MOCK_METHOD(bool, peerCertificateValidated, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, sha256PeerCertificateDigest, (), (const));
+  MOCK_METHOD(const std::string&, sha1PeerCertificateDigest, (), (const));
   MOCK_METHOD(const std::string&, serialNumberPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, issuerPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, subjectPeerCertificate, (), (const));
@@ -112,6 +113,20 @@ public:
   MOCK_METHOD(bool, requireClientCertificate, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
   MOCK_METHOD(bool, disableStatelessSessionResumption, (), (const));
+};
+
+class MockTlsCertificateConfig : public TlsCertificateConfig {
+public:
+  MockTlsCertificateConfig() = default;
+  ~MockTlsCertificateConfig() override = default;
+
+  MOCK_METHOD(const std::string&, certificateChain, (), (const));
+  MOCK_METHOD(const std::string&, certificateChainPath, (), (const));
+  MOCK_METHOD(const std::string&, privateKey, (), (const));
+  MOCK_METHOD(const std::string&, privateKeyPath, (), (const));
+  MOCK_METHOD(const std::string&, password, (), (const));
+  MOCK_METHOD(const std::string&, passwordPath, (), (const));
+  MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, privateKeyMethod, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {

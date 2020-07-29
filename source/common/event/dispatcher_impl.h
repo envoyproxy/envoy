@@ -64,6 +64,7 @@ public:
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
+  Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
@@ -104,13 +105,13 @@ private:
   const std::string name_;
   Api::Api& api_;
   std::string stats_prefix_;
-  std::unique_ptr<DispatcherStats> stats_;
+  DispatcherStatsPtr stats_;
   Thread::ThreadId run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
-  TimerPtr deferred_delete_timer_;
-  TimerPtr post_timer_;
+  SchedulableCallbackPtr deferred_delete_cb_;
+  SchedulableCallbackPtr post_cb_;
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;

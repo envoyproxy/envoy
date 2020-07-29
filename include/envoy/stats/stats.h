@@ -138,6 +138,15 @@ public:
   virtual uint64_t value() const PURE;
 
   /**
+   * Sets a value from a hot-restart parent. This parent contribution must be
+   * kept distinct from the child value, so that when we erase the value it
+   * is not commingled with the child value, which may have been set() directly.
+   *
+   * @param parent_value the value from the hot-restart parent.
+   */
+  virtual void setParentValue(uint64_t parent_value) PURE;
+
+  /**
    * @return the import mode, dictating behavior of the gauge across hot restarts.
    */
   virtual ImportMode importMode() const PURE;

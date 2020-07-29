@@ -6,6 +6,7 @@ import "envoy/config/core/v3/address.proto";
 
 import "google/protobuf/duration.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -28,7 +29,8 @@ message ClientSSLAuth {
   // the authentication service. The filter will connect to the service every 60s to fetch the list
   // of principals. The service must support the expected :ref:`REST API
   // <config_network_filters_client_ssl_auth_rest_api>`.
-  string auth_api_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+  string auth_api_cluster = 1
+      [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // The prefix to use when emitting :ref:`statistics
   // <config_network_filters_client_ssl_auth_stats>`.
@@ -42,6 +44,7 @@ message ClientSSLAuth {
 
   // An optional list of IP address and subnet masks that should be white
   // listed for access by the filter. If no list is provided, there is no
-  // IP white list.
-  repeated config.core.v3.CidrRange ip_white_list = 4;
+  // IP allowlist.
+  repeated config.core.v3.CidrRange ip_white_list = 4
+      [(udpa.annotations.field_migrate).rename = "ip_allowlist"];
 }

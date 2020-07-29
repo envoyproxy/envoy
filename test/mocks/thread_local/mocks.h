@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <unordered_map>
 
 #include "envoy/thread_local/thread_local.h"
 
@@ -51,7 +50,8 @@ public:
 
     ~SlotImpl() override {
       // Do not actually clear slot data during shutdown. This mimics the production code.
-      if (!parent_.shutdown_) {
+      // The defer_delete mimics the recycle() code with Bookkeeper.
+      if (!parent_.shutdown_ && !parent_.defer_delete) {
         EXPECT_LT(index_, parent_.data_.size());
         parent_.data_[index_].reset();
       }
@@ -98,6 +98,7 @@ public:
   bool defer_data{};
   bool shutdown_{};
   bool registered_{true};
+  bool defer_delete{};
 };
 
 } // namespace ThreadLocal

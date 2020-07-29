@@ -61,12 +61,12 @@ def fixFileExpectingSuccess(file, extra_input_files=None):
   command, infile, outfile, status, stdout = fixFileHelper(file,
                                                            extra_input_files=extra_input_files)
   if status != 0:
-    print("FAILED:")
+    print("FAILED: " + infile)
     emitStdoutAsError(stdout)
     return 1
   status, stdout, stderr = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
-    print("FAILED:")
+    print("FAILED: " + infile)
     emitStdoutAsError(stdout + stderr)
     return 1
   return 0
@@ -230,6 +230,14 @@ def runChecks():
       "test/register_factory.cc",
       "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, use "
       "Registry::InjectFactory instead.")
+  errors += checkUnfixableError("strerror.cc",
+                                "Don't use strerror; use Envoy::errorDetails instead")
+  errors += checkUnfixableError(
+      "std_unordered_map.cc", "Don't use std::unordered_map; use absl::flat_hash_map instead " +
+      "or absl::node_hash_map if pointer stability of keys/values is required")
+  errors += checkUnfixableError(
+      "std_unordered_set.cc", "Don't use std::unordered_set; use absl::flat_hash_set instead " +
+      "or absl::node_hash_set if pointer stability of keys/values is required")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",

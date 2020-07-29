@@ -25,7 +25,7 @@ message SubstitutionFormatString {
     //
     // .. code-block::
     //
-    //   text_format: %RESP_BODY%:%RESPONSE_CODE%:path=$REQ(:path)%
+    //   text_format: %LOCAL_REPLY_BODY%:%RESPONSE_CODE%:path=$REQ(:path)%
     //
     // The following plain text will be created:
     //
@@ -43,9 +43,9 @@ message SubstitutionFormatString {
     //
     // .. code-block::
     //
-    //  typed_json_format:
+    //  json_format:
     //    status: %RESPONSE_CODE%
-    //    message: %RESP_BODY%
+    //    message: %LOCAL_REPLY_BODY%
     //
     // The following JSON object would be created:
     //

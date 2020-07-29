@@ -70,7 +70,11 @@ public:
 class Http2FloodMitigationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public HttpIntegrationTest {
 public:
-  Http2FloodMitigationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  Http2FloodMitigationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
+  }
 
 protected:
   void startHttp2Session();
@@ -78,7 +82,7 @@ protected:
   void floodServer(absl::string_view host, absl::string_view path,
                    Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
   Http2Frame readFrame();
-  void sendFame(const Http2Frame& frame);
+  void sendFrame(const Http2Frame& frame);
   void setNetworkConnectionBufferSize();
   void beginSession();
 
