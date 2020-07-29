@@ -179,7 +179,8 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
-   * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to RateLimitSettings.
+   * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
+   * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
    * @return RateLimitSettings.
    */

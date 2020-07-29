@@ -777,8 +777,8 @@ public:
   }
 
   /**
-   * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for all
-   *         load balancers for this cluster.
+   * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
+   * all load balancers for this cluster.
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
@@ -811,8 +811,8 @@ public:
   lbRingHashConfig() const PURE;
 
   /**
-   * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the configuration
-   *         for the Original Destination load balancing policy, only used if type is set to
+   * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
+   * configuration for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.
    */
   virtual const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
