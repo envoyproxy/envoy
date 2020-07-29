@@ -19,7 +19,7 @@ getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc
 class CredsUtility {
 public:
   /**
-   * Translation from envoy::api::v2::core::GrpcService to grpc::ChannelCredentials
+   * Translation from envoy::config::core::v3::GrpcService::GoogleGrpc to grpc::ChannelCredentials
    * for channel credentials.
    * @param google_grpc Google gRPC config.
    * @param api reference to the Api object
@@ -31,7 +31,7 @@ public:
                         Api::Api& api);
 
   /**
-   * Static translation from envoy::api::v2::core::GrpcService to a vector of grpc::CallCredentials.
+   * Static translation from envoy::config::core::v3::GrpcService::GoogleGrpc to a vector of grpc::CallCredentials.
    * Any plugin based call credentials will be elided.
    * @param grpc_service Google gRPC config.
    * @return std::vector<std::shared_ptr<grpc::CallCredentials>> call credentials.
@@ -40,7 +40,7 @@ public:
   callCredentials(const envoy::config::core::v3::GrpcService::GoogleGrpc& google_grpc);
 
   /**
-   * Default translation from envoy::api::v2::core::GrpcService to grpc::ChannelCredentials for SSL
+   * Default translation from envoy::config::core::v3::GrpcService::GoogleGrpc to grpc::ChannelCredentials for SSL
    * channel credentials.
    * @param grpc_service_config gRPC service config.
    * @param api reference to the Api object
@@ -53,7 +53,7 @@ public:
                                Api::Api& api);
 
   /**
-   * Default static translation from envoy::api::v2::core::GrpcService to grpc::ChannelCredentials
+   * Default static translation from envoy::config::core::v3::GrpcService::GoogleGrpc to grpc::ChannelCredentials
    * for all non-plugin based channel and call credentials.
    * @param grpc_service_config gRPC service config.
    * @param api reference to the Api object
