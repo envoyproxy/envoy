@@ -677,6 +677,9 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
                   ->mutable_address()
                   ->mutable_socket_address()
                   ->set_port_value(ports[port_idx++]);
+            } else {
+              ENVOY_LOG_MISC(debug, "Not overriding preset port",
+                             lb_endpoint->endpoint().address().socket_address().port_value());
             }
           }
         }
