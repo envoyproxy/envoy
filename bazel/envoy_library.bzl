@@ -70,10 +70,8 @@ def envoy_cc_extension(
         undocumented = False,
         status = "stable",
         tags = [],
-        # TODO(#9953) //test/config_test:__pkg__ should probably be split up and removed.
-        # TODO(#9953) the config fuzz tests should be moved somewhere local and //test/config_test and //test/server removed.
         extra_visibility = [],
-        visibility = ["//source/extensions:__subpackages__", "//test/extensions:__subpackages__", "//source/exe:__pkg__", "//test/config_test:__pkg__", "//test/server:__pkg__", "//test/server/config_validation:__pkg__"],
+        visibility = ["//:extension_config"],
         **kwargs):
     visibility = visibility + extra_visibility
     if security_posture not in EXTENSION_SECURITY_POSTURES:
@@ -87,7 +85,7 @@ def envoy_cc_extension_library(
         srcs = [],
         hdrs = [],
         copts = [],
-        visibility = ["//source/extensions:__subpackages__", "//test/extensions:__subpackages__"],
+        visibility = ["//:extension_library"],
         external_deps = [],
         tcmalloc_dep = None,
         repository = "",
