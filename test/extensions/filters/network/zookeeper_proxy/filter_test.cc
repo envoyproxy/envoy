@@ -953,6 +953,18 @@ TEST_F(ZooKeeperFilterTest, WatchEvent) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
+TEST_F(ZooKeeperFilterTest, MissingXid) {
+  initialize();
+
+  const auto& stat = config_->stats().getdata_resp_;
+  Buffer::OwnedImpl data = encodeResponseHeader(1000, 2000, 0);
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(data, false));
+  EXPECT_EQ(0UL, stat.value());
+  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+}
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions
