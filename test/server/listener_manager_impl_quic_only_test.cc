@@ -13,7 +13,16 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {};
+class MockSupportsUdpGso : public Api::OsSysCallsImpl {
+public:
+  MOCK_METHOD(bool, supportsUdpGso, (), (const));
+};
+
+class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {
+public:
+  MockSupportsUdpGso udp_gso_syscall_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&udp_gso_syscall_};
+};
 
 TEST_F(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryAndSslContext) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -52,6 +61,7 @@ udp_writer_config:
                                                        Network::Address::IpVersion::v4);
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV2Yaml(yaml);
+  EXPECT_CALL(udp_gso_syscall_, supportsUdpGso()).WillOnce(Return(true));
   EXPECT_CALL(server_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured

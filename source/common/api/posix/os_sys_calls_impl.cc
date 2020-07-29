@@ -95,6 +95,29 @@ bool OsSysCallsImpl::supportsUdpGro() const {
 #endif
 }
 
+bool OsSysCallsImpl::supportsUdpGso() const {
+#if !defined(__linux__)
+  return false;
+#else
+#ifndef UDP_SEGMENT
+  return false;
+#else
+  static const bool is_supported = [] {
+    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (fd < 0) {
+      return false;
+    }
+    int optval;
+    socklen_t optlen = sizeof(optval);
+    bool result = (0 <= ::getsockopt(fd, IPPROTO_UDP, UDP_SEGMENT, &optval, &optlen));
+    ::close(fd);
+    return result;
+  }();
+  return is_supported;
+#endif
+#endif
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, rc != -1 ? 0 : errno};

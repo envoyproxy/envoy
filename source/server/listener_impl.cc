@@ -379,10 +379,9 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
   if (socket_type == Network::Socket::Type::Datagram) {
     auto udp_writer_config = config_.udp_writer_config();
-    if (udp_writer_config.name().empty()) {
+    if (!Api::OsSysCallsSingleton::get().supportsUdpGso() || udp_writer_config.name().empty()) {
       udp_writer_config.set_name(Network::UdpWriterNames::get().DefaultWriter);
     }
-
     auto& config_factory =
         Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterConfigFactory>(
             udp_writer_config.name());
