@@ -16,7 +16,7 @@ envoy_cc_library(
     hdrs = ["main_interface.h"],
     repository = "@envoy",
     deps = [
-        ":envoy_mobile_main_common_lib",
+        ":envoy_mobile_main_common_lib_stamped",
         "//library/common/buffer:utility_lib",
         "//library/common/http:dispatcher_lib",
         "//library/common/http:header_utility_lib",
@@ -34,7 +34,15 @@ envoy_cc_library(
     deps = [
         "@envoy//source/common/common:random_generator_lib",
         "@envoy//source/common/runtime:runtime_lib",
-        "@envoy//source/exe:envoy_common_lib",
+        "@envoy//source/exe:main_common_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_mobile_main_common_lib_stamped",
+    repository = "@envoy",
+    deps = [
+        ":envoy_mobile_main_common_lib",
         "@envoy//source/exe:envoy_main_common_lib",
     ],
 )
