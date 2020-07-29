@@ -1,3 +1,0 @@
-# ThriftProxy's supported thrift_filters
-"envoy.filters.thrift.router"
-"envoy.filters.thrift.rate_limit"

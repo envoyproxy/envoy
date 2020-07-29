@@ -38,6 +38,10 @@ envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildCluster(const std::
   return ConfigHelper::buildCluster(name, "ROUND_ROBIN", api_version_);
 }
 
+envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildTlsCluster(const std::string& name) {
+  return ConfigHelper::buildTlsCluster(name, "ROUND_ROBIN", api_version_);
+}
+
 envoy::config::cluster::v3::Cluster AdsIntegrationTest::buildRedisCluster(const std::string& name) {
   return ConfigHelper::buildCluster(name, "MAGLEV", api_version_);
 }
@@ -47,6 +51,12 @@ AdsIntegrationTest::buildClusterLoadAssignment(const std::string& name) {
   return ConfigHelper::buildClusterLoadAssignment(
       name, Network::Test::getLoopbackAddressString(ipVersion()),
       fake_upstreams_[0]->localAddress()->ip()->port(), api_version_);
+}
+
+envoy::config::endpoint::v3::ClusterLoadAssignment
+AdsIntegrationTest::buildTlsClusterLoadAssignment(const std::string& name) {
+  return ConfigHelper::buildClusterLoadAssignment(
+      name, Network::Test::getLoopbackAddressString(ipVersion()), 8443, api_version_);
 }
 
 envoy::config::listener::v3::Listener

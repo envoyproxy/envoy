@@ -1,8 +1,12 @@
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
+<<<<<<< HEAD
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
+=======
+
+>>>>>>> upstream/master
 #include "extensions/filters/network/common/utility.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -12,19 +16,26 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
+<<<<<<< HEAD
 // Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
 // std::chrono::time_point.
+=======
+>>>>>>> upstream/master
 namespace {
 // Limit the fill_interval in the config of local_ratelimit filter prevent overflow in
 // std::chrono::time_point.
 static const int SecondsPerDay = 86400;
 } // namespace
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/master
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // These filters have already been covered by this fuzzer.
   // Will extend to cover other network filters one by one.
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
+<<<<<<< HEAD
     filter_names = {        
       NetworkFilterNames::get().ExtAuthorization,
       NetworkFilterNames::get().LocalRateLimit,
@@ -52,6 +63,18 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   }
   return filter_names;
   
+=======
+    filter_names = {NetworkFilterNames::get().ExtAuthorization,
+                    NetworkFilterNames::get().LocalRateLimit,
+                    NetworkFilterNames::get().RedisProxy,
+                    NetworkFilterNames::get().ClientSslAuth,
+                    NetworkFilterNames::get().Echo,
+                    NetworkFilterNames::get().DirectResponse,
+                    NetworkFilterNames::get().DubboProxy,
+                    NetworkFilterNames::get().SniCluster};
+  }
+  return filter_names;
+>>>>>>> upstream/master
 }
 
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
@@ -85,6 +108,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
+<<<<<<< HEAD
     read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
     read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
@@ -116,6 +140,8 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         }));
     read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
     read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
+=======
+>>>>>>> upstream/master
   }
 }
 

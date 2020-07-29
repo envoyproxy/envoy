@@ -32,6 +32,15 @@ namespace {
 class MockWriter : public UdpStatsdSink::Writer {
 public:
   MOCK_METHOD(void, write, (const std::string& message));
+  MOCK_METHOD(void, writeBuffer, (Buffer::Instance & buffer));
+
+  void delegateBufferFake() {
+    ON_CALL(*this, writeBuffer).WillByDefault([this](Buffer::Instance& buffer) {
+      this->buffer_writes.push_back(buffer.toString());
+    });
+  }
+
+  std::vector<std::string> buffer_writes;
 };
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/8911
@@ -152,8 +161,9 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
 TEST(UdpStatsdSinkTest, CheckActualStats) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  writer_ptr->delegateBufferFake();
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, false);
+  UdpStatsdSink sink(tls_, writer_ptr, false, getDefaultPrefix(), 1024);
 
   NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
@@ -161,6 +171,48 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   counter.latch_ = 1;
   snapshot.counters_.push_back({1, counter});
 
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_))
+      .Times(1);
+  sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 1);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(0), "envoy.test_counter:1|c");
+  counter.used_ = false;
+
+  NiceMock<Stats::MockGauge> gauge;
+  gauge.name_ = "test_gauge";
+  gauge.value_ = 1;
+  gauge.used_ = true;
+  snapshot.gauges_.push_back(gauge);
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
+  sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 2);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(1), "envoy.test_gauge:1|g");
+
+  NiceMock<Stats::MockHistogram> timer;
+  timer.name_ = "test_timer";
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.test_timer:5|ms"));
+  sink.onHistogramComplete(timer, 5);
+
+  tls_.shutdownThread();
+}
+
+TEST(UdpStatsdSinkTest, CheckMetricLargerThanBuffer) {
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  writer_ptr->delegateBufferFake();
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  uint64_t buffer_size = 4;
+  UdpStatsdSink sink(tls_, writer_ptr, false, getDefaultPrefix(), buffer_size);
+
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.used_ = true;
+  counter.latch_ = 1;
+  snapshot.counters_.push_back({1, counter});
+
+  // Expect the metric to skip the buffer
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_counter:1|c"));
   sink.flush(snapshot);
@@ -172,24 +224,21 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   gauge.used_ = true;
   snapshot.gauges_.push_back(gauge);
 
+  // Expect the metric to skip the buffer
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_gauge:1|g"));
   sink.flush(snapshot);
 
-  NiceMock<Stats::MockHistogram> timer;
-  timer.name_ = "test_timer";
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.test_timer:5|ms"));
-  sink.onHistogramComplete(timer, 5);
-
   tls_.shutdownThread();
 }
 
-TEST(UdpStatsdSinkTest, CheckActualStatsWithCustomPrefix) {
+TEST(UdpStatsdSinkTest, CheckBufferedWritesWithinBufferSize) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  writer_ptr->delegateBufferFake();
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, false, "test_prefix");
+  uint64_t buffer_size = 1024;
+  UdpStatsdSink sink(tls_, writer_ptr, false, getDefaultPrefix(), buffer_size);
 
   NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
@@ -197,9 +246,76 @@ TEST(UdpStatsdSinkTest, CheckActualStatsWithCustomPrefix) {
   counter.latch_ = 1;
   snapshot.counters_.push_back({1, counter});
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("test_prefix.test_counter:1|c"));
+  NiceMock<Stats::MockGauge> gauge;
+  gauge.name_ = "test_gauge";
+  gauge.value_ = 1;
+  gauge.used_ = true;
+  snapshot.gauges_.push_back(gauge);
+
+  // Expect both metrics to be present in single write
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_))
+      .Times(1);
   sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 1);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(0), "envoy.test_counter:1|c\nenvoy.test_gauge:1|g");
+
+  tls_.shutdownThread();
+}
+
+TEST(UdpStatsdSinkTest, CheckBufferedWritesExceedingBufferSize) {
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  writer_ptr->delegateBufferFake();
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  uint64_t buffer_size = 64;
+  UdpStatsdSink sink(tls_, writer_ptr, false, getDefaultPrefix(), buffer_size);
+
+  NiceMock<Stats::MockCounter> counter_1;
+  counter_1.name_ = "test_counter_1";
+  counter_1.used_ = true;
+  counter_1.latch_ = 1;
+  snapshot.counters_.push_back({1, counter_1});
+
+  NiceMock<Stats::MockCounter> counter_2;
+  counter_2.name_ = "test_counter_2";
+  counter_2.used_ = true;
+  counter_2.latch_ = 1;
+  snapshot.counters_.push_back({1, counter_2});
+
+  NiceMock<Stats::MockGauge> gauge;
+  gauge.name_ = "test_gauge";
+  gauge.value_ = 1;
+  gauge.used_ = true;
+  snapshot.gauges_.push_back(gauge);
+
+  // Expect both metrics to be present in single write
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_))
+      .Times(2);
+  sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 2);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(0), "envoy.test_counter_1:1|c\nenvoy.test_counter_2:1|c");
+  EXPECT_EQ(writer_ptr->buffer_writes.at(1), "envoy.test_gauge:1|g");
+
+  tls_.shutdownThread();
+}
+
+TEST(UdpStatsdSinkTest, CheckActualStatsWithCustomPrefix) {
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  writer_ptr->delegateBufferFake();
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  UdpStatsdSink sink(tls_, writer_ptr, false, "test_prefix", 1024);
+
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.used_ = true;
+  counter.latch_ = 1;
+  snapshot.counters_.push_back({1, counter});
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
+  sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 1);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(0), "test_prefix.test_counter:1|c");
   counter.used_ = false;
 
   tls_.shutdownThread();
@@ -249,8 +365,9 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
 TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  writer_ptr->delegateBufferFake();
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, true);
+  UdpStatsdSink sink(tls_, writer_ptr, true, getDefaultPrefix(), 1024);
 
   std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
   NiceMock<Stats::MockCounter> counter;
@@ -260,9 +377,10 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   counter.setTags(tags);
   snapshot.counters_.push_back({1, counter});
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.test_counter:1|c|#key1:value1,key2:value2"));
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
   sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 1);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(0), "envoy.test_counter:1|c|#key1:value1,key2:value2");
   counter.used_ = false;
 
   NiceMock<Stats::MockGauge> gauge;
@@ -272,9 +390,10 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   gauge.setTags(tags);
   snapshot.gauges_.push_back(gauge);
 
-  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
-              write("envoy.test_gauge:1|g|#key1:value1,key2:value2"));
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
   sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 2);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(1), "envoy.test_gauge:1|g|#key1:value1,key2:value2");
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";

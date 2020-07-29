@@ -5,6 +5,7 @@
 #include "envoy/network/transport_socket.h"
 
 #include "extensions/common/tap/extension_config_base.h"
+#include "extensions/transport_sockets/common/passthrough.h"
 #include "extensions/transport_sockets/tap/tap_config.h"
 
 namespace Envoy {
@@ -12,25 +13,19 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tap {
 
-class TapSocket : public Network::TransportSocket {
+class TapSocket : public TransportSockets::PassthroughSocket {
 public:
   TapSocket(SocketTapConfigSharedPtr config, Network::TransportSocketPtr&& transport_socket);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
-  std::string protocol() const override;
-  absl::string_view failureReason() const override;
-  bool canFlushClose() override;
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
-  void onConnected() override;
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
 
 private:
   SocketTapConfigSharedPtr config_;
   PerSocketTapperPtr tapper_;
-  Network::TransportSocketPtr transport_socket_;
 };
 
 class TapSocketFactory : public Network::TransportSocketFactory,

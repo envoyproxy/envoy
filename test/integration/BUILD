@@ -471,6 +471,7 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/common/stats:histogram_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
@@ -873,6 +874,21 @@ envoy_cc_test(
         ":http_integration_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "extension_discovery_integration_test",
+    srcs = ["extension_discovery_integration_test.cc"],
+    tags = ["fails_on_windows"],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/filters/http/rbac:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
     ],
 )
 
