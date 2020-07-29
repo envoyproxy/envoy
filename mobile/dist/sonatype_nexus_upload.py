@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 import argparse
 import base64
 import hashlib
@@ -23,7 +21,9 @@ BASE64_ENCODED_CREDENTIALS = base64.b64encode("{}:{}".format(_USER_CREDS, _KEY_C
 _ARTIFACT_HOST_URL = "https://oss.sonatype.org/service/local/staging"
 _GROUP_ID = "io.envoyproxy.envoymobile"
 _ARTIFACT_ID = "envoy"
-_LOCAL_INSTALL_PATH = os.path.expanduser("~/.m2/repository/io/envoyproxy/envoymobile/{}".format(_ARTIFACT_ID))
+_LOCAL_INSTALL_PATH = os.path.expanduser("~/.m2/repository/{directory}/envoy".format(
+    directory=_GROUP_ID.replace(".", "/"),
+    artifact_id=_ARTIFACT_ID))
 
 
 def _resolve_name(file):
@@ -70,6 +70,7 @@ def _install_locally(version, files):
         )
 
         shutil.copyfile(file, os.path.join(path, basename))
+        print("{file_name}\n{sha}\n".format(file_name=file, sha=_sha256(file)))
 
 
 def _urlopen_retried(request, max_retries=500, attempt=1, delay_sec=1):
@@ -94,13 +95,11 @@ def _urlopen_retried(request, max_retries=500, attempt=1, delay_sec=1):
                     max_retries=max_retries,
                     delay=delay_sec,
                     code=e.code
-                ),
-                file=sys.stderr)
+                ))
             time.sleep(delay_sec)
             return _urlopen_retried(request, max_retries, attempt + 1)
         elif max_retries <= attempt:
-            print("Retry limit reached. Will not continue to retry. Received error code {}".format(e.code),
-                  file=sys.stderr)
+            print("Retry limit reached. Will not continue to retry. Received error code {}".format(e.code))
             raise e
         else:
             raise e
@@ -122,7 +121,7 @@ def _create_staging_repository(profile_id):
 
         response = json.load(_urlopen_retried(request))
         staging_id = response["data"]["stagedRepositoryId"]
-        print("staging id {} was created".format(staging_id), file=sys.stderr)
+        print("staging id {} was created".format(staging_id))
         return staging_id
     except Exception as e:
         raise e
@@ -259,7 +258,7 @@ def _sha256(file_name):
 
 def _build_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile_id", required=True,
+    parser.add_argument("--profile_id", required=False,
                         help="""
                         The staging profile id of the sonatype repository target.
                         This is the id in the sonatype web ui. The REST api is:
@@ -287,7 +286,7 @@ def _build_parser():
                             dist/envoy-sources.jar
                             dist/envoy-javadoc.jar
                         """)
-    parser.add_argument("--signed_files", nargs="+", required=True,
+    parser.add_argument("--signed_files", nargs="+", required=False,
                         help="""
                         Files to upload.
                         Sonatype requires uploaded artifacts to be gpg signed
@@ -337,11 +336,10 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
 
-            print("Unable to complete file upload. Will attempt to drop staging id: [{}]".format(staging_id),
-                  file=sys.stderr)
+            print("Unable to complete file upload. Will attempt to drop staging id: [{}]".format(staging_id))
             try:
                 _drop_staging_repository(staging_id, "droppng release due to error")
                 sys.exit("Dropping staging id: [{}] successful.".format(staging_id))
             except Exception as e:
-                print(e, file=sys.stderr)
+                print(e)
                 sys.exit("Dropping staging id: [{}] failed.".format(staging_id))

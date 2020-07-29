@@ -55,7 +55,7 @@ def android_artifacts(name, android_library, manifest, archive_name, native_deps
 
     # Generate other needed files for a maven publish
     _sources_name, _javadocs_name = _create_sources_javadocs(name, android_library)
-    _pom_name = _create_pom_xml(name, android_library)
+    _pom_name = _create_pom_xml(name, android_library, visibility)
     native.genrule(
         name = name + "_with_artifacts",
         srcs = [
@@ -281,19 +281,20 @@ def _create_sources_javadocs(name, android_library):
 
     return _sources_name, _javadocs_name
 
-def _create_pom_xml(name, android_library):
+def _create_pom_xml(name, android_library, visibility):
     """
     Creates a pom xml associated with the android_library target.
 
     :param name The name of the top level macro.
     :param android_library The android library to generate a pom xml for.
     """
-    _pom_name = name + "_envoy_pom_xml"
+    _pom_name = name + "_pom_xml"
 
     # This is for the pom xml. It has a public visibility since this can be accessed in the root BUILD file
     pom_file(
         name = _pom_name,
         targets = [android_library],
+        visibility = visibility,
         template_file = "@envoy_mobile//bazel:pom_template.xml",
     )
 
