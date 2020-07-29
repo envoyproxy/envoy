@@ -88,7 +88,7 @@ public:
                  const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                  absl::string_view /*details*/) override {
     const bool is_head_request =
-headers_ != nullptr && headers_->getMethodValue() == Http::Headers::get().MethodValues.Head;
+        headers_ != nullptr && headers_->getMethodValue() == Http::Headers::get().MethodValues.Head;
     Http::Utility::sendLocalReply(
         false,
         Http::Utility::EncodeFunctions(
