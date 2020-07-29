@@ -132,7 +132,9 @@ public:
   public:
     MockUpstreamUdpFilter(ConnectionHandlerTest& parent, Network::UdpReadFilterCallbacks& callbacks)
         : UdpListenerReadFilter(callbacks), parent_(parent) {}
-    ~MockUpstreamUdpFilter() override { parent_.deleted_before_listener_ = !parent_.udp_listener_deleted; }
+    ~MockUpstreamUdpFilter() override {
+      parent_.deleted_before_listener_ = !parent_.udp_listener_deleted;
+    }
 
     MOCK_METHOD(void, onData, (Network::UdpRecvData&), (override));
     MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode), (override));
