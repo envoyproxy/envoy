@@ -91,6 +91,7 @@ envoy_cc_library(
         "context_manager_impl.h",
     ],
     external_deps = [
+        "abseil_node_hash_set",
         "abseil_synchronization",
         "ssl",
     ],

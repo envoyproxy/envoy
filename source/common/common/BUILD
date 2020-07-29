@@ -353,6 +353,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["abseil_node_hash_map"],
     deps = [
         ":assert_lib",
         ":hash_lib",

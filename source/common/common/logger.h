@@ -106,10 +106,21 @@ public:
   virtual void flush() PURE;
 
 protected:
+  // Swap the current log sink delegate for this one. This should be called by the derived class
+  // constructor immediately before returning. This is required to match restoreDelegate(),
+  // otherwise it's possible for the previous delegate to get set in the base class constructor,
+  // the derived class constructor throws, and cleanup becomes broken.
+  void setDelegate();
+
+  // Swap the current log sink (this) for the previous one. This should be called by the derived
+  // class destructor in the body. This is critical as otherwise it's possible for a log message
+  // to get routed to a partially destructed sink.
+  void restoreDelegate();
+
   SinkDelegate* previousDelegate() { return previous_delegate_; }
 
 private:
-  SinkDelegate* previous_delegate_;
+  SinkDelegate* previous_delegate_{nullptr};
   DelegatingLogSinkSharedPtr log_sink_;
 };
 
@@ -119,6 +130,7 @@ private:
 class StderrSinkDelegate : public SinkDelegate {
 public:
   explicit StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink);
+  ~StderrSinkDelegate() override;
 
   // SinkDelegate
   void log(absl::string_view msg) override;
@@ -143,7 +155,10 @@ public:
 
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
-  void flush() override { sink_->flush(); }
+  void flush() override {
+    absl::ReaderMutexLock lock(&sink_mutex_);
+    sink_->flush();
+  }
   void set_pattern(const std::string& pattern) override {
     set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
   }
@@ -182,13 +197,20 @@ private:
 
   DelegatingLogSink() = default;
 
-  void setDelegate(SinkDelegate* sink) { sink_ = sink; }
-  SinkDelegate* delegate() { return sink_; }
+  void setDelegate(SinkDelegate* sink) {
+    absl::WriterMutexLock lock(&sink_mutex_);
+    sink_ = sink;
+  }
+  SinkDelegate* delegate() {
+    absl::ReaderMutexLock lock(&sink_mutex_);
+    return sink_;
+  }
 
-  SinkDelegate* sink_{nullptr};
+  SinkDelegate* sink_ ABSL_GUARDED_BY(sink_mutex_){nullptr};
+  absl::Mutex sink_mutex_;
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
   std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
-  absl::Mutex format_mutex_; // direct absl reference to break build cycle.
+  absl::Mutex format_mutex_;
   bool should_escape_{false};
 };
 
@@ -204,6 +226,9 @@ enum class LoggerMode { Envoy, Fancy };
  * context is restored. When all contexts are destroyed, the lock is cleared,
  * and logging will remain unlocked, the same state it is in prior to
  * instantiating a Context.
+ *
+ * Settings for Fancy Logger, a file level logger without explicit implementation,
+ * are integrated here, as they should be updated when context switch occurs.
  */
 class Context {
 public:
@@ -211,8 +236,18 @@ public:
           Thread::BasicLockable& lock, bool should_escape);
   ~Context();
 
+  /**
+   * Gets current logger mode (Envoy or Fancy). It's used in log handler in admin and
+   * in the implementation of Fancy Logger.
+   */
   static LoggerMode getLoggerMode();
+
+  /**
+   * Sets current logger mode. It's used when logger mode is obtained from compile
+   * option.
+   */
   static void setLoggerMode(LoggerMode mode);
+
   static std::string getFancyLogFormat();
   static spdlog::level::level_enum getFancyDefaultLevel();
 
@@ -225,6 +260,11 @@ private:
   bool should_escape_;
   Context* const save_context_;
 
+  /**
+   * Logger mode, 0 for Envoy and 1 for Fancy. It's static as it should work even
+   * when there's no context instance (benchmark environment). Certainly default 
+   * format and level are used for Fancy Logger in that case.
+   */
   static int logger_mode_;
   std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
   spdlog::level::level_enum fancy_default_level_ = spdlog::level::info;

@@ -5,7 +5,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
@@ -29,6 +28,8 @@
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/redis/utility.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -154,9 +155,9 @@ private:
     const std::string cluster_name_;
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
     Upstream::ThreadLocalCluster* cluster_{};
-    std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
+    absl::node_hash_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
-    std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
+    absl::node_hash_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
     std::string auth_username_;
     std::string auth_password_;
     std::list<Upstream::HostSharedPtr> created_via_redirect_hosts_;
