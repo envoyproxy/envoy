@@ -2,7 +2,7 @@
 # clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
 
 diff --git a/base/compiler_specific.h b/base/compiler_specific.h
-index 0cd36dc..8fc4db0 100644
+index 0cd36dc..8c4cbd4 100644
 --- a/base/compiler_specific.h
 +++ b/base/compiler_specific.h
 @@ -7,10 +7,6 @@
@@ -16,7 +16,21 @@ index 0cd36dc..8fc4db0 100644
  // Annotate a variable indicating it's ok if the variable is not used.
  // (Typically used to silence a compiler warning when the assignment
  // is important for some other reason.)
-@@ -226,7 +222,9 @@
+@@ -55,8 +51,12 @@
+ // prevent code folding, see gurl_base::debug::Alias.
+ // Use like:
+ //   void NOT_TAIL_CALLED FooBar();
+-#if defined(__clang__) && __has_attribute(not_tail_called)
++#if defined(__clang__)
++#if defined(__has_attribute)
++#if __has_attribute(not_tail_called)
+ #define NOT_TAIL_CALLED __attribute__((not_tail_called))
++#endif
++#endif
+ #else
+ #define NOT_TAIL_CALLED
+ #endif
+@@ -226,7 +226,9 @@
  #endif
  #endif
 
@@ -27,7 +41,7 @@ index 0cd36dc..8fc4db0 100644
  // Attribute "uninitialized" disables -ftrivial-auto-var-init=pattern for
  // the specified variable.
  // Library-wide alternative is
-@@ -257,6 +255,8 @@
+@@ -257,6 +259,8 @@
  // E.g. platform, bot, benchmark or test name in patch description or next to
  // the attribute.
  #define STACK_UNINITIALIZED __attribute__((uninitialized))
