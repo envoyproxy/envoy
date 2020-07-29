@@ -133,7 +133,7 @@ public:
     MockUpstreamUdpFilter(ConnectionHandlerTest& parent, Network::UdpReadFilterCallbacks& callbacks)
         : UdpListenerReadFilter(callbacks), parent_(parent) {}
     ~MockUpstreamUdpFilter() override {
-      parent_.deleted_before_listener_ = !parent_.udp_listener_deleted;
+      parent_.deleted_before_listener_ = !parent_.udp_listener_deleted_;
     }
 
     MOCK_METHOD(void, onData, (Network::UdpRecvData&), (override));
@@ -148,7 +148,7 @@ public:
     explicit MockUpstreamUdpListener(ConnectionHandlerTest& parent) : parent_(parent) {
       ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     }
-    ~MockUpstreamUdpListener() override { parent_.udp_listener_deleted = true; }
+    ~MockUpstreamUdpListener() override { parent_.udp_listener_deleted_ = true; }
 
     MOCK_METHOD(void, enable, (), (override));
     MOCK_METHOD(void, disable, (), (override));
@@ -223,7 +223,7 @@ public:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
-  bool udp_listener_deleted = false;
+  bool udp_listener_deleted_ = false;
   bool deleted_before_listener_ = false;
 };
 
