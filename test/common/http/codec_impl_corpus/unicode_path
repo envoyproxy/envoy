@@ -1,0 +1,37 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        # value: "/\xe5\x85\x89"
+        value: "/%5Cxe5%5Cx85%5Cx89"
+      }
+       headers {
+         key: ":scheme"
+         value: "http"
+       }
+       headers {
+         key: ":authority"
+         value: "foo.com"
+       }
+    }
+    end_stream: true
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+      }
+    }
+  }
+}
