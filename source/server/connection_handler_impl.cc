@@ -453,7 +453,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::deferredRemoveFilterChains(
       // Since is_deleting_ is on, we need to manually remove the map value and drive the iterator.
       // Defer delete connection container to avoid race condition in destroying connection.
       parent_.dispatcher_.deferredDelete(std::move(iter->second));
-      iter = connections_by_context_.erase(iter);
+      connections_by_context_.erase(iter);
     }
   }
   is_deleting_ = was_deleting;

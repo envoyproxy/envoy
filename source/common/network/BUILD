@@ -163,7 +163,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "lc_trie_lib",
     hdrs = ["lc_trie.h"],
-    external_deps = ["abseil_int128"],
+    external_deps = [
+        "abseil_node_hash_set",
+        "abseil_int128",
+    ],
     deps = [
         ":address_lib",
         ":cidr_range_lib",
@@ -357,8 +360,10 @@ envoy_cc_library(
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
         ":application_protocol_lib",
+        ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
+        "//include/envoy/network:proxy_protocol_options_lib",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:scalar_to_byte_vector_lib",
@@ -433,5 +438,16 @@ envoy_cc_library(
         "//include/envoy/network:udp_packet_writer_config_interface",
         "//include/envoy/registry",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "proxy_protocol_filter_state_lib",
+    srcs = ["proxy_protocol_filter_state.cc"],
+    hdrs = ["proxy_protocol_filter_state.h"],
+    deps = [
+        "//include/envoy/network:proxy_protocol_options_lib",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
     ],
 )

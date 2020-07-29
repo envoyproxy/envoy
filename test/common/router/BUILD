@@ -356,3 +356,12 @@ envoy_cc_test(
         "//source/common/router:string_accessor_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "upstream_request_test",
+    srcs = ["upstream_request_test.cc"],
+    deps = [
+        "//source/common/router:router_lib",
+        "//test/mocks/router:router_filter_interface",
+    ],
+)

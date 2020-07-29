@@ -36,6 +36,7 @@
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
 #include "common/router/upstream_request.h"
+#include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -902,13 +903,15 @@ void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.removeFromList(upstream_requests_);
   cleanup();
 
-  if (downstream_response_started_) {
+  if (downstream_response_started_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     callbacks_->streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
     callbacks_->resetStream();
   } else {
     callbacks_->streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached);
+    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         Http::Code::RequestTimeout, "upstream max stream duration reached", modify_headers_,
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().UpstreamMaxStreamDurationReached);
@@ -945,12 +948,13 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
 
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
                                     absl::string_view details) {
-  if (cluster_->timeoutBudgetStats().has_value()) {
+  Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
+  if (tb_stats.has_value()) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -963,7 +967,8 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
                              absl::string_view body, bool dropped, absl::string_view details) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
-  if (downstream_response_started_) {
+  if (downstream_response_started_ &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_500_after_100")) {
     // This will destroy any created retry timers.
     callbacks_->streamInfo().setResponseCodeDetails(details);
     cleanup();
@@ -974,6 +979,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
+    // sendLocalReply may instead reset the stream if downstream_response_started_ is true.
     callbacks_->sendLocalReply(
         code, body,
         [dropped, this](Http::ResponseHeaderMap& headers) {
@@ -1119,7 +1125,17 @@ void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
   // the complexity until someone asks for it.
   retry_state_.reset();
 
-  callbacks_->encode100ContinueHeaders(std::move(headers));
+  // We coalesce 100-continue headers here, to prevent encoder filters and HCM from having to worry
+  // about this. This is done in the router filter, rather than UpstreamRequest, since we want to
+  // potentially coalesce across retries and multiple upstream requests in the future, even though
+  // we currently don't support retry after 100.
+  // It's plausible that this functionality might need to move to HCM in the future for internal
+  // redirects, but we would need to maintain the "only call encode100ContinueHeaders() once"
+  // invariant.
+  if (!downstream_100_continue_headers_encoded_) {
+    downstream_100_continue_headers_encoded_ = true;
+    callbacks_->encode100ContinueHeaders(std::move(headers));
+  }
 }
 
 void Filter::resetAll() {
@@ -1335,8 +1351,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-  if (cluster_->timeoutBudgetStats().has_value()) {
-    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+  Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
+  if (tb_stats.has_value()) {
+    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
