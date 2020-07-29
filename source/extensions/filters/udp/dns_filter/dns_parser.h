@@ -12,21 +12,12 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
 
+#include "extensions/filters/udp/dns_filter/dns_filter_constants.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
-
-constexpr uint16_t DNS_RECORD_CLASS_IN = 1;
-constexpr uint16_t DNS_RECORD_TYPE_A = 1;
-constexpr uint16_t DNS_RECORD_TYPE_NS = 2;
-constexpr uint16_t DNS_RECORD_TYPE_AAAA = 28;
-constexpr uint16_t DNS_RECORD_TYPE_SRV = 33;
-
-constexpr uint16_t DNS_RESPONSE_CODE_NO_ERROR = 0;
-constexpr uint16_t DNS_RESPONSE_CODE_FORMAT_ERROR = 1;
-constexpr uint16_t DNS_RESPONSE_CODE_NAME_ERROR = 3;
-constexpr uint16_t DNS_RESPONSE_CODE_NOT_IMPLEMENTED = 4;
 
 /**
  * BaseDnsRecord contains the fields and functions common to both query and answer records.
@@ -93,20 +84,32 @@ using DnsAnswerMap = std::unordered_multimap<std::string, DnsAnswerRecordPtr>;
 class DnsSrvRecord : public DnsAnswerRecord {
 public:
   DnsSrvRecord(const absl::string_view service_name, const absl::string_view proto,
-               const std::chrono::seconds ttl, const uint16_t priority, const uint16_t weight,
-               const uint16_t port, const absl::string_view target,
+               const uint16_t port, const std::chrono::seconds ttl,
                const uint16_t rec_type = DNS_RECORD_TYPE_SRV,
                const uint16_t rec_class = DNS_RECORD_CLASS_IN)
       : DnsAnswerRecord(service_name, rec_type, rec_class, ttl, nullptr), proto_(proto),
-        priority_(priority), weight_(weight), port_(port), target_(target) {}
+        port_(port) {}
+
+  // Copy Constructor
+  DnsSrvRecord(const DnsSrvRecord& other)
+      : DnsAnswerRecord(other.name_, other.type_, other.class_, other.ttl_, nullptr),
+        proto_(other.proto_), port_(other.port_) {
+    for (const auto& entry : other.targets_) {
+      addTarget(entry.first, entry.second.priority, entry.second.weight);
+    }
+  }
+
+  struct DnsTargetAttributes {
+    uint16_t priority;
+    uint16_t weight;
+  };
 
   bool serialize(Buffer::OwnedImpl& output) override;
+  void addTarget(const absl::string_view target, const uint16_t priority, const uint16_t weight);
 
   std::string proto_;
-  uint16_t priority_;
-  uint16_t weight_;
   uint16_t port_;
-  std::string target_;
+  absl::flat_hash_map<std::string, DnsTargetAttributes> targets_;
 };
 
 using DnsSrvRecordPtr = std::unique_ptr<DnsSrvRecord>;
@@ -152,7 +155,6 @@ public:
   Network::DnsResolver::ResolutionStatus resolution_status_;
   DnsQueryPtrVec queries_;
   DnsAnswerMap answers_;
-  // DnsAnswerMap authority_;
   DnsAnswerMap additional_;
 };
 
@@ -293,6 +295,20 @@ public:
                           const Buffer::InstancePtr& buffer, uint64_t& offset);
 
   /**
+   * @brief store Answer Records in the supplied collection after validating the record type
+   *
+   * @param name the name of the record being stored
+   * @param rec_type the type of the record being stored
+   * @param rec_class the class of the record being stored
+   * @param ttl the Time-to-live of the record being stored
+   * @param ipaddr the ip of the record being stored. In the case of SRV records, this is
+   * @param collection the destination for the new answer record being created
+   */
+  bool createAndStoreDnsAnswerRecord(const absl::string_view name, const uint16_t rec_type,
+                                     const uint16_t rec_class, const std::chrono::seconds ttl,
+                                     Network::Address::InstanceConstSharedPtr ipaddr,
+                                     DnsAnswerMap& collection);
+  /**
    * @brief store Additional Resource Records in a separate collection from DNS answers
    *
    * @param context the query context for which we are generating a response
@@ -303,30 +319,36 @@ public:
    * @param ipaddr the ip of the record being stored. In the case of SRV records, this is
    * the address of a target node referenced by an SRV record entry
    */
-  void storeDnsAdditionalRecord(DnsQueryContextPtr& context, const absl::string_view name,
+  bool storeDnsAdditionalRecord(DnsQueryContextPtr& context, const absl::string_view name,
                                 const uint16_t rec_type, const uint16_t rec_class,
                                 const std::chrono::seconds ttl,
                                 Network::Address::InstanceConstSharedPtr ipaddr);
+
   /**
    * @brief Constructs a DNS SRV Answer record for a given service and stores the object in a map
-   * where the response is associated with query name
+   * where the response is associated with query name. This creates a new record and uses the
+   * add function above to insert it into the service map
    *
    * @param context the query context for which we are generating a response
    * @param query_rec to which the answer is matched.
    * @param service the service that is returned in the answer record
+   * @param move_rec move the passed in record to the underlying connection instead of creating a
+   * new object
    */
   void storeDnsSrvAnswerRecord(DnsQueryContextPtr& context, const DnsQueryRecord& query_rec,
                                const DnsSrvRecordPtr& service);
+
   /**
    * @brief Constructs a DNS Answer record for a given IP Address and stores the object in a map
-   * where the response is associated with query name
+   * where the response is associated with query name.
    *
    * @param context the query context for which we are generating a response
    * @param query_rec to which the answer is matched.
    * @param ttl the TTL specifying how long the returned answer is cached
    * @param ipaddr the address that is returned in the answer record
+   * @return true if the answer record matches the query type
    */
-  void storeDnsAnswerRecord(DnsQueryContextPtr& context, const DnsQueryRecord& query_rec,
+  bool storeDnsAnswerRecord(DnsQueryContextPtr& context, const DnsQueryRecord& query_rec,
                             const std::chrono::seconds ttl,
                             Network::Address::InstanceConstSharedPtr ipaddr);
 
@@ -350,6 +372,17 @@ public:
   bool parseDnsObject(DnsQueryContextPtr& context, const Buffer::InstancePtr& buffer);
 
 private:
+  /**
+   * @brief Adds a new DNS SRV Answer record for a given service to the service map
+   *
+   * @param context the query context for which we are generating a response
+   * @param query_rec to which the answer is matched.
+   * @param service the service that is returned in the answer record
+   * @param move_rec move the passed in record to the underlying connection instead of creating a
+   * new object
+   */
+  void addNewDnsSrvAnswerRecord(DnsQueryContextPtr& context, const DnsQueryRecord& query_rec,
+                                DnsSrvRecordPtr service);
   /**
    * @brief sets the response code returned to the client
    *

@@ -20,7 +20,7 @@ bool BaseDnsRecord::serializeSpecificName(Buffer::OwnedImpl& output, const absl:
   static constexpr char SEPARATOR = '.';
 
   // Names are restricted to 255 bytes per RFC
-  if (name.size() > Utils::MAX_NAME_LENGTH) {
+  if (name.size() > MAX_NAME_LENGTH) {
     return false;
   }
 
@@ -29,7 +29,7 @@ bool BaseDnsRecord::serializeSpecificName(Buffer::OwnedImpl& output, const absl:
   auto iter = name.begin();
 
   while (count != std::string::npos) {
-    if ((count - last) > Utils::MAX_LABEL_LENGTH) {
+    if ((count - last) > MAX_LABEL_LENGTH) {
       return false;
     }
 
@@ -76,7 +76,7 @@ bool DnsQueryRecord::serialize(Buffer::OwnedImpl& output) {
   return false;
 }
 
-// Serialize a DNS Answer Record
+// Serialize a single DNS Answer Record
 bool DnsAnswerRecord::serialize(Buffer::OwnedImpl& output) {
   if (serializeName(output)) {
     output.writeBEInt<uint16_t>(type_);
@@ -103,24 +103,36 @@ bool DnsAnswerRecord::serialize(Buffer::OwnedImpl& output) {
 }
 
 bool DnsSrvRecord::serialize(Buffer::OwnedImpl& output) {
-  if (serializeName(output)) {
-    output.writeBEInt<uint16_t>(type_);
-    output.writeBEInt<uint16_t>(class_);
-    output.writeBEInt<uint32_t>(static_cast<uint32_t>(ttl_.count()));
+  if (!targets_.empty()) {
+    // The Service Record being serialized should have only one target
+    const auto& target = targets_.begin();
+    Buffer::OwnedImpl target_buf{};
+    if (serializeSpecificName(target_buf, target->first) && serializeName(output)) {
+      output.writeBEInt<uint16_t>(type_);
+      output.writeBEInt<uint16_t>(class_);
+      output.writeBEInt<uint32_t>(static_cast<uint32_t>(ttl_.count()));
 
-    Buffer::OwnedImpl target;
-    if (serializeSpecificName(target, target_)) {
-      const uint16_t data_length =
-          sizeof(priority_) + sizeof(weight_) + sizeof(port_) + target.length();
+      const uint16_t data_length = sizeof(target->second.priority) + sizeof(target->second.weight) +
+                                   sizeof(port_) + target_buf.length();
       output.writeBEInt<uint16_t>(data_length);
-      output.writeBEInt<uint16_t>(priority_);
-      output.writeBEInt<uint16_t>(weight_);
+      output.writeBEInt<uint16_t>(target->second.priority);
+      output.writeBEInt<uint16_t>(target->second.weight);
       output.writeBEInt<uint16_t>(port_);
-      output.move(target);
+      output.move(target_buf);
+
       return true;
     }
   }
   return false;
+}
+
+void DnsSrvRecord::addTarget(const absl::string_view target, const uint16_t priority,
+                             const uint16_t weight) {
+  DnsTargetAttributes attr{};
+  attr.weight = weight;
+  attr.priority = priority;
+
+  targets_.emplace(std::make_pair(std::string(target), attr));
 }
 
 DnsQueryContextPtr DnsMessageParser::createQueryContext(Network::UdpRecvData& client_request,
@@ -254,7 +266,8 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
 
   if (header_.authority_rrs) {
     // We are not generating these in the filter and don't have a use for them at the moment.
-    // If they exist, we will not parse them and return an error to the client
+    // If they exist, we will not parse them and return an error to the client since they appear
+    // between the answers and additional resource records in the buffer
     context->response_code_ = DNS_RESPONSE_CODE_NOT_IMPLEMENTED;
     return false;
   }
@@ -381,8 +394,9 @@ DnsSrvRecordPtr DnsMessageParser::parseDnsSrvRecord(DnsAnswerCtx& ctx) {
     return nullptr;
   }
 
-  auto srv_record = std::make_unique<DnsSrvRecord>(
-      ctx.record_name_, proto, std::chrono::seconds(ctx.ttl_), priority, weight, port, target_name);
+  auto srv_record =
+      std::make_unique<DnsSrvRecord>(ctx.record_name_, proto, port, std::chrono::seconds(ctx.ttl_));
+  srv_record->addTarget(target_name, priority, weight);
   return srv_record;
 }
 
@@ -461,14 +475,10 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::Instance
 
   switch (record_type) {
   case DNS_RECORD_TYPE_A:
-  case DNS_RECORD_TYPE_AAAA: {
-    auto record = parseDnsARecord(ctx);
-    return record;
-  }
-  case DNS_RECORD_TYPE_SRV: {
-    auto record = parseDnsSrvRecord(ctx);
-    return record;
-  }
+  case DNS_RECORD_TYPE_AAAA:
+    return parseDnsARecord(ctx);
+  case DNS_RECORD_TYPE_SRV:
+    return parseDnsSrvRecord(ctx);
   default:
     ENVOY_LOG(debug, "Unsupported record type [{}] found in answer", record_type);
     return nullptr;
@@ -560,58 +570,72 @@ void DnsMessageParser::setDnsResponseFlags(DnsQueryContextPtr& query_context,
   response_header_.additional_rrs = additional_rrs;
 }
 
-void DnsMessageParser::storeDnsAdditionalRecord(DnsQueryContextPtr& context,
-                                                const absl::string_view name,
-                                                const uint16_t rec_type, const uint16_t rec_class,
-                                                const std::chrono::seconds ttl,
-                                                Network::Address::InstanceConstSharedPtr ipaddr) {
-  const std::string rec_name(name);
-  auto answer_record =
-      std::make_unique<DnsAnswerRecord>(rec_name, rec_type, rec_class, ttl, std::move(ipaddr));
-  context->additional_.emplace(rec_name, std::move(answer_record));
-}
-
-void DnsMessageParser::storeDnsAnswerRecord(DnsQueryContextPtr& context,
-                                            const DnsQueryRecord& query_rec,
-                                            const std::chrono::seconds ttl,
-                                            Network::Address::InstanceConstSharedPtr ipaddr) {
+bool DnsMessageParser::createAndStoreDnsAnswerRecord(
+    const absl::string_view name, const uint16_t rec_type, const uint16_t rec_class,
+    const std::chrono::seconds ttl, Network::Address::InstanceConstSharedPtr ipaddr,
+    DnsAnswerMap& collection) {
   // Verify that we have an address matching the query record type
-  switch (query_rec.type_) {
+  switch (rec_type) {
   case DNS_RECORD_TYPE_AAAA:
     if (ipaddr->ip()->ipv6() == nullptr) {
       ENVOY_LOG(debug, "Unable to return IPV6 address for query");
-      return;
+      return false;
     }
     break;
 
   case DNS_RECORD_TYPE_A:
     if (ipaddr->ip()->ipv4() == nullptr) {
       ENVOY_LOG(debug, "Unable to return IPV4 address for query");
-      return;
+      return false;
     }
     break;
   default:
-    ENVOY_LOG(debug, "record type [{}] is not supported in this function", query_rec.type_);
-    return;
+    ENVOY_LOG(trace, "record type [{}] is not supported in this function", rec_type);
+    return false;
   }
 
-  auto answer_record = std::make_unique<DnsAnswerRecord>(query_rec.name_, query_rec.type_,
-                                                         query_rec.class_, ttl, std::move(ipaddr));
-  context->answers_.emplace(query_rec.name_, std::move(answer_record));
+  auto answer_record =
+      std::make_unique<DnsAnswerRecord>(name, rec_type, rec_class, ttl, std::move(ipaddr));
+  collection.emplace(std::string(name), std::move(answer_record));
+
+  return true;
+}
+
+bool DnsMessageParser::storeDnsAdditionalRecord(DnsQueryContextPtr& context,
+                                                const absl::string_view name,
+                                                const uint16_t rec_type, const uint16_t rec_class,
+                                                const std::chrono::seconds ttl,
+                                                Network::Address::InstanceConstSharedPtr ipaddr) {
+  return createAndStoreDnsAnswerRecord(name, rec_type, rec_class, ttl, std::move(ipaddr),
+                                       context->additional_);
+}
+
+bool DnsMessageParser::storeDnsAnswerRecord(DnsQueryContextPtr& context,
+                                            const DnsQueryRecord& query_rec,
+                                            const std::chrono::seconds ttl,
+                                            Network::Address::InstanceConstSharedPtr ipaddr) {
+  return createAndStoreDnsAnswerRecord(query_rec.name_, query_rec.type_, query_rec.class_, ttl,
+                                       std::move(ipaddr), context->answers_);
+}
+
+void DnsMessageParser::addNewDnsSrvAnswerRecord(DnsQueryContextPtr& context,
+                                                const DnsQueryRecord& query_rec,
+                                                DnsSrvRecordPtr service) {
+  RELEASE_ASSERT(query_rec.class_ == DNS_RECORD_CLASS_IN, "Unsupported DNS Record Class in record");
+  if (query_rec.type_ == DNS_RECORD_TYPE_SRV) {
+    context->answers_.emplace(query_rec.name_, std::move(service));
+  }
 }
 
 void DnsMessageParser::storeDnsSrvAnswerRecord(DnsQueryContextPtr& context,
                                                const DnsQueryRecord& query_rec,
                                                const DnsSrvRecordPtr& service) {
-  if (query_rec.type_ != DNS_RECORD_TYPE_SRV) {
-    ENVOY_LOG(debug, "record type [{}] is not supported in this function", query_rec.type_);
-    return;
-  }
+  if (query_rec.type_ == DNS_RECORD_TYPE_SRV) {
+    ENVOY_LOG(trace, "storing answer record type [{}] for {}", query_rec.type_, query_rec.name_);
 
-  auto srv_record = std::make_unique<DnsSrvRecord>(service->name_, service->proto_, service->ttl_,
-                                                   service->priority_, service->weight_,
-                                                   service->port_, service->target_);
-  context->answers_.emplace(query_rec.name_, std::move(srv_record));
+    auto srv_record = std::make_unique<DnsSrvRecord>(*service);
+    addNewDnsSrvAnswerRecord(context, query_rec, std::move(srv_record));
+  }
 }
 
 void DnsMessageParser::setResponseCode(DnsQueryContextPtr& context,
@@ -652,19 +676,6 @@ void DnsMessageParser::setResponseCode(DnsQueryContextPtr& context,
 
 void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
                                            Buffer::OwnedImpl& buffer) {
-  // Ensure that responses stay below the 512 byte byte limit. If we are to exceed this we must
-  // add DNS extension fields
-  //
-  // Note:  There is Network::MAX_UDP_PACKET_SIZE, which is defined as 1500 bytes. If we support
-  // DNS extensions, which support up to 4096 bytes, we will have to keep this 1500 byte limit
-  // in mind.
-  static constexpr uint64_t MAX_DNS_RESPONSE_SIZE = 512;
-  static constexpr uint64_t MAX_DNS_NAME_SIZE = 255;
-
-  // Amazon Route53 will return up to 8 records in an answer
-  // https://aws.amazon.com/route53/faqs/#associate_multiple_ip_with_single_record
-  static constexpr size_t MAX_RETURNED_RECORDS = 8;
-
   // Each response must have DNS flags, which spans 4 bytes. Account for them immediately so
   // that we can adjust the number of returned answers to remain under the limit
   uint64_t total_buffer_size = sizeof(DnsHeaderFlags);
@@ -706,7 +717,7 @@ void DnsMessageParser::buildResponseBuffer(DnsQueryContextPtr& query_context,
       // encoded query names, we should not end up with a non-conforming name here.
       //
       // See Section 2.3.4 of https://tools.ietf.org/html/rfc1035
-      RELEASE_ASSERT(query->name_.size() < MAX_DNS_NAME_SIZE,
+      RELEASE_ASSERT(query->name_.size() < MAX_NAME_LENGTH,
                      "Unable to serialize invalid query name");
 
       // Serialize answer records whose names and types match the query

@@ -1,17 +1,18 @@
 #pragma once
 
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
+#include "envoy/network/address.h"
+
+#include "extensions/filters/udp/dns_filter/dns_filter_constants.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace DnsFilter {
 namespace Utils {
-
-constexpr size_t MAX_LABEL_LENGTH = 63;
-constexpr size_t MAX_NAME_LENGTH = 255;
 
 using envoy::data::dns::v3::DnsTable;
 
@@ -41,6 +42,8 @@ absl::string_view getProtoFromName(const absl::string_view name);
  */
 std::string buildServiceName(const std::string& name, const std::string& proto,
                              const std::string& domain);
+
+absl::optional<uint16_t> getAddressType(const Network::Address::InstanceConstSharedPtr& ipaddr);
 
 } // namespace Utils
 } // namespace DnsFilter

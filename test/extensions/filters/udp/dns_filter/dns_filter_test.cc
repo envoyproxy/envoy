@@ -3,6 +3,7 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include "test/mocks/event/mocks.h"
@@ -279,28 +280,36 @@ virtual_domains:
   - name: "voip.subzero.com"
     endpoint:
       service_list:
-        dns_services:
-          - service_name: "sip"
-            protocol: { number: 6 }
-            ttl: 86400s
-            priority: 10
-            weight: 30
-            port: 5060
-            target_address: "primary.voip.subzero.com"
-          - service_name: "sip"
-            protocol: { name: "tcp" }
-            ttl: 86400s
-            priority: 10
-            weight: 20
-            port: 5060
-            target_address: "secondary.voip.subzero.com"
-          - service_name: "_sip"
-            protocol: { name: "_tcp" }
-            ttl: 86400s
-            priority: 10
+        services:
+        - service_name: "sip"
+          protocol: { number: 6 }
+          ttl: 86400s
+          port: 5060
+          targets: [
+            {name: "primary.voip.subzero.com", weight: 30, priority: 10},
+            {name: "secondary.voip.subzero.com", weight: 20, priority: 10},
+            {name: "backup.voip.subzero.com", weight: 10, priority: 10}
+          ]
+  - name: "web.subzero.com"
+    endpoint:
+      service_list:
+        services:
+        - service_name: "http"
+          protocol: { name: "tcp" }
+          ttl: 43200s
+          port: 80
+          targets:
+          - name: "fake_http_cluster_0"
             weight: 10
-            port: 5060
-            target_address: "backup.voip.subzero.com"
+            priority: 1
+        - service_name: "https"
+          protocol: { name: "tcp" }
+          ttl: 43200s
+          port: 443
+          targets:
+          - name: "fake_http_cluster_1"
+            weight: 10
+            priority: 1
 )EOF";
 };
 
@@ -503,7 +512,7 @@ TEST_F(DnsFilterTest, LocalTypeAQueryFail) {
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
-  EXPECT_EQ(3, config_->stats().local_a_record_answers_.value());
+  EXPECT_EQ(0, config_->stats().local_a_record_answers_.value());
   EXPECT_EQ(1, config_->stats().a_record_queries_.value());
   EXPECT_EQ(1, config_->stats().unanswered_queries_.value());
 }
@@ -907,6 +916,35 @@ TEST_F(DnsFilterTest, ConsumeExternalJsonTableTest) {
   ASSERT_EQ(1, config_->stats().known_domain_queries_.value());
   ASSERT_EQ(2, config_->stats().local_a_record_answers_.value());
   ASSERT_EQ(1, config_->stats().a_record_queries_.value());
+}
+
+TEST_F(DnsFilterTest, ConsumeExternalJsonTableTestNoIpv6Answer) {
+  InSequence s;
+
+  std::string temp_path =
+      TestEnvironment::writeStringToFileForTest("dns_table.json", external_dns_table_json);
+  std::string config_to_use = fmt::format(external_dns_table_config, temp_path);
+  setup(config_to_use);
+
+  const std::string domain("www.external_foo1.com");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
+
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode());
+  EXPECT_EQ(0, query_ctx_->answers_.size());
+
+  // Validate stats
+  ASSERT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  ASSERT_EQ(1, config_->stats().known_domain_queries_.value());
+  ASSERT_EQ(0, config_->stats().local_a_record_answers_.value());
+  ASSERT_EQ(0, config_->stats().local_aaaa_record_answers_.value());
+  ASSERT_EQ(0, config_->stats().a_record_queries_.value());
+  ASSERT_EQ(1, config_->stats().aaaa_record_queries_.value());
 }
 
 TEST_F(DnsFilterTest, ConsumeExternalYamlTableTest) {
@@ -1363,7 +1401,6 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
   EXPECT_TRUE(query_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
-  EXPECT_EQ(3, query_ctx_->answers_.size());
 
   std::map<uint16_t, std::string> validation_map = {
       {10, "backup.voip.subzero.com"},
@@ -1373,6 +1410,7 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
 
   // Validate the priority for each SRV record. The TTL and priority are the same value for each
   // entry
+  EXPECT_EQ(validation_map.size(), query_ctx_->answers_.size());
   for (const auto& answer : query_ctx_->answers_) {
     EXPECT_EQ(answer.second->type_, DNS_RECORD_TYPE_SRV);
 
@@ -1380,10 +1418,15 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
 
     EXPECT_STREQ("_sip._tcp.voip.subzero.com", srv_rec->name_.c_str());
     EXPECT_EQ(86400, srv_rec->ttl_.count());
-    EXPECT_EQ(10, srv_rec->priority_);
 
-    auto target = validation_map[srv_rec->weight_];
-    EXPECT_STREQ(target.c_str(), srv_rec->target_.c_str());
+    EXPECT_EQ(1, srv_rec->targets_.size());
+    const auto target = srv_rec->targets_.begin();
+    const auto target_name = target->first;
+    const auto& attributes = target->second;
+
+    EXPECT_EQ(10, attributes.priority);
+    auto expected_target = validation_map[attributes.weight];
+    EXPECT_EQ(expected_target, target_name);
   }
 
   // Validate additional records from the SRV query
@@ -1393,6 +1436,7 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
       {"backup.voip.subzero.com", "10.0.3.3"},
   };
 
+  EXPECT_EQ(3, query_ctx_->additional_.size());
   for (const auto& answer : query_ctx_->additional_) {
     const auto& entry = target_map.find(answer.first);
     EXPECT_NE(entry, target_map.end());
@@ -1470,7 +1514,6 @@ TEST_F(DnsFilterTest, SrvRecordQuery) {
 
   constexpr size_t count = sizeof(dns_request) / sizeof(dns_request[0]);
   const std::string query = Utils::buildQueryFromBytes(dns_request, count);
-
   sendQueryFromClient("10.0.0.1:1000", query);
 
   query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
@@ -1478,10 +1521,8 @@ TEST_F(DnsFilterTest, SrvRecordQuery) {
   EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_parser_->getQueryResponseCode());
   EXPECT_EQ(1, query_ctx_->queries_.size());
 
-  const auto& parsed_query = query_ctx_->queries_[0];
-
+  const auto& parsed_query = query_ctx_->queries_.front();
   EXPECT_EQ(parsed_query->type_, DNS_RECORD_TYPE_SRV);
-
   EXPECT_STREQ("_ldap._tcp.Default-First-Site-Name._sites.dc._msdcs.utelsystems.local",
                parsed_query->name_.c_str());
 

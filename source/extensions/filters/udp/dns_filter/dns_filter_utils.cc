@@ -80,6 +80,16 @@ std::string buildServiceName(const std::string& name, const std::string& proto,
   return result;
 }
 
+absl::optional<uint16_t> getAddressType(const Network::Address::InstanceConstSharedPtr& ipaddr) {
+  if (ipaddr->type() == Network::Address::Type::Ip) {
+    if (ipaddr->ip()->ipv6() != nullptr) {
+      return absl::make_optional<uint16_t>(DNS_RECORD_TYPE_AAAA);
+    } else if (ipaddr->ip()->ipv4() != nullptr) {
+      return absl::make_optional<uint16_t>(DNS_RECORD_TYPE_A);
+    }
+  }
+  return absl::nullopt;
+}
 } // namespace Utils
 } // namespace DnsFilter
 } // namespace UdpFilters

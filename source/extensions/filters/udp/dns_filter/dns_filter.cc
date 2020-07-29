@@ -70,23 +70,21 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
     if (virtual_domain.endpoint().has_service_list()) {
       const auto& dns_service_list = virtual_domain.endpoint().service_list();
-      for (const auto& dns_service : dns_service_list.dns_services()) {
+      for (const auto& dns_service : dns_service_list.services()) {
 
         // Each service should be its own domain in the stored config. The filter will see
-        // the full service name in queries on the wire.
+        // the full service name in queries on the wire. The protocol string returned will be empty
+        // if a numeric protocol is configured and we cannot resolve its name
         const std::string proto = Utils::getProtoName(dns_service.protocol());
         if (proto.empty()) {
           continue;
         }
         const std::chrono::seconds ttl = std::chrono::seconds(dns_service.ttl().seconds());
-        const uint16_t priority = dns_service.priority();
-        const uint16_t weight = dns_service.weight();
         const uint16_t port = dns_service.port();
 
         // Generate the full name for the DNS service.
         const std::string full_service_name =
             Utils::buildServiceName(dns_service.service_name(), proto, virtual_domain.name());
-
         if (full_service_name.empty()) {
           ENVOY_LOG(
               trace,
@@ -95,25 +93,25 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
           continue;
         }
 
-        DnsSrvRecordPtr service_record_ptr = std::make_unique<DnsSrvRecord>(
-            full_service_name, proto, ttl, priority, weight, port, dns_service.target_address());
+        DnsSrvRecordPtr service_record_ptr =
+            std::make_unique<DnsSrvRecord>(full_service_name, proto, port, ttl);
 
-        ENVOY_LOG(trace, "Storing service {} target {}", full_service_name,
-                  dns_service.target_address());
+        // Store service targets. We require at least one target to be present. The target should
+        // be a fully qualified domain name. If the target name is not a fully qualified name, we
+        // will consider this name to be that of a cluster
+        for (const auto& target : dns_service.targets()) {
+          const absl::string_view target_name = target.name();
+          const uint16_t priority = target.priority();
+          const uint16_t weight = target.weight();
 
-        // If the domain already exists with a different endpoint config, update the service_list
-        // with the configured data
-        if (virtual_domains_.contains(full_service_name)) {
-          virtual_domains_[full_service_name].service_list.value().emplace_back(
-              std::move(service_record_ptr));
-        } else {
-          DnsEndpointConfig endpoint_config{};
-          DnsSrvRecordPtrVec services{};
-          services.push_back(std::move(service_record_ptr));
-          endpoint_config.service_list =
-              absl::make_optional<DnsSrvRecordPtrVec>(std::move(services));
-          virtual_domains_.emplace(full_service_name, std::move(endpoint_config));
+          ENVOY_LOG(trace, "Storing service {} target {}", full_service_name, target_name);
+          service_record_ptr->addTarget(target_name, priority, weight);
         }
+
+        DnsEndpointConfig endpoint_config{};
+        endpoint_config.service_list =
+            absl::make_optional<DnsSrvRecordPtr>(std::move(service_record_ptr));
+        virtual_domains_.emplace(full_service_name, std::move(endpoint_config));
       }
     }
 
@@ -303,6 +301,19 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
   return DnsLookupResponseCode::Success;
 }
 
+bool DnsFilter::resolveViaConfiguredHosts(DnsQueryContextPtr& context,
+                                          const DnsQueryRecord& query) {
+  switch (query.type_) {
+  case DNS_RECORD_TYPE_A:
+  case DNS_RECORD_TYPE_AAAA:
+    return resolveConfiguredDomain(context, query);
+  case DNS_RECORD_TYPE_SRV:
+    return resolveConfiguredService(context, query);
+  default:
+    return false;
+  }
+}
+
 std::chrono::seconds DnsFilter::getDomainTTL(const absl::string_view domain) {
   const auto& domain_ttl_config = config_->domainTtl();
   const auto& iter = domain_ttl_config.find(domain);
@@ -338,10 +349,10 @@ const DnsEndpointConfig* DnsFilter::getEndpointConfigForDomain(const absl::strin
   return &(iter->second);
 }
 
-const DnsSrvRecordPtrVec* DnsFilter::getServiceListForDomain(const absl::string_view domain) {
+const DnsSrvRecord* DnsFilter::getServiceConfigForDomain(const absl::string_view domain) {
   const DnsEndpointConfig* endpoint_config = getEndpointConfigForDomain(domain);
   if (endpoint_config != nullptr && endpoint_config->service_list.has_value()) {
-    return &(endpoint_config->service_list.value());
+    return endpoint_config->service_list.value().get();
   }
   return nullptr;
 }
@@ -362,7 +373,57 @@ const absl::string_view DnsFilter::getClusterNameForDomain(const absl::string_vi
   return {};
 }
 
-bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
+bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
+  size_t cluster_endpoints = 0;
+
+  // Get the service_list config for the domain
+  const auto* service_config = getServiceConfigForDomain(query.name_);
+  if (service_config != nullptr) {
+
+    // We can redirect to more than one cluster, but only one is supported
+    const auto& cluster_target = service_config->targets_.begin();
+    const auto& target_name = cluster_target->first;
+    const auto& attributes = cluster_target->second;
+
+    // Determine if there is a cluster
+    Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(target_name);
+    if (cluster == nullptr) {
+      ENVOY_LOG(trace, "No cluster found for service target: {}", target_name);
+      return false;
+    }
+
+    // Add a service record for each cluster endpoint using the cluster name
+    const std::chrono::seconds ttl = getDomainTTL(target_name);
+    for (const auto& hostsets : cluster->prioritySet().hostSetsPerPriority()) {
+      for (const auto& host : hostsets->hosts()) {
+
+        // Create the service record element and increment the SRV record answer count
+        auto config = std::make_unique<DnsSrvRecord>(service_config->name_, service_config->proto_,
+                                                     service_config->port_, service_config->ttl_);
+
+        config->addTarget(target_name, attributes.priority, attributes.weight);
+        message_parser_.storeDnsSrvAnswerRecord(context, query, std::move(config));
+        incrementClusterQueryTypeAnswerCount(query.type_);
+
+        // Return the address for all discovered endpoints
+        ENVOY_LOG(debug, "using host address {} for cluster [{}]",
+                  host->address()->ip()->addressAsString(), target_name);
+
+        // We have to determine the address type here so that we increment the correct counter
+        const auto type = Utils::getAddressType(host->address());
+        if (type.has_value() &&
+            message_parser_.storeDnsAdditionalRecord(context, target_name, type.value(),
+                                                     query.class_, ttl, host->address())) {
+          ++cluster_endpoints;
+          incrementClusterQueryTypeAnswerCount(type.value());
+        }
+      }
+    }
+  }
+  return (cluster_endpoints != 0);
+} // namespace DnsFilter
+
+bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
   // Determine if the domain name is being redirected to a cluster
   const auto cluster_name = getClusterNameForDomain(query.name_);
   absl::string_view lookup_name;
@@ -372,24 +433,40 @@ bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRe
     lookup_name = query.name_;
   }
 
-  size_t discovered_endpoints = 0;
+  // Return an address for all discovered endpoints. The address and query type must match
+  // for the host to be included in the response
+  size_t cluster_endpoints = 0;
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(lookup_name);
   if (cluster != nullptr) {
     // TODO(abaptiste): consider using host weights when returning answer addresses
+    const std::chrono::seconds ttl = getDomainTTL(lookup_name);
 
-    // Return the address for all discovered endpoints
-    const std::chrono::seconds ttl = getDomainTTL(query.name_);
     for (const auto& hostsets : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hostsets->hosts()) {
-        ++discovered_endpoints;
+        // Return the address for all discovered endpoints
         ENVOY_LOG(debug, "using cluster host address {} for domain [{}]",
                   host->address()->ip()->addressAsString(), lookup_name);
-        incrementClusterQueryTypeAnswerCount(query.type_);
-        message_parser_.storeDnsAnswerRecord(context, query, ttl, host->address());
+        if (message_parser_.storeDnsAnswerRecord(context, query, ttl, host->address())) {
+          incrementClusterQueryTypeAnswerCount(query.type_);
+          ++cluster_endpoints;
+        }
       }
     }
   }
-  return (discovered_endpoints != 0);
+  return (cluster_endpoints != 0);
+}
+
+bool DnsFilter::resolveViaClusters(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
+  switch (query.type_) {
+  case DNS_RECORD_TYPE_SRV:
+    return resolveClusterService(context, query);
+  case DNS_RECORD_TYPE_A:
+  case DNS_RECORD_TYPE_AAAA:
+    return resolveClusterHost(context, query);
+  default:
+    // unsupported query type
+    return false;
+  }
 }
 
 bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
@@ -399,75 +476,65 @@ bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQu
     // Build an answer record from each configured IP address
     for (const auto& configured_address : *configured_address_list) {
       ASSERT(configured_address != nullptr);
-      incrementLocalQueryTypeAnswerCount(query.type_);
-      ENVOY_LOG(debug, "using local address {} for domain [{}]",
+      ENVOY_LOG(trace, "using local address {} for domain [{}]",
                 configured_address->ip()->addressAsString(), query.name_);
       ++hosts_found;
       const std::chrono::seconds ttl = getDomainTTL(query.name_);
-      message_parser_.storeDnsAnswerRecord(context, query, ttl, configured_address);
+      if (message_parser_.storeDnsAnswerRecord(context, query, ttl, configured_address)) {
+        incrementLocalQueryTypeAnswerCount(query.type_);
+      }
     }
   }
   return (hosts_found != 0);
 }
 
 bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQueryRecord& query) {
-  const auto* configured_service_list = getServiceListForDomain(query.name_);
-  std::list<absl::string_view> targets_discovered;
-  if (configured_service_list != nullptr) {
-    // Build an answer record from each configured service
-    for (const auto& configured_service : *configured_service_list) {
-      incrementLocalQueryTypeAnswerCount(query.type_);
-      ENVOY_LOG(debug, "using local service host {} for domain [{}]", configured_service->target_,
-                query.name_);
-      message_parser_.storeDnsSrvAnswerRecord(context, query, configured_service);
-      targets_discovered.emplace_back(configured_service->target_);
-    }
+  const auto* service_config = getServiceConfigForDomain(query.name_);
 
-    // for each target address, we must resolve the address. The target record does not specify the
-    // address type for the name. It is possible that the targets' IP addresses are a mix of A and
-    // AAAA records.
-    for (const auto& target : targets_discovered) {
-      const auto* configured_address_list = getAddressListForDomain(target);
+  size_t targets_discovered = 0;
+  if (service_config != nullptr) {
+    // for each service target address, we must resolve the target's IP. The target record does not
+    // specify the address type, so we must deduce it when building the record. It is possible that
+    // the configured target's IP addresses are a mix of A and AAAA records.
+    for (const auto& target : service_config->targets_) {
+      const auto* configured_address_list = getAddressListForDomain(target.first);
+
       if (configured_address_list != nullptr) {
+        const absl::string_view target_name = target.first;
+        const auto attributes = target.second;
+
+        // Build an SRV answer record for the service. We need a new SRV record for each target.
+        // Although the same class is used, the target storage is different than the way the service
+        // config is modeled. We store one SrvRecord per target so that we can enforce the response
+        // size limit when serializing the answers to the client
+        ENVOY_LOG(trace, "Adding srv record for target [{}]", target_name);
+
+        incrementLocalQueryTypeAnswerCount(query.type_);
+        auto config = std::make_unique<DnsSrvRecord>(service_config->name_, service_config->proto_,
+                                                     service_config->port_, service_config->ttl_);
+        config->addTarget(target_name, attributes.priority, attributes.weight);
+        message_parser_.storeDnsSrvAnswerRecord(context, query, std::move(config));
+
         for (const auto& configured_address : *configured_address_list) {
           ASSERT(configured_address != nullptr);
 
-          // Since there is no target type, only a name, we must determine the record type from the
-          // parsed address
-          ENVOY_LOG(debug, "using address {} for target [{}] in SRV record",
-                    configured_address->ip()->addressAsString(), target);
-          const std::chrono::seconds ttl = getDomainTTL(target);
+          // Since there is no type, only a name, we must determine the record type from its address
+          ENVOY_LOG(trace, "using address {} for target [{}] in SRV record",
+                    configured_address->ip()->addressAsString(), target_name);
+          const std::chrono::seconds ttl = getDomainTTL(target_name);
 
-          uint16_t type;
-          if (configured_address->ip()->ipv4()) {
-            type = DNS_RECORD_TYPE_A;
-          } else if (configured_address->ip()->ipv6()) {
-            type = DNS_RECORD_TYPE_AAAA;
-          } else {
-            // Skip the record since the address must be either ipv4 or ipv6
-            continue;
+          const auto type = Utils::getAddressType(configured_address);
+          if (type.has_value()) {
+            incrementLocalQueryTypeAnswerCount(type.value());
+            message_parser_.storeDnsAdditionalRecord(context, target_name, type.value(),
+                                                     query.class_, ttl, configured_address);
+            ++targets_discovered;
           }
-
-          incrementLocalQueryTypeAnswerCount(type);
-          message_parser_.storeDnsAdditionalRecord(context, target, query.class_, type, ttl,
-                                                   configured_address);
         }
       }
     }
   }
-  return (!targets_discovered.empty());
-}
-
-bool DnsFilter::resolveViaConfiguredHosts(DnsQueryContextPtr& context,
-                                          const DnsQueryRecord& query) {
-  switch (query.type_) {
-  case DNS_RECORD_TYPE_A:
-  case DNS_RECORD_TYPE_AAAA:
-    return resolveConfiguredDomain(context, query);
-  case DNS_RECORD_TYPE_SRV:
-    return resolveConfiguredService(context, query);
-  }
-  return false;
+  return (targets_discovered != 0);
 }
 
 void DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {

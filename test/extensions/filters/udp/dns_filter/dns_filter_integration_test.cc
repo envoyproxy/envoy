@@ -106,6 +106,26 @@ listener_filters:
         - name: "cluster.foo1.com"
           endpoint:
             cluster_name: "cluster_0"
+        - name: "web.foo1.com"
+          endpoint:
+            service_list:
+              services:
+              - service_name: "http"
+                protocol: {{ name: "tcp" }}
+                ttl: 43200s
+                port: 80
+                targets:
+                - name: "cluster_0"
+                  weight: 10
+                  priority: 40
+              - service_name: "https"
+                protocol: {{ name: "tcp" }}
+                ttl: 43200s
+                port: 443
+                targets:
+                - name: "cluster_0"
+                  weight: 20
+                  priority: 10
 )EOF",
                               addr->ip()->addressAsString(), addr->ip()->addressAsString(),
                               addr->ip()->port());
@@ -298,6 +318,39 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
 
   EXPECT_EQ(2, query_ctx_->answers_.size());
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+}
+
+TEST_P(DnsFilterIntegrationTest, ClusterEndpointServiceRecordLookupTest) {
+  setup(2);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  const std::string service("_http._tcp.web.foo1.com");
+  Network::UdpRecvData response;
+  std::string query = Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
+  requestResponseWithListenerAddress(*listener_address, query, response);
+
+  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+
+  EXPECT_EQ(2, query_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+
+  for (const auto& answer : query_ctx_->answers_) {
+    EXPECT_EQ(answer.second->type_, DNS_RECORD_TYPE_SRV);
+
+    DnsSrvRecord* srv_rec = dynamic_cast<DnsSrvRecord*>(answer.second.get());
+
+    EXPECT_EQ(service, srv_rec->name_);
+    EXPECT_EQ(43200, srv_rec->ttl_.count());
+
+    EXPECT_EQ(1, srv_rec->targets_.size());
+    const auto& target = srv_rec->targets_.begin();
+
+    EXPECT_EQ(10, target->second.weight);
+    EXPECT_EQ(40, target->second.priority);
+  }
 }
 
 } // namespace

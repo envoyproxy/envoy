@@ -29,6 +29,7 @@ namespace DnsFilter {
   COUNTER(srv_record_queries)                                                                      \
   COUNTER(cluster_a_record_answers)                                                                \
   COUNTER(cluster_aaaa_record_answers)                                                             \
+  COUNTER(cluster_srv_record_answers)                                                              \
   COUNTER(cluster_unsupported_answers)                                                             \
   COUNTER(downstream_rx_errors)                                                                    \
   COUNTER(downstream_rx_invalid_queries)                                                           \
@@ -65,7 +66,7 @@ struct DnsFilterStats {
 struct DnsEndpointConfig {
   absl::optional<AddressConstPtrVec> address_list;
   absl::optional<std::string> cluster_name;
-  absl::optional<DnsSrvRecordPtrVec> service_list;
+  absl::optional<DnsSrvRecordPtr> service_list;
 };
 
 using DnsVirtualDomainConfig = absl::flat_hash_map<std::string, DnsEndpointConfig>;
@@ -165,6 +166,24 @@ private:
    * records
    */
   std::chrono::seconds getDomainTTL(const absl::string_view domain);
+
+  /**
+   * @brief Resolves a hostname query from configured clusters
+   *
+   * @param context object containing the query context
+   * @param query query object containing the name to be resolved
+   * @return bool true if the requested name matched a cluster and an answer record was constructed
+   */
+  bool resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRecord& query);
+
+  /**
+   * @brief Resolves a service query from configured clusters
+   *
+   * @param context object containing the query context
+   * @param query query object containing the name to be resolved
+   * @return bool true if the requested name matched a cluster and an answer record was constructed
+   */
+  bool resolveClusterService(DnsQueryContextPtr& context, const DnsQueryRecord& query);
 
   /**
    * @brief Resolves the supplied query from configured clusters
@@ -268,6 +287,9 @@ private:
     case DNS_RECORD_TYPE_AAAA:
       config_->stats().cluster_aaaa_record_answers_.inc();
       break;
+    case DNS_RECORD_TYPE_SRV:
+      config_->stats().cluster_srv_record_answers_.inc();
+      break;
     default:
       config_->stats().cluster_unsupported_answers_.inc();
       break;
@@ -323,9 +345,9 @@ private:
   const DnsEndpointConfig* getEndpointConfigForDomain(const absl::string_view domain);
 
   /**
-   * @brief Helper function to retrieve the Service Map for a requested domain
+   * @brief Helper function to retrieve the Service Config for a requested domain
    */
-  const DnsSrvRecordPtrVec* getServiceListForDomain(const absl::string_view domain);
+  const DnsSrvRecord* getServiceConfigForDomain(const absl::string_view domain);
 
   /**
    * @brief Helper function to retrieve the Address List for a requested domain

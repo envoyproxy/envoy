@@ -44,16 +44,30 @@ message DnsTable {
     oneof protocol_config {
       option (validate.required) = true;
 
-      // Specify the protocol number for the service. Envoy will try to resolve the number to the protocol name. Eg. 6 will resolve to "tcp"
+      // Specify the protocol number for the service. Envoy will try to resolve the number to
+      // the protocol name. For example, 6 will resolve to "tcp"
       uint32 number = 1 [(validate.rules).uint32 = {lt: 255}];
 
       // Specify the protocol name for the service.
-      string name = 2 [(validate.rules).string = {min_len: 2 well_known_regex: HTTP_HEADER_NAME}];
+      string name = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
     }
   }
 
+  // Specify the target for a given DNS service
+  message DnsServiceTarget {
+    // Use a resolvable hostname or cluster as the endpoint for a service. Whether the name is
+    // a host or a cluster we will return all resolved addresses in the answer to the client
+    string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+
+    // The priority of the service record target
+    uint32 priority = 2 [(validate.rules).uint32 = {lt: 65536}];
+
+    // The weight of the service record target
+    uint32 weight = 3 [(validate.rules).uint32 = {lt: 65536}];
+  }
+
   // This message defines a service selection record returned for a service query in a domain
-  // [#next-free-field: 8]
+  // [#next-free-field: 6]
   message DnsService {
     // The name of the service without the protocol or domain name
     string service_name = 1;
@@ -64,23 +78,16 @@ message DnsTable {
     // The service entry time to live. This is independent from the DNS Answer record TTL
     google.protobuf.Duration ttl = 3 [(validate.rules).duration = {gte {seconds: 1}}];
 
-    // The priority of the service record
-    uint32 priority = 4 [(validate.rules).uint32 = {lt: 65536}];
-
-    // The weight of the service record
-    uint32 weight = 5 [(validate.rules).uint32 = {lt: 65536}];
-
     // The port to which the service is bound
-    uint32 port = 6 [(validate.rules).uint32 = {lt: 65536}];
+    uint32 port = 4 [(validate.rules).uint32 = {lt: 65536}];
 
-    // The target address hosting the service
-    string target_address = 7
-        [(validate.rules).string = {min_len: 2 well_known_regex: HTTP_HEADER_NAME}];
+    // The list of targets hosting the service
+    repeated DnsServiceTarget targets = 5 [(validate.rules).repeated = {min_items: 1}];
   }
 
   // Define a list of service records for a given service
   message DnsServiceList {
-    repeated DnsService dns_services = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated DnsService services = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
   message DnsEndpoint {
@@ -90,10 +97,13 @@ message DnsTable {
     oneof endpoint_config {
       option (validate.required) = true;
 
+      // Define a list of addresses to return for the specified endpoint
       AddressList address_list = 1;
 
+      // Define a cluster whose addresses are returned for the specified endpoint
       string cluster_name = 2;
 
+      // Define a DNS Service List for the specified endpoint
       DnsServiceList service_list = 3;
     }
   }

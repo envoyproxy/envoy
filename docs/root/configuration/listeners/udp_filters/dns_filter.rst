@@ -78,28 +78,21 @@ Example Configuration
             - name: "voip.domain5.com"
               endpoint:
                 service_list:
-                  dns_services:
+                  services:
                     - service_name: "sip"
                       protocol: { number: 6 }
                       ttl: 86400s
-                      priority: 10
-                      weight: 30
                       port: 5060
-                      target_address: "primary.voip.domain5.com"
-                    - service_name: "sip"
-                      protocol: { name: "tcp" }
-                      ttl: 86400s
-                      priority: 10
-                      weight: 20
-                      port: 5060
-                      target_address: "secondary.voip.domain5.com"
-                    - service_name: "_sip"
-                      protocol: { name: "_tcp" }
-                      ttl: 86400s
-                      priority: 10
-                      weight: 10
-                      port: 5060
-                      target_address: "backup.voip.domain5.com"
+                      targets:
+                      - name: "primary.voip.domain5.com"
+                        priority: 10
+                        weight: 30
+                      - name: "secondary.voip.domain5.com"
+                        priority: 10
+                        weight: 20
+                      - name: "backup.voip.domain5.com"
+                        priority: 10
+                        weight: 10
 
 
 In this example, Envoy is configured to respond to client queries for four domains. For any
@@ -113,12 +106,18 @@ filter can also redirect a query for a DNS name to the enpoints of a cluster. "w
 in the configuration demonstrates this. Along with an address list, a cluster name is a valid
 endpoint for a DNS name.
 
-The DNS filter now supports responding to SRV Records. The records for "domain5.com" illustrate
-the configuration necessary to support responding to SRV records. The "target_address" populated
-in the configuration must be fully qualified domain names. These target addresses must be defined
-in the DNS Filter table so that Envoy can resolve the target hosts' IP addresses. The "protocol"
-of the SRV record can be defined by a name or number. As configured in the example, the filter
-will successfully respond to SRV record requests for "_sip._tcp.voip.domain5.com".
+The DNS filter also supports responding to queries for service records. The records for "domain5.com"
+illustrate the configuration necessary to support responding to SRV records. The target name
+populated in the configuration must be fully qualified domain names, unless the target is a cluster.
+For non-cluster targets, each referenced target name must be defined in the DNS Filter table so that
+Envoy can resolve the target hosts' IP addresses. For a cluster, Envoy will return an address for
+each cluster endpoint.
+
+Each service record's protocol can be defined by a name or number. As configured in the example,
+the filter will successfully respond to SRV record requests for "_sip._tcp.voip.domain5.com".  If a
+numerical value is specified, Envoy will attempt to resolve the number to a name.  String values for
+protocols are used as they appear.  An underscore is prepended to both the service and protocol to
+adhere to the convention outlined in the RFC.
 
 The filter can also consume its domain configuration from an external DNS table. The same entities
 appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
