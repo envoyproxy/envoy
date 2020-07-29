@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // gRPC service configuration. This is used by :ref:`ApiConfigSource
 // <envoy_api_msg_config.core.v3.ApiConfigSource>` and filter configurations.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message GrpcService {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcService";
 
@@ -284,4 +284,9 @@ message GrpcService {
   // This can be used for scenarios in which additional ad hoc authorization
   // headers (e.g. ``x-foo-bar: baz-key``) are to be injected.
   repeated HeaderValue initial_metadata = 5;
+
+  // The :authority header if the underlying transport is http2.
+  string authority = 6 [
+    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+  ];
 }
