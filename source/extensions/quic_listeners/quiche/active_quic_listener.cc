@@ -72,10 +72,10 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   udp_packet_writer_ = listener_config.udpPacketWriterFactory()->createUdpPacketWriter(
       udp_listener_->ioHandle(), listener_config.listenerScope());
   if (udp_packet_writer_->isBatchMode()) {
+    // UdpPacketWriter* can be downcasted to UdpGsoBatchWriter*, which indirectly inherits
+    // from the quic::QuicPacketWriter class and can be passed to InitializeWithWriter().
     quic_dispatcher_->InitializeWithWriter(
-        dynamic_cast<Quic::UdpGsoBatchWriter*>(udp_packet_writer_.get()));
-    // Quic Dispatcher takes the ownership of udp_packet_writer_
-    udp_packet_writer_.release();
+        dynamic_cast<Quic::UdpGsoBatchWriter*>(udp_packet_writer_.release()));
   } else {
     quic_dispatcher_->InitializeWithWriter(
         new EnvoyQuicPacketWriter(std::move(udp_packet_writer_)));
@@ -92,9 +92,9 @@ void ActiveQuicListener::onListenerShutdown() {
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
   quic::QuicSocketAddress peer_address(
-      envoyAddressIpToQuicSocketAddress(data.addresses_.peer_->ip()));
+      envoyIpAddressToQuicSocketAddress(data.addresses_.peer_->ip()));
   quic::QuicSocketAddress self_address(
-      envoyAddressIpToQuicSocketAddress(data.addresses_.local_->ip()));
+      envoyIpAddressToQuicSocketAddress(data.addresses_.local_->ip()));
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(

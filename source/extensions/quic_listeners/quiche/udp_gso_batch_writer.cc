@@ -61,8 +61,8 @@ Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
                                const Network::Address::Instance& peer_address) {
   // Convert received parameters to relevant forms
-  quic::QuicSocketAddress peer_addr = envoyAddressIpToQuicSocketAddress(peer_address.ip());
-  quic::QuicSocketAddress self_addr = envoyAddressIpToQuicSocketAddress(local_ip);
+  quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
+  quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
   size_t payload_len = static_cast<size_t>(buffer.length());
 
   // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
@@ -76,15 +76,15 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
 }
 
 uint64_t UdpGsoBatchWriter::getMaxPacketSize(const Network::Address::Instance& peer_address) const {
-  quic::QuicSocketAddress peer_addr = envoyAddressIpToQuicSocketAddress(peer_address.ip());
+  quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
   return static_cast<uint64_t>(GetMaxPacketSize(peer_addr));
 }
 
 Network::UdpPacketWriterBuffer
 UdpGsoBatchWriter::getNextWriteLocation(const Network::Address::Ip* local_ip,
                                         const Network::Address::Instance& peer_address) {
-  quic::QuicSocketAddress peer_addr = envoyAddressIpToQuicSocketAddress(peer_address.ip());
-  quic::QuicSocketAddress self_addr = envoyAddressIpToQuicSocketAddress(local_ip);
+  quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
+  quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
   quic::QuicPacketBuffer quic_buf = GetNextWriteLocation(self_addr.host(), peer_addr);
   return Network::UdpPacketWriterBuffer(quic_buf.buffer, quic_buf.release_buffer);
 }

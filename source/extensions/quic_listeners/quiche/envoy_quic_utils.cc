@@ -22,7 +22,7 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
              : nullptr;
 }
 
-quic::QuicSocketAddress envoyAddressIpToQuicSocketAddress(const Network::Address::Ip* envoy_ip) {
+quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip) {
   if (envoy_ip == nullptr) {
     // Return uninitialized socket addr
     return quic::QuicSocketAddress();

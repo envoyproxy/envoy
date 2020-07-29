@@ -10,7 +10,8 @@ namespace Quic {
 
 const std::string GsoBatchWriterName{"udp_gso_batch_writer"};
 
-// UdpPacketWriterConfigFactory to create UdpGsoBatchWriterFactory based on given protobuf.
+// Network::UdpPacketWriterConfigFactory to create UdpGsoBatchWriterFactory based on given
+// protobuf.
 class UdpGsoBatchWriterConfigFactory : public Network::UdpPacketWriterConfigFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

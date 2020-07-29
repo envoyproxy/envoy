@@ -14,7 +14,7 @@ public:
 };
 
 // UdpPacketWriterConfigFactory to create UdpDefaultWriterFactory based on given protobuf
-// This is the default UDP packet writer if not specified in config.
+// This is the default UdpPacketWriterConfigFactory if not specified in config.
 class UdpDefaultWriterConfigFactory : public UdpPacketWriterConfigFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
