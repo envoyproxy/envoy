@@ -866,7 +866,7 @@ def _org_unicode_icuuc():
 
     _repository_impl(
         name = "org_unicode_icuuc",
-        build_file = "@envoy//bazel/external:icuuc.BUILD",
+        build_file = "@envoy//bazel/external/icu:BUILD",
         patches = ["@envoy//bazel/external/icu/data:udata.patch"],
     )
 
