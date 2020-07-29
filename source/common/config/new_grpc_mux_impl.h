@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/token_bucket.h"
@@ -41,8 +43,6 @@ public:
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
-  bool paused(const std::string& type_url) const override;
-  bool paused(const std::vector<std::string> type_urls) const override;
 
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
@@ -70,8 +70,10 @@ public:
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
   };
 
+  using SubscriptionStuffPtr = std::unique_ptr<SubscriptionStuff>;
+
   // for use in tests only
-  const absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>>& subscriptions() {
+  const absl::flat_hash_map<std::string, SubscriptionStuffPtr>& subscriptions() {
     return subscriptions_;
   }
 
@@ -130,7 +132,7 @@ private:
   PausableAckQueue pausable_ack_queue_;
 
   // Map key is type_url.
-  absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>> subscriptions_;
+  absl::flat_hash_map<std::string, SubscriptionStuffPtr> subscriptions_;
 
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
   // the order of Envoy's dependency ordering).
@@ -145,6 +147,7 @@ private:
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
+using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;
 
 } // namespace Config

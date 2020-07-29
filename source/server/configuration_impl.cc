@@ -94,6 +94,8 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, kill_timeout, 0));
   watchdog_multikill_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
+  watchdog_multikill_threshold_ =
+      PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(watchdog, multikill_threshold, 0.0);
 
   initializeStatsSinks(bootstrap, server);
 }
@@ -134,7 +136,7 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstra
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
-    stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
+    stats_sinks_.emplace_back(factory.createStatsSink(*message, server.serverFactoryContext()));
   }
 }
 
