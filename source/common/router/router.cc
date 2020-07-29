@@ -1051,10 +1051,15 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   }
 
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
+
   const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
                    Http::Utility::resetReasonToString(reset_reason),
-                   transport_failure_reason.empty() ? "" : ", transport failure reason: ",
+                   Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
+                           !transport_failure_reason.empty()
+                       ? ", transport failure reason: "
+                       : "",
                    transport_failure_reason);
   callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure_reason);
   const std::string& basic_details =
