@@ -8,8 +8,13 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "proxy_protocol_header.h"
+
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_UNIX;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
 
 namespace Envoy {
 namespace Extensions {
