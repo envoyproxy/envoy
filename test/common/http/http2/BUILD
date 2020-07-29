@@ -91,6 +91,7 @@ envoy_cc_test_library(
     hdrs = ["http2_frame.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/common:hex_lib",
         "//source/common/common:macros",
     ],
 )
