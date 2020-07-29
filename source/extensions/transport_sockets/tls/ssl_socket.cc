@@ -46,12 +46,10 @@ public:
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                     HandshakerMaker handshaker_maker)
+                     Ssl::HandshakerFactoryCb handshaker_factory_cb)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), handshaker_([this, handshaker_maker]() {
-        bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
-        return handshaker_maker(std::move(ssl));
-      }()),
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
+      handshaker_(handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()))),
       state_(SocketState::PreHandshake) {
   info_ = std::make_shared<SslSocketInfo>(handshaker_->ssl(), ctx_);
 

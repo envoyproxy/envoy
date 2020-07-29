@@ -102,7 +102,6 @@ private:
 };
 
 using SslSocketInfoSharedPtr = std::shared_ptr<SslSocketInfo>;
-using HandshakerMaker = std::function<Ssl::HandshakerPtr(bssl::UniquePtr<SSL>)>;
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::PrivateKeyConnectionCallbacks,
@@ -111,7 +110,7 @@ class SslSocket : public Network::TransportSocket,
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
             const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-            HandshakerMaker handshaker_maker);
+            Ssl::HandshakerFactoryCb handshaker_factory_cb);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
