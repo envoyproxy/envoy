@@ -34,7 +34,6 @@ public:
   // Network::UdpListener Interface
   Event::Dispatcher& dispatcher() override;
   const Address::InstanceConstSharedPtr& localAddress() const override;
-  IoHandle& ioHandle() override { return socket_->ioHandle(); }
   Api::IoCallUint64Result send(const UdpSendData& data) override;
 
   void processPacket(Address::InstanceConstSharedPtr local_address,

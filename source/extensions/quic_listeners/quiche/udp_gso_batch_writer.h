@@ -71,6 +71,7 @@ public:
                        const Network::Address::Instance& peer_address) override;
   Api::IoCallUint64Result flush() override;
 
+private:
   /**
    * @brief Update stats_ field for the udp packet writer
    * @param quic_result is the result from Flush/WritePacket
@@ -83,8 +84,6 @@ public:
    * @return UdpGsoBatchWriterStats for scope
    */
   UdpGsoBatchWriterStats generateStats(Stats::Scope& scope);
-
-private:
   UdpGsoBatchWriterStats stats_;
 };
 

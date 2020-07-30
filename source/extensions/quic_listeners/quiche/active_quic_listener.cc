@@ -70,7 +70,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
 
   // Create udp_packet_writer
   udp_packet_writer_ = listener_config.udpPacketWriterFactory()->createUdpPacketWriter(
-      udp_listener_->ioHandle(), listener_config.listenerScope());
+      listen_socket_.ioHandle(), listener_config.listenerScope());
   if (udp_packet_writer_->isBatchMode()) {
     // UdpPacketWriter* can be downcasted to UdpGsoBatchWriter*, which indirectly inherits
     // from the quic::QuicPacketWriter class and can be passed to InitializeWithWriter().

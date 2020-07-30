@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 
+#include <memory>
+
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
 namespace Envoy {
@@ -28,8 +30,8 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
                                                      quic::PerPacketOptions* options) {
   ASSERT(options == nullptr, "Per packet option is not supported yet.");
 
-  Buffer::InstancePtr buf;
-  buf = std::make_unique<Buffer::OwnedImpl>(buffer, buf_len);
+  Buffer::OwnedImpl buf;
+  buf.add(buffer, buf_len);
 
   quic::QuicSocketAddress self_address(self_ip, /*port=*/0);
   Network::Address::InstanceConstSharedPtr local_addr =
@@ -38,7 +40,7 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
       quicAddressToEnvoyAddressInstance(peer_address);
 
   Api::IoCallUint64Result result = envoy_udp_packet_writer_->writePacket(
-      *buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
+      buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
 
   return convertToQuicWriteResult(result);
 }

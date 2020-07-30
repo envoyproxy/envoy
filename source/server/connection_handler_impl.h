@@ -348,8 +348,10 @@ class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
 public:
   ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
-  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::UdpListenerPtr&& listener,
-                       Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
+                       Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::UdpListenerPtr&& listener, Network::ListenerConfig& config);
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
@@ -374,6 +376,7 @@ private:
   Network::UdpListenerPtr udp_listener_;
   Network::UdpListenerReadFilterPtr read_filter_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
+  Network::Socket& listen_socket_;
 };
 
 } // namespace Server

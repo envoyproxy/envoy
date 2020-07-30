@@ -319,12 +319,6 @@ public:
    * sender.
    */
   virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
-
-  /**
-   * @brief the io handle of the socket
-   *
-   */
-  virtual Network::IoHandle& ioHandle() PURE;
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;

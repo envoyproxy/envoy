@@ -67,7 +67,7 @@ public:
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
     udp_packet_writer_ = std::make_unique<Quic::UdpGsoBatchWriter>(
-        listener_->ioHandle(), listener_config_.listenerScope());
+        server_socket_->ioHandle(), listener_config_.listenerScope());
     ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(Return(udp_packet_writer_.get()));
   }
 };

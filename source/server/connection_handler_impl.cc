@@ -545,16 +545,22 @@ ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(
-          parent,
-          dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
-          config) {}
+    : ActiveRawUdpListener(parent, config.listenSocketFactory().getListenSocket(), dispatcher,
+                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::SocketSharedPtr listen_socket,
+                                           Event::Dispatcher& dispatcher,
+                                           Network::ListenerConfig& config)
+    : ActiveRawUdpListener(parent, *listen_socket,
+                           dispatcher.createUdpListener(std::move(listen_socket), *this), config) {}
+
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::Socket& listen_socket,
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config),
-      udp_listener_(std::move(listener)), read_filter_(nullptr) {
+      udp_listener_(std::move(listener)), read_filter_(nullptr), listen_socket_(listen_socket) {
   // Create the filter chain on creating a new udp listener
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
@@ -567,7 +573,7 @@ ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
 
   // Create udp_packet_writer
   udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(
-      udp_listener_->ioHandle(), config.listenerScope());
+      listen_socket_.ioHandle(), config.listenerScope());
 }
 
 void ActiveRawUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
