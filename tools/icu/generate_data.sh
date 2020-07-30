@@ -3,8 +3,7 @@
 set -u
 set -e
 
-# Latest version: 23 April 2020, https://github.com/unicode-org/icu/releases/tag/release-67-1.
-# https://github.com/unicode-org/icu/archive/release-67-1.tar.gz
+# ICU release version: https://github.com/unicode-org/icu/releases/tag/release-67-1.
 VERSION="67.1"
 VERSION_MAJOR="67"
 SRC_SHA="c664ba23be70284d0539e2018a44ed7956e6d3bd"
@@ -21,7 +20,7 @@ fi
 
 SCRIPTPATH=$( cd "$(dirname "$0")" ; pwd -P )
 ROOTDIR="${SCRIPTPATH}/../.."
-cd "$ROOTDIR"
+cd "${ROOTDIR}"
 
 SRC_FILENAME="release-"${VERSION//./-}".tar.gz"
 if [[ ! -e "${TMP_DIR}/${SRC_FILENAME}" ]]; then
@@ -61,21 +60,19 @@ pushd "${WORK_DIR}"
 ICU_DATA_FILTER_FILE="${WORK_DIR}"/filters.json ./runConfigureICU "${OS}"
 
 # Build the data.
-make clean && make -j 16
+make clean && make
 
 pushd "${WORK_DIR}"/data/out/tmp
 
-# Generate *.c from *.dat.
+# Generate ICU data *.c from *.dat.
 DYLD_LIBRARY_PATH="${LIB_DIR}" \
   LD_LIBRARY_PATH="${LIB_DIR}" \
-  "${WORK_DIR}"/bin/genccode "icudt"${VERSION_MAJOR}l.dat
+  "${WORK_DIR}"/bin/genccode icudt"${VERSION_MAJOR}"l.dat
 
 echo "U_CAPI const void * U_EXPORT2 uprv_getICUData_conversion() { return icudt${VERSION_MAJOR}l_dat.bytes; }" \
-  >> icudt${VERSION_MAJOR}l_dat.c
+  >> icudt"${VERSION_MAJOR}"l_dat.c
 
-rm -f ${ROOTDIR}/bazel/external/icu/data/data.c.gz.*
-
-gzip -c --best "${WORK_DIR}"/data/out/tmp/icudt${VERSION_MAJOR}l_dat.c \
-  | split -b 1048576 - ${ROOTDIR}/bazel/external/icu/data/data.c.gz.
+cp -f "${WORK_DIR}"/data/out/tmp/icudt"${VERSION_MAJOR}"l_dat.c \
+  "${ROOTDIR}"/bazel/external/icu/data/data.c
 
 popd

@@ -63,7 +63,7 @@ cc_library(
 
 cc_library(
     name = "data",
-    srcs = ["@envoy//bazel/external/icu/data:data.c"],
+    srcs = ["@envoy//bazel/external/icu/data:generated"],
     deps = [":headers"],
     alwayslink = 1,
 )

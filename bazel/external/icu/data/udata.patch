@@ -1,3 +1,15 @@
+# TODO(dio): Consider to remove this patch when we can build a foreign_cc rule for all supported
+# platforms.
+
+# This patch updates https://github.com/unicode-org/icu/blob/release-67-1/icu4c/source/common/udata.cpp
+# With the following changes:
+# 1. Defines ATTRIBUTE_WEAK to enable weak-linkage to access linked data.
+# 2. Setup weak-linkage declarations of partial-data-library access functions where each returns a
+#    pointer to its data package, if it is linked in. Only uprv_getICUData_conversion is enabled.
+#    See also the generated bazel/data/data.c.
+# 3. Makes sure U_STATIC_IMPLEMENTATION is defined since we link ICU statically
+#    Reference: http://userguide.icu-project.org/howtouseicu.
+
 diff --git a/icu4c/source/common/udata.cpp b/icu4c/source/common/udata.cpp
 index ec9c999cea..2e6ac0ea3b 100644
 --- source/common/udata.cpp
