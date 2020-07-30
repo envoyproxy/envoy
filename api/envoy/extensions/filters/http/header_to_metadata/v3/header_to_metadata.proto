@@ -86,29 +86,41 @@ message Config {
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.
+  // [#next-free-field: 6]
   message Rule {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.header_to_metadata.v2.Config.Rule";
 
-    // The header that triggers this rule — required.
-    string header = 1
-        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+    // Specifies that a match will be performed on the value of a header or a cookie.
+    //
+    // The header to be extracted.
+    string header = 1 [
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
+    ];
 
-    // If the header is present, apply this metadata KeyValuePair.
+    // The cookie to be extracted.
+    string cookie = 5 [
+      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false},
+      (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
+    ];
+
+    // If the header or cookie is present, apply this metadata KeyValuePair.
     //
     // If the value in the KeyValuePair is non-empty, it'll be used instead
-    // of the header value.
+    // of the header or cookie value.
     KeyValuePair on_header_present = 2;
 
-    // If the header is not present, apply this metadata KeyValuePair.
+    // If the header or cookie is not present, apply this metadata KeyValuePair.
     //
     // The value in the KeyValuePair must be set, since it'll be used in lieu
-    // of the missing header value.
+    // of the missing header or cookie value.
     KeyValuePair on_header_missing = 3;
 
     // Whether or not to remove the header after a rule is applied.
     //
     // This prevents headers from leaking.
+    // This field is not supported in case of a cookie.
     bool remove = 4;
   }
 
