@@ -253,6 +253,8 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcard) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+  ASSERT_TRUE(decoder_callbacks_.stream_info_.responseCodeDetails().has_value());
+  EXPECT_EQ(decoder_callbacks_.stream_info_.responseCodeDetails().value(), "cors_response");
 }
 
 TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsEnabledShadowDisabled) {

@@ -90,7 +90,11 @@ public:
           callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
           callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
         }));
-    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
+    EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+        .WillOnce(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
+          decoder_filter_->callbacks_ = &callbacks;
+          callbacks.streamInfo().setResponseCodeDetails("");
+        }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
     EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
         .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
