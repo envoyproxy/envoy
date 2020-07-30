@@ -450,14 +450,14 @@ void ActiveMessage::addDecoderFilterWorker(DubboFilters::DecoderFilterSharedPtr 
   ActiveMessageDecoderFilterPtr wrapper =
       std::make_unique<ActiveMessageDecoderFilter>(*this, filter, dual_filter);
   filter->setDecoderFilterCallbacks(*wrapper);
-  wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+  LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 void ActiveMessage::addEncoderFilterWorker(DubboFilters::EncoderFilterSharedPtr filter,
                                            bool dual_filter) {
   ActiveMessageEncoderFilterPtr wrapper =
       std::make_unique<ActiveMessageEncoderFilter>(*this, filter, dual_filter);
   filter->setEncoderFilterCallbacks(*wrapper);
-  wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
+  LinkedList::moveIntoListBack(std::move(wrapper), encoder_filters_);
 }
 
 void ActiveMessage::onReset() { parent_.deferredMessage(*this); }
