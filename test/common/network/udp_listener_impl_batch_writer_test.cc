@@ -252,7 +252,7 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
                   .value(),
               internal_buffer.length());
 
-    // Reset write blocked status, and verify correct buffer is flushed
+    // Reset write blocked status and verify correct buffer is flushed
     udp_packet_writer_->setWritable();
     EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
         .WillOnce(Invoke([&](int /*sockfd*/, const msghdr* msg, int /*flags*/) {
