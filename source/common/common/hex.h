@@ -49,5 +49,13 @@ public:
    * @return value as hexadecimal string
    */
   static std::string uint32ToHex(uint32_t value);
+
+  /**
+   * Converts the given 16-bit unsigned integer into a hexadecimal string.
+   * The result is always a string of 4 characters left padded with zeroes.
+   * @param value The unsigned integer to be converted.
+   * @return value as hexadecimal string
+   */
+  static std::string uint16ToHex(uint16_t value);
 };
 } // namespace Envoy
