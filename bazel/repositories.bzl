@@ -858,8 +858,6 @@ filegroup(
     )
 
 def _org_unicode_icuuc():
-    location = _get_location("org_unicode_icuuc")
-
     _repository_impl(
         name = "org_unicode_icuuc",
         build_file = "@envoy//bazel/external:icuuc.BUILD"
