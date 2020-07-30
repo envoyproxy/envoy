@@ -744,6 +744,8 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
 
   span_ptr->setOperation("foo");
   span_ptr->setTag("foo", "bar");
+  span_ptr->setBaggage("key", "value");
+  span_ptr->getBaggage("key");
   span_ptr->injectContext(request_headers);
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
