@@ -39,7 +39,7 @@ TEST(Logger, All) {
 
   TestFilterLog filter;
   filter.logMessage();
-  
+
   // Misc logging with no facility.
   ENVOY_LOG_MISC(info, "fake message");
 }
