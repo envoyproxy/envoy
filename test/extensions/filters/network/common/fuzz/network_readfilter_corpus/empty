@@ -1,0 +1,14 @@
+config {
+  name: "envoy.filters.network.local_ratelimit"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit"
+    value:"\001\n\311\001type.googleapis.com/envoy.extensions.filters.netwe\360\231\201\270\362\251\212\211\361\263\275\271\363\206\215\263\361\255\230\252\362\265\266\243\364\203\217\266\362\211\226\227\362\232\255\221\362\227\227\210\362\255\274\232\363\220\256\256\364\206\217\231\363\246\273\262\363\214\207\237\360\255\215\236\364\206\232\207\361\273\210\256\362\234\204\234\361\256\236\207\361\225\240\253\363\255\231\272\363\254\256\273\360\276\201\214\361\231\215\216\363\233\202\226\361\252\222\256\362\217\241\265\363\200\257\245voy.api.v2.route.RouteActlRateLimit\022\017\010\200\312\002\022\004\010\200\312\002\032\003\010\200^"
+  }
+}
+
+actions {
+  on_data {
+    data: "\nVtype.googleapis.com/envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit\022\002\010 \032d\n\002\010\001\022^\n2\n%envoy.filters.network.local_ratelimit\022\000\032\007\n\002\010\001\022\001+\022\000\032&\n\000\022\"\000\000\000\000\000voy.filters.network.lo\000\000\000\000\000\000+"
+    end_stream: true
+  }
+}

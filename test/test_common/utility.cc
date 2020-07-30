@@ -114,6 +114,25 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
   return true;
 }
 
+bool TestUtility::rawSlicesEqual(const Buffer::RawSlice* lhs, const Buffer::RawSlice* rhs,
+                                 size_t num_slices) {
+  for (size_t slice = 0; slice < num_slices; slice++) {
+    auto rhs_slice = rhs[slice];
+    auto lhs_slice = lhs[slice];
+    if (rhs_slice.len_ != lhs_slice.len_) {
+      return false;
+    }
+    auto rhs_slice_data = static_cast<const uint8_t*>(rhs_slice.mem_);
+    auto lhs_slice_data = static_cast<const uint8_t*>(lhs_slice.mem_);
+    for (size_t offset = 0; offset < rhs_slice.len_; offset++) {
+      if (rhs_slice_data[offset] != lhs_slice_data[offset]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                                  uint64_t seed) {
   const std::string sample = "Neque porro quisquam est qui dolorem ipsum..";
@@ -139,32 +158,56 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
   return findByName(store.textReadouts(), name);
 }
 
-void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
-                                   Event::TestTimeSystem& time_system) {
+AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
+                                              uint64_t value, Event::TestTimeSystem& time_system,
+                                              std::chrono::milliseconds timeout) {
+  auto end_time = time_system.monotonicTime() + timeout;
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && time_system.monotonicTime() >= end_time) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
-                                   Event::TestTimeSystem& time_system) {
+AssertionResult TestUtility::waitForCounterGe(Stats::Store& store, const std::string& name,
+                                              uint64_t value, Event::TestTimeSystem& time_system,
+                                              std::chrono::milliseconds timeout) {
+  auto end_time = time_system.monotonicTime() + timeout;
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && time_system.monotonicTime() >= end_time) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
-                                 Event::TestTimeSystem& time_system) {
+AssertionResult TestUtility::waitForGaugeGe(Stats::Store& store, const std::string& name,
+                                            uint64_t value, Event::TestTimeSystem& time_system,
+                                            std::chrono::milliseconds timeout) {
+  auto end_time = time_system.monotonicTime() + timeout;
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() < value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && time_system.monotonicTime() >= end_time) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
   }
+  return AssertionSuccess();
 }
 
-void TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
-                                 Event::TestTimeSystem& time_system) {
+AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::string& name,
+                                            uint64_t value, Event::TestTimeSystem& time_system,
+                                            std::chrono::milliseconds timeout) {
+  auto end_time = time_system.monotonicTime() + timeout;
   while (findGauge(store, name) == nullptr || findGauge(store, name)->value() != value) {
     time_system.advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && time_system.monotonicTime() >= end_time) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
   }
+  return AssertionSuccess();
 }
 
 std::list<Network::DnsResponse>

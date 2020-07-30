@@ -490,7 +490,9 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
     const char* rejected = "listener_manager.lds.update_rejected";
     for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
                                  rejected_counter = test_server_->counter(rejected);
-         (success_counter == nullptr || success_counter->value() < concurrency_) &&
+         (success_counter == nullptr ||
+          success_counter->value() <
+              concurrency_ * config_helper_.bootstrap().static_resources().listeners_size()) &&
          (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
          success_counter = test_server_->counter(success),
                                  rejected_counter = test_server_->counter(rejected)) {
@@ -692,6 +694,23 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
     failure << x << ", ";
   }
   return failure << "}";
+}
+
+AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
+                                                          std::chrono::milliseconds timeout) {
+  const auto end_time = time_system_.monotonicTime() + timeout;
+  while (time_system_.monotonicTime() < end_time) {
+    try {
+      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
+                                   *Network::Test::getCanonicalLoopbackAddress(version_), port),
+                               nullptr, true);
+      return AssertionSuccess();
+    } catch (const EnvoyException&) {
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+    }
+  }
+
+  return AssertionFailure() << "Timeout waiting for port availability";
 }
 
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
