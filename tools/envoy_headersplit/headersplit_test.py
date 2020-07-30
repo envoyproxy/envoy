@@ -10,88 +10,18 @@ clang.cindex.Config.set_library_path("/opt/llvm/lib")
 
 
 class HeadersplitTest(unittest.TestCase):
-  source_code_hello_world = """
-// your first c++ program
-#include <iostream>
-
-//random strings
-
-#include "foo/bar"
-
-class test{
-  test() {
-    std::cout<<"Hello World"<<std::endl;
-  }
-};
-  """
+  # A header contains a simple class print hello world
+  source_code_hello_world = open('code_corpus/hello.h', 'r').read()
 
   # A C++ source code contains definition for several classes
-  # class_definitions() should return a list of cursors, each pointing to one of those classes
-
-  source_class_defn = """
-  #include "envoy/split"
-
-  namespace {
-
-  class Foo{
-    
-  };
-
-  class Bar{
-    Foo getFoo();
-  };
-
-  class FooBar : Foo, Bar{
-
-  };
-
-  class DeadBeaf{
-    public:
-      int val();
-      FooBar foobar;
-  };
-  }
-  """
+  source_class_defn = open('code_corpus/class_defn.h', 'r').read()
 
   # almost the same as above, but classes are not enclosed by namespace
-  source_class_defn_without_namespace = """
-  #include "envoy/split"
+  source_class_defn_without_namespace = open('code_corpus/class_defn_without_namespace.h',
+                                             'r').read()
 
-  class Foo{
-    
-  };
-
-  class Bar{
-    Foo getFoo();
-  };
-
-  class FooBar : Foo, Bar{
-
-  };
-
-  class DeadBeaf{
-    public:
-      int val();
-      FooBar foobar;
-  };
-  """
-
-  source_class_impl = """
-  #include "test_class_defn.h"
-
-  namespace{
-    Foo Bar::getFoo(){
-      Foo foo;
-      return foo;
-    }
-
-    int DeadBeaf::val(){
-      return 42;
-    }
-
-    DeadBeaf::DeadBeaf() = default;
-  }
- """
+  # A C++ source code contains method implementaions for class_defn.h
+  source_class_impl = open('code_corpus/class_impl.cc', 'r').read()
 
   def test_to_filename(self):
     # Test class name with one "mock"
@@ -106,37 +36,33 @@ class test{
                      "test_retry_host_predicate_factory")
 
   def test_get_headers(self):
-    includes = """
-// your first c++ program
+    includes = """// your first c++ program
+// NOLINT(namespace-envoy)
 #include <iostream>
 
-//random strings
+// random strings
 
 #include "foo/bar"
 
 """
-    with open("hello.h", "w") as source:
-      source.write(self.source_code_hello_world)
 
     translation_unit_hello_world = TranslationUnit.from_source(
-        "hello.h", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+        "code_corpus/hello.h", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
     self.assertEqual(headersplit.get_headers(translation_unit_hello_world), includes)
 
   def test_class_definitions(self):
-    with open("test_class_defn.h", "w") as source:
-      source.write(self.source_class_defn)
+    # class_definitions() should return a list of cursors, each pointing to one of those classes
 
     idx = Index.create()
-    translation_unit_class_defn = idx.parse("test_class_defn.h", ['-x', 'c++'])
+    translation_unit_class_defn = idx.parse("code_corpus/class_defn.h", ['-x', 'c++'])
     defns_cursors = headersplit.class_definitions(translation_unit_class_defn.cursor)
     defns_names = [cursor.spelling for cursor in defns_cursors]
 
     self.assertEqual(defns_names, ['Foo', 'Bar', 'FooBar', 'DeadBeaf'])
-    with open("test_class_defn_without_namespace.h", "w") as source:
-      source.write(self.source_class_defn_without_namespace)
 
     idx = Index.create()
-    translation_unit_class_defn = idx.parse("test_class_defn_without_namespace.h", ['-x', 'c++'])
+    translation_unit_class_defn = idx.parse("code_corpus/class_defn_without_namespace.h",
+                                            ['-x', 'c++'])
     defns_cursors = headersplit.class_definitions(translation_unit_class_defn.cursor)
     defns_names = [cursor.spelling for cursor in defns_cursors]
 
@@ -144,15 +70,37 @@ class test{
     self.assertEqual(defns_names, [])
 
   def test_class_implementations(self):
-    with open("test_class_impl.cc", "w") as source:
-      source.write(self.source_class_impl)
-
     translation_unit_class_impl = TranslationUnit.from_source(
-        "test_class_impl.cc", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+        "code_corpus/class_impl.cc", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
     impls_cursors = headersplit.class_implementations(translation_unit_class_impl.cursor)
     impls_names = [cursor.spelling for cursor in impls_cursors]
 
     self.assertEqual(impls_names, ['getFoo', 'val', 'DeadBeaf'])
+
+  def test_class_implementations_error(self):
+    # LibClang will fail in parse this source file (it's the origin test/server/mocks.cc from Envoy repository)
+    # if we don't add flag PARSE_SKIP_FUNCTION_BODIES to ignore function bodies.
+    impl_translation_unit = TranslationUnit.from_source('code_corpus/fail_mocks.cc')
+
+    impls_cursors = headersplit.class_implementations(impl_translation_unit.cursor)
+    # impls_name is not complete in this case
+    impls_names = [cursor.spelling for cursor in impls_cursors]
+
+    # LibClang will stop parsing at
+    # MockListenerComponentFactory::MockListenerComponentFactory()
+    #     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
+    #       ^
+    # Since parsing stops early, we will have incomplete method list.
+    #
+    # The reason is not clear, however, this issue can be addressed by adding parsing flag to ignore function body
+
+    # get correct list of member methods
+    impl_translation_unit_correct = TranslationUnit.from_source(
+        'code_corpus/fail_mocks.cc', options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+    impls_cursors_correct = headersplit.class_implementations(impl_translation_unit_correct.cursor)
+    impls_names_correct = [cursor.spelling for cursor in impls_cursors_correct]
+
+    self.assertNotEqual(impls_names, impls_names_correct)
 
 
 if __name__ == '__main__':

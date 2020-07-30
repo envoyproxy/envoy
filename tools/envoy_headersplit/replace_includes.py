@@ -82,13 +82,13 @@ def replace_includes(mockname):
   # don't forget change dependency on bazel
   for test_file in p.glob('**/*.cc'):
     replace_includes = ""
-    used_mock_haeder = False
+    used_mock_header = False
     bazel_targets = ""
 
     with test_file.open() as f:
       content = f.read()
       if '#include "test/mocks/{}/mocks.h"'.format(mockname) in content:
-        used_mock_haeder = True
+        used_mock_header = True
         replace_includes = ""
         for classname in classnames:
           if classname in content:
@@ -101,7 +101,7 @@ def replace_includes(mockname):
                 mockname, to_filename(classname))
             bazel_targets += '"{}",'.format(to_bazelname(to_filename(classname), mockname))
 
-    if used_mock_haeder:
+    if used_mock_header:
       with test_file.open(mode='w') as f:
         f.write(
             content.replace('#include "test/mocks/{}/mocks.h"\n'.format(mockname),
