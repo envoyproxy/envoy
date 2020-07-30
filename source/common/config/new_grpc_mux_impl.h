@@ -39,7 +39,7 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder) override;
+                           OpaqueResourceDecoder& resource_decoder, const bool use_prefix_matching = false) override;
 
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
@@ -60,8 +60,8 @@ public:
   void start() override;
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info)
-        : sub_state_(type_url, watch_map_, local_info) {}
+    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info, const bool use_prefix_matching)
+        : sub_state_(type_url, watch_map_, local_info, use_prefix_matching) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -96,6 +96,10 @@ private:
       parent_.updateWatch(type_url_, watch_, resources);
     }
 
+    void add(const std::set<std::string>& resources) override {
+      parent_.addToWatch(type_url_, watch_, resources);
+    }
+
   private:
     const std::string type_url_;
     Watch* watch_;
@@ -110,7 +114,10 @@ private:
   void updateWatch(const std::string& type_url, Watch* watch,
                    const std::set<std::string>& resources);
 
-  void addSubscription(const std::string& type_url);
+  void addToWatch(const std::string& type_url, Watch* watch,
+                                  const std::set<std::string>& to_add);
+
+  void addSubscription(const std::string& type_url, const bool use_prefix_matching);
 
   void trySendDiscoveryRequests();
 

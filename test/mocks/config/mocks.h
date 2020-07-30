@@ -55,15 +55,16 @@ public:
       void, onConfigUpdate,
       (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
        const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-       const std::string& system_version_info));
+       const std::string& system_version_info, const bool use_prefix_matching));
   MOCK_METHOD(void, onConfigUpdateFailed,
               (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
 };
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD(void, start, (const std::set<std::string>& resources));
+  MOCK_METHOD(void, start, (const std::set<std::string>& resources, const bool use_prefix_matching));
   MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD(void, addResourceInterest, (const std::set<std::string>& add_these_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -107,7 +108,7 @@ public:
 
   MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
               (const std::string& type_url, const std::set<std::string>& resources,
-               SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder));
+               SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder, const bool use_prefix_matching));
 };
 
 class MockGrpcStreamCallbacks

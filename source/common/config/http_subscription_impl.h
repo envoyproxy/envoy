@@ -34,8 +34,11 @@ public:
                        ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::Subscription
-  void start(const std::set<std::string>& resource_names) override;
+  void start(const std::set<std::string>& resource_names, const bool use_prefix_matching = false) override;
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
+  void addResourceInterest(const std::set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   // Http::RestApiFetcher
   void createRequest(Http::RequestMessage& request) override;

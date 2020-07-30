@@ -58,9 +58,26 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
                       findRemovals(newly_removed_from_watch, watch));
 }
 
-absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
-  absl::flat_hash_set<Watch*> ret = wildcard_watches_;
-  const auto watches_interested = watch_interest_.find(resource_name);
+absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name, const bool use_prefix_matching) {
+  absl::flat_hash_set<Watch*> ret;
+  if (!use_prefix_matching) {
+    ret = wildcard_watches_;
+  }
+
+  // TODO (dmitri-d) we need to validate the names of resources added by VHDS for presence of a prefix
+  const auto resource_key = use_prefix_matching ? prefixFromName(resource_name) : resource_name;
+
+  std::cout << "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCcc watchesInterestedIn -- resource_key: " << resource_key << "\n";
+
+  if (use_prefix_matching & resource_key.empty()) {
+    ENVOY_LOG(warn, "Expected a prefix in the resource name {}", resource_name);
+    return ret;
+  }
+
+  for (const auto aa : watch_interest_) {
+    std::cout << "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCcc watchesInterestedIn -- watch_interest_: " << aa.first << "\n";
+  }
+  const auto watches_interested = watch_interest_.find(resource_key);
   if (watches_interested != watch_interest_.end()) {
     for (const auto& watch : watches_interested->second) {
       ret.insert(watch);
@@ -88,7 +105,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
     decoded_resources.emplace_back(
         new DecodedResourceImpl((*watches_.begin())->resource_decoder_, r, version_info));
     const absl::flat_hash_set<Watch*>& interested_in_r =
-        watchesInterestedIn(decoded_resources.back()->name());
+        watchesInterestedIn(decoded_resources.back()->name(), false);
     for (const auto& interested_watch : interested_in_r) {
       per_watch_updates[interested_watch].emplace_back(*decoded_resources.back());
     }
@@ -122,7 +139,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
 
 // For responses to on-demand requests, replace the original watch for an alias
 // with one for the resource's name
-AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
+AddedRemoved WatchMap::removeAliasWatches(
     const envoy::service::discovery::v3::Resource& resource) {
   absl::flat_hash_set<Watch*> watches_to_update;
   for (const auto& alias : resource.aliases()) {
@@ -136,7 +153,25 @@ AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
 
   auto ret = AddedRemoved({}, {});
   for (const auto& watch : watches_to_update) {
-    const auto& converted_watches = updateWatchInterest(watch, {resource.name()});
+    std::set<std::string> without_alias;
+
+    for (const auto rn : watch->resource_names_) {
+      std::cout << "RRRRRRRRRRRRRRRRRRRRRRRRRRRR " << rn << "\n";
+    }
+    for (const auto an: resource.aliases()) {
+      std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAN " << an << "\n";
+    }
+
+
+      std::set_difference(watch->resource_names_.begin(), watch->resource_names_.end(),
+                        resource.aliases().begin(), resource.aliases().end(),
+                        std::inserter(without_alias, without_alias.begin()));
+
+    RELEASE_ASSERT(
+        !without_alias.empty(),
+        fmt::format("WatchMap: prefix watch cannot be converted to a wildcard one."));
+
+    const auto& converted_watches = updateWatchInterest(watch, without_alias);
     std::copy(converted_watches.added_.begin(), converted_watches.added_.end(),
               std::inserter(ret.added_, ret.added_.end()));
     std::copy(converted_watches.removed_.begin(), converted_watches.removed_.end(),
@@ -149,7 +184,8 @@ AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
 void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const std::string& system_version_info, const bool use_prefix_matching) {
+  std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa WatchMap::onConfigUpdate\n";
   // Track any removals triggered by earlier watch updates.
   ASSERT(deferred_removed_during_update_ == nullptr);
   deferred_removed_during_update_ = std::make_unique<absl::flat_hash_set<Watch*>>();
@@ -160,9 +196,11 @@ void WatchMap::onConfigUpdate(
   std::vector<DecodedResourceImplPtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
   for (const auto& r : added_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
+    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name(), use_prefix_matching);
     // If there are no watches, then we don't need to decode. If there are watches, they should all
     // be for the same resource type, so we can just use the callbacks of the first watch to decode.
+    std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa use_prefix_matching: " << use_prefix_matching << "\n";
+    std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa watches interested in " << r.name() << ": " << interested_in_r.size() << "\n";
     if (interested_in_r.empty()) {
       continue;
     }
@@ -174,7 +212,7 @@ void WatchMap::onConfigUpdate(
   }
   absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<std::string>> per_watch_removed;
   for (const auto& r : removed_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r);
+    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r, use_prefix_matching);
     for (const auto& interested_watch : interested_in_r) {
       *per_watch_removed[interested_watch].Add() = r;
     }

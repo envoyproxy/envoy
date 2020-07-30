@@ -81,7 +81,7 @@ public:
 
   // checks is a watch for an alias exists and replaces it with the resource's name
   AddedRemoved
-  convertAliasWatchesToNameWatches(const envoy::service::discovery::v3::Resource& resource);
+  removeAliasWatches(const envoy::service::discovery::v3::Resource& resource);
 
   // UntypedConfigUpdateCallbacks.
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -89,7 +89,7 @@ public:
   void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) override;
+      const std::string& system_version_info, const bool use_prefix_matching) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   WatchMap(const WatchMap&) = delete;
@@ -109,7 +109,13 @@ private:
                                      Watch* watch);
 
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
-  absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
+  absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name, const bool use_prefix_matching);
+
+  std::string prefixFromName(const std::string& resource_name) {
+    const auto pos = resource_name.find_last_of('/');
+    // we are not interested in the "/" character in the prefix
+    return pos == std::string::npos ? "" : resource_name.substr(0, pos);
+  }
 
   absl::flat_hash_set<std::unique_ptr<Watch>> watches_;
 

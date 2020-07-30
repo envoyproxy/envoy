@@ -92,6 +92,8 @@ public:
    * update.
    */
   virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() PURE;
+
+  virtual std::set<std::string> vhdsVhosts() const PURE;
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;

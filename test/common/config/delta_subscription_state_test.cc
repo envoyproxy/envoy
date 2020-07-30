@@ -24,7 +24,7 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 
 class DeltaSubscriptionStateTest : public testing::Test {
 protected:
-  DeltaSubscriptionStateTest() : state_(TypeUrl, callbacks_, local_info_) {
+  DeltaSubscriptionStateTest() : state_(TypeUrl, callbacks_, local_info_, false) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
         state_.getNextRequestAckless();
@@ -44,7 +44,7 @@ protected:
     if (nonce.has_value()) {
       message.set_nonce(nonce.value());
     }
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).Times(expect_config_update_call ? 1 : 0);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _, _)).Times(expect_config_update_call ? 1 : 0);
     return state_.handleResponse(message);
   }
 
@@ -57,7 +57,7 @@ protected:
     *message.mutable_removed_resources() = removed_resources;
     message.set_system_version_info(version_info);
     message.set_nonce(nonce);
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).WillOnce(Throw(EnvoyException(error_message)));
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _, _)).WillOnce(Throw(EnvoyException(error_message)));
     return state_.handleResponse(message);
   }
 

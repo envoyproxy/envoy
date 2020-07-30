@@ -63,7 +63,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   // resource names.
   for (const auto& r : message->resources()) {
     if (r.aliases_size() > 0) {
-      AddedRemoved converted = sub->second->watch_map_.convertAliasWatchesToNameWatches(r);
+      AddedRemoved converted = sub->second->watch_map_.removeAliasWatches(r);
       sub->second->sub_state_.updateSubscriptionInterest(converted.added_, converted.removed_);
     }
   }
@@ -109,15 +109,16 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
 // TODO(fredlas) to be removed from the GrpcMux interface very soon.
 void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
+// TODO (dmitri-d) verify that a prefix-matching watch isn't set up empty
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const std::set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
-                                         OpaqueResourceDecoder& resource_decoder) {
+                                         OpaqueResourceDecoder& resource_decoder, const bool use_prefix_matching) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url);
-    return addWatch(type_url, resources, callbacks, resource_decoder);
+    addSubscription(type_url, use_prefix_matching);
+    return addWatch(type_url, resources, callbacks, resource_decoder, use_prefix_matching);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
@@ -143,6 +144,17 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   }
 }
 
+void NewGrpcMuxImpl::addToWatch(const std::string& type_url, Watch* watch,
+                                 const std::set<std::string>& to_add) {
+  ASSERT(watch != nullptr);
+  std::set<std::string> with_added;
+  std::set_union(to_add.begin(), to_add.end(),
+                 watch->resource_names_.begin(), watch->resource_names_.end(),
+                 std::inserter(with_added, with_added.begin()));
+
+  updateWatch(type_url, watch, with_added);
+}
+
 void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   updateWatch(type_url, watch, {});
   auto entry = subscriptions_.find(type_url);
@@ -151,8 +163,8 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_prefix_matching) {
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_prefix_matching));
   subscription_ordering_.emplace_back(type_url);
 }
 

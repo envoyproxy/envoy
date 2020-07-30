@@ -102,7 +102,7 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
   for (const auto& n : removed_names) {
     *removed_names_proto.Add() = n;
   }
-  watch_map.onConfigUpdate(delta_resources, removed_names_proto, version);
+  watch_map.onConfigUpdate(delta_resources, removed_names_proto, version, false);
 }
 
 // Tests the simple case of a single watch. Checks that the watch will not be told of updates to
@@ -290,7 +290,7 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
   EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
       .Times(AtMost(1))
       .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
-  watch_map_.onConfigUpdate(delta_resources, removed_names_proto, "version1");
+  watch_map_.onConfigUpdate(delta_resources, removed_names_proto, "version1", false);
 }
 
 TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
@@ -302,7 +302,7 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
   EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
       .Times(AtMost(1))
       .WillRepeatedly(InvokeWithoutArgs([this] { removeAllInterest(); }));
-  watch_map_.onConfigUpdate({}, removed_names_proto, "version1");
+  watch_map_.onConfigUpdate({}, removed_names_proto, "version1", false);
 }
 
 // Checks the following:
@@ -500,49 +500,48 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 }
 
-// verifies that a watch is updated with the resource name
-TEST(WatchMapTest, ConvertAliasWatchesToNameWatches) {
+// verifies that a watch for an alias is removed, while the watch for the prefix is kept
+TEST(WatchMapTest, RemoveAliasWatches) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   WatchMap watch_map;
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
-  watch_map.updateWatchInterest(watch, {"alias"});
+  watch_map.updateWatchInterest(watch, {"prefix", "prefix/alias"});
 
   envoy::service::discovery::v3::Resource resource;
-  resource.set_name("resource");
+  resource.set_name("prefix/resource");
   resource.set_version("version");
-  for (const auto alias : {"alias", "alias1", "alias2"}) {
+  for (const auto alias : {"prefix/alias", "prefix/alias1", "prefix/alias2"}) {
     resource.add_aliases(alias);
   }
 
-  AddedRemoved converted = watch_map.convertAliasWatchesToNameWatches(resource);
+  AddedRemoved converted = watch_map.removeAliasWatches(resource);
 
-  EXPECT_EQ(std::set<std::string>{"resource"}, converted.added_);
-  EXPECT_EQ(std::set<std::string>{"alias"}, converted.removed_);
+  EXPECT_EQ(std::set<std::string>{"prefix/alias"}, converted.removed_);
 }
 
-// verifies that if a resource contains an alias the same as its name, and the watch has been set
-// with that alias, the watch won't be updated
-TEST(WatchMapTest, ConvertAliasWatchesToNameWatchesAliasIsSameAsName) {
+// verifies that a watch for an alias is removed, while the watch for the prefix is kept, even
+// if the alias is the same as the resource name
+TEST(WatchMapTest, RemoveAliasWatchesAliasIsSameAsName) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   WatchMap watch_map;
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
-  watch_map.updateWatchInterest(watch, {"name-and-alias"});
+  watch_map.updateWatchInterest(watch, {"prefix", "prefix/name-and-alias"});
 
   envoy::service::discovery::v3::Resource resource;
-  resource.set_name("name-and-alias");
+  resource.set_name("prefix/name-and-alias");
   resource.set_version("version");
-  for (const auto alias : {"name-and-alias", "alias1", "alias2"}) {
+  for (const auto alias : {"prefix/name-and-alias", "prefix/alias1", "prefix/alias2"}) {
     resource.add_aliases(alias);
   }
 
-  AddedRemoved converted = watch_map.convertAliasWatchesToNameWatches(resource);
+  AddedRemoved converted = watch_map.removeAliasWatches(resource);
 
   EXPECT_TRUE(converted.added_.empty());
-  EXPECT_TRUE(converted.removed_.empty());
+  EXPECT_EQ(std::set<std::string>{"prefix/name-and-alias"}, converted.removed_);
 }
 
 } // namespace
