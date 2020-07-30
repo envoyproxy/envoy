@@ -35,7 +35,6 @@ namespace Quic {
 #define UDP_GSO_BATCH_WRITER_STATS(COUNTER, GAUGE, HISTOGRAM)                                      \
   COUNTER(total_bytes_sent)                                                                        \
   GAUGE(internal_buffer_size, NeverImport)                                                         \
-  GAUGE(front_buffered_pkt_size, NeverImport)                                                      \
   HISTOGRAM(pkts_sent_per_batch, Unspecified)
 
 /**
@@ -85,6 +84,7 @@ private:
    */
   UdpGsoBatchWriterStats generateStats(Stats::Scope& scope);
   UdpGsoBatchWriterStats stats_;
+  uint64_t gso_size_;
 };
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {

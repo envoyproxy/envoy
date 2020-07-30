@@ -135,10 +135,6 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
                   .value(),
               internal_buffer.length());
-    EXPECT_EQ(listener_config_.listenerScope()
-                  .gaugeFromString("front_buffered_pkt_size", Stats::Gauge::ImportMode::NeverImport)
-                  .value(),
-              last_buffered.size());
 
     if (send_buffered_pkts) {
       // Verify Correct content is received at the client
@@ -160,10 +156,6 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
   EXPECT_TRUE(flush_result.ok());
   EXPECT_EQ(listener_config_.listenerScope()
                 .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
-                .value(),
-            0);
-  EXPECT_EQ(listener_config_.listenerScope()
-                .gaugeFromString("front_buffered_pkt_size", Stats::Gauge::ImportMode::NeverImport)
                 .value(),
             0);
   total_bytes_sent += payloads.back().length();
@@ -214,10 +206,6 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
                   .value(),
               initial_payload.length());
-    EXPECT_EQ(listener_config_.listenerScope()
-                  .gaugeFromString("front_buffered_pkt_size", Stats::Gauge::ImportMode::NeverImport)
-                  .value(),
-              initial_payload.length());
     EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
               total_bytes_sent);
 
@@ -235,21 +223,28 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
                                     *following_buffer};
     send_result = listener_->send(following_send_data);
 
-    // The following payload should only get buffered if it is shorter than initial payload
     if (following_payload.length() < initial_payload.length()) {
+      // The following payload should get buffered if it is
+      // shorter than initial payload
       EXPECT_TRUE(send_result.ok());
       EXPECT_EQ(send_result.rc_, following_payload.length());
       EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
       internal_buffer.append(following_payload);
-    } else if (following_payload.length() > initial_payload.length()) {
-      EXPECT_FALSE(send_result.ok());
-      EXPECT_EQ(send_result.rc_, 0);
-      EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
+      // Send another packet and verify that writer gets blocked later
+      EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
+          .WillOnce(Invoke([](int /*sockfd*/, const msghdr* /*msg*/, int /*flags*/) {
+            errno = EWOULDBLOCK;
+            return -1;
+          }));
+      following_buffer->add(following_payload);
+      UdpSendData final_send_data{send_to_addr_->ip(), *server_socket_->localAddress(),
+                                  *following_buffer};
+      send_result = listener_->send(final_send_data);
     }
-    EXPECT_EQ(listener_config_.listenerScope()
-                  .gaugeFromString("front_buffered_pkt_size", Stats::Gauge::ImportMode::NeverImport)
-                  .value(),
-              initial_payload.length());
+
+    EXPECT_FALSE(send_result.ok());
+    EXPECT_EQ(send_result.rc_, 0);
+    EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
               total_bytes_sent);
     EXPECT_EQ(listener_config_.listenerScope()
@@ -257,15 +252,13 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
                   .value(),
               internal_buffer.length());
 
-    // Mock the socket implement successful sendmsg
+    // Reset write blocked status, and verify correct buffer is flushed
+    udp_packet_writer_->setWritable();
     EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
         .WillOnce(Invoke([&](int /*sockfd*/, const msghdr* msg, int /*flags*/) {
           EXPECT_EQ(internal_buffer.length(), getPacketLength(msg));
           return internal_buffer.length();
         }));
-
-    // Reset write blocked status, and verify correct buffer is flushed
-    udp_packet_writer_->setWritable();
     auto flush_result = udp_packet_writer_->flush();
     EXPECT_TRUE(flush_result.ok());
     EXPECT_EQ(flush_result.rc_, 0);

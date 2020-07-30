@@ -98,16 +98,15 @@ Api::IoCallUint64Result UdpGsoBatchWriter::flush() {
 
 void UdpGsoBatchWriter::updateUdpGsoBatchWriterStats(quic::WriteResult quic_result) {
   if (quic_result.status == quic::WRITE_STATUS_OK && quic_result.bytes_written > 0) {
-    if (stats_.front_buffered_pkt_size_.value() > 0u) {
-      uint64_t num_pkts_in_batch = std::ceil(static_cast<float>(quic_result.bytes_written) /
-                                             stats_.front_buffered_pkt_size_.value());
+    if (gso_size_ > 0u) {
+      uint64_t num_pkts_in_batch =
+          std::ceil(static_cast<float>(quic_result.bytes_written) / gso_size_);
       stats_.pkts_sent_per_batch_.recordValue(num_pkts_in_batch);
     }
     stats_.total_bytes_sent_.add(quic_result.bytes_written);
   }
   stats_.internal_buffer_size_.set(batch_buffer().SizeInUse());
-  stats_.front_buffered_pkt_size_.set(
-      buffered_writes().empty() ? 0u : buffered_writes().front().buf_len);
+  gso_size_ = buffered_writes().empty() ? 0u : buffered_writes().front().buf_len;
 }
 
 UdpGsoBatchWriterStats UdpGsoBatchWriter::generateStats(Stats::Scope& scope) {
