@@ -28,7 +28,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
             Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
         // Choose a valid filter name.
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
-            std::end(filter_names)) {
+                std::end(filter_names) ||
+            !factories.contains(input->config().name())) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
           input->mutable_config()->set_name(std::string(filter_name));
         }
@@ -43,10 +44,17 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
     TestUtility::validate(input);
     // Check the filter's name in case some filters are not supported yet.
     static const auto filter_names = UberFilterFuzzer::filterNames();
+    static const auto factories = Registry::FactoryRegistry<
+        Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     // TODO(jianwendong): remove this if block after covering all the filters.
     if (std::find(filter_names.begin(), filter_names.end(), input.config().name()) ==
         std::end(filter_names)) {
       ENVOY_LOG_MISC(debug, "Test case with unsupported filter type: {}", input.config().name());
+      return;
+    }
+    if (!factories.contains(input.config().name())) {
+      ENVOY_LOG_MISC(debug, "Test case with non-existing filter name in this Envoy: {}",
+                     input.config().name());
       return;
     }
     static UberFilterFuzzer fuzzer;
