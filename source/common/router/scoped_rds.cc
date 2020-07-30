@@ -144,11 +144,12 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdat
     std::function<void()> callback) {
   // If route table has been initialized, run the callback to continue in filter chain, otherwise
   // cache it and wait for the route table to be initialized.
-  if (routeConfig()) {
+  if (route_provider_ && routeConfig()) {
     callback();
     return;
   }
   on_demand_update_callbacks_.push_back(callback);
+  initRdsConfigProvider();
 }
 
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::runOnDemandUpdateCallback() {
@@ -156,6 +157,40 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::runOnDemandUpdat
     callback();
   }
   on_demand_update_callbacks_.clear();
+}
+
+void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigProvider() {
+  if (route_provider_) {
+    return;
+  }
+  std::unique_ptr<Init::ManagerImpl> srds_init_mgr =
+      std::make_unique<Init::ManagerImpl>(fmt::format("SRDS : "));
+  route_provider_ = std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
+      parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
+          *rds_, parent_.factory_context_, parent_.stat_prefix_, *srds_init_mgr));
+
+  rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
+    // Subscribe to RDS update.
+    parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
+  });
+  // If route configuration hasn't been initialized, return.
+  if (!routeConfig())
+    return;
+  // Update scoped route configuration.
+  std::shared_ptr<ScopedRouteInfo> scoped_route_info =
+      std::make_shared<ScopedRouteInfo>(envoy::config::route::v3::ScopedRouteConfiguration(
+                                            parent_.scoped_route_map_[scope_name_]->configProto()),
+                                        routeConfig());
+  parent_.scoped_route_map_[scope_name_] = scoped_route_info;
+  parent_.applyConfigUpdate([scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
+                                -> ConfigProvider::ConfigConstSharedPtr {
+    auto* thread_local_scoped_config =
+        const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+    thread_local_scoped_config->addOrUpdateRoutingScopes({scoped_route_info});
+    return config;
+  });
+  // Run all the callbacks from worker threads.
+  runOnDemandUpdateCallback();
 }
 
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(

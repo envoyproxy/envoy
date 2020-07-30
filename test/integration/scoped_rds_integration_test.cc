@@ -20,6 +20,65 @@
 namespace Envoy {
 namespace {
 
+const char Config[] = R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+  - name: xds_cluster
+    type: STATIC
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: xds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
+  - name: my_service
+    type: STATIC
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: my_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
+  listeners:
+  - name: http
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+    - filters:
+      - name: http
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          stat_prefix: config_test
+          http_filters:
+          - name: envoy.filters.http.on_demand
+          - name: envoy.filters.http.router
+          codec_type: HTTP2
+          rds:
+            route_config_name: my_route
+            config_source:
+              api_config_source:
+                api_type: GRPC
+                grpc_services:
+                  envoy_grpc:
+                    cluster_name: xds_cluster
+)EOF";
+
 class ScopedRdsIntegrationTest : public HttpIntegrationTest,
                                  public Grpc::DeltaSotwIntegrationParamTest {
 protected:
@@ -28,9 +87,12 @@ protected:
     FakeUpstream* upstream_{};
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
-
+  /*
+    ScopedRdsIntegrationTest()
+        : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+        */
   ScopedRdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {}
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
