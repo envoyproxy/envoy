@@ -401,8 +401,8 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryClearTripsAssert) {
   ON_CALL(*mock_pools_[0], addDrainedCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH_LOG_TO_STDERR(test_map->addDrainedCallback([&test_map] { test_map->clear(); }),
-                             ".*Details: A resource should only be entered once");
+  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->clear(); }),
+               ".*Details: A resource should only be entered once");
 }
 
 TEST_F(ConnPoolMapImplDeathTest, ReentryGetPoolTripsAssert) {
@@ -412,7 +412,7 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryGetPoolTripsAssert) {
   ON_CALL(*mock_pools_[0], addDrainedCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH_LOG_TO_STDERR(
+  EXPECT_DEATH(
       test_map->addDrainedCallback([&test_map, this] { test_map->getPool(2, getBasicFactory()); }),
       ".*Details: A resource should only be entered once");
 }
@@ -424,9 +424,8 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryDrainConnectionsTripsAssert) {
   ON_CALL(*mock_pools_[0], addDrainedCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH_LOG_TO_STDERR(
-      test_map->addDrainedCallback([&test_map] { test_map->drainConnections(); }),
-      ".*Details: A resource should only be entered once");
+  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->drainConnections(); }),
+               ".*Details: A resource should only be entered once");
 }
 
 TEST_F(ConnPoolMapImplDeathTest, ReentryAddDrainedCallbackTripsAssert) {
@@ -436,9 +435,8 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryAddDrainedCallbackTripsAssert) {
   ON_CALL(*mock_pools_[0], addDrainedCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  EXPECT_DEATH_LOG_TO_STDERR(
-      test_map->addDrainedCallback([&test_map] { test_map->addDrainedCallback([]() {}); }),
-      ".*Details: A resource should only be entered once");
+  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->addDrainedCallback([]() {}); }),
+               ".*Details: A resource should only be entered once");
 }
 #endif // !defined(NDEBUG)
 
