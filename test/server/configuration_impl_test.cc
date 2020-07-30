@@ -740,6 +740,59 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
       "The sum of weights of all localities at the same priority exceeds 4294967295");
 }
 
+TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
+  const std::string json = R"EOF(
+  {
+    "watchdog": {
+      "kill_timeout": "1.0s",
+    },
+  })EOF";
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json, bootstrap);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.wdKillTimeout());
+}
+
+TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
+  const std::string json = R"EOF(
+  {
+    "watchdog": {
+      "kill_timeout": "1.0s",
+      "max_kill_timeout_jitter": "0.5s"
+    },
+  })EOF";
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json, bootstrap);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_LT(std::chrono::milliseconds(1000), config.wdKillTimeout());
+  EXPECT_GE(std::chrono::milliseconds(1500), config.wdKillTimeout());
+}
+
+TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
+  const std::string json = R"EOF(
+  {
+    "watchdog": {
+      "max_kill_timeout_jitter": "0.5s"
+    },
+  })EOF";
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json, bootstrap);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_EQ(std::chrono::milliseconds(0), config.wdKillTimeout());
+}
+
 } // namespace
 } // namespace Configuration
 } // namespace Server
