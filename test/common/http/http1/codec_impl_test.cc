@@ -329,18 +329,11 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
 }
 
 void Http1ServerConnectionImplTest::testAllowChunkedContentLength(bool allow_chunked_length) {
-  // initialize();
-  // Make a new 'codec' with the right settings
+
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
-  // if (GetParam()) {
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-  // } else {
-  //   codec_ = std::make_unique<Legacy::Http1::ServerConnectionImpl>(
-  //       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-  //       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
-  // }
 
   MockRequestDecoder decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
