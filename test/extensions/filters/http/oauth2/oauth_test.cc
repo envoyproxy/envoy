@@ -2,6 +2,7 @@
 #include <string>
 
 #include "common/http/message_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/oauth2/oauth.h"
 #include "extensions/filters/http/oauth2/oauth_client.h"
@@ -34,8 +35,11 @@ class OAuth2ClientTest : public testing::Test {
 public:
   OAuth2ClientTest()
       : mock_callbacks_(std::make_shared<MockCallbacks>()), request_(&cm_.async_client_) {
-    client_ = std::make_shared<OAuth2ClientImpl>(cm_, "auth", "/oauth/token",
-                                                 std::chrono::milliseconds(3000));
+    envoy::config::core::v3::HttpUri uri;
+    uri.set_cluster("auth");
+    uri.set_uri("auth.com/oauth/token");
+    uri.mutable_timeout()->set_seconds(1);
+    client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri);
   }
 
   ABSL_MUST_USE_RESULT

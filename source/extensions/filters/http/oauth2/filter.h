@@ -4,15 +4,18 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
+#include "common/common/matchers.h"
 #include "common/config/datasource.h"
 #include "common/http/header_utility.h"
 #include "common/http/rest_api_fetcher.h"
+#include "common/http/utility.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/oauth2/oauth.h"
@@ -90,16 +93,19 @@ public:
                Upstream::ClusterManager& cluster_manager,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
                const std::string& stats_prefix);
-  const std::string& clusterName() const { return cluster_name_; }
+  const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
-  const std::string& oauthServerHostname() const { return oauth_server_hostname_; }
-  const std::string& oauthTokenPath() const { return oauth_token_path_; }
+
+  const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
+    return oauth_token_endpoint_;
+  }
+  const std::string& redirectionHostname() const { return redirection_hostname_; }
   const std::string& callbackPath() const { return callback_path_; }
-  const std::string& signoutPath() const { return signout_path_; }
+  const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
@@ -107,12 +113,11 @@ public:
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  const std::string cluster_name_;
+  const envoy::config::core::v3::HttpUri oauth_token_endpoint_;
+  const std::string redirection_hostname_;
   const std::string client_id_;
-  const std::string oauth_server_hostname_;
   const std::string callback_path_;
-  const std::string oauth_token_path_;
-  const std::string signout_path_;
+  const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;
   const bool forward_bearer_token_ : 1;

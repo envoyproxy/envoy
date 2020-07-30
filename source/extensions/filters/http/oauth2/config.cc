@@ -63,16 +63,12 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
   auto config = std::make_shared<FilterConfig>(proto_config, context.clusterManager(),
                                                secret_reader, context.scope(), stats_prefix);
 
-  const std::chrono::milliseconds timeout_duration(PROTOBUF_GET_MS_REQUIRED(proto_config, timeout));
-
-  return
-      [&context, config, timeout_duration](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        std::unique_ptr<OAuth2Client> oauth_client =
-            std::make_unique<OAuth2ClientImpl>(context.clusterManager(), config->clusterName(),
-                                               config->oauthTokenPath(), timeout_duration);
-        callbacks.addStreamDecoderFilter(
-            std::make_shared<OAuth2Filter>(config, std::move(oauth_client), context.timeSource()));
-      };
+  return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    std::unique_ptr<OAuth2Client> oauth_client =
+        std::make_unique<OAuth2ClientImpl>(context.clusterManager(), config->oauthTokenEndpoint());
+    callbacks.addStreamDecoderFilter(
+        std::make_shared<OAuth2Filter>(config, std::move(oauth_client), context.timeSource()));
+  };
 }
 
 /*

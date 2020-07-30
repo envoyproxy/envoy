@@ -25,12 +25,15 @@ TEST(ConfigTest, CreateFilter) {
 
   const std::string yaml = R"EOF(
 config:
-    cluster: foo
-    hostname: oauth.com
+    token_endpoint:
+      cluster: foo
+      uri: oauth.com/token
+      timeout: 3s
+    redirection_hostname: oauth.com
     callback_path: /callback
-    signout_path: /signout
-    token_path: /token
-    timeout: 3s
+    signout_path: 
+      path:
+        exact: /signout
     )EOF";
 
   envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;

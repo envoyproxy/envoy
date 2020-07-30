@@ -2,8 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.oauth2.v4alpha;
 
+import "envoy/config/core/v4alpha/http_uri.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v4alpha/secret.proto";
+import "envoy/type/matcher/v4alpha/path.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -43,18 +45,17 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 10]
+// [#next-free-field: 8]
 message OAuth2Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.oauth2.v3.OAuth2Config";
 
-  // Name of the cluster to send OAuth requests to.
-  string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+  // Endpoint on the authorization server to retrieve the access token from.
+  config.core.v4alpha.HttpUri token_endpoint = 1;
 
-  // The full domain of the OAuth server. This is used to construct
-  // the redirection URL, and so must be specified in addition to
-  // the cluster.
-  string hostname = 2 [(validate.rules).string = {min_bytes: 1}];
+  // The hostname to redirect to for authorization. The filter will redirect
+  // to https://<redirection_hostname>/oauth/authorize/ when credentials are not presented.
+  string redirection_hostname = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // Credentials used for OAuth.
   OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
@@ -63,22 +64,13 @@ message OAuth2Config {
   string callback_path = 4 [(validate.rules).string = {min_bytes: 1}];
 
   // The path to sign a user out, clearing their credential cookies.
-  string signout_path = 5 [(validate.rules).string = {min_bytes: 1}];
-
-  // The path to send requests for the token against the OAuth cluster.
-  string token_path = 6 [(validate.rules).string = {min_bytes: 1}];
-
-  // The timeout for outgoing auth requests.
-  google.protobuf.Duration timeout = 7 [(validate.rules).duration = {
-    required: true
-    gte {}
-  }];
+  type.matcher.v4alpha.PathMatcher signout_path = 5 [(validate.rules).message = {required: true}];
 
   // Forward the OAuth token as a Bearer to upstream web service.
-  bool forward_bearer_token = 8;
+  bool forward_bearer_token = 6;
 
   // Any request that matches any of the provided matchers will be passed through without OAuth validation.
-  repeated config.route.v4alpha.HeaderMatcher pass_through_matcher = 9;
+  repeated config.route.v4alpha.HeaderMatcher pass_through_matcher = 7;
 }
 
 // Filter config.

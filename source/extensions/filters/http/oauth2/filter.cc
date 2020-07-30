@@ -75,16 +75,17 @@ FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
     Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
     Stats::Scope& scope, const std::string& stats_prefix)
-    : cluster_name_(proto_config.cluster()), client_id_(proto_config.credentials().client_id()),
-      oauth_server_hostname_(proto_config.hostname()), callback_path_(proto_config.callback_path()),
-      oauth_token_path_(proto_config.token_path()), signout_path_(proto_config.signout_path()),
+    : oauth_token_endpoint_(proto_config.token_endpoint()),
+      redirection_hostname_(proto_config.redirection_hostname()),
+      client_id_(proto_config.credentials().client_id()),
+      callback_path_(proto_config.callback_path()), signout_path_(proto_config.signout_path()),
       secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
-  if (!cluster_manager.get(cluster_name_)) {
+  if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
-                                     cluster_name_));
+                                     oauth_token_endpoint_.cluster()));
   }
 }
 
@@ -183,7 +184,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const absl::string_view path_str = path_header->value().getStringView();
 
   // We should check if this is a sign out request.
-  if (path_str == config_->signoutPath()) {
+  if (config_->signoutPath().match(path_header->value().getStringView())) {
     return signOutUser(headers);
   }
 
@@ -259,7 +260,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
     const std::string new_url =
-        fmt::format(AuthClusterUriParameters, config_->oauthServerHostname(), config_->clientId(),
+        fmt::format(AuthClusterUriParameters, config_->redirectionHostname(), config_->clientId(),
                     escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true);

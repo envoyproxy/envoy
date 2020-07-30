@@ -3,12 +3,14 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/utility.h"
 
 #include "extensions/filters/http/oauth2/oauth.h"
 
@@ -36,10 +38,8 @@ public:
 
 class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::upstream> {
 public:
-  OAuth2ClientImpl(Upstream::ClusterManager& cm, std::string cluster_name,
-                   std::string oauth_token_path, const std::chrono::milliseconds timeout_duration)
-      : cm_(cm), cluster_name_(std::move(cluster_name)),
-        oauth_token_path_(std::move(oauth_token_path)), timeout_duration_(timeout_duration) {}
+  OAuth2ClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri)
+      : cm_(cm), uri_(uri) {}
 
   ~OAuth2ClientImpl() override {
     if (in_flight_request_ != nullptr) {
@@ -68,9 +68,7 @@ private:
   FilterCallbacks* parent_{nullptr};
 
   Upstream::ClusterManager& cm_;
-  const std::string cluster_name_;
-  const std::string oauth_token_path_;
-  const std::chrono::milliseconds timeout_duration_;
+  const envoy::config::core::v3::HttpUri uri_;
 
   // Tracks any outstanding in-flight requests, allowing us to cancel the request
   // if the filter ends before the request completes.
@@ -90,8 +88,7 @@ private:
   void dispatchRequest(Http::RequestMessagePtr&& request);
 
   Http::RequestMessagePtr createPostRequest() {
-    Http::RequestMessagePtr request = std::make_unique<Http::RequestMessageImpl>();
-    request->headers().setHost(cluster_name_);
+    auto request = Http::Utility::prepareHeaders(uri_);
     request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     request->headers().setContentType(Http::Headers::get().ContentTypeValues.FormUrlEncoded);
     return request;

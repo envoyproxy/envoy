@@ -2,10 +2,13 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
 #include "common/http/message_impl.h"
+#include "common/protobuf/message_validator_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/oauth2/filter.h"
 
@@ -74,15 +77,24 @@ public:
 
     // Set up proto fields
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
-    p.set_cluster("auth.example.com");
-    p.set_hostname("auth.example.com");
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
     p.set_callback_path(TEST_CALLBACK);
-    p.set_signout_path("/_signout");
+    p.set_redirection_hostname("auth.example.com");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
     p.set_forward_bearer_token(true);
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
     matcher->set_exact_match("OPTIONS");
-    p.mutable_credentials()->set_client_id(TEST_CLIENT_ID);
+
+    auto credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
     // Create the OAuth config.
     auto secret_reader = std::make_shared<MockSecretReader>();

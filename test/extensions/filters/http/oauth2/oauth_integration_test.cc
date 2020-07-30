@@ -40,18 +40,21 @@ name: oauth
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
   config:
-    cluster: oauth
-    hostname: oauth.com
+    token_endpoint:
+      cluster: oauth
+      uri: oauth.com/token
+      timeout: 3s
+    redirection_hostname: oauth.com
     callback_path: /callback
-    signout_path: /signout
-    token_path: /token
+    signout_path: 
+      path:
+        exact: /signout
     credentials:
       client_id: foo
       token_secret:
         name: token
       hmac_secret:
         name: hmac
-    timeout: 3s
 )EOF");
 
     // Add the OAuth cluster.

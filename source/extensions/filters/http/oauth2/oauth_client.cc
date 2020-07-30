@@ -11,6 +11,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 
@@ -36,7 +37,6 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   const auto encoded_cb_url = Http::Utility::PercentEncoding::encode(cb_url, ":/=&?");
 
   Http::RequestMessagePtr request = createPostRequest();
-  request->headers().setPath(oauth_token_path_);
   const std::string body = fmt::format(GetAccessTokenBodyFormatString, auth_code, encoded_client_id,
                                        encoded_secret, encoded_cb_url);
   request->body() = std::make_unique<Buffer::OwnedImpl>(body);
@@ -49,9 +49,11 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 }
 
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
-  in_flight_request_ = cm_.httpAsyncClientForCluster(cluster_name_)
-                           .send(std::move(msg), *this,
-                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_duration_));
+  in_flight_request_ =
+      cm_.httpAsyncClientForCluster(uri_.cluster())
+          .send(std::move(msg), *this,
+                Http::AsyncClient::RequestOptions().setTimeout(
+                    std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
 }
 
 void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
