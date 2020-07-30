@@ -7,7 +7,6 @@ load(
     ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
     _envoy_cc_extension = "envoy_cc_extension",
-    _envoy_cc_extension_library = "envoy_cc_extension_library",
     _envoy_cc_library = "envoy_cc_library",
     _envoy_cc_posix_library = "envoy_cc_posix_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
