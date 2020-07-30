@@ -193,13 +193,11 @@ public:
    * @param code supplies the HTTP error code to send.
    * @param body supplies an optional body to send with the local reply.
    * @param modify_headers supplies a way to edit headers before they are sent downstream.
-   * @param is_head_request indicates if the request is a HEAD request
    * @param grpc_status an optional gRPC status for gRPC requests
    * @param details details about the source of the error, for debug purposes
    */
   virtual void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                              bool is_head_request,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 };

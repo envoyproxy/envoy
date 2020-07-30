@@ -85,8 +85,10 @@ public:
   void
   sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
                  const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
-                 bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                  absl::string_view /*details*/) override {
+    const bool is_head_request =
+        headers_ != nullptr && headers_->getMethodValue() == Http::Headers::get().MethodValues.Head;
     Http::Utility::sendLocalReply(
         false,
         Http::Utility::EncodeFunctions(
