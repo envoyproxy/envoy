@@ -1,4 +1,5 @@
 #pragma once
+// NOLINT(namespace-envoy)
 
 #include <chrono>
 #include <cstdint>

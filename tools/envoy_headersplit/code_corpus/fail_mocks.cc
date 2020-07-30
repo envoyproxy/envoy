@@ -1,4 +1,5 @@
 #include "fail_mocks.h"
+// NOLINT(namespace-envoy)
 
 #include <string>
 
