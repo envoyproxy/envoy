@@ -164,7 +164,7 @@ public:
   newPendingRequest(Envoy::ConnectionPool::AttachContext& context) override {
     Envoy::ConnectionPool::PendingRequestPtr pending_request =
         std::make_unique<TcpPendingRequest>(*this, typedContext<TcpAttachContext>(context));
-    pending_request->moveIntoList(std::move(pending_request), pending_requests_);
+    LinkedList::moveIntoList(std::move(pending_request), pending_requests_);
     return pending_requests_.front().get();
   }
 

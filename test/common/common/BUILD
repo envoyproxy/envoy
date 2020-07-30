@@ -103,6 +103,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "linked_object_test",
+    srcs = ["linked_object_test.cc"],
+    deps = [
+        "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
     deps = [

@@ -56,7 +56,7 @@ void ConnPoolImplBase::tryCreateNewConnection() {
     ASSERT(std::numeric_limits<uint64_t>::max() - connecting_request_capacity_ >=
            client->effectiveConcurrentRequestLimit());
     connecting_request_capacity_ += client->effectiveConcurrentRequestLimit();
-    client->moveIntoList(std::move(client), owningList(client->state_));
+    LinkedList::moveIntoList(std::move(client), owningList(client->state_));
   }
 }
 
