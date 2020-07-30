@@ -99,5 +99,5 @@ with the following statistics:
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  active, Gauge, "Active state of the action (0=inactive, 1=active) - only available for actions with threshold triggers"
-  scale_value, Gauge, "Scaled value of the action as a percent (0=inactive, 100=active) - only available for actions with range triggers"
+  active, Gauge, "Active state of the action (0=inactive, 1=active)"
+  scale_value, Gauge, "Scaled value of the action as a percent (0=inactive, 100=active)"
