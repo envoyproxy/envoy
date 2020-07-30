@@ -116,6 +116,7 @@ message Config {
     // The value in the KeyValuePair must be set, since it'll be used in lieu
     // of the missing header or cookie value.
     KeyValuePair on_header_missing = 3 [(udpa.annotations.field_migrate).rename = "on_missing"];
+
     // Whether or not to remove the header after a rule is applied.
     //
     // This prevents headers from leaking.
