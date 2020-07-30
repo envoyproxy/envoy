@@ -41,7 +41,8 @@ public:
   absl::optional<Envoy::Http::FilterFactoryCb> config() override;
   void validateConfig(const ProtobufWkt::Any& proto_config,
                       Server::Configuration::NamedHttpFilterConfigFactory&) override;
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&) override;
+  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
+                      Config::ConfigAppliedCb cb) override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -146,7 +147,8 @@ public:
                       Server::Configuration::NamedHttpFilterConfigFactory&) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb, const std::string&) override {
+  void onConfigUpdate(Envoy::Http::FilterFactoryCb, const std::string&,
+                      Config::ConfigAppliedCb) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 

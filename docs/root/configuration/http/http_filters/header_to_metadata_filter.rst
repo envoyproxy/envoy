@@ -6,8 +6,14 @@ Envoy Header-To-Metadata Filter
 * This filter should be configured with the name *envoy.filters.http.header_to_metadata*.
 
 This filter is configured with rules that will be matched against requests and responses.
-Each rule has a header and can be triggered either when the header is present or missing. When
-a rule is triggered, dynamic metadata will be added based on the configuration of the rule.
+Each rule has either a cookie or a header and can be triggered either when the header
+or cookie is present or missing.
+
+When a rule is triggered, dynamic metadata will be added based on the configuration of the rule.
+If the header or cookie is present, it's value is extracted and used along with the specified
+key as metadata. If the header or cookie is missing, on missing case is triggered and the value
+specified is used for adding metadata.
+
 The metadata can then be used for load balancing decisions, consumed from logs, etc.
 
 A typical use case for this filter is to dynamically match requests with load balancer
@@ -28,6 +34,29 @@ absence of a version header could be:
         "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
         request_rules:
           - header: x-version
+            on_header_present:
+              metadata_namespace: envoy.lb
+              key: version
+              type: STRING
+            on_header_missing:
+              metadata_namespace: envoy.lb
+              key: default
+              value: 'true'
+              type: STRING
+            remove: false
+
+As with headers, the value of the specified cookie will be extracted from the request
+and added as metadata with the key specified.
+Removing a cookie when a rule matches is unsupported.
+
+.. code-block:: yaml
+
+  http_filters:
+    - name: envoy.filters.http.header_to_metadata
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+        request_rules:
+          - cookie: cookie
             on_header_present:
               metadata_namespace: envoy.lb
               key: version
