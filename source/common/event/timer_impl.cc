@@ -12,8 +12,15 @@ namespace Event {
 
 TimerImpl::TimerImpl(Libevent::BasePtr& libevent, TimerCb cb, Dispatcher& dispatcher)
     : cb_(cb), dispatcher_(dispatcher),
-      activate_timers_next_event_loop_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.activate_timers_next_event_loop")) {
+      activate_timers_next_event_loop_(
+          // Only read the runtime feature if the runtime loader singleton has already been created.
+          // Accessing runtime features too early in the initialization sequence triggers logging
+          // and the logging code itself depends on the use of timers. Attempts to log while
+          // initializing the logging subsystem will result in a crash.
+          Runtime::LoaderSingleton::getExisting()
+              ? Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.activate_timers_next_event_loop")
+              : true) {
   ASSERT(cb_);
   evtimer_assign(
       &raw_event_, libevent.get(),
