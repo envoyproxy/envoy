@@ -1341,7 +1341,7 @@ filter:
         - key: "c"
       value:
         bool_match: true
-    no_key_default:
+    match_if_key_not_found:
       value: false
 
 typed_config:

@@ -241,7 +241,12 @@ public:
                 const Http::ResponseTrailerMap& response_trailers) const override;
 
 private:
-  const envoy::type::matcher::v3::MetadataMatcher matcher_config_;
+  Matchers::ValueMatcherConstSharedPtr present_matcher_;
+  Matchers::ValueMatcherConstSharedPtr value_matcher_;
+
+  std::vector<std::string> path_;
+  std::string filter_;
+
   bool default_res_;
 };
 

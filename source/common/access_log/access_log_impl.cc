@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/config/metadata.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -258,34 +259,35 @@ Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
 }
 
 MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config)
-    : matcher_config_(filter_config.matcher()) {
-  default_res_ = true;
-  if (filter_config.has_no_key_default()) {
-    default_res_ = filter_config.no_key_default().value();
+    : default_res_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)) {
+
+  auto& matcher_config = filter_config.matcher();
+
+  for (const auto& seg : matcher_config.path()) {
+    path_.push_back(seg.key());
   }
+
+  const auto& val = matcher_config.value();
+  value_matcher_ = Matchers::ValueMatcher::create(val);
+
+  auto present_val = envoy::type::matcher::v3::ValueMatcher();
+  present_val.set_present_match(true);
+  present_matcher_ = Matchers::ValueMatcher::create(present_val);
+
+  filter_ = matcher_config.filter();
 }
 
 bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
                               const Http::ResponseHeaderMap&,
                               const Http::ResponseTrailerMap&) const {
-
-  auto matcher = Matchers::MetadataMatcher(matcher_config_);
-
-  if (matcher.match(info.dynamicMetadata())) {
-    return true;
+  const auto& value =
+      Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
+  if (present_matcher_->match(value)) {
+    return value_matcher_->match(value);
   }
 
-  auto present_matcher_config = envoy::type::matcher::v3::MetadataMatcher(matcher_config_);
-  present_matcher_config.mutable_value()->set_present_match(true);
-
-  auto present_matcher = Matchers::MetadataMatcher(present_matcher_config);
-
-  // If the key does not exist, return default_res_
-  if (!present_matcher.match(info.dynamicMetadata())) {
-    return default_res_;
-  }
-
-  return false;
+  // If key does not exist return default value
+  return default_res_;
 }
 
 InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
