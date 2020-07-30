@@ -731,6 +731,11 @@ public:
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return how many streams should be anticipated per each current stream.
+   */
+  virtual float prefetchRatio() const PURE;
+
+  /**
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;

@@ -284,6 +284,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SMTP
 SNI
 SOTW
 SPD
@@ -870,6 +871,8 @@ precompute
 precomputed
 predeclared
 prefetch
+prefetched
+prefetches
 preflight
 preorder
 prepend
