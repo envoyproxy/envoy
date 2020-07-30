@@ -1,6 +1,6 @@
 /// Status returned by filters when transmitting or receiving headers.
 @frozen
-public enum FilterHeaderStatus<T: Headers> {
+public enum FilterHeaderStatus<T: Headers>: Equatable {
   /// Continue filter chain iteration, passing the provided headers through.
   case `continue`(T)
 

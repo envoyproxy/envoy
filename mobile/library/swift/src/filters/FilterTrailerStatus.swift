@@ -1,6 +1,6 @@
 /// Status returned by filters when transmitting or receiving trailers.
 @frozen
-public enum FilterTrailerStatus<T: Headers> {
+public enum FilterTrailerStatus<T: Headers>: Equatable {
   /// Continue filter chain iteration, passing the provided trailers through.
   case `continue`(T)
 
