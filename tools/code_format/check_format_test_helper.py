@@ -238,6 +238,10 @@ def runChecks():
   errors += checkUnfixableError(
       "std_unordered_set.cc", "Don't use std::unordered_set; use absl::flat_hash_set instead " +
       "or absl::node_hash_set if pointer stability of keys/values is required")
+  errors += checkUnfixableError(
+      "absl_string_view.cc", "Don't use absl::string_view; use std::string_view instead")
+  errors += checkUnfixableError(
+      "absl_optional.cc", "Don't use absl::optional; use std::optional instead")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",

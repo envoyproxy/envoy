@@ -647,6 +647,12 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use strptime; use absl::FormatTime instead")
   if tokenInLine("strerror", line):
     reportError("Don't use strerror; use Envoy::errorDetails instead")
+  # With envoy being built in C++17, absl::optional/string_view now uses std implementations
+  # by default. As a result, new code should directly call the standard library versions.
+  if tokenInLine("absl::optional", line):
+    reportError("Don't use absl::optional; use std::optional instead")
+  if tokenInLine("absl::string_view", line):
+    reportError("Don't use absl::string_view; use std::string_view instead")
   # Prefer using abseil hash maps/sets over std::unordered_map/set for performance optimizations and
   # non-deterministic iteration order that exposes faulty assertions.
   # See: https://abseil.io/docs/cpp/guides/container#hash-tables
