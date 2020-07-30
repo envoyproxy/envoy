@@ -210,7 +210,7 @@ private:
 class GoogleAsyncStreamImpl : public RawAsyncStream,
                               public Event::DeferredDeletable,
                               Logger::Loggable<Logger::Id::grpc>,
-                              LinkedObject<GoogleAsyncStreamImpl> {
+                              public LinkedObject<GoogleAsyncStreamImpl> {
 public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                         absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
