@@ -184,7 +184,7 @@ public:
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
   void setUpstreamProtocol(FakeHttpConnection::Type protocol);
-  // Sets fake_upstreams_count_ and alters the upstream protocol in the config_helper_
+  // Sets fake_upstreams_count_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
