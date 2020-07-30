@@ -260,10 +260,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
     com_github_jbeder_yaml_cpp = dict(
-        sha256 = "2292aa54311290c8767a0690fb58f808834ffe5d32513d502d63e6cea730a998",
-        strip_prefix = "yaml-cpp-fix-windows-eol",
+        sha256 = "79ab7069ef1c7c3632e7ffe095f7185d4c77b64d8035db3c085c239d4fe96d5f",
+        strip_prefix = "yaml-cpp-98acc5a8874faab28b82c28936f4b400b389f5d6",
         # 2020-07-28
-        urls = ["https://github.com/greenhouse-org/yaml-cpp/archive/fix-windows-eol.tar.gz"],
+        urls = ["https://github.com/greenhouse-org/yaml-cpp/archive/98acc5a8874faab28b82c28936f4b400b389f5d6.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
