@@ -118,8 +118,8 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
     : state_(OverloadActionState::inactive()),
       active_gauge_(
           makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::Accumulate)),
-      scaling_gauge_(
-          makeGauge(stats_scope, config.name(), "scaling", Stats::Gauge::ImportMode::Accumulate)) {
+      scale_value_gauge_(
+          makeGauge(stats_scope, config.name(), "scale_value", Stats::Gauge::ImportMode::Accumulate)) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
@@ -141,7 +141,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
   }
 
   active_gauge_.set(0);
-  scaling_gauge_.set(0);
+  scale_value_gauge_.set(0);
 }
 
 bool OverloadAction::updateResourcePressure(const std::string& name, double pressure) {
@@ -153,13 +153,8 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
     return false;
   }
   const auto trigger_new_state = it->second->actionState();
-  if (trigger_new_state.isSaturated()) {
-    active_gauge_.set(1);
-    scaling_gauge_.set(0);
-  } else {
-    active_gauge_.set(0);
-    scaling_gauge_.set(1);
-  }
+  active_gauge_.set(trigger_new_state.isSaturated() ? 1 : 0);
+  scale_value_gauge_.set(trigger_new_state.value() * 100);
 
   {
     OverloadActionState new_state = OverloadActionState::inactive();
