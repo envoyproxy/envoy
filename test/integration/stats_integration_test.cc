@@ -192,7 +192,6 @@ private:
           auto* socket_address = host->mutable_socket_address();
           socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
           socket_address->set_address("0.0.0.0");
-          socket_address->set_port_value(80);
         }
       }
     });
