@@ -54,7 +54,7 @@ envoy_cc_test(
     srcs = ["codec_impl_test.cc"],
     # The default codec is the legacy codec. Verify the runtime flag for the new codec is disabled.
     args = [
-        "--runtime-feature-disable-for-tests=envoy.reloadable_features.new_codec_behavior",
+        "--runtime-feature-override-for-tests=envoy.reloadable_features.new_codec_behavior",
     ],
     shard_count = 5,
     tags = ["fails_on_windows"],
