@@ -71,6 +71,16 @@ We will consider producing additional binary types depending on community intere
 CI, packaging, etc. Please open an `issue in GetEnvoy <https://github.com/tetratelabs/getenvoy/issues>`_
 for pre-built binaries for different platforms.
 
+.. _arm_binaries:
+
+ARM64 binaries
+^^^^^^^^^^^^^^
+
+`envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_ and
+`envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_ are Docker
+`multi-arch <https://www.docker.com/blog/multi-arch-build-and-images-the-simple-way/>`_ images
+and should run transparently on compatible ARM64 hosts.
+
 Modifying Envoy
 ---------------
 
