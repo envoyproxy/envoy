@@ -90,11 +90,11 @@ public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)), protobuf_filter_chain_(nullptr),
+        filters_factory_(std::move(filters_factory)), filter_chain_message_(nullptr),
         is_fake_placeholder_(false) {}
 
   FilterChainImpl(const envoy::config::listener::v3::FilterChain* filter_chain)
-      : protobuf_filter_chain_(filter_chain), is_fake_placeholder_(true) {}
+      : filter_chain_message_(filter_chain), is_fake_placeholder_(true) {}
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -110,10 +110,11 @@ public:
     ASSERT(factory_context_ == nullptr);
     factory_context_ = std::move(filter_chain_factory_context);
   }
+
   bool isFakeFilterChain() const { return is_fake_placeholder_; }
 
-  const envoy::config::listener::v3::FilterChain* const& getProtobufFilterChain() {
-    return protobuf_filter_chain_;
+  const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const {
+    return filter_chain_message_;
   }
 
 private:
@@ -121,7 +122,7 @@ private:
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
 
-  const envoy::config::listener::v3::FilterChain* protobuf_filter_chain_;
+  const envoy::config::listener::v3::FilterChain* const filter_chain_message_;
   bool is_fake_placeholder_;
 };
 
@@ -205,9 +206,10 @@ public:
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
 
   void addFakeFilterChain(
-      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span);
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
+      FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
 
-  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+  void addRealFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           FilterChainFactoryBuilder& b,
                           FilterChainFactoryContextCreator& context_creator);
 

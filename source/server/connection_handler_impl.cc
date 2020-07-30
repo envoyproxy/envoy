@@ -396,15 +396,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   // Find matching filter chain.
   // const Network::FilterChain* filter_chain
-  const auto& filter_chain = config_->filterChainManager().findFilterChain(*socket);
-  auto filter_chain_impl = dynamic_cast<const Server::FilterChainImpl*>(filter_chain);
-
-  if (filter_chain_rebuild_info_.find(filter_chain) != filter_chain_rebuild_info_.end()) {
-    // this filter chain is under rebuilding, ignore this connection. There will be reconnection
-    // what if multiple sockets are requesting the same filter chain??
-    // the current hash map<filter_chain, FilterChainRebuildInfo> only contains one socket
-    // reconnection.. option 1: return
-  }
+  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
+  const auto filter_chain_impl = dynamic_cast<const Server::FilterChainImpl*>(filter_chain);
 
   bool is_fake_filter_chain = filter_chain_impl->isFakeFilterChain();
   if (is_fake_filter_chain) {
@@ -415,32 +408,21 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     auto& listener = dynamic_cast<ListenerImpl&>(*config_);
     auto& server_dispatcher = listener.dispatcher();
     auto& worker_dispatcher = parent_.dispatcher_;
+    const auto& filter_chain_message = filter_chain_impl->getFilterChainMessage();
 
-    auto rb = std::make_unique<FilterChainRebuildInfo>(filter_chain, worker_name, listener_name,
-                                                       worker_dispatcher, socket, dynamic_metadata);
-    filter_chain_rebuild_info_[filter_chain] = std::move(rb);
-
-    // auto& listener_manager = listener.list
-    // auto retry = [this]() {
-    //   auto x = this->filter_chain_rebuild_info_;
-    // };
-
-    server_dispatcher.post([]() {});
-    // server_dispatcher.post([this, listener_name, &worker_dispatcher, retry]() {
-    //   // worker_dispatcher.
-    //   // this.
-    // });
-
-    // parent.dispatcher is connection_handler_impl.dispatcher
+    // auto filter_chain_rebuild_info = std::make_unique<FilterChainRebuildInfo>(*this,
+    // filter_chain_message, worker_name, listener_name,
+    //                                                    worker_dispatcher, socket,
+    //                                                    dynamic_metadata);
+    auto filter_chain_rebuild_info = std::make_unique<FilterChainRebuildInfo>(
+        worker_name, listener_name, worker_dispatcher, filter_chain_message);
 
     // auto filter_chain_manager = config_->filterChainManager();
-    // filter_chain_manager.
+    // auto& listener_manager = listener.list
 
-    //     listenerManager.updateReady(FilterChainRebuildInfo) {
-    //       worker[workerID].dispatcher.post([, ]) {
-    //         worker[workerID].retry(listenerID, filter_chain);
-    //       }
-    //     }
+    server_dispatcher.post([&listener, &filter_chain_message, &filter_chain_rebuild_info]() {
+      listener.buildRealFilterChains(filter_chain_message, std::move(filter_chain_rebuild_info));
+    });
 
     // after post
     // clean this connection, ready for retry
@@ -448,57 +430,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // cleanup
   }
 
-  if (filter_chain == nullptr) {
-    ENVOY_LOG(debug, "closing connection: no matching filter chain found");
-    stats_.no_filter_chain_match_.inc();
-    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
-    emitLogs(*config_, *stream_info);
-    socket->close();
-    return;
-  }
-
-  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
-  stream_info->setDownstreamSslConnection(transport_socket->ssl());
-  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
-  auto server_conn_ptr = parent_.dispatcher_.createServerConnection(
-      std::move(socket), std::move(transport_socket), *stream_info);
-  ActiveTcpConnectionPtr active_connection(
-      new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
-                              parent_.dispatcher_.timeSource(), std::move(stream_info)));
-  active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
-
-  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
-      *active_connection->connection_, filter_chain->networkFilterFactories());
-  if (empty_filter_chain) {
-    ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
-    active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
-  }
-
-  // If the connection is already closed, we can just let this connection immediately die.
-  if (active_connection->connection_->state() != Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
-    active_connection->connection_->addConnectionCallbacks(*active_connection);
-    active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
-  }
-}
-
-void ConnectionHandlerImpl::ActiveTcpListener::retryConnection(
-    Network::ConnectionSocketPtr&& socket,
-    const envoy::config::core::v3::Metadata& dynamic_metadata) {
-  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
-      parent_.dispatcher_.timeSource(), StreamInfo::FilterState::LifeSpan::Connection);
-  stream_info->setDownstreamLocalAddress(socket->localAddress());
-  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
-  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
-
-  // merge from the given dynamic metadata if it's not empty
-  if (dynamic_metadata.filter_metadata_size() > 0) {
-    stream_info->dynamicMetadata().MergeFrom(dynamic_metadata);
-  }
-
-  // Find matching filter chain.
-  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
     ENVOY_LOG(debug, "closing connection: no matching filter chain found");
     stats_.no_filter_chain_match_.inc();

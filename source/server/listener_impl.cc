@@ -223,6 +223,70 @@ Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *d
 // Must be overridden
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
+FilterChainRebuilder::FilterChainRebuilder()
+    : rebuild_complete_(false),
+      rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
+      rebuild_watcher_("rebuild_watcher", [this] {
+        rebuild_complete_ = true;
+        callback();
+      }) {}
+FilterChainRebuilder::~FilterChainRebuilder() = default;
+
+void FilterChainRebuilder::addRebuildInfo(FilterChainRebuildInfoPtr rebuild_info) {
+
+  // make callback func
+  // auto rbb = std::move(rb);
+  std::string worker_name = rebuild_info->worker_name_;
+  std::string listener_name = rebuild_info->listener_name_;
+
+  // add this listener_name to the callback set of this workers.
+  listeners_on_workers_to_callback_[worker_name].insert(listener_name);
+
+  // auto dispatcher = rebuild_info->worker_dispatcher_;
+  // add(worker_name, listener_name);
+
+  // auto cb = [info = std::move(rebuild_info)] (bool success) {
+  //   if(success) {
+  //     // auto dm = rb->dynamic_metadata;
+  //     // auto soc = rb->socket_;
+
+  //     dispatcher->post([listener_name] {
+
+  //     } )
+  //     info->worker_dispatcher_.post([info](){
+  //       info->listener_.newConnection(info->socket_, info->dynamic_metadata);
+  //     });
+  //   }
+  // };
+
+  // on_completion_callback_list_.emplace_back(cb);
+}
+
+void FilterChainRebuilder::callback() {
+  bool success = true;
+
+  // TODO(ASOPVII): Find all matching workers and listeners, send callback.
+  for (auto& workerSet : listeners_on_workers_to_callback_) {
+    const auto& worker_name = workerSet.first;
+    // find dispatcher of worker.
+    worker_name[0];
+    for (const auto& listener_name : workerSet.second) {
+      // find listener on this worker.
+      // retry connection on sockets of this listener.
+      listener_name[0];
+    }
+  }
+  // clear hash map after sending callback.
+
+  // TO DEL.
+  for (auto& cb : on_completion_callback_list_) {
+    cb(success);
+  }
+  on_completion_callback_list_.clear();
+}
+
+bool FilterChainRebuilder::rebuildComplete() { return rebuild_complete_; }
+
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
@@ -467,42 +531,52 @@ void ListenerImpl::buildFilterChains() {
 }
 
 void ListenerImpl::buildFakeFilterChains() {
-  filter_chain_manager_.addFakeFilterChain(config_.filter_chains()); // return fake
+  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
+      parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
+      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
+      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
+      parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
+  transport_factory_context.setInitManager(*dynamic_init_manager_);
+  ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+  filter_chain_manager_.addFakeFilterChain(config_.filter_chains(), builder, filter_chain_manager_);
 }
 
-// Init::WatcherImpl
-// ListenerImpl::defineWatcher(const envoy::config::listener::v3::FilterChain*& filter_chain) {
-//   auto init_watcher = filter_chain_specific_init_watcher_map_.find(filter_chain);
-//   init_watcher = std::make_unique<Init::WatcherImpl>(
-//       "name", [](absl::string_view) {}) return Init::WatcherImpl("name", cb)
-// }
+void ListenerImpl::buildRealFilterChains(
+    const envoy::config::listener::v3::FilterChain* const& filter_chain,
+    FilterChainRebuildInfoPtr rebuild_info) {
+  // auto filter_chain_name = filter_chain->name();
 
-// // might need addition callback func from listenerManager
-// void ListenerImpl::loadRealFilterChains(
-//     const envoy::config::listener::v3::FilterChain*& filter_chain) {
-//   auto filter_chain_name = filter_chain->name();
-//   auto init_manager = filter_chain_specific_init_manager_map_.find(filter_chain);
-//   if (init_manager == filter_chain_specific_init_manager_map_.end()) {
-//     init_manager = std::make_unique<Init::ManagerImpl>(fmt::format(
-//         "listener-filter-chain-init-manager {} {} {}", name_, filter_chain_name, hash_));
-//   }
-//   auto init_watcher = filter_chain_specific_init_watcher_map_.find(filter_chain);
-//   filter_chain_specific_init_watcher_map_[filter_chain] =
-//       std::make_unique<Init::WatcherImpl>("name", [this]() { parent_.beginListenerUpdate(); });
-//   init_manager->initialize(*init_watcher);
-//   // might need additional target to be added by listener_manager.init_manager_map[listenerImpl]
+  // Trigger rebuild request only on the arrival of the first filter_chain.
+  bool first_request = false;
 
-//   Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
-//       parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
-//       parent_.server_.clusterManager(), parent_.server_.localInfo(),
-//       parent_.server_.dispatcher(), parent_.server_.random(), parent_.server_.stats(),
-//       parent_.server_.singletonManager(), parent_.server_.threadLocal(), validation_visitor_,
-//       parent_.server_.api());
-//   transport_factory_context.setInitManager(*init_manager);
+  // Find/create rebuilder for protobuf::filter_chain.
+  if (filter_chain_rebuilder_map_.find(filter_chain) == filter_chain_rebuilder_map_.end()) {
+    filter_chain_rebuilder_map_[filter_chain] = std::make_unique<FilterChainRebuilder>();
+    first_request = true;
+  }
 
-//   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
-//   filter_chain_manager_.rebuildFilterChain(filter_chain, builder, filter_chain_manager_);
-// }
+  const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain]);
+  rebuilder->addRebuildInfo(std::move(rebuild_info));
+
+  if (rebuilder->rebuildComplete()) {
+    rebuilder->callback();
+  }
+
+  // Request dependencies only ony the first time.
+  if (first_request) {
+    Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
+        parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
+        parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
+        parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
+        parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
+    transport_factory_context.setInitManager(rebuilder->initManager());
+    ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+    filter_chain_manager_.addRealFilterChain(std::move(filter_chain), builder,
+                                             filter_chain_manager_);
+
+    rebuilder->startRebuilding();
+  }
+}
 
 void ListenerImpl::buildSocketOptions() {
   // TCP specific setup.

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -208,6 +207,58 @@ private:
   ListenerImpl& listener_impl_;
 };
 
+// filter_chain_rebuild_info that will be accessed by master thread
+struct FilterChainRebuildInfo {
+  FilterChainRebuildInfo(
+      const std::string& worker_name, const std::string& listener_name,
+      Event::Dispatcher& dispatcher,
+      const envoy::config::listener::v3::FilterChain* const& filter_chain_message)
+      : worker_name_(worker_name), listener_name_(listener_name), worker_dispatcher_(dispatcher),
+        filter_chain_message_(filter_chain_message) {}
+
+  const std::string& worker_name_;
+  const std::string& listener_name_;
+  Event::Dispatcher& worker_dispatcher_;
+  const envoy::config::listener::v3::FilterChain* const& filter_chain_message_;
+};
+
+using FilterChainRebuildInfoPtr = std::unique_ptr<FilterChainRebuildInfo>;
+
+class FilterChainRebuilder {
+public:
+  FilterChainRebuilder();
+  ~FilterChainRebuilder();
+
+  void addRebuildInfo(FilterChainRebuildInfoPtr rebuild_info);
+
+  bool rebuildComplete();
+
+  Init::Manager& initManager() { return *rebuild_init_manager_; }
+  void startRebuilding() { rebuild_init_manager_->initialize(rebuild_watcher_); }
+  // Trigger all callbacks in the current list, then clear the list.
+  void callback();
+
+private:
+  // rebuild state:
+  // true: rebuilding has finished successfully
+  // false: still in the rebuilding process
+  bool rebuild_complete_;
+
+  // This init manager is populated with targets from the filter chain factories, namely
+  // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
+  std::unique_ptr<Init::Manager> rebuild_init_manager_;
+  Init::WatcherImpl rebuild_watcher_;
+
+  using WorkerCallback = std::function<void(bool)>;
+  std::list<WorkerCallback> on_completion_callback_list_;
+
+  // now we only have the worker_name + listener_name
+  absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>>
+      listeners_on_workers_to_callback_;
+};
+
+using FilterChainRebuilderPtr = std::unique_ptr<FilterChainRebuilder>;
+
 /**
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
@@ -332,8 +383,9 @@ public:
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
   SystemTime last_updated_;
-  Init::WatcherImpl defineWatcher(const envoy::config::listener::v3::FilterChain*& filter_chain);
   Event::Dispatcher& dispatcher() { return listener_factory_context_->dispatcher(); }
+  void buildRealFilterChains(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+                             FilterChainRebuildInfoPtr rb);
 
 private:
   /**
@@ -352,14 +404,10 @@ private:
   void validateFilterChains(Network::Socket::Type socket_type);
   void buildFilterChains();
   void buildFakeFilterChains();
-  void loadRealFilterChains(const envoy::config::listener::v3::FilterChain*& filter_chain);
-  // std::unordered_map<const envoy::config::listener::v3::FilterChain*&,
-  //                    std::unique_ptr<Init::ManagerImpl>>
-  //     filter_chain_specific_init_manager_map_;
 
-  // std::unordered_map<const envoy::config::listener::v3::FilterChain*&,
-  //                    std::unique_ptr<Init::WatcherImpl>>
-  //     filter_chain_specific_init_watcher_map_;`
+  absl::flat_hash_map<const envoy::config::listener::v3::FilterChain* const,
+                      FilterChainRebuilderPtr>
+      filter_chain_rebuilder_map_;
 
   void buildSocketOptions();
   void buildOriginalDstListenerFilter();
