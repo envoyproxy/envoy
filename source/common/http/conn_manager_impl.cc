@@ -256,7 +256,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->high_watermark_count_ > 0);
-  new_stream->moveIntoList(std::move(new_stream), streams_);
+  LinkedList::moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
 
@@ -693,10 +693,10 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
-    sendLocalReply(
-        request_headers_ != nullptr && Grpc::Common::isGrpcRequestHeaders(*request_headers_),
-        Http::Code::RequestTimeout, "downstream duration timeout", nullptr, state_.is_head_request_,
-        absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+                   Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
+                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
   } else {
     stream_info_.setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
     connection_manager_.doEndStream(*this);
@@ -715,7 +715,7 @@ void ConnectionManagerImpl::FilterManager::addStreamDecoderFilterWorker(
   //     - B
   //     - C
   // The decoder filter chain will iterate through filters A, B, C.
-  wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+  LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
 void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
@@ -730,7 +730,7 @@ void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
   //     - B
   //     - C
   // The encoder filter chain will iterate through filters C, B, A.
-  wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
+  LinkedList::moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
