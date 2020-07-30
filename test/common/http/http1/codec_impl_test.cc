@@ -95,6 +95,8 @@ public:
   // Used to test if trailers are decoded/encoded
   void expectTrailersTest(bool enable_trailers);
 
+  void testAllowChunkedContentLength(bool allow_chunked_length);
+
   // Send the request, and validate the received request headers.
   // Then send a response just to clean up.
   void
@@ -324,6 +326,63 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
   buffer = Buffer::OwnedImpl(header_string + "\r\n");
   status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
+}
+
+void Http1ServerConnectionImplTest::testAllowChunkedContentLength(bool allow_chunked_length) {
+  // initialize();
+  // Make a new 'codec' with the right settings
+  codec_settings_.allow_chunked_length_ = allow_chunked_length;
+  // if (GetParam()) {
+  codec_ = std::make_unique<Http1::ServerConnectionImpl>(
+      connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+      max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  // } else {
+  //   codec_ = std::make_unique<Legacy::Http1::ServerConnectionImpl>(
+  //       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
+  //       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+  // }
+
+  MockRequestDecoder decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  Buffer::OwnedImpl expected_data("Hello World");
+
+  if (allow_chunked_length) {
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+    EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
+    EXPECT_CALL(decoder, decodeData(_, true));
+  } else {
+    EXPECT_CALL(decoder, decodeHeaders_(_, _)).Times(0);
+    EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
+    EXPECT_CALL(decoder, sendLocalReply(false, Http::Code::BadRequest, "Bad Request", _, _, _, _));
+  }
+
+  Buffer::OwnedImpl buffer(
+      "POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\ncontent-length: 1\r\n\r\n"
+      "6\r\nHello \r\n"
+      "5\r\nWorld\r\n"
+      "0\r\n\r\n");
+
+  auto status = codec_->dispatch(buffer);
+
+  if (allow_chunked_length) {
+    EXPECT_TRUE(status.ok());
+  } else {
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_EQ(status.message(), "Both Content-Length and Transfer-Encdoding headers are set.");
+    EXPECT_EQ("http1.content_length_not_allowed", response_encoder->getStream().responseDetails());
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(Codecs, Http1ServerConnectionImplTest, testing::Bool(),
@@ -2864,6 +2923,14 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersAccepted) {
   // Response already contains one header.
   buffer = Buffer::OwnedImpl(createHeaderFragment(150) + "\r\n");
   status = codec_->dispatch(buffer);
+}
+
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength) {
+  testAllowChunkedContentLength(false);
+}
+
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength) {
+  testAllowChunkedContentLength(true);
 }
 
 } // namespace Http
