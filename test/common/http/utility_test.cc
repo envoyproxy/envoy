@@ -1292,7 +1292,8 @@ TEST(Url, ParsingTest) {
 
   // Test having unicode chars in the URL.
   validateUrl("https://example.com/\xe5\x85\x89", "https", "example.com", "/%E5%85%89", 443);
-  validateUrl("https://example.com/光", "https", "example.com", "/%E5%85%89", 443);
+  validateUrl(u8"https://example.com/光", "https", "example.com", "/%E5%85%89", 443);
+  validateUrl("https://example.com/%E5%85%89", "https", "example.com", "/%E5%85%89", 443);
 }
 
 void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port,
