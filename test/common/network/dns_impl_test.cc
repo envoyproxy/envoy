@@ -393,10 +393,12 @@ public:
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   Address::Type type() const override { return instance_.type(); }
+  const std::string& socketInterface() const override { return socket_interface_; }
 
 private:
   std::string antagonistic_name_;
   Address::Ipv4Instance instance_;
+  std::string socket_interface_{""};
 };
 
 TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
