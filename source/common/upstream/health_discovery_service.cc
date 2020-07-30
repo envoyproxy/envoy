@@ -102,14 +102,12 @@ void HdsDelegate::handleFailure() {
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
 envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelegate::sendResponse() {
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
-  // Hold information about the current locality for comparison.
-  envoy::config::core::v3::Locality current_locality;
 
   for (const auto& cluster : hds_clusters_) {
     // Add cluster health response and set name
     auto* cluster_health =
         response.mutable_endpoint_health_response()->add_cluster_endpoints_health();
-    cluster_health->set_cluster_name(cluster->info()->name());
+    cluster_health->set_cluster_name(cluster->name());
 
     // Hold all endpoint health information by locality, updated when a new locality
     // has been seen.
@@ -119,7 +117,8 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
         // If we are on a new locality grouping, add grouping and copy the locality.
-        if (locality_health == nullptr || !LocalityEqualTo()(host->locality(), current_locality)) {
+        if (locality_health == nullptr ||
+            !LocalityEqualTo()(host->locality(), locality_health->locality())) {
           locality_health = cluster_health->add_locality_endpoints_health();
           locality_health->mutable_locality()->MergeFrom(host->locality());
         }

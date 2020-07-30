@@ -107,43 +107,44 @@ protected:
     return msg;
   }
 
-   // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
-   // with only one health check type.
-  envoy::service::health::v3::HealthCheckSpecifier* createComplexSpecifier() {
-    // start with the simple message with 1 cluster, locality, and endpoint.
-    envoy::service::health::v3::HealthCheckSpecifier* msg = createSimpleMessage();
+  // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
+  // with only one health check type.
+  envoy::service::health::v3::HealthCheckSpecifier*
+  createComplexSpecifier(const int& n_clusters, const int& n_localities, const int& n_endpoints) {
+    envoy::service::health::v3::HealthCheckSpecifier* msg =
+        new envoy::service::health::v3::HealthCheckSpecifier;
+    msg->mutable_interval()->set_seconds(1);
 
-    auto* health_check = msg->add_cluster_health_checks();
-    health_check->set_cluster_name("billy");
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
-    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
-    health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
-    health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-    health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
-        envoy::type::v3::HTTP1);
-    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
-    auto* locality_endpoints = health_check->add_locality_endpoints();
-    locality_endpoints->mutable_locality()->set_region("middle_earth");
-    locality_endpoints->mutable_locality()->set_zone("rhovanion");
-    locality_endpoints->mutable_locality()->set_sub_zone("dale");
-    auto* socket_address =
-        locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
-    socket_address->set_address("127.0.0.1");
-    socket_address->set_port_value(1235);
-    socket_address = locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
-    socket_address->set_address("127.0.0.2");
-    socket_address->set_port_value(1236);
-    locality_endpoints = health_check->add_locality_endpoints();
-    locality_endpoints->mutable_locality()->set_region("middle_earth");
-    locality_endpoints->mutable_locality()->set_zone("rhovanion");
-    locality_endpoints->mutable_locality()->set_sub_zone("erebor");
-    socket_address = locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
-    socket_address->set_address("127.0.0.3");
-    socket_address->set_port_value(1237);
-    socket_address = locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
-    socket_address->set_address("127.0.0.4");
-    socket_address->set_port_value(1238);
+    for (int cluster_num = 0; cluster_num < n_clusters; cluster_num++) {
+      // add a cluster with a name by iteration, with path /healthcheck
+      auto* health_check = msg->add_cluster_health_checks();
+      health_check->set_cluster_name("anna" + std::to_string(cluster_num));
+      health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+      health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+      health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
+      health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
+      health_check->mutable_health_checks(0)->mutable_grpc_health_check();
+      health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
+          envoy::type::v3::HTTP1);
+      health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+
+      // add some locality groupings
+      for (int loc_num = 0; loc_num < n_localities; loc_num++) {
+        auto* locality_endpoints = health_check->add_locality_endpoints();
+        locality_endpoints->mutable_locality()->set_region("region" + std::to_string(cluster_num));
+        locality_endpoints->mutable_locality()->set_zone("zone" + std::to_string(loc_num));
+        locality_endpoints->mutable_locality()->set_sub_zone("subzone" + std::to_string(loc_num));
+
+        // add some endpoints to the locality group
+        for (int endpoint_num = 0; endpoint_num < n_endpoints; endpoint_num++) {
+          auto* socket_address =
+              locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+          socket_address->set_address("127." + std::to_string(cluster_num) + "." +
+                                      std::to_string(loc_num) + "." + std::to_string(endpoint_num));
+          socket_address->set_port_value(1234);
+        }
+      }
+    }
 
     return msg;
   }
@@ -364,34 +365,52 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
   createHdsDelegate();
 
   // Create Message
-  message.reset(createComplexSpecifier());
+  message.reset(createComplexSpecifier(2, 2, 2));
 
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2).WillRepeatedly(Return(cluster_info_));
-  EXPECT_CALL(*connection_, setBufferLimits(_)).Times(3);
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
-
-  // Set config
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  // EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  // read the response and check that it is pinging the old
-  // address 127.0.0.0 instead of the new 9.9.9.9
-  auto response = hds_delegate_->sendResponse();
-  EXPECT_EQ(response.endpoint_health_response()
-                .endpoints_health(0)
-                .endpoint()
-                .address()
-                .socket_address()
-                .address(),
-            "127.0.0.0");
+  // read response and verify fields
+  auto response = hds_delegate_->sendResponse().endpoint_health_response();
 
-  // Check Correctness by verifying one request and one error has been generated in stat_
-  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).errors_.value(), 1);
-  EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
+  EXPECT_EQ(response.cluster_endpoints_health_size(), 2);
+
+  for (int i = 0; i < 2; i++) {
+    auto& cluster = response.cluster_endpoints_health(i);
+
+    // Expect the correct cluster name by index
+    EXPECT_EQ(cluster.cluster_name(), "anna" + std::to_string(i));
+
+    // Every cluster should have two locality groupings
+    EXPECT_EQ(cluster.locality_endpoints_health_size(), 2);
+
+    for (int j = 0; j < 2; j++) {
+      // Every locality should have a number based on its index
+      auto& loc_group = cluster.locality_endpoints_health(j);
+      EXPECT_EQ(loc_group.locality().region(), "region" + std::to_string(i));
+      EXPECT_EQ(loc_group.locality().zone(), "zone" + std::to_string(j));
+      EXPECT_EQ(loc_group.locality().sub_zone(), "subzone" + std::to_string(j));
+
+      // Every locality should have two endpoints.
+      EXPECT_EQ(loc_group.endpoints_health_size(), 2);
+
+      for (int k = 0; k < 2; k++) {
+
+        // every endpoint's address is based on all 3 index values.
+        auto& endpoint_health = loc_group.endpoints_health(k);
+        EXPECT_EQ(endpoint_health.endpoint().address().socket_address().address(),
+                  "127." + std::to_string(i) + "." + std::to_string(j) + "." + std::to_string(k));
+      }
+    }
+  }
 }
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
