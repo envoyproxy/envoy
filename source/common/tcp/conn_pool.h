@@ -109,7 +109,6 @@ public:
   void clearCallbacks();
 
   ConnPoolImpl& parent_;
-  Upstream::HostDescriptionConstSharedPtr real_host_description_;
   ConnectionPool::UpstreamCallbacks* callbacks_{};
   Network::ClientConnectionPtr connection_;
   ConnectionPool::ConnectionStatePtr connection_state_;
