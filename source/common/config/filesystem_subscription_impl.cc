@@ -27,7 +27,7 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
 }
 
 // Config::Subscription
-void FilesystemSubscriptionImpl::start(const std::set<std::string>&) {
+void FilesystemSubscriptionImpl::start(const std::set<std::string>&, const bool) {
   started_ = true;
   // Attempt to read in case there is a file there already.
   refresh();

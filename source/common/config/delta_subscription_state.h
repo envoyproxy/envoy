@@ -23,7 +23,7 @@ namespace Config {
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         const LocalInfo::LocalInfo& local_info);
+                         const LocalInfo::LocalInfo& local_info, const bool use_prefix_matching);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const std::set<std::string>& cur_added,
@@ -98,6 +98,7 @@ private:
   // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
+  const bool use_prefix_matching_;
 };
 
 } // namespace Config

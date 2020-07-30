@@ -55,6 +55,7 @@ public:
   const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
     return resource_ids_in_last_update_;
   }
+  std::set<std::string> vhdsVhosts() const override;
 
 private:
   TimeSource& time_source_;

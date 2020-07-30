@@ -151,7 +151,7 @@ public:
   virtual void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) PURE;
+      const std::string& system_version_info, const bool use_prefix_matching) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
@@ -175,7 +175,7 @@ public:
    * to fetch throughout the lifetime of the Subscription object.
    * @param resources set of resource names to fetch.
    */
-  virtual void start(const std::set<std::string>& resource_names) PURE;
+  virtual void start(const std::set<std::string>& resource_names, const bool use_prefix_matching = false) PURE;
 
   /**
    * Update the resources to fetch.
@@ -183,6 +183,8 @@ public:
    * be passed to std::set_difference, which must be given sorted collections.
    */
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+
+  virtual void addResourceInterest(const std::set<std::string>& add_these_names) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;
