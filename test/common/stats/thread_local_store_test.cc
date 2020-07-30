@@ -385,7 +385,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   tls_.shutdownThread();
 }
 
-TEST_F(StatsThreadLocalStoreTest, ScopeOverlap) {
+TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
@@ -402,6 +402,15 @@ TEST_F(StatsThreadLocalStoreTest, ScopeOverlap) {
   TextReadout& text_readout = scope1->textReadoutFromString("tr");
   EXPECT_EQ(&text_readout, &scope2->textReadoutFromString("tr"));
   Histogram& histogram = scope1->histogramFromString("histogram", Histogram::Unit::Unspecified);
+  EXPECT_EQ(&histogram, &scope2->histogramFromString("histogram", Histogram::Unit::Unspecified));
+
+  // The histogram was created in scope1, which can now be destroyed. But the
+  // histogram is kept alive by scope2.
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 100));
+  histogram.recordValue(100);
+  scope1.reset();
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 200));
+  histogram.recordValue(200);
   EXPECT_EQ(&histogram, &scope2->histogramFromString("histogram", Histogram::Unit::Unspecified));
 
   store_->shutdownThreading();

@@ -19,8 +19,6 @@
 
 #include "absl/strings/str_join.h"
 
-#define HIST_SET 1
-
 namespace Envoy {
 namespace Stats {
 
@@ -203,12 +201,9 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
         [this]() -> void {
-          for (const auto& scope : tls_->getTyped<TlsCache>().scope_cache_) {
-            const TlsCacheEntry& tls_cache_entry = scope.second;
-            for (const auto& name_histogram_pair : tls_cache_entry.histograms_) {
-              const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
-              tls_hist->beginMerge();
-            }
+          for (const auto& id_hist : tls_->getTyped<TlsCache>().histogram_cache_) {
+            const TlsHistogramSharedPtr& tls_hist = id_hist.second;
+            tls_hist->beginMerge();
           }
         },
         [this, merge_complete_cb]() -> void { mergeInternal(merge_complete_cb); });
@@ -573,7 +568,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                        buckets = &parent_.histogram_settings_->buckets(stat_name);
                                      });
 
-#if HIST_SET
     RefcountPtr<ParentHistogramImpl> stat;
     {
       Thread::LockGuard lock(parent_.hist_mutex_);
@@ -581,19 +575,14 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       if (iter != parent_.histogram_set_.end()) {
         stat = RefcountPtr<ParentHistogramImpl>(*iter);
       } else {
-        stat = new ParentHistogramImpl(final_stat_name, unit, parent_, *this,
+        stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
                                        tag_helper.tagExtractedName(), tag_helper.statNameTags(),
-                                       *buckets);
+                                       *buckets, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
         }
       }
     }
-#else
-    RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
-        final_stat_name, unit, parent_, *this, tag_helper.tagExtractedName(),
-        tag_helper.statNameTags(), *buckets));
-#endif
 
     central_ref = &central_cache_->histograms_[stat->statName()];
     *central_ref = stat;
@@ -665,34 +654,34 @@ TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName
   return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
-                                                         ParentHistogramImpl& parent) {
+Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint64_t id) {
   // tlsHistogram() is generally not called for a histogram that is rejected by
   // the matcher, so no further rejection-checking is needed at this level.
   // TlsHistogram inherits its reject/accept status from ParentHistogram.
 
   // See comments in counterFromStatName() which explains the logic here.
 
-  StatNameHashMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_;
-    auto iter = tls_cache->find(name);
-    if (iter != tls_cache->end()) {
-      return *iter->second;
+  TlsHistogramSharedPtr* tls_histogram = nullptr;
+  if (!shutting_down_ && tls_) {
+    TlsCache& tls_cache = tls_->getTyped<TlsCache>();
+    tls_histogram = &tls_cache.histogram_cache_[id];
+    if (*tls_histogram != nullptr) {
+      return **tls_histogram;
     }
   }
 
-  StatNameTagHelper tag_helper(parent_, name, absl::nullopt);
+  StatNameTagHelper tag_helper(*this, parent.statName(), absl::nullopt);
 
   TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(name, parent.unit(), tag_helper.tagExtractedName(),
+      new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), tag_helper.tagExtractedName(),
                                    tag_helper.statNameTags(), symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
-  if (tls_cache) {
-    tls_cache->insert(std::make_pair(hist_tls_ptr->statName(), hist_tls_ptr));
+  if (tls_histogram != nullptr) {
+    *tls_histogram = hist_tls_ptr;
   }
+
   return *hist_tls_ptr;
 }
 
@@ -726,31 +715,31 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 }
 
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
-                                         ThreadLocalStoreImpl& parent, TlsScope& tls_scope,
-                                         StatName tag_extracted_name,
+                                         ThreadLocalStoreImpl& parent, StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags,
-                                         ConstSupportedBuckets& supported_buckets)
+                                         ConstSupportedBuckets& supported_buckets, uint64_t id)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, parent.symbolTable()), unit_(unit),
-      parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
-      cumulative_histogram_(hist_alloc()),
+      parent_(parent), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, supported_buckets),
-      cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false) {}
+      cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
+  ASSERT(ref_count_ == 0);
   MetricImpl::clear(parent_.symbolTable());
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }
 
+void ParentHistogramImpl::incRefCount() { ++ref_count_; }
+
 bool ParentHistogramImpl::decRefCount() {
-#if HIST_SET
+  bool ret;
   if (shutting_down_) {
-    return --ref_count_ == 0;
+    ret = --ref_count_ == 0;
+  } else {
+    ret = parent_.decHistogramRefCount(*this, ref_count_);
   }
-  return parent_.decHistogramRefCount(*this, ref_count_);
-#else
-  return --ref_count_ == 0;
-#endif
+  return ret;
 }
 
 bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
@@ -777,7 +766,7 @@ SymbolTable& ParentHistogramImpl::symbolTable() { return parent_.symbolTable(); 
 Histogram::Unit ParentHistogramImpl::unit() const { return unit_; }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = tls_scope_.tlsHistogram(statName(), *this);
+  Histogram& tls_histogram = parent_.tlsHistogram(*this, id_);
   tls_histogram.recordValue(value);
   parent_.deliverHistogramToSinks(*this, value);
 }

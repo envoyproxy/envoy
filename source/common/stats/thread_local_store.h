@@ -74,7 +74,6 @@ private:
 
 using TlsHistogramSharedPtr = RefcountPtr<ThreadLocalHistogramImpl>;
 
-class TlsScope;
 class ThreadLocalStoreImpl;
 
 /**
@@ -83,9 +82,8 @@ class ThreadLocalStoreImpl;
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
-                      TlsScope& tls_scope, StatName tag_extracted_name,
-                      const StatNameTagVector& stat_name_tags,
-                      ConstSupportedBuckets& supported_buckets);
+                      StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
+                      ConstSupportedBuckets& supported_buckets, uint64_t id);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -114,7 +112,7 @@ public:
   bool used() const override;
 
   // RefcountInterface
-  void incRefCount() override { ++ref_count_; }
+  void incRefCount() override;
   bool decRefCount() override;
   uint32_t use_count() const override { return ref_count_; }
 
@@ -126,7 +124,6 @@ private:
 
   Histogram::Unit unit_;
   ThreadLocalStoreImpl& parent_;
-  TlsScope& tls_scope_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
   HistogramStatisticsImpl interval_statistics_;
@@ -136,25 +133,10 @@ private:
   bool merged_;
   std::atomic<bool> shutting_down_{false};
   std::atomic<uint32_t> ref_count_{0};
+  const uint64_t id_; // Index into TlsCache::histogram_cache_.
 };
 
 using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
-
-/**
- * Class used to create ThreadLocalHistogram in the scope.
- */
-class TlsScope : public Scope {
-public:
-  ~TlsScope() override = default;
-
-  // TODO(ramaraochavali): Allow direct TLS access for the advanced consumers.
-  /**
-   * @return a ThreadLocalHistogram within the scope's namespace.
-   * @param name name of the histogram with scope prefix attached.
-   * @param parent the parent histogram.
-   */
-  virtual Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) PURE;
-};
 
 /**
  * Store implementation with thread local caching. For design details see
@@ -272,6 +254,8 @@ public:
   void shutdownThreading() override;
   void mergeHistograms(PostMergeCb merge_cb) override;
 
+  Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
+
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
    */
@@ -298,7 +282,6 @@ private:
 
     // The histogram objects are not shared with the central cache, and don't
     // require taking a lock when decrementing their ref-count.
-    StatNameHashMap<TlsHistogramSharedPtr> histograms_;
     StatNameHashMap<ParentHistogramSharedPtr> parent_histograms_;
 
     // We keep a TLS cache of rejected stat names. This costs memory, but
@@ -323,7 +306,7 @@ private:
   };
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
-  struct ScopeImpl : public TlsScope {
+  struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
     ~ScopeImpl() override;
 
@@ -336,7 +319,6 @@ private:
     Histogram& histogramFromStatNameWithTags(const StatName& name,
                                              StatNameTagVectorOptConstRef tags,
                                              Histogram::Unit unit) override;
-    Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopePtr createScope(const std::string& name) override {
@@ -453,6 +435,9 @@ private:
     // store. See the overview for more information. This complexity is required for lockless
     // operation in the fast path.
     absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
+
+    // Maps from histogram ID (monotonically increasing) to a TLS histogram.
+    absl::flat_hash_map<uint64_t, TlsHistogramSharedPtr> histogram_cache_;
   };
 
   template <class StatFn> bool iterHelper(StatFn fn) const {
@@ -511,6 +496,7 @@ private:
 
   Thread::ThreadSynchronizer sync_;
   std::atomic<uint64_t> next_scope_id_{};
+  uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
   StatNameSetPtr well_known_tags_;
 
