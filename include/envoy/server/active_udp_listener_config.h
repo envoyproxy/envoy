@@ -10,7 +10,7 @@ namespace Server {
 
 /**
  * Interface to create udp listener according to
- * envoy::api::v2::listener::UdpListenerConfig.udp_listener_name.
+ * envoy::config::listener::v3::UdpListenerConfig.udp_listener_name.
  */
 class ActiveUdpListenerConfigFactory : public Config::UntypedFactory {
 public:

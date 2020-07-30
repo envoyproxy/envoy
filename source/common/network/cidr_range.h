@@ -94,7 +94,7 @@ public:
   static CidrRange create(const std::string& range);
 
   /**
-   * Constructs a CidrRange from envoy::api::v2::core::CidrRange.
+   * Constructs a CidrRange from envoy::config::core::v3::CidrRange.
    * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    */
   static CidrRange create(const envoy::config::core::v3::CidrRange& cidr);

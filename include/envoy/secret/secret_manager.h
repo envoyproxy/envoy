@@ -24,7 +24,7 @@ public:
   virtual ~SecretManager() = default;
 
   /**
-   * @param add a static secret from envoy::api::v2::auth::Secret.
+   * @param add a static secret from envoy::extensions::transport_sockets::tls::v3::Secret.
    * @throw an EnvoyException if the secret is invalid or not supported, or there is duplicate.
    */
   virtual void
