@@ -9,6 +9,9 @@ cd "${TEST_SRCDIR}/envoy"
 rm -rf "${TEST_TMPDIR}/${TEST_DATA}"
 mkdir -p "${TEST_TMPDIR}/${TEST_DATA}"
 cp -RfL "${TEST_DATA}"/* "${TEST_TMPDIR}/${TEST_DATA}"
+# Verify text value is treated as a binary blob regardless of source line-ending settings
+printf "hello\nworld" > "${TEST_TMPDIR}/${TEST_DATA}/root/envoy/file_lf"
+printf "hello\r\nworld" > "${TEST_TMPDIR}/${TEST_DATA}/root/envoy/file_crlf"
 chmod -R u+rwX "${TEST_TMPDIR}/${TEST_DATA}"
 
 # Deliberate symlink of doom.
