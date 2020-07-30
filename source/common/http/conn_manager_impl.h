@@ -759,6 +759,7 @@ private:
     Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
+    absl::optional<uint64_t> scope_key_hash_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -820,6 +821,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+
 }; // namespace Http
 
 } // namespace Http

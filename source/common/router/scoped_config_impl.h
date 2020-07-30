@@ -190,9 +190,9 @@ public:
 
   // Envoy::Router::ScopedConfig
   Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers) const override;
-
-  uint64_t computeKeyHash(const Http::HeaderMap& headers) const override;
-  bool scopeExistsButNotLoaded(uint64_t key_hash) const override;
+  Router::ConfigConstSharedPtr getRouteConfig(absl::optional<uint64_t> key_hash) const override;
+  // The return value is not null only if the scope corresponding to the header exists.
+  absl::optional<uint64_t> computeKeyHash(const Http::HeaderMap& headers) const override;
 
 private:
   ScopeKeyBuilderImpl scope_key_builder_;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -501,7 +502,6 @@ public:
   ~MockScopedConfig() override;
 
   MOCK_METHOD(ConfigConstSharedPtr, getRouteConfig, (const Http::HeaderMap& headers), (const));
-
   std::shared_ptr<MockConfig> route_config_{new NiceMock<MockConfig>()};
 };
 

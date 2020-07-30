@@ -933,6 +933,58 @@ key:
   EXPECT_EQ(getScopedRouteMap().size(), 2);
 }
 
+TEST_F(ScopedRdsTest, SecondaryPriorityScopeLoadedlazily) {
+  setup();
+  init_watcher_.expectReady();
+  // Default priority of a scope is primary, should be loaded eagerly.
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  // Secondary priority scope should be loaded lazily.
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+priority: Secondary
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
+
+  // Delta API.
+  const auto decoded_resources = TestUtility::decodeResources({lazy_resource, eager_resource});
+  context_init_manager_.initialize(init_watcher_);
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  EXPECT_EQ(1UL,
+            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(getScopedRouteMap().size(), 2);
+
+  // Verify the config is a ScopedConfigImpl instance, both scopes point to "" as RDS hasn't kicked
+  // in yet(NullConfigImpl returned).
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "");
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+              IsNull());
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
