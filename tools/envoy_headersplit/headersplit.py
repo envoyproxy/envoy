@@ -236,7 +236,7 @@ def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dic
   return classname_to_impl
 
 
-def get_enclosing_namespace(defn: Cursor) -> Tuple[str,str]:
+def get_enclosing_namespace(defn: Cursor) -> Tuple[str, str]:
   """
     retrieves all enclosing namespaces for the class pointed by defn.
 
@@ -275,7 +275,7 @@ def get_enclosing_namespace(defn: Cursor) -> Tuple[str,str]:
     namespace_prefix = "namespace {} {{\n".format(parent_cursor.spelling) + namespace_prefix
     namespace_suffix += "\n}"
     parent_cursor = parent_cursor.semantic_parent
-  namespace_suffix+='\n'
+  namespace_suffix += '\n'
   return namespace_prefix, namespace_suffix
 
 
