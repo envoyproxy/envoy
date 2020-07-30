@@ -549,11 +549,19 @@ ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
                            config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
-                                           Network::SocketSharedPtr listen_socket,
+                                           Network::SocketSharedPtr listen_socket_ptr,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(parent, *listen_socket,
-                           dispatcher.createUdpListener(std::move(listen_socket), *this), config) {}
+    : ActiveRawUdpListener(parent, *listen_socket_ptr, listen_socket_ptr, dispatcher, config) {}
+
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::Socket& listen_socket,
+                                           Network::SocketSharedPtr listen_socket_ptr,
+                                           Event::Dispatcher& dispatcher,
+                                           Network::ListenerConfig& config)
+    : ActiveRawUdpListener(parent, listen_socket,
+                           dispatcher.createUdpListener(std::move(listen_socket_ptr), *this),
+                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
                                            Network::Socket& listen_socket,

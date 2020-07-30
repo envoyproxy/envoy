@@ -348,8 +348,12 @@ class ActiveRawUdpListener : public Network::UdpListenerCallbacks,
 public:
   ActiveRawUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                        Network::ListenerConfig& config);
-  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
-                       Event::Dispatcher& dispatcher, Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                       Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
+                       Network::ListenerConfig& config);
+  ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
+                       Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
+                       Network::ListenerConfig& config);
   ActiveRawUdpListener(Network::ConnectionHandler& parent, Network::Socket& listen_socket,
                        Network::UdpListenerPtr&& listener, Network::ListenerConfig& config);
 
