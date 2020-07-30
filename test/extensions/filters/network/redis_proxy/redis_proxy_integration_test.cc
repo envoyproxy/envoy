@@ -117,12 +117,12 @@ static_resources:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 1
+                    port_value: 0
             - endpoint:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 1
+                    port_value: 0
     - name: cluster_2
       type: STATIC
       lb_policy: RANDOM
@@ -134,12 +134,12 @@ static_resources:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 2
+                    port_value: 0
             - endpoint:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 2
+                    port_value: 0
   listeners:
     name: listener_0
     address:
@@ -235,7 +235,7 @@ static_resources:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 1
+                    port_value: 0
     - name: cluster_2
       type: STATIC
       typed_extension_protocol_options:
@@ -251,7 +251,7 @@ static_resources:
                 address:
                   socket_address:
                     address: 127.0.0.1
-                    port_value: 2
+                    port_value: 0
   listeners:
     name: listener_0
     address:
