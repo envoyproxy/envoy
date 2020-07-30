@@ -59,14 +59,14 @@ Configuration
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
 * This filter should be configured with the name *envoy.filters.http.lua*.
 
-A simple example of configuring Lua HTTP filter that contains only :ref:`inline_code 
+A simple example of configuring Lua HTTP filter that contains only :ref:`inline_code
 <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` is as follow:
 
 .. code-block:: yaml
 
   name: envoy.filters.http.lua
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.lua
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
     inline_code: |
       -- Called on the request path.
       function envoy_on_request(request_handle)
@@ -77,14 +77,14 @@ A simple example of configuring Lua HTTP filter that contains only :ref:`inline_
         -- Do something.
       end
 
-By default, Lua script defined in ``inline_code`` will be treated as a ``GLOBAL`` script. Envoy will 
+By default, Lua script defined in ``inline_code`` will be treated as a ``GLOBAL`` script. Envoy will
 execute it for every HTTP request.
 
 Per-Route Configuration
 -----------------------
 
-The Lua HTTP filter also can be disabled or overridden on a per-route basis by providing a 
-:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration 
+The Lua HTTP filter also can be disabled or overridden on a per-route basis by providing a
+:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration
 on the virtual host, route, or weighted cluster.
 
 As a concrete example, given the following Lua filter configuration:
@@ -93,7 +93,7 @@ As a concrete example, given the following Lua filter configuration:
 
   name: envoy.filters.http.lua
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.lua
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
     inline_code: |
       function envoy_on_request(request_handle)
         -- do something
@@ -110,8 +110,9 @@ As a concrete example, given the following Lua filter configuration:
             response_handle:logInfo("Bye Bye.")
           end
 
-The HTTP Lua filter can be disabled on some virtual host, route, or weighted cluster by the 
-LuaPerRoute configuration as follow:
+The HTTP Lua filter can be disabled on some virtual host, route, or weighted cluster by the
+:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration as
+follow:
 
 .. code-block:: yaml
 
@@ -119,7 +120,7 @@ LuaPerRoute configuration as follow:
     envoy.filters.http.lua:
       disabled: true
 
-We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute. 
+We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
 The ``GLOBAL`` Lua script will be overridden by the referenced script:
 
 .. code-block:: yaml
@@ -130,10 +131,10 @@ The ``GLOBAL`` Lua script will be overridden by the referenced script:
 
 .. attention::
 
-  The name ``GLOBAL`` is reserved for :ref:`Lua.inline_code 
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use 
+  The name ``GLOBAL`` is reserved for :ref:`Lua.inline_code
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use
   ``GLOBAL`` as name for other Lua scripts.
-    
+
 
 Script examples
 ---------------

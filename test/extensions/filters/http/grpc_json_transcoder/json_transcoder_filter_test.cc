@@ -1055,9 +1055,8 @@ private:
 // Single headers frame with end_stream flag (trailer), no grpc-status-details-bin header.
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingTextHeadersInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, /*streaming=*/false,
-                                                 /*end_stream=*/false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool, bool) {
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
       }));
 
@@ -1076,9 +1075,8 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingTextHeadersInTr
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
        TranscodingBinaryHeaderInTrailerOnlyResponse) {
   const std::string expected_response(R"({"code":5,"message":"Resource not found"})");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, /*streaming=*/false,
-                                                 /*end_stream=*/false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool, bool) {
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
       }));
 
@@ -1103,9 +1101,8 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest,
   const std::string expected_response(
       "{\"code\":5,\"message\":\"Error\",\"details\":"
       "[{\"@type\":\"type.googleapis.com/helloworld.HelloReply\",\"message\":\"details\"}]}");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, /*streaming=*/false,
-                                                 /*end_stream=*/false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool, bool) {
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
       }));
 
@@ -1129,9 +1126,8 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, TranscodingStatusFromTrail
             filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("application/json", response_headers.get_("content-type"));
   std::string expected_response(R"({"code":5,"message":"Resource not found"})");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, /*streaming=*/false,
-                                                 /*end_stream=*/false))
-      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool, bool) {
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());
       }));
   Http::TestResponseTrailerMapImpl response_trailers{
@@ -1181,7 +1177,7 @@ TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusTest, SkipTranscodingStatusIfBod
   const std::string response_json = response_data->toString();
   EXPECT_EQ(R"({"id":"20","theme":"Children"})", response_json);
 
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _, false)).Times(0);
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _)).Times(0);
 
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));

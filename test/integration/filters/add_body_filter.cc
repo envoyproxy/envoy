@@ -34,7 +34,7 @@ public:
     if (end_stream) {
       Buffer::OwnedImpl body("body");
       headers.setContentLength(body.length());
-      encoder_callbacks_->addEncodedData(body, false, false);
+      encoder_callbacks_->addEncodedData(body, false);
     }
 
     return Http::FilterHeadersStatus::Continue;

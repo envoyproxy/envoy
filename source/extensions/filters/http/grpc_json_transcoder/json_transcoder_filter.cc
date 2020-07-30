@@ -146,7 +146,11 @@ JsonTranscoderConfig::JsonTranscoderConfig(
                                                        &descriptor_pool_));
 
   PathMatcherBuilder<MethodInfoSharedPtr> pmb;
+  // clang-format off
+  // We cannot convert this to a absl hash set as PathMatcherUtility::RegisterByHttpRule takes a
+  // std::unordered_set as an argument
   std::unordered_set<std::string> ignored_query_parameters;
+  // clang-format on
   for (const auto& query_param : proto_config.ignored_query_parameters()) {
     ignored_query_parameters.insert(query_param);
   }
@@ -598,7 +602,7 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
     Buffer::OwnedImpl data;
     readToBuffer(*transcoder_->ResponseOutput(), data);
     if (data.length()) {
-      encoder_callbacks_->addEncodedData(data, /*streaming=*/true, /*end_stream=*/false);
+      encoder_callbacks_->addEncodedData(data, true);
     }
   }
 
@@ -796,7 +800,7 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   response_headers_->setContentLength(json_status.length());
 
   Buffer::OwnedImpl status_data(json_status);
-  encoder_callbacks_->addEncodedData(status_data, /*streaming=*/false, /*end_stream=*/false);
+  encoder_callbacks_->addEncodedData(status_data, false);
   return true;
 }
 

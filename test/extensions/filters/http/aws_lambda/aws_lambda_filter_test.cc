@@ -475,7 +475,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataAddsLastChunk) {
   filter_->encodeHeaders(headers, false /*end_stream*/);
 
   Buffer::OwnedImpl buf(std::string("foobar"));
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, /*streaming=*/false, /*end_stream=*/false));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false));
   EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&buf));
   filter_->encodeData(buf, true /*end_stream*/);
 }

@@ -222,11 +222,11 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMa
   buffer.move(temp);
   if (is_text_response_) {
     Buffer::OwnedImpl encoded(Base64::encode(buffer, buffer.length()));
-    encoder_callbacks_->addEncodedData(encoded, /*streaming=*/true, /*end_stream=*/true);
+    encoder_callbacks_->addEncodedData(encoded, true);
   } else {
-    encoder_callbacks_->addEncodedData(buffer, /*streaming=*/true, /*end_stream=*/true);
+    encoder_callbacks_->addEncodedData(buffer, true);
   }
-  return Http::FilterTrailersStatus::StopIteration;
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void GrpcWebFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {

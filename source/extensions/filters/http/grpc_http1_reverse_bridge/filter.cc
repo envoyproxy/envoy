@@ -203,7 +203,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 
   if (withhold_grpc_frames_) {
     buildGrpcFrameHeader(buffer_);
-    encoder_callbacks_->addEncodedData(buffer_, /*streaming=*/false, /*end_stream=*/false);
+    encoder_callbacks_->addEncodedData(buffer_, false);
   }
 
   return Http::FilterTrailersStatus::Continue;

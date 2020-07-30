@@ -224,7 +224,7 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "0"}};
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ(1UL,
             decoder_callbacks_.clusterInfo()
                 ->statsScope()
@@ -246,7 +246,7 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
   Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "1"}};
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   EXPECT_EQ(1UL,
             decoder_callbacks_.clusterInfo()
                 ->statsScope()
@@ -354,12 +354,12 @@ TEST_P(GrpcWebFilterTest, Unary) {
 
   // Tests response trailers.
   Buffer::OwnedImpl trailers_buffer;
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true, /*end_stream=*/true))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool, bool) { trailers_buffer.move(data); }));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) { trailers_buffer.move(data); }));
   Http::TestResponseTrailerMapImpl response_trailers;
   response_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   response_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.encodeTrailers(response_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
   if (accept_binary_response()) {
     EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), trailers_buffer.toString());
   } else if (accept_text_response()) {

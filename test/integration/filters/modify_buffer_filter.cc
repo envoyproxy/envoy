@@ -29,7 +29,7 @@ public:
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    encoder_callbacks_->addEncodedData(data, true, false);
+    encoder_callbacks_->addEncodedData(data, true);
 
     if (end_stream) {
       encoder_callbacks_->modifyEncodingBuffer([](auto& buffer) {

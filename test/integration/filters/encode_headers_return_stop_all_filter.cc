@@ -68,7 +68,7 @@ public:
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
 
     Buffer::OwnedImpl added_data(std::string(added_size_, 'a'));
-    encoder_callbacks_->addEncodedData(added_data, false, false);
+    encoder_callbacks_->addEncodedData(added_data, false);
     return Http::FilterDataStatus::Continue;
   }
 
@@ -79,7 +79,7 @@ public:
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
 
     Buffer::OwnedImpl data(std::string(added_size_, 'a'));
-    encoder_callbacks_->addEncodedData(data, false, false);
+    encoder_callbacks_->addEncodedData(data, false);
     return Http::FilterTrailersStatus::Continue;
   }
 

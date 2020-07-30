@@ -41,7 +41,8 @@ public:
   absl::optional<Envoy::Http::FilterFactoryCb> config() override;
   void validateConfig(const ProtobufWkt::Any& proto_config,
                       Server::Configuration::NamedHttpFilterConfigFactory&) override;
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&) override;
+  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
+                      Config::ConfigAppliedCb cb) override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -107,7 +108,6 @@ private:
   void onConfigUpdateFailed(Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override;
 
-  std::unique_ptr<Config::Subscription> subscription_;
   const std::string filter_config_name_;
   uint64_t last_config_hash_{0ul};
   Server::Configuration::FactoryContext& factory_context_;
@@ -125,6 +125,10 @@ private:
   const std::string subscription_id_;
   absl::flat_hash_set<DynamicFilterConfigProviderImpl*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImpl;
+
+  // This must be the last since its destructor may call out to stats to report
+  // on draining requests.
+  std::unique_ptr<Config::Subscription> subscription_;
 };
 
 /**
@@ -143,7 +147,8 @@ public:
                       Server::Configuration::NamedHttpFilterConfigFactory&) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb, const std::string&) override {
+  void onConfigUpdate(Envoy::Http::FilterFactoryCb, const std::string&,
+                      Config::ConfigAppliedCb) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 

@@ -632,9 +632,8 @@ public:
    *
    * @param data Buffer::Instance supplies the data to be encoded.
    * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
-   * @param end_stream boolean supplies whether this is the last data frame.
    */
-  virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter, bool end_stream) PURE;
+  virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
    * Encode data directly to subsequent filters in the filter chain. This method is used in
