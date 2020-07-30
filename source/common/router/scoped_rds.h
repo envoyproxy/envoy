@@ -136,6 +136,8 @@ private:
     ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
     void addOnDemandUpdateCallback(std::function<void()> callback);
     void runOnDemandUpdateCallback();
+    void initRdsConfigProvider();
+
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
     RdsRouteConfigProviderImplSharedPtr route_provider_;
