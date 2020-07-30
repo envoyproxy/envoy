@@ -273,7 +273,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
-  for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
+  for (auto it = config_update_callbacks_->begin(); it != config_update_callbacks_->end();) {
     auto found = aliases.find(it->alias_);
     if (found != aliases.end()) {
       // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
@@ -286,7 +286,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
           (*cb)(host_exists);
         }
       });
-      it = config_update_callbacks_.erase(it);
+      it = config_update_callbacks_->erase(it);
     } else {
       it++;
     }
@@ -306,11 +306,19 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
   auto alias =
       VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
-  factory_context_.dispatcher().post([this, alias, &thread_local_dispatcher,
-                                      route_config_updated_cb]() -> void {
-    subscription_->updateOnDemand(alias);
-    config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
-  });
+  // We use weak pointers here as RdsRouteConfigProviderImpl instance could go away before the
+  // dispatcher had a chance to execute the callback.
+  factory_context_.dispatcher().post(
+      [sub = std::weak_ptr<RdsRouteConfigSubscription>(subscription_),
+       config_cbs = std::weak_ptr<std::list<UpdateOnDemandCallback>>(config_update_callbacks_),
+       alias, &thread_local_dispatcher, route_config_updated_cb]() -> void {
+        auto s = sub.lock();
+        auto cb = config_cbs.lock();
+        if (s && cb) {
+          s->updateOnDemand(alias);
+          cb->push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+        }
+      });
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
