@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Network {
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
-                                        Address::IpVersion version) {
+                                        Address::IpVersion version) const {
 #if defined(__APPLE__) || defined(WIN32)
   int flags = 0;
 #else
@@ -54,7 +54,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
-                                        const Address::InstanceConstSharedPtr addr) {
+                                        const Address::InstanceConstSharedPtr addr) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
   IoHandlePtr io_handle = SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version);
   if (addr->type() == Address::Type::Ip && addr->ip()->version() == Address::IpVersion::v6) {
