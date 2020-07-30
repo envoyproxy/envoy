@@ -281,7 +281,7 @@ public:
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this
+   * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
    * connection.
    */
   virtual envoy::config::core::v3::Metadata& dynamicMetadata() PURE;
