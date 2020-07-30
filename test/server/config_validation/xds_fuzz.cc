@@ -242,7 +242,7 @@ void XdsFuzzTest::replay() {
       addListener(listener_name, route_name);
       if (!sent_listener) {
         addRoute(route_name);
-        test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
+        test_server_->waitForCounterEq("listener_manager.listener_create_success", 1, timeout_);
       }
       sent_listener = true;
       break;
@@ -270,15 +270,19 @@ void XdsFuzzTest::replay() {
     if (sent_listener) {
       // wait for all of the updates to take effect
       test_server_->waitForGaugeEq("listener_manager.total_listeners_warming",
-                                   verifier_.numWarming());
-      test_server_->waitForGaugeEq("listener_manager.total_listeners_active",
-                                   verifier_.numActive());
+                                   verifier_.numWarming(), timeout_);
+      test_server_->waitForGaugeEq("listener_manager.total_listeners_active", verifier_.numActive(),
+                                   timeout_);
       test_server_->waitForGaugeEq("listener_manager.total_listeners_draining",
-                                   verifier_.numDraining());
-      test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified());
-      test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded());
-      test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved());
-      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_);
+                                   verifier_.numDraining(), timeout_);
+      test_server_->waitForCounterEq("listener_manager.listener_modified", verifier_.numModified(),
+                                     timeout_);
+      test_server_->waitForCounterEq("listener_manager.listener_added", verifier_.numAdded(),
+                                     timeout_);
+      test_server_->waitForCounterEq("listener_manager.listener_removed", verifier_.numRemoved(),
+                                     timeout_);
+      test_server_->waitForCounterEq("listener_manager.lds.update_success", lds_update_success_,
+                                     timeout_);
     }
     ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})",
                    verifier_.numWarming(),
