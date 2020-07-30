@@ -13,8 +13,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
-#include "common/config/utility.h"
 #include "common/config/metadata.h"
+#include "common/config/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
