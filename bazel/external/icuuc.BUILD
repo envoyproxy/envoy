@@ -38,9 +38,7 @@ cc_library(
     hdrs = glob(["source/common/unicode/*.h"]),
     includes = ["source/common"],
     visibility = ["//visibility:public"],
-    deps = [
-        ":icuuc",
-    ],
+    deps = [":icuuc"],
 )
 
 cc_library(
