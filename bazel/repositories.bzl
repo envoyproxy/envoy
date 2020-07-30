@@ -699,11 +699,7 @@ def _com_googlesource_quiche():
     )
 
 def _com_googlesource_googleurl():
-    _repository_impl(
-        name = "com_googlesource_googleurl",
-        # patches = ["@envoy//bazel/external:googleurl.patch"],
-        # patch_args = ["-p1"],
-    )
+    _repository_impl("com_googlesource_googleurl")
     native.bind(
         name = "googleurl",
         actual = "@com_googlesource_googleurl//url:url",
