@@ -181,8 +181,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "random_generator_test",
     srcs = ["random_generator_test.cc"],
-    # Fails on windows with cr/lf yaml file checkouts
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:random_generator_lib",
         "//test/mocks/runtime:runtime_mocks",

@@ -74,8 +74,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "watermark_buffer_test",
     srcs = ["watermark_buffer_test.cc"],
-    # Fails on windows with cr/lf yaml file checkouts
-    tags = ["fails_on_windows"],
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",

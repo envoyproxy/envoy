@@ -394,7 +394,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   const std::string out_json_path =
       TestEnvironment::temporaryPath(name) + ".with.ports" + extension;
   {
-    std::ofstream out_json_file(out_json_path);
+    std::ofstream out_json_file(out_json_path, std::ios::binary);
     out_json_file << out_json_string;
   }
   return out_json_path;
