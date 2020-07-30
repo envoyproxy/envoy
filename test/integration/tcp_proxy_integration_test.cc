@@ -125,6 +125,25 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   tcp_client->waitForDisconnect();
 }
 
+TEST_P(TcpProxyIntegrationTest, NoUpstream) {
+  // Set the first upstream to have an invalid port, so connection will fail,
+  // but it won't fail synchronously (as it would if there were simply no
+  // upstreams)
+  fake_upstreams_count_ = 0;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+  config_helper_.skipPortUsageValidation();
+  enable_half_close_ = false;
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->waitForDisconnect();
+}
+
 TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
