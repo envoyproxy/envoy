@@ -256,7 +256,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->high_watermark_count_ > 0);
-  new_stream->moveIntoList(std::move(new_stream), streams_);
+  LinkedList::moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
 
@@ -726,7 +726,7 @@ void ConnectionManagerImpl::FilterManager::addStreamDecoderFilterWorker(
   //     - B
   //     - C
   // The decoder filter chain will iterate through filters A, B, C.
-  wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+  LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
 void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
@@ -741,7 +741,7 @@ void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
   //     - B
   //     - C
   // The encoder filter chain will iterate through filters C, B, A.
-  wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
+  LinkedList::moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(

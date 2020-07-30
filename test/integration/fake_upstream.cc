@@ -519,7 +519,7 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   }
   auto connection_wrapper =
       std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
-  connection_wrapper->moveIntoListBack(std::move(connection_wrapper), new_connections_);
+  LinkedList::moveIntoListBack(std::move(connection_wrapper), new_connections_);
   upstream_event_.notifyOne();
   return true;
 }
