@@ -18,53 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-
-TEST(RawByteRangeTest, IsSuffix) {
-  auto r = RawByteRange(UINT64_MAX, 4);
-  ASSERT_TRUE(r.isSuffix());
-}
-
-TEST(RawByteRangeTest, IsNotSuffix) {
-  auto r = RawByteRange(3, 4);
-  ASSERT_FALSE(r.isSuffix());
-}
-
-TEST(RawByteRangeTest, FirstBytePos) {
-  auto r = RawByteRange(3, 4);
-  ASSERT_EQ(3, r.firstBytePos());
-}
-
-TEST(RawByteRangeTest, LastBytePos) {
-  auto r = RawByteRange(3, 4);
-  ASSERT_EQ(4, r.lastBytePos());
-}
-
-TEST(RawByteRangeTest, SuffixLength) {
-  auto r = RawByteRange(UINT64_MAX, 4);
-  ASSERT_EQ(4, r.suffixLength());
-}
-
-TEST(AdjustedByteRangeTest, Length) {
-  auto a = AdjustedByteRange(3, 6);
-  ASSERT_EQ(3, a.length());
-}
-
-TEST(AdjustedByteRangeTest, TrimFront) {
-  auto a = AdjustedByteRange(3, 6);
-  a.trimFront(2);
-  ASSERT_EQ(5, a.begin());
-}
-
-TEST(AdjustedByteRangeTest, MaxLength) {
-  auto a = AdjustedByteRange(0, UINT64_MAX);
-  ASSERT_EQ(UINT64_MAX, a.length());
-}
-
-TEST(AdjustedByteRangeTest, MaxTrim) {
-  auto a = AdjustedByteRange(0, UINT64_MAX);
-  a.trimFront(UINT64_MAX);
-  ASSERT_EQ(0, a.length());
-}
+namespace {
 
 struct LookupRequestTestCase {
   std::string test_name, request_cache_control, response_cache_control;
@@ -333,6 +287,53 @@ TEST_F(LookupRequestTest, NotSatisfiableRange) {
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
+TEST(RawByteRangeTest, IsSuffix) {
+  auto r = RawByteRange(UINT64_MAX, 4);
+  ASSERT_TRUE(r.isSuffix());
+}
+
+TEST(RawByteRangeTest, IsNotSuffix) {
+  auto r = RawByteRange(3, 4);
+  ASSERT_FALSE(r.isSuffix());
+}
+
+TEST(RawByteRangeTest, FirstBytePos) {
+  auto r = RawByteRange(3, 4);
+  ASSERT_EQ(3, r.firstBytePos());
+}
+
+TEST(RawByteRangeTest, LastBytePos) {
+  auto r = RawByteRange(3, 4);
+  ASSERT_EQ(4, r.lastBytePos());
+}
+
+TEST(RawByteRangeTest, SuffixLength) {
+  auto r = RawByteRange(UINT64_MAX, 4);
+  ASSERT_EQ(4, r.suffixLength());
+}
+
+TEST(AdjustedByteRangeTest, Length) {
+  auto a = AdjustedByteRange(3, 6);
+  ASSERT_EQ(3, a.length());
+}
+
+TEST(AdjustedByteRangeTest, TrimFront) {
+  auto a = AdjustedByteRange(3, 6);
+  a.trimFront(2);
+  ASSERT_EQ(5, a.begin());
+}
+
+TEST(AdjustedByteRangeTest, MaxLength) {
+  auto a = AdjustedByteRange(0, UINT64_MAX);
+  ASSERT_EQ(UINT64_MAX, a.length());
+}
+
+TEST(AdjustedByteRangeTest, MaxTrim) {
+  auto a = AdjustedByteRange(0, UINT64_MAX);
+  a.trimFront(UINT64_MAX);
+  ASSERT_EQ(0, a.length());
+}
+
 struct AdjustByteRangeParams {
   std::vector<RawByteRange> request;
   std::vector<AdjustedByteRange> result;
@@ -540,6 +541,7 @@ TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
   ASSERT_EQ(0, result_vector.size());
 }
 
+} // namespace
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

@@ -5,6 +5,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
+namespace {
 
 // TODO(toddmgreer): Expand integration test to include age header values,
 // expiration, range headers, HEAD requests, trailers, config customizations,
@@ -286,6 +287,8 @@ TEST_P(CacheIntegrationTest, GetRequestWithBodyAndTrailers) {
     EXPECT_EQ(response->body(), std::string(42, 'a'));
   }
 }
+
+} // namespace
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions
