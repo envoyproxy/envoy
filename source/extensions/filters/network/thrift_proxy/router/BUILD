@@ -1,13 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
@@ -24,7 +24,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
@@ -34,7 +34,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "router_ratelimit_interface",
     hdrs = ["router_ratelimit.h"],
     deps = [
@@ -44,7 +44,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "router_lib",
     srcs = ["router_impl.cc"],
     hdrs = ["router_impl.h"],
@@ -71,7 +71,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "router_ratelimit_lib",
     srcs = ["router_ratelimit_impl.cc"],
     hdrs = ["router_ratelimit_impl.h"],

@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit_impl.cc"],
     hdrs = ["ratelimit_impl.h"],
@@ -30,7 +30,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "ratelimit_client_interface",
     hdrs = ["ratelimit.h"],
     external_deps = ["abseil_optional"],
@@ -42,7 +42,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "stat_names_lib",
     hdrs = ["stat_names.h"],
     deps = [

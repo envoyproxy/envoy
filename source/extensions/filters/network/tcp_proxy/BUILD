@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 # TCP proxy L4 network filter.
 # Public docs: docs/root/configuration/network_filters/tcp_proxy_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",

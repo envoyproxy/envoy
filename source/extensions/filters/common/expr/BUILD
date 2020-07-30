@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "evaluator_lib",
     srcs = ["evaluator.cc"],
     hdrs = ["evaluator.h"],
@@ -23,7 +23,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "context_lib",
     srcs = ["context.cc"],
     hdrs = ["context.h"],

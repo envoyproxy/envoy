@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "pass_through_filter_lib",
     hdrs = ["pass_through_filter.h"],
     # A thin shim used by test and prod filters.
@@ -21,7 +21,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
     deps = [
@@ -29,7 +29,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "jwks_fetcher_lib",
     srcs = ["jwks_fetcher.cc"],
     hdrs = ["jwks_fetcher.h"],
@@ -43,7 +43,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     # Used by the router filter.  TODO(#9953) clean up.

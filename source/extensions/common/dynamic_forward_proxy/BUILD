@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "dns_cache_interface",
     hdrs = ["dns_cache.h"],
     deps = [
@@ -22,7 +22,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "dns_cache_manager_impl",
     srcs = ["dns_cache_manager_impl.cc"],
     hdrs = ["dns_cache_manager_impl.h"],
@@ -33,7 +33,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "dns_cache_impl",
     srcs = ["dns_cache_impl.cc"],
     hdrs = ["dns_cache_impl.h"],
@@ -50,7 +50,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "dns_cache_resource_manager",
     srcs = ["dns_cache_resource_manager.cc"],
     hdrs = ["dns_cache_resource_manager.h"],

@@ -2,8 +2,8 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 # Kafka network filter.
 # Broker filter public docs: docs/root/configuration/network_filters/kafka_broker_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "kafka_broker_config_lib",
@@ -27,7 +27,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "kafka_broker_filter_lib",
     srcs = ["broker/filter.cc"],
     hdrs = [
@@ -46,7 +46,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "abstract_codec_lib",
     srcs = [],
     hdrs = [
@@ -57,7 +57,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "kafka_request_codec_lib",
     srcs = ["request_codec.cc"],
     hdrs = [
@@ -69,7 +69,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "kafka_request_parser_lib",
     srcs = [
         "external/kafka_request_resolver.cc",
@@ -88,7 +88,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "kafka_request_lib",
     srcs = [
     ],
@@ -120,7 +120,7 @@ genrule(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "kafka_response_codec_lib",
     srcs = ["response_codec.cc"],
     hdrs = [
@@ -132,7 +132,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "kafka_response_parser_lib",
     srcs = [
         "external/kafka_response_resolver.cc",
@@ -151,7 +151,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "kafka_response_lib",
     srcs = [
     ],
@@ -199,7 +199,7 @@ py_library(
     srcs = ["protocol/generator.py"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "parser_lib",
     hdrs = ["parser.h"],
     deps = [
@@ -207,13 +207,13 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "tagged_fields_lib",
     hdrs = ["tagged_fields.h"],
     deps = [":serialization_lib"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "serialization_lib",
     srcs = [
         "serialization.cc",
@@ -260,7 +260,7 @@ py_library(
     srcs = ["serialization/generator.py"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "kafka_types_lib",
     hdrs = [
         "kafka_types.h",

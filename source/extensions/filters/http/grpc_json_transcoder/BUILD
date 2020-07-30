@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 # L7 HTTP filter that implements binary gRPC to JSON transcoding
 # Public docs: docs/root/configuration/http_filters/grpc_json_transcoder_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "json_transcoder_filter_lib",
     srcs = ["json_transcoder_filter.cc"],
     hdrs = ["json_transcoder_filter.h"],
@@ -34,7 +34,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "http_body_utils_lib",
     srcs = ["http_body_utils.cc"],
     hdrs = ["http_body_utils.h"],
@@ -47,7 +47,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "transcoder_input_stream_lib",
     srcs = ["transcoder_input_stream_impl.cc"],
     hdrs = ["transcoder_input_stream_impl.h"],

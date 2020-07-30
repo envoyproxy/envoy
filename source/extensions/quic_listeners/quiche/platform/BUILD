@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 # Build targets in this package are part of the QUICHE platform implementation.
 # These implementations are the infrastructure building block for QUIC. They are
@@ -33,7 +33,7 @@ envoy_package()
 
 # TODO: add build target for quic_platform_impl_lib
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "flags_impl_lib",
     srcs = ["flags_impl.cc"],
     hdrs = [
@@ -47,7 +47,7 @@ envoy_cc_extension_library(
     visibility = ["//visibility:public"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "string_utils_lib",
     srcs = ["string_utils.cc"],
     hdrs = ["string_utils.h"],
@@ -59,7 +59,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
         "http2_arraysize_impl.h",
@@ -85,14 +85,14 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quic_platform_export_impl_lib",
     hdrs = ["quic_export_impl.h"],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = ["quic_logging_impl.cc"],
     hdrs = [
@@ -108,7 +108,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quic_platform_base_impl_lib",
     srcs = [
         "quic_mem_slice_impl.cc",
@@ -160,7 +160,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quic_platform_impl_lib",
     srcs = [
         "quic_cert_utils_impl.cc",
@@ -192,7 +192,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quic_platform_mem_slice_span_impl_lib",
     srcs = ["quic_mem_slice_span_impl.cc"],
     hdrs = ["quic_mem_slice_span_impl.h"],
@@ -209,7 +209,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quic_platform_mem_slice_storage_impl_lib",
     srcs = ["quic_mem_slice_storage_impl.cc"],
     hdrs = ["quic_mem_slice_storage_impl.h"],
@@ -229,7 +229,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quic_platform_udp_socket_impl_lib",
     hdrs = select({
         "//bazel:linux": ["quic_udp_socket_platform_impl.h"],
@@ -239,7 +239,7 @@ envoy_cc_extension_library(
     tags = ["nofips"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "envoy_quic_clock_lib",
     srcs = ["envoy_quic_clock.cc"],
     hdrs = ["envoy_quic_clock.h"],
@@ -251,7 +251,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quiche_common_platform_optional_impl_lib",
     hdrs = ["quiche_optional_impl.h"],
     external_deps = [
@@ -260,7 +260,7 @@ envoy_cc_extension_library(
     visibility = ["//visibility:public"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
     srcs = ["quiche_time_utils_impl.cc"],
     hdrs = [
@@ -286,7 +286,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "spdy_platform_impl_lib",
     hdrs = [
         "spdy_arraysize_impl.h",
@@ -319,21 +319,21 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "spdy_platform_unsafe_arena_impl_lib",
     hdrs = ["spdy_unsafe_arena_impl.h"],
     visibility = ["//visibility:public"],
     deps = ["@com_googlesource_quiche//:spdy_simple_arena_lib"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quiche_common_platform_export_impl_lib",
     hdrs = ["quiche_export_impl.h"],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "quiche_common_platform_endian_impl_lib",
     hdrs = ["quiche_endian_impl.h"],
     tags = ["nofips"],

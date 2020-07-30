@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 # L7 HTTP filter which implements CORS processing (https://en.wikipedia.org/wiki/Cross-origin_resource_sharing)
 # Public docs: docs/root/configuration/http_filters/cors_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "cors_filter_lib",
     srcs = ["cors_filter.cc"],
     hdrs = ["cors_filter.h"],

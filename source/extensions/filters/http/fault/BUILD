@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 # HTTP L7 filter that injects faults into the request flow
 # Public docs: docs/root/configuration/http_filters/fault_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "fault_filter_lib",
     srcs = ["fault_filter.cc"],
     hdrs = ["fault_filter.h"],

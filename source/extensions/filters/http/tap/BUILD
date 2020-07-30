@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 # L7 HTTP Tap filter
 # Public docs: docs/root/configuration/http_filters/tap_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "tap_config_interface",
     hdrs = ["tap_config.h"],
     deps = [
@@ -22,7 +22,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "tap_config_impl",
     srcs = ["tap_config_impl.cc"],
     hdrs = ["tap_config_impl.h"],
@@ -35,7 +35,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "tap_filter_lib",
     srcs = ["tap_filter.cc"],
     hdrs = ["tap_filter.h"],

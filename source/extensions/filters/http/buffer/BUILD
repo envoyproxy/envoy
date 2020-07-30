@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 # Request buffering and timeout L7 HTTP filter
 # Public docs: docs/root/configuration/http_filters/buffer_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "buffer_filter_lib",
     srcs = ["buffer_filter.cc"],
     hdrs = ["buffer_filter.h"],

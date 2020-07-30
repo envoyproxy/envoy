@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,16 +10,16 @@ licenses(["notice"])  # Apache 2
 # clusters.
 # Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "cluster_refresh_manager_interface",
     hdrs = ["cluster_refresh_manager.h"],
     deps = [
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "cluster_refresh_manager_lib",
     srcs = ["cluster_refresh_manager_impl.cc"],
     hdrs = ["cluster_refresh_manager_impl.h"],

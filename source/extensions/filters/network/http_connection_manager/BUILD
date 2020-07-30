@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 # drives all of the L7 HTTP filters.
 # Public docs: docs/root/configuration/http_conn_man/http_conn_man.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",

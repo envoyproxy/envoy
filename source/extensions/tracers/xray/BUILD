@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
     "envoy_proto_library",
 )
 
@@ -10,14 +10,14 @@ licenses(["notice"])  # Apache 2
 
 # Trace driver for AWS X-Ray.
 
-envoy_package()
+envoy_extension_package()
 
 envoy_proto_library(
     name = "daemon",
     srcs = ["daemon.proto"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "xray_lib",
     srcs = [
         "daemon_broker.cc",

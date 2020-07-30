@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
     "envoy_select_google_grpc",
 )
 
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 
 # Trace driver for OpenCensus: https://opencensus.io/
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
@@ -24,7 +24,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "opencensus_tracer_impl",
     srcs = ["opencensus_tracer_impl.cc"],
     hdrs = ["opencensus_tracer_impl.h"],

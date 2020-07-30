@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "null_vm_plugin_interface",
     hdrs = ["null_vm_plugin.h"],
     deps = [
@@ -18,7 +18,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "null_vm_lib",
     srcs = ["null_vm.cc"],
     hdrs = ["null_vm.h"],
@@ -33,7 +33,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "null_lib",
     srcs = ["null.cc"],
     hdrs = ["null.h"],

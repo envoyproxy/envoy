@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 # Access log implementation that writes to a gRPC service.
 # Public docs: TODO(rodaine): Docs needed.
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "config_utils",
     srcs = ["config_utils.cc"],
     hdrs = ["config_utils.h"],
@@ -24,7 +24,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "grpc_access_log_lib",
     srcs = ["grpc_access_log_impl.cc"],
     hdrs = ["grpc_access_log_impl.h"],
@@ -44,7 +44,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "grpc_access_log_utils",
     srcs = ["grpc_access_log_utils.cc"],
     hdrs = ["grpc_access_log_utils.h"],
@@ -58,7 +58,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "http_grpc_access_log_lib",
     srcs = ["http_grpc_access_log_impl.cc"],
     hdrs = ["http_grpc_access_log_impl.h"],
@@ -71,7 +71,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "tcp_grpc_access_log_lib",
     srcs = ["tcp_grpc_access_log_impl.cc"],
     hdrs = ["tcp_grpc_access_log_impl.h"],
@@ -83,7 +83,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "grpc_access_log_proto_descriptors_lib",
     srcs = ["grpc_access_log_proto_descriptors.cc"],
     hdrs = ["grpc_access_log_proto_descriptors.h"],

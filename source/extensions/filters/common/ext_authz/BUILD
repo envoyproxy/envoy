@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "ext_authz_interface",
     hdrs = ["ext_authz.h"],
     deps = [
@@ -19,7 +19,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "ext_authz_grpc_lib",
     srcs = ["ext_authz_grpc_impl.cc"],
     hdrs = ["ext_authz_grpc_impl.h"],
@@ -49,7 +49,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "ext_authz_http_lib",
     srcs = ["ext_authz_http_impl.cc"],
     hdrs = ["ext_authz_http_impl.h"],
@@ -69,7 +69,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "check_request_utils_lib",
     srcs = ["check_request_utils.cc"],
     hdrs = ["check_request_utils.h"],

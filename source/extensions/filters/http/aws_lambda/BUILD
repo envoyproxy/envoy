@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
     "envoy_proto_library",
 )
 
@@ -11,14 +11,14 @@ licenses(["notice"])  # Apache 2
 # L7 HTTP AWS Lambda filter
 # Public docs: docs/root/configuration/http_filters/aws_lambda_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_proto_library(
     name = "request_response",
     srcs = ["request_response.proto"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "aws_lambda_filter_lib",
     srcs = ["aws_lambda_filter.cc"],
     hdrs = ["aws_lambda_filter.h"],

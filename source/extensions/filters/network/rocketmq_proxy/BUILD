@@ -1,21 +1,21 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "well_known_names",
     hdrs = ["well_known_names.h"],
     deps = ["//source/common/singleton:const_singleton"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "stats_interface",
     hdrs = ["stats.h"],
     deps = [
@@ -24,7 +24,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "rocketmq_interface",
     hdrs = [
         "topic_route.h",
@@ -34,7 +34,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "rocketmq_lib",
     srcs = [
         "topic_route.cc",
@@ -44,7 +44,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "protocol_interface",
     hdrs = ["protocol.h"],
     deps = [
@@ -54,7 +54,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "protocol_lib",
     srcs = ["protocol.cc"],
     deps = [
@@ -64,7 +64,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "codec_lib",
     srcs = [
         "codec.cc",
@@ -79,7 +79,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "conn_manager_lib",
     srcs = [
         "active_message.cc",
@@ -138,7 +138,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "metadata_lib",
     hdrs = ["metadata.h"],
     external_deps = ["abseil_optional"],

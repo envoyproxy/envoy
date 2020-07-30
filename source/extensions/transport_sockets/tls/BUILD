@@ -1,15 +1,15 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # Built-in TLS connection transport socket.
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
@@ -28,7 +28,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "ssl_socket_lib",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
@@ -59,7 +59,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
@@ -86,7 +86,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "context_lib",
     srcs = [
         "context_impl.cc",
@@ -127,7 +127,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

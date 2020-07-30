@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
     "envoy_proto_library",
 )
 
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 
 ## Pluggable HTTP cache filter
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "cache_filter_lib",
     srcs = ["cache_filter.cc"],
     hdrs = ["cache_filter.h"],
@@ -29,7 +29,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "cacheability_utils_lib",
     srcs = ["cacheability_utils.cc"],
     hdrs = ["cacheability_utils.h"],
@@ -45,7 +45,7 @@ envoy_proto_library(
     srcs = ["key.proto"],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "http_cache_lib",
     srcs = ["http_cache.cc"],
     hdrs = ["http_cache.h"],
@@ -64,7 +64,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "cache_headers_utils_lib",
     srcs = ["cache_headers_utils.cc"],
     hdrs = ["cache_headers_utils.h"],

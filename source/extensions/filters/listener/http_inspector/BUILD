@@ -1,17 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # HTTP inspector filter for sniffing HTTP protocol and setting HTTP version to a FilterChain.
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "http_inspector_lib",
     srcs = ["http_inspector.cc"],
     hdrs = ["http_inspector.h"],

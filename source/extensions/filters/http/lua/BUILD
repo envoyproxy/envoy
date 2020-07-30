@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 # Lua scripting L7 HTTP filter (https://www.lua.org/, http://luajit.org/)
 # Public docs: docs/root/configuration/http_filters/lua_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "lua_filter_lib",
     srcs = ["lua_filter.cc"],
     hdrs = ["lua_filter.h"],
@@ -34,7 +34,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "wrappers_lib",
     srcs = ["wrappers.cc"],
     hdrs = ["wrappers.h"],

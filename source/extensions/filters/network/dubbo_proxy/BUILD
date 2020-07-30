@@ -1,15 +1,15 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "buffer_helper_lib",
     srcs = ["buffer_helper.cc"],
     hdrs = ["buffer_helper.h"],
@@ -20,7 +20,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "hessian_utils_lib",
     srcs = ["hessian_utils.cc"],
     hdrs = ["hessian_utils.h"],
@@ -30,7 +30,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "protocol_interface",
     hdrs = ["protocol.h"],
     deps = [
@@ -45,7 +45,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "dubbo_protocol_impl_lib",
     srcs = ["dubbo_protocol_impl.cc"],
     hdrs = ["dubbo_protocol_impl.h"],
@@ -56,7 +56,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "serializer_interface",
     srcs = ["serializer_impl.cc"],
     hdrs = [
@@ -75,7 +75,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "dubbo_hessian2_serializer_impl_lib",
     srcs = ["dubbo_hessian2_serializer_impl.cc"],
     hdrs = [
@@ -89,7 +89,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "decoder_lib",
     srcs = ["decoder.cc"],
     hdrs = ["decoder.h"],
@@ -126,7 +126,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "metadata_lib",
     hdrs = ["metadata.h"],
     external_deps = ["abseil_optional"],
@@ -137,7 +137,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "message_lib",
     hdrs = [
         "message.h",
@@ -148,7 +148,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "decoder_events_lib",
     hdrs = ["decoder_event_handler.h"],
     deps = [
@@ -159,7 +159,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "stats_lib",
     hdrs = ["stats.h"],
     deps = [
@@ -168,7 +168,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "app_exception_lib",
     srcs = ["app_exception.cc"],
     hdrs = ["app_exception.h"],
@@ -183,7 +183,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "heartbeat_response_lib",
     srcs = ["heartbeat_response.cc"],
     hdrs = ["heartbeat_response.h"],
@@ -196,7 +196,7 @@ envoy_cc_extension_library(
     ],
 )
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "conn_manager_lib",
     srcs = [
         "active_message.cc",

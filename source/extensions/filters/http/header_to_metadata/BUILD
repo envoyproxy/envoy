@@ -1,8 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_extension_library",
-    "envoy_package",
+    "envoy_cc_library",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,9 +10,9 @@ licenses(["notice"])  # Apache 2
 # HTTP L7 filter that transforms request data into dynamic metadata
 # Public docs: docs/root/configuration/http_filters/header_to_metadata_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
-envoy_cc_extension_library(
+envoy_cc_library(
     name = "header_to_metadata_filter_lib",
     srcs = ["header_to_metadata_filter.cc"],
     hdrs = ["header_to_metadata_filter.h"],
