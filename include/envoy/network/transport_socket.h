@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/types/optional.h"
@@ -199,6 +200,11 @@ public:
    *         TLS configuration.
    */
   virtual const absl::optional<std::string>& applicationProtocolFallback() const PURE;
+
+  /**
+   * @return optional PROXY protocol address information.
+   */
+  virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used
