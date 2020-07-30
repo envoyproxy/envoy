@@ -128,7 +128,11 @@ private:
         ScopedRdsConfigSubscription& parent, std::string scope_name,
         envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds);
 
-    ~RdsRouteConfigProviderHelper() { rds_update_callback_handle_->remove(); }
+    ~RdsRouteConfigProviderHelper() {
+      if (route_provider_) {
+        rds_update_callback_handle_->remove();
+      }
+    }
     ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
     void addOnDemandUpdateCallback(std::function<void()> callback);
     void runOnDemandUpdateCallback();

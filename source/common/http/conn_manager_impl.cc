@@ -531,7 +531,10 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     Router::ScopedRdsConfigProvider* scoped_route_config_provider =
         dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider_);
     scoped_route_config_provider->subscription().onDemandRdsUpdate(
-        key_hash, thread_local_dispatcher, route_config_updated_cb);
+        key_hash, thread_local_dispatcher, move(route_config_updated_cb));
+  } else {
+    // Inline scope route config provider can't be updated on demand.
+    route_config_updated_cb(false);
   }
 }
 
@@ -1476,6 +1479,7 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
+  // scope_key_hash_ = snapped_scoped_routes_config_->computeKeyHash(*request_headers_);
   snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*request_headers_);
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
@@ -1549,26 +1553,23 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     route_config_update_requester_->requestVhdsUpdate(host_header, thread_local_dispatcher,
                                                       std::move(route_config_updated_cb));
     return;
-  } else if (snapped_scoped_routes_config_ != nullptr) {
+  } else if (snapped_scoped_routes_config_ != nullptr && scope_key_hash_) {
     // On demand srds
-    uint64_t key_hash = snapped_scoped_routes_config_->computeKeyHash(*request_headers_);
-    if (snapped_scoped_routes_config_->scopeExistsButNotLoaded(key_hash)) {
-      Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
-          Http::RouteConfigUpdatedCallback(
-              [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
-                         route_config_updated_cb)](bool route_exist) {
-                // Refresh the route before continue the filter chain.
-                if (auto cb = weak_route_config_updated_cb.lock()) {
-                  if (route_exist) {
-                    refreshCachedRoute();
-                  }
-                  (*cb)(route_exist);
+    Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
+        Http::RouteConfigUpdatedCallback(
+            [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
+                       route_config_updated_cb)](bool route_exist) {
+              // Refresh the route before continue the filter chain.
+              if (auto cb = weak_route_config_updated_cb.lock()) {
+                if (route_exist) {
+                  refreshCachedRoute();
                 }
-              });
-      route_config_update_requester_->requestSrdsUpdate(key_hash, thread_local_dispatcher,
-                                                        scoped_route_config_updated_cb);
-      return;
-    }
+                (*cb)(route_exist);
+              }
+            });
+    route_config_update_requester_->requestSrdsUpdate(*scope_key_hash_, thread_local_dispatcher,
+                                                      scoped_route_config_updated_cb);
+    return;
   }
   (*route_config_updated_cb)(false);
 }
