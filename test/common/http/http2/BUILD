@@ -49,7 +49,7 @@ envoy_cc_test(
     name = "codec_impl_legacy_test",
     srcs = ["codec_impl_test.cc"],
     args = [
-        "--runtime-feature-disable-for-tests=envoy.reloadable_features.new_codec_behavior",
+        "--runtime-feature-override-for-tests=envoy.reloadable_features.new_codec_behavior",
     ],
     shard_count = 5,
     tags = ["fails_on_windows"],
