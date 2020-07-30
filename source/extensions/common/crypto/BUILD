@@ -21,13 +21,14 @@ envoy_cc_extension(
     external_deps = [
         "ssl",
     ],
-    # Legacy test use. TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/common/crypto:__subpackages__",
-        "//test/common/config:__subpackages__",
-    ],
     security_posture = "unknown",
     undocumented = True,
+    # Legacy test use. TODO(#9953) clean up.
+    visibility = [
+        "//:extension_config",
+        "//test/common/config:__subpackages__",
+        "//test/common/crypto:__subpackages__",
+    ],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",

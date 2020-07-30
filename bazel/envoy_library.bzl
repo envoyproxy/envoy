@@ -70,10 +70,8 @@ def envoy_cc_extension(
         undocumented = False,
         status = "stable",
         tags = [],
-        extra_visibility = [],
         visibility = ["//:extension_config"],
         **kwargs):
-    visibility = visibility + extra_visibility
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
     if status not in EXTENSION_STATUS_VALUES:

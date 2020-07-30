@@ -14,11 +14,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "data_plane_agnostic",
     # Legacy test use. TODO(#9953) clean up.
-    extra_visibility = [
+    visibility = [
+        "//:extension_config",
         "//test/server:__subpackages__",
     ],
-    security_posture = "data_plane_agnostic",
     deps = [
         "//include/envoy/registry",
         "//source/common/network:address_lib",

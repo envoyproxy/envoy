@@ -30,12 +30,13 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # TODO(#9953) classify and clean up.
-    extra_visibility = [
-        "//test/integration:__subpackages__",
-        "//test/common/access_log:__subpackages__",
-    ],
     security_posture = "robust_to_untrusted_downstream",
+    # TODO(#9953) classify and clean up.
+    visibility = [
+        "//:extension_config",
+        "//test/common/access_log:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
