@@ -150,7 +150,7 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
     contents = source_file.read()
   class_name = cursor.spelling
   class_defn = contents[cursor.extent.start.offset:cursor.extent.end.offset] + ";"
-  # need to know enclosed semantic parents (namespaces)
+  # need to know enclosing semantic parents (namespaces)
   # to generate corresponding definitions
   parent_cursor = cursor.semantic_parent
   while parent_cursor.kind == CursorKind.NAMESPACE:
@@ -172,8 +172,8 @@ def extract_definition(cursor: Cursor, classnames: List[str]) -> Tuple[str, str,
 
 def get_implline(cursor: Cursor) -> int:
   """
-    find the first line of implementation source code for class method pointed by the cursor parameter.
-    and find dependent mock classes by naming look up.
+    finds the first line of implementation source code for class method pointed by the cursor parameter.
+    and finds dependent mock classes by naming look up.
 
     Args:
         cursor: libclang cursor pointing to the target mock class definition.
@@ -186,27 +186,49 @@ def get_implline(cursor: Cursor) -> int:
         in parsing the method body and stops parsing early (see headersplit_test.test_class_implementations_error for details).
         To address this issue when parsing implementation code, we passed the flag that ask clang to ignore function bodies.
         We can not get the function body directly with the same way we used in extract_definition() since clang didn't parse 
-        function this time. Though we can't get the correct method extent offset from Cursor, we can still
-        get the start line and the end line of the corresponding method instead.
+        function this time.
+        Though we can't get the correct method extent offset from Cursor, we can still
+        get the start line of the corresponding method instead. 
+        (We can't get the correct line number for the last line due to skipping function bodies)
     """
   return cursor.extent.start.line - 1
 
 
-def extract_implementations(impls: List[Cursor], contents: str) -> Dict[str, str]:
+def extract_implementations(impl_cursors: List[Cursor], source_code: str) -> Dict[str, str]:
+  """
+    extracts method function body for each cursor in list impl_cursors from source code
+    groups those function bodies with class name to help generating the divided {classname}.cc
+    returns a dict maps class name to the concatenation of all its member methods implementations.
+
+    Args:
+        impl_cursors: list of libclang cursors, each pointing to a mock class member function implementation.
+        source_code: string, the source code for implementations (e.g. mocks.cc)
+
+    Returns:
+        classname_to_impl: a dict maps class name to its member methods implementations
+
+    """
   classname_to_impl = dict()
-  for i, cursor in enumerate(impls):
+  for i, cursor in enumerate(impl_cursors):
     classname = cursor.semantic_parent.spelling
+    # get first line of function body
     implline = get_implline(cursor)
-    if i + 1 < len(impls):
-      _, impl_end = get_implline(impls[i + 1])
-      impl = ''.join(contents[implline:impl_end])
+
+    # get last line of function body
+    if i + 1 < len(impl_cursors):
+      # i is not the last method, get the start line for the next method
+      # as the last line of i
+      _, impl_end = get_implline(impl_cursors[i + 1])
+      impl = ''.join(source_code[implline:impl_end])
     else:
+      # i is the last method, after removing the lines containing close brackets
+      # for namespaces, the rest should be the function body
       offset = 0
-      while implline + offset < len(contents):
-        if '// namespace' in contents[implline + offset]:
+      while implline + offset < len(source_code):
+        if '// namespace' in source_code[implline + offset]:
           break
         offset += 1
-      impl = ''.join(contents[implline:implline + offset])
+      impl = ''.join(source_code[implline:implline + offset])
     if classname in classname_to_impl:
       classname_to_impl[classname] += impl + "\n"
     else:
@@ -214,20 +236,36 @@ def extract_implementations(impls: List[Cursor], contents: str) -> Dict[str, str
   return classname_to_impl
 
 
-def get_fullclassname(cursor: Cursor) -> str:
-  classname = cursor.spelling
-  parent_cursor = cursor.semantic_parent
-  while parent_cursor.kind == CursorKind.NAMESPACE:
-    if parent_cursor.spelling == "":
-      break
-    classname = parent_cursor.spelling + "::" + classname
-    parent_cursor = parent_cursor.semantic_parent
+def get_enclosing_namespace(defn: Cursor) -> Tuple[str,str]:
+  """
+    retrieves all enclosing namespaces for the class pointed by defn.
 
-  fullclassname = "class " + classname
-  return fullclassname
+    this is necessary to construct the mock class header
 
+    e.g.
 
-def get_enclosed_namespace(defn):
+    defn is pointing MockClass in the follow source code:
+
+    namespace Envoy {
+    namespace Server {
+    class MockClass2 {...}
+    namespace Configuration {
+    class MockClass {...}
+          ^ 
+          defn
+    }
+    }
+    }
+
+    this function will return "namespace Envoy {\nnamespace Server {\nnamespace Configuration{\n" and "\n}\n}\n}\n" 
+
+    Args:
+        defn: libclang Cursor pointing to a mock class
+
+    Returns:
+        namespace_prefix, namespace_suffix: a pair of string, representing the enclosing namespaces
+
+    """
   namespace_prefix = ""
   namespace_suffix = ""
   parent_cursor = defn.semantic_parent
@@ -235,8 +273,9 @@ def get_enclosed_namespace(defn):
     if parent_cursor.spelling == "":
       break
     namespace_prefix = "namespace {} {{\n".format(parent_cursor.spelling) + namespace_prefix
-    namespace_suffix += "\n}\n"
+    namespace_suffix += "\n}"
     parent_cursor = parent_cursor.semantic_parent
+  namespace_suffix+='\n'
   return namespace_prefix, namespace_suffix
 
 
@@ -280,15 +319,13 @@ def main(args):
   defns = class_definitions(decl_translation_unit.cursor)
   decl_includes = get_headers(decl_translation_unit)
 
-  impls = class_implementations(impl_translation_unit.cursor)
+  impl_cursors = class_implementations(impl_translation_unit.cursor)
 
   with open(impl_filename, 'r') as source_file:
     contents = source_file.readlines()
-  classname_to_impl = extract_implementations(impls, contents)
+  classname_to_impl = extract_implementations(impl_cursors, contents)
 
   classnames = [cursor.spelling for cursor in defns]
-
-  fullclassnames = [get_fullclassname(cursor) for cursor in defns]
 
   for defn in defns:
     # writing {class}.h and {classname}.cc
@@ -306,7 +343,7 @@ def main(args):
     else:
       impl_include = impl_includes.replace(decl_filename, '{}.h'.format(to_filename(class_name)))
       # we need to enclose methods with namespaces
-      namespace_prefix, namespace_suffix = get_enclosed_namespace(defn)
+      namespace_prefix, namespace_suffix = get_enclosing_namespace(defn)
       class_impl = impl_include + namespace_prefix + \
           classname_to_impl[class_name] + namespace_suffix
 
