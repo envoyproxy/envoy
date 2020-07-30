@@ -78,6 +78,7 @@ private:
 
   Network::Address::IpVersion ip_version_;
 
+  std::chrono::seconds timeout_{5};
   uint64_t lds_update_success_{0};
 };
 

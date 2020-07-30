@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -69,6 +70,7 @@ public:
         }));
     EXPECT_CALL(encoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(testing::AnyNumber());
   }
 
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
@@ -1823,6 +1825,151 @@ TEST_F(LuaHttpFilterTest, CheckConnection) {
 
   setupSecureConnection(true);
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("secure")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Inspect stream info downstream SSL connection.
+TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:streamInfo():downstreamSslConnection() == nil then
+      else
+        if request_handle:streamInfo():downstreamSslConnection():peerCertificatePresented() then
+          request_handle:logTrace("peerCertificatePresented")
+        end
+
+        if request_handle:streamInfo():downstreamSslConnection():peerCertificateValidated() then
+          request_handle:logTrace("peerCertificateValidated")
+        end
+
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():uriSanPeerCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():uriSanLocalCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():dnsSansPeerCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():dnsSansLocalCertificate(), ","))
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteId())
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():validFromPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():expirationPeerCertificate())
+
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectLocalCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():sha256PeerCertificateDigest())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():issuerPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteString())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():tlsVersion())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificateChain())
+      end
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+
+  auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+  EXPECT_CALL(*connection_info, peerCertificatePresented()).WillOnce(Return(true));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peerCertificatePresented")));
+
+  EXPECT_CALL(*connection_info, peerCertificateValidated()).WillOnce(Return(true));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peerCertificateValidated")));
+
+  const std::vector<std::string> peer_uri_sans{"peer-uri-sans-1", "peer-uri-sans-2"};
+  EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillOnce(Return(peer_uri_sans));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peer-uri-sans-1,peer-uri-sans-2")));
+
+  const std::vector<std::string> local_uri_sans{"local-uri-sans-1", "local-uri-sans-2"};
+  EXPECT_CALL(*connection_info, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("local-uri-sans-1,local-uri-sans-2")));
+
+  const std::vector<std::string> peer_dns_sans{"peer-dns-sans-1", "peer-dns-sans-2"};
+  EXPECT_CALL(*connection_info, dnsSansPeerCertificate()).WillOnce(Return(peer_dns_sans));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("peer-dns-sans-1,peer-dns-sans-2")));
+
+  const std::vector<std::string> local_dns_sans{"local-dns-sans-1", "local-dns-sans-2"};
+  EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillOnce(Return(local_dns_sans));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::trace, StrEq("local-dns-sans-1,local-dns-sans-2")));
+
+  const std::string subject_local = "subject-local";
+  EXPECT_CALL(*connection_info, subjectLocalCertificate()).WillOnce(ReturnRef(subject_local));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(subject_local)));
+
+  const uint64_t cipher_suite_id = 0x0707;
+  EXPECT_CALL(*connection_info, ciphersuiteId()).WillRepeatedly(Return(cipher_suite_id));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("0x0707")));
+
+  const SystemTime validity(std::chrono::seconds(1522796777));
+  EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(validity));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1522796777")));
+
+  const SystemTime expiry(std::chrono::seconds(1522796776));
+  EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(expiry));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1522796776")));
+
+  const std::string peer_cert_digest = "peer-cert-digest";
+  EXPECT_CALL(*connection_info, sha256PeerCertificateDigest())
+      .WillOnce(ReturnRef(peer_cert_digest));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_digest)));
+
+  const std::string peer_cert_serial_number = "peer-cert-serial-number";
+  EXPECT_CALL(*connection_info, serialNumberPeerCertificate())
+      .WillOnce(ReturnRef(peer_cert_serial_number));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_serial_number)));
+
+  const std::string peer_cert_issuer = "peer-cert-issuer";
+  EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillOnce(ReturnRef(peer_cert_issuer));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_issuer)));
+
+  const std::string peer_cert_subject = "peer-cert-subject";
+  EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillOnce(ReturnRef(peer_cert_subject));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_subject)));
+
+  const std::string cipher_suite = "cipher-suite";
+  EXPECT_CALL(*connection_info, ciphersuiteString()).WillOnce(Return(cipher_suite));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(cipher_suite)));
+
+  const std::string tls_version = "tls-version";
+  EXPECT_CALL(*connection_info, tlsVersion()).WillOnce(ReturnRef(tls_version));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(tls_version)));
+
+  const std::string peer_cert = "peer-cert";
+  EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificate())
+      .WillOnce(ReturnRef(peer_cert));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert)));
+
+  const std::string peer_cert_chain = "peer-cert-chain";
+  EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificateChain())
+      .WillOnce(ReturnRef(peer_cert_chain));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_chain)));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Inspect stream info downstream SSL connection in a plain connection.
+TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnectionOnPlainConnection) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:streamInfo():downstreamSslConnection() == nil then
+        request_handle:logTrace("downstreamSslConnection is nil")
+      end
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("downstreamSslConnection is nil")));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 

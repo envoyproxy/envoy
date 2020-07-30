@@ -73,9 +73,9 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_default_alpn",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.listener_in_place_filterchain_update",
-    "envoy.reloadable_features.new_codec_behavior",
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
     "envoy.reloadable_features.preserve_upstream_date",
+    "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.stop_faking_paths",
     "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
@@ -90,6 +90,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // TODO(asraa) flip this feature after codec errors are handled
+    "envoy.reloadable_features.new_codec_behavior",
     // TODO(alyssawilk) flip true after the release.
     "envoy.reloadable_features.new_tcp_connection_pool",
     // Sentinel and test flag.
