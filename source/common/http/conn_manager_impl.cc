@@ -391,12 +391,12 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
     stats_.named_.downstream_cx_destroy_local_.inc();
   }
 
-  if (event == Network::ConnectionEvent::RemoteClose) {
-    stats_.named_.downstream_cx_destroy_remote_.inc();
-  }
-
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      remote_close_ = true;
+      stats_.named_.downstream_cx_destroy_remote_.inc();
+    }
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
     // a local connection close, so we still guard against that here. A better solution would be
     // to have some type of "pre-close" callback that we could hook for cleanup that would get
@@ -621,10 +621,21 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     }
   }
 
-  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a
-  // 0 response code and when no other response flags are set.
+  // TODO(alyssawilk) this is not true. Fix.
+  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
+  // response code and when no other response flags are set.
   if (!stream_info_.hasAnyResponseFlag() && !stream_info_.responseCode()) {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  }
+  if (connection_manager_.remote_close_) {
+    stream_info_.setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
+  }
+
+  if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+    // For HTTP/2 there are still some reset cases where details are not set.
+    // For HTTP/1 there shouldn't be any. Regression-proof this.
+    ASSERT(stream_info_.responseCodeDetails().has_value());
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
@@ -665,11 +676,14 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
   // If headers have not been sent to the user, send a 408.
-  if (response_headers_ != nullptr) {
+  if (response_headers_ != nullptr &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
     // TODO(htuch): We could send trailers here with an x-envoy timeout header
     // or gRPC status code, and/or set H2 RST_STREAM error.
+    stream_info_.setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
     connection_manager_.doEndStream(*this);
   } else {
+    // TODO(mattklein) this may result in multiple flags. This Ok?
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
     sendLocalReply(request_headers_ != nullptr &&
                        Grpc::Common::isGrpcRequestHeaders(*request_headers_),
@@ -689,7 +703,15 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  connection_manager_.doEndStream(*this);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
+    sendLocalReply(
+        request_headers_ != nullptr && Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+        Http::Code::RequestTimeout, "downstream duration timeout", nullptr, state_.is_head_request_,
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+  } else {
+    stream_info_.setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+    connection_manager_.doEndStream(*this);
+  }
 }
 
 void ConnectionManagerImpl::FilterManager::addStreamDecoderFilterWorker(
@@ -2704,6 +2726,9 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   if (!complete() || parent_.active_stream_.stream_info_.bytesReceived() != 0) {
     return false;
   }
+
+  parent_.active_stream_.stream_info_.setResponseCodeDetails(
+      StreamInfo::ResponseCodeDetails::get().InternalRedirect);
   // n.b. we do not currently change the codecs to point at the new stream
   // decoder because the decoder callbacks are complete. It would be good to
   // null out that pointer but should not be necessary.
