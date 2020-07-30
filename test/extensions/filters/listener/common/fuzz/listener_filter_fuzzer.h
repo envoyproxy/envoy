@@ -14,11 +14,12 @@ namespace ListenerFilters {
 
 class ListenerFilterFuzzer {
 public:
-  ListenerFilterFuzzer(const test::extensions::filters::listener::FilterFuzzTestCase& input)
-      : data_(input.data()) {
+  ListenerFilterFuzzer() {
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
     ON_CALL(cb_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher_));
+  }
 
+  void fuzz(Network::ListenerFilter& filter, const test::extensions::filters::listener::FilterFuzzTestCase& input) {
     try {
       socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
     } catch (const EnvoyException& e) {
@@ -30,7 +31,7 @@ public:
       // If fuzzed remote address is malformed or missing, socket's remote address will be nullptr
     }
 
-    if (!data_.empty()) {
+    if (input.data_size() > 0) {
       EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(testing::Return("raw_buffer"));
 
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -41,29 +42,45 @@ public:
           .WillOnce(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
                                    testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
     }
-  }
 
-  void fuzz(Network::ListenerFilter& filter) {
     filter.onAccept(cb_);
 
-    if (!data_.empty()) {
-      auto& header = data_;
-      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(
-          Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-            ASSERT(length >= header.size());
-            memcpy(buffer, header.data(), header.size());
-            return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-          }));
+    if (input.data_size() > 0) {
+      {
+        testing::InSequence s;
 
-      if (file_event_callback_ != nullptr) {
+        if (input.data_size() > 1) {
+          EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(testing::InvokeWithoutArgs([]() {
+            return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
+          }));
+        }
+
+        for (int i = 0; i < input.data_size(); i++) {
+          auto& data = input.data(i);
+
+          EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+            .WillOnce(
+                Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= data.size());
+                memcpy(buffer, data.data(), data.size());
+                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+              }));
+        }
+      }
+
+      bool got_continue = false;
+
+      EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(testing::InvokeWithoutArgs([&got_continue]() {
+        got_continue = true;
+      }));
+
+      while(!got_continue) {
         file_event_callback_(Event::FileReadyType::Read);
       }
     }
   }
 
 private:
-  absl::string_view data_;
   FakeOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   NiceMock<Network::MockListenerFilterCallbacks> cb_;

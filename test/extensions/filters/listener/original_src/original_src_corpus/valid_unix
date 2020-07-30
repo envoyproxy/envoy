@@ -3,7 +3,7 @@ config {
   mark: 15
 }
 
-data {
+fuzzed {
   sock {
     remote_address: "unix://domain.socket"
   }

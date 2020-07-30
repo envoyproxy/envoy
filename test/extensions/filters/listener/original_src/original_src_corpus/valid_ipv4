@@ -3,7 +3,7 @@ config {
   mark: 0
 }
 
-data {
+fuzzed {
   sock {
     remote_address: "tcp://1.2.3.4:0"
   }

@@ -19,8 +19,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
   }
 
   auto filter = std::make_unique<OriginalDstFilter>();
-  ListenerFilterFuzzer fuzzer(input);
-  fuzzer.fuzz(*filter);
+  ListenerFilterFuzzer fuzzer;
+  fuzzer.fuzz(*filter, input);
 }
 
 } // namespace OriginalDst

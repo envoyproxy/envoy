@@ -21,8 +21,8 @@ DEFINE_PROTO_FUZZER(
 
   Config config(input.config());
   auto filter = std::make_unique<OriginalSrcFilter>(config);
-  ListenerFilterFuzzer fuzzer(input.data());
-  fuzzer.fuzz(*filter);
+  ListenerFilterFuzzer fuzzer;
+  fuzzer.fuzz(*filter, input.fuzzed());
 }
 
 } // namespace OriginalSrc

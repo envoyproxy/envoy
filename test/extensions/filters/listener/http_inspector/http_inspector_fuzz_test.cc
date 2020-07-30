@@ -22,8 +22,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
   ConfigSharedPtr cfg = std::make_shared<Config>(store);
   auto filter = std::make_unique<Filter>(cfg);
 
-  ListenerFilterFuzzer fuzzer(input);
-  fuzzer.fuzz(*filter);
+  ListenerFilterFuzzer fuzzer;
+  fuzzer.fuzz(*filter, input);
 }
 
 } // namespace OriginalDst
