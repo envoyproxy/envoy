@@ -16,9 +16,9 @@ void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
 } // namespace
 
 LibeventScheduler::LibeventScheduler() {
-  event_base* eventBase = event_base_new();
+  event_base* event_base = event_base_new();
   RELEASE_ASSERT(eventBase != nullptr, "Failed to initialize libevent event_base");
-  libevent_ = Libevent::BasePtr(eventBase);
+  libevent_ = Libevent::BasePtr(event_base);
 
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
