@@ -449,7 +449,6 @@ private:
     ResponseTrailerMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details);
     void sendLocalReplyViaFilterChain(
@@ -506,9 +505,7 @@ private:
     void chargeStats(const ResponseHeaderMap& headers);
     const Network::Connection* connection();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
-
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override;
     uint64_t streamId() { return stream_id_; }
