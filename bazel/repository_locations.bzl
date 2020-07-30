@@ -429,6 +429,13 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
+    com_github_google_flatbuffers = dict(
+        sha256 = "b8efbc25721e76780752bad775a97c3f77a0250271e2db37fc747b20e8b0f24a",
+        strip_prefix = "flatbuffers-a83caf5910644ba1c421c002ef68e42f21c15f9f",
+        urls = ["https://github.com/google/flatbuffers/archive/a83caf5910644ba1c421c002ef68e42f21c15f9f.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
     com_googlesource_code_re2 = dict(
         sha256 = "2e9489a31ae007c81e90e8ec8a15d62d58a9c18d4fd1603f6441ef248556b41f",
         strip_prefix = "re2-2020-07-06",
@@ -480,5 +487,41 @@ DEPENDENCY_REPOSITORIES = dict(
         urls = ["https://github.com/unicode-org/icu/archive/release-64-2.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:icu-project:international_components_for_unicode",
+    ),
+    proxy_wasm_cpp_sdk = dict(
+        sha256 = "7d9e1f2e299215ed3e5fa8c8149740872b1100cfe3230fc639f967d9dcfd812e",
+        strip_prefix = "proxy-wasm-cpp-sdk-5cec30b448975e1fd3f4117311f0957309df5cb0",
+        urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/5cec30b448975e1fd3f4117311f0957309df5cb0.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
+    proxy_wasm_cpp_host = dict(
+        sha256 = "494d3f81156b92bac640c26000497fbf3a7b1bc35f9789594280450c6e5d8129",
+        strip_prefix = "proxy-wasm-cpp-host-928db4d79ec7b90aea3ad13ea5df36dc60c9c31d",
+        urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/928db4d79ec7b90aea3ad13ea5df36dc60c9c31d.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
+    emscripten_toolchain = dict(
+        sha256 = "2bdbee6947e32ad1e03cd075b48fda493ab16157b2b0225b445222cd528e1843",
+        patch_cmds = [
+            "./emsdk install 1.39.19-upstream",
+            "./emsdk activate --embedded 1.39.19-upstream",
+        ],
+        strip_prefix = "emsdk-dec8a63594753fe5f4ad3b47850bf64d66c14a4e",
+        urls = ["https://github.com/emscripten-core/emsdk/archive/dec8a63594753fe5f4ad3b47850bf64d66c14a4e.tar.gz"],
+        use_category = ["build"],
+    ),
+    rules_antlr = dict(
+        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
+        strip_prefix = "rules_antlr-3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
+        urls = ["https://github.com/marcohu/rules_antlr/archive/3cc2f9502a54ceb7b79b37383316b23c4da66f9a.tar.gz"],
+        use_category = ["build"],
+    ),
+    antlr4_runtimes = dict(
+        sha256 = "4d0714f441333a63e50031c9e8e4890c78f3d21e053d46416949803e122a6574",
+        strip_prefix = "antlr4-4.7.1",
+        urls = ["https://github.com/antlr/antlr4/archive/4.7.1.tar.gz"],
+        use_category = ["build"],
     ),
 )
