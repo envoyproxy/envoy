@@ -156,13 +156,12 @@ envoy_cc_test_library(
     ],
 )
 
-# https://github.com/envoyproxy/envoy/issues/12258
-# envoy_cc_fuzz_test(
-#     name = "xds_fuzz_test",
-#     srcs = ["xds_fuzz_test.cc"],
-#     corpus = "xds_corpus",
-#     deps = [
-#         ":xds_fuzz_lib",
-#         "//source/common/protobuf:utility_lib",
-#     ],
-# )
+envoy_cc_fuzz_test(
+    name = "xds_fuzz_test",
+    srcs = ["xds_fuzz_test.cc"],
+    corpus = "xds_corpus",
+    deps = [
+        ":xds_fuzz_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
