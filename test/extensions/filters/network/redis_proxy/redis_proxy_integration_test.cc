@@ -156,7 +156,7 @@ static_resources:
           settings:
             op_timeout: 5s
 )EOF",
-                                       TestEnvironment::nullDevicePath());
+                                                        TestEnvironment::nullDevicePath());
 
 const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
