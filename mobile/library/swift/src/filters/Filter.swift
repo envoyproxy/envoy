@@ -5,19 +5,13 @@ import Foundation
 public protocol Filter {
   /// A unique name for a filter implementation. Needed for extension registration.
   static var name: String { get }
-
-  /// Required initializer for internal creation.
-  init()
 }
 
 extension EnvoyHTTPFilterFactory {
-  convenience init(filterType: Filter.Type) {
+  convenience init<T: Filter>(factory: @escaping () -> T) {
     self.init()
-
-    self.filterName = filterType.name
-    self.create = {
-      return EnvoyHTTPFilter(filter: filterType.init())
-    }
+    self.filterName = T.name
+    self.create = { EnvoyHTTPFilter(filter: factory()) }
   }
 }
 
