@@ -2,9 +2,7 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 
 licenses(["notice"])  # Apache 2
 
-exports_files([
-    "LICENSE",
-])
+exports_files(["LICENSE"])
 
 icuuc_copts = [
     "-DU_STATIC_IMPLEMENTATION",
@@ -30,9 +28,7 @@ icuuc_copts = [
 
 cc_library(
     name = "headers",
-    hdrs = glob([
-        "source/common/unicode/*.h",
-    ]),
+    hdrs = glob(["source/common/unicode/*.h"]),
     includes = ["source/common"],
     visibility = ["//visibility:public"],
 )
