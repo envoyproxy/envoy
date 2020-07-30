@@ -1,6 +1,7 @@
 import Foundation
 
 /// Status returned by filters when transmitting or receiving data.
+@frozen
 public enum FilterDataStatus {
   /// Continue filter chain iteration. If headers have not yet been sent to the next filter, they
   /// will be sent first via `onRequestHeaders()`/`onResponseHeaders()`.
