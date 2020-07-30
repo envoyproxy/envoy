@@ -2,6 +2,7 @@
 #include "envoy/http/codes.h"
 
 #include "common/local_reply/local_reply.h"
+#include "common/http/header_utility.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"

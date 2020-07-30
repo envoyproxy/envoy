@@ -15,6 +15,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
