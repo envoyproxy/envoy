@@ -218,7 +218,7 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, ShouldRegisterRequest) {
 
   EXPECT_CALL(*request_metrics_, onRequest(api_key));
 
-  MonotonicTime time_point{std::chrono::milliseconds(1234)};
+  MonotonicTime time_point{TimeSystem::Milliseconds(1234)};
   EXPECT_CALL(time_source_, monotonicTime()).WillOnce(Return(time_point));
 
   // when
@@ -248,10 +248,10 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, ShouldRegisterResponse) {
   const int32_t correlation_id = 1234;
   AbstractResponseSharedPtr response = std::make_shared<MockResponse>(api_key, correlation_id);
 
-  MonotonicTime request_time_point{std::chrono::milliseconds(1234)};
+  MonotonicTime request_time_point{TimeSystem::Milliseconds(1234)};
   testee_.getRequestArrivalsForTest()[correlation_id] = request_time_point;
 
-  MonotonicTime response_time_point{std::chrono::milliseconds(2345)};
+  MonotonicTime response_time_point{TimeSystem::Milliseconds(2345)};
 
   EXPECT_CALL(*response_metrics_, onResponse(api_key, 1111));
   EXPECT_CALL(time_source_, monotonicTime()).WillOnce(Return(response_time_point));
