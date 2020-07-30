@@ -235,7 +235,6 @@ FilterChainRebuilder::~FilterChainRebuilder() = default;
 void FilterChainRebuilder::addRebuildInfo(FilterChainRebuildInfoPtr rebuild_info) {
 
   // make callback func
-  // auto rbb = std::move(rb);
   std::string worker_name = rebuild_info->worker_name_;
   std::string listener_name = rebuild_info->listener_name_;
 
@@ -247,12 +246,6 @@ void FilterChainRebuilder::addRebuildInfo(FilterChainRebuildInfoPtr rebuild_info
 
   // auto cb = [info = std::move(rebuild_info)] (bool success) {
   //   if(success) {
-  //     // auto dm = rb->dynamic_metadata;
-  //     // auto soc = rb->socket_;
-
-  //     dispatcher->post([listener_name] {
-
-  //     } )
   //     info->worker_dispatcher_.post([info](){
   //       info->listener_.newConnection(info->socket_, info->dynamic_metadata);
   //     });
@@ -562,7 +555,7 @@ void ListenerImpl::buildRealFilterChains(
     rebuilder->callback();
   }
 
-  // Request dependencies only ony the first time.
+  // Request dependencies only on the first time.
   if (first_request) {
     Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
         parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),

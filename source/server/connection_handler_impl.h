@@ -378,7 +378,7 @@ private:
   Network::UdpListenerReadFilterPtr read_filter_;
 };
 
-// // Can not add connectionHandler_lib into deps of listener_manager_lib.
+// // Can not add connectionHandler_lib into dependency of listener_manager_lib.
 // // filter_chain_rebuild_info that will be accessed by master thread
 // struct FilterChainRebuildInfo {
 //   FilterChainRebuildInfo(
