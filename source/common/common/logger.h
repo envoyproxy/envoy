@@ -262,7 +262,7 @@ private:
 
   /**
    * Logger mode, 0 for Envoy and 1 for Fancy. It's static as it should work even
-   * when there's no context instance (benchmark environment). Certainly default 
+   * when there's no context instance (benchmark environment). Certainly default
    * format and level are used for Fancy Logger in that case.
    */
   static int logger_mode_;

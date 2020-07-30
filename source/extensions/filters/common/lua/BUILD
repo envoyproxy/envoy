@@ -44,6 +44,7 @@ envoy_cc_library(
     deps = [
         ":lua_lib",
         "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:hex_lib",
         "//source/common/protobuf",
     ],
 )
