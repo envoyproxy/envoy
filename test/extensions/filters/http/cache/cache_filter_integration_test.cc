@@ -67,7 +67,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(response_headers, /*end_stream=*/false);
     // send 42 'a's
-    upstream_request_->encodeData(response_body, true);
+    upstream_request_->encodeData(response_body, /*end_stream=*/true);
     // Wait for the response to be read by the codec client.
     response_decoder->waitForEndStream();
     EXPECT_TRUE(response_decoder->complete());
@@ -133,7 +133,8 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
   }
 
-  // Advance time for the cached response to be stale
+  // Advance time for the cached response to be stale (expired)
+  // Also to make sure response date header gets updated with the 304 date
   simTime().advanceTimeWait(std::chrono::seconds(11));
 
   // Send second request, the cached response should be validate then served
@@ -199,7 +200,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(response_headers, /*end_stream=*/false);
     // send 10 'a's
-    upstream_request_->encodeData(response_body, true);
+    upstream_request_->encodeData(response_body, /*end_stream=*/true);
     // Wait for the response to be read by the codec client.
     response_decoder->waitForEndStream();
     EXPECT_TRUE(response_decoder->complete());
@@ -209,10 +210,12 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
     EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
   }
 
-  // Advance time for the cached response to be stale
+  // Advance time for the cached response to be stale (expired)
+  // Also to make sure response date header gets updated with the 304 date
   simTime().advanceTimeWait(std::chrono::seconds(11));
 
   // Send second request, validation of the cached response should be attempted but should fail
+  // The new response should be served
   {
     const std::string response_body(20, 'a');
     Http::TestResponseHeaderMapImpl response_headers = {
@@ -232,7 +235,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
     // Reply with the updated response -> cached response is invalid
     upstream_request_->encodeHeaders(response_headers, /*end_stream=*/false);
     // send 20 'a's
-    upstream_request_->encodeData(response_body, true);
+    upstream_request_->encodeData(response_body, /*end_stream=*/true);
 
     // Wait for the response to be read by the codec client.
     response_decoder->waitForEndStream();
