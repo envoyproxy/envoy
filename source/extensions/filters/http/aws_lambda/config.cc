@@ -27,7 +27,8 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
     return InvocationMode::Asynchronous;
   case Config_InvocationMode_SYNCHRONOUS:
     return InvocationMode::Synchronous;
-  default: NOT_REACHED_GCOVR_EXCL_LINE;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
