@@ -562,6 +562,17 @@ dynamicMetadata()
 
 Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
 
+downstreamSslConnection()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamSslConnection()
+
+Returns :repo:`information <include/envoy/ssl/connection.h>` related to the current SSL connection.
+
+Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+
 .. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
 
 Dynamic metadata object API
@@ -625,7 +636,7 @@ Connection object API
 ---------------------
 
 ssl()
-^^^^^^^^
+^^^^^
 
 .. code-block:: lua
 
@@ -638,6 +649,207 @@ ssl()
 Returns :repo:`SSL connection <include/envoy/ssl/connection.h>` object when the connection is
 secured and *nil* when it is not.
 
-.. note::
+Returns an :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
-  Currently the SSL connection object has no exposed APIs.
+.. _config_http_filters_lua_ssl_socket_info:
+
+SSL connection object API
+-------------------------
+
+peerCertificatePresented()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  if downstreamSslConnection:peerCertificatePresented() then
+    print("peer certificate is presented")
+  end
+
+Returns bool whether the peer certificate is presented.
+
+peerCertificateValidated()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  if downstreamSslConnection:peerCertificateVaidated() then
+    print("peer certificate is valiedated")
+  end
+
+Returns bool whether the peer certificate was validated.
+
+uriSanLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  -- For example, uriSanLocalCertificate contains {"san1", "san2"}
+  local certs = downstreamSslConnection:uriSanLocalCertificate()
+
+  -- The following prints san1,san2
+  handle:logTrace(table.concat(certs, ","))
+
+Returns the URIs (as a table) in the SAN field of the local certificate. Returns an empty table if
+there is no local certificate, or no SAN field, or no URI SAN entries.
+
+sha256PeerCertificateDigest()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sha256PeerCertificateDigest()
+
+Returns the SHA256 digest of the peer certificate. Returns ``""`` if there is no peer certificate
+which can happen in TLS (non-mTLS) connections.
+
+serialNumberPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:serialNumberPeerCertificate()
+
+Returns the serial number field of the peer certificate. Returns ``""`` if there is no peer
+certificate, or no serial number.
+
+issuerPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:issuerPeerCertificate()
+
+Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
+peer certificate, or no issuer.
+
+subjectPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:subjectPeerCertificate()
+
+Return the subject field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
+peer certificate, or no subject.
+
+uriSanPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:uriSanPeerCertificate()
+
+Returns the URIs (as a table) in the SAN field of the peer certificate. Returns en empty table if
+there is no peer certificate, or no SAN field, or no URI SAN entries.
+
+subjectLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:subjectLocalCertificate()
+
+Returns the subject field of the local certificate in RFC 2253 format. Returns ``""`` if there is no
+local certificate, or no subject.
+
+urlEncodedPemEncodedPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificate()
+
+Returns the URL-encoded PEM-encoded representation of the peer certificate. Returns ``""`` if there
+is no peer certificate or encoding fails.
+
+urlEncodedPemEncodedPeerCertificateChain()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
+
+Returnns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
+leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails.
+
+dnsSansPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:dnsSansPeerCertificate()
+
+Returns the DNS entries (as a table) in the SAN field of the peer certificate. Returns an empty
+table if there is no peer certificate, or no SAN field, or no DNS SAN entries.
+
+dnsSansLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:dnsSansLocalCertificate()
+
+Returns the DNS entries (as a table) in the SAN field of the local certificate. Returns an empty
+table if there is no local certificate, or no SAN field, or no DNS SAN entries.
+
+validFromPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:validFromPeerCertificate()
+
+Returns the time (timestamp-since-epoch in seconds) that the peer certificate was issued and should
+be considered valid from. Returns ``0`` if there is no peer certificate.
+
+In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
+
+expirationPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:validFromPeerCertificate()
+
+Returns the time (timestamp-since-epoch in seconds) that the peer certificate expires and should not
+be considered valid after. Returns ``0`` if there is no peer certificate.
+
+In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
+
+sessionId()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sessionId()
+
+Returns the hex-encoded TLS session ID as defined in RFC 5246.
+
+ciphersuiteId()
+^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:ciphersuiteId()
+
+Returns the standard ID (hex-encoded) for the ciphers used in the established TLS connection.
+Returns ``"0xffff"`` if there is no current negotiated ciphersuite.
+
+ciphersuiteString()
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:ciphersuiteString()
+
+Returns the OpenSSL name for the set of ciphers used in the established TLS connection. Returns
+``""`` if there is no current negotiated ciphersuite.
+
+tlsVersion()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
+
+Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS connection.
