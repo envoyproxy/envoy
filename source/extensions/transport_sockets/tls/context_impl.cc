@@ -704,7 +704,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool ContextImpl::dnsNameMatch(const std::string& dns_name, const std::string_view pattern) {
+bool ContextImpl::dnsNameMatch(const std::string_view dns_name, const std::string_view pattern) {
   if (dns_name == pattern) {
     return true;
   }
