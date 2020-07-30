@@ -14,7 +14,8 @@ std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
   if (filter_names.empty()) {
     filter_names = {
         NetworkFilterNames::get().ZooKeeperProxy, // assert error in onWrite()
-        NetworkFilterNames::get().KafkaBroker, NetworkFilterNames::get().MongoProxy,
+        NetworkFilterNames::get().KafkaBroker, 
+        NetworkFilterNames::get().MongoProxy,
         NetworkFilterNames::get().MySQLProxy,
         // TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after its issues are fixed.
     };
