@@ -1,3 +1,4 @@
+#include "common/common/hex.h"
 #include "envoy/network/filter.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
@@ -14,7 +15,7 @@ namespace ListenerFilters {
 class ListenerFilterFuzzer {
 public:
   ListenerFilterFuzzer(const test::extensions::filters::listener::FilterFuzzTestCase& input)
-      : header_(input.data()) {
+      : data_(input.data()) {
     ON_CALL(cb_, socket()).WillByDefault(testing::ReturnRef(socket_));
     ON_CALL(cb_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher_));
 
@@ -29,7 +30,7 @@ public:
       // If fuzzed remote address is malformed or missing, socket's remote address will be nullptr
     }
 
-    if (!header_.empty()) {
+    if (!data_.empty()) {
       EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(testing::Return("raw_buffer"));
 
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -45,25 +46,24 @@ public:
   void fuzz(Network::ListenerFilter& filter) {
     filter.onAccept(cb_);
 
-    if (!header_.empty()) {
-      auto& header = header_;
-
+    if (!data_.empty()) {
+      auto& header = data_;
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(
-            Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-              ASSERT(length >= header.size());
-              memcpy(buffer, header.data(), header.size());
-              return Api::SysCallSizeResult{ssize_t(header.size()), 0};
-            }));
-    }
+          Invoke([&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= header.size());
+            memcpy(buffer, header.data(), header.size());
+            return Api::SysCallSizeResult{ssize_t(header.size()), 0};
+          }));
 
-    if (file_event_callback_ != nullptr) {
-      file_event_callback_(Event::FileReadyType::Read);
+      if (file_event_callback_ != nullptr) {
+        file_event_callback_(Event::FileReadyType::Read);
+      }
     }
   }
 
 private:
-  absl::string_view header_;
+  absl::string_view data_;
   FakeOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   NiceMock<Network::MockListenerFilterCallbacks> cb_;

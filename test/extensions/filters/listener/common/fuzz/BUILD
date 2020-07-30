@@ -18,6 +18,7 @@ envoy_cc_test_library(
     name = "listener_filter_fuzzer_lib",
     hdrs = ["listener_filter_fuzzer.h"],
     deps = [
+        "//source/common/common:hex_lib",
         ":listener_filter_fuzzer_proto_cc_proto",
         ":listener_filter_fakes",
         "//include/envoy/network:filter_interface",
