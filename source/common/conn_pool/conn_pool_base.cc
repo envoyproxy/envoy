@@ -90,7 +90,7 @@ bool ConnPoolImplBase::tryCreateNewConnection() {
            client->effectiveConcurrentRequestLimit());
     ASSERT(client->real_host_description_);
     connecting_stream_capacity_ += client->effectiveConcurrentRequestLimit();
-    client->moveIntoList(std::move(client), owningList(client->state_));
+    LinkedList::moveIntoList(std::move(client), owningList(client->state_));
   }
   return can_create_connection;
 }

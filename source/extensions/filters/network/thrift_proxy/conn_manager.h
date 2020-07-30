@@ -222,7 +222,7 @@ private:
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
       ActiveRpcDecoderFilterPtr wrapper = std::make_unique<ActiveRpcDecoderFilter>(*this, filter);
       filter->setDecoderFilterCallbacks(*wrapper);
-      wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+      LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
     }
 
     FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);

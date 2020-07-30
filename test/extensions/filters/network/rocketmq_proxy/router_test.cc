@@ -383,7 +383,7 @@ TEST_F(RocketmqRouterTest, ReceivedSendMessageResponseWithDecodeError) {
   }));
   EXPECT_CALL(*active_message_, onReset());
 
-  active_message_->moveIntoList(std::move(active_message_), conn_manager_->activeMessageList());
+  LinkedList::moveIntoList(std::move(active_message_), conn_manager_->activeMessageList());
   router_->onUpstreamData(buffer, false);
 }
 
