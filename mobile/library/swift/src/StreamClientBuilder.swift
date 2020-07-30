@@ -108,17 +108,14 @@ public final class StreamClientBuilder: NSObject {
     return self
   }
 
-  /// Add HTTP filter for requests sent by this client. Note the current implementation
-  /// uses a single filter instance for all streams on an engine; in other words,
-  /// filters must be effectively stateless. An upcoming change will switch to
-  /// per-stream filter instances (which can then maintain their own state).
+  /// Add an HTTP filter factory used to construct filters for streams sent by this client.
   ///
-  /// - parameter filter: HTTP Filter to be invoked for streams.
+  /// - parameter factory: Closure returning an instantiated filter. Called once per stream.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addFilter(_ filterType: Filter.Type) -> StreamClientBuilder {
-    self.filterChain.append(EnvoyHTTPFilterFactory(filterType: filterType))
+  public func addFilter<T: Filter>(_ factory: @escaping () -> T) -> StreamClientBuilder {
+    self.filterChain.append(EnvoyHTTPFilterFactory(factory: factory))
     return self
   }
 
