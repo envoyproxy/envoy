@@ -323,7 +323,7 @@ message Watchdog {
   // kill behavior. If not specified the default is 0 (disabled).
   google.protobuf.Duration kill_timeout = 3;
 
-  // Defines the maximum skew used to adjust the *kill_timeout* if *kill_timeout* is
+  // Defines the maximum jitter used to adjust the *kill_timeout* if *kill_timeout* is
   // enabled. Enabling this feature would help to reduce risk of synchronized
   // watchdog kill events across proxies due to external triggers. Set to 0 to
   // disable. If not specified the default is 0 (disabled).
