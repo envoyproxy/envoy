@@ -489,7 +489,8 @@ public:
   virtual const Router::RouteEntry* routeEntry() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this request
+   * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
+   * request
    */
   virtual envoy::config::core::v3::Metadata& dynamicMetadata() PURE;
   virtual const envoy::config::core::v3::Metadata& dynamicMetadata() const PURE;
