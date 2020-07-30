@@ -76,3 +76,4 @@ cp -f "${WORK_DIR}"/data/out/tmp/icudt"${VERSION_MAJOR}"l_dat.c \
   "${ROOTDIR}"/bazel/external/icu/data/data.c
 
 popd
+popd
