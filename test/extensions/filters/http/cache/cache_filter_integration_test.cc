@@ -95,7 +95,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   }
 }
 
-TEST_P(CacheIntegrationTest, SuccessfulValidation) {
+TEST_P(CacheIntegrationTest, ExpiredValidated) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   // Set system time to cause Envoy's cached formatted time to match time on this thread.
   simTime().setSystemTime(std::chrono::hours(1));
@@ -106,13 +106,13 @@ TEST_P(CacheIntegrationTest, SuccessfulValidation) {
       {":method", "GET"},
       {":path", absl::StrCat("/", protocolTestParamsToString({GetParam(), 0}))},
       {":scheme", "http"},
-      {":authority", "SuccessfulValidation"}};
+      {":authority", "ExpiredValidated"}};
 
   const std::string response_body(42, 'a');
   Http::TestResponseHeaderMapImpl response_headers = {
       {":status", "200"},
       {"date", formatter_.now(simTime())},
-      {"cache-control", "max-age=0"},
+      {"cache-control", "max-age=10"}, // expires after 10 s
       {"content-length", std::to_string(response_body.size())},
       {"etag", "abc123"}};
 
@@ -133,8 +133,8 @@ TEST_P(CacheIntegrationTest, SuccessfulValidation) {
     EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
   }
 
-  simTime().advanceTimeWait(std::chrono::seconds(10));
-  const std::string not_modified_date = formatter_.now(simTime());
+  // Advance time for the cached response to be stale
+  simTime().advanceTimeWait(std::chrono::seconds(11));
 
   // Send second request, the cached response should be validate then served
   {
@@ -171,7 +171,7 @@ TEST_P(CacheIntegrationTest, SuccessfulValidation) {
   }
 }
 
-TEST_P(CacheIntegrationTest, UnsuccessfulValidation) {
+TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   // Set system time to cause Envoy's cached formatted time to match time on this thread.
   simTime().setSystemTime(std::chrono::hours(1));
@@ -182,7 +182,7 @@ TEST_P(CacheIntegrationTest, UnsuccessfulValidation) {
       {":method", "GET"},
       {":path", absl::StrCat("/", protocolTestParamsToString({GetParam(), 0}))},
       {":scheme", "http"},
-      {":authority", "UnsuccessfulValidation"}};
+      {":authority", "ExpiredFetchedNewResponse"}};
 
   // Send first request, and get response from upstream.
   {
@@ -190,7 +190,7 @@ TEST_P(CacheIntegrationTest, UnsuccessfulValidation) {
     Http::TestResponseHeaderMapImpl response_headers = {
         {":status", "200"},
         {"date", formatter_.now(simTime())},
-        {"cache-control", "max-age=0"},
+        {"cache-control", "max-age=10"}, // expires after 10 s
         {"content-length", std::to_string(response_body.size())},
         {"etag", "a1"}};
 
@@ -209,7 +209,8 @@ TEST_P(CacheIntegrationTest, UnsuccessfulValidation) {
     EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
   }
 
-  simTime().advanceTimeWait(std::chrono::seconds(10));
+  // Advance time for the cached response to be stale
+  simTime().advanceTimeWait(std::chrono::seconds(11));
 
   // Send second request, validation of the cached response should be attempted but should fail
   {
@@ -217,7 +218,6 @@ TEST_P(CacheIntegrationTest, UnsuccessfulValidation) {
     Http::TestResponseHeaderMapImpl response_headers = {
         {":status", "200"},
         {"date", formatter_.now(simTime())},
-        {"cache-control", "max-age=0"},
         {"content-length", std::to_string(response_body.size())},
         {"etag", "a2"}};
 
