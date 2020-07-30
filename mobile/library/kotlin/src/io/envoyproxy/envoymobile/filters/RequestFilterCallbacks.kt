@@ -1,7 +1,5 @@
 package io.envoyproxy.envoymobile
 
-import java.nio.ByteBuffer
-
 interface RequestFilterCallbacks {
   /**
    * Continue iterating through the filter chain with buffered headers and body data.
@@ -15,18 +13,4 @@ interface RequestFilterCallbacks {
    * calls.
    */
   fun continueRequest()
-
-  /**
-   * @return ByteBuffer, The currently buffered data as buffered by the filter or previous ones in
-   *                     the filter chain. Nil if nothing has been buffered yet.
-   */
-  fun requestBuffer(): ByteBuffer?
-
-  /**
-   * Adds request trailers. May only be called in `onHeaders()`/`onData()` when
-   * `endStream = true` in order to guarantee that the client will not send its own trailers.
-   *
-   * @param trailers: The trailers to add and pass to subsequent filters.
-   */
-  fun addRequestTrailers(trailers: RequestTrailers)
 }
