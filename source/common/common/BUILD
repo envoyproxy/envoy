@@ -142,7 +142,7 @@ envoy_cc_library(
         "logger.cc",
         ],
     hdrs = [
-        "fancy_logger.h"
+        "fancy_logger.h",
         "logger.h",
         ],
     external_deps = ["abseil_synchronization"],
