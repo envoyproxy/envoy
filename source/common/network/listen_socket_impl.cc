@@ -62,8 +62,7 @@ template <>
 void NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebindSocketOptions() {}
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
-    : ListenSocketImpl(SocketInterfaceSingleton::get().socket(Socket::Type::Stream, address),
-                       address) {
+    : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address), address) {
   RELEASE_ASSERT(io_handle_->fd() != -1, "");
   bind(local_address_);
 }

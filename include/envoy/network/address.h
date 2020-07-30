@@ -176,6 +176,11 @@ public:
    * @return the type of address.
    */
   virtual Type type() const PURE;
+
+  /**
+   * @return name of socket interface that should be used with this address
+   */
+  virtual const std::string& socketInterface() const PURE;
 };
 
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;

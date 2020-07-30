@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Network {
 
 SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
-    : io_handle_(SocketInterfaceSingleton::get().socket(sock_type, addr)), sock_type_(sock_type),
+    : io_handle_(ioHandleForAddr(sock_type, addr)), sock_type_(sock_type),
       addr_type_(addr->type()) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
