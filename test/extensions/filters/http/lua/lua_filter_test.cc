@@ -70,6 +70,7 @@ public:
         }));
     EXPECT_CALL(encoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(testing::AnyNumber());
   }
 
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
