@@ -1289,9 +1289,6 @@ TEST(Url, ParsingTest) {
   // Test url with non-default ports.
   validateUrl("https://www.host.com:8443", "https", "www.host.com:8443", "/", 8443);
   validateUrl("http://www.host.com:8080", "http", "www.host.com:8080", "/", 8080);
-
-  // Make sure we survive parsing unicode URL.
-  validateUrl("https://\xe5\x85\x89.example/", "https", "xn--54q.example", "/", 443);
 }
 
 void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port,

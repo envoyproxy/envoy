@@ -415,9 +415,11 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
-        sha256 = "b8ca343feb9aedf29259f25169deb70f93a151a2e4713be97d0da2c5e3737e18",
-        strip_prefix = "quiche-googleurl-1bd6372fe3d267b2790ba76a49290b8a0b2df46c",
-        urls = ["https://github.com/dio/quiche-googleurl/archive/1bd6372fe3d267b2790ba76a49290b8a0b2df46c.tar.gz"],
+        # TODO(dio): Change to static snapshot of https://quiche.googlesource.com/googleurl/ when
+        # https://quiche-review.googlesource.com/c/googleurl/+/10620 is merged.
+        sha256 = "9dc56fa2572a2a47067b4f8dac2577ae431601ecb95bac71c7f917fedef1edfd",
+        strip_prefix = "quiche-googleurl-200d14ccc09ec9f5b4a96635d8ab980332bf01a2",
+        urls = ["https://github.com/dio/quiche-googleurl/archive/200d14ccc09ec9f5b4a96635d8ab980332bf01a2.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -477,7 +479,6 @@ DEPENDENCY_REPOSITORIES = dict(
     org_unicode_icuuc = dict(
         strip_prefix = "icu",
         sha256 = "94a80cd6f251a53bd2a997f6f1b5ac6653fe791dfab66e1eb0227740fb86d5dc",
-        # 2020-04-23
         urls = ["https://github.com/unicode-org/icu/releases/download/release-67-1/icu4c-67_1-src.tgz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:icu-project:international_components_for_unicode",

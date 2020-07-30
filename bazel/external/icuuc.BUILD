@@ -43,7 +43,6 @@ cc_library(
     includes = ["source/common"],
     visibility = ["//visibility:public"],
     deps = [
-        ":data",
         ":icuuc",
     ],
 )
@@ -59,11 +58,4 @@ cc_library(
     copts = icuuc_copts,
     visibility = ["//visibility:private"],
     deps = [":headers"],
-)
-
-cc_library(
-    name = "data",
-    srcs = ["@envoy//bazel/external/icu/data:generated"],
-    deps = [":headers"],
-    alwayslink = 1,
 )
