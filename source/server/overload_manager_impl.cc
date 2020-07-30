@@ -43,8 +43,7 @@ private:
 class RangeTriggerImpl final : public OverloadAction::Trigger {
 public:
   RangeTriggerImpl(const envoy::config::overload::v3::RangeTrigger& config)
-      : minimum_(config.min_value()),
-        maximum_(config.max_value()) {
+      : minimum_(config.min_value()), maximum_(config.max_value()) {
     if (minimum_ >= maximum_) {
       throw EnvoyException("min_value must be less than max_value");
     }
@@ -118,8 +117,8 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
     : state_(OverloadActionState::inactive()),
       active_gauge_(
           makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::Accumulate)),
-      scale_value_gauge_(
-          makeGauge(stats_scope, config.name(), "scale_value", Stats::Gauge::ImportMode::Accumulate)) {
+      scale_value_gauge_(makeGauge(stats_scope, config.name(), "scale_value",
+                                   Stats::Gauge::ImportMode::Accumulate)) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
