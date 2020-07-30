@@ -23,7 +23,7 @@ public:
 
   MOCK_METHOD(Upstream::Cluster&, cluster, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
+  MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Upstream::HealthCheckEventLogger*, eventLogger_, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
@@ -34,7 +34,7 @@ public:
 
   testing::NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
-  testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<Envoy::Random::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
   testing::NiceMock<Envoy::Api::MockApi> api_{};

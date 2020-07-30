@@ -86,10 +86,11 @@ public:
   void setCopy(const LowerCaseString& key, absl::string_view value);
   uint64_t byteSize() const;
   const HeaderEntry* get(const LowerCaseString& key) const;
-  void iterate(HeaderMap::ConstIterateCb cb, void* context) const;
-  void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const;
+  void iterate(HeaderMap::ConstIterateCb cb) const;
+  void iterateReverse(HeaderMap::ConstIterateCb cb) const;
   void clear();
   size_t remove(const LowerCaseString& key);
+  size_t removeIf(const HeaderMap::HeaderMatchPredicate& predicate);
   size_t removePrefix(const LowerCaseString& key);
   size_t size() const { return headers_.size(); }
   bool empty() const { return headers_.empty(); }
@@ -298,14 +299,15 @@ public:
   const HeaderEntry* get(const LowerCaseString& key) const override {
     return HeaderMapImpl::get(key);
   }
-  void iterate(HeaderMap::ConstIterateCb cb, void* context) const override {
-    HeaderMapImpl::iterate(cb, context);
-  }
-  void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
-    HeaderMapImpl::iterateReverse(cb, context);
+  void iterate(HeaderMap::ConstIterateCb cb) const override { HeaderMapImpl::iterate(cb); }
+  void iterateReverse(HeaderMap::ConstIterateCb cb) const override {
+    HeaderMapImpl::iterateReverse(cb);
   }
   void clear() override { HeaderMapImpl::clear(); }
   size_t remove(const LowerCaseString& key) override { return HeaderMapImpl::remove(key); }
+  size_t removeIf(const HeaderMap::HeaderMatchPredicate& predicate) override {
+    return HeaderMapImpl::removeIf(predicate);
+  }
   size_t removePrefix(const LowerCaseString& key) override {
     return HeaderMapImpl::removePrefix(key);
   }

@@ -211,7 +211,7 @@ using HostVector = std::vector<HostSharedPtr>;
 using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
-using HostMap = std::unordered_map<std::string, Upstream::HostSharedPtr>;
+using HostMap = absl::node_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -221,7 +221,7 @@ using ExcludedHostVectorConstSharedPtr = std::shared_ptr<const ExcludedHostVecto
 
 using HostListPtr = std::unique_ptr<HostVector>;
 using LocalityWeightsMap =
-    std::unordered_map<envoy::config::core::v3::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
+    absl::node_hash_map<envoy::config::core::v3::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
 using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
 
 /**
@@ -623,6 +623,15 @@ public:
   REMAINING_GAUGE(remaining_rq, Accumulate)
 
 /**
+ * All stats tracking request/response headers and body sizes. Not used by default.
+ */
+#define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(HISTOGRAM)                                         \
+  HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
+  HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rs_body_size, Bytes)
+
+/**
  * All stats around timeout budgets. Not used by default.
  */
 #define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(HISTOGRAM)                                                \
@@ -653,9 +662,24 @@ struct ClusterCircuitBreakersStats {
 /**
  * Struct definition for cluster timeout budget stats. @see stats_macros.h
  */
+struct ClusterRequestResponseSizeStats {
+  ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(GENERATE_HISTOGRAM_STRUCT)
+};
+
+using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
+using ClusterRequestResponseSizeStatsOptRef =
+    absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
+
+/**
+ * Struct definition for cluster timeout budget stats. @see stats_macros.h
+ */
 struct ClusterTimeoutBudgetStats {
   ALL_CLUSTER_TIMEOUT_BUDGET_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
+
+using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
+using ClusterTimeoutBudgetStatsOptRef =
+    absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>;
 
 /**
  * All extension protocol specific options returned by the method at
@@ -705,6 +729,11 @@ public:
    * @return the idle timeout for upstream connection pool connections.
    */
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return how many streams should be anticipated per each current stream.
+   */
+  virtual float prefetchRatio() const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.
@@ -851,9 +880,16 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * @return absl::optional<ClusterTimeoutBudgetStats>& stats on timeout budgets for this cluster.
+   * @return absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
+   * headers/body sizes of request/response for this cluster.
    */
-  virtual const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const PURE;
+  virtual ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const PURE;
+
+  /**
+   * @return absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
+   * budgets for this cluster.
+   */
+  virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
   /**
    * Returns an optional source address for upstream connections to bind to.

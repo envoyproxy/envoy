@@ -35,6 +35,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -187,6 +188,9 @@ public:
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
+  bool streamErrorOnInvalidHttpMessaging() const override {
+    return stream_error_on_invalid_http_messaging_;
+  }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
@@ -199,7 +203,7 @@ public:
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
@@ -234,6 +238,7 @@ public:
   Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
+  bool stream_error_on_invalid_http_messaging_ = false;
   bool preserve_external_request_id_{false};
   Http::Http1Settings http1_settings_;
   Http::DefaultInternalAddressConfig internal_address_config_;
@@ -251,7 +256,12 @@ public:
   // course, it's the codecs must be robust to wire-level violations. We
   // explore these violations via MutateAction and SwapAction at the connection
   // buffer level.
-  enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
+  enum class StreamState {
+    PendingHeaders,
+    PendingNonInformationalHeaders,
+    PendingDataOrTrailers,
+    Closed
+  };
 
   FuzzStream(ConnectionManagerImpl& conn_manager, FuzzConfig& config,
              const HeaderMap& request_headers,
@@ -451,11 +461,15 @@ public:
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
         decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
+        // We don't allow multiple 100-continue headers in HCM, UpstreamRequest is responsible
+        // for coalescing.
+        state = StreamState::PendingNonInformationalHeaders;
       }
       break;
     }
     case test::common::http::ResponseAction::kHeaders: {
-      if (state == StreamState::PendingHeaders) {
+      if (state == StreamState::PendingHeaders ||
+          state == StreamState::PendingNonInformationalHeaders) {
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.headers()));
         // The client codec will ensure we always have a valid :status.
@@ -535,13 +549,14 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   FuzzConfig config(input.forward_client_cert());
   NiceMock<Network::MockDrainDecision> drain_close;
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   Stats::SymbolTablePtr symbol_table(Stats::SymbolTableCreator::makeSymbolTable());
   Http::ContextImpl http_context(*symbol_table);
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<Server::MockOverloadManager> overload_manager;
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   bool connection_alive = true;
 
@@ -555,7 +570,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
-                                     cluster_manager, nullptr, config.time_system_);
+                                     cluster_manager, overload_manager, config.time_system_);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;

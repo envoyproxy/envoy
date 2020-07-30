@@ -4,7 +4,6 @@ load(
     "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -22,6 +21,7 @@ envoy_cc_test_library(
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -139,7 +139,8 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:test_runtime_lib",
@@ -309,7 +310,7 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "lc_trie_speed_test",
     srcs = ["lc_trie_speed_test.cc"],
     external_deps = [
@@ -319,6 +320,11 @@ envoy_cc_test_binary(
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
     ],
+)
+
+envoy_benchmark_test(
+    name = "lc_trie_speed_test_benchmark_test",
+    benchmark_binary = "lc_trie_speed_test",
 )
 
 envoy_cc_test(
@@ -334,6 +340,7 @@ envoy_cc_test(
     name = "transport_socket_options_impl_test",
     srcs = ["transport_socket_options_impl_test.cc"],
     deps = [
+        "//source/common/network:address_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:filter_state_lib",
     ],

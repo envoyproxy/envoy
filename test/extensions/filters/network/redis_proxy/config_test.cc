@@ -5,7 +5,7 @@
 
 #include "extensions/filters/network/redis_proxy/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
@@ -164,6 +164,43 @@ settings:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST(RedisProxyFilterConfigFactoryTest, RedisProxyFaultProto) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+faults:
+- fault_type: ERROR
+  fault_enabled:
+    default_value:
+      numerator: 30
+      denominator: HUNDRED
+    runtime_key: "bogus_key"
+  commands:
+  - GET
+- fault_type: DELAY
+  fault_enabled:
+    default_value:
+      numerator: 20
+      denominator: HUNDRED
+    runtime_key: "bogus_key"
+  delay: 2s
+settings:
+  op_timeout: 0.02s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config{};
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
+  EXPECT_TRUE(factory.isTerminalFilter());
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

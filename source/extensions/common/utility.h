@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unordered_map>
-
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 

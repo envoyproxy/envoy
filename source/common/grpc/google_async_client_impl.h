@@ -21,6 +21,7 @@
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/container/node_hash_set.h"
 #include "grpcpp/generic/generic_stub.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/support/proto_buffer_writer.h"
@@ -29,6 +30,9 @@ namespace Envoy {
 namespace Grpc {
 
 class GoogleAsyncStreamImpl;
+
+using GoogleAsyncStreamImplPtr = std::unique_ptr<GoogleAsyncStreamImpl>;
+
 class GoogleAsyncRequestImpl;
 
 struct GoogleAsyncTag {
@@ -106,8 +110,10 @@ private:
   Thread::ThreadPtr completion_thread_;
   // Track all streams that are currently using this CQ, so we can notify them
   // on shutdown.
-  std::unordered_set<GoogleAsyncStreamImpl*> streams_;
+  absl::node_hash_set<GoogleAsyncStreamImpl*> streams_;
 };
+
+using GoogleAsyncClientThreadLocalPtr = std::unique_ptr<GoogleAsyncClientThreadLocal>;
 
 // Google gRPC client stats. TODO(htuch): consider how a wider set of stats collected by the
 // library, such as the census related ones, can be externalized as needed.
@@ -189,7 +195,7 @@ private:
   // the client if it gets destructed. The streams need to wait for their tags
   // to drain from the CQ.
   GoogleStubSharedPtr stub_;
-  std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
+  std::list<GoogleAsyncStreamImplPtr> active_streams_;
   const std::string stat_prefix_;
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;

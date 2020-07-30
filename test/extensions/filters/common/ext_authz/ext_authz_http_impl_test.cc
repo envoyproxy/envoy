@@ -99,7 +99,7 @@ public:
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
-  Http::RequestMessagePtr sendRequest(std::unordered_map<std::string, std::string>&& headers) {
+  Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers) {
     envoy::service::auth::v3::CheckRequest request{};
     auto mutable_headers =
         request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();

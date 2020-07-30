@@ -39,7 +39,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random,
+                                 Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context)
     : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
@@ -98,6 +98,7 @@ void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_str
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
             *headers);
   ASSERT(!remote_closed_);
+  encoded_response_headers_ = true;
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
   // At present, the router cleans up stream state as soon as the remote is closed, making a

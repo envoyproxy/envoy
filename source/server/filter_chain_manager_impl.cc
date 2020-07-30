@@ -11,6 +11,7 @@
 
 #include "server/configuration_impl.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -87,7 +88,7 @@ const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const 
   return parent_context_.localInfo();
 }
 
-Envoy::Runtime::RandomGenerator& PerFilterChainFactoryContextImpl::random() {
+Envoy::Random::RandomGenerator& PerFilterChainFactoryContextImpl::random() {
   return parent_context_.random();
 }
 
@@ -149,7 +150,7 @@ void FilterChainManagerImpl::addFilterChain(
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
+  absl::node_hash_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
   for (const auto& filter_chain : filter_chain_span) {
@@ -633,7 +634,7 @@ bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
 const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }
-Envoy::Runtime::RandomGenerator& FactoryContextImpl::random() { return server_.random(); }
+Envoy::Random::RandomGenerator& FactoryContextImpl::random() { return server_.random(); }
 Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime(); }
 Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }

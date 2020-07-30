@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -246,7 +247,7 @@ private:
     Event::Dispatcher& dispatcher_;
     std::string current_host_address_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
-    std::unordered_map<std::string, RedisDiscoveryClientPtr> client_map_;
+    absl::node_hash_map<std::string, RedisDiscoveryClientPtr> client_map_;
 
     std::list<Network::Address::InstanceConstSharedPtr> discovery_address_list_;
 
@@ -269,7 +270,7 @@ private:
   Network::DnsLookupFamily dns_lookup_family_;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   RedisDiscoverySession redis_discovery_session_;
   const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 

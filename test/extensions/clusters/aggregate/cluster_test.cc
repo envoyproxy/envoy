@@ -8,7 +8,8 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
@@ -90,7 +91,7 @@ public:
 
   void initialize(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml_config);
+        Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::aggregate::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
@@ -124,7 +125,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;

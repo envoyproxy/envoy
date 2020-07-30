@@ -3,16 +3,15 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/common/random_generator.h"
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
@@ -84,7 +83,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
 
 void RouterCheckTool::assignUniqueRouteNames(
     envoy::config::route::v3::RouteConfiguration& route_config) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
       route.set_name(random.uuid());

@@ -4,7 +4,13 @@
 ./docs/build.sh
 ```
 
-The output can be found in `generated/docs`.
+The output can be found in `generated/docs`. By default configuration examples are going to be validated during build. 
+To disable validation, set `SPHINX_SKIP_CONFIG_VALIDATION` environment variable to `true`:
+
+```bash
+SPHINX_SKIP_CONFIG_VALIDATION=true docs/build.sh
+```
+
 
 # How the Envoy website and docs are updated
 

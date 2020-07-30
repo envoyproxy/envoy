@@ -3,12 +3,11 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_set>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/network/filter.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -18,6 +17,8 @@
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -59,7 +60,7 @@ public:
   size_t size() const { return allowed_sha256_digests_.size(); }
 
 private:
-  std::unordered_set<std::string> allowed_sha256_digests_;
+  absl::node_hash_set<std::string> allowed_sha256_digests_;
 };
 
 using AllowedPrincipalsSharedPtr = std::shared_ptr<AllowedPrincipals>;
@@ -77,7 +78,7 @@ public:
   static ClientSslAuthConfigSharedPtr
   create(const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
          ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
-         Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
+         Event::Dispatcher& dispatcher, Stats::Scope& scope, Random::RandomGenerator& random);
 
   const AllowedPrincipals& allowedPrincipals();
   const Network::Address::IpList& ipAllowlist() { return ip_allowlist_; }
@@ -87,7 +88,7 @@ private:
   ClientSslAuthConfig(
       const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
       ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-      Stats::Scope& scope, Runtime::RandomGenerator& random);
+      Stats::Scope& scope, Random::RandomGenerator& random);
 
   static GlobalStats generateStats(Stats::Scope& scope, const std::string& prefix);
 

@@ -26,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+ceil
 CHACHA
 CHLO
 CHMOD
@@ -122,6 +123,8 @@ GETting
 GLB
 GOAWAY
 GRPC
+GRO
+GSO
 GSS
 GTEST
 GURL
@@ -281,6 +284,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SMTP
 SNI
 SOTW
 SPD
@@ -344,6 +348,7 @@ WRONGPASS
 WRR
 WS
 WSA
+WSS
 Welford's
 Wi
 XDS
@@ -433,6 +438,7 @@ bulkstrings
 bursty
 bytecode
 bytestream
+cacheable
 cacheability
 callee
 callsite
@@ -775,6 +781,7 @@ mutexes
 mux
 muxed
 mysql
+namelen
 nameserver
 namespace
 namespaces
@@ -864,6 +871,8 @@ precompute
 precomputed
 predeclared
 prefetch
+prefetched
+prefetches
 preflight
 preorder
 prepend
@@ -1107,6 +1116,7 @@ tuples
 typedef
 typeid
 typesafe
+uber
 ucontext
 udpa
 uint

@@ -26,6 +26,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/basic_resource_limit.h"
 #include "test/mocks/upstream/cds_api.h"
+#include "test/mocks/upstream/cluster.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_info_factory.h"
 #include "test/mocks/upstream/cluster_manager.h"

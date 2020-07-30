@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
@@ -29,25 +29,13 @@
 #include "common/init/target_impl.h"
 #include "common/singleton/threadsafe_singleton.h"
 
+#include "absl/container/node_hash_map.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Runtime {
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
-
-/**
- * Implementation of RandomGenerator that uses per-thread RANLUX generators seeded with current
- * time.
- */
-class RandomGeneratorImpl : public RandomGenerator {
-public:
-  // Runtime::RandomGenerator
-  uint64_t random() override;
-  std::string uuid() override;
-
-  static const size_t UUID_LENGTH;
-};
 
 /**
  * All runtime stats. @see stats_macros.h
@@ -75,7 +63,7 @@ struct RuntimeStats {
  */
 class SnapshotImpl : public Snapshot, Logger::Loggable<Logger::Id::runtime> {
 public:
-  SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
+  SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
@@ -125,7 +113,7 @@ private:
 
   const std::vector<OverrideLayerConstPtr> layers_;
   EntryMap values_;
-  RandomGenerator& generator_;
+  Random::RandomGenerator& generator_;
   RuntimeStats& stats_;
 };
 
@@ -165,7 +153,7 @@ public:
    * Merge the provided values into our entry map. An empty value indicates that a key should be
    * removed from our map.
    */
-  void mergeValues(const std::unordered_map<std::string, std::string>& values);
+  void mergeValues(const absl::node_hash_map<std::string, std::string>& values);
 
 private:
   RuntimeStats& stats_;
@@ -243,14 +231,14 @@ public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
              const envoy::config::bootstrap::v3::LayeredRuntime& config,
              const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-             RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
-             Api::Api& api);
+             Random::RandomGenerator& generator,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Runtime::Loader
   void initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
   SnapshotConstSharedPtr threadsafeSnapshot() override;
-  void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
+  void mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
   Stats::Scope& getRootScope() override;
 
@@ -262,9 +250,9 @@ private:
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
-  void onRdtsReady();
+  void onRtdsReady();
 
-  RandomGenerator& generator_;
+  Random::RandomGenerator& generator_;
   RuntimeStats stats_;
   AdminLayerPtr admin_layer_;
   ThreadLocal::SlotPtr tls_;

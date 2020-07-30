@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -10,21 +9,11 @@
 
 #include "test/mocks/stats/mocks.h"
 
+#include "absl/container/node_hash_map.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Runtime {
-
-class MockRandomGenerator : public RandomGenerator {
-public:
-  MockRandomGenerator();
-  ~MockRandomGenerator() override;
-
-  MOCK_METHOD(uint64_t, random, ());
-  MOCK_METHOD(std::string, uuid, ());
-
-  const std::string uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
-};
 
 class MockSnapshot : public Snapshot {
 public:
@@ -76,7 +65,7 @@ public:
   MOCK_METHOD(void, initialize, (Upstream::ClusterManager & cm));
   MOCK_METHOD(const Snapshot&, snapshot, ());
   MOCK_METHOD(SnapshotConstSharedPtr, threadsafeSnapshot, ());
-  MOCK_METHOD(void, mergeValues, ((const std::unordered_map<std::string, std::string>&)));
+  MOCK_METHOD(void, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)));
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
   MOCK_METHOD(Stats::Scope&, getRootScope, ());
 

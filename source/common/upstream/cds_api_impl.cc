@@ -14,6 +14,7 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
@@ -52,20 +53,18 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
 void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                                 const std::string& system_version_info) {
-  std::unique_ptr<Cleanup> maybe_eds_resume;
+  Config::ScopedResume maybe_resume_eds;
   if (cm_.adsMux()) {
     const auto type_urls =
         Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-    cm_.adsMux()->pause(type_urls);
-    maybe_eds_resume =
-        std::make_unique<Cleanup>([this, type_urls] { cm_.adsMux()->resume(type_urls); });
+    maybe_resume_eds = cm_.adsMux()->pause(type_urls);
   }
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
             removed_resources.size());
 
   std::vector<std::string> exception_msgs;
-  std::unordered_set<std::string> cluster_names;
+  absl::node_hash_set<std::string> cluster_names;
   bool any_applied = false;
   for (const auto& resource : added_resources) {
     envoy::config::cluster::v3::Cluster cluster;
