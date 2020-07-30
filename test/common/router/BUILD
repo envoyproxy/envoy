@@ -32,8 +32,8 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/server:server_mocks",
-        "//test/mocks/upstream:retry_priority_mocks",
         "//test/mocks/upstream:retry_priority_factory_mocks",
+        "//test/mocks/upstream:retry_priority_mocks",
         "//test/mocks/upstream:test_retry_host_predicate_factory_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
@@ -77,7 +77,6 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -146,7 +145,6 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -164,8 +162,6 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
-        
-        
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -314,7 +310,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -338,6 +333,8 @@ envoy_cc_test(
     srcs = ["header_formatter_test.cc"],
     deps = [
         "//source/common/config:metadata_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/network:address_lib",
         "//source/common/router:header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
@@ -347,8 +344,6 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//source/common/network:address_lib",
-        "//source/common/http:header_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

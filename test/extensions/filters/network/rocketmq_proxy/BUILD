@@ -91,8 +91,8 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.rocketmq_proxy",
     deps = [
         ":utility_lib",
-        "//source/extensions/filters/network/rocketmq_proxy:config",
         "//source/common/network:address_lib",
+        "//source/extensions/filters/network/rocketmq_proxy:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

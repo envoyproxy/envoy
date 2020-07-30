@@ -19,10 +19,10 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.rbac",
     deps = [
         "//source/extensions/filters/common/expr:context_lib",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
-        "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
     ],
 )

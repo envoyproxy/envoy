@@ -29,12 +29,12 @@ envoy_cc_test_library(
     deps = [
         ":validation_proto_cc_proto",
         "//source/common/event:dispatcher_lib",
-        "//source/common/stream_info:stream_info_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:config_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/exe:platform_impl_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:printers_lib",

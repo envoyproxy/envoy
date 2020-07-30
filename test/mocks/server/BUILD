@@ -186,7 +186,9 @@ envoy_cc_mock(
         "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/mocks/upstream:health_check_event_logger_mocks","//test/mocks/upstream:priority_set_mocks","//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
     ],
 )
 
@@ -221,7 +223,10 @@ envoy_cc_mock(
         "//source/common/secret:secret_manager_impl_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/server:config_tracker_mocks",
-        "//test/mocks/upstream:health_check_event_logger_mocks","//test/mocks/upstream:priority_set_mocks","//test/mocks/upstream:health_checker_mocks","//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
     ],
 )
 
@@ -246,7 +251,9 @@ envoy_cc_mock(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/upstream:health_check_event_logger_mocks","//test/mocks/upstream:cluster_priority_set_mocks","//test/mocks/upstream:health_checker_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/mocks/upstream:health_check_event_logger_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
     ],
 )
 

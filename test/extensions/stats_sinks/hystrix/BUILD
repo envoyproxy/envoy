@@ -36,7 +36,9 @@ envoy_extension_cc_test(
         "//source/extensions/stat_sinks/hystrix:hystrix_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:cluster_info_mocks","//test/mocks/upstream:cluster_manager_mocks","//test/mocks/upstream:priority_set_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:priority_set_mocks",
     ],
 )
 

@@ -83,7 +83,6 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/stats:fake_symbol_table_lib",
         "//test/mocks/upstream:cluster_info_mocks",
-        
         "//test/test_common:global_lib",
     ],
 )
@@ -94,7 +93,6 @@ envoy_cc_test(
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
-        
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_grpc_utils_lib"]),
