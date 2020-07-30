@@ -1093,6 +1093,8 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 }
 
 int ClientConnectionImpl::onHeadersComplete() {
+  ENVOY_CONN_LOG(trace, "status_code {}", connection_, parser_.status_code);
+
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.

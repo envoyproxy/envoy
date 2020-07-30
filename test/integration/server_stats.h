@@ -30,6 +30,12 @@ public:
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
 
   /**
+   * Wait for a counter to exist.
+   * @param name counter name.
+   */
+  virtual void waitForCounterExists(const std::string& name) PURE;
+
+  /**
    * Wait for a gauge to >= a given value.
    * @param name gauge name.
    * @param value target value.
