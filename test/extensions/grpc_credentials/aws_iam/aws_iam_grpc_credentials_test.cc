@@ -92,6 +92,8 @@ public:
     case CallCredentials::AccessToken:
       google_grpc->add_call_credentials()->mutable_access_token()->assign("foo");
       return config;
+    default:
+      return config;
     }
   }
   enum class RegionLocation {
