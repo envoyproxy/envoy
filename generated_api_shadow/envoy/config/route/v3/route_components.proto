@@ -1094,7 +1094,74 @@ message RetryPolicy {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
   }
 
+  // A retry back-off strategy that applies when the upstream server rate limits
+  // the request.
+  //
+  // Given this configuration:
+  //
+  // .. code-block:: yaml
+  //
+  //   rate_limited_retry_back_off:
+  //     reset_headers:
+  //     - name: Retry-After
+  //       format: SECONDS
+  //     - name: X-RateLimit-Reset
+  //       format: UNIX_TIMESTAMP
+  //     max_interval: "300s"
+  //
+  // The following algorithm will apply:
+  //
+  //  1. If the response contains the header ``Retry-After`` its value must be on
+  //     the form ``120`` (an integer that represents the number of seconds to
+  //     wait before retrying). If so, this value is used as the back-off interval.
+  //  2. Otherwise, if the response contains the header ``X-RateLimit-Reset`` its
+  //     value must be on the form ``1595320702`` (an integer that represents the
+  //     point in time at which to retry, as a Unix timestamp in seconds). If so,
+  //     the current time is subtracted from this value and the result is used as
+  //     the back-off interval.
+  //  3. Otherwise, Envoy will use the default
+  //     :ref:`exponential back-off <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_back_off>`
+  //     strategy.
+  //
+  // No matter which format is used, if the resulting back-off interval exceeds
+  // ``max_interval`` it is discarded and the next header in ``reset_headers``
+  // is tried. If a request timeout is configured for the route it will further
+  // limit how long the request will be allowed to run.
+  //
+  // To prevent many clients retrying at the same point in time jitter is added
+  // to the back-off interval, so the resulting interval is decided by taking:
+  // ``random(interval, interval * 1.5)``.
+  //
+  // .. attention::
+  //
+  //   Configuring ``rate_limited_retry_back_off`` will not by itself cause a request
+  //   to be retried. You will still need to configure the right retry policy to match
+  //   the responses from the upstream server.
   message RateLimitedRetryBackOff {
+    enum ResetHeaderFormat {
+      SECONDS = 0;
+      UNIX_TIMESTAMP = 1;
+    }
+
+    message ResetHeader {
+      string name = 1 [
+        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
+      ];
+
+      ResetHeaderFormat format = 2 [(validate.rules).message = {required: true}];
+    }
+
+    // Specifies the reset headers (like ``Retry-After`` or ``X-RateLimit-Reset``)
+    // to match against the response. Headers are tried in order, and matched case
+    // insensitive. The first header to be parsed successfully is used. If no headers
+    // match the default exponential back-off is used instead.
+    repeated ResetHeader reset_headers_ng = 3 [(validate.rules).repeated = {min_items: 1}];
+
+    // Specifies the maximum back off interval that Envoy will allow. If a reset
+    // header contains an interval longer than this then it will be discarded and
+    // the next header will be tried. Defaults to 300 seconds.
+    google.protobuf.Duration max_interval = 4 [(validate.rules).duration = {gt {}}];
+
     // Specifies the rate limited retry reset headers (like ``Retry-After`` or
     // ``X-RateLimit-Reset``) to match against the response. If a request is
     // being retried and the response contains one of these headers the value
@@ -1165,11 +1232,11 @@ message RetryPolicy {
   // describes Envoy's back-off algorithm.
   RetryBackOff retry_back_off = 8;
 
-  // Specifies parameters that control a retry back off based on rate limited
-  // responses. When a request is rate limited by the server the server may
-  // include a header like ``Retry-After`` or ``X-RateLimit-Reset`` to provide
-  // feedback to the client on how long to wait before retrying. If configured,
-  // the rate limited retry back off strategy will be used instead of the
+  // Specifies parameters that control a retry back-off strategy that is used
+  // when the request is rate limited by the upstream server. The server may
+  // return a response header like ``Retry-After`` or ``X-RateLimit-Reset`` to
+  // provide feedback to the client on how long to wait before retrying. If
+  // configured, this back-off strategy will be used instead of the
   // default exponential back off strategy (configured using `retry_back_off`)
   // whenever a response includes the matching headers.
   RateLimitedRetryBackOff rate_limited_retry_back_off = 11;
