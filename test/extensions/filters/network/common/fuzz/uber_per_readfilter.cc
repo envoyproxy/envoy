@@ -32,6 +32,8 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         NetworkFilterNames::get().DubboProxy,
         NetworkFilterNames::get().SniCluster};
     // Check whether each filter is loaded into Envoy.
+    // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
+    // that does not exist will cause fatal errors.
     for (auto& filter_name : supported_filter_names) {
       if (factories.contains(filter_name)) {
         filter_names.push_back(filter_name);
