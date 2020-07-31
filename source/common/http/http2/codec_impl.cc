@@ -329,6 +329,20 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 }
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
+  // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
+  // a problem with processing empty trailers (END_STREAM | END_HEADERS with zero length HEADERS) of
+  // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514.
+  const bool skip_encoding_empty_trailers =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_encoding_empty_trailers");
+  if (trailers.empty() && skip_encoding_empty_trailers) {
+    ENVOY_CONN_LOG(debug, "skipping submitting trailers", parent_.connection_);
+
+    // Instead of submitting empty trailers, we send empty data instead.
+    Buffer::OwnedImpl empty_buffer;
+    encodeData(empty_buffer, /*end_stream=*/true);
+    return;
+  }
+
   std::vector<nghttp2_nv> final_headers;
   buildHeaders(final_headers, trailers);
   int rc = nghttp2_submit_trailer(parent_.session_, stream_id_, final_headers.data(),
