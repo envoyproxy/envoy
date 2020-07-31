@@ -24,9 +24,9 @@ public:
     config_helper_.addFilter("name: envoy.filters.http.grpc_web");
   }
 
-  void skipEncodingEmptyTrailers(bool skip) {
+  void skipEncodingEmptyTrailers(bool skip_encoding_empty_trailers) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.skip_encoding_empty_trailers",
-                                      skip ? "true" : "false");
+                                      skip_encoding_empty_trailers ? "true" : "false");
   }
 
   static std::string testParamsToString(const testing::TestParamInfo<TestParams> params) {
@@ -48,8 +48,10 @@ INSTANTIATE_TEST_SUITE_P(
     GrpcWebFilterIntegrationTest::testParamsToString);
 
 TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
+  const auto downstream_protocol = std::get<1>(GetParam());
   const bool skip_encoding_empty_trailers = std::get<2>(GetParam());
-  if (std::get<1>(GetParam()) == Http::CodecClient::Type::HTTP1) {
+
+  if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   } else {
     skipEncodingEmptyTrailers(skip_encoding_empty_trailers);
@@ -89,15 +91,15 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   EXPECT_TRUE(absl::StrContains(response->body(), "response1:trailer1"));
   EXPECT_TRUE(absl::StrContains(response->body(), "response2:trailer2"));
 
-  if (std::get<1>(GetParam()) == Http::CodecClient::Type::HTTP1) {
-    // When the downstream is HTTP/1.1 we expect the trailers to be in the response-body.
+  if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
+    // When the downstream protocol is HTTP/1.1 we expect the trailers to be in the response-body.
     EXPECT_EQ(nullptr, response->trailers());
   }
 
-  if (std::get<1>(GetParam()) == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol == Http::CodecClient::Type::HTTP2) {
     if (skip_encoding_empty_trailers) {
-      // When the downstream is HTTP/2 and the feature-flag to skip encoding empty trailers is
-      // turned on, expect that the trailers is included in the response-body.
+      // When the downstream protocol is HTTP/2 and the feature-flag to skip encoding empty trailers
+      // is turned on, expect that the trailers are included in the response-body.
       EXPECT_EQ(nullptr, response->trailers());
     } else {
       // Otherwise, we send empty trailers.
