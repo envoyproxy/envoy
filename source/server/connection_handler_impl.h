@@ -81,6 +81,9 @@ public:
   void enableListeners() override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
+  void retryAllConnections(
+      const envoy::config::listener::v3::FilterChain* const& filter_chain_message) override;
+
   /**
    * Wrapper for an active listener owned by this handler.
    */
@@ -337,9 +340,13 @@ private:
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
 
-  // TODO(ASOPVII): should be deleted.
-  // for FilterChainRebuildInfo to access ActiveTcpListener.
-  // friend struct FilterChainRebuildInfo;
+  using SocketMetadataPair =
+      std::pair<Network::ConnectionSocketPtr&&, const envoy::config::core::v3::Metadata>;
+
+  // map<filter_chain_message, map<listener_name, set<SocketMetadataPair>>>
+  absl::flat_hash_map<const envoy::config::listener::v3::FilterChain* const,
+                      absl::flat_hash_map<std::string, std::list<SocketMetadataPair>>>
+      sockets_using_filter_chain_;
 };
 
 /**

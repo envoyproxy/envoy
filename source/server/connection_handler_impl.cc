@@ -112,6 +112,37 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
+void ConnectionHandlerImpl::retryAllConnections(
+    const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
+  if (sockets_using_filter_chain_.find(filter_chain_message) == sockets_using_filter_chain_.end()) {
+    return;
+  }
+  auto& listener_sockets_map = sockets_using_filter_chain_[filter_chain_message];
+  // Go through all listeners on this worker, if a listener has sockets sending to rebuild
+  // filter_chain, now retry connection with those sockets.
+  for (auto& listener : listeners_) {
+    if (listener.second.tcp_listener_.has_value()) {
+      auto& active_tcp_listener = listener.second.tcp_listener_->get();
+      const auto& listener_name = active_tcp_listener.config_->name();
+      // Find all SocketMetadataPair of this active tcp listener.
+      if (listener_sockets_map.find(listener_name) != listener_sockets_map.end()) {
+        for (auto& socket_metadata_pair : listener_sockets_map[listener_name]) {
+          // Retry connection with that socket on this active tcp listener.
+          // Should point real filter chain ahead of retry connection, to avoid meet fake filter
+          // chain again.
+          active_tcp_listener.newConnection(std::move(socket_metadata_pair.first),
+                                            socket_metadata_pair.second);
+        }
+      }
+      // Clear this listener from the retry connection list.
+      listener_sockets_map.erase(listener_name);
+    }
+  }
+  // TODO(ASOPVII): check whether to erase this part. For future usage(this filter chain has been
+  // rebuilt).
+  sockets_using_filter_chain_.erase(filter_chain_message);
+}
+
 void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
   ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
   ActiveConnections& active_connections = connection.active_connections_;
@@ -407,27 +438,19 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
     auto& listener = dynamic_cast<ListenerImpl&>(*config_);
     auto& server_dispatcher = listener.dispatcher();
-    auto& worker_dispatcher = parent_.dispatcher_;
     const auto& filter_chain_message = filter_chain_impl->getFilterChainMessage();
 
-    // auto filter_chain_rebuild_info = std::make_unique<FilterChainRebuildInfo>(*this,
-    // filter_chain_message, worker_name, listener_name,
-    //                                                    worker_dispatcher, socket,
-    //                                                    dynamic_metadata);
-    auto filter_chain_rebuild_info = std::make_unique<FilterChainRebuildInfo>(
-        worker_name, listener_name, worker_dispatcher, filter_chain_message);
+    parent_.sockets_using_filter_chain_[filter_chain_message][listener_name].push_back(
+        std::make_pair(std::move(socket), dynamic_metadata));
 
-    // auto filter_chain_manager = config_->filterChainManager();
-    // auto& listener_manager = listener.list
+    auto filter_chain_rebuild_info =
+        std::make_unique<FilterChainRebuildInfo>(worker_name, listener_name, filter_chain_message);
 
     server_dispatcher.post([&listener, &filter_chain_message, &filter_chain_rebuild_info]() {
       listener.buildRealFilterChains(filter_chain_message, std::move(filter_chain_rebuild_info));
     });
-
-    // after post
-    // clean this connection, ready for retry
-    // should not go below if fake
-    // cleanup
+    // Stop Continuing, waiting callbacks from master thread to retry connection.
+    return;
   }
 
   if (filter_chain == nullptr) {

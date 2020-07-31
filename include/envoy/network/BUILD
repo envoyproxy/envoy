@@ -38,6 +38,7 @@ envoy_cc_library(
         ":listen_socket_interface",
         ":listener_interface",
         "//include/envoy/ssl:context_interface",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

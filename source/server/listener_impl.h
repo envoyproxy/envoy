@@ -13,6 +13,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/basic_resource_impl.h"
@@ -207,18 +208,15 @@ private:
   ListenerImpl& listener_impl_;
 };
 
-// filter_chain_rebuild_info that will be accessed by master thread
 struct FilterChainRebuildInfo {
   FilterChainRebuildInfo(
       const std::string& worker_name, const std::string& listener_name,
-      Event::Dispatcher& dispatcher,
       const envoy::config::listener::v3::FilterChain* const& filter_chain_message)
-      : worker_name_(worker_name), listener_name_(listener_name), worker_dispatcher_(dispatcher),
+      : worker_name_(worker_name), listener_name_(listener_name),
         filter_chain_message_(filter_chain_message) {}
 
   const std::string& worker_name_;
   const std::string& listener_name_;
-  Event::Dispatcher& worker_dispatcher_;
   const envoy::config::listener::v3::FilterChain* const& filter_chain_message_;
 };
 
@@ -226,35 +224,31 @@ using FilterChainRebuildInfoPtr = std::unique_ptr<FilterChainRebuildInfo>;
 
 class FilterChainRebuilder {
 public:
-  FilterChainRebuilder();
+  FilterChainRebuilder(ListenerImpl& listener,
+                       const envoy::config::listener::v3::FilterChain* const& filter_chain);
   ~FilterChainRebuilder();
 
   void addRebuildInfo(FilterChainRebuildInfoPtr rebuild_info);
-
-  bool rebuildComplete();
-
+  bool isCompleted() { return rebuild_complete_; }
   Init::Manager& initManager() { return *rebuild_init_manager_; }
   void startRebuilding() { rebuild_init_manager_->initialize(rebuild_watcher_); }
-  // Trigger all callbacks in the current list, then clear the list.
-  void callback();
+  void callbackToWorkers();
 
 private:
   // rebuild state:
   // true: rebuilding has finished successfully
   // false: still in the rebuilding process
+  ListenerImpl& listener_;
+  const envoy::config::listener::v3::FilterChain* const& filter_chain_;
   bool rebuild_complete_;
-
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   std::unique_ptr<Init::Manager> rebuild_init_manager_;
   Init::WatcherImpl rebuild_watcher_;
 
-  using WorkerCallback = std::function<void(bool)>;
-  std::list<WorkerCallback> on_completion_callback_list_;
-
-  // now we only have the worker_name + listener_name
+  // Listeners on worker to retry connection.
   absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>>
-      listeners_on_workers_to_callback_;
+      listeners_on_worker_to_callback_;
 };
 
 using FilterChainRebuilderPtr = std::unique_ptr<FilterChainRebuilder>;
@@ -375,6 +369,8 @@ public:
     }
   }
 
+  Event::Dispatcher& dispatcher() { return listener_factory_context_->dispatcher(); }
+
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;
@@ -382,10 +378,11 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
-  SystemTime last_updated_;
-  Event::Dispatcher& dispatcher() { return listener_factory_context_->dispatcher(); }
   void buildRealFilterChains(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                              FilterChainRebuildInfoPtr rb);
+  WorkerPtr getWorkerByName(const std::string& name);
+
+  SystemTime last_updated_;
 
 private:
   /**

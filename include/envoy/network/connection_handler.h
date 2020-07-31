@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -91,6 +92,11 @@ public:
    * @return the stat prefix used for per-handler stats.
    */
   virtual const std::string& statPrefix() const PURE;
+
+  /**
+   * retry all connections requiring this filter chain.
+   */
+  virtual void retryAllConnections(const envoy::config::listener::v3::FilterChain* const&) PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.
