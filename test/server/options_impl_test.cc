@@ -96,7 +96,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(0U, options->restartEpoch());
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ(2, options->componentLogLevels().size());
-  EXPECT_EQ("[[%g:%#] %v]", options->logFormat());
+  EXPECT_EQ("[%v]", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
@@ -431,19 +431,19 @@ TEST_F(OptionsImplTest, LogFormatDefault) {
 TEST_F(OptionsImplTest, LogFormatDefaultNoPrefix) {
   std::unique_ptr<OptionsImpl> options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format-prefix-with-location", "0"});
-  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] %v");
+  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatOverride) {
   std::unique_ptr<OptionsImpl> options =
-      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
+                         "--log-format-prefix-with-location 1"});
   EXPECT_EQ(options->logFormat(), "%%v [%g:%#] %v %t [%g:%#] %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {
   std::unique_ptr<OptionsImpl> options =
-      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
-                         "--log-format-prefix-with-location 0"});
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
   EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
 }
 
