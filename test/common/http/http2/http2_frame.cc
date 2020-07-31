@@ -4,6 +4,8 @@
 
 #include "envoy/common/platform.h"
 
+#include "common/common/hex.h"
+
 namespace {
 
 // Make request stream ID in the network byte order
@@ -264,6 +266,12 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
 Http2Frame Http2Frame::makeGenericFrame(absl::string_view contents) {
   Http2Frame frame;
   frame.appendData(contents);
+  return frame;
+}
+
+Http2Frame Http2Frame::makeGenericFrameFromHexDump(absl::string_view contents) {
+  Http2Frame frame;
+  frame.appendData(Hex::decode(std::string(contents)));
   return frame;
 }
 
