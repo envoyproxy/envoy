@@ -625,7 +625,7 @@ def checkSourceLine(line, file_path, reportError):
   if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
     # Matching duration(int-const or float-const) other than zero
     reportError(
-        "Don't use ambiguous duration(value), use an explicit duration type, e.g. std::chrono::milliseconds(value) or std::chrono::duration<int64_t, std::micro>(value)"
+        "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
     )
   if not allowlistedForRegisterFactory(file_path):
     if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
