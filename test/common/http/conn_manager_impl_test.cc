@@ -2117,7 +2117,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionTerminatedIfCodecOverridesStream
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   // stream_error from codec, if specified, determines whether the HTTP/1 connection is terminated
-  // or left open
+  // or left open (irrespective of behaviour configured in HCM)
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
       .WillOnce(Return(absl::optional<bool>(false)));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
@@ -2158,7 +2158,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionOpenIfCodecOverridesStreamError)
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   // stream_error from codec, if specified, determines whether the HTTP/1 connection is terminated
-  // or left open
+  // or left open (irrespective of behaviour configured in HCM)
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
       .WillOnce(Return(absl::optional<bool>(true)));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
@@ -2199,7 +2199,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionTerminatedIfCodecDoesntOverrideS
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
-  // stream_error from codec is not specified, so stream_error from HCM determines whether the
+  // stream_error from codec is not specified, so HCM config determines whether the
   // HTTP/1 connection is terminated or not
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
       .WillOnce(Return(absl::optional<bool>()));
@@ -2242,7 +2242,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionLeftOpenIfCodecDoesntOverrideStr
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
-  // stream_error from codec is not specified, so stream_error from HCM determines whether the
+  // stream_error from codec is not specified, so HCM config determines whether the
   // HTTP/1 connection is terminated or not
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
       .WillOnce(Return(absl::optional<bool>()));

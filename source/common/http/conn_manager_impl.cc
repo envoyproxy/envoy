@@ -78,6 +78,16 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
   }
 }
 
+bool streamErrorOnInvalidHttpMessage(
+    bool hcm_stream_error_on_invalid_http_message,
+    const absl::optional<bool>& override_stream_error_on_invalid_http_message) {
+  if (override_stream_error_on_invalid_http_message.has_value()) {
+    return override_stream_error_on_invalid_http_message.value();
+  } else {
+    return hcm_stream_error_on_invalid_http_message;
+  }
+}
+
 } // namespace
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
@@ -1525,7 +1535,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
       code == Http::Code::BadRequest && connection_manager_.codec_->protocol() < Protocol::Http2 &&
-      !Utility::streamErrorOnInvalidHttpMessage(
+      !streamErrorOnInvalidHttpMessage(
           connection_manager_.config_.streamErrorOnInvalidHttpMessaging(),
           response_encoder_->streamErrorOnInvalidHttpMessage())) {
     state_.saw_connection_close_ = true;

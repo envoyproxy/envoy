@@ -418,16 +418,6 @@ Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions&
   return ret;
 }
 
-bool Utility::streamErrorOnInvalidHttpMessage(
-    bool hcm_stream_error_on_invalid_http_message,
-    const absl::optional<bool>& override_stream_error_on_invalid_http_message) {
-  if (override_stream_error_on_invalid_http_message.has_value()) {
-    return override_stream_error_on_invalid_http_message.value();
-  } else {
-    return hcm_stream_error_on_invalid_http_message;
-  }
-}
-
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
                              const LocalReplyData& local_reply_data) {
   sendLocalReply(
