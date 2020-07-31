@@ -158,6 +158,50 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
+// If request Cache-Control header is missing,
+// "Pragma:no-cache" is equivalent to "Cache-Control:no-cache"
+// https://httpwg.org/specs/rfc7234.html#header.pragma
+TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
+  request_headers_.addCopy("pragma", "no-cache");
+  const LookupRequest lookup_request(request_headers_, current_time_);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  // Response is not expired but the request requires revalidation through Pragma: no-cache
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+}
+
+TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
+  request_headers_.addCopy("pragma", "no-cache, custom-directive=custom-value");
+  const LookupRequest lookup_request(request_headers_, current_time_);
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  // Response is not expired but the request requires revalidation through Pragma: no-cache
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+}
+
+TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
+  request_headers_.addCopy("pragma", "max-age=0");
+  const LookupRequest lookup_request(request_headers_, current_time_ + std::chrono::seconds(5));
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  // Response is fresh, Pragma header with values other than "no-cache" is ignored
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+}
+
+TEST_F(LookupRequestTest, PragmaNoFallback) {
+  request_headers_.addCopy("pragma", "no-cache");
+  request_headers_.addCopy("cache-control", "max-age=10");
+  const LookupRequest lookup_request(request_headers_, current_time_ + std::chrono::seconds(5));
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
+  const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
+  // Pragma header is ignored when Cache-Control header is present
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+}
+
 TEST_F(LookupRequestTest, FullRange) {
   request_headers_.addCopy("Range", "0-99");
   const LookupRequest lookup_request(request_headers_, current_time_);
