@@ -82,7 +82,7 @@ public:
     endpoint->set_uri("auth.example.com/_oauth");
     endpoint->mutable_timeout()->set_seconds(1);
     p.set_callback_path(TEST_CALLBACK);
-    p.set_redirection_hostname("auth.example.com");
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
     p.set_forward_bearer_token(true);
     auto* matcher = p.add_pass_through_matcher();

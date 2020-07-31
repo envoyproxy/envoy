@@ -103,7 +103,7 @@ public:
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
   }
-  const std::string& redirectionHostname() const { return redirection_hostname_; }
+  const std::string& authorizationEndpoint() const { return authorization_endpoint_; }
   const std::string& callbackPath() const { return callback_path_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
@@ -114,7 +114,7 @@ private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   const envoy::config::core::v3::HttpUri oauth_token_endpoint_;
-  const std::string redirection_hostname_;
+  const std::string authorization_endpoint_;
   const std::string client_id_;
   const std::string callback_path_;
   const Matchers::PathMatcher signout_path_;

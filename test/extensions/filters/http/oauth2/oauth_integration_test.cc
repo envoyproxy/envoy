@@ -44,7 +44,7 @@ typed_config:
       cluster: oauth
       uri: oauth.com/token
       timeout: 3s
-    redirection_hostname: oauth.com
+    authorization_endpoint: https://oauth.com/oauth/authorize/
     callback_path: /callback
     signout_path: 
       path:

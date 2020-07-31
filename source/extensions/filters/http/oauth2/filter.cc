@@ -48,9 +48,8 @@ constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};sec
 constexpr const char* CookieTailHttpOnlyFormatString =
     ";version=1;path=/;Max-Age={};secure;HttpOnly";
 
-const char* AuthClusterUriParameters =
-    "https://{}/oauth/authorize/"
-    "?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}";
+const char* AuthorizationEndpointFormat =
+    "{}?client_id={}&scope=user&response_type=code&redirect_uri={}&state={}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
@@ -76,7 +75,7 @@ FilterConfig::FilterConfig(
     Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
     Stats::Scope& scope, const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
-      redirection_hostname_(proto_config.redirection_hostname()),
+      authorization_endpoint_(proto_config.authorization_endpoint()),
       client_id_(proto_config.credentials().client_id()),
       callback_path_(proto_config.callback_path()), signout_path_(proto_config.signout_path()),
       secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
@@ -260,7 +259,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
     const std::string new_url =
-        fmt::format(AuthClusterUriParameters, config_->redirectionHostname(), config_->clientId(),
+        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
                     escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
