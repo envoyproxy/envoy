@@ -13,6 +13,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/metadata.h"
 #include "common/config/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
@@ -258,29 +259,39 @@ Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
 }
 
 MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config)
-    : matcher_config_(filter_config.matcher()), default_res_(filter_config.no_key_default()) {}
+    : default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
+      filter_(filter_config.matcher().filter()) {
+
+  auto& matcher_config = filter_config.matcher();
+
+  for (const auto& seg : matcher_config.path()) {
+    path_.push_back(seg.key());
+  }
+
+  // Matches if the value equals the configured 'MetadataMatcher' value.
+  const auto& val = matcher_config.value();
+  value_matcher_ = Matchers::ValueMatcher::create(val);
+
+  // Matches if the value is present in dynamic metadata
+  auto present_val = envoy::type::matcher::v3::ValueMatcher();
+  present_val.set_present_match(true);
+  present_matcher_ = Matchers::ValueMatcher::create(present_val);
+}
 
 bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
                               const Http::ResponseHeaderMap&,
                               const Http::ResponseTrailerMap&) const {
-
-  auto matcher = Matchers::MetadataMatcher(matcher_config_);
-
-  if (matcher.match(info.dynamicMetadata())) {
-    return true;
+  const auto& value =
+      Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
+  // If the key corresponds to a set value in dynamic metadata, return true if the value matches the
+  // the configured 'MetadataMatcher' value and false otherwise
+  if (present_matcher_->match(value)) {
+    return value_matcher_->match(value);
   }
 
-  auto present_matcher_config = envoy::type::matcher::v3::MetadataMatcher(matcher_config_);
-  present_matcher_config.mutable_value()->set_present_match(true);
-
-  auto present_matcher = Matchers::MetadataMatcher(present_matcher_config);
-
-  // If the key does not exist, return default_res_
-  if (!present_matcher.match(info.dynamicMetadata())) {
-    return default_res_;
-  }
-
-  return false;
+  // If the key does not correspond to a set value in dynamic metadata, return true if
+  // 'match_if_key_not_found' is set to true and false otherwise
+  return default_match_;
 }
 
 InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,

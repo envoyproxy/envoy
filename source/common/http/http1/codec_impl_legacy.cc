@@ -40,6 +40,7 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view BodyDisallowed = "http1.body_disallowed";
   const absl::string_view TransferEncodingNotAllowed = "http1.transfer_encoding_not_allowed";
   const absl::string_view ContentLengthNotAllowed = "http1.content_length_not_allowed";
+  const absl::string_view InvalidUnderscore = "http1.unexpected_underscore";
 };
 
 struct Http1HeaderTypesValues {
@@ -1010,10 +1011,9 @@ void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
       is_grpc_request =
           Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
     }
-    const bool is_head_request = parser_.method == HTTP_HEAD;
     active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
                                                       CodeUtility::toString(error_code_), nullptr,
-                                                      is_head_request, absl::nullopt, details);
+                                                      absl::nullopt, details);
     return;
   }
 }
@@ -1050,7 +1050,7 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
       ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}",
                      connection_, current_header_field_.getStringView());
       error_code_ = Http::Code::BadRequest;
-      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
+      sendProtocolError(Http1ResponseCodeDetails::get().InvalidUnderscore);
       stats_.requests_rejected_with_underscores_in_headers_.inc();
       throw CodecProtocolException("http/1.1 protocol error: header name contains underscores");
     }
@@ -1092,6 +1092,8 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 }
 
 int ClientConnectionImpl::onHeadersComplete() {
+  ENVOY_CONN_LOG(trace, "status_code {}", connection_, parser_.status_code);
+
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
@@ -1137,19 +1139,23 @@ int ClientConnectionImpl::onHeadersComplete() {
       }
     }
 
-    if (parser_.status_code == 100) {
-      // http-parser treats 100 continue headers as their own complete response.
-      // Swallow the spurious onMessageComplete and continue processing.
-      ignore_message_complete_for_100_continue_ = true;
+    if (parser_.status_code == enumToInt(Http::Code::Continue)) {
       pending_response_.value().decoder_->decode100ContinueHeaders(std::move(headers));
-
-      // Reset to ensure no information from the continue headers is used for the response headers
-      // in case the callee does not move the headers out.
-      headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
     } else if (cannotHaveBody() && !handling_upgrade_) {
       deferred_end_stream_headers_ = true;
     } else {
       pending_response_.value().decoder_->decodeHeaders(std::move(headers), false);
+    }
+
+    // http-parser treats 1xx headers as their own complete response. Swallow the spurious
+    // onMessageComplete and continue processing for purely informational headers.
+    // 101-SwitchingProtocols is exempt as all data after the header is proxied through after
+    // upgrading.
+    if (CodeUtility::is1xx(parser_.status_code) &&
+        parser_.status_code != enumToInt(Http::Code::SwitchingProtocols)) {
+      ignore_message_complete_for_1xx_ = true;
+      // Reset to ensure no information from the 1xx headers is used for the response headers.
+      headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
     }
   }
 
@@ -1175,8 +1181,8 @@ void ClientConnectionImpl::onBody(Buffer::Instance& data) {
 
 void ClientConnectionImpl::onMessageComplete() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
-  if (ignore_message_complete_for_100_continue_) {
-    ignore_message_complete_for_100_continue_ = false;
+  if (ignore_message_complete_for_1xx_) {
+    ignore_message_complete_for_1xx_ = false;
     return;
   }
   if (pending_response_.has_value()) {

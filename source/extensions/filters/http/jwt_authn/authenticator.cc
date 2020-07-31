@@ -265,8 +265,14 @@ void AuthenticatorImpl::verifyKey() {
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
-  // if on allow missing or failed this should verify all tokens, otherwise stop on ok.
-  if ((Status::Ok == status && !is_allow_failed_ && !is_allow_missing_) || tokens_.empty()) {
+
+  // If a request has multiple tokens, all of them must be valid. Otherwise it may have
+  // following security hole: a request has a good token and a bad one, it will pass
+  // verification, forwarded to the backend, and the backend may mistakenly use the bad
+  // token as the good one that passed the verification.
+
+  // Unless allowing failed or missing, all tokens must be verified successfully.
+  if ((Status::Ok != status && !is_allow_failed_ && !is_allow_missing_) || tokens_.empty()) {
     tokens_.clear();
     if (is_allow_failed_) {
       callback_(Status::Ok);

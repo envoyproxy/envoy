@@ -284,6 +284,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SMTP
 SNI
 SOTW
 SPD
@@ -437,6 +438,7 @@ bulkstrings
 bursty
 bytecode
 bytestream
+cacheable
 cacheability
 callee
 callsite
@@ -869,6 +871,8 @@ precompute
 precomputed
 predeclared
 prefetch
+prefetched
+prefetches
 preflight
 preorder
 prepend

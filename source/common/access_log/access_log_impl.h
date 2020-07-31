@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
@@ -18,6 +17,7 @@
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/hash/hash.h"
 
 namespace Envoy {
@@ -208,7 +208,7 @@ private:
 class GrpcStatusFilter : public Filter {
 public:
   using GrpcStatusHashSet =
-      std::unordered_set<Grpc::Status::GrpcStatus, absl::Hash<Grpc::Status::GrpcStatus>>;
+      absl::node_hash_set<Grpc::Status::GrpcStatus, absl::Hash<Grpc::Status::GrpcStatus>>;
 
   GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatusFilter& config);
 
@@ -241,8 +241,13 @@ public:
                 const Http::ResponseTrailerMap& response_trailers) const override;
 
 private:
-  const envoy::type::matcher::v3::MetadataMatcher matcher_config_;
-  bool default_res_;
+  Matchers::ValueMatcherConstSharedPtr present_matcher_;
+  Matchers::ValueMatcherConstSharedPtr value_matcher_;
+
+  std::vector<std::string> path_;
+
+  const bool default_match_;
+  const std::string filter_;
 };
 
 /**

@@ -9,6 +9,7 @@
 #include "common/common/scalar_to_byte_vector.h"
 #include "common/common/utility.h"
 #include "common/network/application_protocol.h"
+#include "common/network/proxy_protocol_filter_state.h"
 #include "common/network/upstream_server_name.h"
 #include "common/network/upstream_subject_alt_names.h"
 
@@ -54,6 +55,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
+  absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
 
   bool needs_transport_socket_options = false;
   if (filter_state.hasData<UpstreamServerName>(UpstreamServerName::key())) {
@@ -77,9 +79,17 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
     needs_transport_socket_options = true;
   }
 
+  if (filter_state.hasData<ProxyProtocolFilterState>(ProxyProtocolFilterState::key())) {
+    const auto& proxy_protocol_filter_state =
+        filter_state.getDataReadOnly<ProxyProtocolFilterState>(ProxyProtocolFilterState::key());
+    proxy_protocol_options.emplace(proxy_protocol_filter_state.value());
+    needs_transport_socket_options = true;
+  }
+
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
-        server_name, std::move(subject_alt_names), std::move(application_protocols));
+        server_name, std::move(subject_alt_names), std::move(application_protocols), absl::nullopt,
+        proxy_protocol_options);
   } else {
     return nullptr;
   }
