@@ -17,7 +17,7 @@ public protocol RequestFilter: Filter {
   ///
   /// - returns: The header status containing headers with which to continue or buffer.
   func onRequestHeaders(_ headers: RequestHeaders, endStream: Bool)
-    -> FilterHeaderStatus<RequestHeaders>
+    -> FilterHeadersStatus<RequestHeaders>
 
   /// Called any number of times whenever body data is sent.
   ///
@@ -36,5 +36,5 @@ public protocol RequestFilter: Filter {
   /// - parameter trailers: The outbound trailers.
   ///
   /// - returns: The trailer status containing body with which to continue or buffer.
-  func onRequestTrailers(_ trailers: RequestTrailers) -> FilterTrailerStatus<RequestTrailers>
+  func onRequestTrailers(_ trailers: RequestTrailers) -> FilterTrailersStatus<RequestTrailers>
 }

@@ -6,7 +6,7 @@ struct DemoFilter: ResponseFilter {
   static let name = "PlatformStub"
 
   func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool)
-    -> FilterHeaderStatus<ResponseHeaders>
+    -> FilterHeadersStatus<ResponseHeaders>
   {
     NSLog("Adding new header!")
     let builder = headers.toResponseHeadersBuilder()
@@ -22,7 +22,7 @@ struct DemoFilter: ResponseFilter {
     return .continue(body)
   }
 
-  func onResponseTrailers(_ trailers: ResponseTrailers) -> FilterTrailerStatus<ResponseTrailers> {
+  func onResponseTrailers(_ trailers: ResponseTrailers) -> FilterTrailersStatus<ResponseTrailers> {
     return .continue(trailers)
   }
 }
