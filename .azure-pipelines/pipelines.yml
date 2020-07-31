@@ -16,6 +16,9 @@ jobs:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+      - bash: |
+          set -e
+          false
       - task: Cache@2
         inputs:
           key: "format | ./WORKSPACE | **/*.bzl"
