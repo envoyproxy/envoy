@@ -34,12 +34,12 @@ WatcherHandlePtr WatcherImpl::createHandle(absl::string_view handle_name) const 
       new WatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFn>(fn_)));
 }
 
-ManagerWatcherHandleImpl::ManagerWatcherHandleImpl(absl::string_view handle_name,
+TargetAwareWatcherHandleImpl::TargetAwareWatcherHandleImpl(absl::string_view handle_name,
                                                    absl::string_view name,
-                                                   std::weak_ptr<ReadyFnSendName> fn)
+                                                   std::weak_ptr<TargetAwareReadyFn> fn)
     : handle_name_(handle_name), name_(name), fn_sn_(std::move(fn)) {}
 
-bool ManagerWatcherHandleImpl::ready() const {
+bool TargetAwareWatcherHandleImpl::ready() const {
   auto locked_fn(fn_sn_.lock());
   if (locked_fn) {
     // If we can "lock" a shared pointer to the watcher's callback function, call it.
@@ -53,17 +53,17 @@ bool ManagerWatcherHandleImpl::ready() const {
   }
 }
 
-ManagerWatcherImpl::ManagerWatcherImpl(absl::string_view name, ReadyFnSendName fn)
-    : name_(name), fn_sn_(std::make_shared<ReadyFnSendName>(std::move(fn))) {}
+TargetAwareWatcherImpl::TargetAwareWatcherImpl(absl::string_view name, TargetAwareReadyFn fn)
+    : name_(name), fn_sn_(std::make_shared<TargetAwareReadyFn>(std::move(fn))) {}
 
-ManagerWatcherImpl::~ManagerWatcherImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
+TargetAwareWatcherImpl::~TargetAwareWatcherImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
 
-absl::string_view ManagerWatcherImpl::name() const { return name_; }
+absl::string_view TargetAwareWatcherImpl::name() const { return name_; }
 
-WatcherHandlePtr ManagerWatcherImpl::createHandle(absl::string_view handle_name) const {
+WatcherHandlePtr TargetAwareWatcherImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique because WatcherHandleImpl ctor is private.
   return std::unique_ptr<WatcherHandle>(
-      new ManagerWatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFnSendName>(fn_sn_)));
+      new TargetAwareWatcherHandleImpl(handle_name, name_, std::weak_ptr<TargetAwareReadyFn>(fn_sn_)));
 }
 
 } // namespace Init

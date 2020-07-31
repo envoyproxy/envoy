@@ -14,7 +14,7 @@ namespace Init {
  * initialization completes.
  */
 using ReadyFn = std::function<void()>;
-using ReadyFnSendName = std::function<void(absl::string_view)>;
+using TargetAwareReadyFn = std::function<void(absl::string_view)>;
 
 /**
  * A WatcherHandleImpl functions as a weak reference to a Watcher. It is how a TargetImpl safely
@@ -78,19 +78,19 @@ private:
  * its client that all registered targets have initialized, with no guarantees about the lifetimes
  * of the manager or client.
  *
- * We restrict the watcher_ inside ManagerImpl to be constructed with the 'ReadyFnSendName' fn so
+ * We restrict the watcher_ inside ManagerImpl to be constructed with the 'TargetAwareReadyFn' fn so
  * that the init manager will get target name information when the watcher_ calls
  * 'onTargetSendName(target_name)' For any other purpose, a watcher can be constructed with either
  * Ctor. If you do not need a watcher to carry any string information such as the target_name, the
  * first type with 'ReadyFn' fn is enough.
  */
-class ManagerWatcherHandleImpl : public WatcherHandle, Logger::Loggable<Logger::Id::init> {
+class TargetAwareWatcherHandleImpl : public WatcherHandle, Logger::Loggable<Logger::Id::init> {
 private:
-  friend class ManagerWatcherImpl;
+  friend class TargetAwareWatcherImpl;
 
   // Ctor with std::function<void(absl::string_view)> callback function.
-  ManagerWatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
-                           std::weak_ptr<ReadyFnSendName> fn);
+  TargetAwareWatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
+                               std::weak_ptr<TargetAwareReadyFn> fn);
 
 public:
   // Init::WatcherHandle.
@@ -105,22 +105,22 @@ private:
   const std::string name_;
 
   // The watcher's callback function, only called if the weak pointer can be "locked".
-  const std::weak_ptr<ReadyFnSendName> fn_sn_;
+  const std::weak_ptr<TargetAwareReadyFn> fn_sn_;
 };
 
 /**
- * A ManagerWatcherImpl is a WatcherImpl which is specially designed for init manager's internal
+ * A TargetAwareWatcherImpl is a WatcherImpl which is specially designed for init manager's internal
  * watcher_. This watcher_ will monitor all the targets this init manager has added. The callback
  * function fn has a absl::string_view parameter to pass the target name to init manager.
  */
-class ManagerWatcherImpl : public Watcher, Logger::Loggable<Logger::Id::init> {
+class TargetAwareWatcherImpl : public Watcher, Logger::Loggable<Logger::Id::init> {
 public:
   /**
    * @param name a human-readable watcher name, for logging / debugging.
    * @param fn a callback function to invoke when `ready` is called on the handle.
    */
-  ManagerWatcherImpl(absl::string_view name, ReadyFnSendName fn);
-  ~ManagerWatcherImpl() override;
+  TargetAwareWatcherImpl(absl::string_view name, TargetAwareReadyFn fn);
+  ~TargetAwareWatcherImpl() override;
 
   // Init::Watcher.
   absl::string_view name() const override;
@@ -132,7 +132,7 @@ private:
 
   // The callback function with target_name parameter, called via WatcherHandleImpl by either the
   // target or the manager.
-  const std::shared_ptr<ReadyFnSendName> fn_sn_;
+  const std::shared_ptr<TargetAwareReadyFn> fn_sn_;
 };
 
 } // namespace Init
