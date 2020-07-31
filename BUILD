@@ -1,5 +1,5 @@
 load(
-    "//source/extensions:extensions_build_config.bzl",
+    "@envoy_build_config//:extensions_build_config.bzl",
     "ADDITIONAL_VISIBILITY",
 )
 
