@@ -48,7 +48,9 @@ message DnsTable {
       option (validate.required) = true;
 
       // Specify the protocol number for the service. Envoy will try to resolve the number to
-      // the protocol name. For example, 6 will resolve to "tcp"
+      // the protocol name. For example, 6 will resolve to "tcp". Refer to:
+      // https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+      // for protocol names and numbers
       uint32 number = 1 [(validate.rules).uint32 = {lt: 255}];
 
       // Specify the protocol name for the service.
