@@ -39,8 +39,16 @@ Envoy::Config::ConfigProviderPtr create(
 
 class ScopedRoutesConfigProviderManager;
 
+struct ScopedRoutesConfigProviderBase {
+  virtual void
+  onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+                    Http::RouteConfigUpdatedCallback route_config_updated_cb) const PURE;
+  virtual ~ScopedRoutesConfigProviderBase() = default;
+};
+
 // A ConfigProvider for inline scoped routing configuration.
-class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase {
+class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase,
+                                         ScopedRoutesConfigProviderBase {
 public:
   InlineScopedRoutesConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
                                    std::string name,
@@ -66,6 +74,11 @@ public:
 
   std::string getConfigVersion() const override { return ""; }
   ConfigConstSharedPtr getConfig() const override { return config_; }
+
+  void onDemandRdsUpdate(uint64_t, Event::Dispatcher&,
+                         Http::RouteConfigUpdatedCallback route_config_updated_cb) const override {
+    route_config_updated_cb(false);
+  }
 
 private:
   const std::string name_;
@@ -215,12 +228,18 @@ using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubs
 
 // A ConfigProvider for scoped RDS that dynamically fetches scoped routing configuration via a
 // subscription.
-class ScopedRdsConfigProvider : public Envoy::Config::MutableConfigProviderCommonBase {
+class ScopedRdsConfigProvider : public Envoy::Config::MutableConfigProviderCommonBase,
+                                ScopedRoutesConfigProviderBase {
 public:
   ScopedRdsConfigProvider(ScopedRdsConfigSubscriptionSharedPtr&& subscription);
 
-  ScopedRdsConfigSubscription& subscription() {
+  ScopedRdsConfigSubscription& subscription() const {
     return *static_cast<ScopedRdsConfigSubscription*>(subscription_.get());
+  }
+  void onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+                         Http::RouteConfigUpdatedCallback route_config_updated_cb) const override {
+    subscription().onDemandRdsUpdate(key_hash, thread_local_dispatcher,
+                                     move(route_config_updated_cb));
   }
 };
 

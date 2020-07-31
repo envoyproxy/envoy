@@ -487,7 +487,7 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
         provider->configProtoInfoVector<envoy::config::route::v3::ScopedRouteConfiguration>();
     ASSERT(protos_info != absl::nullopt);
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
-    inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
+    inline_config->set_name(dynamic_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
       inline_config->mutable_scoped_route_configs()->Add()->PackFrom(
           API_RECOVER_ORIGINAL(*config_proto));
