@@ -16,7 +16,7 @@ bool WatcherHandleImpl::ready() const {
     return true;
   } else {
     // If not, the watcher was already destroyed.
-    ENVOY_LOG(debug, "{} initialized, but can't notify {} (unavailable)", handle_name_, name_);
+    ENVOY_LOG(debug, "{} initialized, but can't notify {}", handle_name_, name_);
     return false;
   }
 }
@@ -48,7 +48,7 @@ bool ManagerWatcherHandleImpl::ready() const {
     return true;
   } else {
     // If not, the watcher was already destroyed.
-    ENVOY_LOG(debug, "{} initialized, but can't notify {} (unavailable)", handle_name_, name_);
+    ENVOY_LOG(debug, "{} initialized, but can't notify {}", handle_name_, name_);
     return false;
   }
 }

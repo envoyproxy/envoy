@@ -67,8 +67,7 @@ void ManagerImpl::initialize(const Watcher& watcher) {
 }
 
 const absl::flat_hash_map<std::string, uint32_t>& ManagerImpl::unreadyTargets() const {
-  return std::reference_wrapper<const absl::flat_hash_map<std::string, uint32_t>>(
-      target_names_count_);
+  return target_names_count_;
 }
 
 void ManagerImpl::onTargetReady() {
@@ -84,7 +83,8 @@ void ManagerImpl::onTargetReady() {
 
 void ManagerImpl::onTargetReadySendTargetName(absl::string_view target_name) {
   // If there are no remaining targets and one mysteriously calls us back, this manager is haunted.
-  ASSERT(count_ != 0, fmt::format("{} called back by target after initialization complete"));
+  ASSERT(count_ != 0,
+         fmt::format("{} called back by target after initialization complete", target_name));
 
   // Decrease target_name count by 1.
   if (--target_names_count_[target_name] == 0) {

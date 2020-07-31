@@ -139,13 +139,8 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
 }
 
 // Helper method to get the unready_targets parameter.
-bool shouldIncludeActiveListenerUnreadyTargetsInDump(const Http::Utility::QueryParams& params) {
-  return Utility::queryParam(params, "include_active_listener_unready_targets") != absl::nullopt;
-}
-
-// Helper method to get the unready_targets parameter.
-bool shouldIncludeWarmingListenerUnreadyTargetsInDump(const Http::Utility::QueryParams& params) {
-  return Utility::queryParam(params, "include_warming_listener_unready_targets") != absl::nullopt;
+bool shouldIncludeListenerUnreadyTargetsInDump(const Http::Utility::QueryParams& params) {
+  return Utility::queryParam(params, "include_listener_unready_targets") != absl::nullopt;
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
@@ -468,8 +463,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url,
 
 void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
                                    const absl::optional<std::string>& mask, bool include_eds,
-                                   bool include_active_listener_unready_targets,
-                                   bool include_warming_listener_unready_targets) const {
+                                   bool include_listener_unready_targets) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     if (!server_.clusterManager().clusters().empty()) {
@@ -477,14 +471,8 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
     }
   }
 
-  if (include_active_listener_unready_targets) {
-    callbacks_map.emplace("activelistenerunreadytargets",
-                          [this] { return dumpUnreadyTargetsConfigs(true); });
-  }
-
-  if (include_warming_listener_unready_targets) {
-    callbacks_map.emplace("warminglistenerunreadytargets",
-                          [this] { return dumpUnreadyTargetsConfigs(false); });
+  if (include_listener_unready_targets) {
+    callbacks_map.emplace("listenerunreadytargets", [this] { return dumpUnreadyTargetsConfigs(); });
   }
 
   for (const auto& key_callback_pair : callbacks_map) {
@@ -507,8 +495,7 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
 absl::optional<std::pair<Http::Code, std::string>>
 AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
                              const absl::optional<std::string>& mask, const std::string& resource,
-                             bool include_eds, bool include_active_listener_unready_targets,
-                             bool include_warming_listener_unready_targets) const {
+                             bool include_eds, bool include_listener_unready_targets) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     if (!server_.clusterManager().clusters().empty()) {
@@ -516,14 +503,8 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
     }
   }
 
-  if (include_active_listener_unready_targets) {
-    callbacks_map.emplace("activelistenerunreadytargets",
-                          [this] { return dumpUnreadyTargetsConfigs(true); });
-  }
-
-  if (include_warming_listener_unready_targets) {
-    callbacks_map.emplace("warminglistenerunreadytargets",
-                          [this] { return dumpUnreadyTargetsConfigs(false); });
+  if (include_listener_unready_targets) {
+    callbacks_map.emplace("listenerunreadytargets", [this] { return dumpUnreadyTargetsConfigs(); });
   }
 
   for (const auto& key_callback_pair : callbacks_map) {
@@ -652,12 +633,12 @@ ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
   return endpoint_config_dump;
 }
 
-ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool dump_active_listeners) const {
+ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs() const {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
-  if (dump_active_listeners) {
-    listeners = server_.listenerManager().listeners();
-  } else {
+  if (server_.listenerManager().isWorkerStarted()) {
     listeners = server_.listenerManager().warmingListeners();
+  } else {
+    listeners = server_.listenerManager().listeners();
   }
 
   auto unready_targets_config_dump_list =
@@ -670,10 +651,8 @@ ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool dump_active_
 
     auto& listener = dynamic_cast<ListenerImpl&>(listenerConfig.get());
     const auto& init_manager = dynamic_cast<Init::ManagerImpl&>(listener.initManager());
-    const absl::flat_hash_map<std::string, uint32_t>& unready_targets =
-        init_manager.unreadyTargets();
 
-    for (const auto& unready_target : unready_targets) {
+    for (const auto& unready_target : init_manager.unreadyTargets()) {
       listener_message.add_target_names(unready_target.first);
     }
   }
@@ -687,24 +666,20 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url,
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
-  const bool include_active_listener_unready_targets =
-      shouldIncludeActiveListenerUnreadyTargetsInDump(query_params);
-  const bool include_warming_listener_unready_targets =
-      shouldIncludeWarmingListenerUnreadyTargetsInDump(query_params);
+  const bool include_listener_unready_targets =
+      shouldIncludeListenerUnreadyTargetsInDump(query_params);
 
   envoy::admin::v3::ConfigDump dump;
 
   if (resource.has_value()) {
     auto err = addResourceToDump(dump, mask, resource.value(), include_eds,
-                                 include_active_listener_unready_targets,
-                                 include_warming_listener_unready_targets);
+                                 include_listener_unready_targets);
     if (err.has_value()) {
       response.add(err.value().second);
       return err.value().first;
     }
   } else {
-    addAllConfigToDump(dump, mask, include_eds, include_active_listener_unready_targets,
-                       include_warming_listener_unready_targets);
+    addAllConfigToDump(dump, mask, include_eds, include_listener_unready_targets);
   }
   MessageUtil::redact(dump);
 

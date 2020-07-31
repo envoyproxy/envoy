@@ -228,6 +228,8 @@ public:
    * @return the server's API Listener if it exists, nullopt if it does not.
    */
   virtual ApiListenerOptRef apiListener() PURE;
+
+  virtual bool isWorkerStarted() PURE;
 };
 
 } // namespace Server
