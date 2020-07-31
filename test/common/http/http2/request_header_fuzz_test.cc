@@ -4,6 +4,7 @@
 
 #include "common/http/exception.h"
 
+#include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/common/http/http2/frame_replay.h"
 #include "test/fuzz/fuzz_runner.h"
 
