@@ -226,11 +226,17 @@ protected:
     // This code assumes that details is a static string, so that we
     // can avoid copying it.
     void setDetails(absl::string_view details) {
-      // It is probably a mistake to call setDetails() twice, so
-      // assert that details_ is empty.
-      ASSERT(details_.empty());
-
-      details_ = details;
+      // TODO(asraa): In some cases nghttp2's error handling may cause processing of multiple
+      // invalid frames for a single stream. If a temporal stream error is returned from a callback,
+      // remaining frames in the buffer will still be partially processed. For example, remaining
+      // frames will still parse through nghttp2's push promise error handling and in
+      // onBeforeFrame(Send/Received) callbacks, which may return invalid frame errors and attempt
+      // to set details again. In these cases, we simply do not overwrite details. When internal
+      // error latching is implemented in the codec for exception removal, we should prevent calling
+      // setDetails in an error state.
+      if (details_.empty()) {
+        details_ = details;
+      }
     }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
@@ -507,7 +513,7 @@ private:
   virtual void checkOutboundQueueLimits() PURE;
   void incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
   virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
-  virtual bool checkInboundFrameLimits() PURE;
+  virtual bool checkInboundFrameLimits(int32_t stream_id) PURE;
   void releaseOutboundFrame();
   void releaseOutboundControlFrame();
 
@@ -547,7 +553,7 @@ private:
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
   void checkOutboundQueueLimits() override {}
   bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
-  bool checkInboundFrameLimits() override { return true; }
+  bool checkInboundFrameLimits(int32_t) override { return true; }
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -572,7 +578,7 @@ private:
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
   void checkOutboundQueueLimits() override;
   bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
-  bool checkInboundFrameLimits() override;
+  bool checkInboundFrameLimits(int32_t stream_id) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 
   // Http::Connection

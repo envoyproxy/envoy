@@ -13,9 +13,9 @@ namespace Envoy {
 namespace Tcp {
 
 ActiveTcpClient::ActiveTcpClient(ConnPoolImpl& parent, const Upstream::HostConstSharedPtr& host,
-                                 uint64_t concurrent_request_limit)
+                                 uint64_t concurrent_stream_limit)
     : Envoy::ConnectionPool::ActiveClient(parent, host->cluster().maxRequestsPerConnection(),
-                                          concurrent_request_limit),
+                                          concurrent_stream_limit),
       parent_(parent) {
   Upstream::Host::CreateConnectionData data = host->createConnection(
       parent_.dispatcher(), parent_.socketOptions(), parent_.transportSocketOptions());
