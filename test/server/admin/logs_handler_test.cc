@@ -32,11 +32,11 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
 
   postCallback("/logging?level=warning", header_map, response);
   FANCY_LOG(warn, "After post 1: all level is warning now!");
-  EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
+  EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::warn);
   std::string query = fmt::format("/logging?{}=info", __FILE__);
   postCallback(query, header_map, response);
   FANCY_LOG(info, "After post 2: level for this file is info now!");
-  EXPECT_EQ(FancyContext::getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
+  EXPECT_EQ(getFancyContext().getFancyLogEntry(__FILE__)->level(), spdlog::level::info);
 }
 
 } // namespace Server
