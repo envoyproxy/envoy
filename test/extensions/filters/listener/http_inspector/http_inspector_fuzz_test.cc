@@ -26,7 +26,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
   fuzzer.fuzz(*filter, input);
 }
 
-} // namespace OriginalDst
+} // namespace HttpInspector
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy

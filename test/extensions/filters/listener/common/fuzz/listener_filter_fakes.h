@@ -13,8 +13,8 @@ namespace ListenerFilters {
 class FakeConnectionSocket : public Network::MockConnectionSocket {
 public:
   FakeConnectionSocket()
-      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42))
-      , local_address_(nullptr), remote_address_(nullptr) {}
+      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)), local_address_(nullptr),
+        remote_address_(nullptr) {}
 
   ~FakeConnectionSocket() override { io_handle_->close(); }
 
@@ -33,9 +33,13 @@ public:
     remote_address_ = remote_address;
   }
 
-  const Network::Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+    return local_address_;
+  }
 
-  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
+    return remote_address_;
+  }
 
   Network::Address::Type addressType() const override { return addr_type_; }
 

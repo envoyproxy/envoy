@@ -16,11 +16,11 @@ envoy_proto_library(
 
 envoy_cc_test_library(
     name = "listener_filter_fuzzer_lib",
+    srcs = ["listener_filter_fuzzer.cc"],
     hdrs = ["listener_filter_fuzzer.h"],
     deps = [
-        "//source/common/common:hex_lib",
-        ":listener_filter_fuzzer_proto_cc_proto",
         ":listener_filter_fakes",
+        ":listener_filter_fuzzer_proto_cc_proto",
         "//include/envoy/network:filter_interface",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
