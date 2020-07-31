@@ -204,8 +204,9 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
 
   Stats::Gauge& active_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.active",
                                             Stats::Gauge::ImportMode::Accumulate);
-  Stats::Gauge& scale_value_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.scale_value",
-                                             Stats::Gauge::ImportMode::Accumulate);
+  Stats::Gauge& scale_value_gauge =
+      stats_.gauge("overload.envoy.overload_actions.dummy_action.scale_value",
+                   Stats::Gauge::ImportMode::Accumulate);
   Stats::Gauge& pressure_gauge1 =
       stats_.gauge("overload.envoy.resource_monitors.fake_resource1.pressure",
                    Stats::Gauge::ImportMode::NeverImport);
@@ -303,8 +304,9 @@ TEST_F(OverloadManagerImplTest, RangeTrigger) {
       manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
   Stats::Gauge& active_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.active",
                                             Stats::Gauge::ImportMode::Accumulate);
-  Stats::Gauge& scale_value_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.scale_value",
-                                             Stats::Gauge::ImportMode::Accumulate);
+  Stats::Gauge& scale_value_gauge =
+      stats_.gauge("overload.envoy.overload_actions.dummy_action.scale_value",
+                   Stats::Gauge::ImportMode::Accumulate);
 
   factory3_.monitor_->setPressure(0.5);
   timer_cb_();
