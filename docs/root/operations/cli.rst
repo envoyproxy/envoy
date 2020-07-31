@@ -114,13 +114,10 @@ following are the command line options that Envoy supports.
 .. option:: --log-format <format string>
 
    *(optional)* The format string to use for laying out the log message metadata. If this is not
-   set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
+   set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"`` is used.
 
-   When used in conjunction with :option:`--log-format-prefix-with-location` set to 0, the logger can be
-   configured to not prefix ``%v`` by a file path and a line number.
-
-   **NOTE**: The default log format will be changed to ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"``
-   together with the default value of :option:`--log-format-prefix-with-location` to 0 at 1.16.0 release.
+   When used in conjunction with :option:`--log-format-prefix-with-location` set to 1, the logger can be
+   configured to prefix ``%v`` by a file path and a line number.
 
    When used in conjunction with :option:`--log-format-escaped`, the logger can be configured
    to log in a format that is parsable by log viewers. Known integrations are documented
@@ -167,10 +164,9 @@ following are the command line options that Envoy supports.
 
    *(optional)* This temporary flag allows replacing all entries of ``"%v"`` in the log format by
    ``"[%g:%#] %v"``. This flag is provided for migration purposes only. If this is not set, a
-   default value 1 is used.
+   default value 0 is used.
 
-   **NOTE**: The default value will be changed to 0 at 1.16.0 release and the flag will be
-   removed at 1.17.0 release.
+   **NOTE**: The flag will be removed at 1.17.0 release.
 
 .. option:: --log-format-escaped
 
