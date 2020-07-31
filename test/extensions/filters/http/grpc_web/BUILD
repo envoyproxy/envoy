@@ -37,7 +37,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "grpc_web_integration_test",
-    srcs = ["grpc_web_integration_test.cc"],
+    srcs = ["grpc_web_filter_integration_test.cc"],
     extension_name = "envoy.filters.http.grpc_web",
     tags = ["fails_on_windows"],
     deps = [
