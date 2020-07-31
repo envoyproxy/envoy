@@ -2245,20 +2245,10 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
   // outgoing data.
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   if (GetParam()) {
-#ifdef NDEBUG
-    // In release mode, the error is logged at critical level.
-    EXPECT_LOG_CONTAINS(
-        request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
-        ":method and :path must be specified");
-    EXPECT_LOG_CONTAINS(
-        request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
-        ":method and :path must be specified");
-#else
     EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
                  ":method and :path must be specified");
     EXPECT_DEATH(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}, true),
                  ":method and :path must be specified");
-#endif
   } else {
     EXPECT_THROW(request_encoder.encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}}, true),
                  CodecClientException);
