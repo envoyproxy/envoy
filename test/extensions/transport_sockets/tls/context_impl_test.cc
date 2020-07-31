@@ -591,9 +591,10 @@ public:
     loadConfig(server_context_config);
   }
 
-  void loadConfigYaml(const std::string& yaml) {
+  void loadConfigYaml(const std::string& yaml, bool avoid_boosting = true) {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context, false,
+                              avoid_boosting);
     ServerContextConfigImpl cfg(tls_context, factory_context_);
     loadConfig(cfg);
   }
@@ -808,14 +809,15 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
 
 TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
   const std::string yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
-    validation_context:
-      verify_subject_alt_name: "spiffe://lyft.com/testclient"
+       common_tls_context:
+          tls_certificates:
+            certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
+          validation_context:
+            match_subject_alt_names:
+              exact : "spiffe://lyft.com/testclient"
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "

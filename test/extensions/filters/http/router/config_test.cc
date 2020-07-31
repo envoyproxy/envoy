@@ -27,7 +27,7 @@ TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
   )EOF";
 
   envoy::extensions::filters::http::router::v3::Router proto_config;
-  TestUtility::loadFromYaml(yaml_string, proto_config);
+  TestUtility::loadFromYaml(yaml_string, proto_config, false, true);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats.", context);
@@ -43,8 +43,8 @@ TEST(RouterFilterConfigTest, BadRouterFilterConfig) {
   )EOF";
 
   envoy::extensions::filters::http::router::v3::Router proto_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
-                          "route: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config, false, true),
+                          EnvoyException, "route: Cannot find field");
 }
 
 TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
@@ -54,7 +54,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
   )EOF";
 
   envoy::extensions::filters::http::router::v3::Router router_config;
-  TestUtility::loadFromYaml(yaml, router_config);
+  TestUtility::loadFromYaml(yaml, router_config, false, true);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;

@@ -19,9 +19,9 @@ namespace RateLimitFilter {
 namespace {
 
 envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit
-parseRateLimitFromV2Yaml(const std::string& yaml) {
+parseRateLimitFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
   envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit rate_limit;
-  TestUtility::loadFromYaml(yaml, rate_limit);
+  TestUtility::loadFromYaml(yaml, rate_limit, false, avoid_boosting);
   return rate_limit;
 }
 
@@ -46,7 +46,7 @@ rate_limit_service:
       cluster_name: ratelimit_cluster
   )EOF";
 
-  auto proto_config = parseRateLimitFromV2Yaml(yaml_string);
+  auto proto_config = parseRateLimitFromV3Yaml(yaml_string);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

@@ -22,9 +22,9 @@ using DubboProxyProto = envoy::extensions::filters::network::dubbo_proxy::v3::Du
 
 namespace {
 
-DubboProxyProto parseDubboProxyFromV2Yaml(const std::string& yaml) {
+DubboProxyProto parseDubboProxyFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
   DubboProxyProto dubbo_proxy;
-  TestUtility::loadFromYaml(yaml, dubbo_proxy);
+  TestUtility::loadFromYaml(yaml, dubbo_proxy, false, avoid_boosting);
   return dubbo_proxy;
 }
 
@@ -92,7 +92,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithExplicitRouterConfig) {
       - name: envoy.filters.dubbo.router
     )EOF";
 
-  DubboProxyProto config = parseDubboProxyFromV2Yaml(yaml);
+  DubboProxyProto config = parseDubboProxyFromV3Yaml(yaml);
   testConfig(config);
 }
 
@@ -107,7 +107,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithUnknownFilter) {
       - name: envoy.filters.dubbo.router
     )EOF";
 
-  DubboProxyProto config = parseDubboProxyFromV2Yaml(yaml);
+  DubboProxyProto config = parseDubboProxyFromV3Yaml(yaml);
 
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "no_such_filter");
@@ -131,7 +131,7 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithMultipleFilters) {
   DubboFilters::MockFilterConfigFactory factory;
   Registry::InjectFactory<DubboFilters::NamedDubboFilterConfigFactory> registry(factory);
 
-  DubboProxyProto config = parseDubboProxyFromV2Yaml(yaml);
+  DubboProxyProto config = parseDubboProxyFromV3Yaml(yaml);
   testConfig(config);
 
   EXPECT_EQ(1, factory.config_struct_.fields_size());
@@ -156,7 +156,7 @@ TEST_F(DubboFilterConfigTest, CreateFilterChain) {
   DubboFilters::MockFilterConfigFactory factory;
   Registry::InjectFactory<DubboFilters::NamedDubboFilterConfigFactory> registry(factory);
 
-  DubboProxyProto dubbo_config = parseDubboProxyFromV2Yaml(yaml);
+  DubboProxyProto dubbo_config = parseDubboProxyFromV3Yaml(yaml);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboFilters::MockFilterChainFactoryCallbacks callbacks;
