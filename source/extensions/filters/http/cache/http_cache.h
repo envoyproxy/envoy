@@ -183,6 +183,7 @@ public:
                                 uint64_t content_length) const;
 
 private:
+  void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
   bool requiresValidation(const Http::ResponseHeaderMap& response_headers) const;
 
   Key key_;
@@ -196,7 +197,7 @@ private:
   // simpler to instead call makeLookupResult with each potential response.
   HeaderVector vary_headers_;
 
-  const RequestCacheControl request_cache_control_;
+  RequestCacheControl request_cache_control_;
 };
 
 // Statically known information about a cache.
