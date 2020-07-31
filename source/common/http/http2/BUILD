@@ -58,7 +58,9 @@ envoy_cc_library(
         "abseil_inlined_vector",
         "abseil_algorithm",
     ],
-    deps = CODEC_LIB_DEPS,
+    deps = CODEC_LIB_DEPS + [
+        "//source/common/common:statusor_lib",
+    ],
 )
 
 envoy_cc_library(
