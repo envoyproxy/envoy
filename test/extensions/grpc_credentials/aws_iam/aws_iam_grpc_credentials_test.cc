@@ -34,8 +34,9 @@ public:
   }
 
   void expectExtraHeaders(FakeStream& fake_stream) override {
-    if (call_credentials_ != CallCredentials::FromPlugin)
+    if (call_credentials_ != CallCredentials::FromPlugin) {
       return;
+    }
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
     Http::TestRequestHeaderMapImpl stream_headers(fake_stream.headers());
