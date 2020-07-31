@@ -676,7 +676,7 @@ bool ContextImpl::matchSubjectAltName(
       if (general_name->type == GEN_DNS &&
                   config_san_matcher.matcher().match_pattern_case() ==
                       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-              ? dnsNameMatch(config_san_matcher.matcher().exact(), std::string_view(san))
+              ? dnsNameMatch(config_san_matcher.matcher().exact(), absl::string_view(san))
               : config_san_matcher.match(san)) {
         return true;
       }
@@ -704,7 +704,7 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool ContextImpl::dnsNameMatch(const std::string_view dns_name, const std::string_view pattern) {
+bool ContextImpl::dnsNameMatch(const absl::string_view dns_name, const absl::string_view pattern) {
   if (dns_name == pattern) {
     return true;
   }

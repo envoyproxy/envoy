@@ -50,7 +50,7 @@ void EnvoyQuicProofSource::signPayload(
       res.cert_config_;
   if (!cert_config_ref.has_value()) {
     ENVOY_LOG(warn, "No matching filter chain found for handshake.");
-    callback->Run(false, "No matching filter chain found for handshake.", nullptr);
+    callback->Run(false, "", nullptr);
     return;
   }
   auto& cert_config = cert_config_ref.value().get();

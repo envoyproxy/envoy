@@ -17,7 +17,11 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifierBase::VerifyProof(
     const std::string& signature, const quic::ProofVerifyContext* context,
     std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
     std::unique_ptr<quic::ProofVerifierCallback> callback) {
-  if (!verifySignature(server_config, chlo_hash, certs[0], signature)) {
+  if (certs.empty()) {
+    *error_details = "Received empty cert chain.";
+    return quic::QUIC_FAILURE;
+  }
+  if (!verifySignature(server_config, chlo_hash, certs[0], signature, error_details)) {
     return quic::QUIC_FAILURE;
   }
 
@@ -28,7 +32,19 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifierBase::VerifyProof(
 bool EnvoyQuicProofVerifierBase::verifySignature(const std::string& server_config,
                                                  absl::string_view chlo_hash,
                                                  const std::string& cert,
-                                                 const std::string& signature) {
+                                                 const std::string& signature,
+                                                 std::string* error_details) {
+  std::unique_ptr<quic::CertificateView> cert_view =
+      quic::CertificateView::ParseSingleCertificate(cert);
+  if (cert_view == nullptr) {
+    *error_details = "Invalid leaf cert.";
+    return false;
+  }
+  int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), error_details);
+  if (sign_alg == 0) {
+    return false;
+  }
+
   size_t payload_size = sizeof(quic::kProofSignatureLabel) + sizeof(uint32_t) + chlo_hash.size() +
                         server_config.size();
   auto payload = std::make_unique<char[]>(payload_size);
@@ -39,20 +55,15 @@ bool EnvoyQuicProofVerifierBase::verifySignature(const std::string& server_confi
       payload_writer.WriteUInt32(chlo_hash.size()) && payload_writer.WriteStringPiece(chlo_hash) &&
       payload_writer.WriteStringPiece(server_config);
   if (!success) {
+    *error_details = "QuicPacketWriter error.";
     return false;
   }
-
-  std::unique_ptr<quic::CertificateView> cert_view =
-      quic::CertificateView::ParseSingleCertificate(cert);
-  ASSERT(cert_view != nullptr);
-  std::string error;
-  int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), &error);
-  if (sign_alg == 0) {
-    ENVOY_LOG(warn, absl::StrCat("Invalid leaf cert, ", error));
-    return false;
+  bool valid = cert_view->VerifySignature(quiche::QuicheStringPiece(payload.get(), payload_size),
+                                          signature, sign_alg);
+  if (!valid) {
+    *error_details = "Signature is not valid.";
   }
-  return cert_view->VerifySignature(quiche::QuicheStringPiece(payload.get(), payload_size),
-                                    signature, sign_alg);
+  return valid;
 }
 
 } // namespace Quic

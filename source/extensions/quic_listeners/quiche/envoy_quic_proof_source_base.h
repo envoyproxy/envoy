@@ -40,7 +40,8 @@ private:
   const Network::FilterChain& filter_chain_;
 };
 
-// A partial implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
+// A partial implementation of quic::ProofSource which chooses a cipher suite accoridng to the leaf
+// cert to sign in GetProof().
 class EnvoyQuicProofSourceBase : public quic::ProofSource,
                                  protected Logger::Loggable<Logger::Id::quic> {
 public:
@@ -68,7 +69,7 @@ protected:
                            const quic::QuicSocketAddress& client_address,
                            const std::string& hostname, uint16_t signature_algorithm,
                            quiche::QuicheStringPiece in,
-                           std::unique_ptr<quic::ProofSource::SignatureCallback> callback) = 0;
+                           std::unique_ptr<quic::ProofSource::SignatureCallback> callback) PURE;
 
 private:
   // Used by GetProof() to get signature.

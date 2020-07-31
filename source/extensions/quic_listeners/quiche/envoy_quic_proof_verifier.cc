@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 
+#include <openssl/x509_vfy.h>
+
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"
@@ -13,9 +15,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const quic::ProofVerifyContext* /*context*/, std::string* error_details,
     std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
     std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
-  if (certs.empty()) {
-    return quic::QUIC_FAILURE;
-  }
+  ASSERT(!certs.empty());
   bssl::UniquePtr<STACK_OF(X509)> intermediates(sk_X509_new_null());
   bssl::UniquePtr<X509> leaf;
   for (size_t i = 0; i < certs.size(); i++) {

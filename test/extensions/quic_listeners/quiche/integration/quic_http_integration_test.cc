@@ -1,3 +1,5 @@
+#include <openssl/x509_vfy.h>
+
 #include <cstddef>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -48,8 +50,8 @@ public:
 };
 
 std::unique_ptr<QuicClientTransportSocketFactory>
-createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& options,
-                                       Api::Api& api) {
+createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& options, Api::Api& api,
+                                       const std::string& san_to_match) {
   std::string yaml_plain = R"EOF(
   common_tls_context:
     validation_context:
@@ -64,8 +66,8 @@ createQuicClientTransportSocketFactory(const Ssl::ClientSslTransportOptions& opt
     common_context->add_alpn_protocols("h3");
   }
   if (options.san_) {
-    common_context->mutable_validation_context()
-        ->add_hidden_envoy_deprecated_verify_subject_alt_name("spiffe://lyft.com/backend-team");
+    common_context->mutable_validation_context()->add_match_subject_alt_names()->set_exact(
+        san_to_match);
   }
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
@@ -213,7 +215,7 @@ public:
         std::make_unique<quic::QuicCryptoClientConfig>(std::make_unique<EnvoyQuicProofVerifier>(
             stats_store_,
             createQuicClientTransportSocketFactory(
-                Ssl::ClientSslTransportOptions().setAlpn(true).setSan(true), *api_)
+                Ssl::ClientSslTransportOptions().setAlpn(true).setSan(true), *api_, san_to_match_)
                 ->clientContextConfig(),
             timeSystem()));
   }
@@ -223,6 +225,7 @@ public:
 protected:
   quic::QuicConfig quic_config_;
   quic::QuicServerId server_id_{"lyft.com", 443, false};
+  std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   quic::QuicClientPushPromiseIndex push_promise_index_;
   quic::ParsedQuicVersionVector supported_versions_;
   std::unique_ptr<quic::QuicCryptoClientConfig> crypto_config_;
@@ -505,6 +508,20 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
   testAdminDrain(Http::CodecClient::Type::HTTP1);
+}
+
+TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
+  san_to_match_ = "www.random_domain.com";
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
+  EXPECT_FALSE(codec_client_->connected());
+  std::string failure_reason =
+      GetParam().second == QuicVersionType::GquicQuicCrypto
+          ? "QUIC_PROOF_INVALID with details: Proof invalid: X509_verify_cert: certificate "
+            "verification error at depth 0: ok"
+          : "QUIC_HANDSHAKE_FAILED with details: TLS handshake failure (ENCRYPTION_HANDSHAKE) 46: "
+            "certificate unknown";
+  EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
 } // namespace Quic

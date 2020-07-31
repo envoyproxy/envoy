@@ -24,11 +24,11 @@ namespace Quic {
 
 class TestGetProofCallback : public quic::ProofSource::Callback {
 public:
-  TestGetProofCallback(bool& called, const std::string& server_config,
+  TestGetProofCallback(bool& called, bool should_succeed, const std::string& server_config,
                        quic::QuicTransportVersion& version, quiche::QuicheStringPiece chlo_hash,
                        Network::FilterChain& filter_chain)
-      : called_(called), server_config_(server_config), version_(version), chlo_hash_(chlo_hash),
-        expected_filter_chain_(filter_chain) {
+      : called_(called), should_succeed_(should_succeed), server_config_(server_config),
+        version_(version), chlo_hash_(chlo_hash), expected_filter_chain_(filter_chain) {
     ON_CALL(client_context_config_, cipherSuites)
         .WillByDefault(ReturnRef(
             Extensions::TransportSockets::Tls::ClientContextConfigImpl::DEFAULT_CIPHER_SUITES));
@@ -37,7 +37,6 @@ public:
             ReturnRef(Extensions::TransportSockets::Tls::ClientContextConfigImpl::DEFAULT_CURVES));
     const std::string alpn("h2,http/1.1");
     ON_CALL(client_context_config_, alpnProtocols()).WillByDefault(ReturnRef(alpn));
-    ;
     const std::string empty_string;
     ON_CALL(client_context_config_, serverNameIndication()).WillByDefault(ReturnRef(empty_string));
     ON_CALL(client_context_config_, signingAlgorithmsForTest())
@@ -79,6 +78,11 @@ public:
   void Run(bool ok, const quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>& chain,
            const quic::QuicCryptoProof& proof,
            std::unique_ptr<quic::ProofSource::Details> details) override {
+    called_ = true;
+    if (!should_succeed_) {
+      EXPECT_FALSE(ok);
+      return;
+    };
     EXPECT_TRUE(ok);
     EXPECT_EQ(2, chain->certs.size());
     std::string error;
@@ -89,11 +93,11 @@ public:
         << error;
     EXPECT_EQ(&expected_filter_chain_,
               &static_cast<EnvoyQuicProofSourceDetails*>(details.get())->filterChain());
-    called_ = true;
   }
 
 private:
   bool& called_;
+  bool should_succeed_;
   const std::string& server_config_;
   const quic::QuicTransportVersion& version_;
   quiche::QuicheStringPiece chlo_hash_;
@@ -108,14 +112,17 @@ private:
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {
 public:
   TestSignatureCallback(bool expect_success) : expect_success_(expect_success) {}
+  ~TestSignatureCallback() override { EXPECT_TRUE(run_called_); }
 
   // quic::ProofSource::SignatureCallback
   void Run(bool ok, std::string, std::unique_ptr<quic::ProofSource::Details>) override {
     EXPECT_EQ(expect_success_, ok);
+    run_called_ = true;
   }
 
 private:
   bool expect_success_;
+  bool run_called_{false};
 };
 
 class EnvoyQuicProofSourceTest : public ::testing::Test {
@@ -147,7 +154,7 @@ protected:
 
 TEST_F(EnvoyQuicProofSourceTest, TestGetProof) {
   bool called = false;
-  auto callback = std::make_unique<TestGetProofCallback>(called, server_config_, version_,
+  auto callback = std::make_unique<TestGetProofCallback>(called, true, server_config_, version_,
                                                          chlo_hash_, filter_chain_);
   EXPECT_CALL(listen_socket_, ioHandle()).Times(2);
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
@@ -174,6 +181,43 @@ TEST_F(EnvoyQuicProofSourceTest, TestGetProof) {
       .WillRepeatedly(Return(tls_cert_configs));
   EXPECT_CALL(tls_cert_config, certificateChain()).WillOnce(ReturnRef(expected_certs_));
   EXPECT_CALL(tls_cert_config, privateKey()).WillOnce(ReturnRef(pkey_));
+  proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
+                         chlo_hash_, std::move(callback));
+  EXPECT_TRUE(called);
+}
+
+TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoFilterChain) {
+  bool called = false;
+  auto callback = std::make_unique<TestGetProofCallback>(called, false, server_config_, version_,
+                                                         chlo_hash_, filter_chain_);
+  EXPECT_CALL(listen_socket_, ioHandle());
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
+  proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
+                         chlo_hash_, std::move(callback));
+  EXPECT_TRUE(called);
+}
+
+TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidCert) {
+  bool called = false;
+  auto callback = std::make_unique<TestGetProofCallback>(called, false, server_config_, version_,
+                                                         chlo_hash_, filter_chain_);
+  EXPECT_CALL(listen_socket_, ioHandle());
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
+  auto server_context_config = std::make_unique<Ssl::MockServerContextConfig>();
+  auto server_context_config_ptr = server_context_config.get();
+  QuicServerTransportSocketFactory transport_socket_factory(std::move(server_context_config));
+  EXPECT_CALL(filter_chain_, transportSocketFactory())
+      .WillRepeatedly(ReturnRef(transport_socket_factory));
+
+  Ssl::MockTlsCertificateConfig tls_cert_config;
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
+      std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config)};
+  EXPECT_CALL(*server_context_config_ptr, tlsCertificates())
+      .WillRepeatedly(Return(tls_cert_configs));
+  std::string invalid_cert{"invalid certificate"};
+  EXPECT_CALL(tls_cert_config, certificateChain()).WillOnce(ReturnRef(invalid_cert));
   proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
                          chlo_hash_, std::move(callback));
   EXPECT_TRUE(called);

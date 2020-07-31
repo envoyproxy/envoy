@@ -23,6 +23,11 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& server_ad
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
       GetCertChain(server_address, client_address, hostname);
 
+  if (chain == nullptr || chain->certs.empty()) {
+    quic::QuicCryptoProof proof;
+    callback->Run(/*ok=*/false, nullptr, proof, nullptr);
+    return;
+  }
   size_t payload_size = sizeof(quic::kProofSignatureLabel) + sizeof(uint32_t) + chlo_hash.size() +
                         server_config.size();
   auto payload = std::make_unique<char[]>(payload_size);

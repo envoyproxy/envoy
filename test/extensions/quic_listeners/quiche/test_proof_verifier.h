@@ -20,7 +20,8 @@ public:
 protected:
   // EnvoyQuicProofVerifierBase
   bool verifySignature(const std::string& /*server_config*/, absl::string_view /*chlo_hash*/,
-                       const std::string& /*cert*/, const std::string& /*signature*/) override {
+                       const std::string& /*cert*/, const std::string& /*signature*/,
+                       std::string* /*error_details*/) override {
     return true;
   }
 };
