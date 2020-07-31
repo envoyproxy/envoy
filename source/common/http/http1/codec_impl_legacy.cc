@@ -897,7 +897,7 @@ int ServerConnectionImpl::onHeadersComplete() {
     // and serve request if allowed by http1 codec settings.
     if (parser_.uses_transfer_encoding != 0 &&
         (parser_.content_length > 0 && parser_.content_length != ULLONG_MAX)) {
-      if ((parser_.flags & F_CHUNKED) && allowChunkedLength()) {
+      if ((parser_.flags & F_CHUNKED) && codec_settings_.allow_chunked_length_) {
         headers->removeContentLength();
       } else {
         ENVOY_CONN_LOG(debug, "Both 'Content-Length' and 'Transfer-Encdoding' are set.",
