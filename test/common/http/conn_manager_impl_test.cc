@@ -195,11 +195,11 @@ public:
 
   void setUpBufferLimits() {
     ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
+    EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
     EXPECT_CALL(stream_, addCallbacks(_))
         .WillOnce(Invoke(
             [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
     EXPECT_CALL(stream_, setFlushTimeout(_));
-    EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
   }
 
   // If request_with_data_and_trailers is true, includes data and trailers in the request. If
