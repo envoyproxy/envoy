@@ -813,7 +813,7 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
    * this route.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;

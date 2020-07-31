@@ -61,6 +61,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_500_after_100",
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.allow_prefetch",
+    "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.consume_all_retry_headers",
     "envoy.reloadable_features.disallow_unbounded_access_logs",
     "envoy.reloadable_features.early_errors_via_hcm",

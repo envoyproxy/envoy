@@ -218,7 +218,11 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   ASSERT(!local_end_stream_);
-  local_end_stream_ = true;
+
+  const bool skip_encoding_empty_trailers =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_encoding_empty_trailers");
+  local_end_stream_ = !(trailers.empty() && skip_encoding_empty_trailers);
+
   if (pending_send_data_.length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
@@ -1266,7 +1270,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
     stream->runHighWatermarkCallbacks();
   }
   ClientStreamImpl& stream_ref = *stream;
-  stream->moveIntoList(std::move(stream), active_streams_);
+  LinkedList::moveIntoList(std::move(stream), active_streams_);
   return stream_ref;
 }
 
@@ -1332,7 +1336,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   }
   stream->request_decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
-  stream->moveIntoList(std::move(stream), active_streams_);
+  LinkedList::moveIntoList(std::move(stream), active_streams_);
   nghttp2_session_set_stream_user_data(session_, frame->hd.stream_id,
                                        active_streams_.front().get());
   return 0;
