@@ -205,6 +205,7 @@ public:
   }
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
   virtual bool supportsHttp10() { return false; }
+  virtual bool allowChunkedLength() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
   virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
   Http::Http1::CodecStats& stats() { return stats_; }
@@ -430,6 +431,7 @@ public:
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
+  bool allowChunkedLength() override { return codec_settings_.allow_chunked_length_; }
 
 protected:
   /**
