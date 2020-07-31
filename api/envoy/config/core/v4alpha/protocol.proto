@@ -158,7 +158,7 @@ message Http1ProtocolOptions {
   //   - The content length header is not present.
   bool enable_trailers = 5;
 
-  // Allows Envoy to process requests with `Content-Lenght` and `Transfer-Encoding: chunked`.
+  // Allows Envoy to process requests with `Content-Length` and `Transfer-Encoding: chunked`.
   // By default such requests are rejected with `400 Bad Request`, but if option is enabled -
   // Envoy will remove Content-Length header and pass request to upstream.
   // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>` for details.
