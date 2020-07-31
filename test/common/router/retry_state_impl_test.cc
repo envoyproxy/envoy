@@ -927,39 +927,6 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffIntervalDefaultMax) {
   retry_timer_->invokeCallback();
 }
 
-TEST_F(RouterRetryStateImplTest, ParseRateLimitResetMaxInterval) {
-  // No value set in via config nor headers so we get the default value
-  {
-    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
-    setup(request_headers);
-    EXPECT_TRUE(state_->enabled());
-
-    EXPECT_EQ(std::chrono::milliseconds(300000), state_->rateLimitedResetMaxInterval());
-  }
-
-  // The remaining cases expect the config to have a max_interval
-  policy_.ratelimited_reset_max_interval_ = std::chrono::milliseconds(4000);
-
-  // Value set in config is used as fallback
-  {
-    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
-    setup(request_headers);
-    EXPECT_TRUE(state_->enabled());
-
-    EXPECT_EQ(std::chrono::milliseconds(4000), state_->rateLimitedResetMaxInterval());
-  }
-
-  // Value set in headers takes precedence over config
-  {
-    Http::TestRequestHeaderMapImpl request_headers{
-        {"x-envoy-retry-on", "5xx"}, {"x-envoy-ratelimited-reset-max-interval-ms", "1000"}};
-    setup(request_headers);
-    EXPECT_TRUE(state_->enabled());
-
-    EXPECT_EQ(std::chrono::milliseconds(1000), state_->rateLimitedResetMaxInterval());
-  }
-}
-
 TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetHeaders) {
   Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
   auto* matcher = matchers.Add();
@@ -1359,7 +1326,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
         {"x-envoy-retry-on", "5xx,retriable-header-names,retriable-status-codes"},
         {"x-envoy-retry-grpc-on", "resource-exhausted"},
         {"x-envoy-ratelimited-reset-headers", "Retry-After"},
-        {"x-envoy-ratelimited-reset-max-interval-ms", "1000"},
         {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
         {"x-envoy-retriable-status-codes", "418,420"},
         {"x-envoy-max-retries", "7"},
@@ -1373,7 +1339,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
     EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
     EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
     EXPECT_FALSE(request_headers.has("x-envoy-ratelimited-reset-headers"));
-    EXPECT_FALSE(request_headers.has("x-envoy-ratelimited-reset-max-interval-ms"));
     EXPECT_FALSE(request_headers.has("x-envoy-retriable-header-names"));
     EXPECT_FALSE(request_headers.has("x-envoy-retriable-status-codes"));
     EXPECT_FALSE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
@@ -1384,7 +1349,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
   {
     Http::TestRequestHeaderMapImpl request_headers{
         {"x-envoy-ratelimited-reset-headers", "Retry-After"},
-        {"x-envoy-ratelimited-reset-max-interval-ms", "1000"},
         {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
         {"x-envoy-retriable-status-codes", "418,420"},
         {"x-envoy-max-retries", "7"},
@@ -1398,7 +1362,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
     EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
     EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
     EXPECT_FALSE(request_headers.has("x-envoy-ratelimited-reset-headers"));
-    EXPECT_FALSE(request_headers.has("x-envoy-ratelimited-reset-max-interval-ms"));
     EXPECT_FALSE(request_headers.has("x-envoy-retriable-header-names"));
     EXPECT_FALSE(request_headers.has("x-envoy-retriable-status-codes"));
     EXPECT_FALSE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
@@ -1415,7 +1378,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
         {"x-envoy-retry-on", "5xx,retriable-header-names,retriable-status-codes"},
         {"x-envoy-retry-grpc-on", "resource-exhausted"},
         {"x-envoy-ratelimited-reset-headers", "Retry-After"},
-        {"x-envoy-ratelimited-reset-max-interval-ms", "1000"},
         {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
         {"x-envoy-retriable-status-codes", "418,420"},
         {"x-envoy-max-retries", "7"},
@@ -1429,7 +1391,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
     EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
     EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
     EXPECT_FALSE(request_headers.has("x-envoy-ratelimited-reset-headers"));
-    EXPECT_FALSE(request_headers.has("x-envoy-ratelimited-reset-max-interval-ms"));
     EXPECT_TRUE(request_headers.has("x-envoy-retriable-header-names"));
     EXPECT_TRUE(request_headers.has("x-envoy-retriable-status-codes"));
     EXPECT_TRUE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
@@ -1444,7 +1405,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
 
     Http::TestRequestHeaderMapImpl request_headers{
         {"x-envoy-ratelimited-reset-headers", "Retry-After"},
-        {"x-envoy-ratelimited-reset-max-interval-ms", "1000"},
         {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
         {"x-envoy-retriable-status-codes", "418,420"},
         {"x-envoy-max-retries", "7"},
@@ -1458,7 +1418,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
     EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
     EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
     EXPECT_FALSE(request_headers.has("x-envoy-ratelimited-reset-headers"));
-    EXPECT_FALSE(request_headers.has("x-envoy-ratelimited-reset-max-interval-ms"));
     EXPECT_TRUE(request_headers.has("x-envoy-retriable-header-names"));
     EXPECT_TRUE(request_headers.has("x-envoy-retriable-status-codes"));
     EXPECT_TRUE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));

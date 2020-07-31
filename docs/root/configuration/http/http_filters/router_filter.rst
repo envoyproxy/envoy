@@ -270,12 +270,6 @@ x-envoy-ratelimited-reset-headers
 Setting this header will extend the list of rate limited reset headers specified in the :ref:`route configuration rate limited retry back off
 <envoy_v3_api_field_config.route.v3.RetryPolicy.RateLimitedRetryBackOff.reset_headers>`.
 
-x-envoy-ratelimited-reset-max-interval-ms
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Setting this header will override the rate limited reset max interval specified in the :ref:`route configuration rate limited retry back off
-<envoy_v3_api_field_config.route.v3.RetryPolicy.RateLimitedRetryBackOff.reset_max_interval>`.
-
 .. _config_http_filters_router_x-envoy-decorator-operation:
 
 x-envoy-decorator-operation

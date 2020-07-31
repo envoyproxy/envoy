@@ -399,11 +399,6 @@ public:
    * @return the rate limited reset headers used to match against rate limited responses.
    */
   virtual const std::vector<Http::HeaderMatcherSharedPtr>& rateLimitedResetHeaders() const PURE;
-
-  /**
-   * @return the upper limit placed on an interval parsed from a rate limited reset header.
-   */
-  virtual std::chrono::milliseconds rateLimitedResetMaxInterval() const PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;

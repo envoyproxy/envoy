@@ -95,10 +95,6 @@ public:
     return ratelimited_reset_headers_;
   }
 
-  std::chrono::milliseconds rateLimitedResetMaxInterval() const override {
-    return ratelimited_reset_max_interval_;
-  }
-
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,

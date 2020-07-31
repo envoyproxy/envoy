@@ -181,7 +181,6 @@ public:
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
   MOCK_METHOD(const std::vector<Http::HeaderMatcherSharedPtr>&, rateLimitedResetHeaders, (),
               (const));
-  MOCK_METHOD(std::chrono::milliseconds, rateLimitedResetMaxInterval, (), (const));
 
   DoRetryCallback callback_;
 };

@@ -53,7 +53,6 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   request_headers.removeEnvoyRetryGrpcOn();
   request_headers.removeEnvoyMaxRetries();
   request_headers.removeEnvoyRateLimitedResetHeaders();
-  request_headers.removeEnvoyRateLimitedResetMaxIntervalMs();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consume_all_retry_headers")) {
     request_headers.removeEnvoyHedgeOnPerTryTimeout();
     request_headers.removeEnvoyRetriableHeaderNames();
@@ -150,15 +149,6 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
       header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
       retriable_headers_.emplace_back(
           std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher));
-    }
-  }
-
-  if (request_headers.EnvoyRateLimitedResetMaxIntervalMs()) {
-    const auto max_interval =
-        request_headers.EnvoyRateLimitedResetMaxIntervalMs()->value().getStringView();
-    unsigned long out;
-    if (absl::SimpleAtoi(max_interval, &out)) {
-      ratelimited_reset_max_interval_ = std::chrono::milliseconds(out);
     }
   }
 
