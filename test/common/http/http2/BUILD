@@ -41,6 +41,10 @@ envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     shard_count = 5,
+    # The default codec is the legacy codec. Override runtime flag for testing new codec.
+    args = [
+        "--runtime-feature-override-for-tests=envoy.reloadable_features.new_codec_behavior",
+    ],
     tags = ["fails_on_windows"],
     deps = CODEC_TEST_DEPS,
 )
@@ -48,9 +52,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_legacy_test",
     srcs = ["codec_impl_test.cc"],
-    args = [
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.new_codec_behavior",
-    ],
     shard_count = 5,
     tags = ["fails_on_windows"],
     deps = CODEC_TEST_DEPS,
