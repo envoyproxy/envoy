@@ -19,7 +19,7 @@
 
 namespace Envoy {
 namespace {
-
+/*
 const char Config[] = R"EOF(
 admin:
   access_log_path: /dev/null
@@ -63,7 +63,8 @@ static_resources:
     - filters:
       - name: http
         typed_config:
-          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          "@type":
+type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
           - name: envoy.filters.http.on_demand
@@ -78,7 +79,7 @@ static_resources:
                   envoy_grpc:
                     cluster_name: xds_cluster
 )EOF";
-
+*/
 class ScopedRdsIntegrationTest : public HttpIntegrationTest,
                                  public Grpc::DeltaSotwIntegrationParamTest {
 protected:
@@ -87,13 +88,14 @@ protected:
     FakeUpstream* upstream_{};
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
+
+  ScopedRdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+
   /*
-    ScopedRdsIntegrationTest()
-        : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
-        */
   ScopedRdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {}
-
+*/
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
   void initialize() override {
@@ -449,6 +451,66 @@ TEST_P(ScopedRdsIntegrationTest, ConfigUpdateFailure) {
   const std::string scope_route1 = R"EOF(
 name:
 route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  on_server_init_function_ = [this, &scope_route1]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+  };
+  initialize();
+
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
+                                 1);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo"}});
+  response->waitForEndStream();
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+
+  // SRDS update fixed the problem.
+  const std::string scope_route2 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  sendSrdsResponse({scope_route2}, {scope_route2}, {}, "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
+  createRdsStream("foo_route1");
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo"}},
+      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
+      /*cluster_0*/ 0);
+}
+
+TEST_P(ScopedRdsIntegrationTest, OnDemandScopeRdsNotLoaded) {
+  const std::string scope_route1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_route1
+priority: Secondary
 key:
   fragments:
     - string_key: foo
