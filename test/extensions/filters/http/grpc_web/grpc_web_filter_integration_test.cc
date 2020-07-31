@@ -24,7 +24,7 @@ public:
     config_helper_.addFilter("name: envoy.filters.http.grpc_web");
   }
 
-  void skipEncodingEmptyTrailers(bool skip_encoding_empty_trailers) {
+  void skipEncodingEmptyTrailers(SkipEncodingEmptyTrailers skip_encoding_empty_trailers) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.skip_encoding_empty_trailers",
                                       skip_encoding_empty_trailers ? "true" : "false");
   }
@@ -41,10 +41,10 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(
     Params, GrpcWebFilterIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Http::CodecClient::Type::HTTP1,
-                                     Http::CodecClient::Type::HTTP2),
-                     testing::Values(true, false)),
+    testing::Combine(
+        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+        testing::Values(Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2),
+        testing::Values(SkipEncodingEmptyTrailers{true}, SkipEncodingEmptyTrailers{false})),
     GrpcWebFilterIntegrationTest::testParamsToString);
 
 TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
