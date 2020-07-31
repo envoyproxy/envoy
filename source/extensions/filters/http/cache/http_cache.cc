@@ -77,9 +77,9 @@ size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
-  absl::string_view cache_control =
+  const absl::string_view cache_control =
       request_headers.getInlineValue(request_cache_control_handle.handle());
-  absl::string_view pragma = request_headers.getInlineValue(pragma_handler.handle());
+  const absl::string_view pragma = request_headers.getInlineValue(pragma_handler.handle());
 
   if (!cache_control.empty()) {
     request_cache_control_ = RequestCacheControl(cache_control);
