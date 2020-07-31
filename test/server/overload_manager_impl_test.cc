@@ -204,6 +204,8 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
 
   Stats::Gauge& active_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.active",
                                             Stats::Gauge::ImportMode::Accumulate);
+  Stats::Gauge& scale_value_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.scale_value",
+                                             Stats::Gauge::ImportMode::Accumulate);
   Stats::Gauge& pressure_gauge1 =
       stats_.gauge("overload.envoy.resource_monitors.fake_resource1.pressure",
                    Stats::Gauge::ImportMode::NeverImport);
@@ -221,6 +223,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
                                   Property(&OverloadActionState::value, 0)));
   EXPECT_EQ(0, cb_count);
   EXPECT_EQ(0, active_gauge.value());
+  EXPECT_EQ(0, scale_value_gauge.value());
   EXPECT_EQ(50, pressure_gauge1.value());
 
   // Update exceeds fake_resource1 trigger threshold, callback is expected
@@ -230,6 +233,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   EXPECT_TRUE(action_state.isSaturated());
   EXPECT_EQ(1, cb_count);
   EXPECT_EQ(1, active_gauge.value());
+  EXPECT_EQ(100, scale_value_gauge.value());
   EXPECT_EQ(95, pressure_gauge1.value());
 
   // Callback should not be invoked if action state does not change
@@ -299,7 +303,7 @@ TEST_F(OverloadManagerImplTest, RangeTrigger) {
       manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
   Stats::Gauge& active_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.active",
                                             Stats::Gauge::ImportMode::Accumulate);
-  Stats::Gauge& scaling_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.scaling",
+  Stats::Gauge& scale_value_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.scale_value",
                                              Stats::Gauge::ImportMode::Accumulate);
 
   factory3_.monitor_->setPressure(0.5);
@@ -308,7 +312,7 @@ TEST_F(OverloadManagerImplTest, RangeTrigger) {
   EXPECT_THAT(action_state, AllOf(Property(&OverloadActionState::isSaturated, false),
                                   Property(&OverloadActionState::value, 0)));
   EXPECT_EQ(0, active_gauge.value());
-  EXPECT_EQ(0, scaling_gauge.value());
+  EXPECT_EQ(0, scale_value_gauge.value());
 
   // The trigger for fake_resource3 is a range trigger with a min of 0.5 and a max of 0.8. Set the
   // current pressure value to halfway in that range.
@@ -317,21 +321,21 @@ TEST_F(OverloadManagerImplTest, RangeTrigger) {
 
   EXPECT_EQ(action_state.value(), 0.5 /* = 0.65 / (0.8 - 0.5) */);
   EXPECT_EQ(0, active_gauge.value());
-  EXPECT_EQ(1, scaling_gauge.value());
+  EXPECT_EQ(50, scale_value_gauge.value());
 
   factory3_.monitor_->setPressure(0.8);
   timer_cb_();
 
   EXPECT_TRUE(action_state.isSaturated());
   EXPECT_EQ(1, active_gauge.value());
-  EXPECT_EQ(0, scaling_gauge.value());
+  EXPECT_EQ(100, scale_value_gauge.value());
 
   factory3_.monitor_->setPressure(0.9);
   timer_cb_();
 
   EXPECT_TRUE(action_state.isSaturated());
   EXPECT_EQ(1, active_gauge.value());
-  EXPECT_EQ(0, scaling_gauge.value());
+  EXPECT_EQ(100, scale_value_gauge.value());
 }
 
 TEST_F(OverloadManagerImplTest, FailedUpdates) {
