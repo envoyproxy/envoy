@@ -395,10 +395,10 @@ struct Http1Settings {
   // How header keys should be formatted when serializing HTTP/1.1 headers.
   HeaderKeyFormat header_key_format_{HeaderKeyFormat::Default};
 
-  // Behavior on invalid HTTP messaging:
+  // Behaviour on invalid HTTP messaging:
   // - if set and true, the HTTP/1.1 connection is left open (where possible)
   // - if set and false, the HTTP/1.1 connection is terminated
-  // - if not set, fall back to the HCM behaviour on invalid HTTP
+  // - if not set, fall back to the HCM behaviour on invalid HTTP messaging
   absl::optional<bool> stream_error_on_invalid_http_message_{};
 };
 
