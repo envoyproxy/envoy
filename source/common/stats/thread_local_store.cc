@@ -265,12 +265,24 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
+void ThreadLocalStoreImpl::releaseHistogramCrossThread(uint64_t histogram_id) {
+  // This can happen from any thread. We post() back to the main thread which will initiate the
+  // cache flush operation.
+  if (!shutting_down_ && main_thread_dispatcher_) {
+    main_thread_dispatcher_->post(
+        [this, histogram_id]() { clearHistogramFromCaches(histogram_id); });
+  }
+}
+
 ThreadLocalStoreImpl::TlsCacheEntry&
 ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
   return scope_cache_[scope_id];
 }
 
 void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) { scope_cache_.erase(scope_id); }
+void ThreadLocalStoreImpl::TlsCache::eraseHistogram(uint64_t histogram_id) {
+  histogram_cache_.erase(histogram_id);
+}
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
                                                 CentralCacheEntrySharedPtr central_cache) {
@@ -281,6 +293,16 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
     tls_->runOnAllThreads(
         [this, scope_id]() { tls_->getTyped<TlsCache>().eraseScope(scope_id); },
         [central_cache]() { /* Holds onto central_cache until all tls caches are clear */ });
+  }
+}
+
+void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
+  // If we are shutting down we no longer perform cache flushes as workers may be shutting down
+  // at the same time.
+  if (!shutting_down_) {
+    // Perform a cache flush on all threads.
+    tls_->runOnAllThreads(
+        [this, histogram_id]() { tls_->getTyped<TlsCache>().eraseHistogram(histogram_id); });
   }
 }
 
@@ -662,7 +684,7 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
   // See comments in counterFromStatName() which explains the logic here.
 
   TlsHistogramSharedPtr* tls_histogram = nullptr;
-  if (!shutting_down_ && tls_) {
+  if (!shutting_down_ && tls_ != nullptr) {
     TlsCache& tls_cache = tls_->getTyped<TlsCache>();
     tls_histogram = &tls_cache.histogram_cache_[id];
     if (*tls_histogram != nullptr) {
@@ -697,7 +719,7 @@ ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Uni
 }
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
-  MetricImpl::clear(symbolTable());
+  MetricImpl::clear(symbol_table_);
   hist_free(histograms_[0]);
   hist_free(histograms_[1]);
 }
@@ -724,6 +746,7 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
       cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
+  parent_.releaseHistogramCrossThread(id_);
   ASSERT(ref_count_ == 0);
   MetricImpl::clear(parent_.symbolTable());
   hist_free(interval_histogram_);
@@ -759,6 +782,29 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
     return true;
   }
   return false;
+}
+
+uint32_t ThreadLocalStoreImpl::numHistograms() const {
+  Thread::LockGuard lock(hist_mutex_);
+  return histogram_set_.size();
+}
+
+uint32_t ThreadLocalStoreImpl::numTlsHistogramsForTesting() const {
+  std::atomic<uint32_t> num_tls_histograms = 0;
+  absl::Mutex mutex;
+  bool done = false;
+  tls_->runOnAllThreads(
+      [this, &num_tls_histograms]() {
+        TlsCache& tls_cache = tls_->getTyped<TlsCache>();
+        num_tls_histograms += tls_cache.histogram_cache_.size();
+      },
+      [&mutex, &done]() {
+        absl::MutexLock lock(&mutex);
+        done = true;
+      });
+  absl::MutexLock lock(&mutex);
+  mutex.Await(absl::Condition(&done));
+  return num_tls_histograms;
 }
 
 SymbolTable& ParentHistogramImpl::symbolTable() { return parent_.symbolTable(); }

@@ -382,6 +382,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);
   scope1->deliverHistogramToSinks(h2, 200);
+  scope1.reset();
   tls_.shutdownThread();
 }
 
@@ -393,6 +394,9 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   ScopePtr scope1 = store_->createScope("scope.");
   ScopePtr scope2 = store_->createScope("scope.");
   EXPECT_NE(scope1, scope2);
+
+  EXPECT_EQ(0, store_->numHistograms());
+  EXPECT_EQ(0, store_->numTlsHistogramsForTesting());
 
   // However, stats created in the two same-named scopes will be the same objects.
   Counter& counter = scope1->counterFromString("counter");
@@ -408,10 +412,17 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   // histogram is kept alive by scope2.
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 100));
   histogram.recordValue(100);
+  EXPECT_EQ(1, store_->numHistograms());
+  EXPECT_EQ(1, store_->numTlsHistogramsForTesting());
   scope1.reset();
+  EXPECT_EQ(1, store_->numHistograms());
+  EXPECT_EQ(1, store_->numTlsHistogramsForTesting());
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 200));
   histogram.recordValue(200);
   EXPECT_EQ(&histogram, &scope2->histogramFromString("histogram", Histogram::Unit::Unspecified));
+  scope2.reset();
+  EXPECT_EQ(0, store_->numHistograms());
+  EXPECT_EQ(0, store_->numTlsHistogramsForTesting());
 
   store_->shutdownThreading();
   tls_.shutdownThread();

@@ -267,6 +267,14 @@ public:
   const StatNameSet& wellKnownTags() const { return *well_known_tags_; }
 
   bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
+  uint32_t numHistograms() const;
+  void releaseHistogramCrossThread(uint64_t histogram_id);
+
+  // Calculates the number of TLS histograms across all threads. This
+  // requires dispatching to all threads and blocking on their completion,
+  // and is exposed only to enable tests that ensure that TLS histograms
+  // don't leak.
+  uint32_t numTlsHistogramsForTesting() const;
 
 private:
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
@@ -426,6 +434,7 @@ private:
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
     void eraseScope(uint64_t scope_id);
+    void eraseHistogram(uint64_t histogram_id);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
@@ -452,6 +461,7 @@ private:
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
+  void clearHistogramFromCaches(uint64_t histogram_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
   bool rejects(StatName name) const;
@@ -514,7 +524,7 @@ private:
     bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
   };
 
-  Thread::MutexBasicLockable hist_mutex_;
+  mutable Thread::MutexBasicLockable hist_mutex_;
   absl::flat_hash_set<ParentHistogramImpl*, HeapStatHash, HeapStatCompare>
       histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
 };
