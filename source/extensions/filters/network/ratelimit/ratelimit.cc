@@ -69,9 +69,8 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      DescriptorStatusListPtr&&, Http::ResponseHeaderMapPtr&&,
-                      Http::RequestHeaderMapPtr&&) {
+void Filter::complete(Filters::Common::RateLimit::LimitStatus status, DescriptorStatusListPtr&&,
+                      Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 
