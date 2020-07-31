@@ -20,6 +20,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     request_cache_control_handle(Http::CustomHeaders::get().CacheControl);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     response_cache_control_handle(Http::CustomHeaders::get().CacheControl);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    pragma_handler(Http::CustomHeaders::get().Pragma);
 
 std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
   switch (status) {
@@ -42,8 +44,7 @@ std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
 }
 
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
-    : timestamp_(timestamp), request_cache_control_(request_headers.getInlineValue(
-                                 request_cache_control_handle.handle())) {
+    : timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
   // CacheFilter doesn't create LookupRequests for such requests.
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
@@ -56,6 +57,8 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   const Http::HeaderString& forwarded_proto = request_headers.ForwardedProto()->value();
   const auto& scheme_values = Http::Headers::get().SchemeValues;
   ASSERT(forwarded_proto == scheme_values.Http || forwarded_proto == scheme_values.Https);
+
+  initializeRequestCacheControl(request_headers);
   // TODO(toddmgreer): Let config determine whether to include forwarded_proto, host, and
   // query params.
   // TODO(toddmgreer): get cluster name.
@@ -72,6 +75,21 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 // flush. localHashKey however, can be changed at will.
 size_t stableHashKey(const Key& key) { return MessageUtil::hash(key); }
 size_t localHashKey(const Key& key) { return stableHashKey(key); }
+
+void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
+  const absl::string_view cache_control =
+      request_headers.getInlineValue(request_cache_control_handle.handle());
+  const absl::string_view pragma = request_headers.getInlineValue(pragma_handler.handle());
+
+  if (!cache_control.empty()) {
+    request_cache_control_ = RequestCacheControl(cache_control);
+  } else {
+    // According to: https://httpwg.org/specs/rfc7234.html#header.pragma
+    // when Cache-Control header is missing, "Pragma:no-cache" is equivalent to
+    // "Cache-Control:no-cache" Any other directives are ignored
+    request_cache_control_.must_validate_ = RequestCacheControl(pragma).must_validate_;
+  }
+}
 
 bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_headers) const {
   // TODO(yosrym93): Store parsed response cache-control in cache instead of parsing it on every
