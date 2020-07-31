@@ -25,7 +25,7 @@ interface RequestFilter : Filter {
    * @return: The header status containing headers with which to continue or buffer.
    */
   fun onRequestHeaders(headers: RequestHeaders, endStream: Boolean):
-    FilterHeaderStatus<RequestHeaders>
+    FilterHeadersStatus<RequestHeaders>
 
   /**
    * Called any number of times whenever body data is sent.
@@ -48,5 +48,5 @@ interface RequestFilter : Filter {
    *
    * @return: The trailer status containing body with which to continue or buffer.
    */
-  fun onRequestTrailers(trailers: RequestTrailers): FilterTrailerStatus<RequestTrailers>
+  fun onRequestTrailers(trailers: RequestTrailers): FilterTrailersStatus<RequestTrailers>
 }
