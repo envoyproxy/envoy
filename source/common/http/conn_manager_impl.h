@@ -396,33 +396,34 @@ private:
     virtual ~FilterManagerCallbacks() = default;
 
     /**
-     * Called with the fully encoded response headers.
+     * Called when the provided headers have been encoded by all the filters in the chain.
      * @param response_headers the encoded headers.
      * @param end_stream whether this is a header only response.
      */
     virtual void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) PURE;
 
     /**
-     * Called with the fully encoded 100 Continue response headers.
+     * Called when the provided 100 Continue headers have been encoded by all the filters in the
+     * chain.
      * @param response_headers the encoded headers.
      */
     virtual void encode100ContinueHeaders(ResponseHeaderMap& response_headers) PURE;
 
     /**
-     * Called with a fully encoded data buffer.
+     * Called when the provided data has been encoded by all filters in the chain.
      * @param data the encoded data.
      * @param end_stream whether this is the end of the response.
      */
     virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
 
     /**
-     * Called with a fully encoded trailers.
+     * Called when the provided trailers have been encoded by all filters in the chain.
      * @param trailers the encoded trailers.
      */
     virtual void encodeTrailers(ResponseTrailerMap& trailers) PURE;
 
     /**
-     * Called with a fully encoded trailers.
+     * Called when the provided metadata has been encoded by all filters in the chain.
      * @param trailers the encoded trailers.
      */
     virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
@@ -504,15 +505,13 @@ private:
     void disarmRequestTimeout();
 
     /**
-     * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false,
-     * which helps DRY up the if checks.
+     * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false.
      * @param end_stream whether decoding is complete.
      */
     void maybeEndDecode(bool end_stream);
 
     /**
-     * If end_stream is true, marks encoding as complete. This is a noop if end_stream is false,
-     * which helps DRY up the if checks.
+     * If end_stream is true, marks encoding as complete. This is a noop if end_stream is false.
      * @param end_stream whether encoding is complete.
      */
     void maybeEndEncode(bool end_stream);
@@ -601,7 +600,6 @@ private:
     ResponseTrailerMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
@@ -683,9 +681,7 @@ private:
     void chargeStats(const ResponseHeaderMap& headers);
     const Network::Connection* connection();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
-
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override;
     uint64_t streamId() { return stream_id_; }
@@ -751,31 +747,12 @@ private:
     void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
     void encode100ContinueHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
-    void encodeTrailers(ResponseTrailerMap& trailers) override {
-      ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
+    void encodeTrailers(ResponseTrailerMap& trailers) override;
+    void encodeMetadata(MetadataMapVector& metadata) override;
+    void onDecoderFilterBelowWriteBufferLowWatermark() override;
+    void onDecoderFilterAboveWriteBufferHighWatermark() override;
 
-      response_encoder_->encodeTrailers(trailers);
-    }
-    void encodeMetadata(MetadataMapVector& metadata) override {
-      ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
-      response_encoder_->encodeMetadata(metadata);
-    }
-    void onDecoderFilterBelowWriteBufferLowWatermark() override {
-      ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", *this);
-      // If the state is destroyed, the codec's stream is already torn down. On
-      // teardown the codec will unwind any remaining read disable calls.
-      if (!state_.destroyed_) {
-        response_encoder_->getStream().readDisable(false);
-      }
-      connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
-    }
-    void onDecoderFilterAboveWriteBufferHighWatermark() override {
-      ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
-      response_encoder_->getStream().readDisable(true);
-      connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
-    }
-
-    void traceRequest(RequestHeaderMap& requset_headers);
+    void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
     // not found, snapped_route_config_ is set to Router::NullConfigImpl.
@@ -893,7 +870,6 @@ private:
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
-    ResponseEncoder* response_encoder_{};
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
@@ -974,6 +950,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+  bool remote_close_{};
 };
 
 } // namespace Http

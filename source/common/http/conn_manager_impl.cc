@@ -257,7 +257,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->filter_manager_.aboveHighWatermark());
-  new_stream->moveIntoList(std::move(new_stream), streams_);
+  LinkedList::moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
 
@@ -392,12 +392,12 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
     stats_.named_.downstream_cx_destroy_local_.inc();
   }
 
-  if (event == Network::ConnectionEvent::RemoteClose) {
-    stats_.named_.downstream_cx_destroy_remote_.inc();
-  }
-
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      remote_close_ = true;
+      stats_.named_.downstream_cx_destroy_remote_.inc();
+    }
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
     // a local connection close, so we still guard against that here. A better solution would be to
     // have some type of "pre-close" callback that we could hook for cleanup that would get called
@@ -612,10 +612,21 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
     }
   }
 
+  // TODO(alyssawilk) this is not true. Fix.
   // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
   // response code and when no other response flags are set.
   if (!stream_info_.hasAnyResponseFlag() && !stream_info_.responseCode()) {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
+  }
+  if (connection_manager_.remote_close_) {
+    stream_info_.setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect);
+  }
+
+  if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+    // For HTTP/2 there are still some reset cases where details are not set.
+    // For HTTP/1 there shouldn't be any. Regression-proof this.
+    ASSERT(stream_info_.responseCodeDetails().has_value());
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
@@ -656,16 +667,19 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
   // If headers have not been sent to the user, send a 408.
-  if (filter_manager_.responseHeaders() != nullptr) {
+  if (filter_manager_.responseHeaders() != nullptr &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
     // TODO(htuch): We could send trailers here with an x-envoy timeout header
     // or gRPC status code, and/or set H2 RST_STREAM error.
+    stream_info_.setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
     connection_manager_.doEndStream(*this);
   } else {
+    // TODO(mattklein) this may result in multiple flags. This Ok?
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
     sendLocalReply(filter_manager_.requestHeaders() != nullptr &&
                        Grpc::Common::isGrpcRequestHeaders(*filter_manager_.requestHeaders()),
-                   Http::Code::RequestTimeout, "stream timeout", nullptr, state_.is_head_request_,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
+                   Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
   }
 }
 
@@ -673,14 +687,22 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_timeout_.inc();
   sendLocalReply(filter_manager_.requestHeaders() != nullptr &&
                      Grpc::Common::isGrpcRequestHeaders(*filter_manager_.requestHeaders()),
-                 Http::Code::RequestTimeout, "request timeout", nullptr, state_.is_head_request_,
-                 absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+                 Http::Code::RequestTimeout, "request timeout", nullptr, absl::nullopt,
+                 StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
-  connection_manager_.doEndStream(*this);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+                   Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
+                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+  } else {
+    stream_info_.setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
+    connection_manager_.doEndStream(*this);
+  }
 }
 
 void ConnectionManagerImpl::FilterManager::addStreamDecoderFilterWorker(
@@ -695,7 +717,7 @@ void ConnectionManagerImpl::FilterManager::addStreamDecoderFilterWorker(
   //     - B
   //     - C
   // The decoder filter chain will iterate through filters A, B, C.
-  wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
+  LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
 }
 
 void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
@@ -710,7 +732,7 @@ void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
   //     - B
   //     - C
   // The encoder filter chain will iterate through filters C, B, A.
-  wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
+  LinkedList::moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
@@ -845,8 +867,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
     sendLocalReply(Grpc::Common::isGrpcRequestHeaders(*filter_manager_.requestHeaders()),
-                   Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
-                   state_.is_head_request_, absl::nullopt,
+                   Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().Overload);
     return;
   }
@@ -877,8 +898,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     stream_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
-      sendLocalReply(false, Code::UpgradeRequired, "", nullptr, state_.is_head_request_,
-                     absl::nullopt, StreamInfo::ResponseCodeDetails::get().LowVersion);
+      sendLocalReply(false, Code::UpgradeRequired, "", nullptr, absl::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
     } else if (!fixed_connection_close) {
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
@@ -900,7 +921,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   if (!filter_manager_.requestHeaders()->Host()) {
     // Require host header. For HTTP/1.1 Host has already been translated to :authority.
     sendLocalReply(Grpc::Common::hasGrpcContentType(*filter_manager_.requestHeaders()),
-                   Code::BadRequest, "", nullptr, state_.is_head_request_, absl::nullopt,
+                   Code::BadRequest, "", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().MissingHost);
     return;
   }
@@ -917,7 +938,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
        filter_manager_.requestHeaders()->Path()) &&
       filter_manager_.requestHeaders()->getPathValue().empty()) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*filter_manager_.requestHeaders()),
-                   Code::NotFound, "", nullptr, state_.is_head_request_, absl::nullopt,
+                   Code::NotFound, "", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().MissingPath);
     return;
   }
@@ -927,7 +948,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       filter_manager_.requestHeaders()->getPathValue()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*filter_manager_.requestHeaders()),
-                   Code::NotFound, "", nullptr, state_.is_head_request_, absl::nullopt,
+                   Code::NotFound, "", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().AbsolutePath);
     return;
   }
@@ -936,7 +957,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   if (!ConnectionManagerUtility::maybeNormalizePath(*filter_manager_.requestHeaders(),
                                                     connection_manager_.config_)) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*filter_manager_.requestHeaders()),
-                   Code::BadRequest, "", nullptr, state_.is_head_request_, absl::nullopt,
+                   Code::BadRequest, "", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
   }
@@ -991,7 +1012,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       state_.saw_connection_close_ = true;
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*filter_manager_.requestHeaders()),
-                     Code::Forbidden, "", nullptr, state_.is_head_request_, absl::nullopt,
+                     Code::Forbidden, "", nullptr, absl::nullopt,
                      StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
       return;
     }
@@ -1552,8 +1573,9 @@ absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, absl::string_view body,
-    const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+    const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  const bool is_head_request = state_.is_head_request_;
   stream_info_.setResponseCodeDetails(details);
 
   // The BadRequest error code indicates there has been a messaging error.
@@ -1948,10 +1970,9 @@ ResponseTrailerMap& ConnectionManagerImpl::FilterManager::addEncodedTrailers() {
 
 void ConnectionManagerImpl::FilterManager::sendLocalReply(
     bool is_grpc_request, Code code, absl::string_view body,
-    const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+    const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  active_stream_.sendLocalReply(is_grpc_request, code, body, modify_headers, is_head_request,
-                                grpc_status, details);
+  active_stream_.sendLocalReply(is_grpc_request, code, body, modify_headers, grpc_status, details);
 }
 
 void ConnectionManagerImpl::FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter,
@@ -2058,6 +2079,33 @@ void ConnectionManagerImpl::ActiveStream::encodeData(Buffer::Instance& data, boo
 
   stream_info_.addBytesSent(data.length());
   response_encoder_->encodeData(data, end_stream);
+}
+
+void ConnectionManagerImpl::ActiveStream::encodeTrailers(ResponseTrailerMap& trailers) {
+  ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
+
+  response_encoder_->encodeTrailers(trailers);
+}
+
+void ConnectionManagerImpl::ActiveStream::encodeMetadata(MetadataMapVector& metadata) {
+  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata);
+  response_encoder_->encodeMetadata(metadata);
+}
+
+void ConnectionManagerImpl::ActiveStream::onDecoderFilterBelowWriteBufferLowWatermark() {
+  ENVOY_STREAM_LOG(debug, "Read-enabling downstream stream due to filter callbacks.", *this);
+  // If the state is destroyed, the codec's stream is already torn down. On
+  // teardown the codec will unwind any remaining read disable calls.
+  if (!state_.destroyed_) {
+    response_encoder_->getStream().readDisable(false);
+  }
+  connection_manager_.stats_.named_.downstream_flow_control_resumed_reading_total_.inc();
+}
+
+void ConnectionManagerImpl::ActiveStream::onDecoderFilterAboveWriteBufferHighWatermark() {
+  ENVOY_STREAM_LOG(debug, "Read-disabling downstream stream due to filter callbacks.", *this);
+  response_encoder_->getStream().readDisable(true);
+  connection_manager_.stats_.named_.downstream_flow_control_paused_reading_total_.inc();
 }
 
 void ConnectionManagerImpl::FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
@@ -2560,8 +2608,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::sendLocalReply(
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   parent_.active_stream_.stream_info_.setResponseCodeDetails(details);
-  parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
-                         parent_.active_stream_.state_.is_head_request_, grpc_status, details);
+  parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, grpc_status, details);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
@@ -2658,6 +2705,9 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   if (!complete() || parent_.active_stream_.stream_info_.bytesReceived() != 0) {
     return false;
   }
+
+  parent_.active_stream_.stream_info_.setResponseCodeDetails(
+      StreamInfo::ResponseCodeDetails::get().InternalRedirect);
   // n.b. we do not currently change the codecs to point at the new stream
   // decoder because the decoder callbacks are complete. It would be good to
   // null out that pointer but should not be necessary.
@@ -2836,8 +2886,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
     parent_.sendLocalReply(
         parent_.request_headers_ && Grpc::Common::isGrpcRequestHeaders(*parent_.request_headers_),
         Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
-        nullptr, parent_.active_stream_.state_.is_head_request_, absl::nullopt,
-        StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
+        nullptr, absl::nullopt, StreamInfo::ResponseCodeDetails::get().ResponsePayloadTooLarge);
   }
 }
 
