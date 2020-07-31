@@ -358,7 +358,7 @@ void Http1ServerConnectionImplTest::testAllowChunkedContentLength(bool allow_chu
   } else {
     EXPECT_CALL(decoder, decodeHeaders_(_, _)).Times(0);
     EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
-    EXPECT_CALL(decoder, sendLocalReply(false, Http::Code::BadRequest, "Bad Request", _, _, _, _));
+    EXPECT_CALL(decoder, sendLocalReply(false, Http::Code::BadRequest, "Bad Request", _, _, _));
   }
 
   Buffer::OwnedImpl buffer(
