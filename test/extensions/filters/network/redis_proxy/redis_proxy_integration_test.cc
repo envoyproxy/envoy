@@ -212,7 +212,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_0_password }
+          auth_password: {{ inline_string: cluster_0_password }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -229,7 +229,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_1_password }
+          auth_password: {{ inline_string: cluster_1_password }}
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -244,7 +244,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_2_password }
+          auth_password: {{ inline_string: cluster_2_password }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2
