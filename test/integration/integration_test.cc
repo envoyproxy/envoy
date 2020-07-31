@@ -124,12 +124,12 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   check_listener_stats(0, 0);
 
   // Main thread admin listener stats.
-  EXPECT_NE(nullptr, test_server_->counter("listener.admin.main_thread.downstream_cx_total"));
+  test_server_->waitForCounterExists("listener.admin.main_thread.downstream_cx_total");
 
   // Per-thread watchdog stats.
-  EXPECT_NE(nullptr, test_server_->counter("server.main_thread.watchdog_miss"));
-  EXPECT_NE(nullptr, test_server_->counter("server.worker_0.watchdog_miss"));
-  EXPECT_NE(nullptr, test_server_->counter("server.worker_1.watchdog_miss"));
+  test_server_->waitForCounterExists("server.main_thread.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_0.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_1.watchdog_miss");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
@@ -290,11 +290,11 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 }
 
 TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(true, true);
+  testEnvoyProxying1xx(true, true);
 }
 
 TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
-  testEnvoyProxying100Continue(false, true);
+  testEnvoyProxying1xx(false, true);
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
@@ -304,7 +304,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
-  testEnvoyProxying100Continue(true);
+  testEnvoyProxying1xx(true);
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a

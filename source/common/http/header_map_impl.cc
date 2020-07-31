@@ -483,28 +483,10 @@ void HeaderMapImpl::clear() {
   cached_byte_size_ = 0;
 }
 
-size_t HeaderMapImpl::remove(const LowerCaseString& key) {
+size_t HeaderMapImpl::removeIf(const HeaderMap::HeaderMatchPredicate& predicate) {
   const size_t old_size = headers_.size();
-  auto lookup = staticLookup(key.get());
-  if (lookup.has_value()) {
-    removeInline(lookup.value().entry_);
-  } else {
-    for (auto i = headers_.begin(); i != headers_.end();) {
-      if (i->key() == key.get().c_str()) {
-        subtractSize(i->key().size() + i->value().size());
-        i = headers_.erase(i);
-      } else {
-        ++i;
-      }
-    }
-  }
-  return old_size - headers_.size();
-}
-
-size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
-  const size_t old_size = headers_.size();
-  headers_.remove_if([&prefix, this](const HeaderEntryImpl& entry) {
-    bool to_remove = absl::StartsWith(entry.key().getStringView(), prefix.get());
+  headers_.remove_if([&predicate, this](const HeaderEntryImpl& entry) {
+    const bool to_remove = predicate(entry);
     if (to_remove) {
       // If this header should be removed, make sure any references in the
       // static lookup table are cleared as well.
@@ -523,6 +505,26 @@ size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
     return to_remove;
   });
   return old_size - headers_.size();
+}
+
+size_t HeaderMapImpl::remove(const LowerCaseString& key) {
+  auto lookup = staticLookup(key.get());
+  if (lookup.has_value()) {
+    const size_t old_size = headers_.size();
+    removeInline(lookup.value().entry_);
+    return old_size - headers_.size();
+  } else {
+    // TODO(mattklein123): When the lazy map is implemented we can stop using removeIf() here.
+    return HeaderMapImpl::removeIf([&key](const HeaderEntry& entry) -> bool {
+      return key.get() == entry.key().getStringView();
+    });
+  }
+}
+
+size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
+  return HeaderMapImpl::removeIf([&prefix](const HeaderEntry& entry) -> bool {
+    return absl::StartsWith(entry.key().getStringView(), prefix.get());
+  });
 }
 
 void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {

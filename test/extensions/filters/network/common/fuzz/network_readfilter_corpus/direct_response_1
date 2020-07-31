@@ -1,0 +1,36 @@
+config {
+  name: "envoy.filters.network.direct_response"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+  }
+}
+actions {
+  on_data {
+    data: "y"
+  }
+}
+actions {
+  on_data {
+  }
+}
+actions {
+  on_data {
+  }
+}
+actions {
+  on_data {
+    data: "\006"
+  }
+}
+actions {
+  on_data {
+  }
+}

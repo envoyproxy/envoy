@@ -15,7 +15,6 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
-    tags = ["fails_on_windows"],
     deps = [":config_impl_test_lib"],
 )
 
@@ -355,5 +354,14 @@ envoy_cc_test(
     srcs = ["string_accessor_impl_test.cc"],
     deps = [
         "//source/common/router:string_accessor_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "upstream_request_test",
+    srcs = ["upstream_request_test.cc"],
+    deps = [
+        "//source/common/router:router_lib",
+        "//test/mocks/router:router_filter_interface",
     ],
 )
