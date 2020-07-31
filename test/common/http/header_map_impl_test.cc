@@ -105,6 +105,37 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ("HELLO", string.getStringView());
   }
 
+  // Inline rtrim removes trailing whitespace only.
+  {
+    // This header string is short enough to fit into Inline type.
+    const std::string data_with_leading_lws = " \t\f\v  data";
+    const std::string data_with_leading_and_trailing_lws = data_with_leading_lws + " \t\f\v";
+    HeaderString string;
+    string.append(data_with_leading_and_trailing_lws.data(),
+                  data_with_leading_and_trailing_lws.size());
+    EXPECT_EQ(data_with_leading_and_trailing_lws, string.getStringView());
+    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
+    string.rtrim();
+    EXPECT_NE(data_with_leading_and_trailing_lws, string.getStringView());
+    EXPECT_EQ(data_with_leading_lws, string.getStringView());
+  }
+
+  // Dynamic rtrim removes trailing whitespace only.
+  {
+    // Making this string longer than Inline can fit.
+    const std::string padding_data_with_leading_lws = " \t\f\v  data" + std::string(128, 'a');
+    const std::string data_with_leading_and_trailing_lws =
+        padding_data_with_leading_lws + " \t\f\v";
+    HeaderString string;
+    string.append(data_with_leading_and_trailing_lws.data(),
+                  data_with_leading_and_trailing_lws.size());
+    EXPECT_EQ(data_with_leading_and_trailing_lws, string.getStringView());
+    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
+    string.rtrim();
+    EXPECT_NE(data_with_leading_and_trailing_lws, string.getStringView());
+    EXPECT_EQ(padding_data_with_leading_lws, string.getStringView());
+  }
+
   // Static clear() does nothing.
   {
     std::string static_string("HELLO");

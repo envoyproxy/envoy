@@ -50,7 +50,7 @@ void HystrixSink::addHistogramToStream(const QuantileLatencyMap& latency_map, ab
   // TODO: Consider if we better use join here
   ss << ", \"" << key << "\": {";
   bool is_first = true;
-  for (const std::pair<double, double>& element : latency_map) {
+  for (const std::pair<const double, double>& element : latency_map) {
     const std::string quantile = fmt::sprintf("%g", element.first * 100);
     HystrixSink::addDoubleToStream(quantile, element.second, ss, is_first);
     is_first = false;

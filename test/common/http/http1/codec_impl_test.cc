@@ -41,6 +41,16 @@ std::string createHeaderFragment(int num_headers) {
   }
   return headers;
 }
+
+Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t max_slice_size) {
+  Buffer::OwnedImpl buffer;
+  for (size_t offset = 0; offset < input.size(); offset += max_slice_size) {
+    buffer.appendSliceForTest(input.substr(offset, max_slice_size));
+  }
+  // Verify that the buffer contains the right number of slices.
+  ASSERT(buffer.getRawSlices(nullptr, 0) == (input.size() + max_slice_size - 1) / max_slice_size);
+  return buffer;
+}
 } // namespace
 
 class Http1ServerConnectionImplTest : public testing::Test {
@@ -66,7 +76,13 @@ public:
   // Then send a response just to clean up.
   void sendAndValidateRequestAndSendResponse(absl::string_view raw_request,
                                              const TestHeaderMapImpl& expected_request_headers) {
-    NiceMock<Http::MockStreamDecoder> decoder;
+    Buffer::OwnedImpl buffer(raw_request);
+    sendAndValidateRequestAndSendResponse(buffer, expected_request_headers);
+  }
+
+  void sendAndValidateRequestAndSendResponse(Buffer::Instance& buffer,
+                                             const TestHeaderMapImpl& expected_request_headers) {
+    NiceMock<MockStreamDecoder> decoder;
     Http::StreamEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
         .Times(1)
@@ -74,8 +90,7 @@ public:
           response_encoder = &encoder;
           return decoder;
         }));
-    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_request_headers), true)).Times(1);
-    Buffer::OwnedImpl buffer(raw_request);
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_request_headers), true));
     codec_->dispatch(buffer);
     EXPECT_EQ(0U, buffer.length());
     response_encoder->encodeHeaders(TestHeaderMapImpl{{":status", "200"}}, true);
@@ -204,6 +219,42 @@ TEST_F(Http1ServerConnectionImplTest, HostWithLWS) {
   // Regression test mixed spaces and tabs before and after the host header value.
   sendAndValidateRequestAndSendResponse(
       "GET / HTTP/1.1\r\nHost: 	 	  host		  	 \r\n\r\n", expected_headers);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/10270. Linear whitespace at the
+// beginning and end of a header value should be stripped. Whitespace in the middle should be
+// preserved.
+TEST_F(Http1ServerConnectionImplTest, InnerLWSIsPreserved) {
+  initialize();
+
+  // Header with many spaces surrounded by non-whitespace characters to ensure that dispatching is
+  // split across multiple dispatch calls. The threshold used here comes from Envoy preferring 16KB
+  // reads, but the important part is that the header value is split such that the pieces have
+  // leading and trailing whitespace characters.
+  const std::string header_value_with_inner_lws = "v" + std::string(32 * 1024, ' ') + "v";
+  TestHeaderMapImpl expected_headers{{":authority", "host"},
+                                     {":path", "/"},
+                                     {":method", "GET"},
+                                     {"header_field", header_value_with_inner_lws}};
+
+  {
+    // Regression test spaces in the middle are preserved
+    Buffer::OwnedImpl header_buffer = createBufferWithNByteSlices(
+        "GET / HTTP/1.1\r\nHost: host\r\nheader_field: " + header_value_with_inner_lws + "\r\n\r\n",
+        16 * 1024);
+    EXPECT_EQ(3, header_buffer.getRawSlices(nullptr, 0));
+    sendAndValidateRequestAndSendResponse(header_buffer, expected_headers);
+  }
+
+  {
+    // Regression test spaces before and after are removed
+    Buffer::OwnedImpl header_buffer = createBufferWithNByteSlices(
+        "GET / HTTP/1.1\r\nHost: host\r\nheader_field:  " + header_value_with_inner_lws +
+            "  \r\n\r\n",
+        16 * 1024);
+    EXPECT_EQ(3, header_buffer.getRawSlices(nullptr, 0));
+    sendAndValidateRequestAndSendResponse(header_buffer, expected_headers);
+  }
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http10) {

@@ -130,6 +130,12 @@ public:
   char* buffer() { return buffer_.dynamic_; }
 
   /**
+   * Trim trailing whitespaces from the HeaderString.
+   * v1.12 supports both Inline and Dynamic, but not Reference type.
+   */
+  void rtrim();
+
+  /**
    * Get an absl::string_view. It will NOT be NUL terminated!
    *
    * @return an absl::string_view.

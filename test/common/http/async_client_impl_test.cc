@@ -139,7 +139,6 @@ TEST_F(AsyncClientImplTest, Basic) {
         response_decoder_ = &decoder;
         return nullptr;
       }));
-
   TestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
@@ -149,7 +148,7 @@ TEST_F(AsyncClientImplTest, Basic) {
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
   expectSuccess(200);
 
-  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions().setSendXff(true));
 
   HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);

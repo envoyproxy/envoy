@@ -77,10 +77,9 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
 TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
   BufferFilterFactory factory;
   EXPECT_NO_THROW({
-    envoy::config::filter::http::buffer::v2::BufferPerRoute* config =
-        dynamic_cast<envoy::config::filter::http::buffer::v2::BufferPerRoute*>(
-            factory.createEmptyRouteConfigProto().get());
-    EXPECT_NE(nullptr, config);
+    auto config = factory.createEmptyRouteConfigProto();
+    EXPECT_NE(nullptr,
+              dynamic_cast<envoy::config::filter::http::buffer::v2::BufferPerRoute*>(config.get()));
   });
 }
 
