@@ -1025,7 +1025,7 @@ void TwitterProtocolImpl::updateMetadataWithRequestHeader(const ThriftObject& he
   }
   for (const auto& context : *req_header.contexts()) {
     // LowerCaseString doesn't allow '\0', '\n', and '\r'.
-    std::string key =
+    const std::string key =
         absl::StrReplaceAll(context.key_, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
     headers.addCopy(Http::LowerCaseString{key}, context.value_);
   }
@@ -1035,9 +1035,10 @@ void TwitterProtocolImpl::updateMetadataWithRequestHeader(const ThriftObject& he
   // TODO(zuercher): Delegations are stored as headers for now. Consider passing them as simple
   // objects
   for (const auto& delegation : *req_header.delegations()) {
-    std::string key = fmt::format(":d:{}", delegation.src_);
     // LowerCaseString doesn't allow '\0', '\n', and '\r'.
-    key = absl::StrReplaceAll(key, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+    const std::string src =
+        absl::StrReplaceAll(delegation.src_, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+    const std::string key = fmt::format(":d:{}", src);
     headers.addCopy(Http::LowerCaseString{key}, delegation.dst_);
   }
   if (req_header.traceIdHigh()) {
@@ -1058,7 +1059,7 @@ void TwitterProtocolImpl::updateMetadataWithResponseHeader(const ThriftObject& h
   Http::HeaderMap& headers = metadata.headers();
   for (const auto& context : resp_header.contexts()) {
     // LowerCaseString doesn't allow '\0', '\n', and '\r'.
-    std::string key =
+    const std::string key =
         absl::StrReplaceAll(context.key_, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
     headers.addCopy(Http::LowerCaseString(key), context.value_);
   }
