@@ -309,14 +309,14 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   // We use weak pointers here as RdsRouteConfigProviderImpl instance could go away before the
   // dispatcher had a chance to execute the callback.
   factory_context_.dispatcher().post(
-      [sub = std::weak_ptr<RdsRouteConfigSubscription>(subscription_),
-       config_cbs = std::weak_ptr<std::list<UpdateOnDemandCallback>>(config_update_callbacks_),
+      [subscription = std::weak_ptr<RdsRouteConfigSubscription>(subscription_),
+       config_callbacks = std::weak_ptr<std::list<UpdateOnDemandCallback>>(config_update_callbacks_),
        alias, &thread_local_dispatcher, route_config_updated_cb]() -> void {
-        auto s = sub.lock();
-        auto cb = config_cbs.lock();
-        if (s && cb) {
-          s->updateOnDemand(alias);
-          cb->push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+        auto sub = subscription.lock();
+        auto callback = config_callbacks.lock();
+        if (sub && callback) {
+          sub->updateOnDemand(alias);
+          callback->push_back({alias, thread_local_dispatcher, route_config_updated_cb});
         }
       });
 }
