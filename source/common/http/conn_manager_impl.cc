@@ -695,8 +695,8 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
   ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_response_for_timeout")) {
-    sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::Common::isGrpcRequestHeaders(*request_headers_),
+    sendLocalReply(filter_manager_.requestHeaders() != nullptr &&
+                       Grpc::Common::isGrpcRequestHeaders(*filter_manager_.requestHeaders()),
                    Http::Code::RequestTimeout, "downstream duration timeout", nullptr,
                    absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaxDurationTimeout);
   } else {
@@ -1044,7 +1044,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   // Check if tracing is enabled at all.
   if (connection_manager_.config_.tracingConfig()) {
-    traceRequest(*filter_manager_.requestHeaders());
+    traceRequest();
   }
 
   filter_manager_.decodeHeaders(*filter_manager_.requestHeaders(), end_stream);
@@ -1053,13 +1053,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   resetIdleTimer();
 }
 
-void ConnectionManagerImpl::ActiveStream::traceRequest(RequestHeaderMap& request_headers) {
+void ConnectionManagerImpl::ActiveStream::traceRequest() {
   Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::isTracing(stream_info_, request_headers);
+      Tracing::HttpTracerUtility::isTracing(stream_info_, *filter_manager_.requestHeaders());
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
-  active_span_ = connection_manager_.tracer().startSpan(*this, request_headers, stream_info_,
+  active_span_ = connection_manager_.tracer().startSpan(*this, *filter_manager_.requestHeaders(), stream_info_,
                                                         tracing_decision);
 
   if (!active_span_) {
@@ -1089,10 +1089,10 @@ void ConnectionManagerImpl::ActiveStream::traceRequest(RequestHeaderMap& request
     // propagation enabled) as a request header to enable the receiving service to use it in its
     // server span.
     if (decorated_operation_ && state_.decorated_propagate_) {
-      request_headers.setEnvoyDecoratorOperation(*decorated_operation_);
+      filter_manager_.requestHeaders()->setEnvoyDecoratorOperation(*decorated_operation_);
     }
   } else {
-    const HeaderEntry* req_operation_override = request_headers.EnvoyDecoratorOperation();
+    const HeaderEntry* req_operation_override = filter_manager_.requestHeaders()->EnvoyDecoratorOperation();
 
     // For ingress (inbound) requests, if a decorator operation name has been provided, it
     // should be used to override the active span's operation.
@@ -1105,7 +1105,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest(RequestHeaderMap& request
         decorated_operation_ = nullptr;
       }
       // Remove header so not propagated to service
-      request_headers.removeEnvoyDecoratorOperation();
+      filter_manager_.requestHeaders()->removeEnvoyDecoratorOperation();
     }
   }
 }
