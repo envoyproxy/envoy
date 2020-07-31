@@ -25,7 +25,7 @@ public:
   static constexpr OverloadActionState saturated() { return OverloadActionState(1.0); }
 
   explicit constexpr OverloadActionState(float value)
-      : action_value_(value < 0 ? 0 : value < 1 ? value : 1) {}
+      : action_value_(std::min(1.0f, std::max(0.0f, value))) {}
 
   float value() const { return action_value_; }
   bool isSaturated() const { return action_value_ == 1; }

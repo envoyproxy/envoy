@@ -49,7 +49,7 @@ private:
   absl::node_hash_map<std::string, TriggerPtr> triggers_;
   OverloadActionState state_;
   Stats::Gauge& active_gauge_;
-  Stats::Gauge& scale_value_gauge_;
+  Stats::Gauge& scale_percent_gauge_;
 };
 
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {

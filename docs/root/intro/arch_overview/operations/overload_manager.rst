@@ -32,7 +32,7 @@ Triggers
 ~~~~~~~~
 
 Triggers are evaluated on each resource pressure update, and convert a resource pressure value
-into one of two action states:
+into an action state in one of two ranges:
 
 .. _arch_overview_overload_manager-triggers-state:
 
@@ -43,8 +43,9 @@ into one of two action states:
   saturated, the resource pressure is at or above the critical point; drastic action should be taken
   scaling,   the resource pressure is below the critical point; action may be taken
 
-On update, the action states are presented to the configured overload actions. What effect an
-overload action has based on an action state depends on its configuration and implementation.
+When a resource pressure value is updated, the relevant triggers are reevaluated. For each action
+with at least one trigger, the resulting action state is the maximum value over the configured
+triggers. What effect the action state has depends on the action's configuration and implementation.
 
 Actions
 ~~~~~~~
