@@ -31,7 +31,9 @@ public:
       // If fuzzed remote address is malformed or missing, socket's remote address will be nullptr
     }
 
-    if (input.data_size() > 0) {
+    const int nreads = input.data_size(); // Number of reads
+
+    if (nreads > 0) {
       EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(testing::Return("raw_buffer"));
 
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -45,36 +47,53 @@ public:
 
     filter.onAccept(cb_);
 
-    if (input.data_size() > 0) {
+    if (nreads > 0) {
+      // Construct header from single or multiple reads
+      std::string data = "";
+      size_t curr = 0;
+      std::vector<size_t> indices;
+
+      for (int i = 0; i < nreads; i++) {
+        data += input.data(i);
+        curr += input.data(i).size();
+        indices.push_back(curr);
+      }
+
+      absl::string_view header(data);
+
+      bool end_stream = false;
+
       {
         testing::InSequence s;
 
-        if (input.data_size() > 1) {
+        if (nreads > 1) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(testing::InvokeWithoutArgs([]() {
             return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
           }));
         }
 
-        for (int i = 0; i < input.data_size(); i++) {
-          auto& data = input.data(i);
-
+        for (int i = 0; i < nreads; i++) {
           EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
             .WillOnce(
-                Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= data.size());
-                memcpy(buffer, data.data(), data.size());
-                return Api::SysCallSizeResult{ssize_t(data.size()), 0};
+              Invoke([&header, &indices, &end_stream, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= indices[i]);
+                memcpy(buffer, header.data(), indices[i]);
+                if (indices[i] == header.size()) {
+                  end_stream = true;
+                }
+
+                return Api::SysCallSizeResult{ssize_t(indices[i]), 0};
               }));
-        }
+          }
       }
 
       bool got_continue = false;
 
-      EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(testing::InvokeWithoutArgs([&got_continue]() {
+      ON_CALL(cb_, continueFilterChain(true)).WillByDefault(testing::InvokeWithoutArgs([&got_continue]() {
         got_continue = true;
       }));
 
-      while(!got_continue) {
+      while(!end_stream && !got_continue) {
         file_event_callback_(Event::FileReadyType::Read);
       }
     }
