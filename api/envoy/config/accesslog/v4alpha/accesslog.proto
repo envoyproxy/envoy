@@ -294,26 +294,15 @@ message GrpcStatusFilter {
 }
 
 // Filters based on matching dynamic metadata.
-<<<<<<< HEAD
-=======
 // If the matcher path and key correspond to an existing key in dynamic
 // metadata, the request is logged only if the matcher value is equal to the
 // metadata value. If the matcher path and key *do not* correspond to an
 // existing key in dynamic metadata, the request is logged only if
 // match_if_key_not_found is "true" or unset.
->>>>>>> upstream/master
 message MetadataFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v3.MetadataFilter";
 
-<<<<<<< HEAD
-  // Matcher to check metadata for specified value. For example, to match on the access_log_hint metadata,
-  // set the filter to "envoy.common" and the path to "access_log_hint".
-  type.matcher.v4alpha.MetadataMatcher matcher = 1;
-
-  // Default result if the key does not exist in dynamic metadata: if true, then log; if false, then don't log.
-  bool no_key_default = 2;
-=======
   // Matcher to check metadata for specified value. For example, to match on the
   // access_log_hint metadata, set the filter to "envoy.common" and the path to
   // "access_log_hint", and the value to "true".
@@ -322,7 +311,6 @@ message MetadataFilter {
   // Default result if the key does not exist in dynamic metadata: if unset or
   // true, then log; if false, then don't log.
   google.protobuf.BoolValue match_if_key_not_found = 2;
->>>>>>> upstream/master
 }
 
 // Extension filter is statically registered at runtime.
