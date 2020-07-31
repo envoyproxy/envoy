@@ -1318,9 +1318,7 @@ filter:
     matcher:
       filter: "some.namespace"
       path:
-        - key: "a"
-        - key: "b"
-        - key: "c"
+        - key: "x"
       value:
         bool_match: true
 
@@ -1336,9 +1334,7 @@ filter:
     matcher:
       filter: "some.namespace"
       path:
-        - key: "a"
-        - key: "b"
-        - key: "c"
+        - key: "y"
       value:
         bool_match: true
     match_if_key_not_found:

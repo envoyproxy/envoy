@@ -245,9 +245,9 @@ private:
   Matchers::ValueMatcherConstSharedPtr value_matcher_;
 
   std::vector<std::string> path_;
-  std::string filter_;
 
-  bool default_res_;
+  const bool default_match_;
+  const std::string filter_;
 };
 
 /**
