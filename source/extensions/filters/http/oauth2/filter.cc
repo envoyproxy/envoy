@@ -259,8 +259,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
     const std::string new_url =
-        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
-                    escaped_redirect_uri, escaped_state);
+        fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
+                    config_->clientId(), escaped_redirect_uri, escaped_state);
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 
