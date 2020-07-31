@@ -77,10 +77,10 @@ index d5fca65..fc0d7e5 100644
 -]
 +_default_copts = select({
 +    "@envoy//bazel:windows_x86_64": [
-+        "/std:c++14",
++        "/std:c++17",
 +    ],
 +    "//conditions:default": [
-+        "-std=c++14",
++        "-std=c++17",
 +        "-fno-strict-aliasing",
 +    ],
 +})
@@ -114,6 +114,6 @@ index 0126bdc..5d1a171 100644
          "//base",
          "//base/strings",
          "//polyfills",
-+         "@org_unicode_icuuc//:common",
++        "@org_unicode_icuuc//:common",
      ],
  )

@@ -948,12 +948,13 @@ filter:
       - DPE
       - UMSDR
       - RFCF
+      - NFCF
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x100000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x200000,
                 "A flag has been added. Fix this code.");
 
   const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
@@ -977,7 +978,8 @@ typed_config:
       StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders,
       StreamInfo::ResponseFlag::DownstreamProtocolError,
       StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
-      StreamInfo::ResponseFlag::ResponseFromCacheFilter};
+      StreamInfo::ResponseFlag::ResponseFromCacheFilter,
+      StreamInfo::ResponseFlag::NoFilterConfigFound};
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
@@ -1009,7 +1011,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\"]]): name: \"accesslog\"\nfilter {\n "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\"]]): name: "
+      "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
@@ -1036,7 +1039,8 @@ typed_config:
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
       "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\" "
-      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\"]]): name: \"accesslog\"\nfilter {\n "
+      "\"DC\" \"URX\" \"SI\" \"IH\" \"DPE\" \"UMSDR\" \"RFCF\" \"NFCF\"]]): name: "
+      "\"accesslog\"\nfilter {\n "
       " "
       "response_flag_filter {\n    flags: \"UnsupportedFlag\"\n  }\n}\ntyped_config {\n  "
       "[type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog] {\n    path: \"/dev/null\"\n  "
@@ -1263,6 +1267,104 @@ typed_config:
 
   response_headers_.addCopy(Http::Headers::get().GrpcStatus, "0");
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+TEST_F(AccessLogImplTest, MetadataFilter) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  metadata_filter:
+    matcher:
+      filter: "some.namespace"
+      path:
+        - key: "a"
+        - key: "b"
+        - key: "c"
+      value:
+        bool_match: true
+
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  TestStreamInfo stream_info;
+  ProtobufWkt::Struct metadata_val;
+  auto& fields_a = *metadata_val.mutable_fields();
+  auto& struct_b = *fields_a["a"].mutable_struct_value();
+  auto& fields_b = *struct_b.mutable_fields();
+  auto& struct_c = *fields_b["b"].mutable_struct_value();
+  auto& fields_c = *struct_c.mutable_fields();
+  fields_c["c"].set_bool_value(true);
+
+  stream_info.setDynamicMetadata("some.namespace", metadata_val);
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(1);
+
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+  fields_c["c"].set_bool_value(false);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+}
+
+TEST_F(AccessLogImplTest, MetadataFilterNoKey) {
+  const std::string default_true_yaml = R"EOF(
+name: accesslog
+filter:
+  metadata_filter:
+    matcher:
+      filter: "some.namespace"
+      path:
+        - key: "x"
+      value:
+        bool_match: true
+
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  const std::string default_false_yaml = R"EOF(
+name: accesslog
+filter:
+  metadata_filter:
+    matcher:
+      filter: "some.namespace"
+      path:
+        - key: "y"
+      value:
+        bool_match: true
+    match_if_key_not_found:
+      value: false
+
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  TestStreamInfo stream_info;
+  ProtobufWkt::Struct metadata_val;
+  auto& fields_a = *metadata_val.mutable_fields();
+  auto& struct_b = *fields_a["a"].mutable_struct_value();
+  auto& fields_b = *struct_b.mutable_fields();
+  fields_b["b"].set_bool_value(true);
+
+  stream_info.setDynamicMetadata("some.namespace", metadata_val);
+
+  const InstanceSharedPtr default_false_log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_false_yaml), context_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+
+  default_false_log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+
+  const InstanceSharedPtr default_true_log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_true_yaml), context_);
+  EXPECT_CALL(*file_, write(_)).Times(1);
+
+  default_true_log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
 }
 
 class TestHeaderFilterFactory : public ExtensionFilterFactory {

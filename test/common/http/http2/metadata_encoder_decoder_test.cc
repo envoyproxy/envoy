@@ -333,7 +333,6 @@ using MetadataEncoderDecoderDeathTest = MetadataEncoderDecoderTest;
 
 // Crash if a caller tries to pack more frames than the encoder has data for.
 TEST_F(MetadataEncoderDecoderDeathTest, PackTooManyFrames) {
-  Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   MetadataMap metadata_map = {
       {"header_key1", std::string(5, 'a')},
       {"header_key2", std::string(5, 'b')},

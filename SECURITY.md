@@ -124,6 +124,9 @@ to perform a release within this time window. If there are exceptional circumsta
 security team will raise this window to four weeks. The release window will be reduced if the
 security issue is public or embargo is broken.
 
+We will endeavor not to overlap this three week window with or place it adjacent to major corporate
+holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), where possible.
+
 ### Fix and disclosure SLOs
 
 * All reports to envoy-security@googlegroups.com will be triaged and have an
