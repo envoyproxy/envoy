@@ -317,7 +317,7 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
     // Capture all the pending histograms in a local, clearing the list held in
     // this. Once this occurs, if a new histogram is deleted, a new post will be
     // required.
-    auto histograms = new std::vector<uint64_t>();
+    auto histograms = std::make_shared<std::vector<uint64_t>>();
     {
       Thread::LockGuard lock(hist_mutex_);
       histograms->swap(histograms_to_cleanup_);
@@ -326,8 +326,7 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
     // Perform a cache flush on all threads. The local copy of the
     // histograms-list is deleted explicitly after all the threads complete.
     tls_->runOnAllThreads(
-        [this, histograms]() { tls_->getTyped<TlsCache>().eraseHistograms(*histograms); },
-        [histograms]() { delete histograms; });
+        [this, histograms]() { tls_->getTyped<TlsCache>().eraseHistograms(*histograms); });
   }
 }
 
