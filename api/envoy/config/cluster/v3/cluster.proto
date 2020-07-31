@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 50]
+// [#next-free-field: 51]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -541,6 +541,35 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
+  // [#not-implemented-hide:]
+  message PrefetchPolicy {
+    // Indicates how many many streams (rounded up) can be anticipated per-upstream for each
+    // stream, useful for high-QPS or latency-sensitive services.
+    //
+    // For example if this is 2, for an incoming HTTP/1.1 stream, 2 connections will be
+    // established, one for the new incoming stream, and one for a presumed follow-up stream. For
+    // HTTP/2, only one connection would be established by default as one connection can
+    // serve both the original and presumed follow-up stream.
+    //
+    // In steady state for non-multiplexed connections a value of 1.5 would mean if there were 100
+    // active streams, there would be 100 connections in use, and 50 connections prefetched.
+    // This might be a useful value for something like short lived single-use connections,
+    // for example proxying HTTP/1.1 if keep-alive were false and each stream resulted in connection
+    // termination. It would likely be overkill for long lived connections, such as TCP proxying SMTP
+    // or regular HTTP/1.1 with keep-alive. For long lived traffic, a value of 1.05 would be more
+    // reasonable, where for every 100 connections, 5 prefetched connections would be in the queue
+    // in case of unexpected disconnects where the connection could not be reused.
+    //
+    // If this value is not set, or set explicitly to one, Envoy will fetch as many connections
+    // as needed to serve streams in flight. This means in steady state if a connection is torn down,
+    // a subsequent streams will pay an upstream-rtt latency penalty waiting for streams to be
+    // prefetched.
+    //
+    // This is limited somewhat arbitrarily to 3 because prefetching connections too aggressively can
+    // harm latency more than the prefetching helps.
+    google.protobuf.DoubleValue prefetch_ratio = 1 [(validate.rules).double = {lte: 3.0 gte: 1.0}];
+  }
+
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -884,6 +913,10 @@ message Cluster {
 
   // Configuration to track optional cluster stats.
   TrackClusterStats track_cluster_stats = 49;
+
+  // [#not-implemented-hide:]
+  // Prefetch configuration for this cluster.
+  PrefetchPolicy prefetch_policy = 50;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
