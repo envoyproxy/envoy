@@ -360,12 +360,16 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
 // Test if processMessage exits gracefully upon receiving a malformed message
 // There was a previous valid config, so we go back to that.
 TEST_F(HdsTest, TestSendResponseByCluster) {
+  const int N_CLUSTERS = 2;
+  const int N_LOCALITIES = 2;
+  const int N_ENDPOINTS = 2;
+
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
   // Create Message
-  message.reset(createComplexSpecifier(2, 2, 2));
+  message.reset(createComplexSpecifier(N_CLUSTERS, N_LOCALITIES, N_ENDPOINTS));
 
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
@@ -373,7 +377,8 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
   EXPECT_CALL(*connection_, setBufferLimits(_));
-  // EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -381,18 +386,18 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
   // read response and verify fields
   auto response = hds_delegate_->sendResponse().endpoint_health_response();
 
-  EXPECT_EQ(response.cluster_endpoints_health_size(), 2);
+  EXPECT_EQ(response.cluster_endpoints_health_size(), N_CLUSTERS);
 
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < N_CLUSTERS; i++) {
     auto& cluster = response.cluster_endpoints_health(i);
 
     // Expect the correct cluster name by index
     EXPECT_EQ(cluster.cluster_name(), "anna" + std::to_string(i));
 
     // Every cluster should have two locality groupings
-    EXPECT_EQ(cluster.locality_endpoints_health_size(), 2);
+    EXPECT_EQ(cluster.locality_endpoints_health_size(), N_LOCALITIES);
 
-    for (int j = 0; j < 2; j++) {
+    for (int j = 0; j < N_LOCALITIES; j++) {
       // Every locality should have a number based on its index
       auto& loc_group = cluster.locality_endpoints_health(j);
       EXPECT_EQ(loc_group.locality().region(), "region" + std::to_string(i));
@@ -400,9 +405,9 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
       EXPECT_EQ(loc_group.locality().sub_zone(), "subzone" + std::to_string(j));
 
       // Every locality should have two endpoints.
-      EXPECT_EQ(loc_group.endpoints_health_size(), 2);
+      EXPECT_EQ(loc_group.endpoints_health_size(), N_ENDPOINTS);
 
-      for (int k = 0; k < 2; k++) {
+      for (int k = 0; k < N_ENDPOINTS; k++) {
 
         // every endpoint's address is based on all 3 index values.
         auto& endpoint_health = loc_group.endpoints_health(k);
