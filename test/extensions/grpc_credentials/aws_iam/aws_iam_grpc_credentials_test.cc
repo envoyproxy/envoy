@@ -34,6 +34,9 @@ public:
   }
 
   void expectExtraHeaders(FakeStream& fake_stream) override {
+    if (call_credentials_ != CallCredentials::FromPlugin) {
+      return;
+    }
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
     Http::TestRequestHeaderMapImpl stream_headers(fake_stream.headers());
@@ -57,41 +60,55 @@ public:
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
 
-    std::string config_yaml;
-    switch (region_location_) {
-    case RegionLocation::InEnvironment:
-      TestEnvironment::setEnvVar("AWS_REGION", region_name_, 1);
-      ABSL_FALLTHROUGH_INTENDED;
-    case RegionLocation::NotProvided:
-      config_yaml = fmt::format(R"EOF(
-"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
-service_name: {}
-)EOF",
-                                service_name_);
-      break;
-    case RegionLocation::InConfig:
-      config_yaml = fmt::format(R"EOF(
-"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
-service_name: {}
-region: {}
-)EOF",
-                                service_name_, region_name_);
-      break;
+    switch (call_credentials_) {
+    case CallCredentials::FromPlugin: {
+      std::string config_yaml;
+      switch (region_location_) {
+      case RegionLocation::InEnvironment:
+        TestEnvironment::setEnvVar("AWS_REGION", region_name_, 1);
+        ABSL_FALLTHROUGH_INTENDED;
+      case RegionLocation::NotProvided:
+        config_yaml = fmt::format(R"EOF(
+  "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig
+  service_name: {}
+  )EOF",
+                                  service_name_);
+        break;
+      case RegionLocation::InConfig:
+        config_yaml = fmt::format(R"EOF(
+  "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig
+  service_name: {}
+  region: {}
+  )EOF",
+                                  service_name_, region_name_);
+        break;
+      }
+
+      auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
+      plugin_config->set_name(credentials_factory_name_);
+      Envoy::TestUtility::loadFromYaml(config_yaml, *plugin_config->mutable_typed_config());
+      return config;
     }
-
-    auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
-    plugin_config->set_name(credentials_factory_name_);
-    Envoy::TestUtility::loadFromYaml(config_yaml, *plugin_config->mutable_typed_config());
-    return config;
+    case CallCredentials::AccessToken:
+      google_grpc->add_call_credentials()->mutable_access_token()->assign("foo");
+      return config;
+    default:
+      return config;
+    }
   }
-
   enum class RegionLocation {
     NotProvided,
     InEnvironment,
     InConfig,
   };
 
+  enum class CallCredentials {
+    FromPlugin,
+    AccessToken,
+  };
+
   RegionLocation region_location_ = RegionLocation::NotProvided;
+  CallCredentials call_credentials_ = CallCredentials::FromPlugin;
   std::string service_name_{};
   std::string region_name_{};
   std::string credentials_factory_name_{};
@@ -131,6 +148,16 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_NoRegion) {
   region_location_ = RegionLocation::NotProvided;
   credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
   EXPECT_THROW_WITH_REGEX(initialize();, EnvoyException, "AWS region");
+}
+
+TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_UnexpectedCallCredentials) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  call_credentials_ = CallCredentials::AccessToken;
+  credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->sendReply();
+  dispatcher_helper_.runDispatcher();
 }
 
 } // namespace
