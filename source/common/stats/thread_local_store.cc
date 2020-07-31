@@ -43,12 +43,6 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   default_scope_.reset();
   ASSERT(scopes_.empty());
   ASSERT(histograms_to_cleanup_.empty());
-
-  // Histograms may outlive the store in some cases, but any remaining should
-  // be shutting down.
-  for (ParentHistogramImpl* histogram : histogram_set_) {
-    ASSERT(histogram->shuttingDown());
-  }
 }
 
 void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
