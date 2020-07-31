@@ -35,8 +35,7 @@ namespace {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  void complete(LimitStatus status,
-                DescriptorStatusListPtr&& descriptor_statuses,
+  void complete(LimitStatus status, DescriptorStatusListPtr&& descriptor_statuses,
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
                 Http::RequestHeaderMapPtr&& request_headers_to_add) override {
     complete_(status, descriptor_statuses.get(), response_headers_to_add.get(),
@@ -44,8 +43,7 @@ public:
   }
 
   MOCK_METHOD(void, complete_,
-              (LimitStatus status,
-               const DescriptorStatusList* descriptor_statuses,
+              (LimitStatus status, const DescriptorStatusList* descriptor_statuses,
                const Http::ResponseHeaderMap* response_headers_to_add,
                const Http::RequestHeaderMap* request_headers_to_add));
 };

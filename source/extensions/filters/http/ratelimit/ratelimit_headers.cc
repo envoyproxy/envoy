@@ -29,7 +29,8 @@ Http::ResponseHeaderMapPtr RateLimitHeaders::create(
     uint32_t window = convertRateLimitUnit(status.current_limit().unit());
     if (window) {
       quotaPolicy += ", " + std::to_string(status.current_limit().requests_per_unit()) + ";" +
-                     Http::Headers::get().XRateLimitQuotaPolicyKeys.Window + "=" + std::to_string(window);
+                     Http::Headers::get().XRateLimitQuotaPolicyKeys.Window + "=" +
+                     std::to_string(window);
       if (!status.current_limit().name().empty()) {
         quotaPolicy += ";" + Http::Headers::get().XRateLimitQuotaPolicyKeys.Name + "=\"" +
                        status.current_limit().name() + "\"";
