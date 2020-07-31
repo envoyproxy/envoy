@@ -162,6 +162,10 @@ message Http1ProtocolOptions {
   // By default such requests are rejected with `400 Bad Request`, but if option is enabled -
   // Envoy will remove Content-Length header and pass request to upstream.
   // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>` for details.
+  //
+  // .. attention::
+  //   Enabling this option might lead request smuggling vlnarability, especially if traffic 
+  //   is proxied via multiple layers of proxies.
   bool allow_chunked_length = 6;
 }
 

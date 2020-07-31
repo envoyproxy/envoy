@@ -886,7 +886,7 @@ int ServerConnectionImpl::onHeadersComplete() {
     // perform request smuggling (Section 9.5) or response splitting
     // (Section 9.4) and ought to be handled as an error. A sender MUST
     // remove the received Content-Length field prior to forwarding such
-    // a message downstream.
+    // a message.
 
     // Reject request with Http::Code::BadRequest by default or remove Content-Length header
     // and serve request if allowed by http1 codec settings.
