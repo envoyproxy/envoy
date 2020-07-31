@@ -105,7 +105,7 @@ private:
   const std::string name_;
 
   // The watcher's callback function, only called if the weak pointer can be "locked".
-  const std::weak_ptr<TargetAwareReadyFn> fn_sn_;
+  const std::weak_ptr<TargetAwareReadyFn> fn_;
 };
 
 /**
@@ -132,7 +132,7 @@ private:
 
   // The callback function with target_name parameter, called via WatcherHandleImpl by either the
   // target or the manager.
-  const std::shared_ptr<TargetAwareReadyFn> fn_sn_;
+  const std::shared_ptr<TargetAwareReadyFn> fn_;
 };
 
 } // namespace Init
