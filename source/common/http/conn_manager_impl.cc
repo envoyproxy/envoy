@@ -1059,8 +1059,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
-  active_span_ = connection_manager_.tracer().startSpan(*this, *filter_manager_.requestHeaders(), stream_info_,
-                                                        tracing_decision);
+  active_span_ = connection_manager_.tracer().startSpan(*this, *filter_manager_.requestHeaders(),
+                                                        stream_info_, tracing_decision);
 
   if (!active_span_) {
     return;
@@ -1092,7 +1092,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
       filter_manager_.requestHeaders()->setEnvoyDecoratorOperation(*decorated_operation_);
     }
   } else {
-    const HeaderEntry* req_operation_override = filter_manager_.requestHeaders()->EnvoyDecoratorOperation();
+    const HeaderEntry* req_operation_override =
+        filter_manager_.requestHeaders()->EnvoyDecoratorOperation();
 
     // For ingress (inbound) requests, if a decorator operation name has been provided, it
     // should be used to override the active span's operation.
