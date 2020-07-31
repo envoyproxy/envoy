@@ -496,7 +496,6 @@ coverity
 cplusplus
 cpuset
 creds
-cref
 crypto
 cryptographic
 cryptographically
@@ -693,7 +692,6 @@ ish
 istio
 istream
 istringstream
-iter
 iteratively
 javascript
 jitter
