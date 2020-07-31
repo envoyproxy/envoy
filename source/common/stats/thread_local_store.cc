@@ -324,7 +324,7 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
     }
 
     // Perform a cache flush on all threads. The local copy of the
-    // histograms-list is deleted explicitly after all the threads complete.
+    // histograms-list is deleted implicitly after all the threads complete.
     tls_->runOnAllThreads(
         [this, histograms]() { tls_->getTyped<TlsCache>().eraseHistograms(*histograms); });
   }
