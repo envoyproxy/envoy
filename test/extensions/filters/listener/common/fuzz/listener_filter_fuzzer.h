@@ -51,7 +51,7 @@ public:
       // Construct header from single or multiple reads
       std::string data = "";
       size_t curr = 0;
-      std::vector<size_t> indices;
+      std::vector<size_t> indices; // Ending indices for each read
 
       for (int i = 0; i < nreads; i++) {
         data += input.data(i);
@@ -63,6 +63,8 @@ public:
 
       bool end_stream = false;
 
+      int nread = 0;
+
       {
         testing::InSequence s;
 
@@ -72,19 +74,17 @@ public:
           }));
         }
 
-        for (int i = 0; i < nreads; i++) {
-          EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-            .WillOnce(
-              Invoke([&header, &indices, &end_stream, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= indices[i]);
-                memcpy(buffer, header.data(), indices[i]);
-                if (indices[i] == header.size()) {
+        EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).Times(testing::AnyNumber())
+          .WillRepeatedly(
+              Invoke([&header, &indices, &end_stream, &nread, nreads](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= indices[nread]);
+                memcpy(buffer, header.data(), indices[nread]);
+                if (++nread == nreads) {
                   end_stream = true;
                 }
 
-                return Api::SysCallSizeResult{ssize_t(indices[i]), 0};
+                return Api::SysCallSizeResult{ssize_t(indices[nread - 1]), 0};
               }));
-          }
       }
 
       bool got_continue = false;
@@ -93,7 +93,7 @@ public:
         got_continue = true;
       }));
 
-      while(!end_stream && !got_continue) {
+      while (!end_stream && !got_continue) {
         file_event_callback_(Event::FileReadyType::Read);
       }
     }
