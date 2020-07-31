@@ -756,7 +756,7 @@ private:
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
     // not found, snapped_route_config_ is set to Router::NullConfigImpl.
-    void snapScopedRouteConfig(const RequestHeaderMap& request_headers);
+    void snapScopedRouteConfig();
 
     void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);

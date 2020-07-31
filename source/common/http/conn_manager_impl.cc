@@ -845,7 +845,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     } else if (connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
       snapped_scoped_routes_config_ =
           connection_manager_.config_.scopedRouteConfigProvider()->config<Router::ScopedConfig>();
-      snapScopedRouteConfig(*filter_manager_.requestHeaders());
+      snapScopedRouteConfig();
     }
   } else {
     snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->config();
@@ -1489,11 +1489,10 @@ void ConnectionManagerImpl::startDrainSequence() {
   drain_timer_->enableTimer(config_.drainTimeout());
 }
 
-void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig(
-    const RequestHeaderMap& request_headers) {
+void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(request_headers);
+  snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(*filter_manager_.requestHeaders());
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
     // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
@@ -1510,7 +1509,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
     if (connection_manager_.config_.isRoutable() &&
         connection_manager_.config_.scopedRouteConfigProvider() != nullptr) {
       // NOTE: re-select scope as well in case the scope key header has been changed by a filter.
-      snapScopedRouteConfig(*filter_manager_.requestHeaders());
+      snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
       route = snapped_route_config_->route(cb, *filter_manager_.requestHeaders(), stream_info_,
