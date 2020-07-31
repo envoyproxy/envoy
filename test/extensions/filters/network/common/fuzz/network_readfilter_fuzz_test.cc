@@ -28,7 +28,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
             Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
         // Choose a valid filter name.
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
-                std::end(filter_names)) {
+          std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
           input->mutable_config()->set_name(std::string(filter_name));
         }

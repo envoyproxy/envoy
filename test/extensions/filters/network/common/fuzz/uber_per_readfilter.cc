@@ -20,27 +20,25 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // Will extend to cover other network filters one by one.
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
-    const auto factories = Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
-    const std::vector<absl::string_view> supported_filter_names =
-                    {
-                    NetworkFilterNames::get().ExtAuthorization,
-                    NetworkFilterNames::get().LocalRateLimit,
-                    NetworkFilterNames::get().RedisProxy,
-                    NetworkFilterNames::get().ClientSslAuth,
-                    NetworkFilterNames::get().Echo,
-                    NetworkFilterNames::get().DirectResponse,
-                    NetworkFilterNames::get().DubboProxy,
-                    NetworkFilterNames::get().SniCluster
-                    };
+    const auto factories = Registry::FactoryRegistry<
+        Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
+    const std::vector<absl::string_view> supported_filter_names = {
+        NetworkFilterNames::get().ExtAuthorization,
+        NetworkFilterNames::get().LocalRateLimit,
+        NetworkFilterNames::get().RedisProxy,
+        NetworkFilterNames::get().ClientSslAuth,
+        NetworkFilterNames::get().Echo,
+        NetworkFilterNames::get().DirectResponse,
+        NetworkFilterNames::get().DubboProxy,
+        NetworkFilterNames::get().SniCluster};
     // Check whether each filter is loaded into Envoy.
-    for(auto& filter_name:supported_filter_names){
-      if(factories.contains(filter_name)){
+    for (auto& filter_name : supported_filter_names) {
+      if (factories.contains(filter_name)) {
         filter_names.push_back(filter_name);
-      }else{
+      } else {
         ENVOY_LOG_MISC(debug, "Filter name not found in the factory: {}", filter_name);
       }
     }
-    
   }
   return filter_names;
 }

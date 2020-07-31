@@ -32,7 +32,6 @@ envoy_cc_test_library(
     hdrs = ["uber_readfilter.h"],
     deps = [
         ":network_readfilter_fuzz_proto_cc_proto",
-        # "//include/envoy/registry:registry",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:utility_lib",
