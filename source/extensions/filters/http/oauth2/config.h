@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
-#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
+#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -14,12 +14,12 @@ namespace HttpFilters {
 namespace Oauth2 {
 
 class OAuth2Config : public Extensions::HttpFilters::Common::FactoryBase<
-                         envoy::extensions::filters::http::oauth2::v3::OAuth2> {
+                         envoy::extensions::filters::http::oauth2::v3alpha::OAuth2> {
 public:
   OAuth2Config() : FactoryBase(HttpFilterNames::get().OAuth) {}
 
   Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
+  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3alpha::OAuth2&,
                                     const std::string&,
                                     Server::Configuration::FactoryContext&) override;
 };
