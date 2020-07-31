@@ -22,6 +22,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
+#include "common/router/scoped_rds.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/ssl/connection.h"
@@ -431,7 +432,9 @@ private:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
     RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider)
-        : scoped_route_config_provider_(scoped_route_config_provider) {}
+        : scoped_route_config_provider_(
+              dynamic_cast<Router::ScopedRoutesConfigProviderBase*>(scoped_route_config_provider)) {
+    }
     void
     requestVhdsUpdate(const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
                       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
@@ -439,7 +442,7 @@ private:
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
-    Config::ConfigProvider* scoped_route_config_provider_;
+    Router::ScopedRoutesConfigProviderBase* scoped_route_config_provider_;
   };
 
   class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {

@@ -1034,8 +1034,7 @@ key:
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
-  getScopedRdsProvider()->subscription().onDemandRdsUpdate(*key_hash, dispatcher,
-                                                           route_config_updated_cb);
+  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, dispatcher, route_config_updated_cb);
   // After on demand request, push rds update.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
@@ -1106,8 +1105,7 @@ key:
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
-  getScopedRdsProvider()->subscription().onDemandRdsUpdate(*key_hash, dispatcher,
-                                                           route_config_updated_cb);
+  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, dispatcher, route_config_updated_cb);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})

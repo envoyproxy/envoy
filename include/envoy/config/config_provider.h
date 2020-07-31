@@ -141,8 +141,6 @@ public:
    */
   virtual SystemTime lastUpdated() const PURE;
 
-  virtual bool isMutable() const PURE;
-
 protected:
   /**
    * Returns the config proto associated with the provider.

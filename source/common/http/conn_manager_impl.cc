@@ -38,7 +38,6 @@
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
-#include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_features.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/timespan_impl.h"
@@ -527,15 +526,8 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback route_config_updated_cb) {
-  if (scoped_route_config_provider_->isMutable()) {
-    Router::ScopedRdsConfigProvider* scoped_route_config_provider =
-        dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider_);
-    scoped_route_config_provider->subscription().onDemandRdsUpdate(
-        key_hash, thread_local_dispatcher, move(route_config_updated_cb));
-  } else {
-    // Inline scope route config provider can't be updated on demand.
-    route_config_updated_cb(false);
-  }
+  scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
+                                                   move(route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
@@ -565,7 +557,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else if (connection_manager_.config_.isRoutable() &&
              connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
     route_config_update_requester_ =
-        std::make_unique<ConnectionManagerImpl::NullRouteConfigUpdateRequester>();
+        std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
+            connection_manager.config_.scopedRouteConfigProvider());
   }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());

@@ -516,7 +516,6 @@ public:
   MOCK_METHOD(Envoy::Config::ConfigProvider::ConfigProtoVector, getConfigProtos, (), (const));
   MOCK_METHOD(ConfigConstSharedPtr, getConfig, (), (const));
   MOCK_METHOD(ApiType, apiType, (), (const));
-  MOCK_METHOD(bool, isMutable, (), (const));
   std::shared_ptr<MockScopedConfig> config_;
 };
 
