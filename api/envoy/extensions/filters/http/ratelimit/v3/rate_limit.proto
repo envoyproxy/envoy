@@ -66,7 +66,7 @@ message RateLimit {
       [(validate.rules).message = {required: true}];
 
   // If set to true enables emitting X-RateLimit-* headers by the filter.
-  // The headers are specified in the `draft-polli-ratelimit-headers-00 RFC
+  // The headers are specified in the `draft RFC
   // <https://tools.ietf.org/id/draft-polli-ratelimit-headers-00.html>`_
   // Defaults to false.
   bool enable_response_headers = 8;
