@@ -310,7 +310,8 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   // dispatcher had a chance to execute the callback.
   factory_context_.dispatcher().post(
       [subscription = std::weak_ptr<RdsRouteConfigSubscription>(subscription_),
-       config_callbacks = std::weak_ptr<std::list<UpdateOnDemandCallback>>(config_update_callbacks_),
+       config_callbacks =
+           std::weak_ptr<std::list<UpdateOnDemandCallback>>(config_update_callbacks_),
        alias, &thread_local_dispatcher, route_config_updated_cb]() -> void {
         auto sub = subscription.lock();
         auto callback = config_callbacks.lock();
