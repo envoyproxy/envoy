@@ -58,29 +58,10 @@ private:
   friend class TextReadoutImpl;
   friend class NotifyingAllocatorImpl;
 
-  struct HeapStatHash {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-    size_t operator()(const Metric* a) const { return a->statName().hash(); }
-    size_t operator()(StatName a) const { return a.hash(); }
-  };
-
-  struct HeapStatCompare {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-    bool operator()(const Metric* a, const Metric* b) const {
-      return a->statName() == b->statName();
-    }
-    bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
-  };
-
   void removeCounterFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void removeGaugeFromSetLockHeld(Gauge* gauge) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void removeTextReadoutFromSetLockHeld(Counter* counter) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  // An unordered set of HeapStatData pointers which keys off the key()
-  // field in each object. This necessitates a custom comparator and hasher, which key off of the
-  // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
-  template <class StatType>
-  using StatSet = absl::flat_hash_set<StatType*, HeapStatHash, HeapStatCompare>;
   StatSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
   StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
   StatSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);

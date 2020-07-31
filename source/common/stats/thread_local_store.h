@@ -510,23 +510,8 @@ private:
 
   StatNameSetPtr well_known_tags_;
 
-  struct HeapStatHash {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-    size_t operator()(const Metric* a) const { return a->statName().hash(); }
-    size_t operator()(StatName a) const { return a.hash(); }
-  };
-
-  struct HeapStatCompare {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-    bool operator()(const Metric* a, const Metric* b) const {
-      return a->statName() == b->statName();
-    }
-    bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
-  };
-
   mutable Thread::MutexBasicLockable hist_mutex_;
-  absl::flat_hash_set<ParentHistogramImpl*, HeapStatHash, HeapStatCompare>
-      histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
+  StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;
