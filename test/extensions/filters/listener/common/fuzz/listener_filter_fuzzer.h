@@ -50,8 +50,9 @@ public:
     if (nreads > 0) {
       // Construct header from single or multiple reads
       std::string data = "";
-      size_t curr = 0;
       std::vector<size_t> indices; // Ending indices for each read
+
+      size_t curr = 0;
 
       for (int i = 0; i < nreads; i++) {
         data += input.data(i);
@@ -61,9 +62,7 @@ public:
 
       absl::string_view header(data);
 
-      bool end_stream = false;
-
-      int nread = 0;
+      int nread = 0; // Counter of current read
 
       {
         testing::InSequence s;
@@ -76,14 +75,10 @@ public:
 
         EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).Times(testing::AnyNumber())
           .WillRepeatedly(
-              Invoke([&header, &indices, &end_stream, &nread, nreads](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+              Invoke([&header, &indices, &nread](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
                 ASSERT(length >= indices[nread]);
                 memcpy(buffer, header.data(), indices[nread]);
-                if (++nread == nreads) {
-                  end_stream = true;
-                }
-
-                return Api::SysCallSizeResult{ssize_t(indices[nread - 1]), 0};
+                return Api::SysCallSizeResult{ssize_t(indices[nread++]), 0};
               }));
       }
 
@@ -93,8 +88,14 @@ public:
         got_continue = true;
       }));
 
-      while (!end_stream && !got_continue) {
-        file_event_callback_(Event::FileReadyType::Read);
+      while (!got_continue) {
+        if (nread >= nreads) { // End of stream reached but not done
+          nread--; // Decrement to avoid out-of-range for last recv() call
+          file_event_callback_(Event::FileReadyType::Closed);
+          break;
+        } else {
+          file_event_callback_(Event::FileReadyType::Read);
+        }
       }
     }
   }
