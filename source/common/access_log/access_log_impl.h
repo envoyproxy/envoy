@@ -12,6 +12,7 @@
 #include "envoy/server/access_log_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/common/matchers.h"
 #include "common/grpc/status.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
@@ -226,6 +227,27 @@ private:
    */
   Grpc::Status::GrpcStatus
   protoToGrpcStatus(envoy::config::accesslog::v3::GrpcStatusFilter::Status status) const;
+};
+
+/**
+ * Filters requests based on dynamic metadata
+ */
+class MetadataFilter : public Filter {
+public:
+  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config);
+
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) const override;
+
+private:
+  Matchers::ValueMatcherConstSharedPtr present_matcher_;
+  Matchers::ValueMatcherConstSharedPtr value_matcher_;
+
+  std::vector<std::string> path_;
+
+  const bool default_match_;
+  const std::string filter_;
 };
 
 /**
