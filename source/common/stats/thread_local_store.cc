@@ -161,11 +161,6 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
 std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::vector<ParentHistogramSharedPtr> ret;
   Thread::LockGuard lock(lock_);
-  // TODO(ramaraochavali): As histograms don't share storage, there is a chance of duplicate names
-  // here. We need to create global storage for histograms similar to how we have a central storage
-  // in shared memory for counters/gauges. In the interim, no de-dup is done here. This may result
-  // in histograms with duplicate names, but until shared storage is implemented it's ultimately
-  // less confusing for users who have such configs.
   for (ScopeImpl* scope : scopes_) {
     for (const auto& name_histogram_pair : scope->central_cache_->histograms_) {
       const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
