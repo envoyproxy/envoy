@@ -30,7 +30,8 @@ Bug Fixes
 * csrf: fixed issues with regards to origin and host header parsing.
 * dynamic_forward_proxy: only perform DNS lookups for routes to Dynamic Forward Proxy clusters since other cluster types handle DNS lookup themselves.
 * fault: fixed an issue with `active_faults` gauge not being decremented for when abort faults were injected.
-* rocketmq_proxy network-level filter: Fix a crash involving incorrect header lengths.
+* rocketmq_proxy network-level filter: fixed a crash involving incorrect header lengths.
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
