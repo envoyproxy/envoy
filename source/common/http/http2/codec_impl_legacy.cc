@@ -218,11 +218,7 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
 
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   ASSERT(!local_end_stream_);
-
-  const bool skip_encoding_empty_trailers =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_encoding_empty_trailers");
-  local_end_stream_ = !(trailers.empty() && skip_encoding_empty_trailers);
-
+  local_end_stream_ = true;
   if (pending_send_data_.length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
@@ -338,12 +334,7 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 }
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
-  // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
-  // a problem with processing empty trailers (END_STREAM | END_HEADERS with zero length HEADERS) of
-  // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514.
-  const bool skip_encoding_empty_trailers =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_encoding_empty_trailers");
-  if (trailers.empty() && skip_encoding_empty_trailers) {
+  if (trailers.empty() && parent_.skip_encoding_empty_trailers_) {
     ENVOY_CONN_LOG(debug, "skipping submitting trailers", parent_.connection_);
 
     // Instead of submitting empty trailers, we send empty data instead.
@@ -446,7 +437,7 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(!local_end_stream_);
+  ASSERT(!local_end_stream_ || (parent_.skip_encoding_empty_trailers_ && end_stream));
   local_end_stream_ = end_stream;
   parent_.stats_.pending_send_bytes_.add(data.length());
   pending_send_data_.move(data);
@@ -531,6 +522,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           http2_options.max_inbound_priority_frames_per_stream().value()),
       max_inbound_window_update_frames_per_data_frame_sent_(
           http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
+      skip_encoding_empty_trailers_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_encoding_empty_trailers")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
 ConnectionImpl::~ConnectionImpl() {

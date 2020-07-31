@@ -15,7 +15,7 @@ Minor Behavior Changes
 * http: changed Envoy to send error headers and body when possible. This behavior may be temporarily reverted by setting `envoy.reloadable_features.allow_response_for_timeout` to false.
 * http: clarified and enforced 1xx handling. Multiple 100-continue headers are coalesced when proxying. 1xx headers other than {100, 101} are dropped.
 * http: fixed the 100-continue response path to properly handle upstream failure by sending 5xx responses. This behavior can be temporarily reverted by setting `envoy.reloadable_features.allow_500_after_100` to false.
-* http: skip encoding empty trailers. This behavior can be reverted temporarily by setting runtime feature `envoy.reloadable_features.skip_encoding_empty_trailers` to false.
+* http: changed empty trailers encoding behavior by sending empty data with end_stream true (instead of sending empty trailers) for HTTP/2 downstream. This behavior can be reverted temporarily by setting runtime feature `envoy.reloadable_features.skip_encoding_empty_trailers` to false.
 * http: the per-stream FilterState maintained by the HTTP connection manager will now provide read/write access to the downstream connection FilterState. As such, code that relies on interacting with this might
   see a change in behavior.
 * logging: nghttp2 log messages no longer appear at trace level unless `ENVOY_NGHTTP2_TRACE` is set

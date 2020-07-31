@@ -6,8 +6,6 @@
 
 #include "gtest/gtest.h"
 
-using Envoy::Http::HeaderValueOf;
-
 namespace Envoy {
 namespace {
 
