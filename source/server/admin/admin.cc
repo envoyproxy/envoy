@@ -660,12 +660,13 @@ ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool dump_active_
     listeners = server_.listenerManager().warmingListeners();
   }
 
-  auto unready_targets_config_dump = std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDump>();
+  auto unready_targets_config_dump_list =
+      std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDumpList>();
 
   for (auto& listenerConfig : listeners) {
     auto& listener_message =
-        *unready_targets_config_dump->mutable_listener_unready_targets_configs()->Add();
-    listener_message.set_listener_name(listenerConfig.get().name());
+        *unready_targets_config_dump_list->mutable_unready_targets_configs()->Add();
+    listener_message.set_name(listenerConfig.get().name());
 
     auto& listener = dynamic_cast<ListenerImpl&>(listenerConfig.get());
     const auto& init_manager = dynamic_cast<Init::ManagerImpl&>(listener.initManager());
@@ -676,7 +677,7 @@ ProtobufTypes::MessagePtr AdminImpl::dumpUnreadyTargetsConfigs(bool dump_active_
       listener_message.add_target_names(unready_target.first);
     }
   }
-  return unready_targets_config_dump;
+  return unready_targets_config_dump_list;
 }
 
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url,

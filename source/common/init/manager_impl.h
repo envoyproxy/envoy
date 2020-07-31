@@ -63,7 +63,7 @@ private:
   WatcherHandlePtr watcher_handle_;
 
   // Watcher to receive ready notifications from each target.
-  const WatcherImpl watcher_;
+  const ManagerWatcherImpl watcher_;
 
   // All registered targets.
   std::list<TargetHandlePtr> target_handles_;
