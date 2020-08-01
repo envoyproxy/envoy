@@ -152,7 +152,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonDeathTest,
 
 TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
 #if defined(__clang_analyzer__) || (defined(__has_feature) && (__has_feature(thread_sanitizer) ||  \
-                                                               __has_feature(address_sanitizer)))
+                                                               __has_feature(address_sanitizer) || \
+                                                               __has_feature(memory_sanitizer)))
   ENVOY_LOG_MISC(critical,
                  "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
 #else

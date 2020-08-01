@@ -27,7 +27,7 @@ enum class SamplingDecision {
 struct XRayHeader {
   std::string trace_id_;
   std::string parent_id_;
-  SamplingDecision sample_decision_;
+  SamplingDecision sample_decision_{};
 };
 
 } // namespace XRay
