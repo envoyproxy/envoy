@@ -519,8 +519,8 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
                                                   uint32_t buffer_limit)
     : connection_manager_(connection_manager),
-      filter_manager_(*this, *this, buffer_limit, connection_manager_.codec_->protocol(),
-                      connection_manager_.timeSource(),
+      filter_manager_(*this, *this, buffer_limit, connection_manager_.config_.filterFactory(),
+                      connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
                       connection_manager_.read_callbacks_->connection().streamInfo().filterState(),
                       StreamInfo::FilterState::LifeSpan::Connection),
       stream_id_(connection_manager.random_generator_.random()),
@@ -534,6 +534,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
+  for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
+    filter_manager_.addAccessLogHandler(access_log);
+  }
 
   filter_manager_.streamInfo().setRequestIDExtension(
       connection_manager.config_.requestIDExtension());
@@ -637,15 +640,6 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
-  for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
-    access_log->log(filter_manager_.requestHeaders(), filter_manager_.responseHeaders(),
-                    filter_manager_.responseTrailers(), filter_manager_.streamInfo());
-  }
-  for (const auto& log_handler : access_log_handlers_) {
-    log_handler->log(filter_manager_.requestHeaders(), filter_manager_.responseHeaders(),
-                     filter_manager_.responseTrailers(), filter_manager_.streamInfo());
-  }
-
   if (filter_manager_.streamInfo().healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
   }
@@ -744,7 +738,7 @@ void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
   LinkedList::moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
-void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
+void ConnectionManagerImpl::FilterManager::addAccessLogHandler(
     AccessLog::InstanceSharedPtr handler) {
   access_log_handlers_.push_back(handler);
 }
@@ -1008,7 +1002,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   filter_manager_.streamInfo().setRequestHeaders(*filter_manager_.requestHeaders());
 
-  const bool upgrade_rejected = createFilterChain() == false;
+  const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
   // should return 404. The current returns no response if there is no router filter.
@@ -1657,7 +1651,7 @@ void ConnectionManagerImpl::FilterManager::sendLocalReplyViaFilterChain(
   // For early error handling, do a best-effort attempt to create a filter chain
   // to ensure access logging. If the filter chain already exists this will be
   // a no-op.
-  active_stream_.createFilterChain();
+  createFilterChain();
 
   Utility::sendLocalReply(
       active_stream_.state_.destroyed_,
@@ -2259,36 +2253,36 @@ void ConnectionManagerImpl::FilterManager::setBufferLimit(uint32_t new_limit) {
   }
 }
 
-bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
-  if (state_.created_filter_chain_) {
+bool ConnectionManagerImpl::FilterManager::createFilterChain() {
+  if (active_stream_.state_.created_filter_chain_) {
     return false;
   }
   bool upgrade_rejected = false;
   const HeaderEntry* upgrade = nullptr;
-  if (filter_manager_.requestHeaders()) {
-    upgrade = filter_manager_.requestHeaders()->Upgrade();
+  if (request_headers_) {
+    upgrade = request_headers_->Upgrade();
 
     // Treat CONNECT requests as a special upgrade case.
-    if (!upgrade && HeaderUtility::isConnect(*filter_manager_.requestHeaders())) {
-      upgrade = filter_manager_.requestHeaders()->Method();
+    if (!upgrade && HeaderUtility::isConnect(*request_headers_)) {
+      upgrade = request_headers_->Method();
     }
   }
 
-  state_.created_filter_chain_ = true;
+  active_stream_.state_.created_filter_chain_ = true;
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
 
     // We must check if the 'cached_route_' optional is populated since this function can be called
     // early via sendLocalReply(), before the cached route is populated.
-    if (hasCachedRoute() && cached_route_.value()->routeEntry()) {
-      upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
+    if (active_stream_.hasCachedRoute() && active_stream_.cached_route_.value()->routeEntry()) {
+      upgrade_map = &active_stream_.cached_route_.value()->routeEntry()->upgradeMap();
     }
 
-    if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
-            upgrade->value().getStringView(), upgrade_map, *this)) {
-      state_.successful_upgrade_ = true;
-      connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
-      connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
+    if (filter_chain_factory_.createUpgradeFilterChain(upgrade->value().getStringView(),
+                                                       upgrade_map, *this)) {
+      active_stream_.state_.successful_upgrade_ = true;
+
+      filter_manager_callbacks_.upgradeFilterChainCreated();
       return true;
     } else {
       upgrade_rejected = true;
@@ -2297,7 +2291,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
     }
   }
 
-  connection_manager_.config_.filterFactory().createFilterChain(*this);
+  filter_chain_factory_.createFilterChain(*this);
   return !upgrade_rejected;
 }
 
