@@ -866,7 +866,7 @@ static_listeners:
     ListenerHandle* listener_foo3 = expectListenerCreate(true, true);
     EXPECT_CALL(*listener_foo3, onDestroy());
     EXPECT_THROW_WITH_MESSAGE(
-        manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_address_update_yaml),
+        manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_address_update_yaml),
                                       "version3", true),
         EnvoyException,
         "error updating listener: 'foo' has a different address "
