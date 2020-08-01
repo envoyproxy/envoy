@@ -300,8 +300,13 @@ void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
-    // Perform a cache flush on all threads. The local copy of the
-    // histograms-list is deleted implicitly after all the threads complete.
+    // Perform a cache flush on all threads.
+    //
+    // TODO(jmarantz): If this cross-thread posting proves to be a performance
+    // bottleneck,
+    // https://gist.github.com/jmarantz/838cb6de7e74c0970ea6b63eded0139a
+    // contains a patch that will implement batching together to clear multiple
+    // histograms.
     tls_->runOnAllThreads(
         [this, histogram_id]() { tls_->getTyped<TlsCache>().eraseHistogram(histogram_id); });
   }
