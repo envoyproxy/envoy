@@ -63,11 +63,21 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   // in the default_scope. There should be no requests, so there will
   // be no copies in TLS caches.
   Thread::LockGuard lock(lock_);
+  const uint32_t first_histogram_index = deleted_histograms_.size();
   for (ScopeImpl* scope : scopes_) {
     removeRejectedStats(scope->central_cache_->counters_, deleted_counters_);
     removeRejectedStats(scope->central_cache_->gauges_, deleted_gauges_);
     removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
     removeRejectedStats(scope->central_cache_->text_readouts_, deleted_text_readouts_);
+  }
+
+  // Remove any newly rejected histograms from histogram_set_.
+  {
+    Thread::LockGuard hist_lock(hist_mutex_);
+    for (uint32_t i = first_histogram_index; i < deleted_histograms_.size(); ++i) {
+      uint32_t erased = histogram_set_.erase(deleted_histograms_[i].get());
+      ASSERT(erased == 1);
+    }
   }
 }
 
@@ -160,11 +170,11 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
 
 std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::vector<ParentHistogramSharedPtr> ret;
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (const auto& name_histogram_pair : scope->central_cache_->histograms_) {
-      const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
-      ret.push_back(parent_hist);
+  Thread::LockGuard lock(hist_mutex_);
+  {
+    ret.reserve(histogram_set_.size());
+    for (const auto& histogram_ptr : histogram_set_) {
+      ret.emplace_back(histogram_ptr);
     }
   }
 
@@ -268,9 +278,8 @@ void ThreadLocalStoreImpl::releaseHistogramCrossThread(uint64_t histogram_id) {
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    main_thread_dispatcher_->post([this, histogram_id]() {
-                                    clearHistogramFromCaches(histogram_id);
-                                  });
+    main_thread_dispatcher_->post(
+        [this, histogram_id]() { clearHistogramFromCaches(histogram_id); });
   }
 }
 
@@ -743,18 +752,20 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 }
 
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
-                                         ThreadLocalStoreImpl& parent, StatName tag_extracted_name,
+                                         ThreadLocalStoreImpl& thread_local_store,
+                                         StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags,
                                          ConstSupportedBuckets& supported_buckets, uint64_t id)
-    : MetricImpl(name, tag_extracted_name, stat_name_tags, parent.symbolTable()), unit_(unit),
-      parent_(parent), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
+    : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
+      unit_(unit), thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
+      cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, supported_buckets),
       cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
-  parent_.releaseHistogramCrossThread(id_);
+  thread_local_store_.releaseHistogramCrossThread(id_);
   ASSERT(ref_count_ == 0);
-  MetricImpl::clear(parent_.symbolTable());
+  MetricImpl::clear(thread_local_store_.symbolTable());
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }
@@ -766,7 +777,7 @@ bool ParentHistogramImpl::decRefCount() {
   if (shutting_down_) {
     ret = --ref_count_ == 0;
   } else {
-    ret = parent_.decHistogramRefCount(*this, ref_count_);
+    ret = thread_local_store_.decHistogramRefCount(*this, ref_count_);
   }
   return ret;
 }
@@ -790,11 +801,6 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
   return false;
 }
 
-uint32_t ThreadLocalStoreImpl::numHistograms() const {
-  Thread::LockGuard lock(hist_mutex_);
-  return histogram_set_.size();
-}
-
 uint32_t ThreadLocalStoreImpl::numTlsHistogramsForTesting() const {
   std::atomic<uint32_t> num_tls_histograms = 0;
   absl::Mutex mutex;
@@ -813,14 +819,14 @@ uint32_t ThreadLocalStoreImpl::numTlsHistogramsForTesting() const {
   return num_tls_histograms;
 }
 
-SymbolTable& ParentHistogramImpl::symbolTable() { return parent_.symbolTable(); }
+SymbolTable& ParentHistogramImpl::symbolTable() { return thread_local_store_.symbolTable(); }
 
 Histogram::Unit ParentHistogramImpl::unit() const { return unit_; }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = parent_.tlsHistogram(*this, id_);
+  Histogram& tls_histogram = thread_local_store_.tlsHistogram(*this, id_);
   tls_histogram.recordValue(value);
-  parent_.deliverHistogramToSinks(*this, value);
+  thread_local_store_.deliverHistogramToSinks(*this, value);
 }
 
 bool ParentHistogramImpl::used() const {

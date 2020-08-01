@@ -124,7 +124,7 @@ private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
   Histogram::Unit unit_;
-  ThreadLocalStoreImpl& parent_;
+  ThreadLocalStoreImpl& thread_local_store_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
   HistogramStatisticsImpl interval_statistics_;
@@ -268,7 +268,6 @@ public:
   const StatNameSet& wellKnownTags() const { return *well_known_tags_; }
 
   bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
-  uint32_t numHistograms() const;
   void releaseHistogramCrossThread(uint64_t histogram_id);
 
   // Calculates the number of TLS histograms across all threads. This
@@ -500,10 +499,10 @@ private:
   // It seems like it would be better to have each client that expects a stat
   // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
   // but that would be fairly complex to change.
-  std::vector<CounterSharedPtr> deleted_counters_;
-  std::vector<GaugeSharedPtr> deleted_gauges_;
-  std::vector<HistogramSharedPtr> deleted_histograms_;
-  std::vector<TextReadoutSharedPtr> deleted_text_readouts_;
+  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(lock_);
+  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
+  std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
+  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
 
   Thread::ThreadSynchronizer sync_;
   std::atomic<uint64_t> next_scope_id_{};
