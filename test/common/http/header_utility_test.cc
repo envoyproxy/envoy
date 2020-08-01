@@ -8,6 +8,7 @@
 #include "common/http/header_utility.h"
 #include "common/json/json_loader.h"
 
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -499,35 +500,194 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, HeaderNameGetter) {
-  TestRequestHeaderMapImpl matching_headers{{"match-header", "value"}};
-  const std::string yaml = R"EOF(
-name: match-header
-  )EOF";
-
-  std::vector<HeaderUtility::HeaderDataPtr> header_data;
-  header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
-  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
-
-  const LowerCaseString* header_name = header_data[0]->name();
-  EXPECT_EQ("match-header", header_name->get());
+envoy::config::route::v3::RetryPolicy::ResetHeader
+parseResetHeaderParserFromYaml(const std::string& yaml) {
+  envoy::config::route::v3::RetryPolicy::ResetHeader reset_header;
+  TestUtility::loadFromYaml(yaml, reset_header);
+  return reset_header;
 }
 
-TEST(MatchHeadersTest, HeaderNameGetterInverse) {
-  TestRequestHeaderMapImpl unmatching_headers{{"other-header", "value"}};
+TEST(ResetHeaderDataConstructorTest, FormatUnset) {
   const std::string yaml = R"EOF(
-name: match-header
-invert_match: true
+name: retry-after
   )EOF";
 
-  std::vector<HeaderUtility::HeaderDataPtr> header_data;
-  header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
-  EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
 
-  const LowerCaseString* header_name = header_data[0]->name();
-  EXPECT_EQ(nullptr, header_name);
+  EXPECT_EQ("retry-after", reset_header_data.name_.get());
+  EXPECT_EQ(HeaderUtility::ResetHeaderFormat::Seconds, reset_header_data.format_);
+}
+
+TEST(ResetHeaderDataConstructorTest, FormatSeconds) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: SECONDS
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  EXPECT_EQ("retry-after", reset_header_data.name_.get());
+  EXPECT_EQ(HeaderUtility::ResetHeaderFormat::Seconds, reset_header_data.format_);
+}
+
+TEST(ResetHeaderDataConstructorTest, FormatUnixTimestamp) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: UNIX_TIMESTAMP
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  EXPECT_EQ("retry-after", reset_header_data.name_.get());
+  EXPECT_EQ(HeaderUtility::ResetHeaderFormat::UnixTimestamp, reset_header_data.format_);
+}
+
+class ResetHeaderDataParseIntervalTest : public testing::Test {
+public:
+  ResetHeaderDataParseIntervalTest() {
+    const time_t known_date_time = 1000000000;
+    test_time_.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+  }
+
+  Event::SimulatedTimeSystem test_time_;
+};
+
+TEST_F(ResetHeaderDataParseIntervalTest, NoHeaderMatches) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: SECONDS
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  EXPECT_EQ(absl::nullopt,
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
+}
+
+TEST_F(ResetHeaderDataParseIntervalTest, HeaderMatchesButUnsupportedFormatDate) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: SECONDS
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{"retry-after", "Fri, 17 Jul 2020 11:59:51 GMT"}};
+
+  EXPECT_EQ(absl::nullopt,
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
+}
+
+TEST_F(ResetHeaderDataParseIntervalTest, HeaderMatchesButUnsupportedFormatFloat) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: SECONDS
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{"retry-after", "2.5"}};
+
+  EXPECT_EQ(absl::nullopt,
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
+}
+
+TEST_F(ResetHeaderDataParseIntervalTest, HeaderMatchesSupportedFormatSeconds) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: SECONDS
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{"retry-after", "5"}};
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(5000),
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
+}
+
+TEST_F(ResetHeaderDataParseIntervalTest, HeaderMatchesSupportedFormatSecondsCaseInsensitive) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: SECONDS
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{"Retry-After", "5"}};
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(5000),
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
+}
+
+TEST_F(ResetHeaderDataParseIntervalTest, HeaderMatchesButUnsupportedFormatTimestampFloat) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: UNIX_TIMESTAMP
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{"retry-after", "1595320702.1234"}};
+
+  EXPECT_EQ(absl::nullopt,
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
+}
+
+TEST_F(ResetHeaderDataParseIntervalTest, HeaderMatchesSupportedFormatTimestampButInThePast) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: UNIX_TIMESTAMP
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{"retry-after", "999999999"}};
+
+  EXPECT_EQ(absl::nullopt,
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
+}
+
+TEST_F(ResetHeaderDataParseIntervalTest, HeaderMatchesSupportedFormatTimestampEmptyInterval) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: UNIX_TIMESTAMP
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{"retry-after", "1000000000"}};
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(0),
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
+}
+
+TEST_F(ResetHeaderDataParseIntervalTest, HeaderMatchesSupportedFormatTimestampNonEmptyInterval) {
+  const std::string yaml = R"EOF(
+name: retry-after
+format: UNIX_TIMESTAMP
+  )EOF";
+
+  HeaderUtility::ResetHeaderData reset_header_data =
+      HeaderUtility::ResetHeaderData(parseResetHeaderParserFromYaml(yaml));
+
+  TestResponseHeaderMapImpl response_headers{{"retry-after", "1000000007"}};
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(7000),
+            reset_header_data.parseInterval(test_time_.timeSystem(), response_headers));
 }
 
 TEST(HeaderIsValidTest, InvalidHeaderValuesAreRejected) {

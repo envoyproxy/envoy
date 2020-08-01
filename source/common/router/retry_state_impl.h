@@ -54,7 +54,7 @@ public:
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
   absl::optional<std::chrono::milliseconds>
-  parseRateLimitedResetInterval(const Http::ResponseHeaderMap& response_headers) const override;
+  parseResetInterval(const Http::ResponseHeaderMap& response_headers) const override;
   RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                  DoRetryCallback callback) override;
   // Returns true if the retry policy would retry the passed headers. Does not
@@ -91,10 +91,6 @@ public:
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
 
-  const std::vector<Http::HeaderMatcherSharedPtr>& rateLimitedResetHeaders() const override {
-    return ratelimited_reset_headers_;
-  }
-
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
@@ -125,8 +121,8 @@ private:
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
-  std::vector<Http::HeaderMatcherSharedPtr> ratelimited_reset_headers_{};
-  std::chrono::milliseconds ratelimited_reset_max_interval_{};
+  std::vector<Http::ResetHeaderParserSharedPtr> reset_headers_{};
+  std::chrono::milliseconds reset_max_interval_{};
 };
 
 } // namespace Router

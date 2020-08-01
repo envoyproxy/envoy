@@ -152,17 +152,17 @@ private:
       return absl::nullopt;
     }
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
-    const std::vector<Http::HeaderMatcherSharedPtr>& rateLimitedResetHeaders() const override {
-      return ratelimited_reset_headers_;
+    const std::vector<Http::ResetHeaderParserSharedPtr>& resetHeaders() const override {
+      return reset_headers_;
     }
-    std::chrono::milliseconds rateLimitedResetMaxInterval() const override {
+    std::chrono::milliseconds resetMaxInterval() const override {
       return std::chrono::milliseconds(300000);
     }
 
     const std::vector<uint32_t> retriable_status_codes_{};
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_{};
-    const std::vector<Http::HeaderMatcherSharedPtr> ratelimited_reset_headers_{};
+    const std::vector<Http::ResetHeaderParserSharedPtr> reset_headers_{};
   };
 
   struct NullConfig : public Router::Config {

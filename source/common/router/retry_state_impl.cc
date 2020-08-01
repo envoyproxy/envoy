@@ -52,7 +52,6 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   request_headers.removeEnvoyRetryOn();
   request_headers.removeEnvoyRetryGrpcOn();
   request_headers.removeEnvoyMaxRetries();
-  request_headers.removeEnvoyRateLimitedResetHeaders();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consume_all_retry_headers")) {
     request_headers.removeEnvoyHedgeOnPerTryTimeout();
     request_headers.removeEnvoyRetriableHeaderNames();
@@ -76,8 +75,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
-      ratelimited_reset_headers_(route_policy.rateLimitedResetHeaders()),
-      ratelimited_reset_max_interval_(route_policy.rateLimitedResetMaxInterval()) {
+      reset_headers_(route_policy.resetHeaders()),
+      reset_max_interval_(route_policy.resetMaxInterval()) {
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
@@ -148,21 +147,6 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
       envoy::config::route::v3::HeaderMatcher header_matcher;
       header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
       retriable_headers_.emplace_back(
-          std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher));
-    }
-  }
-
-  if (request_headers.EnvoyRateLimitedResetHeaders()) {
-    // Ratelimit reset headers in the configuration are specified via HeaderMatcher.
-    // Giving the same flexibility via request header would require the user
-    // to provide a HeaderMatcher serialized into a string. To avoid this extra
-    // complexity we only support name-only header matchers via request
-    // header. Anything more sophisticated needs to be provided via config.
-    for (const auto header_name : StringUtil::splitToken(
-             request_headers.EnvoyRateLimitedResetHeaders()->value().getStringView(), ",")) {
-      envoy::config::route::v3::HeaderMatcher header_matcher;
-      header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
-      ratelimited_reset_headers_.emplace_back(
           std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher));
     }
   }
@@ -246,45 +230,12 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view ret
   return {ret, all_fields_valid};
 }
 
-absl::optional<std::chrono::milliseconds> RetryStateImpl::parseRateLimitedResetInterval(
-    const Http::ResponseHeaderMap& response_headers) const {
-  bool parsed_value = false;
-  uint64_t num_seconds{};
-
-  for (const auto& reset_header : ratelimited_reset_headers_) {
-    if (reset_header->matchesHeaders(response_headers)) {
-      const Http::LowerCaseString* header_name = reset_header->name();
-
-      if (header_name != nullptr) {
-        const Http::HeaderEntry* entry = response_headers.get(*header_name);
-
-        if (entry != nullptr) {
-          const auto& header_value = entry->value().getStringView();
-
-          // Try to parse the value of the header as an int storing the number of seconds
-          if (absl::SimpleAtoi(header_value, &num_seconds)) {
-            parsed_value = true;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  if (parsed_value) {
-    const auto time_now = time_source_.systemTime().time_since_epoch();
-    uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(time_now).count();
-
-    // Is the value big enough to be a unix timestamp rather than an interval?
-    if (num_seconds > timestamp) {
-      num_seconds = num_seconds - timestamp;
-    }
-
-    const auto interval = std::chrono::milliseconds(num_seconds * 1000UL);
-
-    // Is the interval value within our accepted range?
-    if (interval <= ratelimited_reset_max_interval_) {
-      return absl::optional<std::chrono::milliseconds>(interval);
+absl::optional<std::chrono::milliseconds>
+RetryStateImpl::parseResetInterval(const Http::ResponseHeaderMap& response_headers) const {
+  for (const auto& reset_header : reset_headers_) {
+    const auto interval = reset_header->parseInterval(time_source_, response_headers);
+    if (interval.has_value() && interval.value() <= reset_max_interval_) {
+      return interval;
     }
   }
 
@@ -356,8 +307,8 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
 
   // Yes, we will retry based on the headers - try to parse a rate limited reset interval from the
   // response.
-  if (would_retry && !ratelimited_reset_headers_.empty()) {
-    const auto backoff_interval = parseRateLimitedResetInterval(response_headers);
+  if (would_retry && !reset_headers_.empty()) {
+    const auto backoff_interval = parseResetInterval(response_headers);
     if (backoff_interval.has_value()) {
       ratelimited_backoff_strategy_ = std::make_unique<JitteredLowerBoundBackOffStrategy>(
           backoff_interval.value().count(), random_);

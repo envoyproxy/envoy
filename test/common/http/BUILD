@@ -323,6 +323,7 @@ envoy_cc_test(
     srcs = ["header_utility_test.cc"],
     deps = [
         "//source/common/http:header_utility_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],

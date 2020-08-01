@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -272,7 +273,6 @@ private:
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
   HEADER_FUNC(EnvoyIpTags)                                                                         \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
-  HEADER_FUNC(EnvoyRateLimitedResetHeaders)                                                        \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
   HEADER_FUNC(EnvoyRetryGrpcOn)                                                                    \
   HEADER_FUNC(EnvoyRetriableStatusCodes)                                                           \
@@ -775,21 +775,29 @@ public:
   virtual ~HeaderMatcher() = default;
 
   /**
-   * This getter exists so that once matchHeaders() has been called on a HeaderMap the concrete
-   * header in that map can be extracted by using this getter to discover its name. This is possible
-   * in all cases, except when invert_match_ is true, because in the latter case name_ would *not*
-   * reflect the matching header.
-   * @return the header name the matcher will match against.
-   */
-  virtual const LowerCaseString* name() const PURE;
-
-  /**
    * Check whether header matcher matches any headers in a given HeaderMap.
    */
   virtual bool matchesHeaders(const HeaderMap& headers) const PURE;
 };
 
 using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
+
+/**
+ * An interface to be implemented by rate limited reset header parsers.
+ */
+class ResetHeaderParser {
+public:
+  virtual ~ResetHeaderParser() = default;
+
+  /**
+   * Iterate over the headers, choose the first one that matches by name, and try to parse its
+   * value.
+   */
+  virtual absl::optional<std::chrono::milliseconds>
+  parseInterval(TimeSource& time_source, const HeaderMap& headers) const PURE;
+};
+
+using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 
 } // namespace Http
 } // namespace Envoy

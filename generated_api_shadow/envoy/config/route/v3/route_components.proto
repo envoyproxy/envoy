@@ -1048,6 +1048,11 @@ message RouteAction {
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RetryPolicy";
 
+  enum ResetHeaderFormat {
+    SECONDS = 0;
+    UNIX_TIMESTAMP = 1;
+  }
+
   message RetryPriority {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RetryPolicy.RetryPriority";
@@ -1094,6 +1099,13 @@ message RetryPolicy {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
   }
 
+  message ResetHeader {
+    string name = 1
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
   // A retry back-off strategy that applies when the upstream server rate limits
   // the request.
   //
@@ -1138,48 +1150,16 @@ message RetryPolicy {
   //   to be retried. You will still need to configure the right retry policy to match
   //   the responses from the upstream server.
   message RateLimitedRetryBackOff {
-    enum ResetHeaderFormat {
-      SECONDS = 0;
-      UNIX_TIMESTAMP = 1;
-    }
-
-    message ResetHeader {
-      string name = 1 [
-        (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
-      ];
-
-      ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
-    }
-
     // Specifies the reset headers (like ``Retry-After`` or ``X-RateLimit-Reset``)
     // to match against the response. Headers are tried in order, and matched case
     // insensitive. The first header to be parsed successfully is used. If no headers
     // match the default exponential back-off is used instead.
-    repeated ResetHeader reset_headers_ng = 3 [(validate.rules).repeated = {min_items: 1}];
+    repeated ResetHeader reset_headers = 1 [(validate.rules).repeated = {min_items: 1}];
 
     // Specifies the maximum back off interval that Envoy will allow. If a reset
     // header contains an interval longer than this then it will be discarded and
     // the next header will be tried. Defaults to 300 seconds.
-    google.protobuf.Duration max_interval = 4 [(validate.rules).duration = {gt {}}];
-
-    // Specifies the rate limited retry reset headers (like ``Retry-After`` or
-    // ``X-RateLimit-Reset``) to match against the response. If a request is
-    // being retried and the response contains one of these headers the value
-    // of the header will be used as the retry back off interval, with jitter
-    // added. If multiple headers are specified they are tried in the order
-    // given and the first matching header in the response is used.
-    //
-    // The value of the header must be either:
-    //  1. An interval in seconds as an integer, for example: ``120``.
-    //  2. A unix timestamp as an integer, for example: ``1595320702``. The timestamp
-    //     must be in the future relative to the current system time.
-    repeated HeaderMatcher reset_headers = 1 [(validate.rules).repeated = {min_items: 1}];
-
-    // Specifies the maximum rate limited retry back off interval that Envoy
-    // will allow. If a rate limited reset header contains an interval longer
-    // than this then the default exponential back off strategy will be used
-    // instead. Defaults to 300 seconds.
-    google.protobuf.Duration reset_max_interval = 2 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
   }
 
   // Specifies the conditions under which retry takes place. These are the same

@@ -264,12 +264,6 @@ in flight.
 
 The value of the header should be "true" or "false", and is ignored if invalid.
 
-x-envoy-ratelimited-reset-headers
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Setting this header will extend the list of rate limited reset headers specified in the :ref:`route configuration rate limited retry back off
-<envoy_v3_api_field_config.route.v3.RetryPolicy.RateLimitedRetryBackOff.reset_headers>`.
-
 .. _config_http_filters_router_x-envoy-decorator-operation:
 
 x-envoy-decorator-operation
