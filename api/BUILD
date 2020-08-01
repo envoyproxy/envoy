@@ -249,6 +249,7 @@ proto_library(
         "//envoy/service/discovery/v3:pkg",
         "//envoy/service/endpoint/v3:pkg",
         "//envoy/service/event_reporting/v3:pkg",
+        "//envoy/service/extension/v3:pkg",
         "//envoy/service/health/v3:pkg",
         "//envoy/service/listener/v3:pkg",
         "//envoy/service/load_stats/v3:pkg",
