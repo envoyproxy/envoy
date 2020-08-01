@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
@@ -28,6 +29,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -446,9 +448,12 @@ private:
   class FilterManager {
   public:
     FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& filter_manager_callbacks,
-                  uint32_t buffer_limit)
+                  uint32_t buffer_limit, Http::Protocol protocol, TimeSource& time_source,
+                  StreamInfo::FilterStateSharedPtr parent_filter_state,
+                  StreamInfo::FilterState::LifeSpan filter_state_life_span)
         : active_stream_(active_stream), filter_manager_callbacks_(filter_manager_callbacks),
-          buffer_limit_(buffer_limit) {}
+          buffer_limit_(buffer_limit),
+          stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
 
     void destroyFilters() {
       for (auto& filter : decoder_filters_) {
@@ -569,6 +574,10 @@ private:
      */
     ResponseTrailerMap* responseTrailers() const { return response_trailers_.get(); }
 
+    // TODO(snowp): This should probably return a StreamInfo instead of the impl.
+    StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
+    const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
+
   private:
     // Indicates which filter to start the iteration with.
     enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
@@ -656,6 +665,7 @@ private:
     uint32_t high_watermark_count_{0};
     std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
 
+    StreamInfo::StreamInfoImpl stream_info_;
     // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
     // at which point they no longer need to be friends.
     friend ActiveStreamFilterBase;
@@ -740,7 +750,7 @@ private:
       DUMP_DETAILS(filter_manager_.requestTrailers());
       DUMP_DETAILS(filter_manager_.responseHeaders());
       DUMP_DETAILS(filter_manager_.responseTrailers());
-      DUMP_DETAILS(&stream_info_);
+      DUMP_DETAILS(&filter_manager_.streamInfo());
     }
 
     // FilterManagerCallbacks
@@ -881,7 +891,6 @@ private:
     Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
-    StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
