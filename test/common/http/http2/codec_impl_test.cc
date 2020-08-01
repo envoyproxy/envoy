@@ -675,7 +675,7 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
 TEST_P(Http2CodecImplTest, IgnoreTrailingEmptyHeaders) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.skip_encoding_empty_trailers", "true"}});
+      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "true"}});
 
   initialize();
 
@@ -701,12 +701,12 @@ TEST_P(Http2CodecImplTest, IgnoreTrailingEmptyHeaders) {
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
 }
 
-// When having empty trailers and "envoy.reloadable_features.skip_encoding_empty_trailers" is turned
-// off, codec submits empty trailers.
+// When having empty trailers and "envoy.reloadable_features.http2_skip_encoding_empty_trailers" is
+// turned off, codec submits empty trailers.
 TEST_P(Http2CodecImplTest, SubmitTrailingEmptyHeaders) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.skip_encoding_empty_trailers", "false"}});
+      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "false"}});
 
   initialize();
 

@@ -24,9 +24,10 @@ public:
     config_helper_.addFilter("name: envoy.filters.http.grpc_web");
   }
 
-  void skipEncodingEmptyTrailers(SkipEncodingEmptyTrailers skip_encoding_empty_trailers) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.skip_encoding_empty_trailers",
-                                      skip_encoding_empty_trailers ? "true" : "false");
+  void skipEncodingEmptyTrailers(SkipEncodingEmptyTrailers http2_skip_encoding_empty_trailers) {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
+        http2_skip_encoding_empty_trailers ? "true" : "false");
   }
 
   static std::string testParamsToString(const testing::TestParamInfo<TestParams> params) {
@@ -49,12 +50,12 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   const auto downstream_protocol = std::get<1>(GetParam());
-  const bool skip_encoding_empty_trailers = std::get<2>(GetParam());
+  const bool http2_skip_encoding_empty_trailers = std::get<2>(GetParam());
 
   if (downstream_protocol == Http::CodecClient::Type::HTTP1) {
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   } else {
-    skipEncodingEmptyTrailers(skip_encoding_empty_trailers);
+    skipEncodingEmptyTrailers(http2_skip_encoding_empty_trailers);
   }
 
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -97,7 +98,7 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   }
 
   if (downstream_protocol == Http::CodecClient::Type::HTTP2) {
-    if (skip_encoding_empty_trailers) {
+    if (http2_skip_encoding_empty_trailers) {
       // When the downstream protocol is HTTP/2 and the feature-flag to skip encoding empty trailers
       // is turned on, expect that the trailers are included in the response-body.
       EXPECT_EQ(nullptr, response->trailers());
