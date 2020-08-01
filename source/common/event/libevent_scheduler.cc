@@ -18,7 +18,8 @@ void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
 LibeventScheduler::LibeventScheduler() {
 #ifdef WIN32
   event_config* event_config = event_config_new();
-  RELEASE_ASSERT(event_config != nullptr, "Failed to initialize libevent event_base: event_config_new");
+  RELEASE_ASSERT(event_config != nullptr,
+                 "Failed to initialize libevent event_base: event_config_new");
   // Request wepoll backend by avoiding win32 backend.
   int error = event_config_avoid_method(event_config, "win32");
   RELEASE_ASSERT(error == 0, "Failed to initialize libevent event_base: event_config_avoid_method");
