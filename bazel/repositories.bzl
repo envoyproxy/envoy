@@ -157,8 +157,7 @@ def envoy_dependencies(skip_targets = []):
 
     # Binding to an alias pointing to the selected version of zlib:
     # - zlib-ng from @envoy//bazel/foreign_cc:zlib_ng,
-    # - zlib-ng with optimization (WITH_OPTIM=ON, WITH_NEW_STRATEGIES=ON) from
-    #   @envoy//bazel/foreign_cc:zlib_ng_with_optimization,
+    # - zlib-ng with optimization from @envoy//bazel/foreign_cc:zlib_ng_with_optimization,
     # - zlib from @envoy//bazel/foreign_cc:zlib.
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
