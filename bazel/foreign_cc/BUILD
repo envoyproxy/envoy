@@ -250,8 +250,10 @@ envoy_cmake_external(
         "ZLIB_COMPAT": "on",
         "ZLIB_ENABLE_TESTS": "off",
 
-        # Turning off WITH_OPTIM fixes checksum, but not sure if that is what we want.
+        # Turning off WITH_OPTIM and WITH_NEW_STRATEGIES fixes checksum, but not sure if that is
+        # what we want.
         "WITH_OPTIM": "off",
+        "WITH_NEW_STRATEGIES": "off",
     },
     lib_source = "@com_github_zlib_ng_zlib_ng//:all",
     static_libraries = select({

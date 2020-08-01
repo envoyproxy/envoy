@@ -283,6 +283,10 @@ alias(
 )
 
 # Alias pointing to the selected version of zlib:
+# - zlib-ng from @envoy//bazel/foreign_cc:zlib_ng,
+# - zlib-ng with optimization (WITH_OPTIM=ON, WITH_NEW_STRATEGIES=ON) from
+#   @envoy//bazel/foreign_cc:zlib_ng_with_optimization,
+# - zlib from @envoy//bazel/foreign_cc:zlib.
 alias(
     name = "zlib",
     actual = select({
