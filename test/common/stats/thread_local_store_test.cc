@@ -424,6 +424,9 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   EXPECT_EQ(0, store_->numTlsHistogramsForTesting());
 
   store_->shutdownThreading();
+
+  store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
+
   tls_.shutdownThread();
 }
 
