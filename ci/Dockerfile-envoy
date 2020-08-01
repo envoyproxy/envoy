@@ -1,6 +1,5 @@
 ARG BUILD_FROM=ubuntu:18.04
 
-
 # Build stage
 FROM $BUILD_FROM as build
 
@@ -17,7 +16,7 @@ RUN apt-get update \
 
 # Final stage
 FROM $BUILD_FROM
-
+ARG TARGETPLATFORM
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y ca-certificates \
@@ -31,7 +30,7 @@ RUN adduser --group --system envoy
 
 RUN mkdir -p /etc/envoy
 
-ADD build_release_stripped/envoy /usr/local/bin/envoy
+ADD ${TARGETPLATFORM}/build_release_stripped/envoy /usr/local/bin/envoy
 ADD configs/google_com_proxy.v2.yaml /etc/envoy/envoy.yaml
 
 EXPOSE 10000
