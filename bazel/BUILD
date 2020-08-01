@@ -249,6 +249,11 @@ config_setting(
 )
 
 config_setting(
+    name = "zlib_ng",
+    values = {"define": "zlib=ng"},
+)
+
+config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},
 )
@@ -261,6 +266,15 @@ alias(
     actual = select({
         "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
+    }),
+)
+
+# Alias pointing to the selected version of zlib:
+alias(
+    name = "zlib",
+    actual = select({
+        "//bazel:zlib_ng": "//bazel/foreign_cc:zlib_ng",
+        "//conditions:default": "//bazel/foreign_cc:zlib",
     }),
 )
 

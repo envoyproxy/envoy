@@ -155,6 +155,22 @@ def envoy_dependencies(skip_targets = []):
         actual = "@envoy//bazel:boringssl",
     )
 
+    # Binding to an alias pointing to the selected version of zlib:
+    # - zlib-ng from @envoy//bazel/foreign_cc:zlib_ng
+    # - zlib from @envoy//bazel/foreign_cc:zlib
+    _net_zlib()
+    _com_github_zlib_ng_zlib_ng()
+    native.bind(
+        name = "zlib",
+        actual = "@envoy//bazel:zlib",
+    )
+
+    # Bind for gRPC.
+    native.bind(
+        name = "madler_zlib",
+        actual = "@envoy//bazel:zlib",
+    )
+
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
@@ -189,7 +205,6 @@ def envoy_dependencies(skip_targets = []):
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
-    _net_zlib()
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
@@ -370,15 +385,10 @@ def _net_zlib():
         patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
     )
 
-    native.bind(
-        name = "zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
-    )
-
-    # Bind for grpc.
-    native.bind(
-        name = "madler_zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
+def _com_github_zlib_ng_zlib_ng():
+    _repository_impl(
+        name = "com_github_zlib_ng_zlib_ng",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_google_cel_cpp():

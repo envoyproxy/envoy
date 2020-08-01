@@ -259,6 +259,14 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:gnu:zlib:*",
     ),
+    com_github_zlib_ng_zlib_ng = dict(
+        sha256 = "9646501422faf7a0b3a1d82402a421c0d56c9f4e1926692b6ed0bd80042da209",
+        strip_prefix = "zlib-ng-c71ca170224f31a219513aa470f82aa50a3ded48",
+        # 2020-07-31 develop branch.
+        urls = ["https://github.com/zlib-ng/zlib-ng/archive/c71ca170224f31a219513aa470f82aa50a3ded48.tar.gz"],
+        use_category = ["dataplane"],
+        cpe = "N/A",
+    ),
     com_github_jbeder_yaml_cpp = dict(
         sha256 = "79ab7069ef1c7c3632e7ffe095f7185d4c77b64d8035db3c085c239d4fe96d5f",
         strip_prefix = "yaml-cpp-98acc5a8874faab28b82c28936f4b400b389f5d6",

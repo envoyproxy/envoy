@@ -238,3 +238,18 @@ envoy_cmake_external(
         "//conditions:default": ["libz.a"],
     }),
 )
+
+envoy_cmake_external(
+    name = "zlib_ng",
+    cache_entries = {
+        "BUILD_SHARED_LIBS": "off",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_C_COMPILER_FORCED": "on",
+        "ZLIB_ENABLE_TESTS": "off",
+    },
+    lib_source = "@com_github_zlib_ng_zlib_ng//:all",
+    static_libraries = select({
+        "//bazel:windows_x86_64": ["zlibstatic.lib"],
+        "//conditions:default": ["libz-ng.a"],
+    }),
+)
