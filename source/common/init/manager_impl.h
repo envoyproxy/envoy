@@ -62,9 +62,11 @@ private:
   // Handle to the watcher passed in `initialize`, to be called when initialization completes.
   WatcherHandlePtr watcher_handle_;
 
-  // Watcher to receive ready notifications from each target. Define this watcher to be a
-  // TargetAwareWatcher to send target name to the init manager.
-  const TargetAwareWatcherImpl watcher_;
+  // Watcher to receive ready notifications from each target. We restrict the watcher_ inside
+  // ManagerImpl to be constructed with the 'TargetAwareReadyFn' fn so that the init manager will
+  // get target name information when the watcher_ calls 'onTargetSendName(target_name)' For any
+  // other purpose, a watcher can be constructed with either TargetAwareReadyFn or ReadyFn.
+  const WatcherImpl watcher_;
 
   // All registered targets.
   std::list<TargetHandlePtr> target_handles_;
