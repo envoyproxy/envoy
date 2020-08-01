@@ -66,6 +66,7 @@ public:
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
+  const LowerCaseString Pragma{"pragma"};
   const LowerCaseString Referer{"referer"};
   const LowerCaseString Vary{"vary"};
 
