@@ -27,7 +27,7 @@ public:
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
 
-  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+  Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();

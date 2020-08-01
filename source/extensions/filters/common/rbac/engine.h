@@ -18,64 +18,32 @@ class RoleBasedAccessControlEngine {
 public:
   virtual ~RoleBasedAccessControlEngine() = default;
 
-  enum class LogDecision { Yes, No, Undecided };
-
   /**
-   * Returns whether or not the current action is permitted.
+   * Handles action-specific operations and returns whether or not the request is permitted.
    *
    * @param connection the downstream connection used to identify the action/principal.
    * @param headers    the headers of the incoming request used to identify the action/principal. An
    *                   empty map should be used if there are no headers available.
    * @param info       the per-request or per-connection stream info with additional information
-   *                   about the action/principal.
+   *                   about the action/principal. Can be modified by an Action.
    * @param effective_policy_id  it will be filled by the matching policy's ID,
    *                   which is used to identity the source of the allow/deny.
    */
-  virtual bool allowed(const Network::Connection& connection,
-                       const Envoy::Http::RequestHeaderMap& headers,
-                       const StreamInfo::StreamInfo& info,
-                       std::string* effective_policy_id) const PURE;
+  virtual bool handleAction(const Network::Connection& connection,
+                            const Envoy::Http::RequestHeaderMap& headers,
+                            StreamInfo::StreamInfo& info, std::string* effective_policy_id) PURE;
 
   /**
-   * Returns whether or not the current action is permitted.
+   * Handles action-specific operations and returns whether or not the request is permitted.
    *
    * @param connection the downstream connection used to identify the action/principal.
    * @param info       the per-request or per-connection stream info with additional information
-   *                   about the action/principal.
+   *                   about the action/principal. Can be modified by an Action.
    * @param effective_policy_id  it will be filled by the matching policy's ID,
    *                   which is used to identity the source of the allow/deny.
    */
-  virtual bool allowed(const Network::Connection& connection, const StreamInfo::StreamInfo& info,
-                       std::string* effective_policy_id) const PURE;
-
-  /**
-   * Returns whether or not the current action should be logged.
-   *
-   * @param connection the downstream connection used to identify the action/principal.
-   * @param headers    the headers of the incoming request used to identify the action/principal. An
-   *                   empty map should be used if there are no headers available.
-   * @param info       the per-request or per-connection stream info with additional information
-   *                   about the action/principal.
-   * @param effective_policy_id  it will be filled by the matching policy's ID,
-   *                   which is used to identity the source of the allow/deny.
-   */
-  virtual LogDecision shouldLog(const Network::Connection& connection,
-                                const Envoy::Http::RequestHeaderMap& headers,
-                                const StreamInfo::StreamInfo& info,
-                                std::string* effective_policy_id) const PURE;
-
-  /**
-   * Returns whether or not the current action should be logged.
-   *
-   * @param connection the downstream connection used to identify the action/principal.
-   * @param info       the per-request or per-connection stream info with additional information
-   *                   about the action/principal.
-   * @param effective_policy_id  it will be filled by the matching policy's ID,
-   *                   which is used to identity the source of the allow/deny.
-   */
-  virtual LogDecision shouldLog(const Network::Connection& connection,
-                                const StreamInfo::StreamInfo& info,
-                                std::string* effective_policy_id) const PURE;
+  virtual bool handleAction(const Network::Connection& connection, StreamInfo::StreamInfo& info,
+                            std::string* effective_policy_id) PURE;
 };
 
 } // namespace RBAC
