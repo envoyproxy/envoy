@@ -1125,7 +1125,7 @@ message RetryPolicy {
         (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
       ];
 
-      ResetHeaderFormat format = 2 [(validate.rules).message = {required: true}];
+      ResetHeaderFormat format = 2 [(validate.rules).enum = {defined_only: true}];
     }
 
     // Specifies the reset headers (like ``Retry-After`` or ``X-RateLimit-Reset``)
