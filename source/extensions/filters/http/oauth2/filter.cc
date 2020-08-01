@@ -190,7 +190,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   if (canSkipOAuth(headers)) {
     // Update the path header with the query string parameters after a successful OAuth login.
     // This is necessary if a website requests multiple resources which get redirected to the
-    // auth server. A cached login on the authentication server side will set cookies
+    // auth server. A cached login on the authorization server side will set cookies
     // correctly but cause a race condition on future requests that have their location set
     // to the callback path.
     if (absl::StartsWith(path_str, config_->callbackPath())) {
@@ -264,7 +264,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 
-    config_->stats().oauth_unauthenticated_rq_.inc();
+    config_->stats().oauth_unauthorized_rq_.inc();
 
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
@@ -319,8 +319,6 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     return true;
   }
 
-  // Skip authentication for HTTP method OPTIONS for CORS preflight requests to skip forbidden
-  // redirects to the auth server. Must be opted in from the proto configuration.
   for (const auto& matcher : config_->passThroughMatchers()) {
     if (matcher.matchesHeaders(headers)) {
       return true;
@@ -390,7 +388,7 @@ void OAuth2Filter::finishFlow() {
   const std::string cookie_tail_http_only =
       fmt::format(CookieTailHttpOnlyFormatString, new_expires_);
 
-  // At this point we have all of the pieces needed to authenticate a user that did not originally
+  // At this point we have all of the pieces needed to authorize a user that did not originally
   // have a bearer access token. Now, we construct a redirect request to return the user to their
   // previous state and additionally set the OAuth cookies in browser.
   // The redirection should result in successfully passing this filter.
