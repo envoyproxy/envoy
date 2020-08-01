@@ -275,6 +275,8 @@ envoy_cmake_external(
 
         # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
         "WITH_OPTIM": "on",
+        # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
+        "WITH_NEW_STRATEGIES": "on",
     },
     lib_source = "@com_github_zlib_ng_zlib_ng//:all",
     static_libraries = select({
