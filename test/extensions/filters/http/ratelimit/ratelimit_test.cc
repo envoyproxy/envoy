@@ -349,7 +349,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
       {"x-ratelimit-reset", "3"}};
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  EXPECT_EQ(true, (expected_headers == response_headers));
+  EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_headers));
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 }
@@ -599,13 +599,13 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithFilterHeaders) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
 
-  Http::TestResponseHeaderMapImpl* expected_headers = new Http::TestResponseHeaderMapImpl{
+  Http::TestResponseHeaderMapImpl expected_headers{
       {":status", "429"},
       {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True},
       {"x-ratelimit-limit", "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""},
       {"x-ratelimit-remaining", "2"},
       {"x-ratelimit-reset", "3"}};
-  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(expected_headers), true));
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
