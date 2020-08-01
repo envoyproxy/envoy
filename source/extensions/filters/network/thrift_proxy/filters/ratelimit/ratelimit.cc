@@ -58,7 +58,7 @@ void Filter::onDestroy() {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      DescriptorStatusListPtr&& descriptor_statuses,
+                      Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over

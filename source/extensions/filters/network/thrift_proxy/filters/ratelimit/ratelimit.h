@@ -77,7 +77,7 @@ public:
 
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
-                DescriptorStatusListPtr&& descriptor_statuses,
+                Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
                 Http::RequestHeaderMapPtr&& request_headers_to_add) override;
 
