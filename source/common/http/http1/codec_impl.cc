@@ -912,6 +912,7 @@ int ServerConnectionImpl::onHeadersComplete() {
     if (parser_.flags & F_CHUNKED ||
         (parser_.content_length > 0 && parser_.content_length != ULLONG_MAX) || handling_upgrade_) {
       active_request.request_decoder_->decodeHeaders(std::move(headers), false);
+
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
       // so we return control to the caller.
       if (connection_.state() != Network::Connection::State::Open) {
