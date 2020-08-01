@@ -14,8 +14,16 @@ namespace Event {
 FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb,
                              FileTriggerType trigger, uint32_t events)
     : cb_(cb), fd_(fd), trigger_(trigger),
-      activate_fd_events_next_event_loop_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.activate_fds_next_event_loop")) {
+      activate_fd_events_next_event_loop_(
+          // Only read the runtime feature if the runtime loader singleton has already been created.
+          // Attempts to access runtime features too early in the initialization sequence triggers
+          // some spurious, scary-looking logs about not being able to read runtime feature config
+          // from the singleton. These warnings are caused by creation of filesystem watchers as
+          // part of the process of loading the runtime configuration from disk.
+          Runtime::LoaderSingleton::getExisting()
+              ? Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.activate_fds_next_event_loop")
+              : true) {
 #ifdef WIN32
   RELEASE_ASSERT(trigger_ == FileTriggerType::Level,
                  "libevent does not support edge triggers on Windows");
