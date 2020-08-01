@@ -2,12 +2,12 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "envoy_quic_alarm_lib",
@@ -306,6 +306,12 @@ envoy_cc_library(
     srcs = ["active_quic_listener_config.cc"],
     hdrs = ["active_quic_listener_config.h"],
     tags = ["nofips"],
+    # TODO(#9953) this should be cleaned up
+    visibility = [
+        "//source/extensions:__subpackages__",
+        "//test/extensions:__subpackages__",
+        "//test/server:__subpackages__",
+    ],
     deps = [
         ":active_quic_listener_lib",
         "//include/envoy/registry",

@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 # ZooKeeper proxy L7 network filter.
 # Public docs: docs/root/configuration/network_filters/zookeeper_proxy_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "proxy_lib",

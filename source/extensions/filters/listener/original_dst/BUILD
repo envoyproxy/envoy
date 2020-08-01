@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 # ORIGINAL_DST iptables redirection listener filter
 # Public docs: docs/root/configuration/listener_filters/original_dst_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "original_dst_lib",
@@ -29,6 +29,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     security_posture = "robust_to_untrusted_downstream",
+    # TODO(#9953) clean up.
+    visibility = [
+        "//:extension_config",
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         ":original_dst_lib",
         "//include/envoy/registry",

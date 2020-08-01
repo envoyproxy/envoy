@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 # HTTP L7 filter that probabilistically rejects requests based on upstream success-rate.
 # Public docs: docs/root/configuration/http_filters/admission_control.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "admission_control_filter_lib",

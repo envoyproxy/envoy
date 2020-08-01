@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "utility_lib",
@@ -23,6 +23,12 @@ envoy_cc_extension(
     ],
     security_posture = "unknown",
     undocumented = True,
+    # Legacy test use. TODO(#9953) clean up.
+    visibility = [
+        "//:extension_config",
+        "//test/common/config:__subpackages__",
+        "//test/common/crypto:__subpackages__",
+    ],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",

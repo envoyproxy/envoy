@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 # L7 HTTP filter that bridges HTTP/1.1 unary "gRPC" to compliant HTTP/2 gRPC.
 # Public docs: docs/root/configuration/http_filters/grpc_http1_bridge_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "http1_bridge_filter_lib",
@@ -34,6 +34,13 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "unknown",
+    # Legacy test use. TODO(#9953) clean up.
+    visibility = [
+        "//:extension_config",
+        "//source/exe:__pkg__",
+        "//test/integration:__subpackages__",
+        "//test/server:__subpackages__",
+    ],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
