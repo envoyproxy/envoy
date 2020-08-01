@@ -3152,7 +3152,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
       "error adding listener '127.0.0.1:1234': filter chain 'bar' contains unimplemented fields");
 }
 
