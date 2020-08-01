@@ -23,7 +23,6 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./libjaegertracing.so.0.4.2:/usr/local/lib/libjaegertracing_plugin.so
     networks:
       envoymesh:
         aliases:
@@ -42,7 +41,6 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./libjaegertracing.so.0.4.2:/usr/local/lib/libjaegertracing_plugin.so
     networks:
       envoymesh:
         aliases:
