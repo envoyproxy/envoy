@@ -19,7 +19,10 @@ cd "${SRCDIR}"
 echo "building using ${NUM_CPUS} CPUs"
 
 function collect_build_profile() {
-  cp -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/$1.profile.gz" || true
+  declare -g build_profile_count=${build_profile_count:-1}
+  mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
+  mv -f ${BUILD_DIR}/build_event.json "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.build_event.json" || true
+  ((build_profile_count++))
 }
 
 function bazel_with_collection() {
@@ -42,7 +45,6 @@ function bazel_with_collection() {
 
 function cp_binary_for_outside_access() {
   DELIVERY_LOCATION="$1"
-  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
   cp -f \
     bazel-bin/"${ENVOY_BIN}" \
     "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
@@ -81,6 +83,11 @@ function bazel_binary_build() {
   fi
 
   echo "Building..."
+  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+
+  # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
+  [[ ! -z "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
+
   bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" "${ENVOY_BUILD_TARGET}" ${CONFIG_ARGS}
   collect_build_profile "${BINARY_TYPE}"_build
 
@@ -110,14 +117,14 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # toolchain is kept consistent. This ifdef is checked in
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
+  [[ "$(uname -m)" == "x86_64" ]] && BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=ENVOY_MEMORY_TEST_EXACT=true"
 
   setup_clang_toolchain
-  echo "bazel release build with tests..."
-  bazel_binary_build release
-
   echo "Testing ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
+
+  echo "bazel release build with tests..."
+  bazel_binary_build release
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
@@ -131,26 +138,29 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   setup_clang_toolchain
+  echo "Testing ${TEST_TARGETS}"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=sizeopt ${TEST_TARGETS}
+
   echo "bazel size optimized build with tests..."
   bazel_binary_build sizeopt
-  echo "Testing ${TEST_TARGETS}"
-  bazel test ${BAZEL_BUILD_OPTIONS} --config=sizeopt ${TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HEAPCHECK="	
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HEAPCHECK="
   setup_gcc_toolchain
-  echo "bazel fastbuild build..."
-  bazel_binary_build release
 
   echo "Testing ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c opt ${TEST_TARGETS}
+
+  echo "bazel release build with gcc..."
+  bazel_binary_build release
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
-  echo "bazel debug build with tests..."
-  bazel_binary_build debug
   echo "Testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} -c dbg ${TEST_TARGETS}
+
+  echo "bazel debug build with tests..."
+  bazel_binary_build debug
   exit 0
 elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   setup_clang_toolchain
@@ -205,7 +215,7 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   bazel_binary_build fastbuild
 
   echo "Building and testing ${TEST_TARGETS}"
-  bazel test ${BAZEL_BUILD_OPTIONS} -c fastbuild ${TEST_TARGETS}
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild ${TEST_TARGETS}
   exit 0
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
@@ -221,7 +231,6 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
     --define use_legacy_codecs_in_integration_tests=true \
-    --define --cxxopt=-std=c++14 \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
@@ -233,18 +242,20 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     TEST_TARGETS="@envoy//test/..."
   fi
   # Building all the dependencies from scratch to link them against libc++.
-  echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   echo "Building and testing ${TEST_TARGETS}"
-  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
 
   # Legacy codecs "--define legacy_codecs_in_integration_tests=true" should also be tested in
   # integration tests with asan.
-  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//test/integration/... --config=clang-asan --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
-  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
+
+  echo "Building binary..."
+  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+  collect_build_profile build
 
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
@@ -262,14 +273,11 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
   LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config BAZEL_BUILD_OPTIONS="--config=clang" python3.8 ./tools/api_boost/api_boost_test.py
   exit 0
-elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
+elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
-  echo "bazel coverage build with tests ${COVERAGE_TEST_TARGETS}"
+  echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS}"
 
-  # Reduce the amount of memory Bazel tries to use to prevent it from launching too many subprocesses.
-  # This should prevent the system from running out of memory and killing tasks. See discussion on
-  # https://github.com/envoyproxy/envoy/pull/5611.
-  [ -z "$CIRCLECI" ] || export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_ram_resources=12288"
+  [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
 
   test/run_envoy_bazel_coverage.sh ${COVERAGE_TEST_TARGETS}
   collect_build_profile coverage

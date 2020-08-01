@@ -520,7 +520,42 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ(0UL, headers.remove(Headers::get().ContentLength));
 }
 
-TEST(HeaderMapImplTest, RemoveRegex) {
+TEST(HeaderMapImplTest, RemoveHost) {
+  TestRequestHeaderMapImpl headers;
+  headers.setHost("foo");
+  EXPECT_EQ("foo", headers.get_("host"));
+  EXPECT_EQ("foo", headers.get_(":authority"));
+  // Make sure that when we remove by "host" without using the inline functions, the mapping to
+  // ":authority" still takes place.
+  // https://github.com/envoyproxy/envoy/pull/12160
+  EXPECT_EQ(1UL, headers.remove("host"));
+  EXPECT_EQ("", headers.get_("host"));
+  EXPECT_EQ("", headers.get_(":authority"));
+  EXPECT_EQ(nullptr, headers.Host());
+}
+
+TEST(HeaderMapImplTest, RemoveIf) {
+  LowerCaseString key1 = LowerCaseString("X-postfix-foo");
+  LowerCaseString key2 = LowerCaseString("X-postfix-");
+  LowerCaseString key3 = LowerCaseString("x-postfix-eep");
+
+  TestRequestHeaderMapImpl headers;
+  headers.addReference(key1, "value");
+  headers.addReference(key2, "value");
+  headers.addReference(key3, "value");
+
+  EXPECT_EQ(0UL, headers.removeIf([](const HeaderEntry&) -> bool { return false; }));
+
+  EXPECT_EQ(2UL, headers.removeIf([](const HeaderEntry& entry) -> bool {
+    return absl::EndsWith(entry.key().getStringView(), "foo") ||
+           absl::EndsWith(entry.key().getStringView(), "eep");
+  }));
+
+  TestRequestHeaderMapImpl expected{{"X-postfix-", "value"}};
+  EXPECT_EQ(expected, headers);
+}
+
+TEST(HeaderMapImplTest, RemovePrefix) {
   // These will match.
   LowerCaseString key1 = LowerCaseString("X-prefix-foo");
   LowerCaseString key3 = LowerCaseString("X-Prefix-");
@@ -552,7 +587,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ(nullptr, headers.get(key2));
   EXPECT_EQ(nullptr, headers.get(key4));
 
-  // Add inline and remove by regex
+  // Add inline and remove by prefix
   headers.setContentLength(5);
   EXPECT_EQ("5", headers.getContentLengthValue());
   EXPECT_EQ(1UL, headers.size());
@@ -970,14 +1005,14 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
 TEST(TestHeaderMapImplDeathTest, TestHeaderLengthChecks) {
   HeaderString value;
   value.setCopy("some;");
-  EXPECT_DEATH_LOG_TO_STDERR(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
-                             "Trying to allocate overly large headers.");
+  EXPECT_DEATH(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
+               "Trying to allocate overly large headers.");
 
   std::string source("hello");
   HeaderString reference;
   reference.setReference(source);
-  EXPECT_DEATH_LOG_TO_STDERR(reference.append(nullptr, std::numeric_limits<uint32_t>::max()),
-                             "Trying to allocate overly large headers.");
+  EXPECT_DEATH(reference.append(nullptr, std::numeric_limits<uint32_t>::max()),
+               "Trying to allocate overly large headers.");
 }
 
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {

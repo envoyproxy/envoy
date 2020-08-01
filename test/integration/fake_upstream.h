@@ -85,8 +85,10 @@ public:
   void
   sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
                  const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
-                 bool is_head_request, const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                  absl::string_view /*details*/) override {
+    const bool is_head_request =
+        headers_ != nullptr && headers_->getMethodValue() == Http::Headers::get().MethodValues.Head;
     Http::Utility::sendLocalReply(
         false,
         Http::Utility::EncodeFunctions(
@@ -200,8 +202,8 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
-  Http::MetadataMap& metadata_map() { return metadata_map_; }
-  std::unordered_map<std::string, uint64_t>& duplicated_metadata_key_count() {
+  Http::MetadataMap& metadataMap() { return metadata_map_; }
+  absl::node_hash_map<std::string, uint64_t>& duplicatedMetadataKeyCount() {
     return duplicated_metadata_key_count_;
   }
 
@@ -222,7 +224,7 @@ private:
   bool add_served_by_header_{};
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
-  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool received_data_{false};
 };
 

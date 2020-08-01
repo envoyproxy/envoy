@@ -31,14 +31,14 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
                                        const Http::AsyncClient::RequestOptions& options) {
   auto* const async_request = new AsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
-  std::unique_ptr<AsyncStreamImpl> grpc_stream{async_request};
+  AsyncStreamImplPtr grpc_stream{async_request};
 
   grpc_stream->initialize(true);
   if (grpc_stream->hasResetStream()) {
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(grpc_stream), active_streams_);
   return async_request;
 }
 
@@ -54,7 +54,7 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(grpc_stream), active_streams_);
   return active_streams_.front().get();
 }
 

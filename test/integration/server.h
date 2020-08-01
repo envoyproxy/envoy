@@ -150,6 +150,15 @@ public:
   }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    return wrapped_scope_->iterate(fn);
+  }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return wrapped_scope_->iterate(fn);
+  }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
@@ -196,7 +205,7 @@ class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
 public:
   using Stats::AllocatorImpl::AllocatorImpl;
 
-  virtual void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
+  void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
     absl::MutexLock l(&mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() != value) {
@@ -205,13 +214,22 @@ public:
     ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
   }
 
-  virtual void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
+  void waitForCounterFromStringGe(const std::string& name, uint64_t value) {
     absl::MutexLock l(&mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
     while (getCounterLockHeld(name) == nullptr || getCounterLockHeld(name)->value() < value) {
       condvar_.Wait(&mutex_);
     }
     ENVOY_LOG_MISC(trace, "done waiting for {} to be {}", name, value);
+  }
+
+  void waitForCounterExists(const std::string& name) {
+    absl::MutexLock l(&mutex_);
+    ENVOY_LOG_MISC(trace, "waiting for {} to exist", name);
+    while (getCounterLockHeld(name) == nullptr) {
+      condvar_.Wait(&mutex_);
+    }
+    ENVOY_LOG_MISC(trace, "done waiting for {} to exist", name);
   }
 
 protected:
@@ -333,10 +351,16 @@ public:
     return store_.textReadouts();
   }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
+
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}
   void setStatsMatcher(StatsMatcherPtr&&) override {}
+  void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}
@@ -397,20 +421,32 @@ public:
              Server::FieldValidationConfig validation_config, uint32_t concurrency,
              std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
-  void waitForCounterEq(const std::string& name, uint64_t value) override {
-    notifyingStatsAllocator().waitForCounterFromStringEq(name, value);
+  void
+  waitForCounterEq(const std::string& name, uint64_t value,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForCounterGe(const std::string& name, uint64_t value) override {
-    notifyingStatsAllocator().waitForCounterFromStringGe(name, value);
+  void
+  waitForCounterGe(const std::string& name, uint64_t value,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeGe(statStore(), name, value, time_system_);
+  void
+  waitForGaugeEq(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeEq(statStore(), name, value, time_system_);
+  void
+  waitForGaugeGe(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
+  }
+
+  void waitForCounterExists(const std::string& name) override {
+    notifyingStatsAllocator().waitForCounterExists(name);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

@@ -66,6 +66,7 @@ public:
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
+  const LowerCaseString Pragma{"pragma"};
   const LowerCaseString Referer{"referer"};
   const LowerCaseString Vary{"vary"};
 
@@ -252,6 +253,7 @@ public:
     const std::string _5xx{"5xx"};
     const std::string GatewayError{"gateway-error"};
     const std::string ConnectFailure{"connect-failure"};
+    const std::string EnvoyRateLimited{"envoy-ratelimited"};
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
     const std::string RetriableStatusCodes{"retriable-status-codes"};
