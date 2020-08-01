@@ -31,9 +31,10 @@ enum class LimitStatus {
   OverLimit
 };
 
-typedef std::vector<envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus>
-    DescriptorStatusList;
-typedef std::unique_ptr<DescriptorStatusList> DescriptorStatusListPtr;
+using DescriptorStatusList =
+    std::vector<envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus>;
+using DescriptorStatusListPtr = std::unique_ptr<DescriptorStatusList>;
+
 /**
  * Async callbacks used during limit() calls.
  */
