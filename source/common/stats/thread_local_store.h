@@ -435,7 +435,7 @@ private:
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
     void eraseScope(uint64_t scope_id);
-    void eraseHistograms(const std::vector<uint64_t>& histograms);
+    void eraseHistogram(uint64_t histogram);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
@@ -462,7 +462,7 @@ private:
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
-  void clearHistogramsFromCaches();
+  void clearHistogramFromCaches(uint64_t histogram_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
   bool rejects(StatName name) const;
@@ -513,12 +513,6 @@ private:
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
-
-  // Histograms IDs that are queued for cross-scope release. Because there
-  // can be a large number of histograms, all of which are released at once,
-  // (e.g. when a scope is deleted), it is likely more efficient to batch their
-  // cleanup, which would otherwise entail a post() per histogram per thread.
-  std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;

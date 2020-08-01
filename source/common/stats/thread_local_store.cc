@@ -42,7 +42,6 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_ || !threading_ever_initialized_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
-  ASSERT(histograms_to_cleanup_.empty());
 }
 
 void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
@@ -269,20 +268,9 @@ void ThreadLocalStoreImpl::releaseHistogramCrossThread(uint64_t histogram_id) {
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    // It's possible that many different histograms will be deleted at the same
-    // time, before the main thread gets a chance to run
-    // clearHistogramsFromCaches. If a new histogram is deleted before that
-    // post runs, we add it to our list of histograms to clear, and there's no
-    // need to issue another post.
-    bool need_post = false;
-    {
-      Thread::LockGuard lock(hist_mutex_);
-      need_post = histograms_to_cleanup_.empty();
-      histograms_to_cleanup_.push_back(histogram_id);
-    }
-    if (need_post) {
-      main_thread_dispatcher_->post([this]() { clearHistogramsFromCaches(); });
-    }
+    main_thread_dispatcher_->post([this, histogram_id]() {
+                                    clearHistogramFromCaches(histogram_id);
+                                  });
   }
 }
 
@@ -292,10 +280,8 @@ ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
 }
 
 void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) { scope_cache_.erase(scope_id); }
-void ThreadLocalStoreImpl::TlsCache::eraseHistograms(const std::vector<uint64_t>& histograms) {
-  for (uint64_t histogram_id : histograms) {
-    histogram_cache_.erase(histogram_id);
-  }
+void ThreadLocalStoreImpl::TlsCache::eraseHistogram(uint64_t histogram_id) {
+  histogram_cache_.erase(histogram_id);
 }
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
@@ -310,23 +296,14 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
   }
 }
 
-void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
+void ThreadLocalStoreImpl::clearHistogramFromCaches(uint64_t histogram_id) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
-    // Capture all the pending histograms in a local, clearing the list held in
-    // this. Once this occurs, if a new histogram is deleted, a new post will be
-    // required.
-    auto histograms = std::make_shared<std::vector<uint64_t>>();
-    {
-      Thread::LockGuard lock(hist_mutex_);
-      histograms->swap(histograms_to_cleanup_);
-    }
-
     // Perform a cache flush on all threads. The local copy of the
     // histograms-list is deleted implicitly after all the threads complete.
     tls_->runOnAllThreads(
-        [this, histograms]() { tls_->getTyped<TlsCache>().eraseHistograms(*histograms); });
+        [this, histogram_id]() { tls_->getTyped<TlsCache>().eraseHistogram(histogram_id); });
   }
 }
 
