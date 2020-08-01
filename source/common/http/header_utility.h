@@ -101,7 +101,7 @@ public:
     ResetHeaderFormat format_;
 
     // RateLimitedResetHeaderParser
-    virtual absl::optional<std::chrono::milliseconds>
+    absl::optional<std::chrono::milliseconds>
     parseInterval(TimeSource& time_source, const HeaderMap& headers) const override;
   };
 
