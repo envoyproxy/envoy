@@ -62,7 +62,8 @@ private:
   // Handle to the watcher passed in `initialize`, to be called when initialization completes.
   WatcherHandlePtr watcher_handle_;
 
-  // Watcher to receive ready notifications from each target. Limit this watcher to be a TargetAwareWatcher.
+  // Watcher to receive ready notifications from each target. Define this watcher to be a
+  // TargetAwareWatcher to send target name to the init manager.
   const TargetAwareWatcherImpl watcher_;
 
   // All registered targets.
