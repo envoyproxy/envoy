@@ -249,6 +249,30 @@ envoy_cmake_external(
         # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
         "ZLIB_COMPAT": "on",
         "ZLIB_ENABLE_TESTS": "off",
+
+        # Turning off WITH_OPTIM fixes checksum, but not sure if that is what we want.
+        "WITH_OPTIM": "off",
+    },
+    lib_source = "@com_github_zlib_ng_zlib_ng//:all",
+    static_libraries = select({
+        "//bazel:windows_x86_64": ["zlibstatic.lib"],
+        "//conditions:default": ["libz.a"],
+    }),
+)
+
+envoy_cmake_external(
+    name = "zlib_ng_with_optimization",
+    cache_entries = {
+        "BUILD_SHARED_LIBS": "off",
+        "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_C_COMPILER_FORCED": "on",
+
+        # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
+        "ZLIB_COMPAT": "on",
+        "ZLIB_ENABLE_TESTS": "off",
+
+        # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
+        "WITH_OPTIM": "on",
     },
     lib_source = "@com_github_zlib_ng_zlib_ng//:all",
     static_libraries = select({

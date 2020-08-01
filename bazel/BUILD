@@ -258,6 +258,15 @@ config_setting(
 )
 
 config_setting(
+    name = "zlib_ng_with_optimization",
+    constraint_values = [
+        "@bazel_tools//platforms:linux",
+        "@bazel_tools//platforms:x86_64",
+    ],
+    values = {"define": "zlib=ng-with-optimization"},
+)
+
+config_setting(
     name = "enable_quiche",
     values = {"define": "quiche=enabled"},
 )
@@ -278,6 +287,7 @@ alias(
     name = "zlib",
     actual = select({
         "//bazel:zlib_ng": "//bazel/foreign_cc:zlib_ng",
+        "//bazel:zlib_ng_with_optimization": "//bazel/foreign_cc:zlib_ng_with_optimization",
         "//conditions:default": "//bazel/foreign_cc:zlib",
     }),
 )
