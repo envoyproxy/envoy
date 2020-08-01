@@ -5,6 +5,8 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
+* build: added visibility rules for upstream. If these cause visibility related breakage, see notes in //BUILD.
+
 Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
