@@ -29,17 +29,19 @@ Http::ResponseHeaderMapPtr RateLimitHeaders::create(
     uint32_t window = convertRateLimitUnit(status.current_limit().unit());
     if (window) {
       fmt::print(quotaPolicy, ", {:d};{:s}={:d}", status.current_limit().requests_per_unit(),
-        Http::Headers::get().XRateLimitQuotaPolicyKeys.Window, window);
+                 Http::Headers::get().XRateLimitQuotaPolicyKeys.Window, window);
       if (!status.current_limit().name().empty()) {
-        fmt::print(quotaPolicy, ";{:s}=\"{:s}\"", Http::Headers::get().XRateLimitQuotaPolicyKeys.Name,
-          status.current_limit().name());
+        fmt::print(quotaPolicy, ";{:s}=\"{:s}\"",
+                   Http::Headers::get().XRateLimitQuotaPolicyKeys.Name,
+                   status.current_limit().name());
       }
     }
   }
 
   if (min_remaining_limit_status) {
     std::string rate_limit_limit =
-      std::to_string(min_remaining_limit_status.value().current_limit().requests_per_unit()) + quotaPolicy.str();
+        std::to_string(min_remaining_limit_status.value().current_limit().requests_per_unit()) +
+        quotaPolicy.str();
     result->setXRateLimitLimit(rate_limit_limit);
     result->setXRateLimitRemaining(min_remaining_limit_status.value().limit_remaining());
     result->setXRateLimitReset(min_remaining_limit_status.value().seconds_until_reset());
