@@ -116,6 +116,20 @@ TEST_F(IsCacheableResponseTest, ResponsePrivate) {
   EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
 }
 
+TEST_F(IsCacheableResponseTest, NotEmptyVary) {
+  Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers_;
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
+  response_headers.setCopy(Http::CustomHeaders::get().Vary, "abc");
+  EXPECT_FALSE(CacheabilityUtils::isCacheableResponse(response_headers));
+}
+
+TEST_F(IsCacheableResponseTest, EmptyVary) {
+  Http::TestResponseHeaderMapImpl response_headers = cacheable_response_headers_;
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
+  response_headers.setCopy(Http::CustomHeaders::get().Vary, "");
+  EXPECT_TRUE(CacheabilityUtils::isCacheableResponse(response_headers));
+}
+
 } // namespace
 } // namespace Cache
 } // namespace HttpFilters
