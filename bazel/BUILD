@@ -254,6 +254,9 @@ config_setting(
         "@bazel_tools//platforms:linux",
         "@bazel_tools//platforms:x86_64",
     ],
+    flag_values = {
+        "@bazel_tools//tools/cpp:compiler": "clang",
+    },
     values = {"define": "zlib=ng"},
 )
 

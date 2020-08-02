@@ -254,6 +254,10 @@ envoy_cmake_external(
         # what we want.
         "WITH_OPTIM": "off",
         "WITH_NEW_STRATEGIES": "off",
+
+        # zlib-ng advance build options. Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
+        # Only allow aligned address.
+        "UNALIGNED_OK": "off",
     },
     lib_source = "@com_github_zlib_ng_zlib_ng//:all",
     static_libraries = select({
