@@ -862,6 +862,7 @@ postfix
 postfixes
 postgres
 postgresql
+pragma
 pre
 preallocate
 preallocating
@@ -966,6 +967,7 @@ restarter
 resync
 retriable
 retriggers
+revalidation
 rmdir
 rocketmq
 rewriter
