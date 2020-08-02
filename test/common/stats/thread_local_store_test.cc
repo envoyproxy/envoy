@@ -39,6 +39,32 @@ namespace Stats {
 
 const uint64_t MaxStatNameLength = 127;
 
+class ThreadLocalStoreTestingPeer {
+public:
+  // Calculates the number of TLS histograms across all threads. This
+  // requires dispatching to all threads and blocking on their completion,
+  // and is exposed only to enable tests that ensure that TLS histograms
+  // don't leak.
+  static uint32_t numTlsHistograms(ThreadLocalStoreImpl& thread_local_store_impl) {
+    std::atomic<uint32_t> num_tls_histograms = 0;
+    absl::Mutex mutex;
+    bool done = false;
+    thread_local_store_impl.tls_->runOnAllThreads(
+        [&thread_local_store_impl, &num_tls_histograms]() {
+          auto& tls_cache =
+              thread_local_store_impl.tls_->getTyped<ThreadLocalStoreImpl::TlsCache>();
+          num_tls_histograms += tls_cache.histogram_cache_.size();
+        },
+        [&mutex, &done]() {
+          absl::MutexLock lock(&mutex);
+          done = true;
+        });
+    absl::MutexLock lock(&mutex);
+    mutex.Await(absl::Condition(&done));
+    return num_tls_histograms;
+  }
+};
+
 class StatsThreadLocalStoreTest : public testing::Test {
 public:
   StatsThreadLocalStoreTest()
@@ -395,7 +421,7 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   EXPECT_NE(scope1, scope2);
 
   EXPECT_EQ(0, store_->histograms().size());
-  EXPECT_EQ(0, store_->numTlsHistogramsForTesting());
+  EXPECT_EQ(0, ThreadLocalStoreTestingPeer::numTlsHistograms(*store_));
 
   // However, stats created in the two same-named scopes will be the same objects.
   Counter& counter = scope1->counterFromString("counter");
@@ -412,16 +438,16 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 100));
   histogram.recordValue(100);
   EXPECT_EQ(1, store_->histograms().size());
-  EXPECT_EQ(1, store_->numTlsHistogramsForTesting());
+  EXPECT_EQ(1, ThreadLocalStoreTestingPeer::numTlsHistograms(*store_));
   scope1.reset();
   EXPECT_EQ(1, store_->histograms().size());
-  EXPECT_EQ(1, store_->numTlsHistogramsForTesting());
+  EXPECT_EQ(1, ThreadLocalStoreTestingPeer::numTlsHistograms(*store_));
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 200));
   histogram.recordValue(200);
   EXPECT_EQ(&histogram, &scope2->histogramFromString("histogram", Histogram::Unit::Unspecified));
   scope2.reset();
   EXPECT_EQ(0, store_->histograms().size());
-  EXPECT_EQ(0, store_->numTlsHistogramsForTesting());
+  EXPECT_EQ(0, ThreadLocalStoreTestingPeer::numTlsHistograms(*store_));
 
   store_->shutdownThreading();
 

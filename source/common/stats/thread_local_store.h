@@ -270,13 +270,9 @@ public:
   bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
   void releaseHistogramCrossThread(uint64_t histogram_id);
 
-  // Calculates the number of TLS histograms across all threads. This
-  // requires dispatching to all threads and blocking on their completion,
-  // and is exposed only to enable tests that ensure that TLS histograms
-  // don't leak.
-  uint32_t numTlsHistogramsForTesting() const;
-
 private:
+  friend class ThreadLocalStoreTestingPeer;
+
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
   struct TlsCacheEntry {

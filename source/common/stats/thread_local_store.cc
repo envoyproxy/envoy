@@ -801,24 +801,6 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
   return false;
 }
 
-uint32_t ThreadLocalStoreImpl::numTlsHistogramsForTesting() const {
-  std::atomic<uint32_t> num_tls_histograms = 0;
-  absl::Mutex mutex;
-  bool done = false;
-  tls_->runOnAllThreads(
-      [this, &num_tls_histograms]() {
-        TlsCache& tls_cache = tls_->getTyped<TlsCache>();
-        num_tls_histograms += tls_cache.histogram_cache_.size();
-      },
-      [&mutex, &done]() {
-        absl::MutexLock lock(&mutex);
-        done = true;
-      });
-  absl::MutexLock lock(&mutex);
-  mutex.Await(absl::Condition(&done));
-  return num_tls_histograms;
-}
-
 SymbolTable& ParentHistogramImpl::symbolTable() { return thread_local_store_.symbolTable(); }
 
 Histogram::Unit ParentHistogramImpl::unit() const { return unit_; }
