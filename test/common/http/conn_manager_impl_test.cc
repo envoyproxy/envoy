@@ -817,6 +817,8 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
     data.drain(4);
     return Http::okStatus();
   }));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
+      .WillOnce(Return(absl::optional<bool>(true)));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
   auto* filter = new MockStreamFilter();
@@ -826,9 +828,6 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
-
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-      .WillOnce(Return(absl::optional<bool>(true)));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
