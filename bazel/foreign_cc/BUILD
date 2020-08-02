@@ -144,11 +144,27 @@ envoy_cmake_external(
         "//bazel:windows_x86_64": ["libcurl.lib"],
         "//conditions:default": ["libcurl.a"],
     }),
+    variants = [
+        {
+            "name": "curl_with_zlib_ng",
+            "cache_entries": {
+                "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib_ng",
+                "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib_ng/include",
+            },
+        },
+        {
+            "name": "curl_with_zlib_ng_with_optimization",
+            "cache_entries": {
+                "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib_ng_with_optimization",
+                "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib_ng_with_optimization/include",
+            },
+        },
+    ],
     deps = [
         ":ares",
         ":nghttp2",
-        ":zlib",
         "//external:ssl",
+        "//external:zlib",
     ],
 )
 
@@ -237,54 +253,42 @@ envoy_cmake_external(
         "//bazel:windows_x86_64": ["zlibstatic.lib"],
         "//conditions:default": ["libz.a"],
     }),
-)
+    variants = [
+        {
+            "name": "zlib_ng",
+            "cache_entries": {
+                # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
+                "ZLIB_COMPAT": "on",
+                "ZLIB_ENABLE_TESTS": "off",
 
-envoy_cmake_external(
-    name = "zlib_ng",
-    cache_entries = {
-        "BUILD_SHARED_LIBS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_C_COMPILER_FORCED": "on",
+                # Turning off WITH_OPTIM and WITH_NEW_STRATEGIES fixes checksum, but not sure if that is
+                # what we want.
+                "WITH_OPTIM": "off",
+                "WITH_NEW_STRATEGIES": "off",
 
-        # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
-        "ZLIB_COMPAT": "on",
-        "ZLIB_ENABLE_TESTS": "off",
+                # zlib-ng advance build options. Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
+                # Only allow aligned address.
+                "UNALIGNED_OK": "off",
+            },
+            "lib_source": "@com_github_zlib_ng_zlib_ng//:all",
+        },
+        {
+            "name": "zlib_ng_with_optimization",
+            "cache_entries": {
+                # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
+                "ZLIB_COMPAT": "on",
+                "ZLIB_ENABLE_TESTS": "off",
 
-        # Turning off WITH_OPTIM and WITH_NEW_STRATEGIES fixes checksum, but not sure if that is
-        # what we want.
-        "WITH_OPTIM": "off",
-        "WITH_NEW_STRATEGIES": "off",
+                # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
+                "WITH_OPTIM": "on",
+                # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
+                "WITH_NEW_STRATEGIES": "on",
 
-        # zlib-ng advance build options. Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
-        # Only allow aligned address.
-        "UNALIGNED_OK": "off",
-    },
-    lib_source = "@com_github_zlib_ng_zlib_ng//:all",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["zlibstatic.lib"],
-        "//conditions:default": ["libz.a"],
-    }),
-)
-
-envoy_cmake_external(
-    name = "zlib_ng_with_optimization",
-    cache_entries = {
-        "BUILD_SHARED_LIBS": "off",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_C_COMPILER_FORCED": "on",
-
-        # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
-        "ZLIB_COMPAT": "on",
-        "ZLIB_ENABLE_TESTS": "off",
-
-        # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
-        "WITH_OPTIM": "on",
-        # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
-        "WITH_NEW_STRATEGIES": "on",
-    },
-    lib_source = "@com_github_zlib_ng_zlib_ng//:all",
-    static_libraries = select({
-        "//bazel:windows_x86_64": ["zlibstatic.lib"],
-        "//conditions:default": ["libz.a"],
-    }),
+                # zlib-ng advance build options. Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
+                # Since UNALIGNED_OK is on by default, it is assumed to be one of the optimizations.
+                "UNALIGNED_OK": "on",
+            },
+            "lib_source": "@com_github_zlib_ng_zlib_ng//:all",
+        },
+    ],
 )

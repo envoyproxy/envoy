@@ -684,7 +684,7 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
     )
     native.bind(
         name = "curl",
-        actual = "@envoy//bazel/foreign_cc:curl",
+        actual = "@envoy//bazel:curl",
     )
 
 def _com_googlesource_chromium_v8():

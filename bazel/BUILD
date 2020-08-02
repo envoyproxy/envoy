@@ -253,7 +253,6 @@ config_setting(
     constraint_values = [
         "@bazel_tools//platforms:linux",
         "@bazel_tools//platforms:x86_64",
-        "@bazel_tools//tools/cpp:clang",
     ],
     values = {"define": "zlib=ng"},
 )
@@ -263,7 +262,6 @@ config_setting(
     constraint_values = [
         "@bazel_tools//platforms:linux",
         "@bazel_tools//platforms:x86_64",
-        "@bazel_tools//tools/cpp:clang",
     ],
     values = {"define": "zlib=ng-with-optimization"},
 )
@@ -294,6 +292,15 @@ alias(
         "//bazel:zlib_ng": "//bazel/foreign_cc:zlib_ng",
         "//bazel:zlib_ng_with_optimization": "//bazel/foreign_cc:zlib_ng_with_optimization",
         "//conditions:default": "//bazel/foreign_cc:zlib",
+    }),
+)
+
+alias(
+    name = "curl",
+    actual = select({
+        "//bazel:zlib_ng": "//bazel/foreign_cc:curl_with_zlib_ng",
+        "//bazel:zlib_ng_with_optimization": "//bazel/foreign_cc:curl_with_zlib_ng_with_optimization",
+        "//conditions:default": "//bazel/foreign_cc:curl",
     }),
 )
 
