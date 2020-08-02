@@ -20,11 +20,18 @@ Example configuration
    - name: oauth2
      typed_config:
        "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
-       cluster: oauth
-      hostname: oauth.com
-      callback_path: /callback
-      signout_path: /signout
-      token_path: /token
+       token_endpoint:
+         cluster: oauth
+         uri: oauth.com/token
+         timeout: 3s
+       authorization_endpoint: https://oauth.com/oauth/authorize/
+       redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+       redirect_path_matcher:
+         path:
+           exact: /callback
+       signout_path:
+         path:
+           exact: /signout
       credentials:
         client_id: foo
         token_secret:
