@@ -676,7 +676,7 @@ def _com_github_curl():
     http_archive(
         name = "com_github_curl",
         build_file_content = BUILD_ALL_CONTENT + """
-cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
+cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel:curl"])
 """,
         patches = ["@envoy//bazel/foreign_cc:curl-revert-cmake-minreqver.patch"],
         patch_args = ["-p1"],
