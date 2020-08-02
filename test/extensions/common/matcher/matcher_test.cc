@@ -1,8 +1,8 @@
-#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 
 #include "common/protobuf/utility.h"
 
-#include "extensions/common/tap/tap_matcher.h"
+#include "extensions/common/matcher/matcher.h"
 
 #include "test/test_common/utility.h"
 
@@ -11,19 +11,19 @@
 namespace Envoy {
 namespace Extensions {
 namespace Common {
-namespace Tap {
+namespace Matcher {
 namespace {
 
-class TapMatcherTestBase {
+class MatcherTestBase {
 public:
   std::vector<MatcherPtr> matchers_;
   Matcher::MatchStatusVector statuses_;
-  envoy::config::tap::v3::MatchPredicate config_;
+  envoy::config::common::matcher::v3::MatchPredicate config_;
 
   enum class Direction { Request, Response };
 };
 
-class TapMatcherTest : public TapMatcherTestBase, public testing::Test {
+class TapMatcherTest : public MatcherTestBase, public testing::Test {
 public:
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -31,12 +31,12 @@ public:
   Http::TestResponseTrailerMapImpl response_trailers_;
 };
 
-class TapMatcherGenericBodyConfigTest : public TapMatcherTestBase, public ::testing::Test {};
+class TapMatcherGenericBodyConfigTest : public MatcherTestBase, public ::testing::Test {};
 
 class TapMatcherGenericBodyTest
-    : public TapMatcherTestBase,
+    : public MatcherTestBase,
       public ::testing::TestWithParam<
-          std::tuple<TapMatcherTestBase::Direction,
+          std::tuple<MatcherTestBase::Direction,
                      std::tuple<std::vector<std::string>, std::list<std::list<uint32_t>>,
                                 std::pair<bool, bool>>>> {
 public:
@@ -242,8 +242,8 @@ TEST_P(TapMatcherGenericBodyTest, GenericBodyTest) {
 INSTANTIATE_TEST_SUITE_P(
     TapMatcherGenericBodyTestSuite, TapMatcherGenericBodyTest,
     ::testing::Combine(
-        ::testing::Values(TapMatcherTestBase::Direction::Request,
-                          TapMatcherTestBase::Direction::Response),
+        ::testing::Values(MatcherTestBase::Direction::Request,
+                          MatcherTestBase::Direction::Response),
         ::testing::Values(
             // SEARCHING FOR SINGLE PATTERN - no limit
             // Should match - there is a single body chunk and envoy is in the body
@@ -500,7 +500,7 @@ http_request_generic_body_match:
   }
 }
 } // namespace
-} // namespace Tap
+} // namespace Matcher
 } // namespace Common
 } // namespace Extensions
 } // namespace Envoy

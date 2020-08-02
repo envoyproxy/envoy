@@ -1,15 +1,14 @@
 #pragma once
 
-#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/matchers.h"
 #include "common/http/header_utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
-namespace Tap {
+namespace Matcher {
 
 class Matcher;
 using MatcherPtr = std::unique_ptr<Matcher>;
@@ -27,9 +26,9 @@ public:
 };
 
 /**
- * Base class for all tap matchers.
+ * Base class for all matchers.
  *
- * A high level note on the design of tap matching which is different from other matching in Envoy
+ * A high level note on the design of matching which is different from other matching in Envoy
  * due to a requirement to support streaming matching (match as new data arrives versus
  * calculating the match given all available data at once).
  * - The matching system is composed of a constant matching configuration. This is essentially
@@ -66,7 +65,7 @@ public:
   Matcher(const std::vector<MatcherPtr>& matchers)
       // NOTE: This code assumes that the index for the matcher being constructed has already been
       // allocated, which is why my_index_ is set to size() - 1. See buildMatcher() in
-      // tap_matcher.cc.
+      // matcher.cc.
       : my_index_(matchers.size() - 1) {}
 
   virtual ~Matcher() = default;
@@ -150,9 +149,9 @@ protected:
 /**
  * Factory method to build a matcher given a match config. Calling this function may end
  * up recursively building many matchers, which will all be added to the passed in vector
- * of matchers. See the comments in tap.h for the general structure of how tap matchers work.
+ * of matchers. See the comments in matcher.h for the general structure of how matchers work.
  */
-void buildMatcher(const envoy::config::tap::v3::MatchPredicate& match_config,
+void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& match_config,
                   std::vector<MatcherPtr>& matchers);
 
 /**
@@ -162,7 +161,6 @@ class LogicMatcherBase : public Matcher {
 public:
   using Matcher::Matcher;
 
-  // Extensions::Common::Tap::Matcher
   void onNewStream(MatchStatusVector& statuses) const override {
     updateLocalStatus(statuses,
                       [](Matcher& m, MatchStatusVector& statuses) { m.onNewStream(statuses); });
@@ -215,7 +213,7 @@ class SetLogicMatcher : public LogicMatcherBase {
 public:
   enum class Type { And, Or };
 
-  SetLogicMatcher(const envoy::config::tap::v3::MatchPredicate::MatchSet& configs,
+  SetLogicMatcher(const envoy::config::common::matcher::v3::MatchPredicate::MatchSet& configs,
                   std::vector<MatcherPtr>& matchers, Type type);
 
 private:
@@ -231,7 +229,7 @@ private:
  */
 class NotMatcher : public LogicMatcherBase {
 public:
-  NotMatcher(const envoy::config::tap::v3::MatchPredicate& config,
+  NotMatcher(const envoy::config::common::matcher::v3::MatchPredicate& config,
              std::vector<MatcherPtr>& matchers);
 
 private:
@@ -249,7 +247,6 @@ class SimpleMatcher : public Matcher {
 public:
   using Matcher::Matcher;
 
-  // Extensions::Common::Tap::Matcher
   void onNewStream(MatchStatusVector&) const override {}
   void onHttpRequestHeaders(const Http::RequestHeaderMap&, MatchStatusVector&) const override {}
   void onHttpRequestTrailers(const Http::RequestTrailerMap&, MatchStatusVector&) const override {}
@@ -266,7 +263,6 @@ class AnyMatcher : public SimpleMatcher {
 public:
   using SimpleMatcher::SimpleMatcher;
 
-  // Extensions::Common::Tap::Matcher
   void onNewStream(MatchStatusVector& statuses) const override {
     statuses[my_index_].matches_ = true;
     statuses[my_index_].might_change_status_ = false;
@@ -278,7 +274,7 @@ public:
  */
 class HttpHeaderMatcherBase : public SimpleMatcher {
 public:
-  HttpHeaderMatcherBase(const envoy::config::tap::v3::HttpHeadersMatch& config,
+  HttpHeaderMatcherBase(const envoy::config::common::matcher::v3::HttpHeadersMatch& config,
                         const std::vector<MatcherPtr>& matchers);
 
 protected:
@@ -294,7 +290,6 @@ class HttpRequestHeadersMatcher : public HttpHeaderMatcherBase {
 public:
   using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
 
-  // Extensions::Common::Tap::Matcher
   void onHttpRequestHeaders(const Http::RequestHeaderMap& request_headers,
                             MatchStatusVector& statuses) const override {
     matchHeaders(request_headers, statuses);
@@ -308,7 +303,6 @@ class HttpRequestTrailersMatcher : public HttpHeaderMatcherBase {
 public:
   using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
 
-  // Extensions::Common::Tap::Matcher
   void onHttpRequestTrailers(const Http::RequestTrailerMap& request_trailers,
                              MatchStatusVector& statuses) const override {
     matchHeaders(request_trailers, statuses);
@@ -322,7 +316,6 @@ class HttpResponseHeadersMatcher : public HttpHeaderMatcherBase {
 public:
   using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
 
-  // Extensions::Common::Tap::Matcher
   void onHttpResponseHeaders(const Http::ResponseHeaderMap& response_headers,
                              MatchStatusVector& statuses) const override {
     matchHeaders(response_headers, statuses);
@@ -336,7 +329,6 @@ class HttpResponseTrailersMatcher : public HttpHeaderMatcherBase {
 public:
   using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
 
-  // Extensions::Common::Tap::Matcher
   void onHttpResponseTrailers(const Http::ResponseTrailerMap& response_trailers,
                               MatchStatusVector& statuses) const override {
     matchHeaders(response_trailers, statuses);
@@ -404,7 +396,7 @@ public:
 
 class HttpGenericBodyMatcher : public HttpBodyMatcherBase {
 public:
-  HttpGenericBodyMatcher(const envoy::config::tap::v3::HttpGenericBodyMatch& config,
+  HttpGenericBodyMatcher(const envoy::config::common::matcher::v3::HttpGenericBodyMatch& config,
                          const std::vector<MatcherPtr>& matchers);
 
 protected:
@@ -425,7 +417,7 @@ protected:
 
 private:
   // The following fields are initialized based on matcher config and are used
-  // by all HTTP tappers.
+  // by all HTTP matchers.
   // List of strings which body must contain to get match.
   std::shared_ptr<std::vector<std::string>> patterns_;
   // Stores the length of the longest pattern.
@@ -450,7 +442,7 @@ public:
   }
 };
 
-} // namespace Tap
+} // namespace Matcher
 } // namespace Common
 } // namespace Extensions
 } // namespace Envoy

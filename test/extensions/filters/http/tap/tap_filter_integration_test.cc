@@ -168,10 +168,14 @@ TEST_P(TapIntegrationTest, StaticFilePerTap) {
       R"EOF(
 name: tap
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     static_config:
+      # match_config should be ignored by the match field.
       match_config:
+        not_match:
+          any_match: true
+      match:
         any_match: true
       output_config:
         sinks:

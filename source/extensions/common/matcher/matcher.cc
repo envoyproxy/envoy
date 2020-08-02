@@ -1,60 +1,58 @@
-#include "extensions/common/tap/tap_matcher.h"
-
-#include "envoy/config/tap/v3/common.pb.h"
+#include "extensions/common/matcher/matcher.h"
 
 #include "common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
-namespace Tap {
+namespace Matcher {
 
-void buildMatcher(const envoy::config::tap::v3::MatchPredicate& match_config,
+void buildMatcher(const envoy::config::common::matcher::v3::MatchPredicate& match_config,
                   std::vector<MatcherPtr>& matchers) {
   // In order to store indexes and build our matcher tree inline, we must reserve a slot where
   // the matcher we are about to create will go. This allows us to know its future index and still
   // construct more of the tree in each called constructor (e.g., multiple OR/AND conditions).
-  // Once fully constructed, we move the matcher into its position below. See the tap matcher
-  // overview in tap.h for more information.
+  // Once fully constructed, we move the matcher into its position below. See the matcher
+  // overview in matcher.h for more information.
   matchers.emplace_back(nullptr);
 
   MatcherPtr new_matcher;
   switch (match_config.rule_case()) {
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kOrMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kOrMatch:
     new_matcher = std::make_unique<SetLogicMatcher>(match_config.or_match(), matchers,
                                                     SetLogicMatcher::Type::Or);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kAndMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kAndMatch:
     new_matcher = std::make_unique<SetLogicMatcher>(match_config.and_match(), matchers,
                                                     SetLogicMatcher::Type::And);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kNotMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kNotMatch:
     new_matcher = std::make_unique<NotMatcher>(match_config.not_match(), matchers);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kAnyMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kAnyMatch:
     new_matcher = std::make_unique<AnyMatcher>(matchers);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpRequestHeadersMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpRequestHeadersMatch:
     new_matcher = std::make_unique<HttpRequestHeadersMatcher>(
         match_config.http_request_headers_match(), matchers);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpRequestTrailersMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpRequestTrailersMatch:
     new_matcher = std::make_unique<HttpRequestTrailersMatcher>(
         match_config.http_request_trailers_match(), matchers);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpResponseHeadersMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpResponseHeadersMatch:
     new_matcher = std::make_unique<HttpResponseHeadersMatcher>(
         match_config.http_response_headers_match(), matchers);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpResponseTrailersMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpResponseTrailersMatch:
     new_matcher = std::make_unique<HttpResponseTrailersMatcher>(
         match_config.http_response_trailers_match(), matchers);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpRequestGenericBodyMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpRequestGenericBodyMatch:
     new_matcher = std::make_unique<HttpRequestGenericBodyMatcher>(
         match_config.http_request_generic_body_match(), matchers);
     break;
-  case envoy::config::tap::v3::MatchPredicate::RuleCase::kHttpResponseGenericBodyMatch:
+  case envoy::config::common::matcher::v3::MatchPredicate::RuleCase::kHttpResponseGenericBodyMatch:
     new_matcher = std::make_unique<HttpResponseGenericBodyMatcher>(
         match_config.http_response_generic_body_match(), matchers);
     break;
@@ -66,8 +64,9 @@ void buildMatcher(const envoy::config::tap::v3::MatchPredicate& match_config,
   matchers[new_matcher->index()] = std::move(new_matcher);
 }
 
-SetLogicMatcher::SetLogicMatcher(const envoy::config::tap::v3::MatchPredicate::MatchSet& configs,
-                                 std::vector<MatcherPtr>& matchers, Type type)
+SetLogicMatcher::SetLogicMatcher(
+    const envoy::config::common::matcher::v3::MatchPredicate::MatchSet& configs,
+    std::vector<MatcherPtr>& matchers, Type type)
     : LogicMatcherBase(matchers), matchers_(matchers), type_(type) {
   for (const auto& config : configs.rules()) {
     indexes_.push_back(matchers_.size());
@@ -100,7 +99,7 @@ void SetLogicMatcher::updateLocalStatus(MatchStatusVector& statuses,
                   [&statuses](size_t index) { return statuses[index].might_change_status_; });
 }
 
-NotMatcher::NotMatcher(const envoy::config::tap::v3::MatchPredicate& config,
+NotMatcher::NotMatcher(const envoy::config::common::matcher::v3::MatchPredicate& config,
                        std::vector<MatcherPtr>& matchers)
     : LogicMatcherBase(matchers), matchers_(matchers), not_index_(matchers.size()) {
   buildMatcher(config, matchers);
@@ -117,8 +116,9 @@ void NotMatcher::updateLocalStatus(MatchStatusVector& statuses,
   statuses[my_index_].might_change_status_ = statuses[not_index_].might_change_status_;
 }
 
-HttpHeaderMatcherBase::HttpHeaderMatcherBase(const envoy::config::tap::v3::HttpHeadersMatch& config,
-                                             const std::vector<MatcherPtr>& matchers)
+HttpHeaderMatcherBase::HttpHeaderMatcherBase(
+    const envoy::config::common::matcher::v3::HttpHeadersMatch& config,
+    const std::vector<MatcherPtr>& matchers)
     : SimpleMatcher(matchers),
       headers_to_match_(Http::HeaderUtility::buildHeaderDataVector(config.headers())) {}
 
@@ -134,18 +134,18 @@ void HttpHeaderMatcherBase::matchHeaders(const Http::HeaderMap& headers,
 // HTTP body may be passed to the matcher in chunks. The search logic buffers
 // only as many bytes as is the length of the longest pattern to be found.
 HttpGenericBodyMatcher::HttpGenericBodyMatcher(
-    const envoy::config::tap::v3::HttpGenericBodyMatch& config,
+    const envoy::config::common::matcher::v3::HttpGenericBodyMatch& config,
     const std::vector<MatcherPtr>& matchers)
     : HttpBodyMatcherBase(matchers) {
   patterns_ = std::make_shared<std::vector<std::string>>();
   for (const auto& i : config.patterns()) {
     switch (i.rule_case()) {
     // For binary match 'i' contains sequence of bytes to locate in the body.
-    case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kBinaryMatch: {
+    case envoy::config::common::matcher::v3::HttpGenericBodyMatch::GenericTextMatch::kBinaryMatch: {
       patterns_->push_back(i.binary_match());
     } break;
     // For string match 'i' contains exact string to locate in the body.
-    case envoy::config::tap::v3::HttpGenericBodyMatch::GenericTextMatch::kStringMatch:
+    case envoy::config::common::matcher::v3::HttpGenericBodyMatch::GenericTextMatch::kStringMatch:
       patterns_->push_back(i.string_match());
       break;
     default:
@@ -329,7 +329,7 @@ void HttpGenericBodyMatcher::resizeOverlapBuffer(HttpGenericBodyMatcherCtx* ctx)
   }
 }
 
-} // namespace Tap
+} // namespace Matcher
 } // namespace Common
 } // namespace Extensions
 } // namespace Envoy

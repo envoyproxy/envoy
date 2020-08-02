@@ -7,7 +7,7 @@
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/common/tap/tap_matcher.h"
+#include "extensions/common/matcher/matcher.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -15,6 +15,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
+
+using namespace Matcher;
 
 bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
                                     uint32_t max_buffered_bytes, const Buffer::Instance& data,
@@ -72,7 +74,15 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::config::tap::v3::TapConfig&& proto_c
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  buildMatcher(proto_config.match_config(), matchers_);
+  envoy::config::common::matcher::v3::MatchPredicate match;
+  if (proto_config.has_match()) {
+    match = proto_config.match();
+  } else {
+    std::string out;
+    ASSERT(proto_config.match_config().SerializeToString(&out));
+    ASSERT(match.ParseFromString(out));
+  }
+  buildMatcher(match, matchers_);
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
