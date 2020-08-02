@@ -29,7 +29,7 @@ build:linux --conlyopt=-fexceptions
 build --define absl=1
 
 # Enable zlib-ng.
-build --define zlib=ng-with-optimization
+build --define zlib=ng
 
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
 build --action_env=CC
