@@ -2,11 +2,14 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
+    "envoy_extension_package",
     "envoy_package",
     "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
 
 # HTTP L7 filter that performs oauth.
 # Public docs: docs/root/configuration/http_filters/oauth_filter.rst
@@ -48,6 +51,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/http:url_utility_lib",
         "//source/common/protobuf:utility_lib",

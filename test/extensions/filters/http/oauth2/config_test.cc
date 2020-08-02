@@ -30,7 +30,7 @@ config:
       uri: oauth.com/token
       timeout: 3s
     authorization_endpoint: https://oauth.com/oauth/authorize/
-    callback_path: /callback
+    redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
     signout_path: 
       path:
         exact: /signout

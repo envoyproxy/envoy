@@ -77,8 +77,10 @@ FilterConfig::FilterConfig(
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       client_id_(proto_config.credentials().client_id()),
-      callback_path_(proto_config.callback_path()), signout_path_(proto_config.signout_path()),
-      secret_reader_(secret_reader), stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      redirect_uri_(proto_config.redirect_uri()),
+      redirect_matcher_(proto_config.redirect_path_matcher()),
+      signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
+      stats_(FilterConfig::generateStats(stats_prefix, scope)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())) {
   if (!cluster_manager.get(oauth_token_endpoint_.cluster())) {
@@ -193,7 +195,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // auth server. A cached login on the authorization server side will set cookies
     // correctly but cause a race condition on future requests that have their location set
     // to the callback path.
-    if (absl::StartsWith(path_str, config_->callbackPath())) {
+
+    if (config_->redirectPathMatcher().match(path_str)) {
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
       const auto state =
@@ -204,7 +207,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
       }
       // Avoid infinite redirect storm
-      if (absl::StartsWith(state_url.pathAndQueryParams(), config_->callbackPath())) {
+      if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
       }
@@ -235,7 +238,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   //
   // The following conditional could be replaced with a regex pattern-match,
   // if we're concerned about strict matching against the callback path.
-  if (!absl::StartsWith(path_str, config_->callbackPath())) {
+  if (!config_->redirectPathMatcher().match(path_str)) {
     Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
         {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
@@ -251,12 +254,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     }
 
     const std::string base_path = absl::StrCat(scheme, "://", host_);
-    const std::string callback_path = base_path + config_->callbackPath();
     const std::string state_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
-
-    const std::string escaped_redirect_uri =
-        Http::Utility::PercentEncoding::encode(callback_path, ":/=&?");
     const std::string escaped_state = Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
+
+    Formatter::FormatterImpl formatter(config_->redirectUri());
+    const auto redirect_uri = formatter.format(headers, *Http::ResponseHeaderMapImpl::create(),
+                                               *Http::ResponseTrailerMapImpl::create(),
+                                               decoder_callbacks_->streamInfo(), "");
+    const std::string escaped_redirect_uri =
+        Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
     const std::string new_url =
         fmt::format(AuthorizationEndpointFormat, config_->authorizationEndpoint(),
@@ -293,11 +299,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
-  const auto scheme = state_url.scheme();
 
-  const std::string cb_url = absl::StrCat(scheme, "://", host_, config_->callbackPath());
+  Formatter::FormatterImpl formatter(config_->redirectUri());
+  const auto redirect_uri = formatter.format(headers, *Http::ResponseHeaderMapImpl::create(),
+                                             *Http::ResponseTrailerMapImpl::create(),
+                                             decoder_callbacks_->streamInfo(), "");
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
-                                     cb_url);
+                                     redirect_uri);
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;

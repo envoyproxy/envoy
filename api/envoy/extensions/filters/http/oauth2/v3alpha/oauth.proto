@@ -44,7 +44,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message OAuth2Config {
   // Endpoint on the authorization server to retrieve the access token from.
   config.core.v3.HttpUri token_endpoint = 1;
@@ -55,17 +55,25 @@ message OAuth2Config {
   // Credentials used for OAuth.
   OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
 
-  // The callback path the OAuth server should use.
-  string callback_path = 4 [(validate.rules).string = {min_bytes: 1}];
+  // The redirect URI passed to the authorization endpoint. Supports header formatting
+  // tokens. For more information, including details on header value syntax, see the
+  // documentation on :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
+  //
+  // This URI should not contain any query parameters.
+  string redirect_uri = 4 [(validate.rules).string = {min_bytes: 1}];
+
+  // Matching criteria used to determine whether a path appears to be the result of a redirect from the authorization server.
+  type.matcher.v3.PathMatcher redirect_path_matcher = 5
+      [(validate.rules).message = {required: true}];
 
   // The path to sign a user out, clearing their credential cookies.
-  type.matcher.v3.PathMatcher signout_path = 5 [(validate.rules).message = {required: true}];
+  type.matcher.v3.PathMatcher signout_path = 6 [(validate.rules).message = {required: true}];
 
   // Forward the OAuth token as a Bearer to upstream web service.
-  bool forward_bearer_token = 6;
+  bool forward_bearer_token = 7;
 
   // Any request that matches any of the provided matchers will be passed through without OAuth validation.
-  repeated config.route.v3.HeaderMatcher pass_through_matcher = 7;
+  repeated config.route.v3.HeaderMatcher pass_through_matcher = 8;
 }
 
 // Filter config.

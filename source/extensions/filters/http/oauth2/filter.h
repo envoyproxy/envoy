@@ -4,23 +4,30 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
+#include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/matchers.h"
 #include "common/config/datasource.h"
+#include "common/formatter/substitution_formatter.h"
+#include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
 #include "common/http/rest_api_fetcher.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
+#include "extensions/filters/http/oauth2/filter.h"
 #include "extensions/filters/http/oauth2/oauth.h"
 #include "extensions/filters/http/oauth2/oauth_client.h"
 
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -104,7 +111,8 @@ public:
     return oauth_token_endpoint_;
   }
   const std::string& authorizationEndpoint() const { return authorization_endpoint_; }
-  const std::string& callbackPath() const { return callback_path_; }
+  const std::string& redirectUri() const { return redirect_uri_; }
+  const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
@@ -116,7 +124,8 @@ private:
   const envoy::config::core::v3::HttpUri oauth_token_endpoint_;
   const std::string authorization_endpoint_;
   const std::string client_id_;
-  const std::string callback_path_;
+  const std::string redirect_uri_;
+  const Matchers::PathMatcher redirect_matcher_;
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;

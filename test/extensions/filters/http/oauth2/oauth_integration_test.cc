@@ -45,7 +45,10 @@ typed_config:
       uri: oauth.com/token
       timeout: 3s
     authorization_endpoint: https://oauth.com/oauth/authorize/
-    callback_path: /callback
+    redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+    redirect_path_matcher: 
+      path:
+        exact: /callback
     signout_path: 
       path:
         exact: /signout
@@ -107,6 +110,7 @@ TEST_F(OauthIntegrationTest, AuthenticationFlow) {
       {":method", "GET"},
       {":path", "/callback?code=foo&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
       {":scheme", "http"},
+      {"x-forwarded-proto", "http"},
       {":authority", "authority"},
       {"authority", "Bearer token"}};
   auto encoder_decoder = codec_client_->startRequest(headers);
