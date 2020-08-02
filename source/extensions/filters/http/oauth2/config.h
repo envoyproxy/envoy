@@ -18,10 +18,9 @@ class OAuth2Config : public Extensions::HttpFilters::Common::FactoryBase<
 public:
   OAuth2Config() : FactoryBase(HttpFilterNames::get().OAuth) {}
 
-  Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3alpha::OAuth2&,
-                                    const std::string&,
-                                    Server::Configuration::FactoryContext&) override;
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::oauth2::v3alpha::OAuth2&, const std::string&,
+      Server::Configuration::FactoryContext&) override;
 };
 
 } // namespace Oauth2
