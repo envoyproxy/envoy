@@ -220,7 +220,7 @@ void FilterChainManagerImpl::addFakeFilterChain(
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
+  absl::flat_hash_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
   for (const auto& filter_chain : filter_chain_span) {
@@ -300,9 +300,6 @@ void FilterChainManagerImpl::addRealFilterChain(
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
-      filter_chains;
-  uint32_t new_filter_chain_size = 0;
 
   const auto& filter_chain_match = filter_chain->filter_chain_match();
   if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
@@ -310,12 +307,6 @@ void FilterChainManagerImpl::addRealFilterChain(
                                      "unimplemented fields",
                                      address_->asString()));
   }
-  if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
-    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                     "the same matching rules are defined",
-                                     address_->asString()));
-  }
-  filter_chains.insert(filter_chain_match);
 
   // Validate IP addresses.
   std::vector<std::string> destination_ips;
@@ -350,21 +341,21 @@ void FilterChainManagerImpl::addRealFilterChain(
   if (filter_chain_impl == nullptr) {
     filter_chain_impl =
         filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
-    ++new_filter_chain_size;
   }
 
-  // TODO(ASOPVII)
+  // Rebuild the filter chain match trie with the real one.
   addFilterChainForDestinationPorts(
       destination_ports_map_,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
       filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
       filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
       filter_chain_match.source_ports(), filter_chain_impl);
+  // Should replace the mapped filter chain with the rebuilt one.
   fc_contexts_[*filter_chain] = filter_chain_impl;
 
   convertIPsToTries();
-  ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
-            fc_contexts_.size(), new_filter_chain_size);
+  ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including 1 newly built",
+            fc_contexts_.size());
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(

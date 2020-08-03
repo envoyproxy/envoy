@@ -250,9 +250,13 @@ void FilterChainRebuilder::callbackToWorkers() {
   for (auto& worker_listeners : listeners_on_worker_to_callback_) {
     const auto& worker_name = worker_listeners.first;
     auto worker_ptr = listener_.getWorkerByName(worker_name);
+    // The current notify Listeners will notify all listeners on this worker.
+    // But this is not necessary, we now both store listeners on worker(handler) and master
+    // thread(rebuilder). The stored listener name is currently not used.
     worker_ptr->notifyListeners(filter_chain_);
   }
-  // clear hash map after sending callback.
+  // Clear hash map after sending callback.
+  listeners_on_worker_to_callback_.clear();
 }
 
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
@@ -510,21 +514,21 @@ void ListenerImpl::buildFakeFilterChains() {
 }
 
 void ListenerImpl::buildRealFilterChains(
-    const envoy::config::listener::v3::FilterChain* const& filter_chain,
+    const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
     FilterChainRebuildInfoPtr rebuild_info) {
-  // auto filter_chain_name = filter_chain->name();
+  // auto filter_chain_name = filter_chain_message->name();
 
   // Trigger rebuild request only on the arrival of the first filter_chain.
   bool on_first_request = false;
 
   // Find/create rebuilder for this filter chain message.
-  if (filter_chain_rebuilder_map_.find(filter_chain) == filter_chain_rebuilder_map_.end()) {
-    filter_chain_rebuilder_map_[filter_chain] =
-        std::make_unique<FilterChainRebuilder>(*this, filter_chain);
+  if (filter_chain_rebuilder_map_.find(filter_chain_message) == filter_chain_rebuilder_map_.end()) {
+    filter_chain_rebuilder_map_[filter_chain_message] =
+        std::make_unique<FilterChainRebuilder>(*this, filter_chain_message);
     on_first_request = true;
   }
 
-  const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain]);
+  const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain_message]);
   rebuilder->addRebuildInfo(std::move(rebuild_info));
 
   if (rebuilder->isCompleted()) {
@@ -540,9 +544,7 @@ void ListenerImpl::buildRealFilterChains(
         parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
-    filter_chain_manager_.addRealFilterChain(std::move(filter_chain), builder,
-                                             filter_chain_manager_);
-
+    filter_chain_manager_.addRealFilterChain(filter_chain_message, builder, filter_chain_manager_);
     rebuilder->startRebuilding();
   }
 }

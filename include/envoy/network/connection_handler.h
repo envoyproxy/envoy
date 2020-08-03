@@ -96,7 +96,8 @@ public:
   /**
    * retry all connections requiring this filter chain.
    */
-  virtual void retryAllConnections(const envoy::config::listener::v3::FilterChain* const&) PURE;
+  virtual void retryAllConnections(
+      const envoy::config::listener::v3::FilterChain* const& filter_chain_message) PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.

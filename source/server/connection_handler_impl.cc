@@ -14,9 +14,6 @@
 #include "common/network/utility.h"
 #include "common/stats/timespan_impl.h"
 
-#include "server/filter_chain_manager_impl.h"
-#include "server/listener_impl.h"
-
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -133,9 +130,9 @@ void ConnectionHandlerImpl::retryAllConnections(
           active_tcp_listener.newConnection(std::move(socket_metadata_pair.first),
                                             socket_metadata_pair.second);
         }
+        // Clear this listener from the retry connection list.
+        listener_sockets_map.erase(listener_name);
       }
-      // Clear this listener from the retry connection list.
-      listener_sockets_map.erase(listener_name);
     }
   }
   // TODO(ASOPVII): check whether to erase this part. For future usage(this filter chain has been
@@ -449,7 +446,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     server_dispatcher.post([&listener, &filter_chain_message, &filter_chain_rebuild_info]() {
       listener.buildRealFilterChains(filter_chain_message, std::move(filter_chain_rebuild_info));
     });
-    // Stop Continuing, waiting callbacks from master thread to retry connection.
+    // Waiting for later callbacks from master thread to retry this connection.
     return;
   }
 

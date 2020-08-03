@@ -21,6 +21,8 @@
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
 
+#include "server/listener_impl.h"
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -384,30 +386,6 @@ private:
   Network::UdpListenerPtr udp_listener_;
   Network::UdpListenerReadFilterPtr read_filter_;
 };
-
-// // Can not add connectionHandler_lib into dependency of listener_manager_lib.
-// // filter_chain_rebuild_info that will be accessed by master thread
-// struct FilterChainRebuildInfo {
-//   FilterChainRebuildInfo(
-//       ConnectionHandlerImpl::ActiveTcpListener& listener,
-//       const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
-//       const std::string& worker_name, const std::string& listener_name,
-//       Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& socket,
-//       const envoy::config::core::v3::Metadata& metadata)
-//       : listener_(listener), filter_chain_message_(filter_chain_message),
-//       worker_name_(worker_name),
-//         listener_name_(listener_name), worker_dispatcher_(dispatcher),
-//         socket_(std::move(socket)), dynamic_metadata(metadata) {}
-
-//   ConnectionHandlerImpl::ActiveTcpListener& listener_;
-//   const envoy::config::listener::v3::FilterChain* const& filter_chain_message_;
-//   const std::string& worker_name_;
-//   const std::string& listener_name_;
-//   Event::Dispatcher& worker_dispatcher_;
-//   Network::ConnectionSocketPtr&& socket_;
-//   const envoy::config::core::v3::Metadata& dynamic_metadata;
-// };
-// using FilterChainRebuildInfoPtr = std::unique_ptr<FilterChainRebuildInfo>;
 
 } // namespace Server
 } // namespace Envoy

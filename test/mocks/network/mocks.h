@@ -393,6 +393,8 @@ public:
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
+  MOCK_METHOD(void, retryAllConnections,
+              (const envoy::config::listener::v3::FilterChain* const& filter_chain_message));
 };
 
 class MockIp : public Address::Ip {
