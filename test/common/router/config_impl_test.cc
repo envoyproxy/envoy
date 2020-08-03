@@ -3751,6 +3751,7 @@ virtual_hosts:
 // Test to detect if hostname matches are case-insensitive
 TEST_F(RouteMatcherTest, TestCaseSensitiveDomainConfig) {
   std::string yaml = R"EOF(
+name: foo
 virtual_hosts:
   - name: www2
     domains: [www.lyft.com]
@@ -3766,11 +3767,13 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
+      "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com in "
+      "route foo");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateWildcardDomainConfig) {
   const std::string yaml = R"EOF(
+name: foo
 virtual_hosts:
 - name: www2
   domains: ["*"]
@@ -3786,11 +3789,12 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only a single wildcard domain is permitted");
+      "Only a single wildcard domain is permitted in route foo");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateSuffixWildcardDomainConfig) {
   const std::string yaml = R"EOF(
+name: foo
 virtual_hosts:
 - name: www2
   domains: ["*.lyft.com"]
@@ -3806,11 +3810,13 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com");
+      "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com in route "
+      "foo");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicatePrefixWildcardDomainConfig) {
   const std::string yaml = R"EOF(
+name: foo
 virtual_hosts:
 - name: www2
   domains: ["bar.*"]
@@ -3826,7 +3832,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
+      "Only unique values for domains are permitted. Duplicate entry of domain bar.* in route foo");
 }
 
 TEST_F(RouteMatcherTest, TestInvalidCharactersInPrefixRewrites) {
