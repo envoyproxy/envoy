@@ -23,19 +23,22 @@ void ListenerFilterFuzzer::fuzz(
   const int nreads = input.data_size(); // Number of reads
 
   if (nreads > 0) {
-    EXPECT_CALL(socket_, detectedTransportProtocol()).WillRepeatedly(testing::Return("raw_buffer"));
+    ON_CALL(os_sys_calls_, recv(FAKE_SOCKET_FD, _, _, MSG_PEEK))
+        .WillByDefault(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
 
-    EXPECT_CALL(os_sys_calls_, recv(FAKE_SOCKET_FD, _, _, MSG_PEEK))
-        .WillOnce(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
-
-    EXPECT_CALL(dispatcher_,
-                createFileEvent_(_, _, Event::FileTriggerType::Edge,
-                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
-        .WillOnce(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
-                                 testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
+    ON_CALL(dispatcher_,
+            createFileEvent_(_, _, Event::FileTriggerType::Edge,
+                             Event::FileReadyType::Read | Event::FileReadyType::Closed))
+        .WillByDefault(testing::DoAll(testing::SaveArg<1>(&file_event_callback_),
+                                      testing::ReturnNew<NiceMock<Event::MockFileEvent>>()));
   }
 
   filter.onAccept(cb_);
+
+  if (file_event_callback_ == nullptr) {
+    // If filter does not call createFileEvent (i.e. original_dst and original_src)
+    return;
+  }
 
   if (nreads > 0) {
     // Construct header from single or multiple reads
