@@ -3,14 +3,12 @@ import Foundation
 
 /// Interface representing a filter. See `RequestFilter` and `ResponseFilter` for more details.
 public protocol Filter {
-  /// A unique name for a filter implementation. Needed for extension registration.
-  static var name: String { get }
 }
 
 extension EnvoyHTTPFilterFactory {
-  convenience init<T: Filter>(factory: @escaping () -> T) {
+  convenience init(filterName: String, factory: @escaping () -> Filter) {
     self.init()
-    self.filterName = T.name
+    self.filterName = filterName
     self.create = { EnvoyHTTPFilter(filter: factory()) }
   }
 }
