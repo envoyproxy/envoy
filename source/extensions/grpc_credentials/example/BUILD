@@ -1,20 +1,26 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # Example gRPC Credentials
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     external_deps = ["grpc"],
+    # Legacy test use.
+    visibility = [
+        "//source/extensions:__subpackages__",
+        "//test/common/grpc:__subpackages__",
+        "//test/extensions:__subpackages__",
+    ],
     deps = [
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
