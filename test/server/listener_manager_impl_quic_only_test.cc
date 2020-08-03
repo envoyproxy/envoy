@@ -87,14 +87,13 @@ udp_writer_config:
                    /* expected_sockopt_name */ SO_REUSEPORT,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
-#ifdef UDP_GRO
+
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
                      /* expected_value */ 1,
                      /* expected_num_calls */ 1);
   }
-#endif
 
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());

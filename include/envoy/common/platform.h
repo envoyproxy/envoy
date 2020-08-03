@@ -189,6 +189,10 @@ struct msghdr {
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
+#ifndef UDP_GRO
+#define UDP_GRO 104
+#endif
+
 #ifndef UDP_SEGMENT
 #define UDP_SEGMENT 103
 #endif

@@ -267,11 +267,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
           continue;
         }
       }
-#ifdef UDP_GRO
       if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
         output.msg_[0].gso_size_ = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
       }
-#endif
     }
   }
 

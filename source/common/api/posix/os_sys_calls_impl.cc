@@ -77,9 +77,6 @@ bool OsSysCallsImpl::supportsUdpGro() const {
 #if !defined(__linux__)
   return false;
 #else
-#ifndef UDP_GRO
-  return false;
-#else
   static const bool is_supported = [] {
     int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
     if (fd < 0) {
@@ -91,7 +88,6 @@ bool OsSysCallsImpl::supportsUdpGro() const {
     return result;
   }();
   return is_supported;
-#endif
 #endif
 }
 

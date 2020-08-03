@@ -362,7 +362,6 @@ TEST_P(UdpListenerImplTest, SendDataError) {
  * Test that multiple stacked packets of the same size are properly segmented
  * when UDP GRO is enabled on the platform.
  */
-#ifdef UDP_GRO
 TEST_P(UdpListenerImplTest, UdpGroBasic) {
   // We send 4 packets (3 of equal length and 1 as a trail), which are concatenated together by
   // kernel supporting udp gro. Verify the concatenated packet is transformed back into individual
@@ -481,7 +480,6 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
-#endif
 
 } // namespace
 } // namespace Network
