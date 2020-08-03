@@ -31,24 +31,19 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
   read_filter_callbacks_ = std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
   ON_CALL(write_filter_callbacks_->connection_, addWriteFilter(_))
       .WillByDefault(Invoke([&](Network::WriteFilterSharedPtr write_filter) -> void {
-        std::cout << "add writeFilter" << write_filter.use_count() << std::endl;
         write_filter->initializeWriteFilterCallbacks(*write_filter_callbacks_);
         write_filter_ = write_filter;
       }));
   ON_CALL(write_filter_callbacks_->connection_, addFilter(_))
       .WillByDefault(Invoke([&](Network::FilterSharedPtr filter) -> void {
-        std::cout << "add filter" << filter.use_count() << std::endl;
         filter->initializeReadFilterCallbacks(*read_filter_callbacks_);
         filter->initializeWriteFilterCallbacks(*write_filter_callbacks_);
         write_filter_ = filter;
       }));
   factory_context_.prepareSimulatedSystemTime();
-  // write_filter_callbacks_->connection_.stream_info_.metadata_
 }
 
-UberWriteFilterFuzzer::UberWriteFilterFuzzer(){
-  fuzzerSetup();
-}
+UberWriteFilterFuzzer::UberWriteFilterFuzzer() { fuzzerSetup(); }
 
 void UberWriteFilterFuzzer::fuzz(
     const envoy::config::listener::v3::Filter& proto_config,
@@ -66,18 +61,13 @@ void UberWriteFilterFuzzer::fuzz(
     checkInvalidInputForFuzzer(filter_name, message.get());
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
-  perFilterSetup(proto_config.name());
-  // Add filter to connection_.
-  cb_(write_filter_callbacks_->connection_);
+    perFilterSetup(proto_config.name());
+    // Add filter to connection_.
+    cb_(write_filter_callbacks_->connection_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Controlled exception in filter setup {}", e.what());
     return;
   }
-
-  std::cout << "passed validation!" << std::endl;
-  // if (actions.size() > 2) {
-  //   PANIC("A case is found!");
-  // }
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(info, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
