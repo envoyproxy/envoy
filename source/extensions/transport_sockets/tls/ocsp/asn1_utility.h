@@ -143,7 +143,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
    * OCTETSTRING
    */
-  static absl::string_view parseOctetString(CBS& cbs);
+  static std::vector<uint8_t> parseOctetString(CBS& cbs);
 
   /**
    * Advance `cbs` over an ASN.1 value of the class |tag| if that

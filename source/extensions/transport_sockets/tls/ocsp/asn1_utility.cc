@@ -105,16 +105,14 @@ std::string Asn1Utility::parseInteger(CBS& cbs) {
   throw Envoy::EnvoyException("Failed to parse ASN.1 INTEGER");
 }
 
-absl::string_view Asn1Utility::parseOctetString(CBS& cbs) {
+std::vector<uint8_t> Asn1Utility::parseOctetString(CBS& cbs) {
   CBS value;
   if (!CBS_get_asn1(&cbs, &value, CBS_ASN1_OCTETSTRING)) {
     throw Envoy::EnvoyException("Input is not a well-formed ASN.1 OCTETSTRING");
   }
 
-  
-  /* auto data = reinterpret_cast<const uint8_t*>(CBS_data(&value)); */
-  /* return {data, data + CBS_len(&value)}; */
-  return cbsToString(value);
+  auto data = reinterpret_cast<const uint8_t*>(CBS_data(&value));
+  return {data, data + CBS_len(&value)};
 }
 
 std::string Asn1Utility::parseAlgorithmIdentifier(CBS& cbs) {

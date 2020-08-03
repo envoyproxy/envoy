@@ -65,13 +65,11 @@ enum class CertStatus {
  * unique per issuer but not necessarily universally.
  */
 struct CertId {
-  CertId(std::string serial_number, std::string alg_oid, absl::string_view issuer_name_hash,
-         absl::string_view issuer_public_key_hash);
+  CertId(std::string serial_number, std::string alg_oid, std::vector<uint8_t> issuer_name_hash);
 
   std::string serial_number_;
   std::string alg_oid_;
-  absl::string_view issuer_name_hash_;
-  absl::string_view issuer_public_key_hash_;
+  std::vector<uint8_t> issuer_name_hash_;
 };
 
 /**

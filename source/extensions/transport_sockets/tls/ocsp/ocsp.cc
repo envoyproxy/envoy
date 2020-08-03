@@ -66,10 +66,8 @@ SingleResponse::SingleResponse(CertId cert_id, CertStatus status, Envoy::SystemT
                                absl::optional<Envoy::SystemTime> next_update)
     : cert_id_(cert_id), status_(status), this_update_(this_update), next_update_(next_update) {}
 
-CertId::CertId(std::string serial_number, std::string alg_oid, absl::string_view issuer_name_hash,
-               absl::string_view issuer_public_key_hash)
-    : serial_number_(serial_number), alg_oid_(alg_oid), issuer_name_hash_(issuer_name_hash),
-      issuer_public_key_hash_(issuer_public_key_hash) {}
+CertId::CertId(std::string serial_number, std::string alg_oid, std::vector<uint8_t> issuer_name_hash)
+    : serial_number_(serial_number), alg_oid_(alg_oid), issuer_name_hash_(issuer_name_hash) {}
 
 OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source)
     : raw_bytes_(std::move(der_response)), response_(readDerEncodedOcspResponse(raw_bytes_)),
@@ -261,12 +259,14 @@ CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
     throw EnvoyException("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
   }
 
+  // We use just the issuer name + the serial number to uniquely identify
+  // a certificate.
   auto alg = Asn1Utility::parseAlgorithmIdentifier(elem);
   auto issuer_name_hash = Asn1Utility::parseOctetString(elem);
-  auto issuer_public_key_hash = Asn1Utility::parseOctetString(elem);
+  Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING);
   auto serial_number = Asn1Utility::parseInteger(elem);
 
-  return {serial_number, alg, issuer_name_hash, issuer_public_key_hash};
+  return {serial_number, alg, issuer_name_hash};
 }
 
 CertStatus Asn1OcspUtility::parseCertStatus(CBS& cbs) {
