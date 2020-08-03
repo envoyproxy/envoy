@@ -87,7 +87,6 @@ udp_writer_config:
                    /* expected_sockopt_name */ SO_REUSEPORT,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
-
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
