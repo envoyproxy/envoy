@@ -12,6 +12,11 @@ actions {
   }
 }
 actions {
+  advance_time {
+    milliseconds: 268435
+  }
+}
+actions {
   on_write {
     data: "-"
     end_stream: true

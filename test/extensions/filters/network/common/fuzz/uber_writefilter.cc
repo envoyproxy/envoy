@@ -43,7 +43,10 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
   factory_context_.prepareSimulatedSystemTime();
 }
 
-UberWriteFilterFuzzer::UberWriteFilterFuzzer() { fuzzerSetup(); }
+UberWriteFilterFuzzer::UberWriteFilterFuzzer()
+    : time_source_(factory_context_.simulatedTimeSystem()) {
+  fuzzerSetup();
+}
 
 void UberWriteFilterFuzzer::fuzz(
     const envoy::config::listener::v3::Filter& proto_config,
@@ -57,11 +60,8 @@ void UberWriteFilterFuzzer::fuzz(
         Server::Configuration::NamedNetworkFilterConfigFactory>(filter_name);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
-    // Make sure no invalid system calls are executed in fuzzer.
-    checkInvalidInputForFuzzer(filter_name, message.get());
     ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
-    perFilterSetup(proto_config.name());
     // Add filter to connection_.
     cb_(write_filter_callbacks_->connection_);
   } catch (const EnvoyException& e) {
@@ -76,6 +76,12 @@ void UberWriteFilterFuzzer::fuzz(
       Buffer::OwnedImpl buffer(action.on_write().data());
       write_filter_->onWrite(buffer, action.on_write().end_stream());
 
+      break;
+    }
+    case test::extensions::filters::network::WriteAction::kAdvanceTime: {
+      time_source_.advanceTimeAsync(
+          std::chrono::milliseconds(action.advance_time().milliseconds()));
+      factory_context_.dispatcher().run(Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

@@ -28,11 +28,11 @@ protected:
 
 private:
   Server::Configuration::FakeFactoryContext factory_context_;
+  Event::SimulatedTimeSystem& time_source_;
   Network::WriteFilterSharedPtr write_filter_;
   Network::FilterFactoryCb cb_;
   std::shared_ptr<NiceMock<Network::MockWriteFilterCallbacks>> write_filter_callbacks_;
   std::shared_ptr<NiceMock<Network::MockReadFilterCallbacks>> read_filter_callbacks_;
-
 };
 
 } // namespace NetworkFilters
