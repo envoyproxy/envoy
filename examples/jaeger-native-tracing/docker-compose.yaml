@@ -3,13 +3,8 @@ services:
 
   front-envoy:
     build:
-      context: ../
-      dockerfile: front-proxy/Dockerfile-frontenvoy
-    volumes:
-      - ./front-envoy-jaeger.yaml:/etc/front-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-front.sh:/start-front.sh
-    entrypoint: /start-front.sh
+      context: .
+      dockerfile: Dockerfile-frontenvoy
     networks:
       - envoymesh
     expose:
@@ -28,9 +23,7 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-service.sh:/start-service.sh
-    entrypoint: /start-service.sh
+      - ./libjaegertracing.so.0.4.2:/usr/local/lib/libjaegertracing_plugin.so
     networks:
       envoymesh:
         aliases:
@@ -49,9 +42,7 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-service.sh:/start-service.sh
-    entrypoint: /start-service.sh
+      - ./libjaegertracing.so.0.4.2:/usr/local/lib/libjaegertracing_plugin.so
     networks:
       envoymesh:
         aliases:

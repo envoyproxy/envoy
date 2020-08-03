@@ -63,6 +63,9 @@ admin:
     socket_address:
       address: 0.0.0.0
       port_value: 9901
-runtime:
-  symlink_root: /srv/runtime/current
-  subdirectory: envoy
+layered_runtime:
+  layers:
+  - name: disk_layer_0
+    disk_layer:
+      symlink_root: /srv/runtime/current
+      subdirectory: envoy

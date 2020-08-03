@@ -15,7 +15,7 @@ static_resources:
             - name: envoy.access_loggers.file
               typed_config:
                 "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
-                path: "/var/log/access.log"
+                path: "/dev/stdout"
           route_config:
             name: local_route
             virtual_hosts:
@@ -23,14 +23,17 @@ static_resources:
               domains:
               - "*"
               cors:
-                allow_origin:
-                - "*"
+                allow_origin_string_match:
+                - safe_regex:
+                    google_re2: {}
+                    regex: \*
                 filter_enabled:
                   default_value:
                     numerator: 100
                     denominator: HUNDRED
-              per_filter_config:
+              typed_per_filter_config:
                 envoy.filters.http.csrf:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
                   filter_enabled:
                     default_value:
                       numerator: 100
@@ -46,8 +49,9 @@ static_resources:
                   prefix: "/csrf/disabled"
                 route:
                   cluster: generic_service
-                per_filter_config:
+                typed_per_filter_config:
                   envoy.filters.http.csrf:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
                     filter_enabled:
                       default_value:
                         numerator: 0
@@ -56,8 +60,9 @@ static_resources:
                   prefix: "/csrf/shadow"
                 route:
                   cluster: generic_service
-                per_filter_config:
+                typed_per_filter_config:
                   envoy.filters.http.csrf:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
                     filter_enabled:
                       default_value:
                         numerator: 0
@@ -70,14 +75,17 @@ static_resources:
                   prefix: "/csrf/additional_origin"
                 route:
                   cluster: generic_service
-                per_filter_config:
+                typed_per_filter_config:
                   envoy.filters.http.csrf:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
                     filter_enabled:
                       default_value:
                         numerator: 100
                         denominator: HUNDRED
                     additional_origins:
-                    - regex: .*
+                    - safe_regex:
+                        google_re2: {}
+                        regex: .*
               - match:
                   prefix: "/"
                 route:
@@ -86,7 +94,8 @@ static_resources:
           - name: envoy.filters.http.cors
             typed_config: {}
           - name: envoy.filters.http.csrf
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.csrf.v3.CsrfPolicy
               filter_enabled:
                 default_value:
                   numerator: 0
