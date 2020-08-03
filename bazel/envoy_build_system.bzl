@@ -37,7 +37,7 @@ def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
 
 def envoy_extension_package():
-    native.package(default_visibility = ["//:extension_library"])
+    native.package(default_visibility = ["//visibility:public"])
 
 # A genrule variant that can output a directory. This is useful when doing things like
 # generating a fuzz corpus mechanically.
