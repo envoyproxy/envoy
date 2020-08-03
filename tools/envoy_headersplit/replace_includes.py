@@ -78,6 +78,8 @@ def replace_includes(mockname):
 
   p = Path('./test')
 
+  changed_list = [] # list of test code that been refactored
+
   # walk through all files and check files that contains "{mockname}/mocks.h"
   # don't forget change dependency on bazel
   for test_file in p.glob('**/*.cc'):
@@ -102,6 +104,8 @@ def replace_includes(mockname):
             bazel_targets += '"{}",'.format(to_bazelname(to_filename(classname), mockname))
 
     if used_mock_header:
+      changed_list.append(str(test_file.relative_to(Path('.')))+'\n')
+
       with test_file.open(mode='w') as f:
         f.write(
             content.replace('#include "test/mocks/{}/mocks.h"\n'.format(mockname),
@@ -113,6 +117,9 @@ def replace_includes(mockname):
                                   bazel_targets)
       with (test_file.parent / 'BUILD').open('w') as f:
         f.write(content)
+  with open("changed.txt","w") as f:
+    f.writelines(changed_list)
+    
 
 
 if __name__ == '__main__':
