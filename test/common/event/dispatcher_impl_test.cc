@@ -482,7 +482,7 @@ protected:
   // Advance time forward while updating the libevent's time cache and monotonic time reference.
   // Pushing the monotonic time reference forward eliminates the possibility of time moving
   // backwards and breaking the overly picky TimerImpl tests below.
-  void AdvanceLibeventTime(absl::Duration duration) {
+  void advanceLibeventTime(absl::Duration duration) {
     timeval start_tv;
     {
       int ret = event_base_gettimeofday_cached(&libevent_base_, &start_tv);
@@ -532,7 +532,7 @@ TEST_F(TimerImplTest, TimerOrdering) {
   timer3->enableTimer(std::chrono::milliseconds(2));
 
   // Advance time by 5ms so timers above all trigger in the same loop iteration.
-  AdvanceLibeventTime(absl::Milliseconds(5));
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -565,7 +565,7 @@ TEST_F(TimerImplTest, TimerOrderAndDisableAlarm) {
   timer3->enableTimer(std::chrono::milliseconds(2));
 
   // Advance time by 5ms so timers above all trigger in the same loop iteration.
-  AdvanceLibeventTime(absl::Milliseconds(5));
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -605,7 +605,7 @@ TEST_F(TimerImplTest, TimerOrderDisableAndReschedule) {
   timer4->enableTimer(std::chrono::milliseconds(3));
 
   // Advance time by 5ms so timers above all trigger in the same loop iteration.
-  AdvanceLibeventTime(absl::Milliseconds(5));
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -647,7 +647,7 @@ TEST_F(TimerImplTest, TimerOrderAndReschedule) {
   timer4->enableTimer(std::chrono::milliseconds(3));
 
   // Advance time by 5ms so timers above all trigger in the same loop iteration.
-  AdvanceLibeventTime(absl::Milliseconds(5));
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
