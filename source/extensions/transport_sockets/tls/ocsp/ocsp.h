@@ -101,9 +101,8 @@ struct SingleResponse {
  * as well as the time at which the response was produced.
  */
 struct ResponseData {
-  ResponseData(Envoy::SystemTime produced_at, std::vector<SingleResponse> single_responses);
+  ResponseData(std::vector<SingleResponse> single_responses);
 
-  const Envoy::SystemTime produced_at_;
   const std::vector<SingleResponse> single_responses_;
 };
 
@@ -174,8 +173,9 @@ public:
     return data_.single_responses_[0].next_update_;
   }
 
-  const static std::string OID;
-
+  // Identified as `id-pkix-ocsp-basic` in
+  // https://tools.ietf.org/html/rfc6960#appendix-B.2
+  constexpr static absl::string_view OID = "1.3.6.1.5.5.7.48.1.1";
 private:
   const ResponseData data_;
 };
@@ -185,7 +185,7 @@ private:
  * This is the top-level data structure for OCSP responses.
  */
 struct OcspResponse {
-  OcspResponse(OcspResponseStatus status, ResponsePtr&& response);
+  OcspResponse(OcspResponseStatus status, ResponsePtr response);
 
   OcspResponseStatus status_;
   ResponsePtr response_;

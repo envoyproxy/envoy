@@ -54,16 +54,13 @@ void skipResponderId(CBS& cbs) {
 
 } // namespace
 
-OcspResponse::OcspResponse(OcspResponseStatus status, ResponsePtr&& response)
+OcspResponse::OcspResponse(OcspResponseStatus status, ResponsePtr response)
     : status_(status), response_(std::move(response)) {}
 
 BasicOcspResponse::BasicOcspResponse(ResponseData data) : data_(data) {}
 
-const std::string BasicOcspResponse::OID = "1.3.6.1.5.5.7.48.1.1";
-
-ResponseData::ResponseData(Envoy::SystemTime produced_at,
-                           std::vector<SingleResponse> single_responses)
-    : produced_at_(produced_at), single_responses_(std::move(single_responses)) {}
+ResponseData::ResponseData(std::vector<SingleResponse> single_responses)
+    : single_responses_(std::move(single_responses)) {}
 
 SingleResponse::SingleResponse(CertId cert_id, CertStatus status, Envoy::SystemTime this_update,
                                absl::optional<Envoy::SystemTime> next_update)
@@ -222,11 +219,11 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
 
   Asn1Utility::skipOptional(elem, 0);
   skipResponderId(elem);
-  auto produced_at = Asn1Utility::parseGeneralizedTime(elem);
+  Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME);
   auto responses = Asn1Utility::parseSequenceOf<SingleResponse>(elem, parseSingleResponse);
   // Extensions currently ignored
 
-  return {produced_at, std::move(responses)};
+  return {std::move(responses)};
 }
 
 SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {

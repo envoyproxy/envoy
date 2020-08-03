@@ -137,6 +137,12 @@ void Asn1Utility::skipOptional(CBS& cbs, unsigned tag) {
   }
 }
 
+void Asn1Utility::skip(CBS& cbs, unsigned tag) {
+  if (!CBS_get_asn1(&cbs, nullptr, tag)) {
+    throw Envoy::EnvoyException("Failed to parse ASN.1 element");
+  }
+}
+
 } // namespace Ocsp
 } // namespace Tls
 } // namespace TransportSockets
