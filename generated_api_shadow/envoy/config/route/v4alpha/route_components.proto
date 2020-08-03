@@ -559,15 +559,6 @@ message RouteAction {
     NOT_FOUND = 1;
   }
 
-  // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
-  // [#next-major-version: remove this definition - it's defined in the InternalRedirectPolicy message.]
-  enum InternalRedirectAction {
-    option deprecated = true;
-
-    PASS_THROUGH_INTERNAL_REDIRECT = 0;
-    HANDLE_INTERNAL_REDIRECT = 1;
-  }
-
   // The router is capable of shadowing traffic from one cluster to another. The current
   // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
   // respond before returning the response from the primary cluster. All normal statistics are
@@ -765,9 +756,9 @@ message RouteAction {
     ConnectConfig connect_config = 3;
   }
 
-  reserved 12, 18, 19, 16, 22, 21, 10;
+  reserved 12, 18, 19, 16, 22, 21, 10, 26, 31;
 
-  reserved "request_mirror_policy";
+  reserved "request_mirror_policy", "internal_redirect_action", "max_internal_redirects";
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -899,6 +890,17 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // the result of the regex substitution executed on path value with query and fragment removed.
     // This is useful for transitioning variable content between path segment and subdomain.
+    //
+    // For example with the following config:
+    //
+    //   .. code-block:: yaml
+    //     host_rewrite_path:
+    //       pattern:
+    //         google_re2: {}
+    //         regex: "^/(.+)/.+$"
+    //       substitution: \1
+    //
+    // Would rewrite the host header to `envoyproxy.io` given the path `/envoyproxy.io/some/path`.
     type.matcher.v4alpha.RegexMatchAndSubstitute host_rewrite_path = 35;
   }
 
@@ -1017,25 +1019,6 @@ message RouteAction {
   // by :ref:`redirect_response_codes
   // <envoy_api_field_config.route.v4alpha.InternalRedirectPolicy.redirect_response_codes>`.
   InternalRedirectPolicy internal_redirect_policy = 34;
-
-  InternalRedirectAction hidden_envoy_deprecated_internal_redirect_action = 26 [deprecated = true];
-
-  // An internal redirect is handled, iff the number of previous internal redirects that a
-  // downstream request has encountered is lower than this value, and
-  // :ref:`internal_redirect_action <envoy_api_field_config.route.v4alpha.RouteAction.internal_redirect_action>`
-  // is set to :ref:`HANDLE_INTERNAL_REDIRECT
-  // <envoy_api_enum_value_config.route.v4alpha.RouteAction.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
-  // In the case where a downstream request is bounced among multiple routes by internal redirect,
-  // the first route that hits this threshold, or has
-  // :ref:`internal_redirect_action <envoy_api_field_config.route.v4alpha.RouteAction.internal_redirect_action>`
-  // set to
-  // :ref:`PASS_THROUGH_INTERNAL_REDIRECT
-  // <envoy_api_enum_value_config.route.v4alpha.RouteAction.InternalRedirectAction.PASS_THROUGH_INTERNAL_REDIRECT>`
-  // will pass the redirect back to downstream.
-  //
-  // If not specified, at most one redirect will be followed.
-  google.protobuf.UInt32Value hidden_envoy_deprecated_max_internal_redirects = 31
-      [deprecated = true];
 
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely

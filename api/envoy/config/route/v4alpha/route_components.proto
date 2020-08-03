@@ -890,6 +890,17 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // the result of the regex substitution executed on path value with query and fragment removed.
     // This is useful for transitioning variable content between path segment and subdomain.
+    //
+    // For example with the following config:
+    //
+    //   .. code-block:: yaml
+    //     host_rewrite_path:
+    //       pattern:
+    //         google_re2: {}
+    //         regex: "^/(.+)/.+$"
+    //       substitution: \1
+    //
+    // Would rewrite the host header to `envoyproxy.io` given the path `/envoyproxy.io/some/path`.
     type.matcher.v4alpha.RegexMatchAndSubstitute host_rewrite_path = 35;
   }
 

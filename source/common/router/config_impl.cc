@@ -535,7 +535,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
       }
     }
   } else if (host_rewrite_path_ != nullptr) {
-    std::string path(headers.getPathValue());
+    const std::string path(headers.getPathValue());
     absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(path));
     headers.setHost(host_rewrite_path_->replaceAll(just_path, host_rewrite_path_substitution_));
   }
