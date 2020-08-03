@@ -29,6 +29,7 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "listener_filter_fakes",
+    srcs = ["listener_filter_fakes.cc"],
     hdrs = ["listener_filter_fakes.h"],
     deps = [
         "//source/common/api:os_sys_calls_lib",
