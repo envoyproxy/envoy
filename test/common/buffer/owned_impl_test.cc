@@ -386,7 +386,8 @@ TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
   ASSERT_TRUE(slice);
   ASSERT_NE(slice->data(), nullptr);
   EXPECT_EQ(slice->size(), expected_length0 - partial_drain_size);
-  EXPECT_TRUE(0 == memcmp(slice->data(), "abcde" + partial_drain_size,
+  EXPECT_TRUE(0 == memcmp(slice->data(),
+                          reinterpret_cast<const uint8_t*>("abcde") + partial_drain_size,
                           expected_length0 - partial_drain_size));
   EXPECT_EQ(buffer.toString(), "123");
 }
