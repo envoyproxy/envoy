@@ -39,7 +39,7 @@ Envoy::Config::ConfigProviderPtr create(
 
 class ScopedRoutesConfigProviderManager;
 
-struct ScopedRoutesConfigProviderBase {
+struct ScopedRoutesConfigProviderBase : virtual public Envoy::Config::ConfigProvider {
   virtual void
   onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
                     Http::RouteConfigUpdatedCallback route_config_updated_cb) const PURE;
@@ -75,9 +75,9 @@ public:
   std::string getConfigVersion() const override { return ""; }
   ConfigConstSharedPtr getConfig() const override { return config_; }
 
-  void onDemandRdsUpdate(uint64_t, Event::Dispatcher&,
+  void onDemandRdsUpdate(uint64_t, Event::Dispatcher& thread_local_dispatcher,
                          Http::RouteConfigUpdatedCallback route_config_updated_cb) const override {
-    route_config_updated_cb(false);
+    thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
   }
 
 private:

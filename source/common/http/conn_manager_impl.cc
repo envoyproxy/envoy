@@ -526,6 +526,8 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback route_config_updated_cb) {
+  if (!scoped_route_config_provider_)
+    ENVOY_LOG(debug, "request with nullptr.");
   scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
                                                    move(route_config_updated_cb));
 }
@@ -1551,20 +1553,27 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
         Http::RouteConfigUpdatedCallback(
             [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
-                       route_config_updated_cb)](bool route_exist) {
+                       route_config_updated_cb)](bool scope_exist) {
               // Refresh the route before continue the filter chain.
               if (auto cb = weak_route_config_updated_cb.lock()) {
-                if (route_exist) {
+                if (scope_exist) {
                   refreshCachedRoute();
                 }
-                (*cb)(route_exist);
+                (*cb)(scope_exist && hasCachedRoute());
               }
             });
     route_config_update_requester_->requestSrdsUpdate(*scope_key_hash_, thread_local_dispatcher,
                                                       scoped_route_config_updated_cb);
     return;
   }
-  (*route_config_updated_cb)(false);
+  ENVOY_STREAM_LOG(debug, "on demand srds fail.", *this);
+  thread_local_dispatcher.post(
+      [weak_route_config_updated_cb =
+           std::weak_ptr<Http::RouteConfigUpdatedCallback>(route_config_updated_cb)] {
+        if (auto cb = weak_route_config_updated_cb.lock()) {
+          (*cb)(false);
+        }
+      });
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
@@ -2491,7 +2500,10 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::injectDecodedDataToFilter
                      ActiveStream::FilterIterationStartState::CanStartFromCurrent);
 }
 
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() {
+  ENVOY_STREAM_LOG(debug, "continue decoding.", parent_);
+  commonContinue();
+}
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
     ResponseHeaderMapPtr&& headers) {

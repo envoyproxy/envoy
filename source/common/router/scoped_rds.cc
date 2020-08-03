@@ -438,11 +438,12 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
 void ScopedRdsConfigSubscription::onDemandRdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback route_config_updated_cb) {
-  factory_context_.dispatcher().post([&]() {
+  factory_context_.dispatcher().post([this, &thread_local_dispatcher, key_hash,
+                                      route_config_updated_cb]() {
     auto iter = scope_name_by_hash_.find(key_hash);
     // Return to filter chain if we can find the scope.
     if (iter == scope_name_by_hash_.end()) {
-      route_config_updated_cb(false);
+      thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
       return;
     }
     // Wrap the thread local dispatcher inside the callback.
