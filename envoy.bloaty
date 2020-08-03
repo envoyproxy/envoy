@@ -1,0 +1,22 @@
+custom_data_source: {
+  name: "bloaty_package"
+  base_data_source: "compileunits"
+
+  #envoy source code.
+  rewrite: {
+    pattern: "^(external/envoy/source/)(\\w+/)(\\w+)"
+    replacement: "envoy \\2"
+  }
+
+  #envoy third party libraries.
+  rewrite: {
+      pattern: "^(external/)(\\w+/)"
+      replacement: "\\2"
+  }
+
+  #all compiled protos.
+  rewrite: {
+      pattern: "([.pb.cc | .pb.validate.cc])$"
+      replacement: "compiled protos"
+  }
+}
