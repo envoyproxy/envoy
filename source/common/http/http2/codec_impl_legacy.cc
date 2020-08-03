@@ -334,6 +334,7 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 }
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
+  ASSERT(local_end_stream_);
   const bool skip_encoding_empty_trailers =
       trailers.empty() && parent_.skip_encoding_empty_trailers_;
   if (skip_encoding_empty_trailers) {
