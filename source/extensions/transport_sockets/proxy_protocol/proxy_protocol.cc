@@ -10,8 +10,8 @@
 
 #include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 
-using envoy::config::core::v3::ProxyProtocolConfig_Version;
 using envoy::config::core::v3::ProxyProtocolConfig;
+using envoy::config::core::v3::ProxyProtocolConfig_Version;
 
 namespace Envoy {
 namespace Extensions {

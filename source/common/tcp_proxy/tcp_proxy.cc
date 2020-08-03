@@ -407,12 +407,12 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (downstreamConnection()) {
-    read_callbacks_->connection().streamInfo().filterState()->setData(Network::ProxyProtocolFilterState::key(),
-                        std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-                            downstreamConnection()->remoteAddress(),
-                            downstreamConnection()->localAddress()}),
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
+    read_callbacks_->connection().streamInfo().filterState()->setData(
+        Network::ProxyProtocolFilterState::key(),
+        std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+            downstreamConnection()->remoteAddress(), downstreamConnection()->localAddress()}),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
         downstreamConnection()->streamInfo().filterState());
   }
