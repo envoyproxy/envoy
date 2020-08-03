@@ -37,7 +37,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         NetworkFilterNames::get().HttpConnectionManager,
         NetworkFilterNames::get().SniDynamicForwardProxy,
         NetworkFilterNames::get().KafkaBroker,
-        NetworkFilterNames::get().RocketmqProxy, // fix the assert
+        NetworkFilterNames::get().RocketmqProxy, 
         NetworkFilterNames::get().RateLimit,
         NetworkFilterNames::get().Rbac
         //TODO(Jianwen Dong): cover mongo_proxy, mysql_proxy, postgres_proxy, tcp_proxy.
