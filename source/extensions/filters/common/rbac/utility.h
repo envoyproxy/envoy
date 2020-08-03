@@ -18,9 +18,7 @@ namespace RBAC {
   COUNTER(allowed)                                                                                 \
   COUNTER(denied)                                                                                  \
   COUNTER(shadow_allowed)                                                                          \
-  COUNTER(shadow_denied)                                                                           \
-  // COUNTER(logged)                                                                                  \
-  // COUNTER(not_logged)
+  COUNTER(shadow_denied)                                                                           
 
 /**
  * Wrapper struct for RBAC filter stats. @see stats_macros.h
