@@ -497,7 +497,12 @@ private:
      * Decodes the provided trailers starting at the first filter in the chain.
      * @param trailers the trailers to decode.
      */
-    void decodeTrailers(RequestTrailerMap& trailers) { decodeTrailers(nullptr, trailers); }
+    void decodeTrailers(RequestTrailerMapPtr&& trailers) {
+      ASSERT(request_trailers_ == nullptr);
+
+      request_trailers_ = std::move(trailers);
+      decodeTrailers(nullptr, *request_trailers_);
+    }
 
     /**
      * Decodes the provided metadata starting at the first filter in the chain.
@@ -544,6 +549,42 @@ private:
     // events for this stream and the downstream connection to the router filter.
     void callHighWatermarkCallbacks();
     void callLowWatermarkCallbacks();
+
+    void setRequestHeaders(RequestHeaderMapPtr&& request_headers) {
+      // TODO(snowp): Ideally we don't need this function, but during decodeHeaders we might issue
+      // local replies before the FilterManager::decodeData has been called. We could likely get rid
+      // of this by updating the calls to sendLocalReply to pass ownership over the headers + adding
+      // asserts that we don't call the overload that doesn't pass ownership unless decodeData has
+      // been called.
+      ASSERT(request_headers_ == nullptr);
+      request_headers_ = std::move(request_headers);
+    }
+
+    void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) {
+      // Note: sometimes the headers get reset (local reply while response is buffering), so we
+      // don't assert here.
+      response_headers_ = std::move(response_headers);
+    }
+
+    /**
+     * Returns the current request headers, or nullptr if header decoding hasn't started yet.
+     */
+    RequestHeaderMap* requestHeaders() const { return request_headers_.get(); }
+
+    /**
+     * Returns the current request trailers, or nullptr if trailer decoding hasn't started yet.
+     */
+    RequestTrailerMap* requestTrailers() const { return request_trailers_.get(); }
+
+    /**
+     * Returns the current response headers, or nullptr if header encoding hasn't started yet.
+     */
+    ResponseHeaderMap* responseHeaders() const { return response_headers_.get(); }
+
+    /**
+     * Returns the current response trailers, or nullptr if trailer encoding hasn't started yet.
+     */
+    ResponseTrailerMap* responseTrailers() const { return response_trailers_.get(); }
 
   private:
     // Indicates which filter to start the iteration with.
@@ -603,6 +644,13 @@ private:
     bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
                              bool& filter_streaming);
 
+    MetadataMapVector* getRequestMetadataMapVector() {
+      if (request_metadata_map_vector_ == nullptr) {
+        request_metadata_map_vector_ = std::make_unique<MetadataMapVector>();
+      }
+      return request_metadata_map_vector_.get();
+    }
+
     ActiveStream& active_stream_;
 
     FilterManagerCallbacks& filter_manager_callbacks_;
@@ -610,11 +658,20 @@ private:
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
 
+    ResponseHeaderMapPtr continue_headers_;
+    ResponseHeaderMapPtr response_headers_;
+    ResponseTrailerMapPtr response_trailers_;
+    RequestHeaderMapPtr request_headers_;
+    RequestTrailerMapPtr request_trailers_;
+    // Stores metadata added in the decoding filter that is being processed. Will be cleared before
+    // processing the next filter. The storage is created on demand. We need to store metadata
+    // temporarily in the filter in case the filter has stopped all while processing headers.
+    std::unique_ptr<MetadataMapVector> request_metadata_map_vector_;
     Buffer::WatermarkBufferPtr buffered_response_data_;
     Buffer::WatermarkBufferPtr buffered_request_data_;
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
-    std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
+    std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
 
     // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
     // at which point they no longer need to be friends.
@@ -696,10 +753,10 @@ private:
          << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
          << "\n";
 
-      DUMP_DETAILS(request_headers_);
-      DUMP_DETAILS(request_trailers_);
-      DUMP_DETAILS(response_headers_);
-      DUMP_DETAILS(response_trailers_);
+      DUMP_DETAILS(filter_manager_.requestHeaders());
+      DUMP_DETAILS(filter_manager_.requestTrailers());
+      DUMP_DETAILS(filter_manager_.responseHeaders());
+      DUMP_DETAILS(filter_manager_.responseTrailers());
       DUMP_DETAILS(&stream_info_);
     }
 
@@ -824,13 +881,6 @@ private:
       return os;
     }
 
-    MetadataMapVector* getRequestMetadataMapVector() {
-      if (request_metadata_map_vector_ == nullptr) {
-        request_metadata_map_vector_ = std::make_unique<MetadataMapVector>();
-      }
-      return request_metadata_map_vector_.get();
-    }
-
     Tracing::CustomTagMap& getOrMakeTracingCustomTagMap() {
       if (tracing_custom_tags_ == nullptr) {
         tracing_custom_tags_ = std::make_unique<Tracing::CustomTagMap>();
@@ -845,11 +895,6 @@ private:
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     ResponseEncoder* response_encoder_{};
-    ResponseHeaderMapPtr continue_headers_;
-    ResponseHeaderMapPtr response_headers_;
-    ResponseTrailerMapPtr response_trailers_{};
-    RequestHeaderMapPtr request_headers_;
-    RequestTrailerMapPtr request_trailers_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
@@ -863,10 +908,6 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    // Stores metadata added in the decoding filter that is being processed. Will be cleared before
-    // processing the next filter. The storage is created on demand. We need to store metadata
-    // temporarily in the filter in case the filter has stopped all while processing headers.
-    std::unique_ptr<MetadataMapVector> request_metadata_map_vector_{nullptr};
     const std::string* decorated_operation_{nullptr};
     Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
