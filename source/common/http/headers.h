@@ -69,6 +69,9 @@ public:
   const LowerCaseString Pragma{"pragma"};
   const LowerCaseString Referer{"referer"};
   const LowerCaseString Vary{"vary"};
+  const LowerCaseString XRateLimitLimit{"x-ratelimit-limit"};
+  const LowerCaseString XRateLimitRemaining{"x-ratelimit-remaining"};
+  const LowerCaseString XRateLimitReset{"x-ratelimit-reset"};
 
   struct {
     const std::string Gzip{"gzip"};
@@ -103,6 +106,11 @@ public:
     const std::string AcceptEncoding{"Accept-Encoding"};
     const std::string Wildcard{"*"};
   } VaryValues;
+
+  struct {
+    const std::string Window{"window"};
+    const std::string Name{"name"};
+  } XRateLimitQuotaPolicyKeys;
 };
 
 using CustomHeaders = ConstSingleton<CustomHeaderValues>;
@@ -205,9 +213,6 @@ public:
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
-  const LowerCaseString XRateLimitLimit{"x-ratelimit-limit"};
-  const LowerCaseString XRateLimitRemaining{"x-ratelimit-remaining"};
-  const LowerCaseString XRateLimitReset{"x-ratelimit-reset"};
 
   struct {
     const std::string Close{"close"};
@@ -316,11 +321,6 @@ public:
   struct {
     const std::string Nosniff{"nosniff"};
   } XContentTypeOptionValues;
-
-  struct {
-    const std::string Window{"window"};
-    const std::string Name{"name"};
-  } XRateLimitQuotaPolicyKeys;
 
   struct {
     const std::string Http10String{"HTTP/1.0"};

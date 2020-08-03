@@ -45,7 +45,7 @@ public:
       // enhance rate limit filter config based on the configuration of test.
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
       proto_config_.set_failure_mode_deny(failure_mode_deny_);
-      proto_config_.set_enable_response_headers(enable_response_headers_);
+      proto_config_.set_enable_x_ratelimit_headers(enable_x_ratelimit_headers_);
       setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
                      "ratelimit", fake_upstreams_.back()->localAddress());
       proto_config_.mutable_rate_limit_service()->set_transport_api_version(apiVersion());
@@ -190,7 +190,7 @@ public:
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
   bool failure_mode_deny_ = false;
-  bool enable_response_headers_ = false;
+  bool enable_x_ratelimit_headers_ = false;
   envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config_{};
   const std::string base_filter_config_ = R"EOF(
     domain: some_domain
@@ -207,7 +207,7 @@ public:
 // Test verifies that response headers provided by filter work.
 class RatelimitFilterHeadersEnabledIntegrationTest : public RatelimitIntegrationTest {
 public:
-  RatelimitFilterHeadersEnabledIntegrationTest() { enable_response_headers_ = true; }
+  RatelimitFilterHeadersEnabledIntegrationTest() { enable_x_ratelimit_headers_ = true; }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,
@@ -375,12 +375,12 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
   waitForSuccessfulUpstreamResponse();
 
   EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().XRateLimitLimit,
+              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitLimit,
                                   "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""));
   EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().XRateLimitRemaining, "2"));
+              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitRemaining, "2"));
   EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().XRateLimitReset, "3"));
+              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitReset, "3"));
 
   cleanup();
 
@@ -404,12 +404,12 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
   waitForFailedUpstreamResponse(429);
 
   EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().XRateLimitLimit,
+              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitLimit,
                                   "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""));
   EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().XRateLimitRemaining, "2"));
+              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitRemaining, "2"));
   EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().XRateLimitReset, "3"));
+              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitReset, "3"));
 
   cleanup();
 

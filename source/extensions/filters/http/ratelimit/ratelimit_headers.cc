@@ -2,10 +2,19 @@
 
 #include "common/http/header_map_impl.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
+
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    x_rate_limit_limit_handle(Http::CustomHeaders::get().XRateLimitLimit);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    x_rate_limit_remaining_handle(Http::CustomHeaders::get().XRateLimitRemaining);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    x_rate_limit_reset_handle(Http::CustomHeaders::get().XRateLimitReset);
 
 Http::ResponseHeaderMapPtr RateLimitHeaders::create(
     Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses) {
@@ -17,7 +26,7 @@ Http::ResponseHeaderMapPtr RateLimitHeaders::create(
 
   absl::optional<envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus>
       min_remaining_limit_status;
-  std::ostringstream quotaPolicy;
+  std::string quota_policy;
   for (auto&& status : *descriptor_statuses) {
     if (!status.has_current_limit()) {
       continue;
@@ -27,24 +36,33 @@ Http::ResponseHeaderMapPtr RateLimitHeaders::create(
       min_remaining_limit_status.emplace(status);
     }
     uint32_t window = convertRateLimitUnit(status.current_limit().unit());
+    // Constructing the quota-policy per RFC
+    // https://tools.ietf.org/id/draft-polli-ratelimit-headers-00.html#rfc.section.3.1
+    // Example of the result: `, 10;window=1;name="per-ip", 1000;window=3600`
     if (window) {
-      fmt::print(quotaPolicy, ", {:d};{:s}={:d}", status.current_limit().requests_per_unit(),
-                 Http::Headers::get().XRateLimitQuotaPolicyKeys.Window, window);
+      // For each descriptor status append `<LIMIT>;window=<WINDOW_IN_SECONDS>`
+      absl::StrAppend(&quota_policy,
+                      fmt::format(", {:d};{:s}={:d}", status.current_limit().requests_per_unit(),
+                                  Http::CustomHeaders::get().XRateLimitQuotaPolicyKeys.Window,
+                                  window));
       if (!status.current_limit().name().empty()) {
-        fmt::print(quotaPolicy, ";{:s}=\"{:s}\"",
-                   Http::Headers::get().XRateLimitQuotaPolicyKeys.Name,
-                   status.current_limit().name());
+        // If the descriptor has a name, append `;name="<DESCRIPTOR_NAME>"`
+        absl::StrAppend(&quota_policy,
+                        fmt::format(";{:s}=\"{:s}\"",
+                                    Http::CustomHeaders::get().XRateLimitQuotaPolicyKeys.Name,
+                                    status.current_limit().name()));
       }
     }
   }
 
   if (min_remaining_limit_status) {
-    std::string rate_limit_limit =
-        std::to_string(min_remaining_limit_status.value().current_limit().requests_per_unit()) +
-        quotaPolicy.str();
-    result->setXRateLimitLimit(rate_limit_limit);
-    result->setXRateLimitRemaining(min_remaining_limit_status.value().limit_remaining());
-    result->setXRateLimitReset(min_remaining_limit_status.value().seconds_until_reset());
+    std::string rate_limit_limit = absl::StrCat(
+        min_remaining_limit_status.value().current_limit().requests_per_unit(), quota_policy);
+    result->addReferenceKey(Http::CustomHeaders::get().XRateLimitLimit, rate_limit_limit);
+    result->addReferenceKey(Http::CustomHeaders::get().XRateLimitRemaining,
+                            min_remaining_limit_status.value().limit_remaining());
+    result->addReferenceKey(Http::CustomHeaders::get().XRateLimitReset,
+                            min_remaining_limit_status.value().seconds_until_reset().seconds());
   }
   descriptor_statuses = nullptr;
   return result;

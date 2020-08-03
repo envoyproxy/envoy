@@ -75,9 +75,9 @@ public:
   failure_mode_deny: true
   )EOF";
 
-  const std::string enable_response_headers_config_ = R"EOF(
+  const std::string enable_x_ratelimit_headers_config_ = R"EOF(
   domain: foo
-  enable_response_headers: true
+  enable_x_ratelimit_headers: true
   )EOF";
 
   const std::string filter_config_ = R"EOF(
@@ -295,7 +295,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
 }
 
 TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
-  SetUpTest(enable_response_headers_config_);
+  SetUpTest(enable_x_ratelimit_headers_config_);
   InSequence s;
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0))
@@ -580,7 +580,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithHeaders) {
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithFilterHeaders) {
-  SetUpTest(enable_response_headers_config_);
+  SetUpTest(enable_x_ratelimit_headers_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _, _))

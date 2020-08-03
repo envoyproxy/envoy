@@ -308,10 +308,7 @@ private:
   HEADER_FUNC(EnvoyUpstreamServiceTime)                                                            \
   HEADER_FUNC(Location)                                                                            \
   HEADER_FUNC(Server)                                                                              \
-  HEADER_FUNC(Status)                                                                              \
-  HEADER_FUNC(XRateLimitLimit)                                                                     \
-  HEADER_FUNC(XRateLimitRemaining)                                                                 \
-  HEADER_FUNC(XRateLimitReset)
+  HEADER_FUNC(Status)
 
 /**
  * Default O(1) request and response headers.

@@ -164,14 +164,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     break;
   }
 
-  if (config_->enableResponseHeaders()) {
+  if (config_->enableXRateLimitHeaders()) {
     Http::ResponseHeaderMapPtr rate_limit_headers =
         RateLimitHeaders::create(std::move(descriptor_statuses));
     if (response_headers_to_add_ == nullptr) {
       response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
     }
     Http::HeaderUtility::addHeaders(*response_headers_to_add_, *rate_limit_headers);
-    rate_limit_headers = nullptr;
   } else {
     descriptor_statuses = nullptr;
   }
