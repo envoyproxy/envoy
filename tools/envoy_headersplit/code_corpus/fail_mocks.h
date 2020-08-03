@@ -144,7 +144,7 @@ public:
     return EntryOwnerPtr{add_(key, std::move(callback))};
   }
 
-  std::unordered_map<std::string, Cb> config_tracker_callbacks_;
+  absl::node_hash_map<std::string, Cb> config_tracker_callbacks_;
 };
 
 class MockAdmin : public Admin {
