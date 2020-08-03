@@ -311,6 +311,11 @@ void SimulatedTimeSystemHelper::addAlarmLockHeld(
     // delay alarm which is ready to execution in the next iteration of the event loop.
     // TODO(antoniovicente) Refactor alarm tracking so it happens per scheduler and limit wakeup to
     // a single event loop.
+
+    // We don't want to activate the alarm under lock, as it will make a libevent call, and libevent
+    // itself uses locks:
+    // https://github.com/libevent/libevent/blob/29cc8386a2f7911eaa9336692a2c5544d8b4734f/event.c#L1917
+    UnlockGuard unlocker(mutex_);
     simulated_scheduler.scheduleReadyAlarms();
   }
 
