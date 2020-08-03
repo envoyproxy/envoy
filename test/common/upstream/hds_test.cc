@@ -31,6 +31,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnNew;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -69,7 +70,8 @@ protected:
         .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
           server_response_timer_cb_ = timer_cb;
           return server_response_timer_;
-        }));
+        }))
+        .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::RawAsyncClientPtr(async_client_),
         envoy::config::core::v3::ApiVersion::AUTO, dispatcher_, runtime_, stats_store_,
@@ -370,19 +372,28 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
 
   // Create Message
   message.reset(createComplexSpecifier(N_CLUSTERS, N_LOCALITIES, N_ENDPOINTS));
-
-  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  std::vector<Network::MockClientConnection*> connections_;
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Invoke([&connections_](Network::Address::InstanceConstSharedPtr,
+                                             Network::Address::InstanceConstSharedPtr,
+                                             Network::TransportSocketPtr&,
+                                             const Network::ConnectionSocket::OptionsSharedPtr&) {
+        Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+        EXPECT_CALL(*connection_, setBufferLimits(_)).Times(1);
+        EXPECT_CALL(*connection_, close(_)).Times(1);
+        connections_.push_back(connection_);
+        return connection_;
+      }));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
-  EXPECT_CALL(*connection_, setBufferLimits(_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(N_CLUSTERS * N_LOCALITIES * N_ENDPOINTS);
 
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
-  connection_->raiseEvent(Network::ConnectionEvent::Connected);
-
+  for (auto& connection_ : connections_) {
+    connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  }
   // read response and verify fields
   auto response = hds_delegate_->sendResponse().endpoint_health_response();
 
