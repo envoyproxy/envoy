@@ -116,6 +116,7 @@ public:
    * @return an Http2Frame that is comprised of the given contents.
    */
   static Http2Frame makeGenericFrame(absl::string_view contents);
+  static Http2Frame makeGenericFrameFromHexDump(absl::string_view contents);
 
   Type type() const { return static_cast<Type>(data_[3]); }
   ResponseStatus responseStatus() const;
@@ -155,6 +156,9 @@ private:
   // header.
   void appendHpackInt(uint64_t value, unsigned char prefix_mask);
   void appendData(absl::string_view data) { data_.insert(data_.end(), data.begin(), data.end()); }
+  void appendData(std::vector<uint8_t> data) {
+    data_.insert(data_.end(), data.begin(), data.end());
+  }
 
   // Headers are directly encoded
   void appendStaticHeader(StaticHeaderIndex index);

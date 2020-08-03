@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that probabilistically rejects requests based on upstream success-rate.
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "response_evaluator_lib",

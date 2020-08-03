@@ -6,7 +6,6 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
-#include "extensions/common/sqlutils/sqlutils.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -108,7 +107,9 @@ void MySQLFilter::onCommand(Command& command) {
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   ProtobufWkt::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
-  auto result = Common::SQLUtils::SQLUtils::setMetadata(command.getData(), metadata);
+
+  auto result = Common::SQLUtils::SQLUtils::setMetadata(command.getData(),
+                                                        decoder_->getAttributes(), metadata);
 
   ENVOY_CONN_LOG(trace, "mysql_proxy: query processed {}", read_callbacks_->connection(),
                  command.getData());

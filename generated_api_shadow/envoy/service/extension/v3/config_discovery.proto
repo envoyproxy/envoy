@@ -36,3 +36,9 @@ service ExtensionConfigDiscoveryService {
     option (google.api.http).body = "*";
   }
 }
+
+// [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue
+// with importing services: https://github.com/google/protobuf/issues/4221 and
+// protoxform to upgrade the file.
+message EcdsDummy {
+}
