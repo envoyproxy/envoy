@@ -660,6 +660,15 @@ def checkSourceLine(line, file_path, reportError):
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
     reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
+  # Blocking the use of std::any, std::optional, std::variant for now as iOS 11/macOS 10.13
+  # does not support these functions at runtime.
+  # See: https://github.com/envoyproxy/envoy/issues/12341
+  if tokenInLine("std::any", line):
+    reportError("Don't use std::any; use absl::any instead")
+  if tokenInLine("std::optional", line):
+    reportError("Don't use std::optional; use absl::optional instead")
+  if tokenInLine("std::variant", line):
+    reportError("Don't use std::variant; use absl::variant instead")
   if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
     # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
     # can be used instead
