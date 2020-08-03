@@ -6,6 +6,8 @@
 
 #include "gmock/gmock.h"
 
+#define FAKE_SOCKET_FD 42
+
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
@@ -13,8 +15,8 @@ namespace ListenerFilters {
 class FakeConnectionSocket : public Network::MockConnectionSocket {
 public:
   FakeConnectionSocket()
-      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)), local_address_(nullptr),
-        remote_address_(nullptr) {}
+      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>(FAKE_SOCKET_FD))
+      , local_address_(nullptr), remote_address_(nullptr) {}
 
   ~FakeConnectionSocket() override { io_handle_->close(); }
 
