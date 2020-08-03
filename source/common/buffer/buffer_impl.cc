@@ -199,7 +199,7 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
   return raw_slices;
 }
 
-std::unique_ptr<SliceData> OwnedImpl::extractFrontSlice() {
+SliceDataPtr OwnedImpl::extractFrontSlice() {
   ASSERT(!slices_.empty());
   ASSERT(slices_.front());
   length_ -= slices_.front()->dataSize();
