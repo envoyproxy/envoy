@@ -59,11 +59,12 @@ def get_compilation_performance(test):
       target_size = os.path.getsize(target_filename)
   return building_time, target_size
 
+
 def to_testname(filename):
   # maps test lib file name to bazel target name
   # e.g. "test/server/server_fuzz.cc" -> "//test/server:server_fuzz"
   filename = filename.strip()
-  testname = "//" + filename[:-3] # remove .cc in filename
+  testname = "//" + filename[:-3]  # remove .cc in filename
   last_slash = 0
   for i, c in enumerate(testname):
     if c == '/':
