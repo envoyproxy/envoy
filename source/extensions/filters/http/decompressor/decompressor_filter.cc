@@ -41,6 +41,11 @@ DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     : stats_(generateStats(stats_prefix, scope)),
       decompression_enabled_(proto_config.enabled(), runtime) {}
 
+void DecompressorFilterConfig::DirectionConfig::chargeBytes(uint64_t compressed_bytes, uint64_t uncompressed_bytes) {
+  total_compressed_bytes_ += compressed_bytes;
+  total_uncompressed_bytes_ += uncompressed_bytes;
+}
+
 DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
         proto_config,
@@ -82,9 +87,18 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
                              *decoder_callbacks_, headers);
 };
 
-Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool) {
+Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  absl::optional<Http::HeaderMap&> trailers{};
+  if (end_stream) {
+    trailers.emplace(decoder_callbacks_->addDecodedTrailers());
+  }
   return maybeDecompress(config_->requestDirectionConfig(), request_decompressor_,
-                         *decoder_callbacks_, data);
+                         *decoder_callbacks_, data, trailers);
+}
+
+Http::FilterTrailersStatus DecompressorFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  reportTotalBytes(config_->requestDirectionConfig(), trailers);
+  return Http::FilterTrailersStatus::Continue;
 }
 
 Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -99,20 +113,30 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
                              *encoder_callbacks_, headers);
 }
 
-Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool) {
+Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+  absl::optional<Http::HeaderMap&> trailers{};
+  if (end_stream) {
+    trailers.emplace(encoder_callbacks_->addEncodedTrailers());
+  }
   return maybeDecompress(config_->responseDirectionConfig(), response_decompressor_,
-                         *encoder_callbacks_, data);
+                         *encoder_callbacks_, data, trailers);
+}
+
+Http::FilterTrailersStatus DecompressorFilter::encodeTrailers(Http::RequestTrailerMap& trailers) {
+  reportTotalBytes(config_->responseDirectionConfig(), trailers);
+  return Http::FilterTrailersStatus::Continue;
 }
 
 Http::FilterDataStatus DecompressorFilter::maybeDecompress(
     const DecompressorFilterConfig::DirectionConfig& direction_config,
     const Compression::Decompressor::DecompressorPtr& decompressor,
-    Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const {
+    Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer, absl::optional<Http::HeaderMap&> trailers) const {
   if (decompressor) {
     Buffer::OwnedImpl output_buffer;
     decompressor->decompress(input_buffer, output_buffer);
 
     // Report decompression via stats and logging before modifying the input buffer.
+    direction_config.chargeBytes(input_buffer.length(), output_buffer.length());
     direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
     direction_config.stats().total_uncompressed_bytes_.add(output_buffer.length());
     ENVOY_STREAM_LOG(debug, "{} data decompressed from {} bytes to {} bytes", callbacks,
@@ -120,8 +144,19 @@ Http::FilterDataStatus DecompressorFilter::maybeDecompress(
 
     input_buffer.drain(input_buffer.length());
     input_buffer.add(output_buffer);
+
+    if (trailers.has_value()) {
+      // Report total_<compressed/uncompressed>_bytes in trailers.
+      reportTotalBytes(direction_config, trailers.value());
+    }
   }
   return Http::FilterDataStatus::Continue;
+}
+
+void DecompressorFilter::reportTotalBytes(const DecompressorFilterConfig::DirectionConfig& direction_config, Http::HeaderMap& trailers) const {
+    total_bytes = direction_config.totalBytes();
+    trailers.addCopy("x-envoy-decompressor-compressed-bytes", total_bytes.first);
+    trailers.addCopy("x-envoy-decompressor-uncompressed-bytes", total_bytes.second);
 }
 
 template <>

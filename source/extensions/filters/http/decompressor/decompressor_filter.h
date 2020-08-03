@@ -48,6 +48,8 @@ public:
     virtual const std::string& logString() const PURE;
     const DecompressorStats& stats() const { return stats_; }
     bool decompressionEnabled() const { return decompression_enabled_.enabled(); }
+    void chargeBytes(uint64_t compressed_bytes, uint64_t uncompressed_bytes);
+    std::pair<uint64_t, uint64_t> totalBytes() const { return {total_compressed_bytes_, total_uncompressed_bytes_}; }
 
   private:
     static DecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -56,6 +58,8 @@ public:
 
     const DecompressorStats stats_;
     const Runtime::FeatureFlag decompression_enabled_;
+    uint64_t total_compressed_bytes_;
+    uint64_t total_uncompressed_bytes_;
   };
 
   class RequestDirectionConfig : public DirectionConfig {
@@ -122,10 +126,12 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
   template <class HeaderType>
@@ -156,7 +162,8 @@ private:
   Http::FilterDataStatus
   maybeDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                   const Compression::Decompressor::DecompressorPtr& decompressor,
-                  Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer) const;
+                  Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer, absl::optional<Http::HeaderMap&> trailers) const;
+  void reportTotalBytes(const DecompressorFilterConfig::DirectionConfig& direction_config, Http::HeaderMap& trailers) const;
 
   // TODO(junr03): These can be shared between compressor and decompressor.
   template <Http::CustomInlineHeaderRegistry::Type Type>
