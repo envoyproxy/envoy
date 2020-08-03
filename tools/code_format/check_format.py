@@ -567,7 +567,7 @@ def tokenInLine(token, line):
   index = 0
   while True:
     index = line.find(token, index)
-    if index < 1:
+    if index < 0:
       break
     if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
       if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
