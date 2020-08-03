@@ -168,6 +168,31 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   return {};
 }
 
+absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::string_view& str) {
+  uint64_t val = 0;
+  uint32_t bytes_consumed = 0;
+
+  for (const char cur : str) {
+    if (!absl::ascii_isdigit(cur)) {
+      break;
+    }
+    uint64_t new_val = (val * 10) + (cur - '0');
+    if (new_val / 8 < val) {
+      // Overflow occurred
+      return absl::nullopt;
+    }
+    val = new_val;
+    ++bytes_consumed;
+  }
+
+  if (bytes_consumed) {
+    // Consume some digits
+    str.remove_prefix(bytes_consumed);
+    return val;
+  }
+  return absl::nullopt;
+}
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions
