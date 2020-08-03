@@ -210,11 +210,6 @@ def envoy_cc_test_library(
         repository + "//test/test_common:printers_includes",
     ]
 
-    # Same as envoy_cc_library
-    srcs += select({
-        "@envoy//bazel:compdb_build": ["@envoy//bazel/external:empty.cc"],
-        "//conditions:default": [],
-    })
     _envoy_cc_test_infrastructure_library(
         name,
         srcs,
