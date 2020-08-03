@@ -120,7 +120,7 @@ e7       | dev   | 1.2-pre | std    |
 
 Note: Only e1 has the "xlarge" metadata key.
 
-Given this CDS `envoy::api::v2::Cluster`:
+Given this CDS `envoy::config::cluster::v3::Cluster`:
 
 ``` json
 {
@@ -165,7 +165,7 @@ After loading this configuration, the SLB's `LbSubsetMap` looks like this:
 <a name="diagram"></a>
 ![LbSubsetMap Diagram](subset_load_balancer_diagram.svg)
 
-Given these `envoy::api::v2::route::Route` entries:
+Given these `envoy::config::route::v3::Route` entries:
 
 ``` json
 "routes": [

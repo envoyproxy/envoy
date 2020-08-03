@@ -101,8 +101,7 @@ def ApiBoostTree(target_paths,
   # tool in place before we can start boosting.
   if generate_compilation_database:
     print('Building compilation database for %s' % dep_build_targets)
-    sp.run(['./tools/gen_compilation_database.py', '--run_bazel_build', '--include_headers'] +
-           dep_build_targets,
+    sp.run(['./tools/gen_compilation_database.py', '--include_headers'] + dep_build_targets,
            check=True)
 
   if build_api_booster:

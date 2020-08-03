@@ -42,11 +42,11 @@ public:
   const std::string& body() { return body_; }
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
-  Http::StreamResetReason reset_reason() { return reset_reason_; }
-  const Http::ResponseHeaderMap* continue_headers() { return continue_headers_.get(); }
+  Http::StreamResetReason resetReason() { return reset_reason_; }
+  const Http::ResponseHeaderMap* continueHeaders() { return continue_headers_.get(); }
   const Http::ResponseHeaderMap& headers() { return *headers_; }
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
-  const Http::MetadataMap& metadata_map() { return *metadata_map_; }
+  const Http::MetadataMap& metadataMap() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
   void waitForHeaders();
@@ -79,7 +79,7 @@ private:
   Http::ResponseHeaderMapPtr headers_;
   Http::ResponseTrailerMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
-  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;
@@ -184,7 +184,7 @@ public:
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
   void setUpstreamProtocol(FakeHttpConnection::Type protocol);
-  // Sets fake_upstreams_count_ and alters the upstream protocol in the config_helper_
+  // Sets fake_upstreams_count_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
@@ -240,6 +240,10 @@ public:
   void createXdsUpstream();
   void createXdsConnection();
   void cleanUpXdsConnection();
+
+  // See if a port can be successfully bound within the given timeout.
+  ABSL_MUST_USE_RESULT AssertionResult waitForPortAvailable(
+      uint32_t port, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Helpers for setting up expectations and making the internal gears turn for xDS request/response
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use

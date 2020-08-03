@@ -36,7 +36,7 @@ generates this and also does setup of the Bazel cache paths to allow external
 dependencies to be located:
 
 ```console
-tools/gen_compilation_database.py --run_bazel_build --include_headers
+tools/gen_compilation_database.py --include_headers
 ```
 
 Finally, the tool can be run against source files in the Envoy tree:

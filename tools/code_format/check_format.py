@@ -647,10 +647,28 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use strptime; use absl::FormatTime instead")
   if tokenInLine("strerror", line):
     reportError("Don't use strerror; use Envoy::errorDetails instead")
+  # Prefer using abseil hash maps/sets over std::unordered_map/set for performance optimizations and
+  # non-deterministic iteration order that exposes faulty assertions.
+  # See: https://abseil.io/docs/cpp/guides/container#hash-tables
+  if "std::unordered_map" in line:
+    reportError("Don't use std::unordered_map; use absl::flat_hash_map instead or "
+                "absl::node_hash_map if pointer stability of keys/values is required")
+  if "std::unordered_set" in line:
+    reportError("Don't use std::unordered_set; use absl::flat_hash_set instead or "
+                "absl::node_hash_set if pointer stability of keys/values is required")
   if "std::atomic_" in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
     reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
+  # Blocking the use of std::any, std::optional, std::variant for now as iOS 11/macOS 10.13
+  # does not support these functions at runtime.
+  # See: https://github.com/envoyproxy/envoy/issues/12341
+  if tokenInLine("std::any", line):
+    reportError("Don't use std::any; use absl::any instead")
+  if tokenInLine("std::optional", line):
+    reportError("Don't use std::optional; use absl::optional instead")
+  if tokenInLine("std::variant", line):
+    reportError("Don't use std::variant; use absl::variant instead")
   if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
     # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
     # can be used instead

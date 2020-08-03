@@ -127,7 +127,8 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
         auto* endpoint = locality_health->add_endpoints_health();
         Network::Utility::addressToProtobufAddress(
             *host->address(), *endpoint->mutable_endpoint()->mutable_address());
-        // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
+        // TODO(lilika): Add support for more granular options of
+        // envoy::config::core::v3::HealthStatus
         if (host->health() == Host::Health::Healthy) {
           endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
         } else {
@@ -309,9 +310,9 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
 
-  return std::make_unique<ClusterInfoImpl>(
-      params.cluster_, params.bind_config_, params.runtime_, std::move(socket_matcher),
-      std::move(scope), params.added_via_api_, params.validation_visitor_, factory_context);
+  return std::make_unique<ClusterInfoImpl>(params.cluster_, params.bind_config_, params.runtime_,
+                                           std::move(socket_matcher), std::move(scope),
+                                           params.added_via_api_, factory_context);
 }
 
 void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manager,
