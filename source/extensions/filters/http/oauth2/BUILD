@@ -14,8 +14,6 @@ envoy_extension_package()
 # HTTP L7 filter that performs oauth.
 # Public docs: docs/root/configuration/http_filters/oauth_filter.rst
 
-envoy_package()
-
 envoy_cc_library(
     name = "oauth_callback_interface",
     hdrs = ["oauth.h"],
