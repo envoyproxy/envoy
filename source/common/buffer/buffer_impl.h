@@ -239,8 +239,8 @@ public:
     ASSERT(slice_);
     ASSERT(slice_->dataSize() > 0);
   }
-  void* data() { return slice_->data(); };
-  size_t size() const { return slice_->dataSize(); };
+  void* data() override { return slice_->data(); };
+  size_t size() const override { return slice_->dataSize(); };
 
 private:
   SlicePtr slice_;
