@@ -34,7 +34,6 @@ CODEC_LIB_DEPS = [
     "//source/common/buffer:buffer_lib",
     "//source/common/buffer:watermark_buffer_lib",
     "//source/common/common:assert_lib",
-    "//source/common/common:cleanup_lib",
     "//source/common/common:statusor_lib",
     "//source/common/common:utility_lib",
     "//source/common/grpc:common_lib",
@@ -56,7 +55,7 @@ envoy_cc_library(
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     external_deps = ["http_parser"],
-    deps = CODEC_LIB_DEPS,
+    deps = CODEC_LIB_DEPS + ["//source/common/common:cleanup_lib"],
 )
 
 envoy_cc_library(

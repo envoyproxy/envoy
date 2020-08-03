@@ -2241,7 +2241,7 @@ TEST_P(Http1ClientConnectionImplTest, BadEncodeParams) {
   // Need to set :method and :path.
   // New and legacy codecs will behave differently on errors from processing outbound data. The
   // legacy codecs will throw an exception (that presently will be uncaught in contexts like
-  // sendLocalReply), while the new codecs temporarily ENVOY_BUG until Envoy handles errors on
+  // sendLocalReply), while the new codecs temporarily RELEASE_ASSERT until Envoy handles errors on
   // outgoing data.
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
   if (GetParam()) {
