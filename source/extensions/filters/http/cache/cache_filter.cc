@@ -145,8 +145,8 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
   bool should_continue_decoding = false;
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
-  case CacheEntryStatus::UnsatisfiableRange:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
+  case CacheEntryStatus::NotSatisfiableRange: // TODO(#10132): create 416 response.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;          // We don't yet return or support these codes.
   case CacheEntryStatus::RequiresValidation:
     // If a cache entry requires validation inject validation headers in the request and let it
     // pass through as if no cache entry was found. If the cache entry was valid the response
@@ -160,6 +160,8 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     should_continue_decoding = filter_state_ == FilterState::WaitingForCacheLookup;
     filter_state_ = FilterState::NoCachedResponseFound;
     break;
+  case CacheEntryStatus::SatisfiableRange: // TODO(#10132): break response content to the ranges
+                                           // requested.
   case CacheEntryStatus::Ok:
     lookup_result_ = std::make_unique<LookupResult>(std::move(result));
     filter_state_ = FilterState::DecodeServingFromCache;

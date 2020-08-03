@@ -93,6 +93,13 @@ public:
   // Parses header_entry as an HTTP time. Returns SystemTime() if
   // header_entry is null or malformed.
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
+
+  /**
+   * Read a leading positive decimal integer value and advance "*str" past the
+   * digits read. If overflow occurs, or no digits exist, return
+   * absl::nullopt without advancing "*str".
+   */
+  static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
 };
 } // namespace Cache
 } // namespace HttpFilters
