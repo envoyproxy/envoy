@@ -39,18 +39,13 @@ void ListenerFilterFuzzer::fuzz(
 
   if (nreads > 0) {
     // Construct header from single or multiple reads
-    std::string data = "";
+    std::string header = "";
     std::vector<size_t> indices; // Ending indices for each read
 
-    size_t curr = 0;
-
     for (int i = 0; i < nreads; i++) {
-      data += input.data(i);
-      curr += input.data(i).size();
-      indices.push_back(curr);
+      header += input.data(i);
+      indices.push_back(header.size());
     }
-
-    absl::string_view header(data);
 
     int nread = 0; // Counter of current read
 
