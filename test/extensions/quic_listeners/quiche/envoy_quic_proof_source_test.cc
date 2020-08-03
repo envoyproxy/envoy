@@ -218,6 +218,8 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidCert) {
       .WillRepeatedly(Return(tls_cert_configs));
   std::string invalid_cert{"invalid certificate"};
   EXPECT_CALL(tls_cert_config, certificateChain()).WillOnce(ReturnRef(invalid_cert));
+  std::string path("some path");
+  EXPECT_CALL(tls_cert_config, certificateChainPath()).WillOnce(ReturnRef(path));
   proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
                          chlo_hash_, std::move(callback));
   EXPECT_TRUE(called);

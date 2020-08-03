@@ -28,11 +28,11 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   }
   auto& cert_config = cert_config_ref.value().get();
   const std::string& chain_str = cert_config.certificateChain();
-  std::string pem_str = std::string(const_cast<char*>(chain_str.data()), chain_str.size());
   std::stringstream pem_stream(chain_str);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
   if (chain.empty()) {
-    ENVOY_LOG(warn, "Failed to load certificate chain from %s", cert_config.certificateChainPath());
+    const std::string& path = cert_config.certificateChainPath();
+    ENVOY_LOG(warn, "Failed to load certificate chain from %s", path);
     return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
         new quic::ProofSource::Chain({}));
   }
