@@ -15,6 +15,11 @@
 /**
  * Data structures and functions for unmarshaling OCSP responses
  * according to the RFC6960 B.2 spec. See: https://tools.ietf.org/html/rfc6960#appendix-B
+ *
+ * WARNING: This module is meant to validate that OCSP responses are well-formed
+ * and extract useful fields for OCSP stapling. This assumes that responses are
+ * provided from configs or another trusted source and does not perform the
+ * necessary checks to verify responses coming from an upstream server.
  */
 
 namespace Envoy {

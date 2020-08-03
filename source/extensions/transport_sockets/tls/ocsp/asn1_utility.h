@@ -20,8 +20,10 @@ namespace TransportSockets {
 namespace Tls {
 namespace Ocsp {
 
+constexpr absl::string_view GENERALIZED_TIME_FORMAT = "%E4Y%m%d%H%M%S";
+
 /**
- * Construct a |T| from the data contained in the CBS&. Functions
+ * Construct a `T` from the data contained in the CBS&. Functions
  * of this type must advance the input CBS& over the element.
  */
 template <typename T> using Asn1ParsingFunc = std::function<T(CBS&)>;
@@ -57,7 +59,7 @@ public:
   static absl::string_view cbsToString(CBS& cbs);
 
   /**
-   * Parses all elements of an ASN.1 SEQUENCE OF. |parse_element| must
+   * Parses all elements of an ASN.1 SEQUENCE OF. `parse_element` must
    * advance its input CBS& over the entire element.
    *
    * @param cbs a CBS& that refers to an ASN.1 SEQUENCE OF object
@@ -70,8 +72,8 @@ public:
   static std::vector<T> parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parse_element);
 
   /**
-   * Checks if an explicitly tagged optional element of |tag| is present and
-   * if so parses its value with |parse_data|. If the element is not present,
+   * Checks if an explicitly tagged optional element of `tag` is present and
+   * if so parses its value with `parse_data`. If the element is not present,
    * `cbs` is not advanced.
    *
    * @param cbs a CBS& that refers to the current document position
@@ -83,16 +85,16 @@ public:
   static absl::optional<T> parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag);
 
   /**
-   * Returns whether or not an element explicitly tagged with |tag| is present
+   * Returns whether or not an element explicitly tagged with `tag` is present
    * at `cbs`. If so, `cbs` is advanced over the optional and assigns
-   * |data| to the inner element, if |data| is not nullptr.
-   * If `cbs` does not contain |tag|, `cbs` remains at the same position.
+   * `data` to the inner element, if `data` is not nullptr.
+   * If `cbs` does not contain `tag`, `cbs` remains at the same position.
    *
    * @param cbs a CBS& that refers to the current document position
    * @param data a CBS* that is set to the contents of `cbs` if present
    * @param an explicit tag indicating an optional value
    *
-   * @returns bool whether `cbs` points to an element tagged with |tag|
+   * @returns bool whether `cbs` points to an element tagged with `tag`
    * @throws Envoy::EnvoyException if `cbs` is a malformed TLV bytestring
    */
   static bool getOptional(CBS& cbs, CBS* data, unsigned tag);
@@ -146,7 +148,7 @@ public:
   static std::vector<uint8_t> parseOctetString(CBS& cbs);
 
   /**
-   * Advance `cbs` over an ASN.1 value of the class |tag| if that
+   * Advance `cbs` over an ASN.1 value of the class `tag` if that
    * value is present. Otherwise, `cbs` stays in the same position.
    *
    * @param cbs a CBS& that refers to the current document position
@@ -156,7 +158,7 @@ public:
   static void skipOptional(CBS& cbs, unsigned tag);
 
   /**
-   * Advance `cbs` over an ASN.1 value of the class |tag|.
+   * Advance `cbs` over an ASN.1 value of the class `tag`.
    *
    * @param cbs a CBS& that refers to the current document position
    * @param tag the tag of the value to skip

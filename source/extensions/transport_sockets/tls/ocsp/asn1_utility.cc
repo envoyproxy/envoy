@@ -70,11 +70,10 @@ Envoy::SystemTime Asn1Utility::parseGeneralizedTime(CBS& cbs) {
 
   absl::Time time;
   auto utc_time_str = time_str.substr(0, time_str.length() - 1);
-  std::string time_format = "%E4Y%m%d%H%M%S";
   std::string parse_error;
-  if (!absl::ParseTime(time_format, utc_time_str, &time, &parse_error)) {
+  if (!absl::ParseTime(GENERALIZED_TIME_FORMAT, utc_time_str, &time, &parse_error)) {
     throw Envoy::EnvoyException(absl::StrCat("Error parsing timestamp ", time_str, " with format ",
-                                             time_format, ". Error: ", parse_error));
+                                             GENERALIZED_TIME_FORMAT, ". Error: ", parse_error));
   }
   return absl::ToChronoTime(time);
 }

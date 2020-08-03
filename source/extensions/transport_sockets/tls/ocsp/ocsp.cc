@@ -84,7 +84,8 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
 
   auto& this_update = response_->response_->getThisUpdate();
   if (time_source_.systemTime() < this_update) {
-    DateFormatter formatter("%E4Y%m%d%H%M%S");
+    std::string time_format(GENERALIZED_TIME_FORMAT);
+    DateFormatter formatter(time_format);
     throw EnvoyException(absl::StrCat("OCSP Response thisUpdate field is set in the future: ",
                                       formatter.fromTime(this_update)));
   }
