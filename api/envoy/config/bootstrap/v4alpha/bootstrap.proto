@@ -305,6 +305,9 @@ message Watchdog {
         "envoy.config.bootstrap.v3.Watchdog.WatchdogAction";
 
     // In priority events are fired from KILL, MULTIKILL, MEGAMISS and MISS.
+    // For KILL/MULTIKILL there is a default PANIC that will kill the process,
+    // but it might be useful to specify several debug actions, and possibly
+    // an alternate FATAL action.
     enum WatchdogEvent {
       UNKNOWN = 0;
       KILL = 1;
@@ -318,6 +321,10 @@ message Watchdog {
 
     WatchdogEvent event = 2;
   }
+
+  // Register actions that will fire on given WatchDog events.
+  // See *WatchDogAction* for priority of events.
+  repeated WatchdogAction actions = 7;
 
   // The duration after which Envoy counts a nonresponsive thread in the
   // *watchdog_miss* statistic. If not specified the default is 200ms.
@@ -349,9 +356,6 @@ message Watchdog {
   // nonresponsive threads required for the *multikill_timeout*.
   // If not specified the default is 0.
   type.v3.Percent multikill_threshold = 5;
-
-  // Register actions that will fire on given WatchDog events.
-  repeated WatchdogAction actions = 7;
 }
 
 // Runtime :ref:`configuration overview <config_runtime>` (deprecated).

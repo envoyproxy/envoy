@@ -26,7 +26,7 @@ public:
    * Callback function for when the GuardDog observes an event.
    * @param event the event the GuardDog observes.
    * @param thread_ltt_pairs pairs of the relevant thread to the event, and the
-   *  last time touched (ltt) of those threads with their watchdog.
+   *  last time touched (LTT) of those threads with their watchdog.
    * @param now the current time.
    */
   virtual void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,

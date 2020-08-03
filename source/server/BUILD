@@ -124,6 +124,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/config:utility_lib",
         "//source/common/event:libevent_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],

@@ -18,6 +18,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/config/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "server/watchdog_impl.h"
@@ -56,7 +57,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
         const auto& actions = config.wdActions();
         for (const auto& action : actions) {
           if (action.event() == WatchDogAction::UNKNOWN) {
-            ENVOY_LOG_MISC(error, "WatchDogAction specified with UNKNOWN event");
+            throw ProtoValidationException("WatchDogAction specified with UNKNOWN event", action);
           } else {
             // Get factory and add the created cb
             auto& factory =

@@ -11,6 +11,7 @@
 #include "common/api/api_impl.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
+#include "common/protobuf/utility.h"
 
 #include "server/guarddog_impl.h"
 
@@ -26,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::ElementsAre;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::KilledBySignal;
 using testing::NiceMock;
@@ -34,11 +36,11 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-// Kill has an explict value that disables the feature.
+// Kill has an explicit value that disables the feature.
 const int DISABLE_KILL = 0;
 const int DISABLE_MULTIKILL = 0;
 
-// Miss / Megamiss don't have an explict value that disables them
+// Miss / Megamiss don't have an explicit value that disables them
 // so set a timeout larger than those used in tests for 'disable' it.
 const int DISABLE_MISS = 1000000;
 const int DISABLE_MEGAMISS = 1000000;
@@ -105,9 +107,9 @@ INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogTestBase,
 class GuardDogDeathTest : public GuardDogTestBase {
 protected:
   GuardDogDeathTest()
-      : config_kill_(1000, 1000, 100, 1000, 0, actions_),
-        config_multikill_(1000, 1000, 1000, 500, 0, actions_),
-        config_multikill_threshold_(1000, 1000, 1000, 500, 60, actions_) {}
+      : config_kill_(1000, 1000, 100, 1000, 0, std::vector<std::string>{}),
+        config_multikill_(1000, 1000, 1000, 500, 0, std::vector<std::string>{}),
+        config_multikill_threshold_(1000, 1000, 1000, 500, 60, std::vector<std::string>{}) {}
 
   /**
    * This does everything but the final forceCheckForTest() that should cause
@@ -165,7 +167,6 @@ protected:
     time_system_->advanceTimeWait(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
   }
 
-  std::vector<std::string> actions_;
   NiceMock<Configuration::MockMain> config_kill_;
   NiceMock<Configuration::MockMain> config_multikill_;
   NiceMock<Configuration::MockMain> config_multikill_threshold_;
@@ -273,7 +274,8 @@ TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
 class GuardDogMissTest : public GuardDogTestBase {
 protected:
   GuardDogMissTest()
-      : config_miss_(500, 1000, 0, 0, 0, actions_), config_mega_(1000, 500, 0, 0, 0, actions_) {}
+      : config_miss_(500, 1000, 0, 0, 0, std::vector<std::string>{}),
+        config_mega_(1000, 500, 0, 0, 0, std::vector<std::string>{}) {}
 
   void checkMiss(uint64_t count, const std::string& descriptor) {
     EXPECT_EQ(count, TestUtility::findCounter(stats_store_, "server.watchdog_miss")->value())
@@ -292,7 +294,6 @@ protected:
         << descriptor;
   }
 
-  std::vector<std::string> actions_;
   NiceMock<Configuration::MockMain> config_miss_;
   NiceMock<Configuration::MockMain> config_mega_;
 };
@@ -394,31 +395,27 @@ TEST_P(GuardDogMissTest, MissCountTest) {
 
 TEST_P(GuardDogTestBase, StartStopTest) {
   NiceMock<Stats::MockStore> stats;
-  std::vector<std::string> actions;
-  NiceMock<Configuration::MockMain> config(0, 0, 0, 0, 0, actions);
+  NiceMock<Configuration::MockMain> config(0, 0, 0, 0, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
-  std::vector<std::string> actions;
-  NiceMock<Configuration::MockMain> config(40, 50, 0, 0, 0, actions);
+  NiceMock<Configuration::MockMain> config(40, 50, 0, 0, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(40));
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
-  std::vector<std::string> actions;
-  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0, actions);
+  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(90));
 }
 
 TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
-  std::vector<std::string> actions;
-  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0, actions);
+  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0, std::vector<std::string>{});
   initGuardDog(stats, config);
   auto watched_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
@@ -443,9 +440,9 @@ TEST_P(GuardDogTestBase, AtomicIsAtomicTest) {
 // the events vector passed to it.
 // Instances of this class will be registered for GuardDogEvent through
 // TestGuardDogActionFactory.
-class LogGuardDogAction : public Configuration::GuardDogAction {
+class RecordGuardDogAction : public Configuration::GuardDogAction {
 public:
-  LogGuardDogAction(std::vector<std::string>& events) : events_(events) {}
+  RecordGuardDogAction(std::vector<std::string>& events) : events_(events) {}
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,
            std::vector<std::pair<Thread::ThreadId, MonotonicTime>> thread_ltt_pairs,
@@ -484,16 +481,16 @@ protected:
 
 // Test factory for consuming Watchdog configs and creating GuardDogActions.
 template <class ConfigType>
-class LogGuardDogActionFactory : public Configuration::GuardDogActionFactory {
+class RecordGuardDogActionFactory : public Configuration::GuardDogActionFactory {
 public:
-  LogGuardDogActionFactory(const std::string& name, std::vector<std::string>& events)
+  RecordGuardDogActionFactory(const std::string& name, std::vector<std::string>& events)
       : name_(name), events_(events) {}
 
   Configuration::GuardDogActionPtr createGuardDogActionFromProto(
       const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& /*config*/,
       Configuration::GuardDogActionFactoryContext& /*context*/) override {
     // Return different actions depending on the config.
-    return std::make_unique<LogGuardDogAction>(events_);
+    return std::make_unique<RecordGuardDogAction>(events_);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -529,7 +526,7 @@ public:
 };
 
 /**
- * Tests that various actions registered for the guarddog get called upon.
+ * Tests that various actions registered for the guard dog get called upon.
  */
 class GuardDogActionsTest : public GuardDogTestBase {
 protected:
@@ -595,7 +592,7 @@ protected:
 
   std::vector<std::string> actions_;
   std::vector<std::string> events_;
-  LogGuardDogActionFactory<Envoy::ProtobufWkt::Empty> log_factory_;
+  RecordGuardDogActionFactory<Envoy::ProtobufWkt::Empty> log_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_log_factory_;
   AssertGuardDogActionFactory<Envoy::ProtobufWkt::StringValue> assert_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_assert_factory_;
@@ -808,6 +805,27 @@ TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
   };
 
   EXPECT_DEATH(die_function(), "MultiKill conditions triggered.");
+}
+
+TEST_P(GuardDogActionsTest, ShouldErrorOnUnknownEvent) {
+  std::vector<std::string> invalidActionsConfig = {
+      R"EOF(
+      {
+        "config": {
+          "name": "LogFactory",
+          "typed_config": {
+            "@type": "type.googleapis.com/google.protobuf.Empty"
+          }
+        },
+        "event": "UNKNOWN"
+      }
+    )EOF"};
+
+  const NiceMock<Configuration::MockMain> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
+                                                 DISABLE_MULTIKILL, 0, invalidActionsConfig);
+
+  EXPECT_THAT_THROWS_MESSAGE(SetupFirstDog(config), ProtoValidationException,
+                             HasSubstr("UNKNOWN event"));
 }
 
 } // namespace

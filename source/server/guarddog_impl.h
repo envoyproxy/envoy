@@ -133,8 +133,8 @@ private:
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
-  using EventToActionsMap = std::unordered_map<WatchDogAction::WatchdogEvent,
-                                               std::vector<Configuration::GuardDogActionPtr>>;
+  using EventToActionsMap = absl::flat_hash_map<WatchDogAction::WatchdogEvent,
+                                                std::vector<Configuration::GuardDogActionPtr>>;
   EventToActionsMap events_to_actions_;
   std::vector<WatchedDogPtr> watched_dogs_ ABSL_GUARDED_BY(wd_lock_);
   Thread::MutexBasicLockable wd_lock_;
