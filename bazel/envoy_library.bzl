@@ -70,12 +70,13 @@ def envoy_cc_extension(
         undocumented = False,
         status = "stable",
         tags = [],
+        visibility = ["//:extension_config"],
         **kwargs):
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
     if status not in EXTENSION_STATUS_VALUES:
         fail("Unknown extension status: " + status)
-    envoy_cc_library(name, tags = tags, **kwargs)
+    envoy_cc_library(name, tags = tags, visibility = visibility, **kwargs)
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
