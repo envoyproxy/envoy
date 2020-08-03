@@ -547,7 +547,7 @@ message CorsPolicy {
   core.v4alpha.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 35]
+// [#next-free-field: 36]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteAction";
 
@@ -886,6 +886,11 @@ message RouteAction {
     //   must come from trusted source.
     string host_rewrite_header = 29
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    // Indicates that during forwarding, the host header will be swapped with
+    // the result of the regex substitution executed on path value with query and fragment removed.
+    // This is useful for transitioning variable content between path segment and subdomain.
+    type.matcher.v4alpha.RegexMatchAndSubstitute host_rewrite_path = 35;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
