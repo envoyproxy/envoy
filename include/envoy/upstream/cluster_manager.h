@@ -214,8 +214,8 @@ public:
   virtual void shutdown() PURE;
 
   /**
-   * @return const envoy::api::v2::core::BindConfig& cluster manager wide bind configuration for new
-   *         upstream connections.
+   * @return const envoy::config::core::v3::BindConfig& cluster manager wide bind configuration for
+   * new upstream connections.
    */
   virtual const envoy::config::core::v3::BindConfig& bindConfig() const PURE;
 

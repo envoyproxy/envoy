@@ -23,6 +23,7 @@ public:
   MOCK_METHOD(void, incTransactionsRollback, (), (override));
   MOCK_METHOD(void, incNotices, (NoticeType), (override));
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
+  MOCK_METHOD(void, processQuery, (const std::string&), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -75,12 +76,36 @@ class PostgresProxyNoticeTest
 TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   decoder_->setStartup(true);
 
-  // Start with length.
-  data_.writeBEInt<uint32_t>(12);
-  // Add 8 bytes of some data.
-  data_.add(buf_, 8);
+  buf_[0] = '\0';
+  // Startup message has the following structure:
+  // Length (4 bytes) - payload and length field
+  // version (4 bytes)
+  // Attributes: key/value pairs separated by '\0'
+  data_.writeBEInt<uint32_t>(53);
+  // Add version code
+  data_.writeBEInt<uint32_t>(0x00030000);
+  // user-postgres key-pair
+  data_.add("user"); // 4 bytes
+  data_.add(buf_, 1);
+  data_.add("postgres"); // 8 bytes
+  data_.add(buf_, 1);
+  // database-test-db key-pair
+  data_.add("database"); // 8 bytes
+  data_.add(buf_, 1);
+  data_.add("testdb"); // 6 bytes
+  data_.add(buf_, 1);
+  // Some other attribute
+  data_.add("attribute"); // 9 bytes
+  data_.add(buf_, 1);
+  data_.add("blah"); // 4 bytes
+  data_.add(buf_, 1);
   decoder_->onData(data_, true);
   ASSERT_THAT(data_.length(), 0);
+  // Verify parsing attributes
+  ASSERT_THAT(decoder_->getAttributes().at("user"), "postgres");
+  ASSERT_THAT(decoder_->getAttributes().at("database"), "testdb");
+  // This attribute should not be found
+  ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
 
   // Now feed normal message with 1bytes as command.
   data_.add("P");
@@ -89,6 +114,40 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   data_.add("AB");
   decoder_->onData(data_, true);
   ASSERT_THAT(data_.length(), 0);
+}
+
+// Test verifies that when Startup message does not carry
+// "database" attribute, it is derived from "user".
+TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
+  decoder_->setStartup(true);
+
+  buf_[0] = '\0';
+  // Startup message has the following structure:
+  // Length (4 bytes) - payload and length field
+  // version (4 bytes)
+  // Attributes: key/value pairs separated by '\0'
+  data_.writeBEInt<uint32_t>(37);
+  // Add version code
+  data_.writeBEInt<uint32_t>(0x00030000);
+  // user-postgres key-pair
+  data_.add("user"); // 4 bytes
+  data_.add(buf_, 1);
+  data_.add("postgres"); // 8 bytes
+  data_.add(buf_, 1);
+  // database-test-db key-pair
+  // Some other attribute
+  data_.add("attribute"); // 9 bytes
+  data_.add(buf_, 1);
+  data_.add("blah"); // 4 bytes
+  data_.add(buf_, 1);
+  decoder_->onData(data_, true);
+  ASSERT_THAT(data_.length(), 0);
+
+  // Verify parsing attributes
+  ASSERT_THAT(decoder_->getAttributes().at("user"), "postgres");
+  ASSERT_THAT(decoder_->getAttributes().at("database"), "postgres");
+  // This attribute should not be found
+  ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
 }
 
 // Test processing messages which map 1:1 with buffer.
@@ -181,7 +240,7 @@ TEST_F(PostgresProxyDecoderTest, Unknown) {
 // Test if each frontend command calls incMessagesFrontend() method.
 TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
   EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(1);
-  createPostgresMsg(data_, GetParam(), "Some message just to create payload");
+  createPostgresMsg(data_, GetParam(), "SELECT 1;");
   decoder_->onData(data_, true);
 }
 
@@ -204,6 +263,43 @@ TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
   createPostgresMsg(data_, "X");
   decoder_->onData(data_, true);
   ASSERT_FALSE(decoder_->getSession().inTransaction());
+}
+
+// Query message should invoke filter's callback message
+TEST_F(PostgresProxyFrontendDecoderTest, QueryMessage) {
+  EXPECT_CALL(callbacks_, processQuery).Times(1);
+  createPostgresMsg(data_, "Q", "SELECT * FROM whatever;");
+  decoder_->onData(data_, true);
+}
+
+// Parse message has optional Query name which may be in front of actual
+// query statement. This test verifies that both formats are processed
+// correctly.
+TEST_F(PostgresProxyFrontendDecoderTest, ParseMessage) {
+  std::string query = "SELECT * FROM whatever;";
+  std::string query_name, query_params;
+
+  // Should be called twice with the same query.
+  EXPECT_CALL(callbacks_, processQuery(query)).Times(2);
+
+  // Set params to be zero.
+  query_params.reserve(2);
+  query_params += '\0';
+  query_params += '\0';
+
+  // Message without optional query name.
+  query_name.reserve(1);
+  query_name += '\0';
+  createPostgresMsg(data_, "P", query_name + query + query_params);
+  decoder_->onData(data_, true);
+
+  // Message with optional name query_name
+  query_name.clear();
+  query_name.reserve(5);
+  query_name += "P0_8";
+  query_name += '\0';
+  createPostgresMsg(data_, "P", query_name + query + query_params);
+  decoder_->onData(data_, true);
 }
 
 // Test if each backend command calls incMessagesBackend()) method.

@@ -60,7 +60,7 @@ udp_writer_config:
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV2Yaml(yaml);
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
   EXPECT_CALL(udp_gso_syscall_, supportsUdpGso()).WillOnce(Return(true));
   EXPECT_CALL(server_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
