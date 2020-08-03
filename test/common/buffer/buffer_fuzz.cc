@@ -14,6 +14,7 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
+#include "absl/types/span.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -131,6 +132,26 @@ public:
   void* linearize(uint32_t /*size*/) override {
     // Sketchy, but probably will work for test purposes.
     return mutableStart();
+  }
+
+  class SliceDataImpl : public Buffer::SliceData {
+  public:
+    SliceDataImpl() = delete;
+    SliceDataImpl(absl::Span<uint8_t> slice) : slice_(slice) {}
+    void* data() override { return slice_.data(); }
+    size_t size() const override { return slice_.size(); }
+
+  private:
+    absl::Span<uint8_t> slice_;
+  };
+
+  std::unique_ptr<Buffer::SliceData> extractFrontSlice() override {
+    ASSERT(size_ > 0);
+    // assumption: test keeps buffer instance alive while using extracted slice
+    auto slice = std::make_unique<SliceDataImpl>(
+        absl::Span<uint8_t>{reinterpret_cast<uint8_t*>(data_.data() + start_), size_});
+    drain(size_);
+    return slice;
   }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }

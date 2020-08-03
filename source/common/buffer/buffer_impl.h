@@ -117,10 +117,10 @@ public:
    * @param reservation a reservation obtained from a previous call to reserve().
    *        If the reservation is not from this Slice, commit() will return false.
    *        If the caller is committing fewer bytes than provided by reserve(), it
-   *        should change the mem_ field of the reservation before calling commit().
+   *        should change the len_ field of the reservation before calling commit().
    *        For example, if a caller reserve()s 4KB to do a nonblocking socket read,
    *        and the read only returns two bytes, the caller should set
-   *        reservation.mem_ = 2 and then call `commit(reservation)`.
+   *        reservation.len_ = 2 and then call `commit(reservation)`.
    * @return whether the Reservation was successfully committed to the Slice.
    */
   bool commit(const Reservation& reservation) {
@@ -229,6 +229,22 @@ protected:
 };
 
 using SlicePtr = std::unique_ptr<Slice>;
+
+/**
+ * Wraps a valid SlicePtr
+ */
+class SliceDataImpl : public SliceData {
+public:
+  SliceDataImpl(SlicePtr slice) : slice_(std::move(slice)) {
+    ASSERT(slice_);
+    ASSERT(slice_->dataSize() > 0);
+  }
+  void* data() { return slice_->data(); };
+  size_t size() const { return slice_->dataSize(); };
+
+private:
+  SlicePtr slice_;
+};
 
 // OwnedSlice can not be derived from as it has variable sized array as member.
 class OwnedSlice final : public Slice, public InlineStorage {
@@ -539,6 +555,7 @@ public:
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
+  std::unique_ptr<SliceData> extractFrontSlice() override;
   uint64_t length() const override;
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;

@@ -347,6 +347,79 @@ TEST_F(OwnedImplTest, Read) {
   EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 }
 
+TEST_F(OwnedImplTest, ExtractOwnedSlice) {
+  Buffer::OwnedImpl buffer;
+  buffer.appendSliceForTest("abcde");
+  const uint64_t expected_length0 = 5;
+  buffer.appendSliceForTest("123");
+  const uint64_t expected_length1 = 3;
+  EXPECT_EQ(buffer.toString(), "abcde123");
+  RawSliceVector slices = buffer.getRawSlices();
+  EXPECT_EQ(2, slices.size());
+  auto slice = buffer.extractFrontSlice();
+  ASSERT_TRUE(slice);
+  ASSERT_NE(slice->data(), nullptr);
+  EXPECT_EQ(slice->size(), expected_length0);
+  EXPECT_TRUE(0 == memcmp(slice->data(), "abcde", expected_length0));
+  EXPECT_EQ(buffer.toString(), "123");
+  buffer.appendSliceForTest(slice->data(), slice->size());
+  EXPECT_EQ(buffer.toString(), "123abcde");
+  slice = buffer.extractFrontSlice();
+  ASSERT_TRUE(slice);
+  ASSERT_NE(slice->data(), nullptr);
+  EXPECT_EQ(slice->size(), expected_length1);
+  EXPECT_TRUE(0 == memcmp(slice->data(), "123", expected_length1));
+  EXPECT_EQ(buffer.toString(), "abcde");
+}
+
+TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
+  Buffer::OwnedImpl buffer;
+  buffer.appendSliceForTest("abcde");
+  const uint64_t expected_length0 = 5;
+  buffer.appendSliceForTest("123");
+  EXPECT_EQ(buffer.toString(), "abcde123");
+  RawSliceVector slices = buffer.getRawSlices();
+  EXPECT_EQ(2, slices.size());
+  const uint64_t partial_drain_size = 2;
+  buffer.drain(partial_drain_size);
+  auto slice = buffer.extractFrontSlice();
+  ASSERT_TRUE(slice);
+  ASSERT_NE(slice->data(), nullptr);
+  EXPECT_EQ(slice->size(), expected_length0 - partial_drain_size);
+  EXPECT_TRUE(0 == memcmp(slice->data(), "abcde" + partial_drain_size,
+                          expected_length0 - partial_drain_size));
+  EXPECT_EQ(buffer.toString(), "123");
+}
+
+TEST_F(OwnedImplTest, ExtractUnownedSlice) {
+  std::string input{"some string to test with"};
+  const size_t expected_length0 = input.size();
+  auto frag = OwnedBufferFragmentImpl::create(
+      {input.c_str(), expected_length0},
+      [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
+  Buffer::OwnedImpl buffer;
+  buffer.addBufferFragment(*frag);
+  EXPECT_EQ(expected_length0, buffer.length());
+  buffer.appendSliceForTest("another slice");
+  const uint64_t expected_length1 = 13;
+
+  const uint64_t partial_drain_size = 5;
+  buffer.drain(partial_drain_size);
+  EXPECT_EQ(expected_length0 - partial_drain_size + expected_length1, buffer.length());
+  EXPECT_FALSE(release_callback_called_);
+
+  auto slice = buffer.extractFrontSlice();
+  ASSERT_TRUE(slice);
+  ASSERT_NE(slice->data(), nullptr);
+  EXPECT_EQ(slice->size(), expected_length0 - partial_drain_size);
+  EXPECT_TRUE(0 == memcmp(slice->data(), input.data() + partial_drain_size,
+                          expected_length0 - partial_drain_size));
+  EXPECT_EQ(expected_length1, buffer.length());
+  EXPECT_FALSE(release_callback_called_); // extracted slice keeps fragment alive
+  slice.reset();
+  EXPECT_TRUE(release_callback_called_);
+}
+
 TEST_F(OwnedImplTest, DrainTracking) {
   testing::InSequence s;
 

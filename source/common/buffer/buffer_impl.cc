@@ -199,6 +199,15 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
   return raw_slices;
 }
 
+std::unique_ptr<SliceData> OwnedImpl::extractFrontSlice() {
+  ASSERT(!slices_.empty());
+  ASSERT(slices_.front());
+  length_ -= slices_.front()->dataSize();
+  auto slice = std::make_unique<SliceDataImpl>(std::move(slices_.front()));
+  slices_.pop_front();
+  return slice;
+}
+
 uint64_t OwnedImpl::length() const {
 #ifndef NDEBUG
   // When running in debug mode, verify that the precomputed length matches the sum

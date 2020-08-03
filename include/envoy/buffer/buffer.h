@@ -56,6 +56,25 @@ public:
 };
 
 /**
+ * A wrapper class to facilitate extracting buffer slices from a buffer instance.
+ */
+class SliceData {
+public:
+  virtual ~SliceData() = default;
+  /**
+   * @return void* a pointer to the data.
+   */
+  virtual void* data() PURE;
+
+  /**
+   * @return size_t the size of the data.
+   */
+  virtual size_t size() const PURE;
+};
+
+using SliceDataPtr = std::unique_ptr<SliceData>;
+
+/**
  * A basic buffer abstraction.
  */
 class Instance {
@@ -143,6 +162,13 @@ public:
    */
   virtual RawSliceVector
   getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
+
+  /**
+   * Transfer ownership of the front slice to the caller. Must only be called if the
+   * buffer is not empty otherwise the implementation will have undefined behavior.
+   * @return pointer to SliceData object that wraps the front slice
+   */
+  virtual SliceDataPtr extractFrontSlice() PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).
