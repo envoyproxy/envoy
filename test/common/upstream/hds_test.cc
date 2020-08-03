@@ -311,16 +311,16 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
   // Create Message
   message.reset(createSimpleMessage());
 
-  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
-  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(*connection, setBufferLimits(_));
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
-  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  connection->raiseEvent(Network::ConnectionEvent::Connected);
 
   // Create a invalid message
   message.reset(createSimpleMessage());
@@ -372,34 +372,33 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
 
   // Create Message
   message.reset(createComplexSpecifier(N_CLUSTERS, N_LOCALITIES, N_ENDPOINTS));
-  std::vector<Network::MockClientConnection*> connections_;
+
+  // Create a new active connection on request.
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillRepeatedly(Invoke([&connections_](Network::Address::InstanceConstSharedPtr,
-                                             Network::Address::InstanceConstSharedPtr,
-                                             Network::TransportSocketPtr&,
-                                             const Network::ConnectionSocket::OptionsSharedPtr&) {
-        Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
-        EXPECT_CALL(*connection_, setBufferLimits(_)).Times(1);
-        EXPECT_CALL(*connection_, close(_)).Times(1);
-        connections_.push_back(connection_);
-        return connection_;
-      }));
+      .WillRepeatedly(Invoke(
+          [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+             Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
+            Network::MockClientConnection* connection =
+                new NiceMock<Network::MockClientConnection>();
+            connection->raiseEvent(Network::ConnectionEvent::Connected);
+            return connection;
+          }));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  // Carry over cluster name on a call to createClusterInfo,
+  // in the same way that the prod factory does.
   EXPECT_CALL(test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([](const ClusterInfoFactory::CreateClusterInfoParams& params) {
-        std::shared_ptr<Upstream::MockClusterInfo> new_cluster_info_{
+        std::shared_ptr<Upstream::MockClusterInfo> cluster_info{
             new NiceMock<Upstream::MockClusterInfo>()};
-        new_cluster_info_->name_ = params.cluster_.name();
-        return new_cluster_info_;
+        cluster_info->name_ = params.cluster_.name();
+        return cluster_info;
       }));
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(N_CLUSTERS * N_LOCALITIES * N_ENDPOINTS);
 
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
-  for (auto& connection_ : connections_) {
-    connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  }
+
   // read response and verify fields
   auto response = hds_delegate_->sendResponse().endpoint_health_response();
 
