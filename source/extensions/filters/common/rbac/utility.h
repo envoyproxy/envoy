@@ -1,9 +1,10 @@
 #pragma once
 
-#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/singleton/const_singleton.h"
+
+#include "extensions/filters/common/rbac/engine_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,17 +30,18 @@ struct RoleBasedAccessControlFilterStats {
 
 RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-class DynamicMetadataKeys {
-public:
-  const std::string ShadowEffectivePolicyIdField{"shadow_effective_policy_id"};
-  const std::string ShadowEngineResultField{"shadow_engine_result"};
-  const std::string EngineResultAllowed{"allowed"};
-  const std::string EngineResultDenied{"denied"};
-  const std::string AccessLogKey{"access_log_hint"};
-  const std::string CommonNamespace{"envoy.common"};
-};
+template <class ConfigType>
+std::unique_ptr<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {
+  return config.has_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules(), EnforcementMode::Enforced)
+                            : nullptr;
+}
 
-using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
+template <class ConfigType>
+std::unique_ptr<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
+  return config.has_shadow_rules()
+             ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.shadow_rules(), EnforcementMode::Shadow)
+             : nullptr;
+}
 
 } // namespace RBAC
 } // namespace Common

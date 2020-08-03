@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
+        ":engine_lib",
         "//include/envoy/stats:stats_macros",
         "//source/common/singleton:const_singleton",
     ],
@@ -53,7 +54,6 @@ envoy_cc_library(
     srcs = ["engine_impl.cc"],
     hdrs = ["engine_impl.h"],
     deps = [
-        ":utility_lib",
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
