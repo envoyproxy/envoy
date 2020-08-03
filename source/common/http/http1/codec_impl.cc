@@ -564,7 +564,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
-  // ConnectionImpl::dispatch throws an exception.
+  // http_parser exits early with an error code.
   Cleanup cleanup([this]() { dispatching_ = false; });
   ASSERT(!dispatching_);
   ASSERT(codec_status_.ok());
