@@ -28,9 +28,6 @@ build:linux --conlyopt=-fexceptions
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
 
-# Enable zlib-ng.
-build --define zlib=ng
-
 # Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
 build --action_env=CC
 build --action_env=CXX
