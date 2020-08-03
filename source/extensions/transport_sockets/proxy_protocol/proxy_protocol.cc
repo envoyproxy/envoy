@@ -11,6 +11,7 @@
 #include "extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
+using envoy::config::core::v3::ProxyProtocolConfig;
 
 namespace Envoy {
 namespace Extensions {
@@ -98,6 +99,20 @@ Network::IoResult UpstreamProxyProtocolSocket::writeHeader() {
   } while (true);
 
   return {action, bytes_written, false};
+}
+
+UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
+    Network::TransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config)
+    : transport_socket_factory_(std::move(transport_socket_factory)), config_(config) {}
+
+Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsSharedPtr options) const {
+  return std::make_unique<UpstreamProxyProtocolSocket>(
+      transport_socket_factory_->createTransportSocket(options), options, config_.version());
+}
+
+bool UpstreamProxyProtocolSocketFactory::implementsSecureTransport() const {
+  return transport_socket_factory_->implementsSecureTransport();
 }
 
 } // namespace ProxyProtocol
