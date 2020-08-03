@@ -52,5 +52,23 @@ static inline const SocketInterface* socketInterface(std::string name) {
 using SocketInterfaceSingleton = InjectableSingleton<SocketInterface>;
 using SocketInterfaceLoader = ScopedInjectableLoader<SocketInterface>;
 
+/**
+ * Create IoHandle for given address
+ * @param type type of socket to be requested
+ * @param addr address that is gleaned for address type, version and socket interface name
+ * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
+ */
+static inline IoHandlePtr ioHandleForAddr(Socket::Type type,
+                                          const Address::InstanceConstSharedPtr addr) {
+  auto sock_interface_name = addr->socketInterface();
+  if (!sock_interface_name.empty()) {
+    auto sock_interface = socketInterface(sock_interface_name);
+    RELEASE_ASSERT(sock_interface != nullptr,
+                   fmt::format("missing socket interface {}", sock_interface_name));
+    return sock_interface->socket(type, addr);
+  }
+  return SocketInterfaceSingleton::get().socket(type, addr);
+}
+
 } // namespace Network
 } // namespace Envoy

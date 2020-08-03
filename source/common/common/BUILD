@@ -152,6 +152,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "fancy_logger_lib",
+    srcs = ["fancy_logger.cc"],
+    hdrs = ["fancy_logger.h"],
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        ":base_logger_lib",
+        ":lock_guard_lib",
+        ":macros",
+        ":minimal_logger_lib",
+        ":non_copyable",
+    ] + select({
+        "//bazel:android_logger": ["logger_impl_lib_android"],
+        "//conditions:default": ["logger_impl_lib_standard"],
+    }),
+)
+
+envoy_cc_library(
     name = "base_logger_lib",
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
@@ -347,6 +364,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["abseil_node_hash_map"],
     deps = [
         ":assert_lib",
         ":hash_lib",

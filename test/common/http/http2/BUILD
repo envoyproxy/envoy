@@ -49,7 +49,7 @@ envoy_cc_test(
     name = "codec_impl_legacy_test",
     srcs = ["codec_impl_test.cc"],
     args = [
-        "--runtime-feature-disable-for-tests=envoy.reloadable_features.new_codec_behavior",
+        "--runtime-feature-override-for-tests=envoy.reloadable_features.new_codec_behavior",
     ],
     shard_count = 5,
     tags = ["fails_on_windows"],
@@ -82,6 +82,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -91,6 +92,7 @@ envoy_cc_test_library(
     hdrs = ["http2_frame.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/common:hex_lib",
         "//source/common/common:macros",
     ],
 )
@@ -105,7 +107,6 @@ envoy_cc_test_library(
         "//source/common/http:utility_lib",
         "//source/common/http/http2:codec_lib",
         "//test/common/http:common_lib",
-        "//test/common/http/http2:codec_impl_test_util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
@@ -123,7 +124,10 @@ envoy_cc_test(
         "response_header_corpus/simple_example_plain",
     ],
     tags = ["fails_on_windows"],
-    deps = [":frame_replay_lib"],
+    deps = [
+        ":frame_replay_lib",
+        "//test/common/http/http2:codec_impl_test_util",
+    ],
 )
 
 envoy_cc_test(
@@ -146,12 +150,18 @@ envoy_cc_fuzz_test(
     name = "response_header_fuzz_test",
     srcs = ["response_header_fuzz_test.cc"],
     corpus = "response_header_corpus",
-    deps = [":frame_replay_lib"],
+    deps = [
+        ":frame_replay_lib",
+        "//test/common/http/http2:codec_impl_test_util",
+    ],
 )
 
 envoy_cc_fuzz_test(
     name = "request_header_fuzz_test",
     srcs = ["request_header_fuzz_test.cc"],
     corpus = "request_header_corpus",
-    deps = [":frame_replay_lib"],
+    deps = [
+        ":frame_replay_lib",
+        "//test/common/http/http2:codec_impl_test_util",
+    ],
 )

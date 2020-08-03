@@ -2,12 +2,12 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "omit_canary_hosts_predicate_lib",
@@ -26,7 +26,6 @@ envoy_cc_extension(
         ":omit_canary_hosts_predicate_lib",
         "//include/envoy/registry",
         "//include/envoy/upstream:retry_interface",
-        "//source/extensions/retry/host:well_known_names",
         "@envoy_api//envoy/config/retry/omit_canary_hosts/v2:pkg_cc_proto",
     ],
 )

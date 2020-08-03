@@ -55,7 +55,7 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
@@ -81,7 +81,7 @@ api_listener:
         path: eds path
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
@@ -115,7 +115,7 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
