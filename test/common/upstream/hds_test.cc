@@ -386,7 +386,13 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
       }));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(test_factory_, createClusterInfo(_))
+      .WillRepeatedly(Invoke([](const ClusterInfoFactory::CreateClusterInfoParams& params) {
+        std::shared_ptr<Upstream::MockClusterInfo> new_cluster_info_{
+            new NiceMock<Upstream::MockClusterInfo>()};
+        new_cluster_info_->name_ = params.cluster_.name();
+        return new_cluster_info_;
+      }));
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(N_CLUSTERS * N_LOCALITIES * N_ENDPOINTS);
 
   // Process message

@@ -107,7 +107,7 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     // Add cluster health response and set name
     auto* cluster_health =
         response.mutable_endpoint_health_response()->add_cluster_endpoints_health();
-    cluster_health->set_cluster_name(cluster->name());
+    cluster_health->set_cluster_name(cluster->info()->name());
 
     // Hold all endpoint health information by locality, updated when a new locality
     // has been seen.
