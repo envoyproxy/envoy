@@ -476,11 +476,11 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->readDisable(true);
-  upstream_request_->encodeData("", true);
+  upstream_request_->encodeData("hello", false);
 
   // This ensures that fake_upstream_connection->readDisable has been run on its thread
   // before tcp_client starts writing.
-  tcp_client->waitForHalfClose();
+  ASSERT_TRUE(tcp_client->waitForData(5));
 
   ASSERT_TRUE(tcp_client->write(data, true));
 
@@ -490,6 +490,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
   upstream_request_->readDisable(false);
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, size));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeData("world", true);
   tcp_client->waitForHalfClose();
 }
 
