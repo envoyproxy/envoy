@@ -1,4 +1,4 @@
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -32,16 +32,11 @@ protected:
   ScopedRdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
-  /*
-  ScopedRdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {}
-*/
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
   void initialize() override {
     // Setup two upstream hosts, one for each cluster.
     setUpstreamCount(2);
-
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add the static cluster to serve SRDS.
       auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
@@ -166,7 +161,7 @@ fragments:
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::api::v2::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     auto route_configuration =
@@ -193,7 +188,7 @@ fragments:
                                   const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
+    envoy::api::v2::DeltaDiscoveryResponse response;
     response.set_system_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
@@ -216,7 +211,7 @@ fragments:
                                  const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::api::v2::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
@@ -240,6 +235,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test that a SRDS DiscoveryResponse is successfully processed.
+
 TEST_P(ScopedRdsIntegrationTest, BasicSuccess) {
   const std::string scope_tmpl = R"EOF(
 name: {}
@@ -447,11 +443,11 @@ key:
       /*cluster_0*/ 0);
 }
 
-TEST_P(ScopedRdsIntegrationTest, OnDemandScopeRdsNotLoaded) {
+TEST_P(ScopedRdsIntegrationTest, OnDemandUpdate) {
+  // 'name' will fail to validate due to empty string.
   const std::string scope_route1 = R"EOF(
-name: foo_scope1
+name:
 route_configuration_name: foo_route1
-priority: Secondary
 key:
   fragments:
     - string_key: foo

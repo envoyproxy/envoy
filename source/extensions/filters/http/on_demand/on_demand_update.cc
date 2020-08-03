@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/logger.h"
 #include "common/http/codes.h"
 
 namespace Envoy {
@@ -54,7 +55,6 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
       callbacks_->recreateStream()) {
     return;
   }
-
   // route cannot be resolved after an on-demand VHDS update or
   // recreating stream failed, continue the filter-chain
   callbacks_->continueDecoding();

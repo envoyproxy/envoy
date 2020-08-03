@@ -106,7 +106,7 @@ enum class ConfigProviderInstanceType {
  * This class can not be instantiated directly; instead, it provides the foundation for
  * immutable config provider implementations which derive from it.
  */
-class ImmutableConfigProviderBase : public ConfigProvider {
+class ImmutableConfigProviderBase : virtual public ConfigProvider {
 public:
   ~ImmutableConfigProviderBase() override;
 
@@ -341,7 +341,7 @@ protected:
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
  */
-class MutableConfigProviderCommonBase : public ConfigProvider {
+class MutableConfigProviderCommonBase : virtual public ConfigProvider {
 public:
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
