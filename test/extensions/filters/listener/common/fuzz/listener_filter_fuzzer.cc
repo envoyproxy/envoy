@@ -10,12 +10,14 @@ void ListenerFilterFuzzer::fuzz(
   try {
     socket_.setLocalAddress(Network::Utility::resolveUrl(input.sock().local_address()));
   } catch (const EnvoyException& e) {
-    // If fuzzed local address is malformed or missing, socket's local address will be nullptr
+    // Socket's local address will be nullptr by default if fuzzed local address is malformed
+    // or missing - local address field in proto is optional
   }
   try {
     socket_.setRemoteAddress(Network::Utility::resolveUrl(input.sock().remote_address()));
   } catch (const EnvoyException& e) {
-    // If fuzzed remote address is malformed or missing, socket's remote address will be nullptr
+    // Socket's remote address will be nullptr by default if fuzzed remote address is malformed
+    // or missing - remote address field in proto is optional
   }
 
   const int nreads = input.data_size(); // Number of reads
