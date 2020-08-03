@@ -82,17 +82,19 @@ Example Configuration
                     - service_name: "sip"
                       protocol: { number: 6 }
                       ttl: 86400s
-                      port: 5060
                       targets:
                       - name: "primary.voip.domain5.com"
                         priority: 10
                         weight: 30
+                        port: 5060
                       - name: "secondary.voip.domain5.com"
                         priority: 10
                         weight: 20
+                        port: 5060
                       - name: "backup.voip.domain5.com"
                         priority: 10
                         weight: 10
+                        port: 5060
 
 
 In this example, Envoy is configured to respond to client queries for four domains. For any

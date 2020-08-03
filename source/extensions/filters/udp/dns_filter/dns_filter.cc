@@ -80,7 +80,6 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
           continue;
         }
         const std::chrono::seconds ttl = std::chrono::seconds(dns_service.ttl().seconds());
-        const uint16_t port = dns_service.port();
 
         // Generate the full name for the DNS service.
         const std::string full_service_name =
@@ -94,7 +93,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         }
 
         DnsSrvRecordPtr service_record_ptr =
-            std::make_unique<DnsSrvRecord>(full_service_name, proto, port, ttl);
+            std::make_unique<DnsSrvRecord>(full_service_name, proto, ttl);
 
         // Store service targets. We require at least one target to be present. The target should
         // be a fully qualified domain name. If the target name is not a fully qualified name, we
@@ -103,9 +102,10 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
           const absl::string_view target_name = target.name();
           const uint16_t priority = target.priority();
           const uint16_t weight = target.weight();
+          const uint16_t port = target.port();
 
           ENVOY_LOG(trace, "Storing service {} target {}", full_service_name, target_name);
-          service_record_ptr->addTarget(target_name, priority, weight);
+          service_record_ptr->addTarget(target_name, priority, weight, port);
         }
 
         DnsEndpointConfig endpoint_config{};
@@ -397,11 +397,21 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
     for (const auto& hostsets : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hostsets->hosts()) {
 
+        // If the target port is zero, use the port from the cluster host.
+        // If the cluster host port is zero also, then this is the value that will
+        // appear in the service record. Zero is a permitted value in the record
+        uint16_t target_port = 0;
+        if (attributes.port != 0) {
+          target_port = attributes.port;
+        } else {
+          target_port = host->address()->ip()->port();
+        }
+
         // Create the service record element and increment the SRV record answer count
         auto config = std::make_unique<DnsSrvRecord>(service_config->name_, service_config->proto_,
-                                                     service_config->port_, service_config->ttl_);
+                                                     service_config->ttl_);
 
-        config->addTarget(target_name, attributes.priority, attributes.weight);
+        config->addTarget(target_name, attributes.priority, attributes.weight, target_port);
         message_parser_.storeDnsSrvAnswerRecord(context, query, std::move(config));
         incrementClusterQueryTypeAnswerCount(query.type_);
 
@@ -511,8 +521,8 @@ bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQ
 
         incrementLocalQueryTypeAnswerCount(query.type_);
         auto config = std::make_unique<DnsSrvRecord>(service_config->name_, service_config->proto_,
-                                                     service_config->port_, service_config->ttl_);
-        config->addTarget(target_name, attributes.priority, attributes.weight);
+                                                     service_config->ttl_);
+        config->addTarget(target_name, attributes.priority, attributes.weight, attributes.port);
         message_parser_.storeDnsSrvAnswerRecord(context, query, std::move(config));
 
         for (const auto& configured_address : *configured_address_list) {

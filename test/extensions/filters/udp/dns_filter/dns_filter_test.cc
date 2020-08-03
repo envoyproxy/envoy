@@ -284,11 +284,10 @@ virtual_domains:
         - service_name: "sip"
           protocol: { number: 6 }
           ttl: 86400s
-          port: 5060
           targets: [
-            {name: "primary.voip.subzero.com", weight: 30, priority: 10},
-            {name: "secondary.voip.subzero.com", weight: 20, priority: 10},
-            {name: "backup.voip.subzero.com", weight: 10, priority: 10}
+            {name: "primary.voip.subzero.com", weight: 30, priority: 10, port: 5060},
+            {name: "secondary.voip.subzero.com", weight: 20, priority: 10, port: 5061},
+            {name: "backup.voip.subzero.com", weight: 10, priority: 10, port: 5062}
           ]
   - name: "web.subzero.com"
     endpoint:
@@ -305,14 +304,12 @@ virtual_domains:
         - service_name: "https"
           protocol: { name: "tcp" }
           ttl: 43200s
-          port: 443
           targets:
           - name: "fake_http_cluster_1"
             weight: 10
             priority: 1
         - service_name: "for_coverage_no_protocol_defined_so_record_is_skipped"
           ttl: 86400s
-          port: 8443
           targets:
           - name: "fake_http_cluster_3"
             weight: 3
@@ -1467,15 +1464,21 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
   EXPECT_TRUE(query_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
 
-  std::map<uint16_t, std::string> validation_map = {
+  std::map<uint16_t, std::string> validation_weight_map = {
       {10, "backup.voip.subzero.com"},
       {20, "secondary.voip.subzero.com"},
       {30, "primary.voip.subzero.com"},
   };
 
-  // Validate the priority for each SRV record. The TTL and priority are the same value for each
+  std::map<uint16_t, std::string> validation_port_map = {
+      {5062, "backup.voip.subzero.com"},
+      {5061, "secondary.voip.subzero.com"},
+      {5060, "primary.voip.subzero.com"},
+  };
+
+  // Validate the weight for each SRV record. The TTL and priority are the same value for each
   // entry
-  EXPECT_EQ(validation_map.size(), query_ctx_->answers_.size());
+  EXPECT_EQ(validation_weight_map.size(), query_ctx_->answers_.size());
   for (const auto& answer : query_ctx_->answers_) {
     EXPECT_EQ(answer.second->type_, DNS_RECORD_TYPE_SRV);
 
@@ -1490,8 +1493,11 @@ TEST_F(DnsFilterTest, ConsumeExternalTableWithServicesTest) {
     const auto& attributes = target->second;
 
     EXPECT_EQ(10, attributes.priority);
-    auto expected_target = validation_map[attributes.weight];
+    auto expected_target = validation_weight_map[attributes.weight];
     EXPECT_EQ(expected_target, target_name);
+
+    auto port_entry = validation_port_map[attributes.port];
+    EXPECT_EQ(expected_target, port_entry);
   }
 
   // Validate additional records from the SRV query

@@ -84,31 +84,30 @@ using DnsAnswerMap = std::unordered_multimap<std::string, DnsAnswerRecordPtr>;
 class DnsSrvRecord : public DnsAnswerRecord {
 public:
   DnsSrvRecord(const absl::string_view service_name, const absl::string_view proto,
-               const uint16_t port, const std::chrono::seconds ttl,
-               const uint16_t rec_type = DNS_RECORD_TYPE_SRV,
+               const std::chrono::seconds ttl, const uint16_t rec_type = DNS_RECORD_TYPE_SRV,
                const uint16_t rec_class = DNS_RECORD_CLASS_IN)
-      : DnsAnswerRecord(service_name, rec_type, rec_class, ttl, nullptr), proto_(proto),
-        port_(port) {}
+      : DnsAnswerRecord(service_name, rec_type, rec_class, ttl, nullptr), proto_(proto) {}
 
   // Copy Constructor
   DnsSrvRecord(const DnsSrvRecord& other)
       : DnsAnswerRecord(other.name_, other.type_, other.class_, other.ttl_, nullptr),
-        proto_(other.proto_), port_(other.port_) {
+        proto_(other.proto_) {
     for (const auto& entry : other.targets_) {
-      addTarget(entry.first, entry.second.priority, entry.second.weight);
+      addTarget(entry.first, entry.second.priority, entry.second.weight, entry.second.port);
     }
   }
 
   struct DnsTargetAttributes {
     uint16_t priority;
     uint16_t weight;
+    uint16_t port;
   };
 
   bool serialize(Buffer::OwnedImpl& output) override;
-  void addTarget(const absl::string_view target, const uint16_t priority, const uint16_t weight);
+  void addTarget(const absl::string_view target, const uint16_t priority, const uint16_t weight,
+                 const uint16_t port);
 
   std::string proto_;
-  uint16_t port_;
   absl::flat_hash_map<std::string, DnsTargetAttributes> targets_;
 };
 
@@ -399,6 +398,8 @@ private:
    * @param context the query context for which we are generating a response
    * @param queries specify the number of query records contained in the response
    * @param answers specify the number of answer records contained in the response
+   * @param authority_rrs specify the number of authority records contained in the response
+   * @param additional_rrs specify the number of additional records contained in the response
    */
   void setDnsResponseFlags(DnsQueryContextPtr& context, const uint16_t questions,
                            const uint16_t answers, const uint16_t authority_rrs,

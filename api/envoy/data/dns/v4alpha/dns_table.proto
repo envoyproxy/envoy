@@ -72,10 +72,14 @@ message DnsTable {
 
     // The weight of the service record target
     uint32 weight = 3 [(validate.rules).uint32 = {lt: 65536}];
+
+    // The port to which the service is bound. This value is optional if the target is a
+    // cluster. Setting port to zero in this case makes the filter use the port value
+    // from the cluster host
+    uint32 port = 4 [(validate.rules).uint32 = {lt: 65536}];
   }
 
   // This message defines a service selection record returned for a service query in a domain
-  // [#next-free-field: 6]
   message DnsService {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.dns.v3.DnsTable.DnsService";
@@ -89,11 +93,8 @@ message DnsTable {
     // The service entry time to live. This is independent from the DNS Answer record TTL
     google.protobuf.Duration ttl = 3 [(validate.rules).duration = {gte {seconds: 1}}];
 
-    // The port to which the service is bound
-    uint32 port = 4 [(validate.rules).uint32 = {lt: 65536}];
-
     // The list of targets hosting the service
-    repeated DnsServiceTarget targets = 5 [(validate.rules).repeated = {min_items: 1}];
+    repeated DnsServiceTarget targets = 4 [(validate.rules).repeated = {min_items: 1}];
   }
 
   // Define a list of service records for a given service

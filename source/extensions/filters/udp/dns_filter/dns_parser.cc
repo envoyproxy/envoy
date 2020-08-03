@@ -112,11 +112,11 @@ bool DnsSrvRecord::serialize(Buffer::OwnedImpl& output) {
       output.writeBEInt<uint32_t>(static_cast<uint32_t>(ttl_.count()));
 
       const uint16_t data_length = sizeof(target->second.priority) + sizeof(target->second.weight) +
-                                   sizeof(port_) + target_buf.length();
+                                   sizeof(target->second.port) + target_buf.length();
       output.writeBEInt<uint16_t>(data_length);
       output.writeBEInt<uint16_t>(target->second.priority);
       output.writeBEInt<uint16_t>(target->second.weight);
-      output.writeBEInt<uint16_t>(port_);
+      output.writeBEInt<uint16_t>(target->second.port);
       output.move(target_buf);
     }
   }
@@ -124,10 +124,11 @@ bool DnsSrvRecord::serialize(Buffer::OwnedImpl& output) {
 }
 
 void DnsSrvRecord::addTarget(const absl::string_view target, const uint16_t priority,
-                             const uint16_t weight) {
+                             const uint16_t weight, const uint16_t port) {
   DnsTargetAttributes attr{};
   attr.weight = weight;
   attr.priority = priority;
+  attr.port = port;
 
   targets_.emplace(std::make_pair(std::string(target), attr));
 }
@@ -374,9 +375,9 @@ DnsSrvRecordPtr DnsMessageParser::parseDnsSrvRecord(DnsAnswerCtx& ctx) {
   const absl::string_view proto = Utils::getProtoFromName(ctx.record_name_);
 
   if (!proto.empty() && !target_name.empty()) {
-    auto srv_record = std::make_unique<DnsSrvRecord>(ctx.record_name_, proto, port,
-                                                     std::chrono::seconds(ctx.ttl_));
-    srv_record->addTarget(target_name, priority, weight);
+    auto srv_record =
+        std::make_unique<DnsSrvRecord>(ctx.record_name_, proto, std::chrono::seconds(ctx.ttl_));
+    srv_record->addTarget(target_name, priority, weight, port);
     return srv_record;
   }
   return nullptr;

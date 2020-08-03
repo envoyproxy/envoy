@@ -113,15 +113,14 @@ listener_filters:
               - service_name: "http"
                 protocol: {{ name: "tcp" }}
                 ttl: 43200s
-                port: 80
                 targets:
                 - name: "cluster_0"
                   weight: 10
                   priority: 40
+                  port: 80
               - service_name: "https"
                 protocol: {{ name: "tcp" }}
                 ttl: 43200s
-                port: 443
                 targets:
                 - name: "cluster_0"
                   weight: 20
@@ -320,7 +319,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
 }
 
-TEST_P(DnsFilterIntegrationTest, ClusterEndpointServiceRecordLookupTest) {
+TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithPortServiceRecordLookupTest) {
   setup(2);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
@@ -350,9 +349,50 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointServiceRecordLookupTest) {
 
     EXPECT_EQ(10, target->second.weight);
     EXPECT_EQ(40, target->second.priority);
+    EXPECT_EQ(80, target->second.port);
   }
 }
 
+TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithoutPortServiceRecordLookupTest) {
+  constexpr size_t endpoints = 2;
+  setup(endpoints);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  const std::string service("_https._tcp.web.foo1.com");
+  Network::UdpRecvData response;
+  std::string query = Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
+  requestResponseWithListenerAddress(*listener_address, query, response);
+
+  query_ctx_ = response_parser_->createQueryContext(response, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+
+  EXPECT_EQ(endpoints, query_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_parser_->getQueryResponseCode());
+
+  std::set<uint16_t> ports;
+  for (const auto& answer : query_ctx_->answers_) {
+    EXPECT_EQ(answer.second->type_, DNS_RECORD_TYPE_SRV);
+
+    DnsSrvRecord* srv_rec = dynamic_cast<DnsSrvRecord*>(answer.second.get());
+
+    EXPECT_EQ(service, srv_rec->name_);
+    EXPECT_EQ(43200, srv_rec->ttl_.count());
+
+    EXPECT_EQ(1, srv_rec->targets_.size());
+    const auto& target = srv_rec->targets_.begin();
+
+    EXPECT_EQ(20, target->second.weight);
+    EXPECT_EQ(10, target->second.priority);
+
+    // The port is unspecified and automatically assigned by the cluster
+    EXPECT_NE(0, target->second.priority);
+    ports.emplace(target->second.port);
+  }
+
+  EXPECT_EQ(endpoints, ports.size());
+}
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters
