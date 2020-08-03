@@ -16,9 +16,9 @@ namespace {
 // in the cluster. The load balancing policy must be set
 // to random for proper test operation.
 
-const std::string CONFIG = R"EOF(
+const std::string CONFIG = fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -59,7 +59,8 @@ static_resources:
               cluster: cluster_0
           settings:
             op_timeout: 5s
-)EOF";
+)EOF",
+                                       TestEnvironment::nullDevicePath());
 
 // This is a configuration with command stats enabled.
 const std::string CONFIG_WITH_COMMAND_STATS = CONFIG + R"EOF(
@@ -77,9 +78,9 @@ const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
             buffer_flush_timeout: 0.003s 
 )EOF";
 
-const std::string CONFIG_WITH_ROUTES_BASE = R"EOF(
+const std::string CONFIG_WITH_ROUTES_BASE = fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -151,7 +152,8 @@ static_resources:
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
-)EOF";
+)EOF",
+                                                        TestEnvironment::nullDevicePath());
 
 const std::string CONFIG_WITH_ROUTES = CONFIG_WITH_ROUTES_BASE + R"EOF(
           prefix_routes:
@@ -192,9 +194,10 @@ const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
           downstream_auth_password: { inline_string: somepassword }
 )EOF";
 
-const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS = R"EOF(
+const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS =
+    fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -206,7 +209,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_0_password }
+          auth_password: {{ inline_string: cluster_0_password }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -223,7 +226,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_1_password }
+          auth_password: {{ inline_string: cluster_1_password }}
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -238,7 +241,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
-          auth_password: { inline_string: cluster_2_password }
+          auth_password: {{ inline_string: cluster_2_password }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2
@@ -271,7 +274,8 @@ static_resources:
               cluster: cluster_1
             - prefix: "baz:"
               cluster: cluster_2
-)EOF";
+)EOF",
+                TestEnvironment::nullDevicePath());
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
 // Redis servers, according to the Redis protocol.
