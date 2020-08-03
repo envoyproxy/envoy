@@ -11,7 +11,7 @@
 
 #include "server/configuration_impl.h"
 
-#include "absl/container/node_hash_set.h"
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -150,22 +150,25 @@ void FilterChainManagerImpl::addFilterChain(
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  absl::node_hash_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
+  absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch, std::string, MessageUtil,
+                      MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
                                        "unimplemented fields",
-                                       address_->asString()));
+                                       address_->asString(), filter_chain->name()));
     }
-    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                       "the same matching rules are defined",
-                                       address_->asString()));
+    const auto& matching_iter = filter_chains.find(filter_chain_match);
+    if (matching_iter != filter_chains.end()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
+                                       "the same matching rules defined as '{}'",
+                                       address_->asString(), filter_chain->name(),
+                                       matching_iter->second));
     }
-    filter_chains.insert(filter_chain_match);
+    filter_chains.insert({filter_chain_match, filter_chain->name()});
 
     // Validate IP addresses.
     std::vector<std::string> destination_ips;
