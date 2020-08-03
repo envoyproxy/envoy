@@ -196,13 +196,13 @@ struct OcspResponse {
  */
 class OcspResponseWrapper {
 public:
-  OcspResponseWrapper(std::string der_response, TimeSource& time_source);
+  OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source);
 
   /**
-   * @return std::string& a reference to the underlying bytestring representation
+   * @return std::vector<uint8_t>& a reference to the underlying bytestring representation
    * of the OCSP response
    */
-  const std::string& rawBytes() { return raw_bytes_; }
+  const std::vector<uint8_t>& rawBytes() { return raw_bytes_; }
 
   /**
    * @return OcspResponseStatus whether the OCSP response was successfully created
@@ -232,7 +232,7 @@ public:
   bool isExpired();
 
 private:
-  const std::string raw_bytes_;
+  const std::vector<uint8_t> raw_bytes_;
   const std::unique_ptr<OcspResponse> response_;
   TimeSource& time_source_;
 };

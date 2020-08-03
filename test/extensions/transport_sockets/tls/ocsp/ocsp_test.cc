@@ -33,12 +33,13 @@ public:
     return TestEnvironment::substitute("{{ test_tmpdir }}/ocsp_test_data/" + filename);
   }
 
-  std::string readFile(std::string filename) {
-    return TestEnvironment::readFileToStringForTest(fullPath(filename));
+  std::vector<uint8_t> readFile(std::string filename) {
+    auto str = TestEnvironment::readFileToStringForTest(fullPath(filename));
+    return {str.begin(), str.end()};
   }
 
   void setup(std::string response_filename) {
-    std::string der_response = readFile(response_filename);
+    auto der_response = readFile(response_filename);
     response_ = std::make_unique<OcspResponseWrapper>(der_response, time_system_);
     EXPECT_EQ(response_->rawBytes(), der_response);
   }
@@ -107,7 +108,7 @@ TEST_F(OcspFullResponseParsingTest, ResponderIdKeyHashTest) {
 }
 
 TEST_F(OcspFullResponseParsingTest, MultiCertResponseTest) {
-  std::string resp_bytes = readFile("multiple_cert_ocsp_resp.der");
+  auto resp_bytes = readFile("multiple_cert_ocsp_resp.der");
   EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response(resp_bytes, time_system_), EnvoyException,
                             "OCSP Response must be for one certificate only");
 }
@@ -120,24 +121,23 @@ TEST_F(OcspFullResponseParsingTest, NoResponseBodyTest) {
       0xau, 1, 2,
       // no response bytes
   };
-  std::string byte_string(reinterpret_cast<char*>(data.data()), data.size());
-  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response(byte_string, time_system_), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response(data, time_system_), EnvoyException,
                             "OCSP response has no body");
 }
 
 TEST_F(OcspFullResponseParsingTest, OnlyOneResponseInByteStringTest) {
-  auto resp1_bytes = readFile("good_ocsp_resp.der");
+  auto resp_bytes = readFile("good_ocsp_resp.der");
   auto resp2_bytes = readFile("revoked_ocsp_resp.der");
-  auto two_responses = resp1_bytes + resp2_bytes;
+  resp_bytes.insert(resp_bytes.end(), resp2_bytes.begin(), resp2_bytes.end());
 
-  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response_wrapper(two_responses, time_system_),
+  EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response_wrapper(resp_bytes, time_system_),
                             EnvoyException, "Data contained more than a single OCSP response");
 }
 
 TEST_F(OcspFullResponseParsingTest, ParseOcspResponseWrongTagTest) {
-  std::string resp_bytes = readFile("good_ocsp_resp.der");
+  auto resp_bytes = readFile("good_ocsp_resp.der");
   // Change the SEQUENCE tag to an OCTETSTRING tag
-  resp_bytes.replace(0, 1, "\x4u");
+  resp_bytes[0] = 0x4u;
   EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response_wrapper(resp_bytes, time_system_),
                             EnvoyException, "OCSP Response is not a well-formed ASN.1 SEQUENCE");
 }

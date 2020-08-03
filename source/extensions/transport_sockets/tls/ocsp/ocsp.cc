@@ -23,9 +23,9 @@ unsigned parseTag(CBS& cbs) {
   return tag;
 }
 
-std::unique_ptr<OcspResponse> readDerEncodedOcspResponse(const std::string& der) {
+std::unique_ptr<OcspResponse> readDerEncodedOcspResponse(const std::vector<uint8_t>& der) {
   CBS cbs;
-  CBS_init(&cbs, reinterpret_cast<const uint8_t*>(der.c_str()), der.size());
+  CBS_init(&cbs, der.data(), der.size());
 
   auto resp = Asn1OcspUtility::parseOcspResponse(cbs);
   if (CBS_len(&cbs) != 0) {
@@ -71,7 +71,7 @@ CertId::CertId(std::string serial_number, std::string alg_oid, absl::string_view
     : serial_number_(serial_number), alg_oid_(alg_oid), issuer_name_hash_(issuer_name_hash),
       issuer_public_key_hash_(issuer_public_key_hash) {}
 
-OcspResponseWrapper::OcspResponseWrapper(std::string der_response, TimeSource& time_source)
+OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source)
     : raw_bytes_(std::move(der_response)), response_(readDerEncodedOcspResponse(raw_bytes_)),
       time_source_(time_source) {
 
