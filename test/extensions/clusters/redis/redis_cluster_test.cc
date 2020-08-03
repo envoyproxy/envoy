@@ -24,11 +24,11 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
-#include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
-#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/upstream/health_checker.h"
 
 using testing::_;
 using testing::ContainerEq;

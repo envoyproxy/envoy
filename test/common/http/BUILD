@@ -375,8 +375,8 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
-        "//test/test_common:utility_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
