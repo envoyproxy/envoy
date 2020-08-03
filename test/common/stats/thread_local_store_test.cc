@@ -29,6 +29,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
@@ -1450,9 +1451,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             parent_histogram->bucketSummary());
 }
 
-class ClusterShutdownCleanupStarvationTest : public ThreadLocalStoreNoMocksTestBase {
-public:
-  static constexpr uint32_t NumThreads = 2;
+class ThreadLocalRealThreadsTestBase : public ThreadLocalStoreNoMocksTestBase {
+protected:
   static constexpr uint32_t NumScopes = 1000;
   static constexpr uint32_t NumIters = 35;
 
@@ -1488,18 +1488,17 @@ public:
     absl::BlockingCounter blocking_counter_;
   };
 
-  ClusterShutdownCleanupStarvationTest()
-      : start_time_(time_system_.monotonicTime()), api_(Api::createApiForTest()),
-        thread_factory_(api_->threadFactory()), pool_(store_->symbolTable()),
-        my_counter_name_(pool_.add("my_counter")),
-        my_counter_scoped_name_(pool_.add("scope.my_counter")) {
+  ThreadLocalRealThreadsTestBase(uint32_t num_threads)
+      : num_threads_(num_threads), start_time_(time_system_.monotonicTime()),
+        api_(Api::createApiForTest()), thread_factory_(api_->threadFactory()),
+        pool_(store_->symbolTable()) {
     // This is the same order as InstanceImpl::initialize in source/server/server.cc.
-    thread_dispatchers_.resize(NumThreads);
+    thread_dispatchers_.resize(num_threads_);
     {
-      BlockingBarrier blocking_barrier(NumThreads + 1);
+      BlockingBarrier blocking_barrier(num_threads_ + 1);
       main_thread_ = thread_factory_.createThread(
           [this, &blocking_barrier]() { mainThreadFn(blocking_barrier); });
-      for (uint32_t i = 0; i < NumThreads; ++i) {
+      for (uint32_t i = 0; i < num_threads_; ++i) {
         threads_.emplace_back(thread_factory_.createThread(
             [this, i, &blocking_barrier]() { workerThreadFn(i, blocking_barrier); }));
       }
@@ -1519,7 +1518,7 @@ public:
     }
   }
 
-  ~ClusterShutdownCleanupStarvationTest() override {
+  ~ThreadLocalRealThreadsTestBase() override {
     {
       BlockingBarrier blocking_barrier(1);
       main_dispatcher_->post(blocking_barrier.run([this]() {
@@ -1545,14 +1544,6 @@ public:
     main_thread_->join();
   }
 
-  void createScopesIncCountersAndCleanup() {
-    for (uint32_t i = 0; i < NumScopes; ++i) {
-      ScopePtr scope = store_->createScope("scope.");
-      Counter& counter = scope->counterFromStatName(my_counter_name_);
-      counter.inc();
-    }
-  }
-
   void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
     thread_dispatchers_[thread_index] =
         api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
@@ -1564,6 +1555,49 @@ public:
     main_dispatcher_ = api_->allocateDispatcher("test_main_thread");
     blocking_barrier.decrementCount();
     main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+
+  void mainDispatchBlock() {
+    // To ensure all stats are freed we have to wait for a few posts() to clear.
+    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
+    BlockingBarrier blocking_barrier(1);
+    main_dispatcher_->post(blocking_barrier.run([]() {}));
+  }
+
+  void tlsBlock() {
+    BlockingBarrier blocking_barrier(num_threads_);
+    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
+      thread_dispatcher->post(blocking_barrier.run([]() {}));
+    }
+  }
+
+  const uint32_t num_threads_;
+  Event::TestRealTimeSystem time_system_;
+  MonotonicTime start_time_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr main_dispatcher_;
+  std::vector<Event::DispatcherPtr> thread_dispatchers_;
+  Thread::ThreadFactory& thread_factory_;
+  ThreadLocal::InstanceImplPtr tls_;
+  Thread::ThreadPtr main_thread_;
+  std::vector<Thread::ThreadPtr> threads_;
+  StatNamePool pool_;
+};
+
+class ClusterShutdownCleanupStarvationTest : public ThreadLocalRealThreadsTestBase {
+protected:
+  static constexpr uint32_t NumThreads = 2;
+
+  ClusterShutdownCleanupStarvationTest()
+      : ThreadLocalRealThreadsTestBase(NumThreads), my_counter_name_(pool_.add("my_counter")),
+        my_counter_scoped_name_(pool_.add("scope.my_counter")) {}
+
+  void createScopesIncCountersAndCleanup() {
+    for (uint32_t i = 0; i < NumScopes; ++i) {
+      ScopePtr scope = store_->createScope("scope.");
+      Counter& counter = scope->counterFromStatName(my_counter_name_);
+      counter.inc();
+    }
   }
 
   void createScopesIncCountersAndCleanupAllThreads() {
@@ -1579,16 +1613,6 @@ public:
                                                             start_time_);
   }
 
-  Event::TestRealTimeSystem time_system_;
-  MonotonicTime start_time_;
-  Api::ApiPtr api_;
-  Event::DispatcherPtr main_dispatcher_;
-  std::vector<Event::DispatcherPtr> thread_dispatchers_;
-  Thread::ThreadFactory& thread_factory_;
-  ThreadLocal::InstanceImplPtr tls_;
-  Thread::ThreadPtr main_thread_;
-  std::vector<Thread::ThreadPtr> threads_;
-  StatNamePool pool_;
   StatName my_counter_name_;
   StatName my_counter_scoped_name_;
 };
@@ -1601,24 +1625,14 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
   for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
     createScopesIncCountersAndCleanupAllThreads();
 
-    // To ensure all stats are freed we have to wait for a few posts() to clear.
     // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
-    auto main_dispatch_block = [this]() {
-      BlockingBarrier blocking_barrier(1);
-      main_dispatcher_->post(blocking_barrier.run([]() {}));
-    };
-    main_dispatch_block();
+    mainDispatchBlock();
 
     // Next, wait for all the worker threads to complete their TLS cleanup.
-    {
-      BlockingBarrier blocking_barrier(NumThreads);
-      for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-        thread_dispatcher->post(blocking_barrier.run([]() {}));
-      }
-    }
+    tlsBlock();
 
     // Finally, wait for the final central-cache cleanup, which occurs on the main thread.
-    main_dispatch_block();
+    mainDispatchBlock();
 
     // Here we show that the counter cleanups have finished, because the use-count is 1.
     CounterSharedPtr counter =
@@ -1653,6 +1667,37 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
   }
   EXPECT_EQ(70000, NumThreads * NumScopes * NumIters);
   store_->sync().signal(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
+}
+
+class HistogramThreadTest : public ThreadLocalRealThreadsTestBase {
+protected:
+  static constexpr uint32_t NumThreads = 10;
+
+  HistogramThreadTest() : ThreadLocalRealThreadsTestBase(NumThreads) {}
+};
+
+TEST_F(HistogramThreadTest, MakeHistogramsAndRecordValues) {
+  BlockingBarrier blocking_barrier(NumThreads);
+  for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
+    thread_dispatcher->post(blocking_barrier.run([this]() {
+      Histogram& histogram =
+          store_->histogramFromString("my_hist", Stats::Histogram::Unit::Unspecified);
+      histogram.recordValue(42);
+    }));
+  }
+
+  {
+    BlockingBarrier blocking_barrier(1);
+    main_dispatcher_->post([this, &blocking_barrier]() {
+      store_->mergeHistograms(blocking_barrier.decrementCountFn());
+    });
+  }
+
+  auto histograms = store_->histograms();
+  ASSERT_EQ(1, histograms.size());
+  ParentHistogramSharedPtr hist = histograms[0];
+  EXPECT_THAT(hist->bucketSummary(),
+              HasSubstr(absl::StrCat(" B25(0,0) B50(", NumThreads, ",", NumThreads, ") ")));
 }
 
 } // namespace Stats
