@@ -1,0 +1,56 @@
+package io.envoyproxy.envoymobile.engine.types;
+
+import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
+import java.util.List;
+import java.util.Map;
+
+public interface EnvoyHTTPFilter {
+  /**
+   * Called when request headers are sent on the HTTP stream.
+   *
+   * @param headers,   the headers received.
+   * @param endStream, whether the response is headers-only.
+   */
+  Object[] onRequestHeaders(Map<String, List<String>> headers, boolean endStream);
+
+  /**
+   * Called when a request data frame is sent on the HTTP stream. This
+   * callback can be invoked multiple times.
+   *
+   * @param data,      the buffer of the data received.
+   * @param endStream, whether the data is the last data frame.
+   */
+  Object[] onRequestData(ByteBuffer data, boolean endStream);
+
+  /**
+   * Called when request trailers are sent on the HTTP stream.
+   *
+   * @param trailers, the trailers received.
+   */
+  Object[] onRequestTrailers(Map<String, List<String>> trailers);
+
+  /**
+   * Called when response headers are received on the HTTP stream.
+   *
+   * @param headers,   the headers received.
+   * @param endStream, whether the response is headers-only.
+   */
+  Object[] onResponseHeaders(Map<String, List<String>> headers, boolean endStream);
+
+  /**
+   * Called when a data frame is received on the HTTP stream. This
+   * callback can be invoked multiple times.
+   *
+   * @param data,      the buffer of the data received.
+   * @param endStream, whether the data is the last data frame.
+   */
+  Object[] onResponseData(ByteBuffer data, boolean endStream);
+
+  /**
+   * Called when response trailers are received on the HTTP stream.
+   *
+   * @param trailers, the trailers received.
+   */
+  Object[] onResponseTrailers(Map<String, List<String>> trailers);
+}
