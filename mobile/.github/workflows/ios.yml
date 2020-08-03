@@ -10,7 +10,7 @@ jobs:
   macdist:
     name: mac_dist
     runs-on: macOS-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v1
         with:
