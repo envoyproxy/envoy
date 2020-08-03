@@ -496,10 +496,16 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 
   // Receive updates until the one we expect arrives
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!(checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
+  while (!(checkEndpointHealthResponse(response_.endpoint_health_response()
+                                           .cluster_endpoints_health(0)
+                                           .locality_endpoints_health(0)
+                                           .endpoints_health(0),
                                        envoy::config::core::v3::UNHEALTHY,
                                        host_upstream_->localAddress()) &&
-           checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(1),
+           checkEndpointHealthResponse(response_.endpoint_health_response()
+                                           .cluster_endpoints_health(0)
+                                           .locality_endpoints_health(0)
+                                           .endpoints_health(1),
                                        envoy::config::core::v3::HEALTHY,
                                        host2_upstream_->localAddress()))) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -548,10 +554,16 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
 
   // Receive updates until the one we expect arrives
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!(checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
+  while (!(checkEndpointHealthResponse(response_.endpoint_health_response()
+                                           .cluster_endpoints_health(0)
+                                           .locality_endpoints_health(0)
+                                           .endpoints_health(0),
                                        envoy::config::core::v3::UNHEALTHY,
                                        host_upstream_->localAddress()) &&
-           checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(1),
+           checkEndpointHealthResponse(response_.endpoint_health_response()
+                                           .cluster_endpoints_health(0)
+                                           .locality_endpoints_health(1)
+                                           .endpoints_health(0),
                                        envoy::config::core::v3::HEALTHY,
                                        host2_upstream_->localAddress()))) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -611,10 +623,16 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
 
   // Receive updates until the one we expect arrives
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!(checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
+  while (!(checkEndpointHealthResponse(response_.endpoint_health_response()
+                                           .cluster_endpoints_health(0)
+                                           .locality_endpoints_health(0)
+                                           .endpoints_health(0),
                                        envoy::config::core::v3::UNHEALTHY,
                                        host_upstream_->localAddress()) &&
-           checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(1),
+           checkEndpointHealthResponse(response_.endpoint_health_response()
+                                           .cluster_endpoints_health(1)
+                                           .locality_endpoints_health(0)
+                                           .endpoints_health(0),
                                        envoy::config::core::v3::HEALTHY,
                                        host2_upstream_->localAddress()))) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
