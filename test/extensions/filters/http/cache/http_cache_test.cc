@@ -202,9 +202,12 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
-TEST_F(LookupRequestTest, FullRange) {
-  request_headers_.addCopy("Range", "0-99");
+TEST_F(LookupRequestTest, SatisfiableRange) {
+  // add method (GET) and range to headers
+  request_headers_.addReference(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get);
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99,3-,-2");
   const LookupRequest lookup_request(request_headers_, current_time_);
+
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(current_time_)},
        {"cache-control", "public, max-age=3600"},
@@ -212,11 +215,50 @@ TEST_F(LookupRequestTest, FullRange) {
   const uint64_t content_length = 4;
   const LookupResult lookup_response =
       makeLookupResult(lookup_request, response_headers, content_length);
-  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  ASSERT_EQ(CacheEntryStatus::SatisfiableRange, lookup_response.cache_entry_status_);
+
   ASSERT_TRUE(lookup_response.headers_);
   EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
   EXPECT_EQ(lookup_response.content_length_, 4);
-  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+
+  // checks that the ranges have been adjusted to the content's length
+  EXPECT_EQ(lookup_response.response_ranges_.size(), 3);
+
+  EXPECT_EQ(lookup_response.response_ranges_[0].begin(), 1);
+  EXPECT_EQ(lookup_response.response_ranges_[0].end(), 4);
+  EXPECT_EQ(lookup_response.response_ranges_[0].length(), 3);
+
+  EXPECT_EQ(lookup_response.response_ranges_[1].begin(), 3);
+  EXPECT_EQ(lookup_response.response_ranges_[1].end(), 4);
+  EXPECT_EQ(lookup_response.response_ranges_[1].length(), 1);
+
+  EXPECT_EQ(lookup_response.response_ranges_[2].begin(), 2);
+  EXPECT_EQ(lookup_response.response_ranges_[2].end(), 4);
+  EXPECT_EQ(lookup_response.response_ranges_[2].length(), 2);
+
+  EXPECT_FALSE(lookup_response.has_trailers_);
+}
+
+TEST_F(LookupRequestTest, NotSatisfiableRange) {
+  // add method (GET) and range headers
+  request_headers_.addReference(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get);
+  request_headers_.addReference(Http::Headers::get().Range, "bytes=5-99,100-");
+
+  const LookupRequest lookup_request(request_headers_, current_time_);
+
+  const Http::TestResponseHeaderMapImpl response_headers(
+      {{"date", formatter_.fromTime(current_time_)},
+       {"cache-control", "public, max-age=3600"},
+       {"content-length", "4"}});
+  const uint64_t content_length = 4;
+  const LookupResult lookup_response =
+      makeLookupResult(lookup_request, response_headers, content_length);
+  ASSERT_EQ(CacheEntryStatus::NotSatisfiableRange, lookup_response.cache_entry_status_);
+
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 4);
+  ASSERT_TRUE(lookup_response.response_ranges_.empty());
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
@@ -283,6 +325,148 @@ TEST(AdjustByteRange, NoRangeRequest) {
   std::vector<AdjustedByteRange> result;
   ASSERT_TRUE(adjustByteRangeSet(result, {}, 8));
   EXPECT_THAT(result, ContainerEq(std::vector<AdjustedByteRange>{}));
+}
+
+namespace {
+Http::TestRequestHeaderMapImpl makeTestHeaderMap(std::string range_value) {
+  return Http::TestRequestHeaderMapImpl{{":method", "GET"}, {"range", range_value}};
+}
+} // namespace
+
+TEST(ParseRangesTest, NoRangeHeader) {
+  Http::TestRequestHeaderMapImpl headers = Http::TestRequestHeaderMapImpl{{":method", "GET"}};
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
+
+  ASSERT_EQ(0, result_vector.size());
+}
+
+TEST(ParseRangesTest, InvalidUnit) {
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bits=3-4");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
+
+  ASSERT_EQ(0, result_vector.size());
+}
+
+TEST(ParseRangesTest, SingleRange) {
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=3-4");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
+
+  ASSERT_EQ(1, result_vector.size());
+
+  ASSERT_EQ(3, result_vector[0].firstBytePos());
+  ASSERT_EQ(4, result_vector[0].lastBytePos());
+}
+
+TEST(ParseRangesTest, MissingFirstBytePos) {
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=-5");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
+
+  ASSERT_EQ(1, result_vector.size());
+
+  ASSERT_TRUE(result_vector[0].isSuffix());
+  ASSERT_EQ(5, result_vector[0].suffixLength());
+}
+
+TEST(ParseRangesTest, MissingLastBytePos) {
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=6-");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
+
+  ASSERT_EQ(1, result_vector.size());
+
+  ASSERT_EQ(6, result_vector[0].firstBytePos());
+  ASSERT_EQ(std::numeric_limits<uint64_t>::max(), result_vector[0].lastBytePos());
+}
+
+TEST(ParseRangesTest, MultipleRanges) {
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=345-456,-567,6789-");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 5);
+
+  ASSERT_EQ(3, result_vector.size());
+
+  ASSERT_EQ(345, result_vector[0].firstBytePos());
+  ASSERT_EQ(456, result_vector[0].lastBytePos());
+
+  ASSERT_TRUE(result_vector[1].isSuffix());
+  ASSERT_EQ(567, result_vector[1].suffixLength());
+
+  ASSERT_EQ(6789, result_vector[2].firstBytePos());
+  ASSERT_EQ(UINT64_MAX, result_vector[2].lastBytePos());
+}
+
+TEST(ParseRangesTest, LongRangeHeaderValue) {
+  Http::TestRequestHeaderMapImpl headers =
+      makeTestHeaderMap("bytes=1000-1000,1001-1001,1002-1002,1003-1003,1004-1004,1005-"
+                        "1005,1006-1006,1007-1007,1008-1008,100-");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 10);
+
+  ASSERT_EQ(10, result_vector.size());
+}
+
+TEST(ParseRangesTest, ZeroRangeLimit) {
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=1000-1000");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 0);
+
+  ASSERT_EQ(0, result_vector.size());
+}
+
+TEST(ParseRangesTest, OverRangeLimit) {
+  Http::TestRequestHeaderMapImpl headers = makeTestHeaderMap("bytes=1000-1000,1001-1001");
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(headers, 1);
+
+  ASSERT_EQ(0, result_vector.size());
+}
+
+class ParseInvalidRangeHeaderTest : public testing::Test,
+                                    public testing::WithParamInterface<std::string> {
+protected:
+  Http::TestRequestHeaderMapImpl range() { return makeTestHeaderMap(GetParam()); }
+};
+
+// clang-format off
+INSTANTIATE_TEST_SUITE_P(
+    Default, ParseInvalidRangeHeaderTest,
+    testing::Values("-",
+                    "1-2",
+                    "12",
+                    "a",
+                    "a1",
+                    "bytes=",
+                    "bytes=-",
+                    "bytes1-2",
+                    "bytes=12",
+                    "bytes=1-2-3",
+                    "bytes=1-2-",
+                    "bytes=1--3",
+                    "bytes=--2",
+                    "bytes=2--",
+                    "bytes=-2-",
+                    "bytes=-1-2",
+                    "bytes=a-2",
+                    "bytes=2-a",
+                    "bytes=-a",
+                    "bytes=a-",
+                    "bytes=a1-2",
+                    "bytes=1-a2",
+                    "bytes=1a-2",
+                    "bytes=1-2a",
+                    "bytes=1-2,3-a",
+                    "bytes=1-a,3-4",
+                    "bytes=1-2,3a-4",
+                    "bytes=1-2,3-4a",
+                    "bytes=1-2,3-4-5",
+                    "bytes=1-2,bytes=3-4",
+                    "bytes=1-2,3-4,a",
+                    // too many byte ranges (test sets the limit as 5)
+                    "bytes=0-1,1-2,2-3,3-4,4-5,5-6",
+                    // UINT64_MAX-UINT64_MAX+1
+                    "bytes=18446744073709551615-18446744073709551616",
+                    // UINT64_MAX+1-UINT64_MAX+2
+                    "bytes=18446744073709551616-18446744073709551617"));
+// clang-format on
+
+TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
+  std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(range(), 5);
+  ASSERT_EQ(0, result_vector.size());
 }
 
 } // namespace Cache

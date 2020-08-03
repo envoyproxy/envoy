@@ -89,8 +89,8 @@ void CacheFilter::onHeaders(LookupResult&& result) {
   // TODO(yosrym93): Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
-  case CacheEntryStatus::UnsatisfiableRange:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
+  case CacheEntryStatus::NotSatisfiableRange: // TODO(#10132): create 416 response.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;          // We don't yet return or support these codes.
   case CacheEntryStatus::RequiresValidation:
     // Cache entries that require validation are treated as unusable entries
     // until validation is implemented
@@ -104,6 +104,8 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       state_ = GetHeadersState::GetHeadersResultUnusable;
     }
     return;
+  case CacheEntryStatus::SatisfiableRange: // TODO(#10132): break response content to the ranges
+                                           // requested.
   case CacheEntryStatus::Ok:
     response_has_trailers_ = result.has_trailers_;
     const bool end_stream = (result.content_length_ == 0 && !response_has_trailers_);
