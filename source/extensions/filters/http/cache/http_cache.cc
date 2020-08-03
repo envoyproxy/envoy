@@ -2,13 +2,17 @@
 
 #include <algorithm>
 #include <ostream>
+#include <vector>
 
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "absl/time/time.h"
 
 namespace Envoy {
@@ -33,8 +37,10 @@ std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
     return os << "RequiresValidation";
   case CacheEntryStatus::FoundNotModified:
     return os << "FoundNotModified";
-  case CacheEntryStatus::UnsatisfiableRange:
-    return os << "UnsatisfiableRange";
+  case CacheEntryStatus::NotSatisfiableRange:
+    return os << "NotSatisfiableRange";
+  case CacheEntryStatus::SatisfiableRange:
+    return os << "SatisfiableRange";
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
@@ -62,8 +68,13 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   // TODO(toddmgreer): Let config determine whether to include forwarded_proto, host, and
   // query params.
   // TODO(toddmgreer): get cluster name.
-  // TODO(toddmgreer): Parse Range header into request_range_spec_, and handle the resultant
-  // vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
+  // TODO(toddmgreer): handle the resultant vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
+  // Range Requests are only valid for GET requests
+  if (request_headers.getMethodValue() == Http::Headers::get().MethodValues.Get) {
+    // TODO(cbdm): using a constant limit of 10 ranges, could make this into a parameter
+    const int RangeSpecifierLimit = 10;
+    request_range_spec_ = RangeRequests::parseRanges(request_headers, RangeSpecifierLimit);
+  }
   key_.set_cluster_name("cluster_name_goes_here");
   key_.set_host(std::string(request_headers.getHostValue()));
   key_.set_path(std::string(request_headers.getPathValue()));
@@ -156,6 +167,9 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   result.content_length_ = content_length;
   if (!adjustByteRangeSet(result.response_ranges_, request_range_spec_, content_length)) {
     result.headers_->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
+    result.cache_entry_status_ = CacheEntryStatus::NotSatisfiableRange;
+  } else if (!result.response_ranges_.empty()) {
+    result.cache_entry_status_ = CacheEntryStatus::SatisfiableRange;
   }
   result.has_trailers_ = false;
   return result;
@@ -212,6 +226,90 @@ bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
     return false;
   }
   return true;
+}
+
+std::vector<RawByteRange> RangeRequests::parseRanges(const Http::RequestHeaderMap& request_headers,
+                                                     uint64_t max_byte_range_specs) {
+  // Makes sure we have a GET request, as Range headers are only valid with this type of request.
+  const absl::string_view method = request_headers.getMethodValue();
+  ASSERT(method == Http::Headers::get().MethodValues.Get);
+
+  // Multiple instances of range headers are invalid.
+  // https://tools.ietf.org/html/rfc7230#section-3.2.2
+  std::vector<absl::string_view> range_headers;
+  Http::HeaderUtility::getAllOfHeader(request_headers, Http::Headers::get().Range.get(),
+                                      range_headers);
+
+  absl::string_view header_value;
+  if (range_headers.size() == 1) {
+    header_value = range_headers.front();
+  } else {
+    if (range_headers.size() > 1) {
+      ENVOY_LOG(debug, "Multiple range headers provided in request. Ignoring all range headers.");
+    }
+    return {};
+  }
+
+  if (!absl::ConsumePrefix(&header_value, "bytes=")) {
+    ENVOY_LOG(debug, "Invalid range header. range-unit not correctly specified, only 'bytes' "
+                     "supported. Ignoring range header.");
+    return {};
+  }
+
+  std::vector<absl::string_view> ranges =
+      absl::StrSplit(header_value, absl::MaxSplits(',', max_byte_range_specs));
+  if (ranges.size() > max_byte_range_specs) {
+    ENVOY_LOG(debug,
+              "There are more ranges than allowed by the byte range parse limit ({}). Ignoring "
+              "range header.",
+              max_byte_range_specs);
+    return {};
+  }
+
+  std::vector<RawByteRange> parsed_ranges;
+  for (absl::string_view cur_range : ranges) {
+    absl::optional<uint64_t> first = CacheHeadersUtils::readAndRemoveLeadingDigits(cur_range);
+
+    if (!absl::ConsumePrefix(&cur_range, "-")) {
+      ENVOY_LOG(debug,
+                "Invalid format for range header: missing range-end. Ignoring range header.");
+      return {};
+    }
+
+    absl::optional<uint64_t> last = CacheHeadersUtils::readAndRemoveLeadingDigits(cur_range);
+
+    if (!cur_range.empty()) {
+      ENVOY_LOG(debug,
+                "Unexpected characters after byte range in range header. Ignoring range header.");
+      return {};
+    }
+
+    if (!first && !last) {
+      ENVOY_LOG(debug, "Invalid format for range header: missing first-byte-pos AND last-byte-pos; "
+                       "at least one of them is required. Ignoring range header.");
+      return {};
+    }
+
+    // Handle suffix range (e.g., -123).
+    if (!first) {
+      first = std::numeric_limits<uint64_t>::max();
+    }
+
+    // Handle optional range-end (e.g., 123-).
+    if (!last) {
+      last = std::numeric_limits<uint64_t>::max();
+    }
+
+    if (first != std::numeric_limits<uint64_t>::max() && first > last) {
+      ENVOY_LOG(debug, "Invalid format for range header: range-start and range-end out of order. "
+                       "Ignoring range header.");
+      return {};
+    }
+
+    parsed_ranges.push_back(RawByteRange(first.value(), last.value()));
+  }
+
+  return parsed_ranges;
 }
 } // namespace Cache
 } // namespace HttpFilters
