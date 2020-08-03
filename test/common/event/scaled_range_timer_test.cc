@@ -1,11 +1,13 @@
-#include "common/event/scaled_range_timer.h"
+#include <chrono>
 
 #include "envoy/event/timer.h"
-#include "test/test_common/simulated_time_system.h"
+
+#include "common/event/scaled_range_timer.h"
+
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
-#include <chrono>
 
 namespace Envoy {
 namespace Event {

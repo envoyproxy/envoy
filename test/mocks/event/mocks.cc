@@ -29,13 +29,14 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
 
 MockDispatcher::~MockDispatcher() = default;
 
-MockTimer::MockTimer(TimerCb callback): callback_(callback) {
+MockTimer::MockTimer(TimerCb callback) : callback_(callback) {
   ON_CALL(*this, enableTimer(_, _))
-      .WillByDefault(Invoke([&](const std::chrono::milliseconds& duration, const ScopeTrackedObject* scope) {
-        enabled_ = true;
-        scope_ = scope;
-        duration_ms_ = duration;
-      }));
+      .WillByDefault(
+          Invoke([&](const std::chrono::milliseconds& duration, const ScopeTrackedObject* scope) {
+            enabled_ = true;
+            scope_ = scope;
+            duration_ms_ = duration;
+          }));
   ON_CALL(*this, disableTimer()).WillByDefault(Assign(&enabled_, false));
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
 }
