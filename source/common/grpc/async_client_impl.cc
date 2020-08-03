@@ -38,7 +38,7 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(grpc_stream), active_streams_);
   return async_request;
 }
 
@@ -54,7 +54,7 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
     return nullptr;
   }
 
-  grpc_stream->moveIntoList(std::move(grpc_stream), active_streams_);
+  LinkedList::moveIntoList(std::move(grpc_stream), active_streams_);
   return active_streams_.front().get();
 }
 

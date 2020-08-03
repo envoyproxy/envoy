@@ -288,6 +288,11 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
         sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.sha256PeerCertificateDigest();
         });
+  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_1") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.sha1PeerCertificateDigest();
+        });
   } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
     field_extractor_ =
         sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {

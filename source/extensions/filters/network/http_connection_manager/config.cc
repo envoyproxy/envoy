@@ -9,6 +9,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
@@ -17,6 +18,7 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/filter/http/filter_config_discovery_impl.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
@@ -34,6 +36,8 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_manager_impl.h"
+
+#include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -75,6 +79,16 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
+class MissingConfigFilter : public Http::PassThroughDecoderFilter {
+public:
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
+                                       absl::nullopt, EMPTY_STRING);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+};
+
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
@@ -82,6 +96,7 @@ SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(http_tracer_manager);
+SINGLETON_MANAGER_REGISTRATION(filter_config_provider_manager);
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
@@ -112,8 +127,13 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.getServerFactoryContext(), context.messageValidationVisitor()));
       });
 
+  std::shared_ptr<Filter::Http::FilterConfigProviderManager> filter_config_provider_manager =
+      context.singletonManager().getTyped<Filter::Http::FilterConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(filter_config_provider_manager),
+          [] { return std::make_shared<Filter::Http::FilterConfigProviderManagerImpl>(); });
+
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
-          http_tracer_manager};
+          http_tracer_manager, filter_config_provider_manager};
 }
 
 std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
@@ -122,10 +142,11 @@ std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-    Tracing::HttpTracerManager& http_tracer_manager) {
+    Tracing::HttpTracerManager& http_tracer_manager,
+    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager) {
   return std::make_shared<HttpConnectionManagerConfig>(
       proto_config, context, date_provider, route_config_provider_manager,
-      scoped_routes_config_provider_manager, http_tracer_manager);
+      scoped_routes_config_provider_manager, http_tracer_manager, filter_config_provider_manager);
 }
 
 Network::FilterFactoryCb
@@ -137,7 +158,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
 
   auto filter_config = Utility::createConfig(
       proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
-      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_);
+      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_,
+      *singletons.filter_config_provider_manager_);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
@@ -169,7 +191,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-    Tracing::HttpTracerManager& http_tracer_manager)
+    Tracing::HttpTracerManager& http_tracer_manager,
+    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -180,6 +203,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
+      filter_config_provider_manager_(filter_config_provider_manager),
       http2_options_(Http2::Utility::initializeAndValidateOptions(
           config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
@@ -451,17 +475,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 void HttpConnectionManagerConfig::processFilter(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
-    int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories,
+    int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
     const char* filter_chain_type, bool last_filter_in_current_config) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
-  ENVOY_LOG(debug, "      name: {}", proto_config.name());
-  ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessage(
-                proto_config.has_typed_config()
-                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                    : static_cast<const Protobuf::Message&>(
-                          proto_config.hidden_envoy_deprecated_config()),
-                true));
+  if (proto_config.config_type_case() ==
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::ConfigTypeCase::
+          kConfigDiscovery) {
+    processDynamicFilterConfig(proto_config.name(), proto_config.config_discovery(),
+                               filter_factories, filter_chain_type, last_filter_in_current_config);
+    return;
+  }
 
   // Now see if there is a factory that will accept the config.
   auto& factory =
@@ -474,7 +497,63 @@ void HttpConnectionManagerConfig::processFilter(
   bool is_terminal = factory.isTerminalFilter();
   Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
-  filter_factories.push_back(callback);
+  auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
+      callback, proto_config.name());
+  ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
+  ENVOY_LOG(debug, "    config: {}",
+            MessageUtil::getJsonStringFromMessage(
+                proto_config.has_typed_config()
+                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                    : static_cast<const Protobuf::Message&>(
+                          proto_config.hidden_envoy_deprecated_config()),
+                true));
+  filter_factories.push_back(std::move(filter_config_provider));
+}
+
+void HttpConnectionManagerConfig::processDynamicFilterConfig(
+    const std::string& name, const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
+    FilterFactoriesList& filter_factories, const char* filter_chain_type,
+    bool last_filter_in_current_config) {
+  ENVOY_LOG(debug, "      dynamic filter name: {}", name);
+  if (config_discovery.apply_default_config_without_warming() &&
+      !config_discovery.has_default_config()) {
+    throw EnvoyException(fmt::format(
+        "Error: filter config {} applied without warming but has no default config.", name));
+  }
+  std::set<std::string> require_type_urls;
+  for (const auto& type_url : config_discovery.type_urls()) {
+    auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+    require_type_urls.emplace(factory_type_url);
+    auto* factory = Registry::FactoryRegistry<
+        Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(factory_type_url);
+    if (factory == nullptr) {
+      throw EnvoyException(
+          fmt::format("Error: no factory found for a required type URL {}.", factory_type_url));
+    }
+    Config::Utility::validateTerminalFilters(name, factory->name(), filter_chain_type,
+                                             factory->isTerminalFilter(),
+                                             last_filter_in_current_config);
+  }
+  auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
+      config_discovery.config_source(), name, require_type_urls, context_, stats_prefix_,
+      config_discovery.apply_default_config_without_warming());
+  if (config_discovery.has_default_config()) {
+    auto* default_factory =
+        Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
+            config_discovery.default_config());
+    if (default_factory == nullptr) {
+      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
+                                       "configuration with type URL {}.",
+                                       name, config_discovery.default_config().type_url()));
+    }
+    filter_config_provider->validateConfig(config_discovery.default_config(), *default_factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        config_discovery.default_config(), context_.messageValidationVisitor(), *default_factory);
+    Http::FilterFactoryCb default_config =
+        default_factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
+    filter_config_provider->onConfigUpdate(default_config, "", nullptr);
+  }
+  filter_factories.push_back(std::move(filter_config_provider));
 }
 
 Http::ServerConnectionPtr
@@ -528,10 +607,30 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  for (const Http::FilterFactoryCb& factory : filter_factories_) {
-    factory(callbacks);
+void HttpConnectionManagerConfig::createFilterChainForFactories(
+    Http::FilterChainFactoryCallbacks& callbacks, const FilterFactoriesList& filter_factories) {
+  bool added_missing_config_filter = false;
+  for (const auto& filter_config_provider : filter_factories) {
+    auto config = filter_config_provider->config();
+    if (config.has_value()) {
+      config.value()(callbacks);
+      continue;
+    }
+
+    // If a filter config is missing after warming, inject a local reply with status 500.
+    if (!added_missing_config_filter) {
+      ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
+      callbacks.addStreamDecoderFilter(
+          Http::StreamDecoderFilterSharedPtr{std::make_shared<MissingConfigFilter>()});
+      added_missing_config_filter = true;
+    } else {
+      ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider->name());
+    }
   }
+}
+
+void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
+  createFilterChainForFactories(callbacks, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
@@ -562,9 +661,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  for (const Http::FilterFactoryCb& factory : *filters_to_use) {
-    factory(callbacks);
-  }
+  createFilterChainForFactories(callbacks, *filters_to_use);
   return true;
 }
 
@@ -602,7 +699,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
 
   auto filter_config = Utility::createConfig(
       proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
-      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_);
+      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_,
+      *singletons.filter_config_provider_manager_);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.

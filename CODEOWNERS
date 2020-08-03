@@ -22,7 +22,7 @@ extensions/filters/common/original_src @snowp @klarose
 # rocketmq_proxy extension
 /*/extensions/filters/network/rocketmq_proxy @aaron-ai @lizhanhui @lizan
 # thrift_proxy extension
-/*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
+/*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # compressor used by http compression filters
 /*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 /*/extensions/filters/http/compressor @rojkov @dio
@@ -36,6 +36,10 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/transport_sockets/alts @htuch @yangminzhu
 # tls transport socket extension
 /*/extensions/transport_sockets/tls @PiotrSikora @lizan
+# proxy protocol socket extension
+/*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
+# common transport socket
+/*/extensions/transport_sockets/common @alyssawilk @wez470
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # sni_dynamic_forward_proxy extension
