@@ -132,11 +132,10 @@ message EndpointHealthResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.health.v3.EndpointHealthResponse";
 
-  // [#comment:TODO(drewsortega): add deprecate annotation once cluster_endpoints_health is implemented]
-  // Deprecated - Flat list of endpoint health information.
-  repeated EndpointHealth endpoints_health = 1;
+  reserved 1;
 
-  // [#not-implemented-hide:]
+  reserved "endpoints_health";
+
   // Organize Endpoint health information by cluster.
   repeated ClusterEndpointsHealth cluster_endpoints_health = 2;
 }
