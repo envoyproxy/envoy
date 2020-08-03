@@ -49,20 +49,19 @@ public:
 
 TEST_F(Asn1UtilityTest, ParseMethodsWrongTagTest) {
   expectThrowOnWrongTag(
-      [](CBS& cbs) { Asn1Utility::parseSequenceOf<std::string>(cbs, [](CBS&) { return ""; }); });
+      [](CBS& cbs) { Asn1Utility::parseSequenceOf<absl::string_view>(cbs, [](CBS&) { return ""; }); });
   expectThrowOnWrongTag(Asn1Utility::parseOid);
   expectThrowOnWrongTag(Asn1Utility::parseGeneralizedTime);
   expectThrowOnWrongTag(Asn1Utility::parseInteger);
   expectThrowOnWrongTag(Asn1Utility::parseOctetString);
-  expectThrowOnWrongTag(Asn1Utility::parseBitString);
   expectThrowOnWrongTag(Asn1Utility::parseAlgorithmIdentifier);
 }
 
 TEST_F(Asn1UtilityTest, ToStringTest) {
   CBS cbs;
-  std::string data = "test";
-  CBS_init(&cbs, reinterpret_cast<const uint8_t*>(data.c_str()), data.size());
-  EXPECT_EQ(data, Asn1Utility::cbsToString(cbs));
+  absl::string_view str = "test";
+  CBS_init(&cbs, reinterpret_cast<const uint8_t*>(str.data()), str.size());
+  EXPECT_EQ(str, Asn1Utility::cbsToString(cbs));
 }
 
 TEST_F(Asn1UtilityTest, ParseSequenceOfEmptySequenceTest) {
@@ -98,8 +97,8 @@ TEST_F(Asn1UtilityTest, ParseSequenceOfMultipleElementSequenceTest) {
   CBS cbs;
   CBS_init(&cbs, octet_seq.data(), octet_seq.size());
 
-  std::vector<std::string> vec = {"\x1\x2", "\x3\x4", "\x5\x6"};
-  auto actual = Asn1Utility::parseSequenceOf<std::string>(cbs, Asn1Utility::parseOctetString);
+  std::vector<absl::string_view> vec = {"\x1\x2", "\x3\x4", "\x5\x6"};
+  auto actual = Asn1Utility::parseSequenceOf<absl::string_view>(cbs, Asn1Utility::parseOctetString);
   EXPECT_EQ(vec, actual);
 }
 
@@ -118,7 +117,7 @@ TEST_F(Asn1UtilityTest, SequenceOfLengthMismatchErrorTest) {
   CBS_init(&cbs, malformed.data(), malformed.size());
 
   EXPECT_THROW_WITH_MESSAGE(
-      Asn1Utility::parseSequenceOf<std::string>(cbs, Asn1Utility::parseOctetString), EnvoyException,
+      Asn1Utility::parseSequenceOf<absl::string_view>(cbs, Asn1Utility::parseOctetString), EnvoyException,
       "Input is not a well-formed ASN.1 OCTETSTRING");
 }
 
@@ -141,7 +140,7 @@ TEST_F(Asn1UtilityTest, SequenceOfMixedTypeErrorTest) {
   CBS_init(&cbs, mixed_type.data(), mixed_type.size());
 
   EXPECT_THROW_WITH_MESSAGE(
-      Asn1Utility::parseSequenceOf<std::string>(cbs, Asn1Utility::parseOctetString), EnvoyException,
+      Asn1Utility::parseSequenceOf<absl::string_view>(cbs, Asn1Utility::parseOctetString), EnvoyException,
       "Input is not a well-formed ASN.1 OCTETSTRING");
 }
 
@@ -150,10 +149,10 @@ TEST_F(Asn1UtilityTest, IsOptionalPresentTest) {
   CBS_init(&cbs, asn1_true.data(), asn1_true.size());
 
   const uint8_t* start = CBS_data(&cbs);
-  EXPECT_FALSE(Asn1Utility::isOptionalPresent(cbs, nullptr, CBS_ASN1_INTEGER));
+  EXPECT_FALSE(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_INTEGER));
   EXPECT_EQ(start, CBS_data(&cbs));
 
-  EXPECT_TRUE(Asn1Utility::isOptionalPresent(cbs, &value, CBS_ASN1_BOOLEAN));
+  EXPECT_TRUE(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN));
   EXPECT_EQ(0xff, *CBS_data(&value));
 }
 
@@ -162,7 +161,7 @@ TEST_F(Asn1UtilityTest, IsOptionalPresentMissingValueTest) {
   CBS cbs, value;
   CBS_init(&cbs, missing_val_bool.data(), missing_val_bool.size());
 
-  EXPECT_THROW_WITH_MESSAGE(Asn1Utility::isOptionalPresent(cbs, &value, CBS_ASN1_BOOLEAN),
+  EXPECT_THROW_WITH_MESSAGE(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN),
                             EnvoyException, "Failed to parse ASN.1 element tag");
 }
 
@@ -219,11 +218,12 @@ TEST_F(Asn1UtilityTest, ParseGeneralizedTimeWrongFormatErrorTest) {
 }
 
 TEST_F(Asn1UtilityTest, ParseGeneralizedTimeTest) {
-  std::string time = "20070614185900Z";
+  std::string time = "20070614185900z";
+  std::string expected_time = "20070614185900";
 
   CBS cbs;
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, time, CBS_ASN1_GENERALIZEDTIME));
-  absl::Time expected = TestUtility::parseTime(time, "%E4Y%m%d%H%M%SZ");
+  absl::Time expected = TestUtility::parseTime(expected_time, "%E4Y%m%d%H%M%S");
 
   EXPECT_EQ(absl::ToChronoTime(expected), Asn1Utility::parseGeneralizedTime(cbs));
 }
@@ -243,7 +243,7 @@ TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeInvalidTime) {
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, ymd, CBS_ASN1_GENERALIZEDTIME));
 
   EXPECT_THROW_WITH_REGEX(Asn1Utility::parseGeneralizedTime(cbs), EnvoyException,
-                          "Error parsing timestamp 20070601Z with format %E4Y%m%d%H%M%SZ");
+                          "Error parsing timestamp 20070601Z with format %E4Y%m%d%H%M%S");
 }
 
 // Taken from
@@ -303,16 +303,6 @@ TEST_F(Asn1UtilityTest, ParseOctetStringTest) {
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, data, CBS_ASN1_OCTETSTRING));
 
   EXPECT_EQ(data, Asn1Utility::parseOctetString(cbs));
-}
-
-TEST_F(Asn1UtilityTest, ParseBitStringTest) {
-  std::vector<uint8_t> data = {0, 1, 2, 3};
-  std::vector<uint8_t> tlv = {0x3u, 4};
-  tlv.insert(tlv.end(), data.begin(), data.end());
-
-  CBS cbs;
-  CBS_init(&cbs, tlv.data(), tlv.size());
-  EXPECT_EQ(data, Asn1Utility::parseBitString(cbs));
 }
 
 TEST_F(Asn1UtilityTest, ParseAlgorithmIdentifierTest) {

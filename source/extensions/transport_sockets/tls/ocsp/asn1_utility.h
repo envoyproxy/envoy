@@ -50,12 +50,11 @@ public:
 
   /**
    * Extracts the full contents of `cbs` as a string.
-   * This copies the data in `cbs`.
    *
    * @param cbs a CBS& that refers to the current document position
-   * @returns std::string containing the contents of `cbs`
+   * @returns absl::string_view containing the contents of `cbs`
    */
-  static std::string cbsToString(CBS& cbs);
+  static absl::string_view cbsToString(CBS& cbs);
 
   /**
    * Parses all elements of an ASN.1 SEQUENCE OF. |parse_element| must
@@ -90,13 +89,13 @@ public:
    * If `cbs` does not contain |tag|, `cbs` remains at the same position.
    *
    * @param cbs a CBS& that refers to the current document position
-   * @param data a CBS& that is set to the contents of `cbs`
+   * @param data a CBS* that is set to the contents of `cbs` if present
    * @param an explicit tag indicating an optional value
    *
    * @returns bool whether `cbs` points to an element tagged with |tag|
    * @throws Envoy::EnvoyException if `cbs` is a malformed TLV bytestring
    */
-  static bool isOptionalPresent(CBS& cbs, CBS* data, unsigned tag);
+  static bool getOptional(CBS& cbs, CBS* data, unsigned tag);
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 OBJECT IDENTIFIER element
@@ -140,23 +139,11 @@ public:
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 OCTETSTRING element
-   * @returns std::string of the octets in `cbs`
+   * @returns absl::string_view of the octets in `cbs`
    * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
    * OCTETSTRING
    */
-  static std::string parseOctetString(CBS& cbs);
-
-  /**
-   * Parses an ASN.1 BITSTRING into a byte vector. The first byte
-   * of the vector indicates the number of unused bits at the end of
-   * the last byte. The second byte up through part of the last byte
-   * contain the contents of the bit string.
-   *
-   * @param cbs a CBS& that refers to an ASN.1 BITSTRING element
-   * @returns std::vector<uint8_t> of the bitstring packed into bytes.
-   * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed BITSTRING
-   */
-  static std::vector<uint8_t> parseBitString(CBS& cbs);
+  static absl::string_view parseOctetString(CBS& cbs);
 
   /**
    * Advance `cbs` over an ASN.1 value of the class |tag| if that
@@ -194,7 +181,7 @@ template <typename T>
 absl::optional<T> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
                                              unsigned tag) {
   CBS data;
-  if (isOptionalPresent(cbs, &data, tag)) {
+  if (getOptional(cbs, &data, tag)) {
     return parse_data(data);
   }
 

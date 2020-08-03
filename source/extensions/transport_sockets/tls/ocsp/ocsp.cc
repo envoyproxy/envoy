@@ -13,9 +13,6 @@ namespace Ocsp {
 
 namespace CertUtility = Envoy::Extensions::TransportSockets::Tls::Utility;
 
-static const unsigned CONS = CBS_ASN1_CONSTRUCTED;
-static const unsigned CONT = CBS_ASN1_CONTEXT_SPECIFIC;
-
 namespace {
 
 unsigned parseTag(CBS& cbs) {
@@ -47,8 +44,8 @@ void skipResponderId(CBS& cbs) {
   // KeyHash ::= OCTET STRING -- SHA-1 hash of responder's public key
   //    (excluding the tag and length fields)
 
-  if (Asn1Utility::isOptionalPresent(cbs, nullptr, CONS | CONT | 1) ||
-      Asn1Utility::isOptionalPresent(cbs, nullptr, CONS | CONT | 2)) {
+  if (Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1) ||
+      Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2)) {
     return;
   }
 
@@ -60,9 +57,7 @@ void skipResponderId(CBS& cbs) {
 OcspResponse::OcspResponse(OcspResponseStatus status, ResponsePtr&& response)
     : status_(status), response_(std::move(response)) {}
 
-BasicOcspResponse::BasicOcspResponse(ResponseData data, std::string signature_alg,
-                                     std::vector<uint8_t> signature)
-    : data_(data), signature_alg_(signature_alg), signature_(std::move(signature)) {}
+BasicOcspResponse::BasicOcspResponse(ResponseData data) : data_(data) {}
 
 const std::string BasicOcspResponse::OID = "1.3.6.1.5.5.7.48.1.1";
 
@@ -74,8 +69,8 @@ SingleResponse::SingleResponse(CertId cert_id, CertStatus status, Envoy::SystemT
                                absl::optional<Envoy::SystemTime> next_update)
     : cert_id_(cert_id), status_(status), this_update_(this_update), next_update_(next_update) {}
 
-CertId::CertId(std::string serial_number, std::string alg_oid, std::string issuer_name_hash,
-               std::string issuer_public_key_hash)
+CertId::CertId(std::string serial_number, std::string alg_oid, absl::string_view issuer_name_hash,
+               absl::string_view issuer_public_key_hash)
     : serial_number_(serial_number), alg_oid_(alg_oid), issuer_name_hash_(issuer_name_hash),
       issuer_public_key_hash_(issuer_public_key_hash) {}
 
@@ -127,7 +122,7 @@ std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {
 
   CBS bytes;
   ResponsePtr resp = nullptr;
-  if (Asn1Utility::isOptionalPresent(elem, &bytes, CONS | CONT | 0)) {
+  if (Asn1Utility::getOptional(elem, &bytes, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0)) {
     resp = Asn1OcspUtility::parseResponseBytes(bytes);
   }
 
@@ -205,15 +200,11 @@ std::unique_ptr<BasicOcspResponse> Asn1OcspUtility::parseBasicOcspResponse(CBS& 
     throw EnvoyException("OCSP BasicOCSPResponse is not a wellf-formed ASN.1 SEQUENCE");
   }
   auto response_data = Asn1OcspUtility::parseResponseData(elem);
-  auto signature_alg = Asn1Utility::parseAlgorithmIdentifier(elem);
-  auto signature = Asn1Utility::parseBitString(elem);
-  // TODO(daniel-goldstein): Verify this signature
-  // "The value for signature SHALL be computed on the hash of the DER
-  //    encoding of ResponseData."
+  // The `signatureAlgorithm` and `signature` are ignored because OCSP
+  // responses are expected to be delivered from a reliable source.
+  // Optional additional certs are ignored.
 
-  // optional additional certs are ignored.
-
-  return std::make_unique<BasicOcspResponse>(response_data, signature_alg, std::move(signature));
+  return std::make_unique<BasicOcspResponse>(response_data);
 }
 
 ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
@@ -255,7 +246,7 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   auto status = Asn1OcspUtility::parseCertStatus(elem);
   auto this_update = Asn1Utility::parseGeneralizedTime(elem);
   auto next_update = Asn1Utility::parseOptional<Envoy::SystemTime>(
-      elem, Asn1Utility::parseGeneralizedTime, CONS | CONT | 0);
+      elem, Asn1Utility::parseGeneralizedTime, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0);
   // Extensions currently ignored
 
   return {cert_id, status, this_update, next_update};
@@ -287,13 +278,13 @@ CertStatus Asn1OcspUtility::parseCertStatus(CBS& cbs) {
   //    revoked             [1] IMPLICIT RevokedInfo,
   //    unknown             [2] IMPLICIT UnknownInfo
   // }
-  if (Asn1Utility::isOptionalPresent(cbs, nullptr, CONT | 0)) {
+  if (Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 0)) {
     return CertStatus::GOOD;
   }
-  if (Asn1Utility::isOptionalPresent(cbs, nullptr, CONS | CONT | 1)) {
+  if (Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) {
     return CertStatus::REVOKED;
   }
-  if (Asn1Utility::isOptionalPresent(cbs, nullptr, CONT | 2)) {
+  if (Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 2)) {
     return CertStatus::UNKNOWN;
   }
 

@@ -29,5 +29,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/ssl:context_config_interface",
+        "//source/common/common:c_smart_ptr_lib",
     ],
 )

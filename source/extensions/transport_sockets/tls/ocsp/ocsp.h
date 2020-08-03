@@ -8,6 +8,7 @@
 #include "envoy/common/time.h"
 
 #include "absl/types/optional.h"
+#include "absl/strings/string_view.h"
 #include "openssl/bytestring.h"
 #include "openssl/ssl.h"
 
@@ -64,13 +65,13 @@ enum class CertStatus {
  * unique per issuer but not necessarily universally.
  */
 struct CertId {
-  CertId(std::string serial_number, std::string alg_oid, std::string issuer_name_hash,
-         std::string issuer_public_key_hash);
+  CertId(std::string serial_number, std::string alg_oid, absl::string_view issuer_name_hash,
+         absl::string_view issuer_public_key_hash);
 
   std::string serial_number_;
   std::string alg_oid_;
-  std::string issuer_name_hash_;
-  std::string issuer_public_key_hash_;
+  absl::string_view issuer_name_hash_;
+  absl::string_view issuer_public_key_hash_;
 };
 
 /**
@@ -107,8 +108,8 @@ struct ResponseData {
 };
 
 /**
- * An abstract type for OCSP response formats. Which variant of |Response| is
- * used in an |OcspResponse| is indicated by the structure's OID.
+ * An abstract type for OCSP response formats. Which variant of `Response` is
+ * used in an `OcspResponse` is indicated by the structure's OID.
  *
  * We currently enforce that OCSP responses must be for a single certificate
  * only. The methods on this class extract the relevant information for the
@@ -140,7 +141,7 @@ public:
 
   /**
    * The time at which this response is considered to expire. If
-   * |nullopt|, then there is assumed to always be more up-to-date
+   * `nullopt`, then there is assumed to always be more up-to-date
    * information available and the response is always considered expired.
    *
    * @return The end of the validity window for this response.
@@ -152,14 +153,13 @@ using ResponsePtr = std::unique_ptr<Response>;
 
 /**
  * Reflection of the ASN.1 BasicOcspResponse structure.
- * Contains the full data of an OCSP response and a signature/signature
- * algorithm to verify the OCSP responder.
+ * Contains the full data of an OCSP response.
  *
  * BasicOcspResponse is the only supported Response type in RFC 6960.
  */
 class BasicOcspResponse : public Response {
 public:
-  BasicOcspResponse(ResponseData data, std::string signature_alg, std::vector<uint8_t> signature);
+  BasicOcspResponse(ResponseData data);
 
   // Response
   size_t getNumCerts() override { return data_.single_responses_.size(); }
@@ -178,8 +178,6 @@ public:
 
 private:
   const ResponseData data_;
-  const std::string signature_alg_;
-  const std::vector<uint8_t> signature_;
 };
 
 /**
@@ -219,7 +217,7 @@ public:
 
   /**
    * @param cert a X509& SSL certificate
-   * @returns bool whether this OCSP response contains the revocation status of |cert|
+   * @returns bool whether this OCSP response contains the revocation status of `cert`
    */
   bool matchesCertificate(X509& cert);
 

@@ -1,6 +1,8 @@
 #include "extensions/transport_sockets/tls/ocsp/asn1_utility.h"
+#include "common/common/c_smart_ptr.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -8,12 +10,26 @@ namespace TransportSockets {
 namespace Tls {
 namespace Ocsp {
 
-std::string Asn1Utility::cbsToString(CBS& cbs) {
+namespace {
+  // A type adapter since OPENSSL_free accepts void*.
+  void freeOpensslString(char* str) {
+    OPENSSL_free(str);
+  }
+
+  // ASN1_INTEGER is a type alias for ASN1_STRING.
+  // This static_cast is intentional to avoid the
+  // c-style cast performed in M_ASN1_INTEGER_free.
+  void freeAsn1Integer(ASN1_INTEGER* integer) {
+    ASN1_STRING_free(static_cast<ASN1_STRING*>(integer));
+  }
+}
+
+absl::string_view Asn1Utility::cbsToString(CBS& cbs) {
   auto str_head = reinterpret_cast<const char*>(CBS_data(&cbs));
   return {str_head, CBS_len(&cbs)};
 }
 
-bool Asn1Utility::isOptionalPresent(CBS& cbs, CBS* data, unsigned tag) {
+bool Asn1Utility::getOptional(CBS& cbs, CBS* data, unsigned tag) {
   int is_present;
   if (!CBS_get_optional_asn1(&cbs, data, &is_present, tag)) {
     throw Envoy::EnvoyException("Failed to parse ASN.1 element tag");
@@ -27,13 +43,12 @@ std::string Asn1Utility::parseOid(CBS& cbs) {
   if (!CBS_get_asn1(&cbs, &oid, CBS_ASN1_OBJECT)) {
     throw Envoy::EnvoyException("Input is not a well-formed ASN.1 OBJECT");
   }
-  char* oid_text = CBS_asn1_oid_to_text(&oid);
+  CSmartPtr<char, freeOpensslString> oid_text(CBS_asn1_oid_to_text(&oid));
   if (oid_text == nullptr) {
     throw Envoy::EnvoyException("Failed to parse oid");
   }
 
-  std::string oid_text_str(oid_text);
-  OPENSSL_free(oid_text);
+  std::string oid_text_str(oid_text.get());
   return oid_text_str;
 }
 
@@ -49,14 +64,15 @@ Envoy::SystemTime Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   // Local time or time differential, though a part of the ASN.1
   // GENERALIZEDTIME spec, are not supported.
   // Reference: https://tools.ietf.org/html/rfc5280#section-4.1.2.5.2
-  if (time_str.at(time_str.length() - 1) != 'Z') {
+  if (absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
     throw Envoy::EnvoyException("GENERALIZEDTIME must be in UTC");
   }
 
   absl::Time time;
-  std::string time_format = "%E4Y%m%d%H%M%SZ";
+  auto utc_time_str = time_str.substr(0, time_str.length() - 1);
+  std::string time_format = "%E4Y%m%d%H%M%S";
   std::string parse_error;
-  if (!absl::ParseTime(time_format, time_str, &time, &parse_error)) {
+  if (!absl::ParseTime(time_format, utc_time_str, &time, &parse_error)) {
     throw Envoy::EnvoyException(absl::StrCat("Error parsing timestamp ", time_str, " with format ",
                                              time_format, ". Error: ", parse_error));
   }
@@ -72,44 +88,33 @@ std::string Asn1Utility::parseInteger(CBS& cbs) {
   }
 
   auto head = CBS_data(&num);
-  ASN1_INTEGER* asn1_serial_number = c2i_ASN1_INTEGER(nullptr, &head, CBS_len(&num));
-  if (asn1_serial_number != nullptr) {
+  CSmartPtr<ASN1_INTEGER, freeAsn1Integer> asn1_integer(c2i_ASN1_INTEGER(nullptr, &head, CBS_len(&num)));
+  if (asn1_integer != nullptr) {
     BIGNUM num_bn;
     BN_init(&num_bn);
-    ASN1_INTEGER_to_BN(asn1_serial_number, &num_bn);
+    ASN1_INTEGER_to_BN(asn1_integer.get(), &num_bn);
 
-    char* char_serial_number = BN_bn2hex(&num_bn);
+    CSmartPtr<char, freeOpensslString> char_hex_number(BN_bn2hex(&num_bn));
     BN_free(&num_bn);
-    // avoiding M_ASN1_INTEGER_free which performs a c-style cast
-    ASN1_STRING_free(static_cast<ASN1_STRING*>(asn1_serial_number));
-
-    if (char_serial_number != nullptr) {
-      std::string serial_number(char_serial_number);
-      OPENSSL_free(char_serial_number);
-      return serial_number;
+    if (char_hex_number != nullptr) {
+      std::string hex_number(char_hex_number.get());
+      return hex_number;
     }
   }
 
   throw Envoy::EnvoyException("Failed to parse ASN.1 INTEGER");
 }
 
-std::string Asn1Utility::parseOctetString(CBS& cbs) {
+absl::string_view Asn1Utility::parseOctetString(CBS& cbs) {
   CBS value;
   if (!CBS_get_asn1(&cbs, &value, CBS_ASN1_OCTETSTRING)) {
     throw Envoy::EnvoyException("Input is not a well-formed ASN.1 OCTETSTRING");
   }
 
+  
+  /* auto data = reinterpret_cast<const uint8_t*>(CBS_data(&value)); */
+  /* return {data, data + CBS_len(&value)}; */
   return cbsToString(value);
-}
-
-std::vector<uint8_t> Asn1Utility::parseBitString(CBS& cbs) {
-  CBS value;
-  if (!CBS_get_asn1(&cbs, &value, CBS_ASN1_BITSTRING)) {
-    throw Envoy::EnvoyException("Input is not a well-formed ASN.1 BITSTRING");
-  }
-
-  auto data = reinterpret_cast<const uint8_t*>(CBS_data(&value));
-  return {data, data + CBS_len(&value)};
 }
 
 std::string Asn1Utility::parseAlgorithmIdentifier(CBS& cbs) {
@@ -123,7 +128,7 @@ std::string Asn1Utility::parseAlgorithmIdentifier(CBS& cbs) {
   }
 
   return parseOid(elem);
-  // ignore parameters
+  // Ignore `parameters`.
 }
 
 void Asn1Utility::skipOptional(CBS& cbs, unsigned tag) {
