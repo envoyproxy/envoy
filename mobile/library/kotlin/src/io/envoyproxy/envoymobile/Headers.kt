@@ -6,7 +6,7 @@ package io.envoyproxy.envoymobile
  */
 open class Headers {
   @Suppress("MemberNameEqualsClassName")
-  protected val headers: Map<String, List<String>>
+  val headers: Map<String, List<String>>
 
   /**
    * Internal constructor used by builders.

@@ -23,6 +23,7 @@ open class StreamClientBuilder(
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
+  private var filterChain = mutableListOf<FilterFactory>()
   private var statsFlushSeconds = 60
   private var appVersion = "unspecified"
   private var appId = "unspecified"
@@ -99,6 +100,19 @@ open class StreamClientBuilder(
    */
   fun addStatsFlushSeconds(statsFlushSeconds: Int): StreamClientBuilder {
     this.statsFlushSeconds = statsFlushSeconds
+    return this
+  }
+
+  /**
+   * Add an HTTP filter factory used to create filters for streams sent by this client.
+   *
+   * @param filterName: unique name identifying this filter in the chain.
+   * @param factory closure returning an instantiated filter.
+   *
+   * @return this builder.
+   */
+  fun addFilter(filterName: String, factory: () -> Filter): StreamClientBuilder {
+    this.filterChain.add(FilterFactory(filterName, factory))
     return this
   }
 

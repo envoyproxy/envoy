@@ -6,6 +6,8 @@ java_library(
     name = "envoy_c_types_lib",
     srcs = [
         "EnvoyHTTPCallbacks.java",
+        "EnvoyHTTPFilter.java",
+        "EnvoyHTTPFilterFactory.java",
         "EnvoyStatus.java",
     ],
     visibility = ["//visibility:public"],
