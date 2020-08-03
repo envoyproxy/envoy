@@ -350,21 +350,19 @@ void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& mo
   // That can only happen here in alarm->activate(), which is run with the mutex
   // released.
   if (monotonic_time >= monotonic_time_) {
-    MonotonicTime start_monotonic_time = monotonic_time_;
     system_time_ +=
         std::chrono::duration_cast<SystemTime::duration>(monotonic_time - monotonic_time_);
     monotonic_time_ = monotonic_time;
-    scheduleReadyAlarmsLockHeld(start_monotonic_time);
+    scheduleReadyAlarmsLockHeld();
   }
 }
 
 void SimulatedTimeSystemHelper::scheduleReadyAlarms() {
   absl::MutexLock lock(&mutex_);
-  scheduleReadyAlarmsLockHeld(monotonic_time_);
+  scheduleReadyAlarmsLockHeld();
 }
 
-void SimulatedTimeSystemHelper::scheduleReadyAlarmsLockHeld(MonotonicTime start_monotonic_time) {
-  MonotonicTime prev_alarm_time = start_monotonic_time;
+void SimulatedTimeSystemHelper::scheduleReadyAlarmsLockHeld() {
   // Alarms is a std::set ordered by wakeup time, so pulling off begin() each
   // iteration gives you wakeup order. Also note that alarms may be added
   // or removed during the call to activate() so it would not be correct to
@@ -375,10 +373,6 @@ void SimulatedTimeSystemHelper::scheduleReadyAlarmsLockHeld(MonotonicTime start_
     if (alarm_time > monotonic_time_) {
       break;
     }
-
-    // Verify alarm ordering invariant.
-    ASSERT(alarm_time >= prev_alarm_time);
-    prev_alarm_time = alarm_time;
 
     Alarm& alarm = alarm_registration.alarm_;
     removeAlarmLockHeld(alarm);

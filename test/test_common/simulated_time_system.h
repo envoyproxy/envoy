@@ -108,8 +108,7 @@ private:
    * Schedule expired alarms so they execute in their event loops.
    */
   void scheduleReadyAlarms();
-  void scheduleReadyAlarmsLockHeld(MonotonicTime start_monotonic_time)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void scheduleReadyAlarmsLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   void alarmActivateLockHeld(Alarm& alarm) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
