@@ -66,6 +66,7 @@ message RateLimit {
       [(validate.rules).message = {required: true}];
 
   // If set to true enables emitting X-RateLimit-* headers by the filter:
+  //
   // * ``X-RateLimit-Limit`` - indicates the request-quota associated to the
   //   client in the current time-window followed by the description of the
   //   quota policy. Example: `10, 10;window=1;name="per-ip", 1000;window=3600`.
