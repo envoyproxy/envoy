@@ -40,7 +40,7 @@ private:
   const Network::FilterChain& filter_chain_;
 };
 
-// A partial implementation of quic::ProofSource which chooses a cipher suite accoridng to the leaf
+// A partial implementation of quic::ProofSource which chooses a cipher suite according to the leaf
 // cert to sign in GetProof().
 class EnvoyQuicProofSourceBase : public quic::ProofSource,
                                  protected Logger::Loggable<Logger::Id::quic> {

@@ -1,7 +1,5 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_proof_verifier.h"
 
-#include <openssl/x509_vfy.h>
-
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"
