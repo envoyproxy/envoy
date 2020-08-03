@@ -197,34 +197,10 @@ stats_config:
       patterns:
         - safe_regex:
             google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_cx_active'
+            regex: '^cluster\.[\w]+?\.upstream_cx_active'
         - safe_regex:
             google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_[1|2|3|4|5]xx'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_active'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_retry'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_retry_limit_exceeded'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_retry_overflow'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_retry_success'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_time'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_total'
-        - safe_regex:
-            google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_unknown'
+            regex: '^cluster\.[\w]+?\.upstream_rq_(?:[12345]xx|active|retry.*|time|total|unknown)'
         - safe_regex:
             google_re2: {}
             regex: '^http.dispatcher.*'
@@ -233,33 +209,10 @@ stats_config:
             regex: '^http.hcm.decompressor.*'
         - safe_regex:
             google_re2: {}
-            regex: 'http.hcm.downstream_rq_[1|2|3|4|5]xx'
-        - exact: 'http.hcm.downstream_rq_total'
-        - exact: 'http.hcm.downstream_rq_completed'
+            regex: '^http.hcm.downstream_rq_(?:[12345]xx|total|completed)'
         - safe_regex:
             google_re2: {}
-            regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_[1|2|3|4|5]xx'
-        - safe_regex:
-            google_re2: {}
-            regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_retry'
-        - safe_regex:
-            google_re2: {}
-            regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_retry_limit_exceeded'
-        - safe_regex:
-            google_re2: {}
-            regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_retry_overflow'
-        - safe_regex:
-            google_re2: {}
-            regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_retry_success'
-        - safe_regex:
-            google_re2: {}
-            regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_time'
-        - safe_regex:
-            google_re2: {}
-            regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_timeout'
-        - safe_regex:
-            google_re2: {}
-            regex: 'vhost.api.vcluster\.[\w]+?\.upstream_rq_total'
+            regex: '^vhost.api.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|retry.*|time|timeout|total)'
 watchdog:
   megamiss_timeout: 60s
   miss_timeout: 60s
