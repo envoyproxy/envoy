@@ -99,9 +99,9 @@ function bazel_binary_build() {
 }
 
 CI_TARGET=$1
+shift
 
 if [[ $# -gt 1 ]]; then
-  shift
   COVERAGE_TEST_TARGETS=$*
   TEST_TARGETS="$COVERAGE_TEST_TARGETS"
 else
@@ -284,7 +284,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
-  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh
+  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh $*
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
