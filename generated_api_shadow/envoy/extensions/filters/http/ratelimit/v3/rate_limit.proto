@@ -29,7 +29,7 @@ message RateLimit {
     // `X-RateLimit-*` headers disabled.
     OFF = 0;
 
-    // Use `draft RFC Version 02<https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html>`_
+    // Use `draft RFC Version 02<https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html>`_.
     DRAFT_VERSION_02 = 1;
   }
 
@@ -74,7 +74,7 @@ message RateLimit {
   config.ratelimit.v3.RateLimitServiceConfig rate_limit_service = 7
       [(validate.rules).message = {required: true}];
 
-  // Defines the standrad version to use for `X-RateLimit-*` headers emitted by the filter:
+  // Defines the standard version to use for `X-RateLimit-*` headers emitted by the filter:
   //
   // * ``X-RateLimit-Limit`` - indicates the request-quota associated to the
   //   client in the current time-window followed by the description of the
@@ -94,7 +94,7 @@ message RateLimit {
   // above represent the window that is closest to reaching its limit.
   //
   // For more information about the headers specification see selected version of
-  // the `draft RFC<https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html>`_
+  // the `draft RFC<https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html>`_.
   //
   // Disabled by default.
   XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
