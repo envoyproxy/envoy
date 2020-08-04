@@ -78,7 +78,7 @@ message RateLimit {
   //   field.
   // * ``X-RateLimit-Reset`` - indicates the number of seconds until reset of
   //   the current time-window. The values are returned by the rate limiting service
-  //   in :ref:`seconds_until_reset<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.seconds_until_reset>`
+  //   in :ref:`duration_unitl_reset<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.duration_unitl_reset>`
   //   field.
   //
   // In case rate limiting policy specifies more then one time window, the values

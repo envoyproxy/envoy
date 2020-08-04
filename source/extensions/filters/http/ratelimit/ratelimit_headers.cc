@@ -53,7 +53,7 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
     result->addReferenceKey(XRateLimitHeaders::get().XRateLimitRemaining,
                             min_remaining_limit_status.value().limit_remaining());
     result->addReferenceKey(XRateLimitHeaders::get().XRateLimitReset,
-                            min_remaining_limit_status.value().seconds_until_reset().seconds());
+                            min_remaining_limit_status.value().duration_unitl_reset().seconds());
   }
   descriptor_statuses = nullptr;
   return result;

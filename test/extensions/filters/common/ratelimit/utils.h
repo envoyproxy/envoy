@@ -13,7 +13,7 @@ buildDescriptorStatus(uint32_t requests_per_unit,
                       std::string name, uint32_t limit_remaining, uint32_t seconds_until_reset) {
   envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus statusMsg;
   statusMsg.set_limit_remaining(limit_remaining);
-  statusMsg.mutable_seconds_until_reset()->set_seconds(seconds_until_reset);
+  statusMsg.mutable_duration_until_reset()->set_seconds(seconds_until_reset);
   if (requests_per_unit) {
     envoy::service::ratelimit::v3::RateLimitResponse_RateLimit* limitMsg =
         statusMsg.mutable_current_limit();
