@@ -329,7 +329,7 @@ void FilterChainManagerImpl::addRealFilterChain(
       filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
 
   ENVOY_LOG(debug, "placeholder->loadRealFilterChain");
-  
+
   // TODO(ASOPVII): Call Ctor/Point of this placeholder to update its context.
   auto placeholder = std::move(fc_contexts_[*filter_chain]);
   placeholder->loadRealFilterChain(filter_chain_impl);
