@@ -381,7 +381,7 @@ public:
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
   // void buildRealFilterChains(const envoy::config::listener::v3::FilterChain* const& filter_chain,
-  //                            FilterChainRebuildInfoPtr rb);
+  //                            FilterChainRebuildInfoPtr rebuild);
   void buildRealFilterChains(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                              const std::string& worker_name);
   WorkerPtr getWorkerByName(const std::string& worker_name);
