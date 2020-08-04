@@ -79,7 +79,7 @@ else
   if [[ -z "${DIFF_REF}" ]]; then
     if [[ "${BUILD_REASON}" == "PullRequest" ]]; then
       DIFF_REF="remotes/origin/${SYSTEM_PULLREQUEST_TARGETBRANCH}"
-    else [[ "${BUILD_REASON}" == *CI ]]; then
+    elif [[ "${BUILD_REASON}" == *CI ]]; then
       DIFF_REF="HEAD^"
     else
       DIFF_REF=$(${ENVOY_SRCDIR}/tools/git/last_github_commit.sh)
