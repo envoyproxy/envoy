@@ -110,7 +110,38 @@ decompressor_library:
     }
   }
 
-  void expectDecompression(Compression::Decompressor::MockDecompressor* decompressor_ptr) {
+  void doTrailers() {
+    if (isRequestDirection()) {
+      Http::TestRequestTrailerMapImpl request_trailers;
+      EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+      EXPECT_EQ("30",
+                request_trailers
+                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                    ->value()
+                    .getStringView());
+      EXPECT_EQ("60",
+                request_trailers
+                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
+                    ->value()
+                    .getStringView());
+    } else {
+      Http::TestResponseTrailerMapImpl response_trailers;
+      EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+      EXPECT_EQ("30",
+                response_trailers
+                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                    ->value()
+                    .getStringView());
+      EXPECT_EQ("60",
+                response_trailers
+                    .get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
+                    ->value()
+                    .getStringView());
+    }
+  }
+
+  void expectDecompression(Compression::Decompressor::MockDecompressor* decompressor_ptr,
+                           bool end_with_data) {
     EXPECT_CALL(*decompressor_ptr, decompress(_, _))
         .Times(2)
         .WillRepeatedly(
@@ -122,8 +153,11 @@ decompressor_library:
     EXPECT_EQ(10, buffer.length());
     doData(buffer, false /* end_stream */, true /* expect_decompression */);
     EXPECT_EQ(20, buffer.length());
-    doData(buffer, true /* end_stream */, true /* expect_decompression */);
+    doData(buffer, end_with_data /* end_stream */, true /* expect_decompression */);
     EXPECT_EQ(40, buffer.length());
+    if (!end_with_data) {
+      doTrailers();
+    }
   }
 
   void expectNoDecompression() {
@@ -134,7 +168,7 @@ decompressor_library:
     EXPECT_EQ(10, buffer.length());
   }
 
-  void decompressionActive(const Http::HeaderMap& headers_before_filter,
+  void decompressionActive(const Http::HeaderMap& headers_before_filter, bool end_with_data,
                            const absl::optional<std::string> expected_content_encoding,
                            const absl::optional<std::string> expected_accept_encoding = "mock") {
     // Keep the decompressor to set expectations about it
@@ -169,7 +203,7 @@ decompressor_library:
       EXPECT_EQ(nullptr, accept_encoding);
     }
 
-    expectDecompression(decompressor_ptr);
+    expectDecompression(decompressor_ptr, end_with_data);
   }
 
   Compression::Decompressor::MockDecompressorFactory* decompressor_factory_{};
@@ -187,21 +221,31 @@ INSTANTIATE_TEST_SUITE_P(IsRequestDirection, DecompressorFilterTest,
 TEST_P(DecompressorFilterTest, DecompressionActive) {
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                        {"content-length", "256"}};
-  decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding */);
+  decompressionActive(headers_before_filter, true /* end_with_data */,
+                      absl::nullopt /* expected_content_encoding */);
+}
+
+TEST_P(DecompressorFilterTest, DecompressionActiveEndWithTrailers) {
+  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
+                                                       {"content-length", "256"}};
+  decompressionActive(headers_before_filter, false /* end_with_data */,
+                      absl::nullopt /* expected_content_encoding */);
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveContentEncodingSpacing) {
   // Additional spacing should still match.
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", " mock "},
                                                        {"content-length", "256"}};
-  decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding */);
+  decompressionActive(headers_before_filter, true /* end_with_data */,
+                      absl::nullopt /* expected_content_encoding */);
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveContentEncodingCasing) {
   // Different casing should still match.
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "MOCK"},
                                                        {"content-length", "256"}};
-  decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding */);
+  decompressionActive(headers_before_filter, true /* end_with_data */,
+                      absl::nullopt /* expected_content_encoding */);
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings) {
@@ -209,7 +253,7 @@ TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings) {
   // still be active.
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br"},
                                                        {"content-length", "256"}};
-  decompressionActive(headers_before_filter, "br");
+  decompressionActive(headers_before_filter, true /* end_with_data */, "br");
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings2) {
@@ -217,7 +261,7 @@ TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings2) {
   // still be active.
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock, br , gzip "},
                                                        {"content-length", "256"}};
-  decompressionActive(headers_before_filter, "br , gzip");
+  decompressionActive(headers_before_filter, true /* end_with_data */, "br , gzip");
 }
 
 TEST_P(DecompressorFilterTest, DisableAdvertiseAcceptEncoding) {
@@ -231,7 +275,8 @@ request_direction_config:
 
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                        {"content-length", "256"}};
-  decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
+  decompressionActive(headers_before_filter, true /* end_with_data */,
+                      absl::nullopt /* expected_content_encoding*/,
                       absl::nullopt /* expected_accept_encoding */);
 }
 
@@ -250,7 +295,8 @@ request_direction_config:
     // Also test that the filter appends to an already existing header.
     headers_before_filter.addCopy("accept-encoding", "br");
   }
-  decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
+  decompressionActive(headers_before_filter, true /* end_with_data */,
+                      absl::nullopt /* expected_content_encoding*/,
                       "br,mock" /* expected_accept_encoding */);
 }
 
@@ -308,7 +354,8 @@ request_direction_config:
 
     expectNoDecompression();
   } else {
-    decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
+    decompressionActive(headers_before_filter, true /* end_with_data */,
+                        absl::nullopt /* expected_content_encoding*/,
                         "mock" /* expected_accept_encoding */);
   }
 }
@@ -331,7 +378,8 @@ response_direction_config:
   if (isRequestDirection()) {
     // Accept-Encoding is not advertised in the request headers when response decompression is
     // disabled.
-    decompressionActive(headers_before_filter, absl::nullopt /* expected_content_encoding*/,
+    decompressionActive(headers_before_filter, true /* end_with_data */,
+                        absl::nullopt /* expected_content_encoding*/,
                         absl::nullopt /* expected_accept_encoding */);
   } else {
     EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
