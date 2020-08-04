@@ -339,13 +339,6 @@ void FilterChainManagerImpl::addRealFilterChain(
   // Reuse created filter chain if possible.
   // FilterChainManager maintains the lifetime of FilterChainFactoryContext
   // ListenerImpl maintains the dependencies of FilterChainFactoryContext
-  // auto filter_chain_impl = findExistingFilterChain(*filter_chain);
-  // if (filter_chain_impl == nullptr) {
-  //   ENVOY_LOG(debug, "find its nullptr, call build.buildFilterChain");
-  // }
-
-  // Previously, we first find existing filter chain, we don't need to find the old active.
-  ENVOY_LOG(debug, "call filter_chain_factory_builder.buildFilterChain");
   auto filter_chain_impl =
       filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
 

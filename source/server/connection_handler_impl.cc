@@ -433,7 +433,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   // Find matching filter chain.
   ENVOY_LOG(debug, "find filter chain");
-  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
+  const auto& filter_chain = config_->filterChainManager().findFilterChain(*socket);
 
   if (filter_chain == nullptr) {
     ENVOY_LOG(debug, "closing connection: no matching filter chain found");
@@ -454,13 +454,11 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     const auto& listener_name = config_->name();
     ENVOY_LOG(debug, "info: worker_name: {}, listener_name: {}", worker_name, listener_name);
 
-    auto& listener = dynamic_cast<ListenerImpl&>(*config_);
-    auto& server_dispatcher = listener.dispatcher();
     // const auto& filter_chain_message = filter_chain_impl->getFilterChainMessage();
     const auto& filter_chain_message = filter_chain->getFilterChainMessage();
 
-    parent_.sockets_using_filter_chain_[filter_chain_message][listener_name].push_back(
-        std::make_pair(std::move(socket), dynamic_metadata));
+    parent_.sockets_using_filter_chain_[filter_chain_message][listener_name].emplace_back(
+        std::move(socket), dynamic_metadata);
 
     // auto filter_chain_rebuild_info =
     //     std::make_unique<FilterChainRebuildInfo>(worker_name, listener_name,
@@ -469,6 +467,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // server_dispatcher.post([&listener, &filter_chain_message, &filter_chain_rebuild_info]() {
     //   listener.buildRealFilterChains(filter_chain_message, std::move(filter_chain_rebuild_info));
     // });
+    auto& listener = dynamic_cast<ListenerImpl&>(*config_);
+    auto& server_dispatcher = listener.dispatcher();
 
     server_dispatcher.post([&listener, &filter_chain_message, &worker_name]() {
       listener.buildRealFilterChains(filter_chain_message, worker_name);
@@ -476,7 +476,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // Waiting for later callbacks from master thread to retry this connection.
     return;
   }
-  ENVOY_LOG(debug, "filter chain is not fake now");
+  ENVOY_LOG(debug, "filter chain is not fake.");
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);

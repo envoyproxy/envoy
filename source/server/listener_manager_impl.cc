@@ -1010,8 +1010,8 @@ ApiListenerOptRef ListenerManagerImpl::apiListener() {
   return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
 }
 
-WorkerPtr ListenerManagerImpl::getWorkerByName(const std::string& name) {
-  return std::move(*worker_by_name_[name]);
+WorkerPtr& ListenerManagerImpl::getWorkerByName(const std::string& name) {
+  return *worker_by_name_[name];
 }
 } // namespace Server
 } // namespace Envoy

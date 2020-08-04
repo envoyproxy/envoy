@@ -223,7 +223,7 @@ Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *d
 // Must be overridden
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-FilterChainRebuilder::FilterChainRebuilder(
+PerFilterChainRebuilder::PerFilterChainRebuilder(
     ListenerImpl& listener, const envoy::config::listener::v3::FilterChain* const& filter_chain)
     : listener_(listener), filter_chain_(filter_chain), rebuild_complete_(false),
       rebuild_init_manager_(std::make_unique<Init::ManagerImpl>("rebuild_init_manager")),
@@ -231,23 +231,15 @@ FilterChainRebuilder::FilterChainRebuilder(
         rebuild_complete_ = true;
         callbackToWorkers();
       }) {}
-FilterChainRebuilder::~FilterChainRebuilder() = default;
+PerFilterChainRebuilder::~PerFilterChainRebuilder() = default;
 
-void FilterChainRebuilder::addRebuildInfo(FilterChainRebuildInfoPtr rebuild_info) {
-  std::string worker_name = rebuild_info->worker_name_;
-  std::string listener_name = rebuild_info->listener_name_;
-
-  // Add this listener_name to the callback set of this worker.
-  listeners_on_worker_to_callback_[worker_name].insert(listener_name);
-}
-
-void FilterChainRebuilder::saveWorkerName(const std::string& worker_name) {
+void PerFilterChainRebuilder::storeWorkerInCallbackList(const std::string& worker_name) {
   // Add this worker to the callback list.
   workers_to_callback_.insert(worker_name);
 }
 
-void FilterChainRebuilder::callbackToWorkers() {
-  ENVOY_LOG(debug, "inside rebuilder::callbacktoWorkers");
+void PerFilterChainRebuilder::callbackToWorkers() {
+  // TODO(ASOPVII): callback when rebuild fails.
   bool success = true;
   if (!success) {
     return;
@@ -255,27 +247,10 @@ void FilterChainRebuilder::callbackToWorkers() {
 
   // Find all matching workers and listeners, send callback.
   for (const auto& worker_name : workers_to_callback_) {
-    ENVOY_LOG(debug, "callbacktoWorker: {}", worker_name);
-
-    auto worker_ptr = listener_.getWorkerByName(worker_name);
-    // The current notify Listeners will notify all listeners on this worker.
-    // But this is not necessary, we now both store listeners on worker(handler) and master
-    // thread(rebuilder). The stored listener name is currently not used.
-    worker_ptr->notifyListeners(filter_chain_);
+    ENVOY_LOG(debug, "rebuild completed, callback to worker: {}", worker_name);
+    listener_.getWorkerByName(worker_name)->notifyListeners(filter_chain_);
   }
   workers_to_callback_.clear();
-
-  // for (auto& worker_listeners : listeners_on_worker_to_callback_) {
-  //   const auto& worker_name = worker_listeners.first;
-  //   ENVOY_LOG(debug, "callback to watchers {}", worker_name);
-  //   auto worker_ptr = listener_.getWorkerByName(worker_name);
-  //   // The current notify Listeners will notify all listeners on this worker.
-  //   // But this is not necessary, we now both store listeners on worker(handler) and master
-  //   // thread(rebuilder). The stored listener name is currently not used.
-  //   worker_ptr->notifyListeners(filter_chain_);
-  // }
-  // // Clear hash map after sending callback.
-  // listeners_on_worker_to_callback_.clear();
 }
 
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
@@ -536,31 +511,27 @@ void ListenerImpl::buildRealFilterChains(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
     const std::string& worker_name) {
 
-  ENVOY_LOG(debug, "Inside build real filter chains");
+  ENVOY_LOG(debug, "Inside ListenerImpl::buildRealFilterChains");
   if (filter_chain_message == nullptr) {
     ENVOY_LOG(debug, "Filter chain message is empty");
   }
   // auto filter_chain_name = filter_chain_message->name();
 
-  // Trigger rebuild request only on the arrival of the first filter_chain.
+  // Request rebuilding only on the arrival of the first filter_chain.
   bool on_first_request = false;
 
   // Find/create rebuilder for this filter chain message.
   if (filter_chain_rebuilder_map_.find(filter_chain_message) == filter_chain_rebuilder_map_.end()) {
     ENVOY_LOG(debug, "Not found filter chain rebuilder, create rebuilder and start rebuilding.");
     filter_chain_rebuilder_map_[filter_chain_message] =
-        std::make_unique<FilterChainRebuilder>(*this, filter_chain_message);
+        std::make_unique<PerFilterChainRebuilder>(*this, filter_chain_message);
     on_first_request = true;
   }
 
-  ENVOY_LOG(debug, "move get rebuilder.");
   const auto& rebuilder = std::move(filter_chain_rebuilder_map_[filter_chain_message]);
-  // rebuilder->addRebuildInfo(std::move(rebuild_info));
-  rebuilder->saveWorkerName(worker_name);
-  ENVOY_LOG(debug, "Add rebuild info/save worker name");
+  rebuilder->storeWorkerInCallbackList(worker_name);
 
   if (rebuilder->isCompleted()) {
-    ENVOY_LOG(debug, "Rebuild Complete, callback directly.");
     rebuilder->callbackToWorkers();
   }
 
@@ -576,12 +547,11 @@ void ListenerImpl::buildRealFilterChains(
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
     ENVOY_LOG(debug, "Call filterchainManager.addRealFilterChain");
     filter_chain_manager_.addRealFilterChain(filter_chain_message, builder, filter_chain_manager_);
-    ENVOY_LOG(debug, "rebuider.startRebuilding");
-    rebuilder->startRebuilding(); // manager.initialize();
+    rebuilder->startRebuilding();
   }
 }
 
-WorkerPtr ListenerImpl::getWorkerByName(const std::string& name) {
+WorkerPtr& ListenerImpl::getWorkerByName(const std::string& name) {
   return parent_.getWorkerByName(name);
 }
 
