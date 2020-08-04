@@ -73,10 +73,6 @@ def _envoy_linkopts():
             "-Wl,-z,relro,-z,now",
             "-Wl,--hash-style=gnu",
         ],
-    }) + select({
-        "@envoy//bazel:boringssl_fips": [],
-        "@envoy//bazel:windows_x86_64": [],
-        "//conditions:default": ["-pie"],
     }) + _envoy_select_exported_symbols(["-Wl,-E"])
 
 def _envoy_stamped_deps():
