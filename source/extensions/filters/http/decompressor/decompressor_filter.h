@@ -41,33 +41,37 @@ public:
   public:
     DirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                         CommonDirectionConfig& proto_config,
-                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+                    const std::string& stats_prefix, const std::string& trailers_prefix,
+                    Stats::Scope& scope, Runtime::Loader& runtime);
 
     virtual ~DirectionConfig() = default;
 
     virtual const std::string& logString() const PURE;
+          const std::vector<Http::LowerCaseString>& trailersStrings() const  {
+      CONSTRUCT_ON_FIRST_USE(
+          std::vector<Http::LowerCaseString>,
+          {Http::LowerCaseString(fmt::format("{}-compressed-bytes", trailers_prefix_)),
+           Http::LowerCaseString(fmt::format("{}-uncompressed-bytes", trailers_prefix_))});
+    }
     const DecompressorStats& stats() const { return stats_; }
     bool decompressionEnabled() const { return decompression_enabled_.enabled(); }
-    void chargeBytes(uint64_t compressed_bytes, uint64_t uncompressed_bytes);
-    std::pair<uint64_t, uint64_t> totalBytes() const { return {total_compressed_bytes_, total_uncompressed_bytes_}; }
 
   private:
     static DecompressorStats generateStats(const std::string& prefix, Stats::Scope& scope) {
       return DecompressorStats{ALL_DECOMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
     }
 
+    const std::string& trailers_prefix_;
     const DecompressorStats stats_;
     const Runtime::FeatureFlag decompression_enabled_;
-    uint64_t total_compressed_bytes_;
-    uint64_t total_uncompressed_bytes_;
   };
 
   class RequestDirectionConfig : public DirectionConfig {
   public:
     RequestDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                                RequestDirectionConfig& proto_config,
-                           const std::string& stats_prefix, Stats::Scope& scope,
-                           Runtime::Loader& runtime);
+                           const std::string& stats_prefix, const std::string& trailers_prefix,
+                           Stats::Scope& scope, Runtime::Loader& runtime);
 
     // DirectionConfig
     const std::string& logString() const override {
@@ -84,8 +88,8 @@ public:
   public:
     ResponseDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                                 ResponseDirectionConfig& proto_config,
-                            const std::string& stats_prefix, Stats::Scope& scope,
-                            Runtime::Loader& runtime);
+                            const std::string& stats_prefix, const std::string& trailers_prefix,
+                            Stats::Scope& scope, Runtime::Loader& runtime);
 
     // DirectionConfig
     const std::string& logString() const override {
@@ -107,6 +111,7 @@ public:
 
 private:
   const std::string stats_prefix_;
+  const std::string trailers_prefix_;
   const std::string decompressor_stats_prefix_;
   const Compression::Decompressor::DecompressorFactoryPtr decompressor_factory_;
   const RequestDirectionConfig request_direction_config_;
@@ -134,6 +139,28 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
+  struct ByteTracker {
+    ByteTracker(const Http::LowerCaseString& compressed_bytes_trailer, const Http::LowerCaseString& uncompressed_bytes_trailer): compressed_bytes_trailer_(compressed_bytes_trailer), uncompressed_bytes_trailer_(uncompressed_bytes_trailer) {}
+    void chargeBytes(uint64_t compressed_bytes, uint64_t uncompressed_bytes) {
+      total_compressed_bytes_ += compressed_bytes;
+      total_uncompressed_bytes_ += uncompressed_bytes;
+    }
+    void reportTotalBytes(Http::HeaderMap& trailers) const {
+      ENVOY_LOG_MISC(error, "reporting {} {}", compressed_bytes_trailer_.get(), uncompressed_bytes_trailer_.get());
+      trailers.addCopy(compressed_bytes_trailer_,
+                       total_compressed_bytes_);
+      trailers.addCopy(uncompressed_bytes_trailer_,
+                       total_uncompressed_bytes_);
+    }
+
+  private:
+    const Http::LowerCaseString& compressed_bytes_trailer_;
+    const Http::LowerCaseString& uncompressed_bytes_trailer_;
+    uint64_t total_compressed_bytes_{};
+    uint64_t total_uncompressed_bytes_{};
+  };
+  using ByteTrackerOptConstRef = absl::optional<std::reference_wrapper<const ByteTracker>>;
+
   template <class HeaderType>
   Http::FilterHeadersStatus
   maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
@@ -159,11 +186,11 @@ private:
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::FilterDataStatus
-  maybeDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
+  using HeaderMapOptRef = absl::optional<std::reference_wrapper<Http::HeaderMap>>;
+  void decompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                   const Compression::Decompressor::DecompressorPtr& decompressor,
-                  Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer, absl::optional<Http::HeaderMap&> trailers) const;
-  void reportTotalBytes(const DecompressorFilterConfig::DirectionConfig& direction_config, Http::HeaderMap& trailers) const;
+                  Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer,
+                  ByteTracker& byte_tracker, HeaderMapOptRef trailers) const;
 
   // TODO(junr03): These can be shared between compressor and decompressor.
   template <Http::CustomInlineHeaderRegistry::Type Type>
@@ -208,6 +235,8 @@ private:
   DecompressorFilterConfigSharedPtr config_;
   Compression::Decompressor::DecompressorPtr request_decompressor_{};
   Compression::Decompressor::DecompressorPtr response_decompressor_{};
+  ByteTracker request_byte_tracker_;
+  ByteTracker response_byte_tracker_;
 };
 
 } // namespace Decompressor

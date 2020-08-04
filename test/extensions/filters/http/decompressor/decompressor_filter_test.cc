@@ -17,6 +17,7 @@
 
 using testing::ByMove;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -29,6 +30,7 @@ public:
   void SetUp() override {
     setUpFilter(R"EOF(
 decompressor_library:
+  name: testlib
   typed_config:
     "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
 )EOF");
@@ -64,11 +66,43 @@ decompressor_library:
     }
   }
 
-  void doData(Buffer::Instance& buffer, const bool end_stream) {
+  void doData(Buffer::Instance& buffer, const bool end_stream, const bool expect_decompression) {
     if (isRequestDirection()) {
+      Http::TestRequestTrailerMapImpl trailers;
+      if (end_stream && expect_decompression) {
+        EXPECT_CALL(decoder_callbacks_, addDecodedTrailers()).WillOnce(ReturnRef(trailers));
+      }
+
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, end_stream));
+
+      if (end_stream && expect_decompression) {
+        EXPECT_EQ("30",
+                  trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-mock-compressed-bytes"))
+                      ->value()
+                      .getStringView());
+        EXPECT_EQ("60",
+                  trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-mock-uncompressed-bytes"))
+                      ->value()
+                      .getStringView());
+      }
     } else {
+      Http::TestResponseTrailerMapImpl trailers;
+      if (end_stream && expect_decompression) {
+        EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
+      }
+
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, end_stream));
+
+      if (end_stream && expect_decompression) {
+        EXPECT_EQ("30",
+                  trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-mock-compressed-bytes"))
+                      ->value()
+                      .getStringView());
+        EXPECT_EQ("60",
+                  trailers.get(Http::LowerCaseString("x-envoy-decompressor-testfilter-mock-uncompressed-bytes"))
+                      ->value()
+                      .getStringView());
+      }
     }
   }
 
@@ -82,9 +116,9 @@ decompressor_library:
     Buffer::OwnedImpl buffer;
     TestUtility::feedBufferWithRandomCharacters(buffer, 10);
     EXPECT_EQ(10, buffer.length());
-    doData(buffer, false /* end_stream */);
+    doData(buffer, false /* end_stream */, true /* expect_decompression */);
     EXPECT_EQ(20, buffer.length());
-    doData(buffer, true /* end_stream */);
+    doData(buffer, true /* end_stream */, true /* expect_decompression */);
     EXPECT_EQ(40, buffer.length());
   }
 
@@ -92,7 +126,7 @@ decompressor_library:
     Buffer::OwnedImpl buffer;
     TestUtility::feedBufferWithRandomCharacters(buffer, 10);
     EXPECT_EQ(10, buffer.length());
-    doData(buffer, true /* end_stream */);
+    doData(buffer, true /* end_stream */, false /* expect_decompression */);
     EXPECT_EQ(10, buffer.length());
   }
 

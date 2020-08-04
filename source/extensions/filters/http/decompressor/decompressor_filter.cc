@@ -27,41 +27,44 @@ DecompressorFilterConfig::DecompressorFilterConfig(
     : stats_prefix_(fmt::format("{}decompressor.{}.{}", stats_prefix,
                                 proto_config.decompressor_library().name(),
                                 decompressor_factory->statsPrefix())),
+      trailers_prefix_(fmt::format(
+          "{}-decompressor-{}-{}", ThreadSafeSingleton<Http::PrefixValue>::get().prefix(),
+          proto_config.decompressor_library().name(), decompressor_factory->statsPrefix())),
       decompressor_stats_prefix_(stats_prefix_ + "decompressor_library"),
       decompressor_factory_(std::move(decompressor_factory)),
-      request_direction_config_(proto_config.request_direction_config(), stats_prefix_, scope,
-                                runtime),
-      response_direction_config_(proto_config.response_direction_config(), stats_prefix_, scope,
-                                 runtime) {}
+      request_direction_config_(proto_config.request_direction_config(), stats_prefix_,
+                                trailers_prefix_, scope, runtime),
+      response_direction_config_(proto_config.response_direction_config(), stats_prefix_,
+                                 trailers_prefix_, scope, runtime) {}
 
 DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::CommonDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : stats_(generateStats(stats_prefix, scope)),
+    const std::string& stats_prefix, const std::string& trailers_prefix, Stats::Scope& scope,
+    Runtime::Loader& runtime)
+    : trailers_prefix_(trailers_prefix), stats_(generateStats(stats_prefix, scope)),
       decompression_enabled_(proto_config.enabled(), runtime) {}
-
-void DecompressorFilterConfig::DirectionConfig::chargeBytes(uint64_t compressed_bytes, uint64_t uncompressed_bytes) {
-  total_compressed_bytes_ += compressed_bytes;
-  total_uncompressed_bytes_ += uncompressed_bytes;
-}
 
 DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : DirectionConfig(proto_config.common_config(), stats_prefix + "request.", scope, runtime),
+    const std::string& stats_prefix, const std::string& trailers_prefix, Stats::Scope& scope,
+    Runtime::Loader& runtime)
+    : DirectionConfig(proto_config.common_config(), stats_prefix + "request.", trailers_prefix,
+                      scope, runtime),
       advertise_accept_encoding_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, advertise_accept_encoding, true)) {}
 
 DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::ResponseDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : DirectionConfig(proto_config.common_config(), stats_prefix + "response.", scope, runtime) {}
+    const std::string& stats_prefix, const std::string& trailers_prefix, Stats::Scope& scope,
+    Runtime::Loader& runtime)
+    : DirectionConfig(proto_config.common_config(), stats_prefix + "response.", trailers_prefix,
+                      scope, runtime) {}
 
 DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
-    : config_(std::move(config)) {}
+    : config_(std::move(config)), request_byte_tracker_(config_->requestDirectionConfig().trailersStrings()[0], config_->requestDirectionConfig().trailersStrings()[1]), response_byte_tracker_(config_->responseDirectionConfig().trailersStrings()[0], config_->responseDirectionConfig().trailersStrings()[1]) {}
 
 Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                             bool end_stream) {
@@ -88,16 +91,19 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
 };
 
 Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
-  absl::optional<Http::HeaderMap&> trailers{};
-  if (end_stream) {
-    trailers.emplace(decoder_callbacks_->addDecodedTrailers());
+  if (request_decompressor_) {
+    HeaderMapOptRef trailers;
+    if (end_stream) {
+      trailers = HeaderMapOptRef(std::ref(decoder_callbacks_->addDecodedTrailers()));
+    }
+    decompress(config_->requestDirectionConfig(), request_decompressor_, *decoder_callbacks_, data,
+               request_byte_tracker_, trailers);
   }
-  return maybeDecompress(config_->requestDirectionConfig(), request_decompressor_,
-                         *decoder_callbacks_, data, trailers);
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus DecompressorFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
-  reportTotalBytes(config_->requestDirectionConfig(), trailers);
+  request_byte_tracker_.reportTotalBytes(trailers);
   return Http::FilterTrailersStatus::Continue;
 }
 
@@ -114,49 +120,44 @@ Http::FilterHeadersStatus DecompressorFilter::encodeHeaders(Http::ResponseHeader
 }
 
 Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  absl::optional<Http::HeaderMap&> trailers{};
-  if (end_stream) {
-    trailers.emplace(encoder_callbacks_->addEncodedTrailers());
-  }
-  return maybeDecompress(config_->responseDirectionConfig(), response_decompressor_,
-                         *encoder_callbacks_, data, trailers);
-}
-
-Http::FilterTrailersStatus DecompressorFilter::encodeTrailers(Http::RequestTrailerMap& trailers) {
-  reportTotalBytes(config_->responseDirectionConfig(), trailers);
-  return Http::FilterTrailersStatus::Continue;
-}
-
-Http::FilterDataStatus DecompressorFilter::maybeDecompress(
-    const DecompressorFilterConfig::DirectionConfig& direction_config,
-    const Compression::Decompressor::DecompressorPtr& decompressor,
-    Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer, absl::optional<Http::HeaderMap&> trailers) const {
-  if (decompressor) {
-    Buffer::OwnedImpl output_buffer;
-    decompressor->decompress(input_buffer, output_buffer);
-
-    // Report decompression via stats and logging before modifying the input buffer.
-    direction_config.chargeBytes(input_buffer.length(), output_buffer.length());
-    direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
-    direction_config.stats().total_uncompressed_bytes_.add(output_buffer.length());
-    ENVOY_STREAM_LOG(debug, "{} data decompressed from {} bytes to {} bytes", callbacks,
-                     direction_config.logString(), input_buffer.length(), output_buffer.length());
-
-    input_buffer.drain(input_buffer.length());
-    input_buffer.add(output_buffer);
-
-    if (trailers.has_value()) {
-      // Report total_<compressed/uncompressed>_bytes in trailers.
-      reportTotalBytes(direction_config, trailers.value());
+  if (response_decompressor_) {
+    HeaderMapOptRef trailers;
+    if (end_stream) {
+      trailers = HeaderMapOptRef(std::ref(encoder_callbacks_->addEncodedTrailers()));
     }
+    decompress(config_->responseDirectionConfig(), response_decompressor_, *encoder_callbacks_,
+               data, response_byte_tracker_, trailers);
   }
   return Http::FilterDataStatus::Continue;
 }
 
-void DecompressorFilter::reportTotalBytes(const DecompressorFilterConfig::DirectionConfig& direction_config, Http::HeaderMap& trailers) const {
-    total_bytes = direction_config.totalBytes();
-    trailers.addCopy("x-envoy-decompressor-compressed-bytes", total_bytes.first);
-    trailers.addCopy("x-envoy-decompressor-uncompressed-bytes", total_bytes.second);
+Http::FilterTrailersStatus DecompressorFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  response_byte_tracker_.reportTotalBytes(trailers);
+  return Http::FilterTrailersStatus::Continue;
+}
+
+void DecompressorFilter::decompress(
+    const DecompressorFilterConfig::DirectionConfig& direction_config,
+    const Compression::Decompressor::DecompressorPtr& decompressor,
+    Http::StreamFilterCallbacks& callbacks, Buffer::Instance& input_buffer,
+    ByteTracker& byte_tracker, HeaderMapOptRef trailers) const {
+  ASSERT(decompressor);
+  Buffer::OwnedImpl output_buffer;
+  decompressor->decompress(input_buffer, output_buffer);
+
+  // Report decompression via stats and logging before modifying the input buffer.
+  byte_tracker.chargeBytes(input_buffer.length(), output_buffer.length());
+  direction_config.stats().total_compressed_bytes_.add(input_buffer.length());
+  direction_config.stats().total_uncompressed_bytes_.add(output_buffer.length());
+  ENVOY_STREAM_LOG(debug, "{} data decompressed from {} bytes to {} bytes", callbacks,
+                   direction_config.logString(), input_buffer.length(), output_buffer.length());
+
+  input_buffer.drain(input_buffer.length());
+  input_buffer.add(output_buffer);
+
+  if (trailers.has_value()) {
+    byte_tracker.reportTotalBytes(trailers.value().get());
+  }
 }
 
 template <>
