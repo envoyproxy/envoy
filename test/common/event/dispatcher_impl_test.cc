@@ -552,8 +552,8 @@ TEST_P(TimerImplTest, ChangeTimerBackwardsBeforeRun) {
   timer2->enableTimer(std::chrono::milliseconds(3));
   timer1->enableTimer(std::chrono::milliseconds(4));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   // Expect watcher3 to trigger first because the deadlines for timers 1 and 2 was moved backwards.
   InSequence s;
@@ -575,8 +575,8 @@ TEST_P(TimerImplTest, ChangeTimerForwardsToZeroBeforeRun) {
   timer2->enableTimer(std::chrono::milliseconds(1));
   timer1->enableTimer(std::chrono::milliseconds(0));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   // Expect watcher1 to trigger first because timer1's deadline was moved forward.
   InSequence s;
@@ -603,8 +603,8 @@ TEST_P(TimerImplTest, ChangeTimerForwardsToNonZeroBeforeRun) {
   timer2->enableTimer(std::chrono::milliseconds(2));
   timer1->enableTimer(std::chrono::milliseconds(1));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   // Expect watcher1 to trigger first because timer1's deadline was moved forward.
   InSequence s;
@@ -644,8 +644,8 @@ TEST_P(TimerImplTest, ChangeLargeTimerForwardToNonZeroBeforeRun) {
   timer2->enableTimer(std::chrono::seconds(1000));
   timer1->enableTimer(std::chrono::milliseconds(1));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   // Expect watcher1 to trigger because timer1's deadline was moved forward.
   InSequence s;
