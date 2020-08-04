@@ -94,7 +94,9 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     if (filter_state_ != FilterState::ResponseServedFromCache) {
       // Response is still being fetched from cache -- wait until it is fetched & encoded
       filter_state_ = FilterState::WaitingForCacheBody;
+      return Http::FilterHeadersStatus::StopIteration;
     }
+    return Http::FilterHeadersStatus::Continue;
   }
 
   // Either a cache miss or a cache entry that is no longer valid
