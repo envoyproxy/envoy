@@ -13,20 +13,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
+using LogDecision = Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision;
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
-      enforcement_type_(proto_config.enforcement_type()) {
-  engine_ = proto_config.has_rules()
-                ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
-                      proto_config.rules(), Filters::Common::RBAC::EnforcementMode::Enforced)
-                : nullptr;
-  shadow_engine_ =
-      proto_config.has_shadow_rules()
-          ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
-                proto_config.shadow_rules(), Filters::Common::RBAC::EnforcementMode::Shadow)
-          : nullptr;
-}
+      engine_(Filters::Common::RBAC::createEngine(proto_config)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
+      enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   ENVOY_LOG(debug,
@@ -90,14 +84,36 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
 
 EngineResult
 RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
-  auto engine = config_->engine(mode);
+  const auto engine = config_->engine(mode);
 
   if (engine != nullptr) {
     std::string effective_policy_id;
+    if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
+      // Check log decision
+      LogDecision log_dec = engine->shouldLog(
+          callbacks_->connection(), callbacks_->connection().streamInfo(), &effective_policy_id);
+      if (log_dec != LogDecision::Undecided) {
+        ProtobufWkt::Struct log_metadata;
+        auto& fields = *log_metadata.mutable_fields();
+        fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey]
+            .set_bool_value(log_dec == LogDecision::Yes);
+        callbacks_->connection().streamInfo().setDynamicMetadata(
+            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace,
+            log_metadata);
 
-    // Check authorization decision and do Action operations
-    if (engine->handleAction(callbacks_->connection(), callbacks_->connection().streamInfo(),
-                             &effective_policy_id)) {
+        if (log_dec == LogDecision::Yes) {
+          ENVOY_LOG(debug, "request logged");
+          config_->stats().logged_.inc();
+        } else {
+          ENVOY_LOG(debug, "request not logged");
+          config_->stats().not_logged_.inc();
+        }
+      }
+    }
+
+    // Check authorization decision
+    if (engine->allowed(callbacks_->connection(), callbacks_->connection().streamInfo(),
+                        &effective_policy_id)) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow allowed");
         config_->stats().shadow_allowed_.inc();

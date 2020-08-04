@@ -20,24 +20,16 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-// using LogDecision = Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision;
+using LogDecision = Filters::Common::RBAC::RoleBasedAccessControlEngine::LogDecision;
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)) {
-  engine_ = proto_config.has_rules()
-                ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
-                      proto_config.rules(), Filters::Common::RBAC::EnforcementMode::Enforced)
-                : nullptr;
-  shadow_engine_ =
-      proto_config.has_shadow_rules()
-          ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
-                proto_config.shadow_rules(), Filters::Common::RBAC::EnforcementMode::Shadow)
-          : nullptr;
-}
+    : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
+      engine_(Filters::Common::RBAC::createEngine(proto_config)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
 
-Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
                                            Filters::Common::RBAC::EnforcementMode mode) const {
   if (!route || !route->routeEntry()) {
@@ -90,8 +82,8 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   if (shadow_engine != nullptr) {
     std::string shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
-    if (shadow_engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
-                                    &effective_policy_id)) {
+    if (shadow_engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(),
+                               &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
       config_->stats().shadow_allowed_.inc();
     } else {
@@ -118,9 +110,28 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   const auto engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
-    // Check authorization decision and do Action operations
-    if (engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
-                             nullptr)) {
+    // Check log decision
+    LogDecision log_dec =
+        engine->shouldLog(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr);
+    if (log_dec != LogDecision::Undecided) {
+      ProtobufWkt::Struct log_metadata;
+      auto& log_fields = *log_metadata.mutable_fields();
+      log_fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey]
+          .set_bool_value(log_dec == LogDecision::Yes);
+      callbacks_->streamInfo().setDynamicMetadata(
+          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
+
+      if (log_dec == LogDecision::Yes) {
+        ENVOY_LOG(debug, "request logged");
+        config_->stats().logged_.inc();
+      } else {
+        ENVOY_LOG(debug, "request not logged");
+        config_->stats().not_logged_.inc();
+      }
+    }
+
+    // Check authorization decision
+    if (engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;

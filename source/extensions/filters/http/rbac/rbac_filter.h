@@ -22,7 +22,7 @@ public:
   RoleBasedAccessControlRouteSpecificFilterConfig(
       const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config);
 
-  Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
@@ -44,12 +44,12 @@ public:
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
 
-  Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(const Router::RouteConstSharedPtr route,
          Filters::Common::RBAC::EnforcementMode mode) const;
 
 private:
-  Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
@@ -57,8 +57,8 @@ private:
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
 
-  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
-  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
+  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =

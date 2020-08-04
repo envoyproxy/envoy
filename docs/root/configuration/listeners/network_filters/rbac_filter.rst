@@ -42,4 +42,4 @@ The RBAC filter emits the following dynamic metadata.
 
   shadow_effective_policy_id, string, The effective shadow policy ID matching the action (if any).
   shadow_engine_result, string, The engine result for the shadow rules (i.e. either `allowed` or `denied`).
-  access_log_hint, boolean, Whether the request should be logged. This metadata is shared and set under the key namespace 'envoy.common' (See :ref:`Shared Dynamic Metadata<shared_dynamic_metadata>`).
+  access_log_policy, boolean, Whether the request should be logged. This metadata is shared and set under the key namespace 'envoy.common' (See :ref:`Shared Dynamic Metadata<shared_dynamic_metadata>`).

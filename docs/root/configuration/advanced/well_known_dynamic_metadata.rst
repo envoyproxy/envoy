@@ -47,4 +47,4 @@ The following Envoy filters emit shared dynamic metadata.
 
 The following filters consume shared dynamic metadata.
 
-* :ref:`Metadata Access Log Filter<envoy_v3_api_msg_config.accesslog.v3.MetadataFilter>`
+* Metadata Access Log Filter

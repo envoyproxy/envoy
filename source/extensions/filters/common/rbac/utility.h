@@ -12,6 +12,18 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
+class DynamicMetadataKeys {
+public:
+  const std::string ShadowEffectivePolicyIdField{"shadow_effective_policy_id"};
+  const std::string ShadowEngineResultField{"shadow_engine_result"};
+  const std::string EngineResultAllowed{"allowed"};
+  const std::string EngineResultDenied{"denied"};
+  const std::string AccessLogKey{"access_log_hint"};
+  const std::string CommonNamespace{"envoy.common"};
+};
+
+using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
+
 /**
  * All stats for the RBAC filter. @see stats_macros.h
  */
@@ -19,7 +31,9 @@ namespace RBAC {
   COUNTER(allowed)                                                                                 \
   COUNTER(denied)                                                                                  \
   COUNTER(shadow_allowed)                                                                          \
-  COUNTER(shadow_denied)
+  COUNTER(shadow_denied)                                                                           \
+  COUNTER(logged)                                                                                  \
+  COUNTER(not_logged)
 
 /**
  * Wrapper struct for RBAC filter stats. @see stats_macros.h
@@ -30,18 +44,19 @@ struct RoleBasedAccessControlFilterStats {
 
 RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
+enum class EnforcementMode { Enforced, Shadow };
+
 template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {
-  return config.has_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(
-                                  config.rules(), EnforcementMode::Enforced)
+  return config.has_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules())
                             : nullptr;
 }
 
 template <class ConfigType>
 std::unique_ptr<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
-  return config.has_shadow_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(
-                                         config.shadow_rules(), EnforcementMode::Shadow)
-                                   : nullptr;
+  return config.has_shadow_rules()
+             ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
+             : nullptr;
 }
 
 } // namespace RBAC

@@ -10,9 +10,12 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
+using LogDecision = RoleBasedAccessControlEngine::LogDecision;
+
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
-    const envoy::config::rbac::v3::RBAC& rules, const EnforcementMode mode)
-    : action_(rules.action()), mode_(mode) {
+    const envoy::config::rbac::v3::RBAC& rules)
+    : allowed_if_matched_(rules.action() == envoy::config::rbac::v3::RBAC::ALLOW),
+      action_log_(rules.action() == envoy::config::rbac::v3::RBAC::LOG) {
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
@@ -26,45 +29,15 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   }
 }
 
-bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& connection,
-                                                    StreamInfo::StreamInfo& info,
-                                                    std::string* effective_policy_id) {
-  return handleAction(connection, *Http::StaticEmptyHeaders::get().request_headers, info,
-                      effective_policy_id);
-}
-
-bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& connection,
-                                                    const Envoy::Http::RequestHeaderMap& headers,
-                                                    StreamInfo::StreamInfo& info,
-                                                    std::string* effective_policy_id) {
-  bool matched = checkPolicyMatch(connection, info, headers, effective_policy_id);
-
-  switch (action_) {
-  case envoy::config::rbac::v3::RBAC::ALLOW:
-    return matched;
-  case envoy::config::rbac::v3::RBAC::DENY:
-    return !matched;
-  case envoy::config::rbac::v3::RBAC::LOG: {
-    // If not shadow enforcement, set shared log metadata
-    if (mode_ != EnforcementMode::Shadow) {
-      ProtobufWkt::Struct log_metadata;
-      auto& log_fields = *log_metadata.mutable_fields();
-      log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(matched);
-      info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
-    }
-
-    return true;
-  }
-  default:
+bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
+                                               const Envoy::Http::RequestHeaderMap& headers,
+                                               const StreamInfo::StreamInfo& info,
+                                               std::string* effective_policy_id) const {
+  // Automatically allow if LOG action
+  if (action_log_) {
     return true;
   }
 
-  return true;
-}
-
-bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
-    const Network::Connection& connection, const StreamInfo::StreamInfo& info,
-    const Envoy::Http::RequestHeaderMap& headers, std::string* effective_policy_id) const {
   bool matched = false;
 
   for (const auto& policy : policies_) {
@@ -77,7 +50,48 @@ bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
     }
   }
 
-  return matched;
+  // only allowed if:
+  //   - matched and ALLOW action
+  //   - not matched and DENY action
+  //   - LOG action
+  return matched == allowed_if_matched_;
+}
+
+bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
+                                               const StreamInfo::StreamInfo& info,
+                                               std::string* effective_policy_id) const {
+  return allowed(connection, *Http::StaticEmptyHeaders::get().request_headers, info,
+                 effective_policy_id);
+}
+
+LogDecision RoleBasedAccessControlEngineImpl::shouldLog(
+    const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+    const StreamInfo::StreamInfo& info, std::string* effective_policy_id) const {
+  if (!action_log_) {
+    return LogDecision::Undecided;
+  }
+
+  bool matched = false;
+
+  for (const auto& policy : policies_) {
+    if (policy.second->matches(connection, headers, info)) {
+      matched = true;
+      if (effective_policy_id != nullptr) {
+        *effective_policy_id = policy.first;
+      }
+      break;
+    }
+  }
+
+  // log if action is LOG and a policy matches
+  return matched ? LogDecision::Yes : LogDecision::No;
+}
+
+LogDecision RoleBasedAccessControlEngineImpl::shouldLog(const Network::Connection& connection,
+                                                        const StreamInfo::StreamInfo& info,
+                                                        std::string* effective_policy_id) const {
+  return shouldLog(connection, *Http::StaticEmptyHeaders::get().request_headers, info,
+                   effective_policy_id);
 }
 
 } // namespace RBAC
