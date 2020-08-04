@@ -99,7 +99,7 @@ decompressor_library:
                       ->value()
                       .getStringView());
         EXPECT_EQ("60",
-                  trailers.get(Http::LowerCaseString("x-envoy-decompressor-testfilter-mock-uncompressed-bytes"))
+                  trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-mock-uncompressed-bytes"))
                       ->value()
                       .getStringView());
       }
