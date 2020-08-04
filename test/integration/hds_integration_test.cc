@@ -513,13 +513,13 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 
   // Endpoint health response nested layout assertions.
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
-  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
+  EXPECT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
             "anna");
   ASSERT_EQ(response_.endpoint_health_response()
                 .cluster_endpoints_health(0)
                 .locality_endpoints_health_size(),
             1);
-  ASSERT_EQ(response_.endpoint_health_response()
+  EXPECT_EQ(response_.endpoint_health_response()
                 .cluster_endpoints_health(0)
                 .locality_endpoints_health(0)
                 .locality()
@@ -591,13 +591,13 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
 
   // Endpoint health response nested layout assertions.
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
-  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
+  EXPECT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
             "anna");
   ASSERT_EQ(response_.endpoint_health_response()
                 .cluster_endpoints_health(0)
                 .locality_endpoints_health_size(),
             2);
-  ASSERT_EQ(response_.endpoint_health_response()
+  EXPECT_EQ(response_.endpoint_health_response()
                 .cluster_endpoints_health(0)
                 .locality_endpoints_health(0)
                 .locality()
@@ -608,7 +608,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
                 .locality_endpoints_health(0)
                 .endpoints_health_size(),
             1);
-  ASSERT_EQ(response_.endpoint_health_response()
+  EXPECT_EQ(response_.endpoint_health_response()
                 .cluster_endpoints_health(0)
                 .locality_endpoints_health(1)
                 .locality()
@@ -691,9 +691,9 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
 
   // Endpoint health response nested layout assertions.
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 2);
-  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
+  EXPECT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
             "anna");
-  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health(1).cluster_name(), "cat");
+  EXPECT_EQ(response_.endpoint_health_response().cluster_endpoints_health(1).cluster_name(), "cat");
   ASSERT_EQ(response_.endpoint_health_response()
                 .cluster_endpoints_health(0)
                 .locality_endpoints_health_size(),
@@ -702,7 +702,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
                 .cluster_endpoints_health(1)
                 .locality_endpoints_health_size(),
             1);
-  ASSERT_EQ(response_.endpoint_health_response()
+  EXPECT_EQ(response_.endpoint_health_response()
                 .cluster_endpoints_health(0)
                 .locality_endpoints_health(0)
                 .locality()
@@ -713,7 +713,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
                 .locality_endpoints_health(0)
                 .endpoints_health_size(),
             1);
-  ASSERT_EQ(response_.endpoint_health_response()
+  EXPECT_EQ(response_.endpoint_health_response()
                 .cluster_endpoints_health(1)
                 .locality_endpoints_health(0)
                 .locality()

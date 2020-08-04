@@ -118,7 +118,7 @@ protected:
   // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
   // with only one health check type.
   envoy::service::health::v3::HealthCheckSpecifier*
-  createComplexSpecifier(const int& n_clusters, const int& n_localities, const int& n_endpoints) {
+  createComplexSpecifier(const int n_clusters, const int n_localities, const int n_endpoints) {
     // Final specifier to return.
     envoy::service::health::v3::HealthCheckSpecifier* msg =
         new envoy::service::health::v3::HealthCheckSpecifier;
@@ -368,9 +368,10 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
   EXPECT_EQ(hds_delegate_friend_.getStats(*hds_delegate_).requests_.value(), 2);
 }
 
-// Test if processMessage exits gracefully upon receiving a malformed message
-// There was a previous valid config, so we go back to that.
-TEST_F(HdsTest, TestSendResponseByCluster) {
+// Test if sendResponse() retains the structure of all endpoints ingested in the specifier
+// from onReceiveMessage(). This verifies that all endpoints are grouped by the correct
+// cluster and the correct locality.
+TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
   // number of clusters, localities by cluster, and endpoints by locality
   // to build and verify off of.
   const int NumClusters = 2;
@@ -420,38 +421,40 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
   hds_delegate_->onReceiveMessage(std::move(message));
 
   // read response and verify fields
-  auto response = hds_delegate_->sendResponse().endpoint_health_response();
+  const auto response = hds_delegate_->sendResponse().endpoint_health_response();
 
-  EXPECT_EQ(response.cluster_endpoints_health_size(), NumClusters);
+  ASSERT_EQ(response.cluster_endpoints_health_size(), NumClusters);
 
   for (int i = 0; i < NumClusters; i++) {
-    auto& cluster = response.cluster_endpoints_health(i);
+    const auto& cluster = response.cluster_endpoints_health(i);
 
     // Expect the correct cluster name by index
     EXPECT_EQ(cluster.cluster_name(), "anna" + std::to_string(i));
 
     // Every cluster should have two locality groupings
-    EXPECT_EQ(cluster.locality_endpoints_health_size(), NumLocalities);
+    ASSERT_EQ(cluster.locality_endpoints_health_size(), NumLocalities);
 
     for (int j = 0; j < NumLocalities; j++) {
       // Every locality should have a number based on its index
-      auto& loc_group = cluster.locality_endpoints_health(j);
+      const auto& loc_group = cluster.locality_endpoints_health(j);
       EXPECT_EQ(loc_group.locality().region(), "region" + std::to_string(i));
       EXPECT_EQ(loc_group.locality().zone(), "zone" + std::to_string(j));
       EXPECT_EQ(loc_group.locality().sub_zone(), "subzone" + std::to_string(j));
 
       // Every locality should have two endpoints.
-      EXPECT_EQ(loc_group.endpoints_health_size(), NumEndpoints);
+      ASSERT_EQ(loc_group.endpoints_health_size(), NumEndpoints);
 
       for (int k = 0; k < NumEndpoints; k++) {
 
         // every endpoint's address is based on all 3 index values.
-        auto& endpoint_health = loc_group.endpoints_health(k);
+        const auto& endpoint_health = loc_group.endpoints_health(k);
         EXPECT_EQ(endpoint_health.endpoint().address().socket_address().address(),
                   "127." + std::to_string(i) + "." + std::to_string(j) + "." + std::to_string(k));
+        EXPECT_EQ(endpoint_health.health_status(), envoy::config::core::v3::UNHEALTHY);
       }
     }
   }
+  EXPECT_EQ(response.endpoints_health_size(), NumClusters * NumLocalities * NumEndpoints);
 }
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message

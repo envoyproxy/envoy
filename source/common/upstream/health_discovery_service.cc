@@ -110,13 +110,32 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     cluster_health->set_cluster_name(cluster->info()->name());
 
     // Hold all endpoint health information by locality, updated when a new locality
-    // has been seen.
+    // has been seen. When we ingest our configuration and endpoints during the call
+    // of the processMessage() function, all of the endpoints come grouped by cluster
+    // and locality. We continuously appended to the end of the list of endpoints
+    // by locality, meaning each group of endpoints by a particular locality are all
+    // next to each other in the list. If two endpoints next to each other have the same
+    // locality, then we append to the same locality grouping. When the locality
+    // changes from endpoint to endpoint, we start a new grouping by changing this
+    // pointer.
     envoy::service::health::v3::LocalityEndpointsHealth* locality_health = nullptr;
 
     // Iterate through all hosts in our priority set.
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
+
         // If we are on a new locality grouping, add grouping and copy the locality.
+        // If this is the first endpoint, then locality_health will not be pointing
+        // at anything so we create a new grouping.
+        //
+        // If locality_health is already pointing to something, there is already
+        // a locality group open. We need to check to see if this endpoint is part
+        // of the current locality or of it is the start of a new locality grouping.
+        // we do this by comparing the last seen locality (locality_health variable)
+        // with the endpoint's actual stored locality information using the
+        // LocalityEqualTo. If they are not equal than this endpoint is the start
+        // of a new grouping, and so we add a new locality to our result list and
+        // copy over the information.
         if (locality_health == nullptr ||
             !LocalityEqualTo()(host->locality(), locality_health->locality())) {
           locality_health = cluster_health->add_locality_endpoints_health();
