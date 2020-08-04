@@ -218,7 +218,7 @@ def GetImportDeps(proto_path):
           imports.append('//%s:pkg' % os.path.dirname(import_path))
           continue
         raise ProtoSyncError(
-            'Unknown import path mapping for %s, please update the mappings in tools/proto_sync.py.\n'
+            'Unknown import path mapping for %s, please update the mappings in tools/proto_format/proto_sync.py.\n'
             % import_path)
   return imports
 
