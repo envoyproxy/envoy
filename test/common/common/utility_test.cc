@@ -874,7 +874,7 @@ TEST(TrieLookupTable, AddDeepTrieEntry) {
   // there will be "stack overflow" if the string size exceeds the size limitation of call-stack.
   TrieLookupTable<const char*> trie;
   const char* cstr_value = "a";
-  std::string long_str(60000, 'a');
+  const std::string long_str(60000, 'a');
   const char* long_c_str = long_str.c_str();
   EXPECT_TRUE(trie.add(long_c_str, cstr_value, false));
   EXPECT_EQ(cstr_value, trie.find(long_c_str));
