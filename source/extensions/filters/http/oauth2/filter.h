@@ -204,11 +204,11 @@ private:
   std::shared_ptr<CookieValidator> validator_;
 
   // wrap up some of these in a UserData struct or something...
-  std::string auth_code_{};
-  std::string access_token_{}; // TODO - see if we can avoid this being a member variable
+  std::string auth_code_;
+  std::string access_token_; // TODO - see if we can avoid this being a member variable
   std::string new_expires_;
   absl::string_view host_;
-  std::string state_{};
+  std::string state_;
   bool found_bearer_token_{false};
   Http::RequestHeaderMap* request_headers_{nullptr};
 
