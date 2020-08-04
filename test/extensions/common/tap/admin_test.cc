@@ -7,15 +7,16 @@
 
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Return;
-using testing::SaveArg;
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
 namespace {
+
+using ::testing::_;
+using ::testing::DoAll;
+using ::testing::Return;
+using ::testing::SaveArg;
 
 class MockExtensionConfig : public ExtensionConfig {
 public:

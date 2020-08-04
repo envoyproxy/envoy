@@ -198,3 +198,9 @@ EXTENSIONS = {
 
 
 }
+
+# This can be used to extend the visibility rules for Envoy extensions
+# (//:extension_config and //:extension_library in //BUILD)
+# if downstream Envoy builds need to directly reference envoy extensions.
+ADDITIONAL_VISIBILITY = [
+  ]
