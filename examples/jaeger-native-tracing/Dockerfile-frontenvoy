@@ -1,0 +1,17 @@
+FROM envoyproxy/envoy-dev:latest
+
+RUN apt-get update && apt-get -q install -y \
+    curl
+COPY ./front-envoy-jaeger.yaml /etc/front-envoy.yaml
+#
+# for discussion on jaeger binary compatibility, and the source of the file, see here:
+#  https://github.com/envoyproxy/envoy/issues/11382#issuecomment-638012072
+#
+RUN echo "4a7d17d4724ee890490bcd6cfdedb12a02316a3d33214348d30979abd201f1ca /usr/local/lib/libjaegertracing_plugin.so" > /tmp/checksum \
+         && curl -Ls https://github.com/tetratelabs/getenvoy-package/files/3518103/getenvoy-centos-jaegertracing-plugin.tar.gz \
+              | tar zxf - -C /usr/local/lib \
+         && mv /usr/local/lib/libjaegertracing.so.0.4.2 /usr/local/lib/libjaegertracing_plugin.so \
+         && sha256sum -c /tmp/checksum \
+         && rm /tmp/checksum \
+	 && chmod go+r /etc/front-envoy.yaml
+CMD /usr/local/bin/envoy -c /etc/front-envoy.yaml --service-cluster front-proxy

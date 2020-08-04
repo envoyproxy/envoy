@@ -37,6 +37,8 @@ public:
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
+  // The host header value in the http transport.
+  const std::string host_name_;
   const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   std::list<AsyncStreamImplPtr> active_streams_;
   TimeSource& time_source_;
