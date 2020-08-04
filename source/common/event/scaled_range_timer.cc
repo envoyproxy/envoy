@@ -70,9 +70,9 @@ public:
       callback_();
     } else {
       ScopeTrackerScopeState scope(scope_, manager_.dispatcher_);
+      scope_ = nullptr;
       callback_();
     }
-    scope_ = nullptr;
   }
 
 private:

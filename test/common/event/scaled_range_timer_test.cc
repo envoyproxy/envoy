@@ -179,17 +179,33 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileActive) {
   EXPECT_FALSE(timer.pending_timer->enabled());
 }
 
-TEST_F(ScaledRangeTimerManagerTest, ReRegisterOnCallback) {
+class ScaledRangeTimerManagerTestWithScope : public ScaledRangeTimerManagerTest,
+                                             public testing::WithParamInterface<bool> {};
+
+TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
   ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  MockScopedTrackedObject scope;
 
   RangeTimerGroup timer(manager, dispatcher_);
+  if (GetParam()) {
+    InSequence s;
+    EXPECT_CALL(dispatcher_, setTrackedObject(&scope));
+    EXPECT_CALL(*timer.callback, Call).WillOnce([&] {
+      timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2), &scope);
+    });
+    EXPECT_CALL(dispatcher_, setTrackedObject(nullptr));
+    EXPECT_CALL(dispatcher_, setTrackedObject(&scope));
+    EXPECT_CALL(*timer.callback, Call);
+    EXPECT_CALL(dispatcher_, setTrackedObject(nullptr));
+  } else {
+    EXPECT_CALL(*timer.callback, Call)
+        .WillOnce(
+            [&] { timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2)); })
+        .WillOnce([] {});
+  }
 
-  EXPECT_CALL(*timer.callback, Call)
-      .WillOnce(
-          [&timer] { timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2)); })
-      .WillOnce([] {});
-
-  timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2));
+  timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2),
+                           GetParam() ? &scope : nullptr);
   dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(1));
   timer.pending_timer->invokeCallback();
   dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(1));
@@ -206,6 +222,31 @@ TEST_F(ScaledRangeTimerManagerTest, ReRegisterOnCallback) {
   EXPECT_FALSE(timer.timer->enabled());
   EXPECT_FALSE(timer.pending_timer->enabled());
 }
+
+TEST_P(ScaledRangeTimerManagerTestWithScope, ScheduleWithScalingFactorZero) {
+  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  MockScopedTrackedObject scope;
+
+  RangeTimerGroup timer(manager, dispatcher_);
+  manager.setScaleFactor(0);
+
+  if (GetParam()) {
+    InSequence s;
+    EXPECT_CALL(dispatcher_, setTrackedObject(&scope));
+    EXPECT_CALL(*timer.callback, Call);
+    EXPECT_CALL(dispatcher_, setTrackedObject(nullptr));
+  } else {
+    EXPECT_CALL(*timer.callback, Call);
+  }
+
+  timer.timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(1),
+                           GetParam() ? &scope : nullptr);
+  EXPECT_FALSE(timer.pending_timer->enabled());
+  fireReadyTimers(dispatcher_.timeSource().monotonicTime(), bucket_timers_);
+}
+
+INSTANTIATE_TEST_SUITE_P(WithAndWithoutScope, ScaledRangeTimerManagerTestWithScope,
+                         testing::Bool());
 
 TEST_F(ScaledRangeTimerManagerTest, SingleTimerTriggeredNoScaling) {
   ScaledRangeTimerManager manager(dispatcher_, 1.0);
@@ -354,18 +395,6 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersSameTimes) {
   dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(1));
   while (fireReadyTimers(dispatcher_.timeSource().monotonicTime(), bucket_timers_)) {
   }
-}
-
-TEST_F(ScaledRangeTimerManagerTest, ScheduleWithScalingFactorZero) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
-
-  RangeTimerGroup timer(manager, dispatcher_);
-  EXPECT_CALL(*timer.callback, Call);
-  manager.setScaleFactor(0);
-
-  timer.timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(1));
-  EXPECT_FALSE(timer.pending_timer->enabled());
-  fireReadyTimers(dispatcher_.timeSource().monotonicTime(), bucket_timers_);
 }
 
 } // namespace
