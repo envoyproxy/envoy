@@ -50,9 +50,14 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_megamiss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
               .statName())),
+      dispatcher_(api.allocateDispatcher("guarddog_thread")),
+      loop_timer_(dispatcher_->createTimer([this]() { step(); })),
       events_to_actions_([&](const Server::Configuration::Main& config) -> EventToActionsMap {
         EventToActionsMap map;
-        Configuration::GuardDogActionFactoryContext context = {api};
+
+        // We should be able to share the dispatcher since guarddog's lifetime
+        // should eclipse those of actions.
+        Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_};
 
         const auto& actions = config.wdActions();
         for (const auto& action : actions) {
@@ -69,8 +74,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 
         return map;
       }(config)),
-      dispatcher_(api.allocateDispatcher("guarddog_thread")),
-      loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
+      run_thread_(true) {
   start(api);
 }
 

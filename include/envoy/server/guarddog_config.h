@@ -6,6 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/guarddog.h"
 
@@ -17,6 +18,7 @@ namespace Configuration {
 
 struct GuardDogActionFactoryContext {
   Api::Api& api_;
+  Event::Dispatcher& dispatcher_; // not owned (this is the guarddog's dispatcher)
 };
 
 class GuardDogAction {

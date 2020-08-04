@@ -313,6 +313,7 @@ message Watchdog {
         "envoy.config.bootstrap.v3.Watchdog.WatchdogAction";
 
     // In priority events are fired from KILL, MULTIKILL, MEGAMISS and MISS.
+    // Within an event type, actions execute in the order they are configured.
     // For KILL/MULTIKILL there is a default PANIC that will kill the process,
     // but it might be useful to specify several debug actions, and possibly
     // an alternate FATAL action.
