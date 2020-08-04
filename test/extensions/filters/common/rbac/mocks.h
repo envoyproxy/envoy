@@ -14,18 +14,19 @@ namespace RBAC {
 
 class MockEngine : public RoleBasedAccessControlEngineImpl {
 public:
-  MockEngine(const envoy::config::rbac::v3::RBAC& rules)
-      : RoleBasedAccessControlEngineImpl(rules){};
+  MockEngine(const envoy::config::rbac::v3::RBAC& rules,
+             const EnforcementMode mode = EnforcementMode::Shadow)
+      : RoleBasedAccessControlEngineImpl(rules, mode){};
 
-  MOCK_METHOD(bool, allowed,
-              (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
-               const StreamInfo::StreamInfo&, std::string* effective_policy_id),
-              (const));
+  // MOCK_METHOD(bool, allowed,
+  //             (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+  //              const StreamInfo::StreamInfo&, std::string* effective_policy_id),
+  //             (const));
 
-  MOCK_METHOD(bool, allowed,
-              (const Envoy::Network::Connection&, const StreamInfo::StreamInfo&,
-               std::string* effective_policy_id),
-              (const));
+  // MOCK_METHOD(bool, allowed,
+  //             (const Envoy::Network::Connection&, const StreamInfo::StreamInfo&,
+  //              std::string* effective_policy_id),
+  //             (const));
 };
 
 } // namespace RBAC

@@ -206,9 +206,6 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldLog) {
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
 
-  EXPECT_EQ(1U, config_->stats().logged_.value());
-  EXPECT_EQ(0U, config_->stats().not_logged_.value());
-
   checkAccessLogMetadata(true);
 }
 
@@ -224,9 +221,6 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, ShouldNotLog) {
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
 
-  EXPECT_EQ(0U, config_->stats().logged_.value());
-  EXPECT_EQ(1U, config_->stats().not_logged_.value());
-
   checkAccessLogMetadata(false);
 }
 
@@ -235,8 +229,6 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowNoChangeLog) {
   setMetadata();
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
-  EXPECT_EQ(0U, config_->stats().logged_.value());
-  EXPECT_EQ(0U, config_->stats().not_logged_.value());
 
   // Check that Allow action does not set access log metadata
   EXPECT_EQ(stream_info_.dynamicMetadata().filter_metadata().end(),

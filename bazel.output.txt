@@ -1,0 +1,516 @@
+==================== Test output for //test/extensions/filters/http/grpc_http1_reverse_bridge:reverse_bridge_integration_test:
+WARNING: Perftools heap leak checker is active -- Performance may suffer
+[==========] Running 4 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 4 tests from IpVersions/ReverseBridgeIntegrationTest
+[ RUN      ] IpVersions/ReverseBridgeIntegrationTest.DisabledRoute/IPv4
+[       OK ] IpVersions/ReverseBridgeIntegrationTest.DisabledRoute/IPv4 (860 ms)
+[ RUN      ] IpVersions/ReverseBridgeIntegrationTest.DisabledRoute/IPv6
+[2020-08-03 21:22:42.230][35831][critical][main] [source/server/server.cc:102] error initializing configuration '/build/tmp/_bazel_envoybuild/b570b5ccd0454dc9af9f65ab1833764d/sandbox/processwrapper-sandbox/339/execroot/envoy/_tmp/34b195ec3fd9b4e4f43d020a8e761e79/bootstrap.pb': cannot bind '[::1]:0': Cannot assign requested address
+terminating with uncaught exception of type Envoy::Network::SocketBindException: cannot bind '[::1]:0': Cannot assign requested address
+[2020-08-03 21:22:42.230][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:104] Caught Aborted, suspect faulting address 0xc224300008bbb
+[2020-08-03 21:22:42.230][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:91] Backtrace (use tools/stack_decode.py to get line numbers):
+[2020-08-03 21:22:42.230][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:92] Envoy version: 0/1.16.0-dev/test/DEBUG/BoringSSL
+[2020-08-03 21:22:42.302][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #0: Envoy::SignalAction::sigHandler() [0x41543bc]
+[2020-08-03 21:22:42.302][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #1: __restore_rt [0x7fca75ef08a0]
+[2020-08-03 21:22:42.372][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #2: Envoy::IntegrationTestServerImpl::createAndRunEnvoyServer() [0x252214e]
+[2020-08-03 21:22:42.442][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #3: Envoy::IntegrationTestServer::threadRoutine() [0x2521b89]
+[2020-08-03 21:22:42.512][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #4: Envoy::IntegrationTestServer::start()::$_0::operator()() [0x2524398]
+[2020-08-03 21:22:42.583][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #5: std::__1::__invoke<>() [0x25242cd]
+[2020-08-03 21:22:42.655][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #6: std::__1::__invoke_void_return_wrapper<>::__call<>() [0x252427d]
+[2020-08-03 21:22:42.724][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #7: std::__1::__function::__alloc_func<>::operator()() [0x252424d]
+[2020-08-03 21:22:42.793][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #8: std::__1::__function::__func<>::operator()() [0x252356e]
+[2020-08-03 21:22:42.864][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #9: std::__1::__function::__value_func<>::operator()() [0x245e3d5]
+[2020-08-03 21:22:42.934][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #10: std::__1::function<>::operator()() [0x245e295]
+[2020-08-03 21:22:43.005][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #11: Envoy::Thread::ThreadImplPosix::ThreadImplPosix()::{lambda()#1}::operator()() [0x5028a82]
+[2020-08-03 21:22:43.075][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #12: Envoy::Thread::ThreadImplPosix::ThreadImplPosix()::{lambda()#1}::__invoke() [0x5028a55]
+[2020-08-03 21:22:43.075][35831][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #13: start_thread [0x7fca75ee56db]
+================================================================================
+==================== Test output for //test/server/admin:logs_handler_test:
+WARNING: Perftools heap leak checker is active -- Performance may suffer
+[==========] Running 2 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 2 tests from IpVersions/AdminInstanceTest
+[ RUN      ] IpVersions/AdminInstanceTest.ReopenLogs/IPv4
+TestRandomGenerator running with seed 2096517680
+[       OK ] IpVersions/AdminInstanceTest.ReopenLogs/IPv4 (395 ms)
+[ RUN      ] IpVersions/AdminInstanceTest.ReopenLogs/IPv6
+TestRandomGenerator running with seed 2096517680
+unknown file: Failure
+C++ exception with description "cannot bind '[::1]:0': Cannot assign requested address" thrown in the test fixture's constructor.
+[  FAILED  ] IpVersions/AdminInstanceTest.ReopenLogs/IPv6, where GetParam() = 4-byte object <01-00 00-00> (319 ms)
+[----------] 2 tests from IpVersions/AdminInstanceTest (714 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 1 test suite ran. (714 ms total)
+[  PASSED  ] 1 test.
+[  FAILED  ] 1 test, listed below:
+[  FAILED  ] IpVersions/AdminInstanceTest.ReopenLogs/IPv6, where GetParam() = 4-byte object <01-00 00-00>
+
+ 1 FAILED TEST
+Have memory regions w/o callers: might report false leaks
+No leaks found for check "_main_" (but no 100% guarantee that there aren't any): found 17951 reachable heap objects of 2897135 bytes
+================================================================================
+==================== Test output for //test/extensions/filters/http/tap:tap_filter_integration_test:
+WARNING: Perftools heap leak checker is active -- Performance may suffer
+[==========] Running 18 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 18 tests from IpVersions/TapIntegrationTest
+[ RUN      ] IpVersions/TapIntegrationTest.StaticFilePerTap/IPv4
+[       OK ] IpVersions/TapIntegrationTest.StaticFilePerTap/IPv4 (943 ms)
+[ RUN      ] IpVersions/TapIntegrationTest.StaticFilePerTap/IPv6
+[2020-08-03 21:28:10.135][41714][critical][main] [source/server/server.cc:102] error initializing configuration '/build/tmp/_bazel_envoybuild/b570b5ccd0454dc9af9f65ab1833764d/sandbox/processwrapper-sandbox/543/execroot/envoy/_tmp/4ce2d8b1861876b859b107620d7d2ae0/bootstrap.pb': cannot bind '[::1]:0': Cannot assign requested address
+terminating with uncaught exception of type Envoy::Network::SocketBindException: cannot bind '[::1]:0': Cannot assign requested address
+[2020-08-03 21:28:10.136][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:104] Caught Aborted, suspect faulting address 0xc22430000a2d5
+[2020-08-03 21:28:10.136][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:91] Backtrace (use tools/stack_decode.py to get line numbers):
+[2020-08-03 21:28:10.136][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:92] Envoy version: 0/1.16.0-dev/test/DEBUG/BoringSSL
+[2020-08-03 21:28:10.206][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #0: Envoy::SignalAction::sigHandler() [0x414c97c]
+[2020-08-03 21:28:10.207][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #1: __restore_rt [0x7f549b3238a0]
+[2020-08-03 21:28:10.277][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #2: Envoy::IntegrationTestServerImpl::createAndRunEnvoyServer() [0x252d4be]
+[2020-08-03 21:28:10.347][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #3: Envoy::IntegrationTestServer::threadRoutine() [0x252cef9]
+[2020-08-03 21:28:10.416][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #4: Envoy::IntegrationTestServer::start()::$_0::operator()() [0x252f708]
+[2020-08-03 21:28:10.488][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #5: std::__1::__invoke<>() [0x252f63d]
+[2020-08-03 21:28:10.559][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #6: std::__1::__invoke_void_return_wrapper<>::__call<>() [0x252f5ed]
+[2020-08-03 21:28:10.629][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #7: std::__1::__function::__alloc_func<>::operator()() [0x252f5bd]
+[2020-08-03 21:28:10.699][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #8: std::__1::__function::__func<>::operator()() [0x252e8de]
+[2020-08-03 21:28:10.770][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #9: std::__1::__function::__value_func<>::operator()() [0x24694d5]
+[2020-08-03 21:28:10.840][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #10: std::__1::function<>::operator()() [0x2469395]
+[2020-08-03 21:28:10.909][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #11: Envoy::Thread::ThreadImplPosix::ThreadImplPosix()::{lambda()#1}::operator()() [0x5024ee2]
+[2020-08-03 21:28:10.980][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #12: Envoy::Thread::ThreadImplPosix::ThreadImplPosix()::{lambda()#1}::__invoke() [0x5024eb5]
+[2020-08-03 21:28:10.980][41714][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #13: start_thread [0x7f549b3186db]
+================================================================================
+==================== Test output for //test/extensions/filters/network/postgres_proxy:postgres_integration_test:
+WARNING: Perftools heap leak checker is active -- Performance may suffer
+[==========] Running 2 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 2 tests from IpVersions/PostgresIntegrationTest
+[ RUN      ] IpVersions/PostgresIntegrationTest.Login/0
+[       OK ] IpVersions/PostgresIntegrationTest.Login/0 (1510 ms)
+[ RUN      ] IpVersions/PostgresIntegrationTest.Login/1
+[2020-08-03 21:29:52.988][42506][critical][main] [source/server/server.cc:102] error initializing configuration '/build/tmp/_bazel_envoybuild/b570b5ccd0454dc9af9f65ab1833764d/sandbox/processwrapper-sandbox/674/execroot/envoy/_tmp/25d60d38146fdfcb74151ad27508c65f/bootstrap.pb': cannot bind '[::1]:0': Cannot assign requested address
+terminating with uncaught exception of type Envoy::Network::SocketBindException: cannot bind '[::1]:0': Cannot assign requested address
+[2020-08-03 21:29:52.988][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:104] Caught Aborted, suspect faulting address 0xc22430000a5f7
+[2020-08-03 21:29:52.988][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:91] Backtrace (use tools/stack_decode.py to get line numbers):
+[2020-08-03 21:29:52.988][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:92] Envoy version: 0/1.16.0-dev/test/DEBUG/BoringSSL
+[2020-08-03 21:29:53.037][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #0: Envoy::SignalAction::sigHandler() [0x418287c]
+[2020-08-03 21:29:53.037][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #1: __restore_rt [0x7fb8f86628a0]
+[2020-08-03 21:29:53.086][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #2: Envoy::IntegrationTestServerImpl::createAndRunEnvoyServer() [0x2593dae]
+[2020-08-03 21:29:53.136][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #3: Envoy::IntegrationTestServer::threadRoutine() [0x25937e9]
+[2020-08-03 21:29:53.185][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #4: Envoy::IntegrationTestServer::start()::$_0::operator()() [0x2595ff8]
+[2020-08-03 21:29:53.233][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #5: std::__1::__invoke<>() [0x2595f2d]
+[2020-08-03 21:29:53.282][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #6: std::__1::__invoke_void_return_wrapper<>::__call<>() [0x2595edd]
+[2020-08-03 21:29:53.333][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #7: std::__1::__function::__alloc_func<>::operator()() [0x2595ead]
+[2020-08-03 21:29:53.381][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #8: std::__1::__function::__func<>::operator()() [0x25951ce]
+[2020-08-03 21:29:53.429][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #9: std::__1::__function::__value_func<>::operator()() [0x24c2305]
+[2020-08-03 21:29:53.479][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #10: std::__1::function<>::operator()() [0x24c21c5]
+[2020-08-03 21:29:53.529][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #11: Envoy::Thread::ThreadImplPosix::ThreadImplPosix()::{lambda()#1}::operator()() [0x5057622]
+[2020-08-03 21:29:53.580][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #12: Envoy::Thread::ThreadImplPosix::ThreadImplPosix()::{lambda()#1}::__invoke() [0x50575f5]
+[2020-08-03 21:29:53.580][42506][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #13: start_thread [0x7fb8f86576db]
+================================================================================
+[==========] Running 165 tests from 14 test suites.
+[----------] Global test environment set-up.
+[----------] 79 tests from RouteMatcherTest
+[ RUN      ] RouteMatcherTest.TestLegacyRoutes
+[       OK ] RouteMatcherTest.TestLegacyRoutes (554 ms)
+[ RUN      ] RouteMatcherTest.TestConnectRoutes
+[       OK ] RouteMatcherTest.TestConnectRoutes (175 ms)
+[ RUN      ] RouteMatcherTest.TestRoutes
+[       OK ] RouteMatcherTest.TestRoutes (1526 ms)
+[ RUN      ] RouteMatcherTest.TestRoutesWithWildcardAndDefaultOnly
+[       OK ] RouteMatcherTest.TestRoutesWithWildcardAndDefaultOnly (80 ms)
+[ RUN      ] RouteMatcherTest.TestRoutesWithInvalidRegexLegacy
+[       OK ] RouteMatcherTest.TestRoutesWithInvalidRegexLegacy (67 ms)
+[ RUN      ] RouteMatcherTest.TestRoutesWithInvalidRegex
+[       OK ] RouteMatcherTest.TestRoutesWithInvalidRegex (69 ms)
+[ RUN      ] RouteMatcherTest.TestRoutesWithInvalidVirtualCluster
+[       OK ] RouteMatcherTest.TestRoutesWithInvalidVirtualCluster (51 ms)
+[ RUN      ] RouteMatcherTest.TestAddRemoveRequestHeaders
+[       OK ] RouteMatcherTest.TestAddRemoveRequestHeaders (138 ms)
+[ RUN      ] RouteMatcherTest.TestRequestHeadersToAddWithAppendFalse
+[       OK ] RouteMatcherTest.TestRequestHeadersToAddWithAppendFalse (117 ms)
+[ RUN      ] RouteMatcherTest.TestRequestHeadersToAddWithAppendFalseMostSpecificWins
+[       OK ] RouteMatcherTest.TestRequestHeadersToAddWithAppendFalseMostSpecificWins (101 ms)
+[ RUN      ] RouteMatcherTest.TestAddRemoveResponseHeaders
+[       OK ] RouteMatcherTest.TestAddRemoveResponseHeaders (144 ms)
+[ RUN      ] RouteMatcherTest.TestAddRemoveResponseHeadersAppendFalse
+[       OK ] RouteMatcherTest.TestAddRemoveResponseHeadersAppendFalse (84 ms)
+[ RUN      ] RouteMatcherTest.TestAddRemoveResponseHeadersAppendMostSpecificWins
+[       OK ] RouteMatcherTest.TestAddRemoveResponseHeadersAppendMostSpecificWins (91 ms)
+[ RUN      ] RouteMatcherTest.TestAddGlobalResponseHeaderRemoveFromRoute
+[       OK ] RouteMatcherTest.TestAddGlobalResponseHeaderRemoveFromRoute (95 ms)
+[ RUN      ] RouteMatcherTest.TestRequestHeadersToAddNoPseudoHeader
+[       OK ] RouteMatcherTest.TestRequestHeadersToAddNoPseudoHeader (140 ms)
+[ RUN      ] RouteMatcherTest.TestRequestHeadersToRemoveNoPseudoHeader
+[       OK ] RouteMatcherTest.TestRequestHeadersToRemoveNoPseudoHeader (152 ms)
+[ RUN      ] RouteMatcherTest.Priority
+[       OK ] RouteMatcherTest.Priority (94 ms)
+[ RUN      ] RouteMatcherTest.NoHostRewriteAndAutoRewrite
+[       OK ] RouteMatcherTest.NoHostRewriteAndAutoRewrite (49 ms)
+[ RUN      ] RouteMatcherTest.NoHostRewriteAndAutoRewriteHeader
+[       OK ] RouteMatcherTest.NoHostRewriteAndAutoRewriteHeader (49 ms)
+[ RUN      ] RouteMatcherTest.NoAutoRewriteAndAutoRewriteHeader
+[       OK ] RouteMatcherTest.NoAutoRewriteAndAutoRewriteHeader (49 ms)
+[ RUN      ] RouteMatcherTest.HeaderMatchedRouting
+[       OK ] RouteMatcherTest.HeaderMatchedRouting (197 ms)
+[ RUN      ] RouteMatcherTest.InvalidHeaderMatchedRoutingConfigLegacy
+[       OK ] RouteMatcherTest.InvalidHeaderMatchedRoutingConfigLegacy (54 ms)
+[ RUN      ] RouteMatcherTest.InvalidHeaderMatchedRoutingConfig
+[       OK ] RouteMatcherTest.InvalidHeaderMatchedRoutingConfig (55 ms)
+[ RUN      ] RouteMatcherTest.QueryParamMatchedRouting
+[       OK ] RouteMatcherTest.QueryParamMatchedRouting (206 ms)
+[ RUN      ] RouteMatcherTest.InvalidQueryParamMatchedRoutingConfig
+[       OK ] RouteMatcherTest.InvalidQueryParamMatchedRoutingConfig (54 ms)
+[ RUN      ] RouteMatcherTest.ClusterHeader
+[       OK ] RouteMatcherTest.ClusterHeader (110 ms)
+[ RUN      ] RouteMatcherTest.ContentType
+[       OK ] RouteMatcherTest.ContentType (95 ms)
+[ RUN      ] RouteMatcherTest.GrpcTimeoutOffset
+[       OK ] RouteMatcherTest.GrpcTimeoutOffset (83 ms)
+[ RUN      ] RouteMatcherTest.GrpcTimeoutOffsetOfDynamicRoute
+[       OK ] RouteMatcherTest.GrpcTimeoutOffsetOfDynamicRoute (99 ms)
+[ RUN      ] RouteMatcherTest.FractionalRuntime
+[       OK ] RouteMatcherTest.FractionalRuntime (81 ms)
+[ RUN      ] RouteMatcherTest.ShadowClusterNotFound
+[       OK ] RouteMatcherTest.ShadowClusterNotFound (50 ms)
+[ RUN      ] RouteMatcherTest.ClusterNotFound
+[       OK ] RouteMatcherTest.ClusterNotFound (51 ms)
+[ RUN      ] RouteMatcherTest.ClusterNotFoundNotChecking
+[       OK ] RouteMatcherTest.ClusterNotFoundNotChecking (50 ms)
+[ RUN      ] RouteMatcherTest.ClusterNotFoundNotCheckingViaConfig
+[       OK ] RouteMatcherTest.ClusterNotFoundNotCheckingViaConfig (51 ms)
+[ RUN      ] RouteMatcherTest.AttemptCountHeader
+[       OK ] RouteMatcherTest.AttemptCountHeader (77 ms)
+[ RUN      ] RouteMatcherTest.ClusterNotFoundResponseCode
+[       OK ] RouteMatcherTest.ClusterNotFoundResponseCode (79 ms)
+[ RUN      ] RouteMatcherTest.ClusterNotFoundResponseCodeConfig503
+[       OK ] RouteMatcherTest.ClusterNotFoundResponseCodeConfig503 (79 ms)
+[ RUN      ] RouteMatcherTest.ClusterNotFoundResponseCodeConfig404
+[       OK ] RouteMatcherTest.ClusterNotFoundResponseCodeConfig404 (79 ms)
+[ RUN      ] RouteMatcherTest.Shadow
+[       OK ] RouteMatcherTest.Shadow (115 ms)
+[ RUN      ] RouteMatcherTest.ShadowPolicyAndPolicies
+[       OK ] RouteMatcherTest.ShadowPolicyAndPolicies (53 ms)
+[ RUN      ] RouteMatcherTest.Retry
+[       OK ] RouteMatcherTest.Retry (186 ms)
+[ RUN      ] RouteMatcherTest.RetryVirtualHostLevel
+[       OK ] RouteMatcherTest.RetryVirtualHostLevel (215 ms)
+[ RUN      ] RouteMatcherTest.GrpcRetry
+[       OK ] RouteMatcherTest.GrpcRetry (189 ms)
+[ RUN      ] RouteMatcherTest.RetryBackOffIntervals
+[       OK ] RouteMatcherTest.RetryBackOffIntervals (175 ms)
+[ RUN      ] RouteMatcherTest.InvalidRetryBackOff
+[       OK ] RouteMatcherTest.InvalidRetryBackOff (57 ms)
+[ RUN      ] RouteMatcherTest.HedgeRouteLevel
+[       OK ] RouteMatcherTest.HedgeRouteLevel (195 ms)
+[ RUN      ] RouteMatcherTest.HedgeVirtualHostLevel
+[       OK ] RouteMatcherTest.HedgeVirtualHostLevel (199 ms)
+[ RUN      ] RouteMatcherTest.TestBadDefaultConfig
+[       OK ] RouteMatcherTest.TestBadDefaultConfig (71 ms)
+[ RUN      ] RouteMatcherTest.TestDuplicateDomainConfig
+[       OK ] RouteMatcherTest.TestDuplicateDomainConfig (56 ms)
+[ RUN      ] RouteMatcherTest.TestCaseSensitiveDomainConfig
+[       OK ] RouteMatcherTest.TestCaseSensitiveDomainConfig (54 ms)
+[ RUN      ] RouteMatcherTest.TestDuplicateWildcardDomainConfig
+[       OK ] RouteMatcherTest.TestDuplicateWildcardDomainConfig (54 ms)
+[ RUN      ] RouteMatcherTest.TestDuplicateSuffixWildcardDomainConfig
+[       OK ] RouteMatcherTest.TestDuplicateSuffixWildcardDomainConfig (53 ms)
+[ RUN      ] RouteMatcherTest.TestDuplicatePrefixWildcardDomainConfig
+[       OK ] RouteMatcherTest.TestDuplicatePrefixWildcardDomainConfig (53 ms)
+[ RUN      ] RouteMatcherTest.TestInvalidCharactersInPrefixRewrites
+[       OK ] RouteMatcherTest.TestInvalidCharactersInPrefixRewrites (51 ms)
+[ RUN      ] RouteMatcherTest.TestInvalidCharactersInHostRewrites
+[       OK ] RouteMatcherTest.TestInvalidCharactersInHostRewrites (51 ms)
+[ RUN      ] RouteMatcherTest.TestInvalidCharactersInAutoHostRewrites
+[       OK ] RouteMatcherTest.TestInvalidCharactersInAutoHostRewrites (51 ms)
+[ RUN      ] RouteMatcherTest.TestInvalidCharactersInHostRedirect
+[       OK ] RouteMatcherTest.TestInvalidCharactersInHostRedirect (49 ms)
+[ RUN      ] RouteMatcherTest.TestInvalidCharactersInPathRedirect
+[       OK ] RouteMatcherTest.TestInvalidCharactersInPathRedirect (51 ms)
+[ RUN      ] RouteMatcherTest.TestInvalidCharactersInPrefixRewriteRedirect
+[       OK ] RouteMatcherTest.TestInvalidCharactersInPrefixRewriteRedirect (50 ms)
+[ RUN      ] RouteMatcherTest.TestPrefixAndRegexRewrites
+[       OK ] RouteMatcherTest.TestPrefixAndRegexRewrites (51 ms)
+[ RUN      ] RouteMatcherTest.TestDomainMatchOrderConfig
+[       OK ] RouteMatcherTest.TestDomainMatchOrderConfig (157 ms)
+[ RUN      ] RouteMatcherTest.NoProtocolInHeadersWhenTlsIsRequired
+[       OK ] RouteMatcherTest.NoProtocolInHeadersWhenTlsIsRequired (66 ms)
+[ RUN      ] RouteMatcherTest.RouteName
+[       OK ] RouteMatcherTest.RouteName (148 ms)
+[ RUN      ] RouteMatcherTest.DirectResponse
+[       OK ] RouteMatcherTest.DirectResponse (1138 ms)
+[ RUN      ] RouteMatcherTest.ExclusiveRouteEntryOrDirectResponseEntry
+[       OK ] RouteMatcherTest.ExclusiveRouteEntryOrDirectResponseEntry (111 ms)
+[ RUN      ] RouteMatcherTest.ExclusiveWeightedClustersEntryOrDirectResponseEntry
+[       OK ] RouteMatcherTest.ExclusiveWeightedClustersEntryOrDirectResponseEntry (111 ms)
+[ RUN      ] RouteMatcherTest.WeightedClusters
+[       OK ] RouteMatcherTest.WeightedClusters (1129 ms)
+[ RUN      ] RouteMatcherTest.ExclusiveWeightedClustersOrClusterConfig
+[       OK ] RouteMatcherTest.ExclusiveWeightedClustersOrClusterConfig (48 ms)
+[ RUN      ] RouteMatcherTest.WeightedClustersMissingClusterList
+[       OK ] RouteMatcherTest.WeightedClustersMissingClusterList (50 ms)
+[ RUN      ] RouteMatcherTest.WeightedClustersEmptyClustersList
+[       OK ] RouteMatcherTest.WeightedClustersEmptyClustersList (47 ms)
+[ RUN      ] RouteMatcherTest.WeightedClustersSumOFWeightsNotEqualToMax
+[       OK ] RouteMatcherTest.WeightedClustersSumOFWeightsNotEqualToMax (87 ms)
+[ RUN      ] RouteMatcherTest.TestWeightedClusterWithMissingWeights
+[       OK ] RouteMatcherTest.TestWeightedClusterWithMissingWeights (103 ms)
+[ RUN      ] RouteMatcherTest.TestWeightedClusterInvalidClusterName
+[       OK ] RouteMatcherTest.TestWeightedClusterInvalidClusterName (65 ms)
+[ RUN      ] RouteMatcherTest.TestWeightedClusterHeaderManipulation
+[       OK ] RouteMatcherTest.TestWeightedClusterHeaderManipulation (95 ms)
+[ RUN      ] RouteMatcherTest.TestOpaqueConfig
+[       OK ] RouteMatcherTest.TestOpaqueConfig (137 ms)
+[ RUN      ] RouteMatcherTest.TestOpaqueConfigUsingDeprecatedName
+[       OK ] RouteMatcherTest.TestOpaqueConfigUsingDeprecatedName (69 ms)
+[ RUN      ] RouteMatcherTest.Decorator
+[       OK ] RouteMatcherTest.Decorator (83 ms)
+[ RUN      ] RouteMatcherTest.HeaderMatchedRoutingV2
+[       OK ] RouteMatcherTest.HeaderMatchedRoutingV2 (305 ms)
+[ RUN      ] RouteMatcherTest.TlsContextMatching
+[       OK ] RouteMatcherTest.TlsContextMatching (187 ms)
+[----------] 79 tests from RouteMatcherTest (11638 ms total)
+
+[----------] 10 tests from RouterMatcherHashPolicyTest
+[ RUN      ] RouterMatcherHashPolicyTest.HashHeaders
+[       OK ] RouterMatcherHashPolicyTest.HashHeaders (96 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.HashHeadersRegexSubstitution
+[       OK ] RouterMatcherHashPolicyTest.HashHeadersRegexSubstitution (65 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.HashIp
+[       OK ] RouterMatcherHashPolicyTest.HashIp (124 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.HashIpNonIpAddress
+[       OK ] RouterMatcherHashPolicyTest.HashIpNonIpAddress (73 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.HashIpv4DifferentAddresses
+[       OK ] RouterMatcherHashPolicyTest.HashIpv4DifferentAddresses (82 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.HashIpv6DifferentAddresses
+[       OK ] RouterMatcherHashPolicyTest.HashIpv6DifferentAddresses (81 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.HashQueryParameters
+[       OK ] RouterMatcherHashPolicyTest.HashQueryParameters (94 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.HashMultiple
+[       OK ] RouterMatcherHashPolicyTest.HashMultiple (122 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.HashTerminal
+[       OK ] RouterMatcherHashPolicyTest.HashTerminal (109 ms)
+[ RUN      ] RouterMatcherHashPolicyTest.InvalidHashPolicies
+[       OK ] RouterMatcherHashPolicyTest.InvalidHashPolicies (50 ms)
+[----------] 10 tests from RouterMatcherHashPolicyTest (897 ms total)
+
+[----------] 5 tests from RouterMatcherCookieHashPolicyTest
+[ RUN      ] RouterMatcherCookieHashPolicyTest.NoTtl
+[       OK ] RouterMatcherCookieHashPolicyTest.NoTtl (107 ms)
+[ RUN      ] RouterMatcherCookieHashPolicyTest.DifferentCookies
+[       OK ] RouterMatcherCookieHashPolicyTest.DifferentCookies (80 ms)
+[ RUN      ] RouterMatcherCookieHashPolicyTest.TtlSet
+[       OK ] RouterMatcherCookieHashPolicyTest.TtlSet (141 ms)
+[ RUN      ] RouterMatcherCookieHashPolicyTest.SetSessionCookie
+[       OK ] RouterMatcherCookieHashPolicyTest.SetSessionCookie (66 ms)
+[ RUN      ] RouterMatcherCookieHashPolicyTest.SetCookiePath
+[       OK ] RouterMatcherCookieHashPolicyTest.SetCookiePath (66 ms)
+[----------] 5 tests from RouterMatcherCookieHashPolicyTest (460 ms total)
+
+[----------] 4 tests from RouterMatcherFilterStateHashPolicyTest
+[ RUN      ] RouterMatcherFilterStateHashPolicyTest.KeyNotFound
+[       OK ] RouterMatcherFilterStateHashPolicyTest.KeyNotFound (65 ms)
+[ RUN      ] RouterMatcherFilterStateHashPolicyTest.NullValue
+[       OK ] RouterMatcherFilterStateHashPolicyTest.NullValue (68 ms)
+[ RUN      ] RouterMatcherFilterStateHashPolicyTest.ValueNonHashable
+[       OK ] RouterMatcherFilterStateHashPolicyTest.ValueNonHashable (66 ms)
+[ RUN      ] RouterMatcherFilterStateHashPolicyTest.Hashable
+[       OK ] RouterMatcherFilterStateHashPolicyTest.Hashable (66 ms)
+[----------] 4 tests from RouterMatcherFilterStateHashPolicyTest (266 ms total)
+
+[----------] 24 tests from RouteConfigurationV2
+[ RUN      ] RouteConfigurationV2.RequestMirrorPolicy
+[       OK ] RouteConfigurationV2.RequestMirrorPolicy (95 ms)
+[ RUN      ] RouteConfigurationV2.RedirectCode
+[       OK ] RouteConfigurationV2.RedirectCode (94 ms)
+[ RUN      ] RouteConfigurationV2.DirectResponse
+[       OK ] RouteConfigurationV2.DirectResponse (63 ms)
+[ RUN      ] RouteConfigurationV2.DirectResponseTooLarge
+[       OK ] RouteConfigurationV2.DirectResponseTooLarge (60 ms)
+[ RUN      ] RouteConfigurationV2.BrokenTypedMetadata
+[       OK ] RouteConfigurationV2.BrokenTypedMetadata (51 ms)
+[ RUN      ] RouteConfigurationV2.RouteConfigGetters
+[       OK ] RouteConfigurationV2.RouteConfigGetters (98 ms)
+[ RUN      ] RouteConfigurationV2.RouteTracingConfig
+[       OK ] RouteConfigurationV2.RouteTracingConfig (104 ms)
+[ RUN      ] RouteConfigurationV2.RedirectPrefixRewrite
+[       OK ] RouteConfigurationV2.RedirectPrefixRewrite (253 ms)
+[ RUN      ] RouteConfigurationV2.PathRedirectQueryNotPreserved
+[       OK ] RouteConfigurationV2.PathRedirectQueryNotPreserved (158 ms)
+[ RUN      ] RouteConfigurationV2.RedirectStripQuery
+[       OK ] RouteConfigurationV2.RedirectStripQuery (196 ms)
+[ RUN      ] RouteConfigurationV2.RegexPrefixWithNoRewriteWorksWhenPathChanged
+[       OK ] RouteConfigurationV2.RegexPrefixWithNoRewriteWorksWhenPathChanged (66 ms)
+[ RUN      ] RouteConfigurationV2.NoIdleTimeout
+[       OK ] RouteConfigurationV2.NoIdleTimeout (61 ms)
+[ RUN      ] RouteConfigurationV2.ZeroIdleTimeout
+[       OK ] RouteConfigurationV2.ZeroIdleTimeout (66 ms)
+[ RUN      ] RouteConfigurationV2.ExplicitIdleTimeout
+[       OK ] RouteConfigurationV2.ExplicitIdleTimeout (63 ms)
+[ RUN      ] RouteConfigurationV2.RetriableStatusCodes
+[       OK ] RouteConfigurationV2.RetriableStatusCodes (60 ms)
+[ RUN      ] RouteConfigurationV2.RetriableHeaders
+[       OK ] RouteConfigurationV2.RetriableHeaders (67 ms)
+[ RUN      ] RouteConfigurationV2.UpgradeConfigs
+[       OK ] RouteConfigurationV2.UpgradeConfigs (66 ms)
+[ RUN      ] RouteConfigurationV2.DuplicateUpgradeConfigs
+[       OK ] RouteConfigurationV2.DuplicateUpgradeConfigs (52 ms)
+[ RUN      ] RouteConfigurationV2.BadConnectConfig
+[       OK ] RouteConfigurationV2.BadConnectConfig (53 ms)
+[ RUN      ] RouteConfigurationV2.RetryPluginsAreNotReused
+[       OK ] RouteConfigurationV2.RetryPluginsAreNotReused (66 ms)
+[ RUN      ] RouteConfigurationV2.InternalRedirectIsDisabledWhenNotSpecifiedInRouteAction
+[       OK ] RouteConfigurationV2.InternalRedirectIsDisabledWhenNotSpecifiedInRouteAction (64 ms)
+[ RUN      ] RouteConfigurationV2.DefaultInternalRedirectPolicyIsSensible
+[       OK ] RouteConfigurationV2.DefaultInternalRedirectPolicyIsSensible (67 ms)
+[ RUN      ] RouteConfigurationV2.InternalRedirectPolicyDropsInvalidRedirectCode
+[       OK ] RouteConfigurationV2.InternalRedirectPolicyDropsInvalidRedirectCode (65 ms)
+[ RUN      ] RouteConfigurationV2.InternalRedirectPolicyDropsInvalidRedirectCodeCauseEmptySet
+[       OK ] RouteConfigurationV2.InternalRedirectPolicyDropsInvalidRedirectCodeCauseEmptySet (67 ms)
+[----------] 24 tests from RouteConfigurationV2 (2055 ms total)
+
+[----------] 1 test from NullConfigImplTest
+[ RUN      ] NullConfigImplTest.All
+[       OK ] NullConfigImplTest.All (11 ms)
+[----------] 1 test from NullConfigImplTest (11 ms total)
+
+[----------] 9 tests from BadHttpRouteConfigurationsTest
+[ RUN      ] BadHttpRouteConfigurationsTest.BadRouteConfig
+[       OK ] BadHttpRouteConfigurationsTest.BadRouteConfig (50 ms)
+[ RUN      ] BadHttpRouteConfigurationsTest.BadVirtualHostConfig
+[       OK ] BadHttpRouteConfigurationsTest.BadVirtualHostConfig (51 ms)
+[ RUN      ] BadHttpRouteConfigurationsTest.BadRouteEntryConfig
+[       OK ] BadHttpRouteConfigurationsTest.BadRouteEntryConfig (51 ms)
+[ RUN      ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigPrefixAndPath
+[       OK ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigPrefixAndPath (49 ms)
+[ RUN      ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigMissingPathSpecifier
+[       OK ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigMissingPathSpecifier (49 ms)
+[ RUN      ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigPrefixAndRegex
+[       OK ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigPrefixAndRegex (49 ms)
+[ RUN      ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigNoAction
+[       OK ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigNoAction (49 ms)
+[ RUN      ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigPathAndRegex
+[       OK ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigPathAndRegex (48 ms)
+[ RUN      ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigPrefixAndPathAndRegex
+[       OK ] BadHttpRouteConfigurationsTest.BadRouteEntryConfigPrefixAndPathAndRegex (49 ms)
+[----------] 9 tests from BadHttpRouteConfigurationsTest (445 ms total)
+
+[----------] 6 tests from RoutePropertyTest
+[ RUN      ] RoutePropertyTest.ExcludeVHRateLimits
+[       OK ] RoutePropertyTest.ExcludeVHRateLimits (101 ms)
+[ RUN      ] RoutePropertyTest.TestVHostCorsConfig
+[       OK ] RoutePropertyTest.TestVHostCorsConfig (68 ms)
+[ RUN      ] RoutePropertyTest.TestRouteCorsConfig
+[       OK ] RoutePropertyTest.TestRouteCorsConfig (67 ms)
+[ RUN      ] RoutePropertyTest.TTestVHostCorsLegacyConfig
+[       OK ] RoutePropertyTest.TTestVHostCorsLegacyConfig (64 ms)
+[ RUN      ] RoutePropertyTest.TestRouteCorsLegacyConfig
+[       OK ] RoutePropertyTest.TestRouteCorsLegacyConfig (66 ms)
+[ RUN      ] RoutePropertyTest.TestBadCorsConfig
+[       OK ] RoutePropertyTest.TestBadCorsConfig (50 ms)
+[----------] 6 tests from RoutePropertyTest (416 ms total)
+
+[----------] 2 tests from CustomRequestHeadersTest
+[ RUN      ] CustomRequestHeadersTest.AddNewHeader
+[       OK ] CustomRequestHeadersTest.AddNewHeader (80 ms)
+[ RUN      ] CustomRequestHeadersTest.CustomHeaderWrongFormat
+[       OK ] CustomRequestHeadersTest.CustomHeaderWrongFormat (65 ms)
+[----------] 2 tests from CustomRequestHeadersTest (1591 ms total)
+
+[----------] 3 tests from MetadataMatchCriteriaImpl
+[ RUN      ] MetadataMatchCriteriaImpl.Create
+[       OK ] MetadataMatchCriteriaImpl.Create (0 ms)
+[ RUN      ] MetadataMatchCriteriaImpl.Merge
+[       OK ] MetadataMatchCriteriaImpl.Merge (0 ms)
+[ RUN      ] MetadataMatchCriteriaImpl.Filter
+[       OK ] MetadataMatchCriteriaImpl.Filter (0 ms)
+[----------] 3 tests from MetadataMatchCriteriaImpl (0 ms total)
+
+[----------] 1 test from RouteEntryMetadataMatchTest
+[ RUN      ] RouteEntryMetadataMatchTest.ParsesMetadata
+[       OK ] RouteEntryMetadataMatchTest.ParsesMetadata (206 ms)
+[----------] 1 test from RouteEntryMetadataMatchTest (206 ms total)
+
+[----------] 2 tests from ConfigUtilityTest
+[ RUN      ] ConfigUtilityTest.ParseResponseCode
+[       OK ] ConfigUtilityTest.ParseResponseCode (46 ms)
+[ RUN      ] ConfigUtilityTest.ParseDirectResponseBody
+[       OK ] ConfigUtilityTest.ParseDirectResponseBody (46 ms)
+[----------] 2 tests from ConfigUtilityTest (92 ms total)
+
+[----------] 11 tests from PerFilterConfigsTest
+[ RUN      ] PerFilterConfigsTest.TypedConfigFilterError
+[       OK ] PerFilterConfigsTest.TypedConfigFilterError (62 ms)
+[ RUN      ] PerFilterConfigsTest.UnknownFilterStruct
+[       OK ] PerFilterConfigsTest.UnknownFilterStruct (51 ms)
+[ RUN      ] PerFilterConfigsTest.UnknownFilterAny
+[       OK ] PerFilterConfigsTest.UnknownFilterAny (50 ms)
+[ RUN      ] PerFilterConfigsTest.DefaultFilterImplementationStruct
+[       OK ] PerFilterConfigsTest.DefaultFilterImplementationStruct (67 ms)
+[ RUN      ] PerFilterConfigsTest.DefaultFilterImplementationAny
+[       OK ] PerFilterConfigsTest.DefaultFilterImplementationAny (67 ms)
+[ RUN      ] PerFilterConfigsTest.RouteLocalConfig
+[       OK ] PerFilterConfigsTest.RouteLocalConfig (68 ms)
+[ RUN      ] PerFilterConfigsTest.RouteLocalTypedConfig
+[       OK ] PerFilterConfigsTest.RouteLocalTypedConfig (67 ms)
+[ RUN      ] PerFilterConfigsTest.WeightedClusterConfig
+[       OK ] PerFilterConfigsTest.WeightedClusterConfig (68 ms)
+[ RUN      ] PerFilterConfigsTest.WeightedClusterTypedConfig
+[       OK ] PerFilterConfigsTest.WeightedClusterTypedConfig (68 ms)
+[ RUN      ] PerFilterConfigsTest.WeightedClusterFallthroughConfig
+[       OK ] PerFilterConfigsTest.WeightedClusterFallthroughConfig (68 ms)
+[ RUN      ] PerFilterConfigsTest.WeightedClusterFallthroughTypedConfig
+[       OK ] PerFilterConfigsTest.WeightedClusterFallthroughTypedConfig (67 ms)
+[----------] 11 tests from PerFilterConfigsTest (704 ms total)
+
+[----------] 8 tests from RouteMatchOverrideTest
+[ RUN      ] RouteMatchOverrideTest.VerifyAllMatchableRoutes
+[       OK ] RouteMatchOverrideTest.VerifyAllMatchableRoutes (65 ms)
+[ RUN      ] RouteMatchOverrideTest.VerifyRouteOverrideStops
+[       OK ] RouteMatchOverrideTest.VerifyRouteOverrideStops (64 ms)
+[ RUN      ] RouteMatchOverrideTest.StopWhenNoMoreRoutes
+[       OK ] RouteMatchOverrideTest.StopWhenNoMoreRoutes (65 ms)
+[ RUN      ] RouteMatchOverrideTest.NullRouteOnNoRouteMatch
+[       OK ] RouteMatchOverrideTest.NullRouteOnNoRouteMatch (81 ms)
+[ RUN      ] RouteMatchOverrideTest.NullRouteOnNoHostMatch
+[       OK ] RouteMatchOverrideTest.NullRouteOnNoHostMatch (66 ms)
+[ RUN      ] RouteMatchOverrideTest.NullRouteOnNullXForwardedProto
+[       OK ] RouteMatchOverrideTest.NullRouteOnNullXForwardedProto (66 ms)
+[ RUN      ] RouteMatchOverrideTest.NullRouteOnRequireTlsAll
+[       OK ] RouteMatchOverrideTest.NullRouteOnRequireTlsAll (65 ms)
+[ RUN      ] RouteMatchOverrideTest.NullRouteOnRequireTlsInternal
+[       OK ] RouteMatchOverrideTest.NullRouteOnRequireTlsInternal (65 ms)
+[----------] 8 tests from RouteMatchOverrideTest (538 ms total)
+
+[----------] Global test environment tear-down
+[==========] 165 tests from 14 test suites ran. (19322 ms total)
+[  PASSED  ] 165 tests.
+==================== Test output for //test/extensions/filters/network/sni_dynamic_forward_proxy:proxy_filter_integration_test:
+WARNING: Perftools heap leak checker is active -- Performance may suffer
+[==========] Running 4 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 4 tests from IpVersions/SniDynamicProxyFilterIntegrationTest
+[ RUN      ] IpVersions/SniDynamicProxyFilterIntegrationTest.UpstreamTls/IPv4
+TestRandomGenerator running with seed 205585968
+[       OK ] IpVersions/SniDynamicProxyFilterIntegrationTest.UpstreamTls/IPv4 (765 ms)
+[ RUN      ] IpVersions/SniDynamicProxyFilterIntegrationTest.UpstreamTls/IPv6
+TestRandomGenerator running with seed 205585968
+[2020-08-03 21:33:40.808][44312][critical][main] [source/server/server.cc:102] error initializing configuration '/build/tmp/_bazel_envoybuild/b570b5ccd0454dc9af9f65ab1833764d/sandbox/processwrapper-sandbox/898/execroot/envoy/_tmp/282b4d28423b557fc72f2459645621cd/bootstrap.pb': cannot bind '[::1]:0': Cannot assign requested address
+terminating with uncaught exception of type Envoy::Network::SocketBindException: cannot bind '[::1]:0': Cannot assign requested address
+[2020-08-03 21:33:40.809][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:104] Caught Aborted, suspect faulting address 0xc22430000acdd
+[2020-08-03 21:33:40.809][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:91] Backtrace (use tools/stack_decode.py to get line numbers):
+[2020-08-03 21:33:40.809][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:92] Envoy version: 0/1.16.0-dev/test/DEBUG/BoringSSL
+[2020-08-03 21:33:40.881][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #0: Envoy::SignalAction::sigHandler() [0x4267f3c]
+[2020-08-03 21:33:40.881][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #1: __restore_rt [0x7f8f0f7748a0]
+[2020-08-03 21:33:40.952][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #2: Envoy::IntegrationTestServerImpl::createAndRunEnvoyServer() [0x266b38e]
+[2020-08-03 21:33:41.024][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #3: Envoy::IntegrationTestServer::threadRoutine() [0x266adc9]
+[2020-08-03 21:33:41.096][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #4: Envoy::IntegrationTestServer::start()::$_0::operator()() [0x266d5d8]
+[2020-08-03 21:33:41.168][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #5: std::__1::__invoke<>() [0x266d50d]
+[2020-08-03 21:33:41.239][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #6: std::__1::__invoke_void_return_wrapper<>::__call<>() [0x266d4bd]
+[2020-08-03 21:33:41.311][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #7: std::__1::__function::__alloc_func<>::operator()() [0x266d48d]
+[2020-08-03 21:33:41.382][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #8: std::__1::__function::__func<>::operator()() [0x266c7ae]
+[2020-08-03 21:33:41.453][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #9: std::__1::__function::__value_func<>::operator()() [0x25b1745]
+[2020-08-03 21:33:41.525][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #10: std::__1::function<>::operator()() [0x25b1605]
+[2020-08-03 21:33:41.596][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #11: Envoy::Thread::ThreadImplPosix::ThreadImplPosix()::{lambda()#1}::operator()() [0x513dce2]
+[2020-08-03 21:33:41.668][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #12: Envoy::Thread::ThreadImplPosix::ThreadImplPosix()::{lambda()#1}::__invoke() [0x513dcb5]
+[2020-08-03 21:33:41.668][44312][critical][backtrace] [bazel-out/k8-fastbuild/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:96] #13: start_thread [0x7f8f0f7696db]
+================================================================================
