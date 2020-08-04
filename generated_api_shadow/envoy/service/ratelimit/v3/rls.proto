@@ -113,7 +113,7 @@ message RateLimitResponse {
     // The limit remaining in the current time unit.
     uint32 limit_remaining = 3;
 
-    // Number of seconds until reset of the current limit window.
+    // Duration until reset of the current limit window.
     google.protobuf.Duration duration_until_reset = 4;
   }
 

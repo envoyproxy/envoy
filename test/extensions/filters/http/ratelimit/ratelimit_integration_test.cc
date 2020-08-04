@@ -191,7 +191,8 @@ public:
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
   bool failure_mode_deny_ = false;
-  bool enable_x_ratelimit_headers_ = false;
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit::XRateLimitHeadersRFCVersion
+      enable_x_ratelimit_headers_ = envoy::extensions::filters::http::ratelimit::v3::RateLimit::OFF;
   envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config_{};
   const std::string base_filter_config_ = R"EOF(
     domain: some_domain
@@ -208,7 +209,10 @@ public:
 // Test verifies that response headers provided by filter work.
 class RatelimitFilterHeadersEnabledIntegrationTest : public RatelimitIntegrationTest {
 public:
-  RatelimitFilterHeadersEnabledIntegrationTest() { enable_x_ratelimit_headers_ = true; }
+  RatelimitFilterHeadersEnabledIntegrationTest() {
+    enable_x_ratelimit_headers_ =
+        envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_02;
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,

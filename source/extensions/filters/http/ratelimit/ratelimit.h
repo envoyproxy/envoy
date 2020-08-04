@@ -43,7 +43,9 @@ public:
                                                     : stringToType(config.request_type())),
         local_info_(local_info), scope_(scope), runtime_(runtime),
         failure_mode_deny_(config.failure_mode_deny()),
-        enable_x_ratelimit_headers_(config.enable_x_ratelimit_headers()),
+        enable_x_ratelimit_headers_(
+            config.enable_x_ratelimit_headers() ==
+            envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_02),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
