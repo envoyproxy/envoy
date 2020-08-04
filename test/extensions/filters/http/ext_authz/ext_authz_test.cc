@@ -104,7 +104,7 @@ public:
 };
 
 template <bool failure_mode_allow_value, bool http_client>
-envoy::extensions::filters::http::ext_authz::v3::ExtAuthz GetFilterConfig() {
+envoy::extensions::filters::http::ext_authz::v3::ExtAuthz getFilterConfig() {
   const std::string http_config = R"EOF(
   http_service:
     server_uri:
@@ -126,8 +126,8 @@ envoy::extensions::filters::http::ext_authz::v3::ExtAuthz GetFilterConfig() {
 }
 
 INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
-                         Values(&GetFilterConfig<true, true>, &GetFilterConfig<false, false>,
-                                &GetFilterConfig<true, false>, &GetFilterConfig<false, true>));
+                         Values(&getFilterConfig<true, true>, &getFilterConfig<false, false>,
+                                &getFilterConfig<true, false>, &getFilterConfig<false, true>));
 
 // Test that the per route config is properly merged: more specific keys override previous keys.
 TEST_F(HttpFilterTest, MergeConfig) {

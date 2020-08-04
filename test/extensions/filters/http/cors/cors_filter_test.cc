@@ -60,7 +60,7 @@ public:
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  bool IsCorsRequest() { return filter_.is_cors_request_; }
+  bool isCoreRequest() { return filter_.is_cors_request_; }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -81,7 +81,7 @@ TEST_F(CorsFilterTest, RequestWithoutOrigin) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(false, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -99,7 +99,7 @@ TEST_F(CorsFilterTest, RequestWithOrigin) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -115,7 +115,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithoutOrigin) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(false, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -131,7 +131,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOrigin) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -202,7 +202,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsEnabled) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -218,7 +218,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithoutAccessRequestMethod) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -244,7 +244,7 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcard) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -274,7 +274,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsEnabledShadowDisabled) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -302,7 +302,7 @@ TEST_F(CorsFilterTest, OptionsRequestWithOriginCorsEnabledShadowEnabled) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -322,7 +322,7 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOrigin) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(false, isCoreRequest());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -341,7 +341,7 @@ TEST_F(CorsFilterTest, OptionsRequestEmptyOriginList) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(false, isCoreRequest());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -372,7 +372,7 @@ TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsTrue) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -398,7 +398,7 @@ TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsFalse) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -524,7 +524,7 @@ TEST_F(CorsFilterTest, RedirectRoute) {
       .WillByDefault(Return(&direct_response_entry_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
-  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(false, isCoreRequest());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
@@ -579,7 +579,7 @@ TEST_F(CorsFilterTest, NoCorsEntry) {
       .WillByDefault(Return(nullptr));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(false, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -611,7 +611,7 @@ TEST_F(CorsFilterTest, NoRouteCorsEntry) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -641,7 +641,7 @@ TEST_F(CorsFilterTest, NoVHostCorsEntry) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -672,7 +672,7 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByRegex) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(true, isCoreRequest());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -693,7 +693,7 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOriginByRegex) {
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(false, IsCorsRequest());
+  EXPECT_EQ(false, isCoreRequest());
   EXPECT_EQ(1, stats_.counter("test.cors.origin_invalid").value());
   EXPECT_EQ(0, stats_.counter("test.cors.origin_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));

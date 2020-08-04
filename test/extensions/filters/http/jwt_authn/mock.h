@@ -77,8 +77,6 @@ public:
             }));
   }
 
-  int called_count() const { return called_count_; }
-
 private:
   Http::MockAsyncClientRequest request_;
   std::string response_body_;

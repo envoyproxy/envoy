@@ -45,6 +45,7 @@ CODEC_LIB_DEPS = [
     "//source/common/http:status_lib",
     "//source/common/http:utility_lib",
     "//source/common/runtime:runtime_features_lib",
+    "//source/common/common:statusor_lib",
     "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
 ]
 
@@ -58,9 +59,7 @@ envoy_cc_library(
         "abseil_inlined_vector",
         "abseil_algorithm",
     ],
-    deps = CODEC_LIB_DEPS + [
-        "//source/common/common:statusor_lib",
-    ],
+    deps = CODEC_LIB_DEPS,
 )
 
 envoy_cc_library(
