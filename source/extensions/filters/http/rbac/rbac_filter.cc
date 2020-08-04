@@ -25,9 +25,17 @@ using RcDetails = ConstSingleton<RcDetailsValues>;
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
-      engine_(Filters::Common::RBAC::createEngine(proto_config)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
+    : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)) {
+  engine_ = proto_config.has_rules()
+                ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
+                      proto_config.rules(), Filters::Common::RBAC::EnforcementMode::Enforced)
+                : nullptr;
+  shadow_engine_ =
+      proto_config.has_shadow_rules()
+          ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
+                proto_config.shadow_rules(), Filters::Common::RBAC::EnforcementMode::Shadow)
+          : nullptr;
+}
 
 Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,

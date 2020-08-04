@@ -16,9 +16,17 @@ namespace RBACFilter {
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
-      engine_(Filters::Common::RBAC::createEngine(proto_config)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
-      enforcement_type_(proto_config.enforcement_type()) {}
+      enforcement_type_(proto_config.enforcement_type()) {
+  engine_ = proto_config.has_rules()
+                ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
+                      proto_config.rules(), Filters::Common::RBAC::EnforcementMode::Enforced)
+                : nullptr;
+  shadow_engine_ =
+      proto_config.has_shadow_rules()
+          ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
+                proto_config.shadow_rules(), Filters::Common::RBAC::EnforcementMode::Shadow)
+          : nullptr;
+}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   ENVOY_LOG(debug,
