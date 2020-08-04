@@ -296,7 +296,7 @@ message ClusterManager {
 // Envoy process watchdog configuration. When configured, this monitors for
 // nonresponsive threads and kills the process after the configured thresholds.
 // See the :ref:`watchdog documentation <operations_performance_watchdog>` for more information.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Watchdog {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v3.Watchdog";
 
@@ -313,6 +313,12 @@ message Watchdog {
   // programming error and kill the entire Envoy process. Set to 0 to disable
   // kill behavior. If not specified the default is 0 (disabled).
   google.protobuf.Duration kill_timeout = 3;
+
+  // Defines the maximum jitter used to adjust the *kill_timeout* if *kill_timeout* is
+  // enabled. Enabling this feature would help to reduce risk of synchronized
+  // watchdog kill events across proxies due to external triggers. Set to 0 to
+  // disable. If not specified the default is 0 (disabled).
+  google.protobuf.Duration max_kill_timeout_jitter = 6 [(validate.rules).duration = {gte {}}];
 
   // If max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))
   // threads have been nonresponsive for at least this duration kill the entire

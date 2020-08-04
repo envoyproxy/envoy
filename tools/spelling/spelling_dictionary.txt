@@ -284,6 +284,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SMTP
 SNI
 SOTW
 SPD
@@ -859,6 +860,7 @@ postfix
 postfixes
 postgres
 postgresql
+pragma
 pre
 preallocate
 preallocating
@@ -870,6 +872,8 @@ precompute
 precomputed
 predeclared
 prefetch
+prefetched
+prefetches
 preflight
 preorder
 prepend
@@ -961,6 +965,7 @@ restarter
 resync
 retriable
 retriggers
+revalidation
 rmdir
 rocketmq
 rewriter

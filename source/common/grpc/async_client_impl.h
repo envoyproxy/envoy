@@ -48,7 +48,7 @@ private:
 class AsyncStreamImpl : public RawAsyncStream,
                         Http::AsyncClient::StreamCallbacks,
                         public Event::DeferredDeletable,
-                        LinkedObject<AsyncStreamImpl> {
+                        public LinkedObject<AsyncStreamImpl> {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                   absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
