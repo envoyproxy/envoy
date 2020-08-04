@@ -31,8 +31,11 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t 
   ASSERT(options == nullptr, "Per packet option is not supported yet.");
 
   Buffer::OwnedImpl buf;
-  Buffer::BufferFragmentImpl frag(buffer, buffer_len, nullptr);
-  buf.addBufferFragment(frag);
+  auto fragment = std::make_unique<Buffer::BufferFragmentImpl>(
+      buffer, buffer_len, [](const void*, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+        delete this_fragment;
+      });
+  buf.addBufferFragment(*fragment.release());
 
   quic::QuicSocketAddress self_address(self_ip, /*port=*/0);
   Network::Address::InstanceConstSharedPtr local_addr =
