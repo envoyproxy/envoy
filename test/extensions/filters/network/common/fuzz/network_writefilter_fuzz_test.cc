@@ -20,7 +20,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         // post-processor mutation.
 
         // TODO(jianwendong): consider using a factory to store the names of all
-        // writefilters.
+        // writeFilters.
         static const auto filter_names = UberWriteFilterFuzzer::filterNames();
         static const auto factories = Registry::FactoryRegistry<
             Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
@@ -40,7 +40,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
   try {
     TestUtility::validate(input);
     // Check the filter's name in case some filters are not supported yet.
-    // TODO(jianwendong): remove this if block when we have a factory for writefilters.
+    // TODO(jianwendong): remove this if block when we have a factory for writeFilters.
     static const auto filter_names = UberWriteFilterFuzzer::filterNames();
     if (std::find(filter_names.begin(), filter_names.end(), input.config().name()) ==
         std::end(filter_names)) {
