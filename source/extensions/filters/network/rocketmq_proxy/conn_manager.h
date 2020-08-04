@@ -39,7 +39,7 @@ public:
   virtual Router::RouterPtr createRouter() PURE;
 
   /**
-   * Indicate whether this proxy is running in develop mode. Once set true, this proxy plugin may
+   * Indicate whether this proxy is running in development mode. If true, this proxy plugin may
    * work without dedicated traffic intercepting facility without considering backward
    * compatibility.
    * @return true when in development mode; false otherwise.
