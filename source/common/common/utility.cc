@@ -507,12 +507,12 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
   const auto intervals = remove_characters.toVector();
   std::vector<absl::string_view> pieces;
   pieces.reserve(intervals.size());
-  for (const auto& interval : intervals) {
-    if (interval.first != pos) {
-      ASSERT(interval.second <= str.size());
-      pieces.push_back(str.substr(pos, interval.first - pos));
+  for (const auto& [left_bound, right_bound] : intervals) {
+    if (left_bound != pos) {
+      ASSERT(right_bound <= str.size());
+      pieces.push_back(str.substr(pos, left_bound - pos));
     }
-    pos = interval.second;
+    pos = right_bound;
   }
   if (pos != str.size()) {
     pieces.push_back(str.substr(pos));

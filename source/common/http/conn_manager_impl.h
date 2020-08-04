@@ -569,6 +569,11 @@ private:
     void callLowWatermarkCallbacks();
 
     void setRequestHeaders(RequestHeaderMapPtr&& request_headers) {
+      // TODO(snowp): Ideally we don't need this function, but during decodeHeaders we might issue
+      // local replies before the FilterManager::decodeData has been called. We could likely get rid
+      // of this by updating the calls to sendLocalReply to pass ownership over the headers + adding
+      // asserts that we don't call the overload that doesn't pass ownership unless decodeData has
+      // been called.
       ASSERT(request_headers_ == nullptr);
       request_headers_ = std::move(request_headers);
     }

@@ -30,7 +30,7 @@ export NUM_CPUS=6
 
 # CircleCI doesn't support IPv6 by default, so we run all tests with IPv4 only.
 # IPv6 tests are run with Azure Pipelines.
-export BAZEL_EXTRA_BUILD_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v4only --local_cpu_resources=${NUM_CPUS} \
+export BAZEL_BUILD_EXTRA_OPTIONS+="--test_env=ENVOY_IP_TEST_VERSIONS=v4only --local_cpu_resources=${NUM_CPUS} \
   --action_env=HOME --action_env=PYTHONUSERBASE --test_env=HOME --test_env=PYTHONUSERBASE"
 
 function finish {
