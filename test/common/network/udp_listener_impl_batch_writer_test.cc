@@ -44,7 +44,7 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Network {
@@ -68,8 +68,7 @@ public:
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
     udp_packet_writer_ = std::make_unique<Quic::UdpGsoBatchWriter>(
         server_socket_->ioHandle(), listener_config_.listenerScope());
-    ON_CALL(listener_callbacks_, udpPacketWriter())
-        .WillByDefault(testing::ReturnRef(*udp_packet_writer_));
+    ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(ReturnRef(*udp_packet_writer_));
   }
 };
 

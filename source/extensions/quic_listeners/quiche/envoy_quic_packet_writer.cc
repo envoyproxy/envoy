@@ -24,14 +24,15 @@ quic::WriteResult convertToQuicWriteResult(Api::IoCallUint64Result& result) {
 EnvoyQuicPacketWriter::EnvoyQuicPacketWriter(Network::UdpPacketWriterPtr envoy_udp_packet_writer)
     : envoy_udp_packet_writer_(std::move(envoy_udp_packet_writer)) {}
 
-quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t buf_len,
+quic::WriteResult EnvoyQuicPacketWriter::WritePacket(const char* buffer, size_t buffer_len,
                                                      const quic::QuicIpAddress& self_ip,
                                                      const quic::QuicSocketAddress& peer_address,
                                                      quic::PerPacketOptions* options) {
   ASSERT(options == nullptr, "Per packet option is not supported yet.");
 
   Buffer::OwnedImpl buf;
-  buf.add(buffer, buf_len);
+  Buffer::BufferFragmentImpl frag(buffer, buffer_len, nullptr);
+  buf.addBufferFragment(frag);
 
   quic::QuicSocketAddress self_address(self_ip, /*port=*/0);
   Network::Address::InstanceConstSharedPtr local_addr =
