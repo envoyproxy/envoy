@@ -87,6 +87,12 @@ STD_REGEX_ALLOWLIST = (
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 
+# These files should not throw exceptions.
+EXCEPTION_DENYLIST = ("./source/common/http/http1/codec_impl.h",
+                      "./source/common/http/http1/codec_impl.cc",
+                      "./source/common/http/http2/codec_impl.h",
+                      "./source/common/http/http2/codec_impl.cc")
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
 BUILDIFIER_PATH = paths.getBuildifier()
 BUILDOZER_PATH = paths.getBuildozer()
@@ -103,6 +109,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
+COMMENT_REGEX = re.compile(r"//|\*")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -353,6 +360,8 @@ def allowlistedForUnpackTo(file_path):
       "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
   ]
 
+def denylistedForExceptions(file_path):
+    return file_path in EXCEPTION_DENYLIST or isInSubdir(file_path, 'tools/testdata')
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   text = readFile(file_path)
@@ -732,6 +741,15 @@ def checkSourceLine(line, file_path, reportError):
       if comment == -1 or comment > grpc_init_or_shutdown:
         reportError("Don't call grpc_init() or grpc_shutdown() directly, instantiate " +
                     "Grpc::GoogleGrpcContext. See #8282")
+
+  if denylistedForExceptions(file_path):
+      throw = line.find("throw")
+      if throw != -1:
+          comment_match = COMMENT_REGEX.search(line)
+          if comment_match is None or comment_match.start(0) > throw:
+              reportError("Don't introduce throws into exception-free files, use error " +
+                          "statuses instead.")
+
 
 
 def checkBuildLine(line, file_path, reportError):
