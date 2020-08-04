@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 # requests based on sampled latencies.
 # Public docs: TODO (tonya11en)
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "controller_lib",

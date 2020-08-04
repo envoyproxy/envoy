@@ -120,7 +120,7 @@ public:
   /**
    * @brief a helper function to determine if the headers represent an accepted CONNECT response.
    */
-  static bool isConnectResponse(const RequestHeaderMapPtr& request_headers,
+  static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
 
   /**
