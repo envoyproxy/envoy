@@ -348,6 +348,7 @@ TEST_F(OwnedImplTest, Read) {
 }
 
 TEST_F(OwnedImplTest, ExtractOwnedSlice) {
+  // Create a buffer with two owned slices.
   Buffer::OwnedImpl buffer;
   buffer.appendSliceForTest("abcde");
   const uint64_t expected_length0 = 5;
@@ -356,23 +357,34 @@ TEST_F(OwnedImplTest, ExtractOwnedSlice) {
   EXPECT_EQ(buffer.toString(), "abcde123");
   RawSliceVector slices = buffer.getRawSlices();
   EXPECT_EQ(2, slices.size());
+
+  // Extract first slice.
   auto slice = buffer.extractFrontSlice();
   ASSERT_TRUE(slice);
-  ASSERT_NE(slice->data(), nullptr);
-  EXPECT_EQ(slice->size(), expected_length0);
-  EXPECT_TRUE(0 == memcmp(slice->data(), "abcde", expected_length0));
+  auto slice_data = slice->getData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length0);
+  EXPECT_EQ("abcde",
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
   EXPECT_EQ(buffer.toString(), "123");
-  buffer.appendSliceForTest(slice->data(), slice->size());
+
+  // Re-add extracted first slice to the end of the buffer.
+  buffer.appendSliceForTest(slice_data.data(), slice_data.size());
   EXPECT_EQ(buffer.toString(), "123abcde");
+
+  // Extract second slice, leaving only the original first slice.
   slice = buffer.extractFrontSlice();
   ASSERT_TRUE(slice);
-  ASSERT_NE(slice->data(), nullptr);
-  EXPECT_EQ(slice->size(), expected_length1);
-  EXPECT_TRUE(0 == memcmp(slice->data(), "123", expected_length1));
+  slice_data = slice->getData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length1);
+  EXPECT_EQ("123",
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
   EXPECT_EQ(buffer.toString(), "abcde");
 }
 
 TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
+  // Create a buffer with two owned slices.
   Buffer::OwnedImpl buffer;
   buffer.appendSliceForTest("abcde");
   const uint64_t expected_length0 = 5;
@@ -380,45 +392,82 @@ TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
   EXPECT_EQ(buffer.toString(), "abcde123");
   RawSliceVector slices = buffer.getRawSlices();
   EXPECT_EQ(2, slices.size());
+
+  // Partially drain the first slice.
   const uint64_t partial_drain_size = 2;
   buffer.drain(partial_drain_size);
+  EXPECT_EQ(buffer.toString(), static_cast<const char*>("abcde123") + partial_drain_size);
+
+  // Extracted partially drained first slice, leaving the second slice.
   auto slice = buffer.extractFrontSlice();
   ASSERT_TRUE(slice);
-  ASSERT_NE(slice->data(), nullptr);
-  EXPECT_EQ(slice->size(), expected_length0 - partial_drain_size);
-  EXPECT_TRUE(0 == memcmp(slice->data(),
-                          reinterpret_cast<const uint8_t*>("abcde") + partial_drain_size,
-                          expected_length0 - partial_drain_size));
+  auto slice_data = slice->getData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length0 - partial_drain_size);
+  EXPECT_EQ(static_cast<const char*>("abcde") + partial_drain_size,
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
   EXPECT_EQ(buffer.toString(), "123");
 }
 
 TEST_F(OwnedImplTest, ExtractUnownedSlice) {
-  std::string input{"some string to test with"};
+  // Create a buffer with an unowned slice.
+  std::string input{"unowned test slice"};
   const size_t expected_length0 = input.size();
   auto frag = OwnedBufferFragmentImpl::create(
       {input.c_str(), expected_length0},
       [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
   buffer.addBufferFragment(*frag);
-  EXPECT_EQ(expected_length0, buffer.length());
-  buffer.appendSliceForTest("another slice");
-  const uint64_t expected_length1 = 13;
 
+  // Add an owned slice to the end of the buffer.
+  EXPECT_EQ(expected_length0, buffer.length());
+  std::string owned_slice_content{"another slice, but owned"};
+  buffer.appendSliceForTest(owned_slice_content);
+  const uint64_t expected_length1 = owned_slice_content.length();
+
+  // Partially drain the unowned slice.
   const uint64_t partial_drain_size = 5;
   buffer.drain(partial_drain_size);
   EXPECT_EQ(expected_length0 - partial_drain_size + expected_length1, buffer.length());
   EXPECT_FALSE(release_callback_called_);
 
+  // Extract what remains of the unowned slice, leaving only the owned slice
   auto slice = buffer.extractFrontSlice();
   ASSERT_TRUE(slice);
-  ASSERT_NE(slice->data(), nullptr);
-  EXPECT_EQ(slice->size(), expected_length0 - partial_drain_size);
-  EXPECT_TRUE(0 == memcmp(slice->data(), input.data() + partial_drain_size,
-                          expected_length0 - partial_drain_size));
+  auto slice_data = slice->getData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length0 - partial_drain_size);
+  EXPECT_EQ(input.data() + partial_drain_size,
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
   EXPECT_EQ(expected_length1, buffer.length());
-  EXPECT_FALSE(release_callback_called_); // extracted slice keeps fragment alive
+
+  // This test now has ownership of the unowned slice, which means that the
+  // release callback will only be called once the slice is destroyed.
+  EXPECT_FALSE(release_callback_called_);
   slice.reset();
   EXPECT_TRUE(release_callback_called_);
+}
+
+TEST_F(OwnedImplTest, ExtractWithDrainTracker) {
+  testing::InSequence s;
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("a");
+
+  testing::MockFunction<void()> tracker1;
+  testing::MockFunction<void()> tracker2;
+  buffer.addDrainTracker(tracker1.AsStdFunction());
+  buffer.addDrainTracker(tracker2.AsStdFunction());
+
+  testing::MockFunction<void()> done;
+  EXPECT_CALL(tracker1, Call());
+  EXPECT_CALL(tracker2, Call());
+  EXPECT_CALL(done, Call());
+  auto slice = buffer.extractFrontSlice();
+  // The test now has ownership of the slice with the associated drain trackers.
+  // The drain trackers will only be called once the slice is destroyed.
+  slice.reset();
+  done.Call();
 }
 
 TEST_F(OwnedImplTest, DrainTracking) {

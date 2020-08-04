@@ -200,10 +200,16 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
 }
 
 SliceDataPtr OwnedImpl::extractFrontSlice() {
+  RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
+  // Remove zero byte fragments from the front of the queue to ensure
+  // that the extracted slice has data.
+  while (!slices_.empty() && slices_.front()->dataSize() == 0) {
+    slices_.pop_front();
+  }
   ASSERT(!slices_.empty());
   ASSERT(slices_.front());
   length_ -= slices_.front()->dataSize();
-  auto slice = std::make_unique<SliceDataImpl>(std::move(slices_.front()));
+  auto slice = std::move(slices_.front());
   slices_.pop_front();
   return slice;
 }

@@ -16,6 +16,7 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -56,20 +57,15 @@ public:
 };
 
 /**
- * A wrapper class to facilitate extracting buffer slices from a buffer instance.
+ * A class to facilitate extracting buffer slices from a buffer instance.
  */
 class SliceData {
 public:
   virtual ~SliceData() = default;
   /**
-   * @return void* a pointer to the data.
+   * @return absl::Span<uint8_t> a span of the slice data.
    */
-  virtual void* data() PURE;
-
-  /**
-   * @return size_t the size of the data.
-   */
-  virtual size_t size() const PURE;
+  virtual absl::Span<uint8_t> getData() PURE;
 };
 
 using SliceDataPtr = std::unique_ptr<SliceData>;

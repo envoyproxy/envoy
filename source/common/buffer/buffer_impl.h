@@ -31,7 +31,7 @@ namespace Buffer {
  *                   |
  *                   data()
  */
-class Slice {
+class Slice : public SliceData {
 public:
   using Reservation = RawSlice;
 
@@ -40,6 +40,9 @@ public:
       drain_tracker();
     }
   }
+
+  // SliceData
+  absl::Span<uint8_t> getData() override { return {base_ + data_, reservable_ - data_}; }
 
   /**
    * @return a pointer to the start of the usable content.
@@ -229,22 +232,6 @@ protected:
 };
 
 using SlicePtr = std::unique_ptr<Slice>;
-
-/**
- * Wraps a valid SlicePtr
- */
-class SliceDataImpl : public SliceData {
-public:
-  SliceDataImpl(SlicePtr slice) : slice_(std::move(slice)) {
-    ASSERT(slice_);
-    ASSERT(slice_->dataSize() > 0);
-  }
-  void* data() override { return slice_->data(); };
-  size_t size() const override { return slice_->dataSize(); };
-
-private:
-  SlicePtr slice_;
-};
 
 // OwnedSlice can not be derived from as it has variable sized array as member.
 class OwnedSlice final : public Slice, public InlineStorage {
@@ -555,7 +542,7 @@ public:
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
-  std::unique_ptr<SliceData> extractFrontSlice() override;
+  SliceDataPtr extractFrontSlice() override;
   uint64_t length() const override;
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
@@ -575,13 +562,13 @@ public:
    * @param data start of the content to copy.
    *
    */
-  void appendSliceForTest(const void* data, uint64_t size);
+  virtual void appendSliceForTest(const void* data, uint64_t size);
 
   /**
    * Create a new slice at the end of the buffer, and copy the supplied string into it.
    * @param data the string to append to the buffer.
    */
-  void appendSliceForTest(absl::string_view data);
+  virtual void appendSliceForTest(absl::string_view data);
 
   /**
    * Describe the in-memory representation of the slices in the buffer. For use
