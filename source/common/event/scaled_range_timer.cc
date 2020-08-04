@@ -123,44 +123,49 @@ RangeTimerPtr ScaledRangeTimerManager::createTimer(TimerCb callback) {
 void ScaledRangeTimerManager::setScaleFactor(float scale_factor) {
   scale_factor_ = DurationScaleFactor(scale_factor);
   for (auto& bucket : buckets_) {
-    if (!bucket.scaled_timers.empty()) {
-      bucket.updateTimer(*this);
-    }
+    bucket.updateTimer(*this, true);
   }
 }
 
 MonotonicTime::duration
 ScaledRangeTimerManager::getBucketedDuration(MonotonicTime::duration max_duration) {
-  return MonotonicTime::duration(static_cast<MonotonicTime::duration::rep>(
-      std::pow(kBucketScaleFactor,
-               std::floor(std::log(max_duration.count()) / std::log(kBucketScaleFactor)))));
+  if (max_duration <= MonotonicTime::duration::zero()) {
+    return MonotonicTime::duration::zero();
+  }
+  const int index = std::floor(std::log(max_duration.count()) / std::log(kBucketScaleFactor));
+  return MonotonicTime::duration(
+      static_cast<MonotonicTime::duration::rep>(std::pow(kBucketScaleFactor, index)));
 }
 
-void ScaledRangeTimerManager::Bucket::updateTimer(ScaledRangeTimerManager& manager) {
+void ScaledRangeTimerManager::Bucket::updateTimer(ScaledRangeTimerManager& manager,
+                                                  bool scale_factor_changed) {
   if (scaled_timers.empty()) {
     if (timer->enabled()) {
       timer->disableTimer();
     }
-  } else {
-    auto& entry = scaled_timers.front();
-    timer->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
-        manager.scale_factor_.value() *
-        (entry.latest_trigger_time - manager.dispatcher_.timeSource().monotonicTime())));
+  } else { // !scaled_timers.empty()
+    if (scale_factor_changed || !timer->enabled()) {
+      auto& entry = scaled_timers.front();
+      timer->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
+          manager.scale_factor_.value() *
+          (entry.latest_trigger_time - manager.dispatcher_.timeSource().monotonicTime())));
+    }
   }
 }
 
 ScaledRangeTimerManager::DurationScaleFactor::DurationScaleFactor(float value)
-    : value_(value < 0 ? 0 : value < 1 ? value : 1) {}
+    : value_(std::max(0.0f, std::min(value, 1.0f))) {}
 
 float ScaledRangeTimerManager::DurationScaleFactor::value() const { return value_; }
 
 ScaledRangeTimerManager::BucketEnabledList::iterator
-ScaledRangeTimerManager::add(RangeTimerImpl& timer, MonotonicTime::duration max_duration) {
-  max_duration = getBucketedDuration(max_duration);
+ScaledRangeTimerManager::add(RangeTimerImpl& timer, const MonotonicTime::duration max_duration) {
   Bucket& bucket = getOrCreateBucket(max_duration);
+  const auto quantized_duration = getBucketedDuration(max_duration);
 
-  bucket.scaled_timers.emplace_back(timer, max_duration + dispatcher_.timeSource().monotonicTime());
-  bucket.updateTimer(*this);
+  bucket.scaled_timers.emplace_back(timer,
+                                    quantized_duration + dispatcher_.timeSource().monotonicTime());
+  bucket.updateTimer(*this, false);
   return --(bucket.scaled_timers.end());
 }
 
@@ -168,7 +173,7 @@ void ScaledRangeTimerManager::disableActiveTimer(
     MonotonicTime::duration max_duration, const BucketEnabledList::iterator& bucket_position) {
   auto& bucket = getOrCreateBucket(max_duration);
   bucket.scaled_timers.erase(bucket_position);
-  bucket.updateTimer(*this);
+  bucket.updateTimer(*this, false);
 }
 
 void ScaledRangeTimerManager::onBucketTimer(int bucket_index) {
@@ -179,7 +184,7 @@ void ScaledRangeTimerManager::onBucketTimer(int bucket_index) {
   auto* timer = &it->timer;
   bucket.scaled_timers.erase(it);
 
-  bucket.updateTimer(*this);
+  bucket.updateTimer(*this, false);
 
   timer->trigger();
 }
@@ -189,8 +194,8 @@ ScaledRangeTimerManager::getOrCreateBucket(MonotonicTime::duration max_duration)
   const size_t index =
       max_duration <= minimum_duration_
           ? 0
-          : std::floor(std::log(max_duration.count()) / std::log(kBucketScaleFactor) -
-                       std::log(minimum_duration_.count()) / std::log(kBucketScaleFactor));
+          : std::floor((std::log(max_duration.count()) - std::log(minimum_duration_.count())) /
+                       std::log(kBucketScaleFactor));
 
   while (buckets_.size() <= index) {
     Bucket bucket;

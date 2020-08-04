@@ -42,7 +42,7 @@ private:
   struct Bucket {
     TimerPtr timer;
     BucketEnabledList scaled_timers;
-    void updateTimer(ScaledRangeTimerManager& manager);
+    void updateTimer(ScaledRangeTimerManager& manager, bool scale_factor_changed);
   };
 
   class DurationScaleFactor {
