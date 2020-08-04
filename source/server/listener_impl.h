@@ -209,8 +209,8 @@ private:
 };
 
 /**
- * PerFilterChainRebuilder is used to rebuild filter chain placeholder. It assigns an init manager to
- * dependencies and send callback to workers when the rebuilding is completed.
+ * PerFilterChainRebuilder is used to rebuild filter chain placeholder. It assigns an init manager
+ * to dependencies and send callback to workers when the rebuilding is completed.
  */
 class PerFilterChainRebuilder : Logger::Loggable<Logger::Id::config> {
 public:
