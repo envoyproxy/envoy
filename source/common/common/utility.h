@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <set>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <vector>
 
@@ -551,7 +552,38 @@ template <class Value> struct TrieEntry {
  * A trie used for faster lookup with lookup time at most equal to the size of the key.
  */
 template <class Value> struct TrieLookupTable {
-
+  ~TrieLookupTable() {
+    // Use a stack to store non-nullptr nodes which should be deleted, and their children will be
+    // pushed into this stack and will be deleted later.
+    std::stack<TrieEntry<Value>*> to_delete;
+    // Release all pointers in root_ and push them into the stack.
+    for (unsigned long i = 0; i < root_.entries_.size(); i++) {
+      auto entry = std::move(root_.entries_[i]); // This entry in trie will be nullptr now.
+      if (entry != nullptr) {
+        to_delete.push(
+            entry.release()); // Raw points will be inside the stack and will be deleted later.
+      }
+    }
+    // Now all unique_ptr in root_ are released and raw pointers are stored inside the stack.
+    // We will delete all of the raw pointers in below while loop.
+    // All raw pointers in to_delete will finally be deleted and popped out.
+    while (!to_delete.empty()) {
+      TrieEntry<Value>* current = to_delete.top();
+      to_delete.pop();
+      bool empty_entry = true;
+      // Push children into to_delete.
+      for (unsigned long i = 0; i < current->entries_.size(); i++) {
+        auto entry = std::move(current->entries_[i]);
+        if (entry != nullptr) {
+          empty_entry = false;
+          to_delete.push(entry.release());
+        }
+      }
+      // Now all the entries inside current node are released and pushed into the stack.
+      // We can safely delete it now.
+      delete current;
+    }
+  }
   /**
    * Adds an entry to the Trie at the given Key.
    * @param key the key used to add the entry.
