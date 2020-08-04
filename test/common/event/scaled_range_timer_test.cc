@@ -53,6 +53,9 @@ public:
               });
           return timer;
         });
+    ON_CALL(dispatcher_, approximateMonotonicTime).WillByDefault([&] {
+      return dispatcher_.timeSource().monotonicTime();
+    });
   }
 
   SimulatedTimeSystem simulated_time;

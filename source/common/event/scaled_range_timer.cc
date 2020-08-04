@@ -36,7 +36,7 @@ public:
       void operator()(const Inactive&) {}
       void operator()(const WaitingForMin&) { timer.pending_timer_->disableTimer(); }
       void operator()(const ScalingMax& active) {
-        timer.manager_.disableActiveTimer(active.duration, active.bucket_position);
+        timer.manager_.disableActiveTimer(active.scaling_duration, active.bucket_position);
       }
     };
     absl::visit(Dispatch(*this), state_);
@@ -46,7 +46,7 @@ public:
   void enableTimer(const std::chrono::milliseconds& min_ms, const std::chrono::milliseconds& max_ms,
                    const ScopeTrackedObject* scope) override {
     disableTimer();
-    const MonotonicTime now = manager_.dispatcher_.timeSource().monotonicTime();
+    const MonotonicTime now = manager_.dispatcher_.approximateMonotonicTime();
     const MonotonicTime latest_trigger = now + max_ms;
     scope_ = scope;
     ENVOY_LOG_MISC(trace, "enableTimer called on {} for ({}ms, {}ms)", static_cast<void*>(this),
@@ -83,14 +83,20 @@ private:
   struct WaitingForMin {
     WaitingForMin(MonotonicTime latest_trigger) : latest_trigger(latest_trigger) {}
 
+    // The latest time that this timer can legally be triggered (if there is no scaling).
     const MonotonicTime latest_trigger;
   };
 
   struct ScalingMax {
-    ScalingMax(MonotonicTime::duration duration,
+    ScalingMax(MonotonicTime::duration scaling_duration,
                ScaledRangeTimerManager::BucketEnabledList::iterator bucket_position)
-        : duration(duration), bucket_position(std::move(bucket_position)) {}
-    const MonotonicTime::duration duration;
+        : scaling_duration(scaling_duration), bucket_position(std::move(bucket_position)) {}
+
+    // The duration over which this timer is scaling.
+    const MonotonicTime::duration scaling_duration;
+
+    // An interator into the bucket in the manager that points to this timer's location. The
+    // iterator is valid while the timer is in the ScalingMax state.
     const ScaledRangeTimerManager::BucketEnabledList::iterator bucket_position;
   };
 
@@ -99,7 +105,7 @@ private:
     ASSERT(absl::holds_alternative<WaitingForMin>(state_));
     WaitingForMin& pending = absl::get<WaitingForMin>(state_);
 
-    const MonotonicTime now = manager_.dispatcher_.timeSource().monotonicTime();
+    const MonotonicTime now = manager_.dispatcher_.approximateMonotonicTime();
     auto it = manager_.add(*this, pending.latest_trigger - now);
     state_.emplace<ScalingMax>(pending.latest_trigger - now, it);
   }
@@ -148,7 +154,7 @@ void ScaledRangeTimerManager::Bucket::updateTimer(ScaledRangeTimerManager& manag
       auto& entry = scaled_timers.front();
       timer->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
           manager.scale_factor_.value() *
-          (entry.latest_trigger_time - manager.dispatcher_.timeSource().monotonicTime())));
+          (entry.latest_trigger_time - manager.dispatcher_.approximateMonotonicTime())));
     }
   }
 }
@@ -164,7 +170,7 @@ ScaledRangeTimerManager::add(RangeTimerImpl& timer, const MonotonicTime::duratio
   const auto quantized_duration = getBucketedDuration(max_duration);
 
   bucket.scaled_timers.emplace_back(timer,
-                                    quantized_duration + dispatcher_.timeSource().monotonicTime());
+                                    quantized_duration + dispatcher_.approximateMonotonicTime());
   bucket.updateTimer(*this, false);
   return --(bucket.scaled_timers.end());
 }
@@ -191,6 +197,10 @@ void ScaledRangeTimerManager::onBucketTimer(int bucket_index) {
 
 ScaledRangeTimerManager::Bucket&
 ScaledRangeTimerManager::getOrCreateBucket(MonotonicTime::duration max_duration) {
+  static_assert(
+      std::is_same<decltype(max_duration), std::remove_const_t<decltype(minimum_duration_)>>::value,
+      "max_duration and minimum_duration_ must be the same type for math on their "
+      ".count()s to be meaningful");
   const size_t index =
       max_duration <= minimum_duration_
           ? 0

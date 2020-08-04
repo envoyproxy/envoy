@@ -9,14 +9,26 @@
 namespace Envoy {
 namespace Event {
 
+/**
+ * Class for creating RangeTimer objects that can be adjusted towards either the minimum or maximum
+ * of their range by the owner of the manager object.
+ */
 class ScaledRangeTimerManager {
 public:
   ScaledRangeTimerManager(
       Dispatcher& dispatcher, float scale_factor,
       std::chrono::milliseconds minimum_duration = std::chrono::milliseconds(100));
 
+  /**
+   * Creates a new range timer backed by the manager. The returned timer will be subject to the
+   * current and future scale factor values set on the manager. All returned timers must be deleted
+   * before the manager.
+   */
   RangeTimerPtr createTimer(TimerCb callback);
 
+  /**
+   * Sets the scale factor for all timers created through this manager.
+   */
   void setScaleFactor(float scale_factor);
 
 protected:
@@ -61,7 +73,7 @@ private:
   void onBucketTimer(int index);
 
   Dispatcher& dispatcher_;
-  const std::chrono::milliseconds minimum_duration_;
+  const MonotonicTime::duration minimum_duration_;
 
   DurationScaleFactor scale_factor_;
   std::vector<Bucket> buckets_;
