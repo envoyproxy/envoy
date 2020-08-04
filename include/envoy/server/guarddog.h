@@ -1,10 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/common/time.h"
-#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/server/watchdog.h"
-#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Server {
