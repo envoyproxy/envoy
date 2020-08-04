@@ -81,6 +81,10 @@ public:
   ~TimeSystem() override = default;
 
   using Duration = MonotonicTime::duration;
+  using Nanoseconds = std::chrono::nanoseconds;
+  using Microseconds = std::chrono::microseconds;
+  using Milliseconds = std::chrono::milliseconds;
+  using Seconds = std::chrono::seconds;
 
   /**
    * Creates a timer factory. This indirection enables thread-local timer-queue management,

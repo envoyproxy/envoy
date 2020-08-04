@@ -1,3 +1,5 @@
+#include "envoy/event/timer.h"
+
 #include "extensions/filters/network/kafka/broker/filter.h"
 #include "extensions/filters/network/kafka/external/requests.h"
 
@@ -218,7 +220,7 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, ShouldRegisterRequest) {
 
   EXPECT_CALL(*request_metrics_, onRequest(api_key));
 
-  MonotonicTime time_point{MonotonicTime::duration(1234)};
+  MonotonicTime time_point{Event::TimeSystem::Milliseconds(1234)};
   EXPECT_CALL(time_source_, monotonicTime()).WillOnce(Return(time_point));
 
   // when
@@ -248,10 +250,10 @@ TEST_F(KafkaMetricsFacadeImplUnitTest, ShouldRegisterResponse) {
   const int32_t correlation_id = 1234;
   AbstractResponseSharedPtr response = std::make_shared<MockResponse>(api_key, correlation_id);
 
-  MonotonicTime request_time_point{MonotonicTime::duration(1234000000)};
+  MonotonicTime request_time_point{Event::TimeSystem::Milliseconds(1234)};
   testee_.getRequestArrivalsForTest()[correlation_id] = request_time_point;
 
-  MonotonicTime response_time_point{MonotonicTime::duration(2345000000)};
+  MonotonicTime response_time_point{Event::TimeSystem::Milliseconds(2345)};
 
   EXPECT_CALL(*response_metrics_, onResponse(api_key, 1111));
   EXPECT_CALL(time_source_, monotonicTime()).WillOnce(Return(response_time_point));

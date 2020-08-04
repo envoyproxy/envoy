@@ -26,6 +26,7 @@ envoy_extension_cc_test(
     srcs = ["filter_unit_test.cc"],
     extension_name = "envoy.filters.network.kafka_broker",
     deps = [
+        "//include/envoy/event:timer_interface",
         "//source/extensions/filters/network/kafka:kafka_broker_filter_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
