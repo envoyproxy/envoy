@@ -511,6 +511,26 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   }
 
+  // Endpoint health response nested layout assertions.
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
+            "anna");
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health_size(),
+            1);
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health(0)
+                .locality()
+                .sub_zone(),
+            "hobbiton");
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health(0)
+                .endpoints_health_size(),
+            2);
+
   checkCounters(1, 2, 1, 1);
 
   // Clean up connections
@@ -568,6 +588,37 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
                                        host2_upstream_->localAddress()))) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   }
+
+  // Endpoint health response nested layout assertions.
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
+            "anna");
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health_size(),
+            2);
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health(0)
+                .locality()
+                .sub_zone(),
+            "hobbiton");
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health(0)
+                .endpoints_health_size(),
+            1);
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health(1)
+                .locality()
+                .sub_zone(),
+            "emplisi");
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health(1)
+                .endpoints_health_size(),
+            1);
 
   checkCounters(1, 2, 1, 1);
 
@@ -637,6 +688,42 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
                                        host2_upstream_->localAddress()))) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   }
+
+  // Endpoint health response nested layout assertions.
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 2);
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
+            "anna");
+  ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health(1).cluster_name(), "cat");
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health_size(),
+            1);
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(1)
+                .locality_endpoints_health_size(),
+            1);
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health(0)
+                .locality()
+                .sub_zone(),
+            "hobbiton");
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(0)
+                .locality_endpoints_health(0)
+                .endpoints_health_size(),
+            1);
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(1)
+                .locality_endpoints_health(0)
+                .locality()
+                .sub_zone(),
+            "paris");
+  ASSERT_EQ(response_.endpoint_health_response()
+                .cluster_endpoints_health(1)
+                .locality_endpoints_health(0)
+                .endpoints_health_size(),
+            1);
 
   checkCounters(1, 2, 0, 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cat.health_check.success")->value());
