@@ -570,7 +570,7 @@ def tokenInLine(token, line):
     # the following check has been changed from index < 1 to index < 0 because 
     # this function incorrectly returns false when the token in question is the 
     # first one in a line. The following line returns false when the token is present:
-    #violating_symbol foo;
+    # (no leading whitespace) violating_symbol foo;
     if index < 0:
       break
     if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
