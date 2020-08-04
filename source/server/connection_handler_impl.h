@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <vector>
 
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
@@ -346,17 +345,9 @@ private:
   using SocketMetadataPair =
       std::pair<Network::ConnectionSocketPtr, const envoy::config::core::v3::Metadata>;
 
-  // auto list = list<pair<Network::ConnectionSocketPtr, const envoy::config::core::v3::Metadata>>;
-  // // write list
-  // list.push_back(make_pair(std::move(ptr), metadata));
-
-  // // read list
-  // for(auto& pair : list)
-  //   newConnection(std::move(pair.first), pair.second);
-
-  // map<filter_chain_message, map<listener_name, set<SocketMetadataPair>>>
+  // map<filter_chain_message, map<listener_name, list<SocketMetadataPair>>>
   absl::flat_hash_map<const envoy::config::listener::v3::FilterChain* const,
-                      absl::flat_hash_map<std::string, std::vector<SocketMetadataPair>>>
+                      absl::flat_hash_map<std::string, std::list<SocketMetadataPair>>>
       sockets_using_filter_chain_;
 };
 

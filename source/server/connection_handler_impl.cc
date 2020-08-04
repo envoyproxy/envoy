@@ -447,26 +447,17 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   // const auto filter_chain_impl = dynamic_cast<const Server::FilterChainImpl*>(filter_chain);
   bool is_fake_filter_chain = filter_chain->isFakeFilterChain();
-  // bool is_fake_filter_chain = filter_chain_impl->isFakeFilterChain();
   if (is_fake_filter_chain) {
     ENVOY_LOG(debug, "found a filter chain placeholder, start rebuilding request");
     const auto& worker_name = parent_.dispatcher_.name();
     const auto& listener_name = config_->name();
     ENVOY_LOG(debug, "info: worker_name: {}, listener_name: {}", worker_name, listener_name);
 
-    // const auto& filter_chain_message = filter_chain_impl->getFilterChainMessage();
     const auto& filter_chain_message = filter_chain->getFilterChainMessage();
 
     parent_.sockets_using_filter_chain_[filter_chain_message][listener_name].emplace_back(
         std::move(socket), dynamic_metadata);
 
-    // auto filter_chain_rebuild_info =
-    //     std::make_unique<FilterChainRebuildInfo>(worker_name, listener_name,
-    //     filter_chain_message);
-
-    // server_dispatcher.post([&listener, &filter_chain_message, &filter_chain_rebuild_info]() {
-    //   listener.buildRealFilterChains(filter_chain_message, std::move(filter_chain_rebuild_info));
-    // });
     auto& listener = dynamic_cast<ListenerImpl&>(*config_);
     auto& server_dispatcher = listener.dispatcher();
 
@@ -476,6 +467,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     // Waiting for later callbacks from master thread to retry this connection.
     return;
   }
+
   ENVOY_LOG(debug, "filter chain is not fake.");
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());

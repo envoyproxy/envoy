@@ -269,8 +269,9 @@ void FilterChainManagerImpl::addFakeFilterChain(
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
     auto filter_chain_impl = findExistingFilterChain(*filter_chain);
     if (filter_chain_impl == nullptr) {
-      // if the build option for this filter chain is build_on_demand, we build a fake placeholder
-      // for now. Otherwise, we build the filter chain directly.
+      // If the option for this filter chain is build_on_demand, we build a fake placeholder.
+      // Otherwise, we request dependencies and use factory builder to build the filter chain
+      // directly.
       // TODO(ASOPVII): add build option to filter chain config.
       bool build_on_demand = true; // filter_chain.build_option()
       if (build_on_demand) {
@@ -301,28 +302,13 @@ void FilterChainManagerImpl::addRealFilterChain(
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  ENVOY_LOG(debug, "Inside filter chain manager:: add real filter chain");
+  ENVOY_LOG(debug, "Inside FilterChainManagerImpl::addRealFilterChain");
 
   const auto& filter_chain_match = filter_chain->filter_chain_match();
   if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
     throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
                                      "unimplemented fields",
                                      address_->asString()));
-  }
-
-  // Validate IP addresses.
-  std::vector<std::string> destination_ips;
-  destination_ips.reserve(filter_chain_match.prefix_ranges().size());
-  for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
-    const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
-    destination_ips.push_back(cidr_range.asString());
-  }
-
-  std::vector<std::string> source_ips;
-  source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
-  for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
-    const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
-    source_ips.push_back(cidr_range.asString());
   }
 
   // Reject partial wildcards, we don't match on them.
@@ -343,7 +329,8 @@ void FilterChainManagerImpl::addRealFilterChain(
       filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
 
   ENVOY_LOG(debug, "placeholder->loadRealFilterChain");
-  // Call Ctor/Point of this placeholder to update its context.
+  
+  // TODO(ASOPVII): Call Ctor/Point of this placeholder to update its context.
   auto placeholder = std::move(fc_contexts_[*filter_chain]);
   placeholder->loadRealFilterChain(filter_chain_impl);
 }
