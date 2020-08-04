@@ -1428,10 +1428,11 @@ TEST_P(IntegrationTest, Response204WithBody) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
-  // Create a response with a body
+  // Create a response with a body. This will cause an upstream messaging error but downstream
+  // should still see a response.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "204"}}, false);
   upstream_request_->encodeData(512, true);
-  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect(true));
 
   response->waitForEndStream();
 
