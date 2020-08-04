@@ -30,10 +30,10 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
     }
     const uint32_t window = convertRateLimitUnit(status.current_limit().unit());
     // Constructing the quota-policy per RFC
-    // https://tools.ietf.org/id/draft-polli-ratelimit-headers-00.html#rfc.section.3.1
-    // Example of the result: `, 10;window=1;name="per-ip", 1000;window=3600`
+    // https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html#name-ratelimit-limit
+    // Example of the result: `, 10;w=1;name="per-ip", 1000;w=3600`
     if (window) {
-      // For each descriptor status append `<LIMIT>;window=<WINDOW_IN_SECONDS>`
+      // For each descriptor status append `<LIMIT>;w=<WINDOW_IN_SECONDS>`
       absl::SubstituteAndAppend(&quota_policy, ", $0;$1=$2",
                                 status.current_limit().requests_per_unit(),
                                 XRateLimitHeaders::get().QuotaPolicyKeys.Window, window);
@@ -53,7 +53,7 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
     result->addReferenceKey(XRateLimitHeaders::get().XRateLimitRemaining,
                             min_remaining_limit_status.value().limit_remaining());
     result->addReferenceKey(XRateLimitHeaders::get().XRateLimitReset,
-                            min_remaining_limit_status.value().duration_unitl_reset().seconds());
+                            min_remaining_limit_status.value().duration_until_reset().seconds());
   }
   descriptor_statuses = nullptr;
   return result;

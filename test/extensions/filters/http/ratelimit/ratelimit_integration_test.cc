@@ -379,7 +379,7 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
       response_.get()->headers(),
       Http::HeaderValueOf(
           Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitLimit,
-          "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""));
+          "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""));
   EXPECT_THAT(
       response_.get()->headers(),
       Http::HeaderValueOf(
@@ -415,7 +415,7 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
       response_.get()->headers(),
       Http::HeaderValueOf(
           Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitLimit,
-          "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""));
+          "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""));
   EXPECT_THAT(
       response_.get()->headers(),
       Http::HeaderValueOf(

@@ -31,7 +31,7 @@ public:
         // Empty descriptor statuses
         {{}, {}},
         // Status with no current limit is ignored
-        {{{"x-ratelimit-limit", "4, 4;window=3600;name=\"second\""},
+        {{{"x-ratelimit-limit", "4, 4;w=3600;name=\"second\""},
           {"x-ratelimit-remaining", "5"},
           {"x-ratelimit-reset", "6"}},
          {// passing 0 will cause it not to set a current limit
@@ -42,7 +42,7 @@ public:
                                 envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::HOUR,
                                 "second", 5, 6)}},
         // Empty name is not appended
-        {{{"x-ratelimit-limit", "1, 1;window=60"},
+        {{{"x-ratelimit-limit", "1, 1;w=60"},
           {"x-ratelimit-remaining", "2"},
           {"x-ratelimit-reset", "3"}},
          {
@@ -51,7 +51,7 @@ public:
                  1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE, "", 2, 3),
          }},
         // Unknown unit is ignored in window, but not overall
-        {{{"x-ratelimit-limit", "1, 4;window=3600;name=\"second\""},
+        {{{"x-ratelimit-limit", "1, 4;w=3600;name=\"second\""},
           {"x-ratelimit-remaining", "2"},
           {"x-ratelimit-reset", "3"}},
          {// passing 0 will cause it not to set a current limit
@@ -62,7 +62,7 @@ public:
                                 envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::HOUR,
                                 "second", 5, 6)}},
         // Normal case, multiple arguments
-        {{{"x-ratelimit-limit", "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""},
+        {{{"x-ratelimit-limit", "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""},
           {"x-ratelimit-remaining", "2"},
           {"x-ratelimit-reset", "3"}},
          {buildDescriptorStatus(1,

@@ -18,7 +18,7 @@ public:
   const Http::LowerCaseString XRateLimitReset{"x-ratelimit-reset"};
 
   struct {
-    const std::string Window{"window"};
+    const std::string Window{"w"};
     const std::string Name{"name"};
   } QuotaPolicyKeys;
 };

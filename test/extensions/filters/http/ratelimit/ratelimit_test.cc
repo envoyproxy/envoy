@@ -344,7 +344,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
                                std::move(descriptor_statuses_ptr), nullptr, nullptr);
 
   Http::TestResponseHeaderMapImpl expected_headers{
-      {"x-ratelimit-limit", "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""},
+      {"x-ratelimit-limit", "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""},
       {"x-ratelimit-remaining", "2"},
       {"x-ratelimit-reset", "3"}};
   Http::TestResponseHeaderMapImpl response_headers;
@@ -602,7 +602,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithFilterHeaders) {
   Http::TestResponseHeaderMapImpl expected_headers{
       {":status", "429"},
       {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True},
-      {"x-ratelimit-limit", "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""},
+      {"x-ratelimit-limit", "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""},
       {"x-ratelimit-remaining", "2"},
       {"x-ratelimit-reset", "3"}};
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
