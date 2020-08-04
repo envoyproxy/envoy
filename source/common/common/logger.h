@@ -227,8 +227,9 @@ enum class LoggerMode { Envoy, Fancy };
  * and logging will remain unlocked, the same state it is in prior to
  * instantiating a Context.
  *
- * Settings for Fancy Logger, a file level logger without explicit implementation,
- * are integrated here, as they should be updated when context switch occurs.
+ * Settings for Fancy Logger, a file level logger without explicit implementation of
+ * Envoy::Logger:Loggable, are integrated here, as they should be updated when
+ * context switch occurs.
  */
 class Context {
 public:
