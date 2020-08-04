@@ -82,7 +82,7 @@ message RateLimit {
   //   field.
   //
   // In case rate limiting policy specifies more then one time window, the values
-  // above represent the window that is closest to reaching it's limit.
+  // above represent the window that is closest to reaching its limit.
   //
   // For more information about the headers specification see the `draft RFC
   // <https://tools.ietf.org/id/draft-polli-ratelimit-headers-00.html>`_
