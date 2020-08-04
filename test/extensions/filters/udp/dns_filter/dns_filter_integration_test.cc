@@ -71,6 +71,7 @@ static_resources:
   getListener0(Network::Address::InstanceConstSharedPtr& addr) {
     auto config = fmt::format(R"EOF(
 name: listener_0
+reuse_port: true
 address:
   socket_address:
     address: {}
