@@ -32,43 +32,36 @@ DecompressorFilterConfig::DecompressorFilterConfig(
           proto_config.decompressor_library().name(), decompressor_factory->statsPrefix())),
       decompressor_stats_prefix_(stats_prefix_ + "decompressor_library"),
       decompressor_factory_(std::move(decompressor_factory)),
-      request_direction_config_(proto_config.request_direction_config(), stats_prefix_,
-                                trailers_prefix_, scope, runtime),
-      response_direction_config_(proto_config.response_direction_config(), stats_prefix_,
-                                 trailers_prefix_, scope, runtime) {}
+      request_direction_config_(proto_config.request_direction_config(), stats_prefix_, scope,
+                                runtime),
+      response_direction_config_(proto_config.response_direction_config(), stats_prefix_, scope,
+                                 runtime) {}
 
 DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::CommonDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, const std::string& trailers_prefix, Stats::Scope& scope,
-    Runtime::Loader& runtime)
-    : trailers_prefix_(trailers_prefix), stats_(generateStats(stats_prefix, scope)),
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    : stats_(generateStats(stats_prefix, scope)),
       decompression_enabled_(proto_config.enabled(), runtime) {}
 
 DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, const std::string& trailers_prefix, Stats::Scope& scope,
-    Runtime::Loader& runtime)
-    : DirectionConfig(proto_config.common_config(), stats_prefix + "request.", trailers_prefix,
-                      scope, runtime),
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    : DirectionConfig(proto_config.common_config(), stats_prefix + "request.", scope, runtime),
       advertise_accept_encoding_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, advertise_accept_encoding, true)) {}
 
 DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::ResponseDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, const std::string& trailers_prefix, Stats::Scope& scope,
-    Runtime::Loader& runtime)
-    : DirectionConfig(proto_config.common_config(), stats_prefix + "response.", trailers_prefix,
-                      scope, runtime) {}
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    : DirectionConfig(proto_config.common_config(), stats_prefix + "response.", scope, runtime) {}
 
 DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
     : config_(std::move(config)),
-      request_byte_tracker_(config_->requestDirectionConfig().trailersStrings()[0],
-                            config_->requestDirectionConfig().trailersStrings()[1]),
-      response_byte_tracker_(config_->responseDirectionConfig().trailersStrings()[0],
-                             config_->responseDirectionConfig().trailersStrings()[1]) {}
+      request_byte_tracker_(config_->trailersStrings()[0], config_->trailersStrings()[1]),
+      response_byte_tracker_(config_->trailersStrings()[0], config_->trailersStrings()[1]) {}
 
 Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                             bool end_stream) {

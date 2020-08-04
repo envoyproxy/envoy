@@ -41,18 +41,11 @@ public:
   public:
     DirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                         CommonDirectionConfig& proto_config,
-                    const std::string& stats_prefix, const std::string& trailers_prefix,
-                    Stats::Scope& scope, Runtime::Loader& runtime);
+                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
     virtual ~DirectionConfig() = default;
 
     virtual const std::string& logString() const PURE;
-    const std::vector<Http::LowerCaseString>& trailersStrings() const {
-      CONSTRUCT_ON_FIRST_USE(
-          std::vector<Http::LowerCaseString>,
-          {Http::LowerCaseString(fmt::format("{}-compressed-bytes", trailers_prefix_)),
-           Http::LowerCaseString(fmt::format("{}-uncompressed-bytes", trailers_prefix_))});
-    }
     const DecompressorStats& stats() const { return stats_; }
     bool decompressionEnabled() const { return decompression_enabled_.enabled(); }
 
@@ -61,7 +54,6 @@ public:
       return DecompressorStats{ALL_DECOMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
     }
 
-    const std::string& trailers_prefix_;
     const DecompressorStats stats_;
     const Runtime::FeatureFlag decompression_enabled_;
   };
@@ -70,8 +62,8 @@ public:
   public:
     RequestDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                                RequestDirectionConfig& proto_config,
-                           const std::string& stats_prefix, const std::string& trailers_prefix,
-                           Stats::Scope& scope, Runtime::Loader& runtime);
+                           const std::string& stats_prefix, Stats::Scope& scope,
+                           Runtime::Loader& runtime);
 
     // DirectionConfig
     const std::string& logString() const override {
@@ -88,8 +80,8 @@ public:
   public:
     ResponseDirectionConfig(const envoy::extensions::filters::http::decompressor::v3::Decompressor::
                                 ResponseDirectionConfig& proto_config,
-                            const std::string& stats_prefix, const std::string& trailers_prefix,
-                            Stats::Scope& scope, Runtime::Loader& runtime);
+                            const std::string& stats_prefix, Stats::Scope& scope,
+                            Runtime::Loader& runtime);
 
     // DirectionConfig
     const std::string& logString() const override {
@@ -108,6 +100,14 @@ public:
   const std::string& contentEncoding() { return decompressor_factory_->contentEncoding(); }
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
   const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
+  // TODO: replace std::vector for std::pair. For some reason the macro is failing to build with a
+  // multivariate templated type.
+  const std::vector<Http::LowerCaseString>& trailersStrings() const {
+    CONSTRUCT_ON_FIRST_USE(
+        std::vector<Http::LowerCaseString>,
+        {Http::LowerCaseString(fmt::format("{}-compressed-bytes", trailers_prefix_)),
+         Http::LowerCaseString(fmt::format("{}-uncompressed-bytes", trailers_prefix_))});
+  }
 
 private:
   const std::string stats_prefix_;
