@@ -486,9 +486,34 @@ protected:
 
   bool activateTimersNextEventLoop() { return GetParam(); }
 
+  void SetUp() override {
+    // Update time cache to provide a stable time reference for timer registration.
+    event_base_update_cache_time(&libevent_base_);
+  }
+
+  // Advance time forward while updating the libevent's time cache and monotonic time reference.
+  // Pushing the monotonic time reference forward eliminates the possibility of time moving
+  // backwards and breaking the overly picky TimerImpl tests below.
+  void advanceLibeventTime(absl::Duration duration) {
+    timeval start_tv;
+    {
+      int ret = event_base_gettimeofday_cached(&libevent_base_, &start_tv);
+      RELEASE_ASSERT(ret == 0, "event_base_gettimeofday_cached failed");
+    }
+
+    timeval now_tv;
+    do {
+      absl::SleepFor(duration);
+      event_base_update_cache_time(&libevent_base_);
+      int ret = event_base_gettimeofday_cached(&libevent_base_, &now_tv);
+      RELEASE_ASSERT(ret == 0, "event_base_gettimeofday_cached failed");
+    } while (duration > absl::DurationFromTimeval(now_tv) - absl::DurationFromTimeval(start_tv));
+  }
+
   TestScopedRuntime scoped_runtime_;
   Api::ApiPtr api_{Api::createApiForTest()};
   DispatcherPtr dispatcher_{api_->allocateDispatcher("test_thread")};
+  event_base& libevent_base_{static_cast<DispatcherImpl&>(*dispatcher_).base()};
   ReadyWatcher prepare_watcher_;
 };
 
@@ -512,10 +537,6 @@ TEST_P(TimerImplTest, TimerEnabledDisabled) {
 }
 
 TEST_P(TimerImplTest, ChangeTimerBackwardsBeforeRun) {
-  Event::TimerPtr timer = dispatcher_->createTimer([] {});
-  EXPECT_FALSE(timer->enabled());
-  timer->enableTimer(std::chrono::milliseconds(0));
-
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -544,10 +565,6 @@ TEST_P(TimerImplTest, ChangeTimerBackwardsBeforeRun) {
 }
 
 TEST_P(TimerImplTest, ChangeTimerForwardsToZeroBeforeRun) {
-  Event::TimerPtr timer = dispatcher_->createTimer([] {});
-  EXPECT_FALSE(timer->enabled());
-  timer->enableTimer(std::chrono::milliseconds(0));
-
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -576,10 +593,6 @@ TEST_P(TimerImplTest, ChangeTimerForwardsToZeroBeforeRun) {
 }
 
 TEST_P(TimerImplTest, ChangeTimerForwardsToNonZeroBeforeRun) {
-  Event::TimerPtr timer = dispatcher_->createTimer([] {});
-  EXPECT_FALSE(timer->enabled());
-  timer->enableTimer(std::chrono::milliseconds(0));
-
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -602,10 +615,6 @@ TEST_P(TimerImplTest, ChangeTimerForwardsToNonZeroBeforeRun) {
 }
 
 TEST_P(TimerImplTest, ChangeLargeTimerForwardToZeroBeforeRun) {
-  Event::TimerPtr timer = dispatcher_->createTimer([] {});
-  EXPECT_FALSE(timer->enabled());
-  timer->enableTimer(std::chrono::milliseconds(0));
-
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -625,10 +634,6 @@ TEST_P(TimerImplTest, ChangeLargeTimerForwardToZeroBeforeRun) {
 }
 
 TEST_P(TimerImplTest, ChangeLargeTimerForwardToNonZeroBeforeRun) {
-  Event::TimerPtr timer = dispatcher_->createTimer([] {});
-  EXPECT_FALSE(timer->enabled());
-  timer->enableTimer(std::chrono::milliseconds(0));
-
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -665,8 +670,8 @@ TEST_P(TimerImplTest, TimerOrdering) {
   timer2->enableTimer(std::chrono::milliseconds(1));
   timer3->enableTimer(std::chrono::milliseconds(2));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -699,8 +704,8 @@ TEST_P(TimerImplTest, TimerOrderAndDisableAlarm) {
   timer2->enableTimer(std::chrono::milliseconds(1));
   timer3->enableTimer(std::chrono::milliseconds(2));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -740,8 +745,8 @@ TEST_P(TimerImplTest, TimerOrderDisableAndReschedule) {
   timer3->enableTimer(std::chrono::milliseconds(2));
   timer4->enableTimer(std::chrono::milliseconds(3));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -758,8 +763,8 @@ TEST_P(TimerImplTest, TimerOrderDisableAndReschedule) {
     // Sleep during prepare to ensure that enough time has elapsed before timer evaluation to ensure
     // that timers 2 and 3 are picked up by the same loop iteration. Without the sleep the two
     // timers could execute in different loop iterations.
-    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([]() {
-      absl::SleepFor(absl::Milliseconds(5));
+    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
+      advanceLibeventTime(absl::Milliseconds(5));
     }));
     EXPECT_CALL(watcher2, ready());
     EXPECT_CALL(watcher3, ready());
@@ -767,8 +772,8 @@ TEST_P(TimerImplTest, TimerOrderDisableAndReschedule) {
     EXPECT_CALL(watcher4, ready());
     EXPECT_CALL(watcher2, ready());
     // Sleep in prepare cb to avoid flakiness if epoll_wait returns before the timer timeout.
-    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([]() {
-      absl::SleepFor(absl::Milliseconds(5));
+    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
+      advanceLibeventTime(absl::Milliseconds(5));
     }));
     EXPECT_CALL(watcher3, ready());
   }
@@ -799,8 +804,8 @@ TEST_P(TimerImplTest, TimerOrderAndReschedule) {
   timer3->enableTimer(std::chrono::milliseconds(2));
   timer4->enableTimer(std::chrono::milliseconds(3));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -818,8 +823,8 @@ TEST_P(TimerImplTest, TimerOrderAndReschedule) {
     // Sleep during prepare to ensure that enough time has elapsed before timer evaluation to ensure
     // that timers 2 and 3 are picked up by the same loop iteration. Without the sleep the two
     // timers could execute in different loop iterations.
-    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([]() {
-      absl::SleepFor(absl::Milliseconds(5));
+    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
+      advanceLibeventTime(absl::Milliseconds(5));
     }));
     EXPECT_CALL(watcher2, ready());
     EXPECT_CALL(watcher3, ready());
@@ -827,8 +832,8 @@ TEST_P(TimerImplTest, TimerOrderAndReschedule) {
     EXPECT_CALL(watcher2, ready());
     EXPECT_CALL(watcher4, ready());
     // Sleep in prepare cb to avoid flakiness if epoll_wait returns before the timer timeout.
-    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([]() {
-      absl::SleepFor(absl::Milliseconds(5));
+    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
+      advanceLibeventTime(absl::Milliseconds(5));
     }));
     EXPECT_CALL(watcher3, ready());
   }
