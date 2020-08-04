@@ -4,6 +4,7 @@
 
 #include "common/event/scaled_range_timer.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 

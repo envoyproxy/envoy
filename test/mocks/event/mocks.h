@@ -9,6 +9,8 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/timer.h"
+#include "envoy/event/range_timer.h"
 #include "envoy/event/signal.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"

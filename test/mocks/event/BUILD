@@ -17,6 +17,7 @@ envoy_cc_mock(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/event:signal_interface",
+        "//include/envoy/event:range_timer_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_handler_interface",
         "//include/envoy/network:connection_interface",

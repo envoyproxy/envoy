@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/range_timer.h"
 #include "envoy/event/timer.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -18,21 +20,21 @@ public:
   void setScaleFactor(float scale_factor);
 
 protected:
-  class ScaledRangeTimer;
+  class RangeTimerImpl;
 
   struct BucketedEnabledTimer {
-    BucketedEnabledTimer(ScaledRangeTimer& timer, MonotonicTime latest_trigger_time)
+    BucketedEnabledTimer(RangeTimerImpl& timer, MonotonicTime latest_trigger_time)
         : timer(timer), latest_trigger_time(latest_trigger_time) {}
-    ScaledRangeTimer& timer;
+    RangeTimerImpl& timer;
     MonotonicTime latest_trigger_time;
   };
 
   using BucketEnabledList = std::list<BucketedEnabledTimer>;
 
-  void enqueuePendingTimer(ScaledRangeTimer& timer);
-  void disablePendingTimer(ScaledRangeTimer& timer);
+  void enqueuePendingTimer(RangeTimerImpl& timer);
+  void disablePendingTimer(RangeTimerImpl& timer);
 
-  BucketEnabledList::iterator add(ScaledRangeTimer& timer, MonotonicTime::duration max_duration);
+  BucketEnabledList::iterator add(RangeTimerImpl& timer, MonotonicTime::duration max_duration);
   void disableActiveTimer(MonotonicTime::duration max_duration,
                           const BucketEnabledList::iterator& bucket_position);
 
@@ -55,7 +57,7 @@ private:
   static constexpr int kBucketScaleFactor = 2;
   static MonotonicTime::duration getBucketedDuration(MonotonicTime::duration duration);
 
-  Bucket& getBucket(MonotonicTime::duration max_duration);
+  Bucket& getOrCreateBucket(MonotonicTime::duration max_duration);
   void onBucketTimer(int index);
 
   Dispatcher& dispatcher_;
