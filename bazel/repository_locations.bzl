@@ -67,10 +67,10 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["build"],
     ),
     envoy_build_tools = dict(
-        sha256 = "88e58fdb42021e64a0b35ae3554a82e92f5c37f630a4dab08a132fc77f8db4b7",
-        strip_prefix = "envoy-build-tools-1d6573e60207efaae6436b25ecc594360294f63a",
-        # 2020-07-18
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/1d6573e60207efaae6436b25ecc594360294f63a.tar.gz"],
+        sha256 = "9c014ba5054455c270fc490c86e0213ca0b8cb98cfd888c78135ad0c0a69f36d",
+        strip_prefix = "envoy-build-tools-3324f56f51c0e91a72b353f1decae6a721f5a02d",
+        # WIP(mrostecki): Switch to upstream repo as soon as the PR is merged.
+        urls = ["https://github.com/mrostecki/envoy-build-tools/archive/3324f56f51c0e91a72b353f1decae6a721f5a02d.tar.gz"],
         use_category = ["build"],
     ),
     boringssl = dict(

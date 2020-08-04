@@ -258,6 +258,16 @@ Or use our configuration with Remote Execution or Docker sandbox, pass `--config
 
 If you want to make libc++ as default, add a line `build --config=libc++` to the `user.bazelrc` file in Envoy source root.
 
+## Cross-compilation for aarch64
+
+To build Envoy for aarch64 target on x86_64:
+```
+bazel build \
+    --crosstool_top=@envoy_build_tools//toolchains/configs/linux/gcc/bazel_3.4.1/cc:toolchain \
+    --cpu=aarch64-cross \
+    //source/exe:envoy-static
+```
+
 ## Using a compiler toolchain in a non-standard location
 
 By setting the `CC` and `LD_LIBRARY_PATH` in the environment that Bazel executes from as

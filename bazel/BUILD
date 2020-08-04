@@ -270,6 +270,11 @@ config_setting(
 )
 
 config_setting(
+    name = "linux_aarch64_cross",
+    values = {"cpu": "aarch64-cross"},
+)
+
+config_setting(
     name = "linux_ppc",
     values = {"cpu": "ppc"},
 )

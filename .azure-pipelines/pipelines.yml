@@ -76,6 +76,8 @@ jobs:
       matrix:
         gcc:
           CI_TARGET: "bazel.gcc"
+        gcc_cross_aarch64:
+          CI_TARGET: "bazel.gcc.cross_aarch64"
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
         asan:

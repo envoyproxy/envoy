@@ -116,9 +116,11 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.sizeopt` &mdash; build Envoy static binary and run tests under `-c opt --config=sizeopt` with clang.
 * `bazel.sizeopt <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c opt --config=sizeopt` with clang.
 * `bazel.sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
-* `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
+* `bazel.gcc` &mdash; build Envoy static binary and run tests under `-c opt` with gcc.
+* `bazel.gcc.cross_aarch64` &mdash; cross-build Envoy static binary for aarch64 target with gcc.
+* `bazel.coverage` &mdash; build and run tests under `-c dbg` with clang, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
-* `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
+* `bazel.coverity` &mdash; build Envoy static binary with gcc and run Coverity Scan static analysis.
 * `bazel.msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
 * `bazel.msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
