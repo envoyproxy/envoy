@@ -3,6 +3,9 @@
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 
+using testing::_;
+using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -41,6 +44,24 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
         write_filter_ = filter;
       }));
   factory_context_.prepareSimulatedSystemTime();
+  // Set featureEnabled for mongo_proxy
+  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
+      .WillByDefault(Return(true));
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("mongo.connection_logging_enabled", 100))
+      .WillByDefault(Return(true));
+  ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("mongo.logging_enabled", 100))
+      .WillByDefault(Return(true));
+  // Set featureEnabled for thrift_proxy
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("ratelimit.thrift_filter_enabled", 100))
+      .WillByDefault(Return(true));
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("ratelimit.thrift_filter_enforcing", 100))
+      .WillByDefault(Return(true));
+  ON_CALL(factory_context_.runtime_loader_.snapshot_,
+          featureEnabled("ratelimit.test_key.thrift_filter_enabled", 100))
+      .WillByDefault(Return(true));
 }
 
 UberWriteFilterFuzzer::UberWriteFilterFuzzer()

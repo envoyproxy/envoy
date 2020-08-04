@@ -15,8 +15,9 @@ std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
         NetworkFilterNames::get().ZooKeeperProxy, NetworkFilterNames::get().KafkaBroker,
-        NetworkFilterNames::get().MongoProxy, NetworkFilterNames::get().MySQLProxy,
-        // TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after its issues are fixed.
+        NetworkFilterNames::get().MongoProxy, NetworkFilterNames::get().MySQLProxy
+        // TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after it supports untrusted
+        // data.
     };
     for (auto& filter_name : supported_filter_names) {
       if (factories.contains(filter_name)) {
