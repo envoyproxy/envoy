@@ -149,10 +149,8 @@ private:
       total_uncompressed_bytes_ += uncompressed_bytes;
     }
     void reportTotalBytes(Http::HeaderMap& trailers) const {
-      ENVOY_LOG_MISC(error, "reporting {} {}", compressed_bytes_trailer_.get(),
-                     uncompressed_bytes_trailer_.get());
-      trailers.addCopy(compressed_bytes_trailer_, total_compressed_bytes_);
-      trailers.addCopy(uncompressed_bytes_trailer_, total_uncompressed_bytes_);
+      trailers.addReferenceKey(compressed_bytes_trailer_, total_compressed_bytes_);
+      trailers.addReferenceKey(uncompressed_bytes_trailer_, total_uncompressed_bytes_);
     }
 
   private:

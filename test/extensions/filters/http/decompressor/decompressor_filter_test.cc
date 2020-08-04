@@ -76,16 +76,16 @@ decompressor_library:
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, end_stream));
 
       if (end_stream && expect_decompression) {
-        EXPECT_EQ("30", trailers
-                            .get(Http::LowerCaseString(
-                                "x-envoy-decompressor-testlib-mock-compressed-bytes"))
-                            ->value()
-                            .getStringView());
-        EXPECT_EQ("60", trailers
-                            .get(Http::LowerCaseString(
-                                "x-envoy-decompressor-testlib-mock-uncompressed-bytes"))
-                            ->value()
-                            .getStringView());
+        EXPECT_EQ(
+            "30",
+            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                ->value()
+                .getStringView());
+        EXPECT_EQ(
+            "60",
+            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
+                ->value()
+                .getStringView());
       }
     } else {
       Http::TestResponseTrailerMapImpl trailers;
@@ -96,16 +96,16 @@ decompressor_library:
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, end_stream));
 
       if (end_stream && expect_decompression) {
-        EXPECT_EQ("30", trailers
-                            .get(Http::LowerCaseString(
-                                "x-envoy-decompressor-testlib-mock-compressed-bytes"))
-                            ->value()
-                            .getStringView());
-        EXPECT_EQ("60", trailers
-                            .get(Http::LowerCaseString(
-                                "x-envoy-decompressor-testlib-mock-uncompressed-bytes"))
-                            ->value()
-                            .getStringView());
+        EXPECT_EQ(
+            "30",
+            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
+                ->value()
+                .getStringView());
+        EXPECT_EQ(
+            "60",
+            trailers.get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
+                ->value()
+                .getStringView());
       }
     }
   }
