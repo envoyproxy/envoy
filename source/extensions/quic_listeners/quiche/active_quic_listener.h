@@ -47,7 +47,7 @@ public:
   void onReceiveError(Api::IoError::IoErrorCode /*error_code*/) override {
     // No-op. Quic can't do anything upon listener error.
   }
-  Network::UdpPacketWriter* udpPacketWriter() override { return udp_packet_writer_.get(); }
+  Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }

@@ -142,7 +142,7 @@ public:
   MOCK_METHOD(void, onReadReady, ());
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
-  MOCK_METHOD(Network::UdpPacketWriter*, udpPacketWriter, ());
+  MOCK_METHOD(Network::UdpPacketWriter&, udpPacketWriter, ());
 };
 
 class MockDrainDecision : public DrainDecision {

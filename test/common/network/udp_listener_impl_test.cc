@@ -60,7 +60,8 @@ public:
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
     udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
-    ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(Return(udp_packet_writer_.get()));
+    ON_CALL(listener_callbacks_, udpPacketWriter())
+        .WillByDefault(testing::ReturnRef(*udp_packet_writer_));
   }
 
   NiceMock<MockSupportsUdpGro> udp_gro_syscall_;

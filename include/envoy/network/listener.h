@@ -267,7 +267,7 @@ public:
    * UdpListenerCallback
    *
    */
-  virtual UdpPacketWriter* udpPacketWriter() PURE;
+  virtual UdpPacketWriter& udpPacketWriter() PURE;
 };
 
 /**

@@ -111,7 +111,7 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   Buffer::Instance& buffer = send_data.buffer_;
 
   Api::IoCallUint64Result send_result =
-      cb_.udpPacketWriter()->writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
+      cb_.udpPacketWriter().writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
 
   // The send_result normalizes the rc_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.
