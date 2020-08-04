@@ -18,7 +18,7 @@ namespace Configuration {
 
 struct GuardDogActionFactoryContext {
   Api::Api& api_;
-  Event::Dispatcher& dispatcher_; // not owned (this is the guarddog's dispatcher)
+  Event::Dispatcher& dispatcher_; // not owned (this is the guard dog's dispatcher)
 };
 
 class GuardDogAction {

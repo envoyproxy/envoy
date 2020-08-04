@@ -55,7 +55,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       events_to_actions_([&](const Server::Configuration::Main& config) -> EventToActionsMap {
         EventToActionsMap map;
 
-        // We should be able to share the dispatcher since guarddog's lifetime
+        // We should be able to share the dispatcher since guard dog's lifetime
         // should eclipse those of actions.
         Configuration::GuardDogActionFactoryContext context = {api, *dispatcher_};
 
