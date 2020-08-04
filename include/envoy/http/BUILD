@@ -90,6 +90,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     deps = [
         ":header_map_interface",
+        "//include/envoy/stream_info:filter_state_interface",
         "//include/envoy/network:address_interface",
     ],
 )

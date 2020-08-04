@@ -69,7 +69,7 @@ if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
     -clang-tidy-binary=${CLANG_TIDY} \
     -clang-apply-replacements-binary=${CLANG_APPLY_REPLACEMENTS} \
     -export-fixes=${FIX_YAML} \
-    -j ${NUM_CPUS:-0} -p 1 -quiet \
+    -j ${NUM_CPUS:-0} -p . -quiet \
     ${APPLY_CLANG_TIDY_FIXES:+-fix}
 elif [[ -n "${DIFF_REF}" ]]; then
   echo "Running clang-tidy-diff against ref ${DIFF_REF}"
