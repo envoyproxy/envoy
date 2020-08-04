@@ -65,6 +65,8 @@ protected:
       retry_timer_cb_ = timer_cb;
       return retry_timer_;
     }));
+    // First call will set up the response timer for assertions, all other future calls
+    // just return a new timer that we won't keep track of.
     EXPECT_CALL(dispatcher_, createTimer_(_))
         .Times(AtLeast(1))
         .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
@@ -72,6 +74,7 @@ protected:
           return server_response_timer_;
         }))
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
+
     hds_delegate_ = std::make_unique<HdsDelegate>(
         stats_store_, Grpc::RawAsyncClientPtr(async_client_),
         envoy::config::core::v3::ApiVersion::AUTO, dispatcher_, runtime_, stats_store_,
@@ -98,9 +101,12 @@ protected:
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
     auto* locality_endpoints = health_check->add_locality_endpoints();
+    // add locality information to this endpoint set of one endpoint.
     locality_endpoints->mutable_locality()->set_region("middle_earth");
     locality_endpoints->mutable_locality()->set_zone("shire");
     locality_endpoints->mutable_locality()->set_sub_zone("hobbiton");
+
+    // add one endpoint to this locality grouping.
     auto* socket_address =
         locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
     socket_address->set_address("127.0.0.0");
@@ -113,8 +119,11 @@ protected:
   // with only one health check type.
   envoy::service::health::v3::HealthCheckSpecifier*
   createComplexSpecifier(const int& n_clusters, const int& n_localities, const int& n_endpoints) {
+    // Final specifier to return.
     envoy::service::health::v3::HealthCheckSpecifier* msg =
         new envoy::service::health::v3::HealthCheckSpecifier;
+
+    // set interval.
     msg->mutable_interval()->set_seconds(1);
 
     for (int cluster_num = 0; cluster_num < n_clusters; cluster_num++) {
@@ -130,14 +139,14 @@ protected:
           envoy::type::v3::HTTP1);
       health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
-      // add some locality groupings
+      // add some locality groupings with iterative names for verification.
       for (int loc_num = 0; loc_num < n_localities; loc_num++) {
         auto* locality_endpoints = health_check->add_locality_endpoints();
         locality_endpoints->mutable_locality()->set_region("region" + std::to_string(cluster_num));
         locality_endpoints->mutable_locality()->set_zone("zone" + std::to_string(loc_num));
         locality_endpoints->mutable_locality()->set_sub_zone("subzone" + std::to_string(loc_num));
 
-        // add some endpoints to the locality group
+        // add some endpoints to the locality group with iterative naming for verification.
         for (int endpoint_num = 0; endpoint_num < n_endpoints; endpoint_num++) {
           auto* socket_address =
               locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
@@ -362,39 +371,50 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
 // Test if processMessage exits gracefully upon receiving a malformed message
 // There was a previous valid config, so we go back to that.
 TEST_F(HdsTest, TestSendResponseByCluster) {
-  const int N_CLUSTERS = 2;
-  const int N_LOCALITIES = 2;
-  const int N_ENDPOINTS = 2;
+  // number of clusters, localities by cluster, and endpoints by locality
+  // to build and verify off of.
+  const int NumClusters = 2;
+  const int NumLocalities = 2;
+  const int NumEndpoints = 2;
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
   // Create Message
-  message.reset(createComplexSpecifier(N_CLUSTERS, N_LOCALITIES, N_ENDPOINTS));
+  message.reset(createComplexSpecifier(NumClusters, NumLocalities, NumEndpoints));
 
-  // Create a new active connection on request.
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
       .WillRepeatedly(Invoke(
           [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
              Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
             Network::MockClientConnection* connection =
                 new NiceMock<Network::MockClientConnection>();
+
+            // pretend our endpoint was connected to.
             connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+            // return this new, connected endpoint.
             return connection;
           }));
+
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+
   // Carry over cluster name on a call to createClusterInfo,
   // in the same way that the prod factory does.
   EXPECT_CALL(test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([](const ClusterInfoFactory::CreateClusterInfoParams& params) {
         std::shared_ptr<Upstream::MockClusterInfo> cluster_info{
             new NiceMock<Upstream::MockClusterInfo>()};
+        // copy name for use in sendResponse() in HdsCluster
+
         cluster_info->name_ = params.cluster_.name();
         return cluster_info;
       }));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(N_CLUSTERS * N_LOCALITIES * N_ENDPOINTS);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(NumClusters * NumLocalities * NumEndpoints);
 
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
@@ -402,18 +422,18 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
   // read response and verify fields
   auto response = hds_delegate_->sendResponse().endpoint_health_response();
 
-  EXPECT_EQ(response.cluster_endpoints_health_size(), N_CLUSTERS);
+  EXPECT_EQ(response.cluster_endpoints_health_size(), NumClusters);
 
-  for (int i = 0; i < N_CLUSTERS; i++) {
+  for (int i = 0; i < NumClusters; i++) {
     auto& cluster = response.cluster_endpoints_health(i);
 
     // Expect the correct cluster name by index
     EXPECT_EQ(cluster.cluster_name(), "anna" + std::to_string(i));
 
     // Every cluster should have two locality groupings
-    EXPECT_EQ(cluster.locality_endpoints_health_size(), N_LOCALITIES);
+    EXPECT_EQ(cluster.locality_endpoints_health_size(), NumLocalities);
 
-    for (int j = 0; j < N_LOCALITIES; j++) {
+    for (int j = 0; j < NumLocalities; j++) {
       // Every locality should have a number based on its index
       auto& loc_group = cluster.locality_endpoints_health(j);
       EXPECT_EQ(loc_group.locality().region(), "region" + std::to_string(i));
@@ -421,9 +441,9 @@ TEST_F(HdsTest, TestSendResponseByCluster) {
       EXPECT_EQ(loc_group.locality().sub_zone(), "subzone" + std::to_string(j));
 
       // Every locality should have two endpoints.
-      EXPECT_EQ(loc_group.endpoints_health_size(), N_ENDPOINTS);
+      EXPECT_EQ(loc_group.endpoints_health_size(), NumEndpoints);
 
-      for (int k = 0; k < N_ENDPOINTS; k++) {
+      for (int k = 0; k < NumEndpoints; k++) {
 
         // every endpoint's address is based on all 3 index values.
         auto& endpoint_health = loc_group.endpoints_health(k);

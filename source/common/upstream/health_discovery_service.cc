@@ -281,8 +281,11 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
+  // iterate over every endpoint in every cluster.
   for (const auto& locality_endpoints : cluster_.load_assignment().endpoints()) {
     for (const auto& host : locality_endpoints.lb_endpoints()) {
+      // for every endpoint, add to a flat list without structure by locality, but keeping
+      // locality internally as a member variable of the host/endpoint.
       initial_hosts_->emplace_back(new HostImpl(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
           locality_endpoints.locality(),
