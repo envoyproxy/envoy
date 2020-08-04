@@ -136,13 +136,14 @@ void ThreadAwareLoadBalancerBase::refresh() {
     per_priority_state->global_panic_ = per_priority_panic_[priority];
 
     // Normalize host and locality weights such that the sum of all normalized weights is 1.
-    std::shared_ptr<NormalizedHostWeightVector> normalized_host_weights = std::make_shared<NormalizedHostWeightVector>();
+    std::shared_ptr<NormalizedHostWeightVector> normalized_host_weights =
+        std::make_shared<NormalizedHostWeightVector>();
     double min_normalized_weight = 1.0;
     double max_normalized_weight = 0.0;
     normalizeWeights(*host_set, per_priority_state->global_panic_, *normalized_host_weights,
                      min_normalized_weight, max_normalized_weight);
-    per_priority_state->current_lb_ =
-        createLoadBalancer(normalized_host_weights, min_normalized_weight, max_normalized_weight, hash_balance_factor);
+    per_priority_state->current_lb_ = createLoadBalancer(
+        normalized_host_weights, min_normalized_weight, max_normalized_weight, hash_balance_factor);
   }
 
   {
@@ -178,7 +179,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   }
 
   HostConstSharedPtr host;
-  const uint32_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
+  uint32_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (uint32_t i = 0; i < max_attempts; ++i) {
     host = per_priority_state->current_lb_->chooseHost(h, i);
 
@@ -204,79 +205,100 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   return lb;
 }
 
+bool ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::isHostOverloaded(
+    HostConstSharedPtr host, double weight) const {
 
-HostConstSharedPtr
-ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t hash, uint32_t attempt) const {
+  if (is_host_overloaded_ != nullptr) {
+    // this is only used while testing.
+    return is_host_overloaded_(host, weight);
+  }
+  /*
+  Consistent Hashing with Bounded Load
+  Ref: https://arxiv.org/abs/1608.01350
+  */
+  uint32_t overall_active = host->cluster().stats().upstream_rq_active_.value();
+  uint32_t host_active = host->stats().rq_active_.value();
 
-    auto is_host_overloaded = [this](HostConstSharedPtr host, double weight) {
-      /*
-        Consistent Hashing with Bounded Load
-        Ref: https://arxiv.org/abs/1608.01350
-      */
-      uint32_t overall_active = host->cluster().stats().upstream_rq_active_.value();
-      uint32_t host_active = host->stats().rq_active_.value();
+  uint32_t total_slots = ((overall_active + 1) * hash_balance_factor + 99) / 100;
+  uint32_t slots =
+      std::max(static_cast<uint32_t>(std::ceil(total_slots * weight)), static_cast<uint32_t>(1));
 
-      uint32_t total_slots = ((overall_active + 1) * hash_balance_factor + 99) / 100;
-      uint32_t slots = std::max(static_cast<uint32_t>(std::ceil(total_slots * weight)), static_cast<uint32_t>(1));
-
-      if (host->stats().rq_active_.value() > slots) {
-         ENVOY_LOG_MISC(debug, "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
-                               "host {} overloaded; overall_active {}, host_weight {}, host_active {} > slots {}",
-                               host->address()->asString(), overall_active, weight, host_active, slots);
-         return true;
-      }
-      return false;
-    };
-
-    HostConstSharedPtr host = hlb_ptr->chooseHost(hash, attempt);
-    const double weight = normalized_host_weights_map_.at(host);
-    if (!is_host_overloaded(host, weight)) {
-      ENVOY_LOG_MISC(debug, "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
-                            "selected host #{} (attempt:1)", host->address()->asString());
-      return host;
-    }
-
-    /*
-    Revisiting Consistent Hashing with Bounded Loads
-    https://arxiv.org/abs/1908.08762
-
-    When a host is overloaded, we choose the next host in a random manner rather than picking the
-    next one in the ring. The random sequence is seeded by the hash, so the same input gets the same
-    sequence of hosts all the time.
-    */
-    uint32_t num_hosts = normalized_host_weights_->size();
-    auto host_index = std::vector<uint32_t>(num_hosts);
-    for (uint32_t i = 0; i < num_hosts; i ++) {
-      host_index[i] = i;
-    }
-
-    uint64_t seed = hash;
-    std::default_random_engine random(seed);
-    HostConstSharedPtr h;
-    for (uint32_t i = 0; i < num_hosts; i ++) {
-      // The random shuffle algorithm
-      std::uniform_int_distribution<int> uniform_dist(0, num_hosts-i-1); // inclusive,inclusive
-      uint32_t j = uniform_dist(random);
-      std::swap(host_index[i], host_index[i + j]);
-
-      uint32_t k = host_index[i];
-      h = (*normalized_host_weights_)[k].first;
-      if (h == host)
-        continue;
-
-      const double w = (*normalized_host_weights_)[k].second;
-
-      if (!is_host_overloaded(h, w)) {
-          ENVOY_LOG_MISC(debug, "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
-                                "selected host #{}:{} (attempt:{})",
-                                k, h->address()->asString(), i+2);
-          return h;
-      }
-     }
-
-    return h;
+  if (host->stats().rq_active_.value() > slots) {
+    ENVOY_LOG_MISC(
+        debug,
+        "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
+        "host {} overloaded; overall_active {}, host_weight {}, host_active {} > slots {}",
+        host->address()->asString(), overall_active, weight, host_active, slots);
+    return true;
+  }
+  return false;
 }
 
+HostConstSharedPtr
+ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t hash,
+                                                                        uint32_t attempt) const {
+
+  if (hlb_ptr == nullptr) {
+    return nullptr;
+  }
+  if (normalized_host_weights_ == nullptr || (*normalized_host_weights_).empty()) {
+    return nullptr;
+  }
+
+  HostConstSharedPtr host = hlb_ptr->chooseHost(hash, attempt);
+  if (host == nullptr) {
+    return nullptr;
+  }
+  const double weight = normalized_host_weights_map_.at(host);
+  if (!isHostOverloaded(host, weight)) {
+    ENVOY_LOG_MISC(debug,
+                   "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
+                   "selected host #{} (attempt:1)",
+                   host->address()->asString());
+    return host;
+  }
+
+  /*
+  Revisiting Consistent Hashing with Bounded Loads
+  https://arxiv.org/abs/1908.08762
+
+  When a host is overloaded, we choose the next host in a random manner rather than picking the
+  next one in the ring. The random sequence is seeded by the hash, so the same input gets the same
+  sequence of hosts all the time.
+  */
+  uint32_t num_hosts = normalized_host_weights_->size();
+  auto host_index = std::vector<uint32_t>(num_hosts);
+  for (uint32_t i = 0; i < num_hosts; i++) {
+    host_index[i] = i;
+  }
+
+  uint64_t seed = hash;
+  std::default_random_engine random(seed);
+  HostConstSharedPtr h;
+  for (uint32_t i = 0; i < num_hosts; i++) {
+    // The random shuffle algorithm
+    std::uniform_int_distribution<int> uniform_dist(0, num_hosts - i - 1); // inclusive,inclusive
+    uint32_t j = uniform_dist(random);
+    std::swap(host_index[i], host_index[i + j]);
+
+    uint32_t k = host_index[i];
+    h = (*normalized_host_weights_)[k].first;
+    if (h == host)
+      continue;
+
+    const double w = (*normalized_host_weights_)[k].second;
+
+    if (!isHostOverloaded(h, w)) {
+      ENVOY_LOG_MISC(debug,
+                     "ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost: "
+                     "selected host #{}:{} (attempt:{})",
+                     k, h->address()->asString(), i + 2);
+      return h;
+    }
+  }
+
+  return h;
+}
 
 } // namespace Upstream
 } // namespace Envoy
