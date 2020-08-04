@@ -359,7 +359,8 @@ def allowlistedForUnpackTo(file_path):
   ]
 
 def denylistedForExceptions(file_path):
-    return file_path in EXCEPTION_DENYLIST or isInSubdir(file_path, 'tools/testdata')
+    return (file_path in EXCEPTION_DENYLIST or isInSubdir(file_path, 'tools/testdata')) and \
+        not file_path.endswith(DOCS_SUFFIX)
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   text = readFile(file_path)
