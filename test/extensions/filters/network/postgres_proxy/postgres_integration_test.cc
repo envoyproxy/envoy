@@ -19,7 +19,7 @@ class PostgresIntegrationTest : public testing::TestWithParam<Network::Address::
     return fmt::format(
         TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
             "test/extensions/filters/network/postgres_proxy/postgres_test_config.yaml")),
-        Network::Test::getLoopbackAddressString(GetParam()),
+        TestEnvironment::nullDevicePath(), Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getAnyAddressString(GetParam()));
   }

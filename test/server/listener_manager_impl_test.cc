@@ -866,7 +866,7 @@ static_listeners:
     ListenerHandle* listener_foo3 = expectListenerCreate(true, true);
     EXPECT_CALL(*listener_foo3, onDestroy());
     EXPECT_THROW_WITH_MESSAGE(
-        manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_address_update_yaml),
+        manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_address_update_yaml),
                                       "version3", true),
         EnvoyException,
         "error updating listener: 'foo' has a different address "
@@ -3117,17 +3117,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
     - name: "envoy.filters.listener.tls_inspector"
       typed_config: {}
     filter_chains:
-    - filter_chain_match:
+    - name : foo
+      filter_chain_match:
         transport_protocol: "tls"
-    - filter_chain_match:
+    - name: bar
+      filter_chain_match:
         transport_protocol: "tls"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
                             EnvoyException,
-                            "error adding listener '127.0.0.1:1234': multiple filter chains with "
-                            "the same matching rules are defined");
+                            "error adding listener '127.0.0.1:1234': filter chain 'bar' has "
+                            "the same matching rules defined as 'foo'");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest,
@@ -3139,18 +3141,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     - name: "envoy.filters.listener.tls_inspector"
       typed_config: {}
     filter_chains:
-    - filter_chain_match:
+    - name: foo
+      filter_chain_match:
         transport_protocol: "tls"
-    - filter_chain_match:
+    - name: bar
+      filter_chain_match:
         transport_protocol: "tls"
         address_suffix: 127.0.0.0
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                            EnvoyException,
-                            "error adding listener '127.0.0.1:1234': contains filter chains with "
-                            "unimplemented fields");
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), EnvoyException,
+      "error adding listener '127.0.0.1:1234': filter chain 'bar' contains unimplemented fields");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappingRules) {

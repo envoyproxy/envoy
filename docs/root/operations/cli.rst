@@ -309,9 +309,9 @@ following are the command line options that Envoy supports.
 .. option:: --ignore-unknown-dynamic-fields
 
   *(optional)* This flag disables validation of protobuf configuration for unknown fields in dynamic
-   configuration. Unlike setting --reject-unknown-dynamic-fields to false, it does not log warnings or
-   count occurrences of unknown fields, in the interest of configuration processing speed. If
-   --reject-unknown-dynamic-fields is set to true, this flag has no effect.
+  configuration. Unlike setting :option:`--reject-unknown-dynamic-fields` to false, it does not log warnings
+  or count occurrences of unknown fields, in the interest of configuration processing speed. If
+  :option:`--reject-unknown-dynamic-fields` is set to true, this flag has no effect.
 
 .. option:: --disable-extensions <extension list>
 

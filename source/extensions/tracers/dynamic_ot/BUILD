@@ -2,14 +2,14 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # Trace driver for dynamically loadable C++ OpenTracing drivers (http://opentracing.io/).
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "dynamic_opentracing_driver_lib",

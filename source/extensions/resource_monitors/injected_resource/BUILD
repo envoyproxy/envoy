@@ -2,12 +2,12 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "injected_resource_monitor",
@@ -28,6 +28,11 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     security_posture = "data_plane_agnostic",
     status = "alpha",
+    # TODO(#9953) clean up.
+    visibility = [
+        "//:extension_config",
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         ":injected_resource_monitor",
         "//include/envoy/registry",
