@@ -60,6 +60,7 @@ envoy_cc_test_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

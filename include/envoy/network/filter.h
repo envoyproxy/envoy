@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/upstream/host_description.h"
@@ -347,9 +348,14 @@ using ListenerFilterFactoryCb = std::function<void(ListenerFilterManager& filter
 /**
  * Interface representing a single filter chain.
  */
+class FilterChain;
+using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
+
 class FilterChain {
 public:
   virtual ~FilterChain() = default;
+
+  virtual void loadRealFilterChain(Network::FilterChainSharedPtr real_filter_chain) PURE;
 
   /**
    * @return const TransportSocketFactory& a transport socket factory to be used by the new
@@ -361,9 +367,11 @@ public:
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
-};
 
-using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
+  virtual bool isFakeFilterChain() const PURE;
+
+  virtual const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const PURE;
+};
 
 /**
  * A filter chain that can be drained.

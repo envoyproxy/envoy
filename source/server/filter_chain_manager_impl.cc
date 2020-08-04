@@ -301,6 +301,7 @@ void FilterChainManagerImpl::addRealFilterChain(
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
+  ENVOY_LOG(debug, "Inside filter chain manager:: add real filter chain");
 
   const auto& filter_chain_match = filter_chain->filter_chain_match();
   if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
@@ -338,25 +339,20 @@ void FilterChainManagerImpl::addRealFilterChain(
   // Reuse created filter chain if possible.
   // FilterChainManager maintains the lifetime of FilterChainFactoryContext
   // ListenerImpl maintains the dependencies of FilterChainFactoryContext
-  auto filter_chain_impl = findExistingFilterChain(*filter_chain);
-  if (filter_chain_impl == nullptr) {
-    filter_chain_impl =
-        filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
-  }
+  // auto filter_chain_impl = findExistingFilterChain(*filter_chain);
+  // if (filter_chain_impl == nullptr) {
+  //   ENVOY_LOG(debug, "find its nullptr, call build.buildFilterChain");
+  // }
 
-  // Rebuild the filter chain match trie with the real one.
-  addFilterChainForDestinationPorts(
-      destination_ports_map_,
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-      filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
-      filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
-      filter_chain_match.source_ports(), filter_chain_impl);
-  // Should replace the mapped filter chain with the rebuilt one.
-  fc_contexts_[*filter_chain] = filter_chain_impl;
+  // Previously, we first find existing filter chain, we don't need to find the old active.
+  ENVOY_LOG(debug, "call filter_chain_factory_builder.buildFilterChain");
+  auto filter_chain_impl =
+      filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
 
-  convertIPsToTries();
-  ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including 1 newly built",
-            fc_contexts_.size());
+  ENVOY_LOG(debug, "placeholder->loadRealFilterChain");
+  // Call Ctor/Point of this placeholder to update its context.
+  auto placeholder = std::move(fc_contexts_[*filter_chain]);
+  placeholder->loadRealFilterChain(filter_chain_impl);
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(
@@ -739,17 +735,21 @@ void FilterChainManagerImpl::convertIPsToTries() {
 
 Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
+  ENVOY_LOG(debug, "Inside findExistingFilterChain");
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
   if (origin == nullptr) {
+    ENVOY_LOG(debug, "origin = nullptr, return nullptr");
     return nullptr;
   }
   auto iter = origin->fc_contexts_.find(filter_chain_message);
   if (iter != origin->fc_contexts_.end()) {
     // copy the context to this filter chain manager.
+    ENVOY_LOG(debug, "origin fc_contexts already exists, emplace to new fc_contexts");
     fc_contexts_.emplace(filter_chain_message, iter->second);
     return iter->second;
   }
+  ENVOY_LOG(debug, "just return nullptr");
   return nullptr;
 }
 

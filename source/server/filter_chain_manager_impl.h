@@ -91,18 +91,37 @@ public:
                   std::vector<Network::FilterFactoryCb>&& filters_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)), filter_chain_message_(nullptr),
-        is_fake_placeholder_(false) {}
+        is_fake_placeholder_(false), has_rebuilt_filter_chain_(false),
+        rebuilt_filter_chain_(nullptr) {}
 
+  // Ctor for filter chain placeholder.
   FilterChainImpl(const envoy::config::listener::v3::FilterChain* filter_chain)
-      : filter_chain_message_(filter_chain), is_fake_placeholder_(true) {}
+      : filter_chain_message_(filter_chain), is_fake_placeholder_(true),
+        has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
+
+  void loadRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+    is_fake_placeholder_ = false;
+    has_rebuilt_filter_chain_ = true;
+    rebuilt_filter_chain_ = rebuilt_filter_chain;
+  }
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
-    return *transport_socket_factory_;
+    if (has_rebuilt_filter_chain_) {
+      return rebuilt_filter_chain_->transportSocketFactory();
+    } else {
+      return *transport_socket_factory_;
+    }
   }
+
   const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
-    return filters_factory_;
+    if (has_rebuilt_filter_chain_) {
+      return rebuilt_filter_chain_->networkFilterFactories();
+    } else {
+      return filters_factory_;
+    }
   }
+
   void startDraining() override { factory_context_->startDraining(); }
 
   void setFilterChainFactoryContext(
@@ -111,9 +130,9 @@ public:
     factory_context_ = std::move(filter_chain_factory_context);
   }
 
-  bool isFakeFilterChain() const { return is_fake_placeholder_; }
+  bool isFakeFilterChain() const override { return is_fake_placeholder_; }
 
-  const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const {
+  const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
     return filter_chain_message_;
   }
 
@@ -123,7 +142,13 @@ private:
   const std::vector<Network::FilterFactoryCb> filters_factory_;
 
   const envoy::config::listener::v3::FilterChain* const filter_chain_message_;
+  // On-demand filter chain is built with a placeholder, set this to true. After it is rebuilt, flip
+  // this to false.
   bool is_fake_placeholder_;
+  // After a filter chain placeholder is rebuilt, set this to true.
+  bool has_rebuilt_filter_chain_;
+  // The rebuilt filter chain.
+  Network::FilterChainSharedPtr rebuilt_filter_chain_;
 };
 
 /**

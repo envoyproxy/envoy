@@ -222,13 +222,14 @@ struct FilterChainRebuildInfo {
 
 using FilterChainRebuildInfoPtr = std::unique_ptr<FilterChainRebuildInfo>;
 
-class FilterChainRebuilder {
+class FilterChainRebuilder : Logger::Loggable<Logger::Id::config> {
 public:
   FilterChainRebuilder(ListenerImpl& listener,
                        const envoy::config::listener::v3::FilterChain* const& filter_chain);
   ~FilterChainRebuilder();
 
   void addRebuildInfo(FilterChainRebuildInfoPtr rebuild_info);
+  void saveWorkerName(const std::string& worker_name);
   bool isCompleted() { return rebuild_complete_; }
   Init::Manager& initManager() { return *rebuild_init_manager_; }
   void startRebuilding() { rebuild_init_manager_->initialize(rebuild_watcher_); }
@@ -249,6 +250,7 @@ private:
   // Listeners on worker to retry connection.
   absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>>
       listeners_on_worker_to_callback_;
+  absl::flat_hash_set<std::string> workers_to_callback_;
 };
 
 using FilterChainRebuilderPtr = std::unique_ptr<FilterChainRebuilder>;
@@ -378,9 +380,11 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
+  // void buildRealFilterChains(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+  //                            FilterChainRebuildInfoPtr rb);
   void buildRealFilterChains(const envoy::config::listener::v3::FilterChain* const& filter_chain,
-                             FilterChainRebuildInfoPtr rb);
-  WorkerPtr getWorkerByName(const std::string& name);
+                             const std::string& worker_name);
+  WorkerPtr getWorkerByName(const std::string& worker_name);
 
   SystemTime last_updated_;
 

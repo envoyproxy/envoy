@@ -67,6 +67,7 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/upstream:host_description_interface",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
