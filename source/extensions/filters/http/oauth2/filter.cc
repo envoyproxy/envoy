@@ -101,8 +101,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   hmac_ = Http::Utility::parseCookieValue(headers, "OauthHMAC");
   host_ = headers.Host()->value().getStringView();
 
-  std::vector<uint8_t> vec(secret.begin(), secret.end());
-  secret_ = std::move(vec);
+  secret_.assign(secret.begin(), secret.end());
 }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
