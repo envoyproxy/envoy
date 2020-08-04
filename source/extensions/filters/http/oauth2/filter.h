@@ -51,31 +51,27 @@ public:
                   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
       : client_secret_provider_(std::move(client_secret_provider)),
         token_secret_provider_(std::move(token_secret_provider)), api_(api) {
-          readAndWatchSecret(client_secret_, *client_secret_provider_);
-          readAndWatchSecret(token_secret_, *token_secret_provider_);
-        }
-
-  const std::string& clientSecret() const override {
-    return client_secret_;
+    readAndWatchSecret(client_secret_, *client_secret_provider_);
+    readAndWatchSecret(token_secret_, *token_secret_provider_);
   }
 
-  const std::string& tokenSecret() const override {
-    return token_secret_;
-  }
+  const std::string& clientSecret() const override { return client_secret_; }
+
+  const std::string& tokenSecret() const override { return token_secret_; }
 
 private:
-
-  void readAndWatchSecret(std::string& value, Secret::GenericSecretConfigProvider& secret_provider) {
+  void readAndWatchSecret(std::string& value,
+                          Secret::GenericSecretConfigProvider& secret_provider) {
     const auto* secret = secret_provider.secret();
     if (secret != nullptr) {
       value = Config::DataSource::read(secret->secret(), true, api_);
-    } 
+    }
 
     secret_provider.addUpdateCallback([&secret_provider, this, &value]() {
       const auto* secret = secret_provider.secret();
       if (secret != nullptr) {
         value = Config::DataSource::read(secret->secret(), true, api_);
-      } 
+      }
     });
   }
   Secret::GenericSecretConfigProviderSharedPtr client_secret_provider_;

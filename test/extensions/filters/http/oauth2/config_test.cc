@@ -19,8 +19,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
-using testing::Return;
 using testing::NiceMock;
+using testing::Return;
 
 TEST(ConfigTest, CreateFilter) {
   const std::string yaml = R"EOF(

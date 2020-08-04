@@ -1,12 +1,12 @@
 #include <memory>
 #include <string>
 
-#include "common/common/macros.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
+#include "common/common/macros.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -43,8 +43,12 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 class MockSecretReader : public SecretReader {
 public:
-  const std::string& clientSecret() const override { CONSTRUCT_ON_FIRST_USE(std::string, "asdf_client_secret_fdsa"); }
-  const std::string& tokenSecret() const override { CONSTRUCT_ON_FIRST_USE(std::string, "asdf_token_secret_fdsa"); }
+  const std::string& clientSecret() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "asdf_client_secret_fdsa");
+  }
+  const std::string& tokenSecret() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "asdf_token_secret_fdsa");
+  }
 };
 
 class MockOAuth2CookieValidator : public CookieValidator {
