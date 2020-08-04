@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 void UberWriteFilterFuzzer::reset() {
-  // Reset some changes made by current filter on some mock objects.
+  // Reset the state of dependancies so that a new fuzz input starts in a clean state.
 
   // Close the connection to make sure the filter's callback is set to nullptr.
   write_filter_callbacks_->connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
@@ -44,6 +44,7 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
         write_filter_ = filter;
       }));
   factory_context_.prepareSimulatedSystemTime();
+
   // Set featureEnabled for mongo_proxy
   ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
       .WillByDefault(Return(true));
@@ -52,6 +53,7 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
       .WillByDefault(Return(true));
   ON_CALL(factory_context_.runtime_loader_.snapshot_, featureEnabled("mongo.logging_enabled", 100))
       .WillByDefault(Return(true));
+
   // Set featureEnabled for thrift_proxy
   ON_CALL(factory_context_.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.thrift_filter_enabled", 100))
