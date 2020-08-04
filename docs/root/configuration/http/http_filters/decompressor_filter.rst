@@ -53,7 +53,7 @@ When decompression is *applied*:
 
 - The *content-encoding* header is modified to remove the decompression that was applied.
 
-- *x-envoy-decompressor-<decompressor_name>-<compressed/uncompressed>-bytes* trailer is added to
+- *x-envoy-decompressor-<decompressor_name>-<compressed/uncompressed>-bytes* trailers are added to
   the request/response to relay information about decompression.
 
 .. _decompressor-statistics:
