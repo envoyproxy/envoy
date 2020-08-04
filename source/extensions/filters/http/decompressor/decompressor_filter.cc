@@ -64,7 +64,11 @@ DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
                       scope, runtime) {}
 
 DecompressorFilter::DecompressorFilter(DecompressorFilterConfigSharedPtr config)
-    : config_(std::move(config)), request_byte_tracker_(config_->requestDirectionConfig().trailersStrings()[0], config_->requestDirectionConfig().trailersStrings()[1]), response_byte_tracker_(config_->responseDirectionConfig().trailersStrings()[0], config_->responseDirectionConfig().trailersStrings()[1]) {}
+    : config_(std::move(config)),
+      request_byte_tracker_(config_->requestDirectionConfig().trailersStrings()[0],
+                            config_->requestDirectionConfig().trailersStrings()[1]),
+      response_byte_tracker_(config_->responseDirectionConfig().trailersStrings()[0],
+                             config_->responseDirectionConfig().trailersStrings()[1]) {}
 
 Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                             bool end_stream) {

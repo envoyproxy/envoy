@@ -47,7 +47,7 @@ public:
     virtual ~DirectionConfig() = default;
 
     virtual const std::string& logString() const PURE;
-          const std::vector<Http::LowerCaseString>& trailersStrings() const  {
+    const std::vector<Http::LowerCaseString>& trailersStrings() const {
       CONSTRUCT_ON_FIRST_USE(
           std::vector<Http::LowerCaseString>,
           {Http::LowerCaseString(fmt::format("{}-compressed-bytes", trailers_prefix_)),
@@ -140,17 +140,19 @@ public:
 
 private:
   struct ByteTracker {
-    ByteTracker(const Http::LowerCaseString& compressed_bytes_trailer, const Http::LowerCaseString& uncompressed_bytes_trailer): compressed_bytes_trailer_(compressed_bytes_trailer), uncompressed_bytes_trailer_(uncompressed_bytes_trailer) {}
+    ByteTracker(const Http::LowerCaseString& compressed_bytes_trailer,
+                const Http::LowerCaseString& uncompressed_bytes_trailer)
+        : compressed_bytes_trailer_(compressed_bytes_trailer),
+          uncompressed_bytes_trailer_(uncompressed_bytes_trailer) {}
     void chargeBytes(uint64_t compressed_bytes, uint64_t uncompressed_bytes) {
       total_compressed_bytes_ += compressed_bytes;
       total_uncompressed_bytes_ += uncompressed_bytes;
     }
     void reportTotalBytes(Http::HeaderMap& trailers) const {
-      ENVOY_LOG_MISC(error, "reporting {} {}", compressed_bytes_trailer_.get(), uncompressed_bytes_trailer_.get());
-      trailers.addCopy(compressed_bytes_trailer_,
-                       total_compressed_bytes_);
-      trailers.addCopy(uncompressed_bytes_trailer_,
-                       total_uncompressed_bytes_);
+      ENVOY_LOG_MISC(error, "reporting {} {}", compressed_bytes_trailer_.get(),
+                     uncompressed_bytes_trailer_.get());
+      trailers.addCopy(compressed_bytes_trailer_, total_compressed_bytes_);
+      trailers.addCopy(uncompressed_bytes_trailer_, total_uncompressed_bytes_);
     }
 
   private:

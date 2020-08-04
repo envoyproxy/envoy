@@ -210,8 +210,10 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
                         ->value()
                         .getStringView());
   EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::LowerCaseString("content-encoding")));
-//   EXPECT_EQ("10", upstream_request_->trailers().get(Http::LowerCaseString("x-envoy-decompressor-testlib-gzip-compressed-bytes"))->getInlineValue());
-//   EXPECT_EQ("15", upstream_request_->trailers().get(Http::LowerCaseString("x-envoy-decompressor-testlib-gzip-uncompressed-bytes"))->getInlineValue());
+  //   EXPECT_EQ("10",
+  //   upstream_request_->trailers().get(Http::LowerCaseString("x-envoy-decompressor-testlib-gzip-compressed-bytes"))->getInlineValue());
+  //   EXPECT_EQ("15",
+  //   upstream_request_->trailers().get(Http::LowerCaseString("x-envoy-decompressor-testlib-gzip-uncompressed-bytes"))->getInlineValue());
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.request.decompressed",
@@ -247,8 +249,10 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-//   EXPECT_EQ("10", response->trailers().get(Http::LowerCaseString("x-envoy-decompressor-testlib-gzip-compressed-bytes"))->getInlineValue());
-//   EXPECT_EQ("15", response->trailers().get(Http::LowerCaseString("x-envoy-decompressor-testlib-gzip-uncompressed-bytes"))->getInlineValue());
+  //   EXPECT_EQ("10",
+  //   response->trailers().get(Http::LowerCaseString("x-envoy-decompressor-testlib-gzip-compressed-bytes"))->getInlineValue());
+  //   EXPECT_EQ("15",
+  //   response->trailers().get(Http::LowerCaseString("x-envoy-decompressor-testlib-gzip-uncompressed-bytes"))->getInlineValue());
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.response.decompressed",
