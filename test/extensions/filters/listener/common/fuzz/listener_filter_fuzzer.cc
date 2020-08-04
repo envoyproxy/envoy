@@ -23,7 +23,7 @@ void ListenerFilterFuzzer::fuzz(
   const int nreads = input.data_size(); // Number of reads
 
   if (nreads > 0) {
-    ON_CALL(os_sys_calls_, recv(FAKE_SOCKET_FD, _, _, MSG_PEEK))
+    ON_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, MSG_PEEK))
         .WillByDefault(testing::Return(Api::SysCallSizeResult{static_cast<ssize_t>(0), 0}));
 
     ON_CALL(dispatcher_,
@@ -56,13 +56,13 @@ void ListenerFilterFuzzer::fuzz(
       testing::InSequence s;
 
       if (nreads > 1) {
-        EXPECT_CALL(os_sys_calls_, recv(FAKE_SOCKET_FD, _, _, MSG_PEEK))
+        EXPECT_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, MSG_PEEK))
             .WillOnce(testing::InvokeWithoutArgs([]() {
               return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
             }));
       }
 
-      EXPECT_CALL(os_sys_calls_, recv(FAKE_SOCKET_FD, _, _, MSG_PEEK))
+      EXPECT_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, MSG_PEEK))
           .Times(testing::AnyNumber())
           .WillRepeatedly(Invoke([&header, &indices, &nread](os_fd_t, void* buffer, size_t length,
                                                              int) -> Api::SysCallSizeResult {
