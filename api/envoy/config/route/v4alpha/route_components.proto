@@ -894,6 +894,7 @@ message RouteAction {
     // For example with the following config:
     //
     //   .. code-block:: yaml
+    //
     //     host_rewrite_path:
     //       pattern:
     //         google_re2: {}
