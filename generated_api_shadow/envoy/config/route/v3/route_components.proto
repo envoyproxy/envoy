@@ -54,9 +54,7 @@ message VirtualHost {
     ALL = 2;
   }
 
-  reserved 9, 12;
-
-  reserved "per_filter_config";
+  reserved 9;
 
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
@@ -184,6 +182,9 @@ message VirtualHost {
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
+
+  map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 12
+      [deprecated = true];
 }
 
 // A filter-defined action type.
@@ -204,9 +205,7 @@ message FilterAction {
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
-  reserved 6, 8;
-
-  reserved "per_filter_config";
+  reserved 6;
 
   // Name for the route.
   string name = 14;
@@ -289,6 +288,9 @@ message Route {
   // If set, the bytes actually buffered will be the minimum value of this and the
   // listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
+
+  map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 8
+      [deprecated = true];
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_config.route.v3.RouteAction.cluster>` field that specifies a
@@ -305,9 +307,7 @@ message WeightedCluster {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.WeightedCluster.ClusterWeight";
 
-    reserved 7, 8;
-
-    reserved "per_filter_config";
+    reserved 7;
 
     // Name of the upstream cluster. The cluster must exist in the
     // :ref:`cluster manager configuration <config_cluster_manager>`.
@@ -360,6 +360,9 @@ message WeightedCluster {
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
     map<string, google.protobuf.Any> typed_per_filter_config = 10;
+
+    map<string, google.protobuf.Struct> hidden_envoy_deprecated_per_filter_config = 8
+        [deprecated = true];
   }
 
   // Specifies one or more upstream clusters associated with the route.
@@ -406,9 +409,7 @@ message RouteMatch {
   message ConnectMatcher {
   }
 
-  reserved 5, 3;
-
-  reserved "regex";
+  reserved 5;
 
   oneof path_specifier {
     option (validate.required) = true;
@@ -445,6 +446,12 @@ message RouteMatch {
     // Note that CONNECT support is currently considered alpha in Envoy.
     // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
     ConnectMatcher connect_matcher = 12;
+
+    string hidden_envoy_deprecated_regex = 3 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -499,10 +506,6 @@ message RouteMatch {
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
 
-  reserved 1, 8, 7;
-
-  reserved "allow_origin", "allow_origin_regex", "enabled";
-
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
   repeated type.matcher.v3.StringMatcher allow_origin_string_match = 11;
@@ -531,6 +534,9 @@ message CorsPolicy {
     // If :ref:`runtime_key <envoy_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is
     // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.v3.RuntimeFractionalPercent filter_enabled = 9;
+
+    google.protobuf.BoolValue hidden_envoy_deprecated_enabled = 7
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
   }
 
   // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
@@ -543,6 +549,12 @@ message CorsPolicy {
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
+
+  repeated string hidden_envoy_deprecated_allow_origin = 1
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+  repeated string hidden_envoy_deprecated_allow_origin_regex = 8
+      [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
 }
 
 // [#next-free-field: 36]
@@ -581,10 +593,6 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
 
-    reserved 2;
-
-    reserved "runtime_key";
-
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
     string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -601,6 +609,9 @@ message RouteAction {
 
     // Determines if the trace span should be sampled. Defaults to true.
     google.protobuf.BoolValue trace_sampled = 4;
+
+    string hidden_envoy_deprecated_runtime_key = 2
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
@@ -760,9 +771,7 @@ message RouteAction {
     ConnectConfig connect_config = 3;
   }
 
-  reserved 12, 18, 19, 16, 22, 21, 10;
-
-  reserved "request_mirror_policy";
+  reserved 12, 18, 19, 16, 22, 21;
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -1047,6 +1056,8 @@ message RouteAction {
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   HedgePolicy hedge_policy = 27;
+
+  RequestMirrorPolicy hidden_envoy_deprecated_request_mirror_policy = 10 [deprecated = true];
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
@@ -1058,14 +1069,12 @@ message RetryPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RetryPolicy.RetryPriority";
 
-    reserved 2;
-
-    reserved "config";
-
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
       google.protobuf.Any typed_config = 3;
+
+      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
     }
   }
 
@@ -1073,14 +1082,12 @@ message RetryPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RetryPolicy.RetryHostPredicate";
 
-    reserved 2;
-
-    reserved "config";
-
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
       google.protobuf.Any typed_config = 3;
+
+      google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
     }
   }
 
@@ -1364,10 +1371,6 @@ message Tracing {
 message VirtualCluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualCluster";
 
-  reserved 1, 3;
-
-  reserved "pattern", "method";
-
   // Specifies a list of header matchers to use for matching requests. Each specified header must
   // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
   // method, respectively.
@@ -1377,6 +1380,15 @@ message VirtualCluster {
   // as the virtual host name are used when emitting statistics. The statistics are emitted by the
   // router filter and are documented :ref:`here <config_http_filters_router_stats>`.
   string name = 2 [(validate.rules).string = {min_bytes: 1}];
+
+  string hidden_envoy_deprecated_pattern = 1 [
+    deprecated = true,
+    (validate.rules).string = {max_bytes: 1024},
+    (envoy.annotations.disallowed_by_default) = true
+  ];
+
+  core.v3.RequestMethod hidden_envoy_deprecated_method = 3
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
@@ -1614,9 +1626,7 @@ message RateLimit {
 message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
-  reserved 2, 3, 5;
-
-  reserved "regex_match";
+  reserved 2, 3;
 
   // Specifies the name of the header in the request.
   string name = 1
@@ -1664,6 +1674,12 @@ message HeaderMatcher {
     //
     // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
     string suffix_match = 10 [(validate.rules).string = {min_bytes: 1}];
+
+    string hidden_envoy_deprecated_regex_match = 5 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.
@@ -1682,10 +1698,6 @@ message QueryParameterMatcher {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.route.QueryParameterMatcher";
 
-  reserved 3, 4;
-
-  reserved "value", "regex";
-
   // Specifies the name of a key that must be present in the requested
   // *path*'s query string.
   string name = 1 [(validate.rules).string = {min_bytes: 1 max_bytes: 1024}];
@@ -1697,6 +1709,12 @@ message QueryParameterMatcher {
     // Specifies whether a query parameter should be present.
     bool present_match = 6;
   }
+
+  string hidden_envoy_deprecated_value = 3
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+  google.protobuf.BoolValue hidden_envoy_deprecated_regex = 4
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
