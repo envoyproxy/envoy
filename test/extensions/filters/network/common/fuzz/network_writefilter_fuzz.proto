@@ -17,7 +17,7 @@ message AdvanceTime {
 message WriteAction {
   oneof action_selector {
     option (validate.required) = true;
-    // Call onData()
+    // Call onWrite()
     OnWrite on_write = 2;
     // Advance time_source_
     AdvanceTime advance_time = 3;
