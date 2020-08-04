@@ -5,6 +5,7 @@
 
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/secret/secret_provider_impl.h"
 
 #include "extensions/filters/http/oauth2/config.h"
 
@@ -18,11 +19,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
+using testing::Return;
 using testing::NiceMock;
 
 TEST(ConfigTest, CreateFilter) {
-  OAuth2Config config;
-
   const std::string yaml = R"EOF(
 config:
     token_endpoint:
@@ -39,6 +39,12 @@ config:
   envoy::extensions::filters::http::oauth2::v3alpha::OAuth2 proto_config;
   MessageUtil::loadFromYaml(yaml, proto_config, ProtobufMessage::getStrictValidationVisitor());
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  auto& secret_manager = factory_context.cluster_manager_.cluster_manager_factory_.secretManager();
+  ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  OAuth2Config config;
   auto cb = config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callbacks;

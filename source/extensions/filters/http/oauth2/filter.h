@@ -41,8 +41,8 @@ class OAuth2Client;
 class SecretReader {
 public:
   virtual ~SecretReader() = default;
-  virtual std::string clientSecret() const PURE;
-  virtual std::string tokenSecret() const PURE;
+  virtual const std::string& clientSecret() const PURE;
+  virtual const std::string& tokenSecret() const PURE;
 };
 
 class SDSSecretReader : public SecretReader {
@@ -50,28 +50,39 @@ public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
       : client_secret_provider_(std::move(client_secret_provider)),
-        token_secret_provider_(std::move(token_secret_provider)), api_(api) {}
+        token_secret_provider_(std::move(token_secret_provider)), api_(api) {
+          readAndWatchSecret(client_secret_, *client_secret_provider_);
+          readAndWatchSecret(token_secret_, *token_secret_provider_);
+        }
 
-  std::string clientSecret() const override {
-    const auto* secret = client_secret_provider_->secret();
-    if (!secret) {
-      return EMPTY_STRING;
-    }
-
-    return Config::DataSource::read(secret->secret(), true, api_);
+  const std::string& clientSecret() const override {
+    return client_secret_;
   }
 
-  std::string tokenSecret() const override {
-    const auto* secret = token_secret_provider_->secret();
-    if (!secret) {
-      return EMPTY_STRING;
-    }
-    return Config::DataSource::read(secret->secret(), true, api_);
+  const std::string& tokenSecret() const override {
+    return token_secret_;
   }
 
 private:
+
+  void readAndWatchSecret(std::string& value, Secret::GenericSecretConfigProvider& secret_provider) {
+    const auto* secret = secret_provider.secret();
+    if (secret != nullptr) {
+      value = Config::DataSource::read(secret->secret(), true, api_);
+    } 
+
+    secret_provider.addUpdateCallback([&secret_provider, this, &value]() {
+      const auto* secret = secret_provider.secret();
+      if (secret != nullptr) {
+        value = Config::DataSource::read(secret->secret(), true, api_);
+      } 
+    });
+  }
   Secret::GenericSecretConfigProviderSharedPtr client_secret_provider_;
   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider_;
+
+  std::string client_secret_;
+  std::string token_secret_;
   Api::Api& api_;
 };
 
