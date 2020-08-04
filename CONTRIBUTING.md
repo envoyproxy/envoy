@@ -188,7 +188,7 @@ maintainer's discretion. Generally all runtime guarded features will be set true
 release is cut. Old code paths for refactors can be cleaned up after a release and there has been
 some production run time. Old code for behavioral changes will be deprecated after six months.
 Runtime features are set true by default by inclusion in
-[source/common/runtime/runtime_features.h](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h)
+[source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.cc)
 
 There are four suggested options for testing new runtime features:
 
