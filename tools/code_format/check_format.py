@@ -87,10 +87,8 @@ STD_REGEX_ALLOWLIST = (
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
 
-# These files should not throw exceptions.
-EXCEPTION_DENYLIST = ("./source/common/http/http1/codec_impl.h",
-                      "./source/common/http/http1/codec_impl.cc",
-                      "./source/common/http/http2/codec_impl.h",
+# These files should not throw exceptions. Add HTTP/1 when exceptions removed.
+EXCEPTION_DENYLIST = ("./source/common/http/http2/codec_impl.h",
                       "./source/common/http/http2/codec_impl.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
