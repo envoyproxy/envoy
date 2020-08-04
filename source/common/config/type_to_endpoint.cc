@@ -1,6 +1,7 @@
+#include "common/config/type_to_endpoint.h"
+
 #include "envoy/annotations/resource.pb.h"
 
-#include "common/config/type_to_endpoint.h"
 #include "common/grpc/common.h"
 
 // API_NO_BOOST_FILE

@@ -1,8 +1,9 @@
+#include "common/config/delta_subscription_state.h"
+
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
-#include "common/config/delta_subscription_state.h"
 #include "common/config/utility.h"
 
 namespace Envoy {

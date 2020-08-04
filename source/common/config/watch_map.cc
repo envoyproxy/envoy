@@ -1,8 +1,9 @@
+#include "common/config/watch_map.h"
+
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/cleanup.h"
 #include "common/config/decoded_resource_impl.h"
-#include "common/config/watch_map.h"
 
 namespace Envoy {
 namespace Config {
