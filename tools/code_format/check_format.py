@@ -568,7 +568,11 @@ def tokenInLine(token, line):
   index = 0
   while True:
     index = line.find(token, index)
-    if index < 1:
+    # the following check has been changed from index < 1 to index < 0 because
+    # this function incorrectly returns false when the token in question is the
+    # first one in a line. The following line returns false when the token is present:
+    # (no leading whitespace) violating_symbol foo;
+    if index < 0:
       break
     if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
       if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
