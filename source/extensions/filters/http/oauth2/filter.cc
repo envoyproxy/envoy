@@ -68,6 +68,11 @@ std::vector<Http::HeaderUtility::HeaderData> headerMatchers(const T& matcher_pro
 
   return matchers;
 }
+
+// Sets the auth token as the Bearer token in the authorization header.
+void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
+  headers.setInline(authorization_handle.handle(), absl::StrCat("Bearer ", token));
+}
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -308,10 +313,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
-}
-
-void OAuth2Filter::setBearerToken(Http::RequestHeaderMap& headers, const std::string& token) {
-  headers.setInline(authorization_handle.handle(), absl::StrCat("Bearer ", token));
 }
 
 // Defines a sequence of checks determining whether we should initiate a new OAuth flow or skip to

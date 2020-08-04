@@ -204,9 +204,6 @@ public:
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
-  // Sets the auth token as the Bearer token in the authorization header.
-  static void setBearerToken(Http::RequestHeaderMap& headers, const std::string& token);
-
   void finishFlow();
 
 private:
