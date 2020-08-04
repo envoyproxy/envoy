@@ -54,15 +54,18 @@ void DynamicFilterConfigProviderImpl::validateConfig(
 void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryCb config,
                                                      const std::string&,
                                                      Config::ConfigAppliedCb cb) {
-  tls_->runOnAllThreads([config, cb](ThreadLocal::ThreadLocalObjectSharedPtr previous)
-                            -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
-    prev_config->config_ = config;
-    if (cb) {
-      cb();
-    }
-    return previous;
-  });
+  auto old_config = this->config();
+  tls_->runOnAllThreads(
+      [config, cb](ThreadLocal::ThreadLocalObjectSharedPtr previous)
+          -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        auto prev_config = std::dynamic_pointer_cast<ThreadLocalConfig>(previous);
+        prev_config->config_ = config;
+        if (cb) {
+          cb();
+        }
+        return previous;
+      },
+      [old_config]() {});
 }
 
 FilterConfigSubscription::FilterConfigSubscription(
