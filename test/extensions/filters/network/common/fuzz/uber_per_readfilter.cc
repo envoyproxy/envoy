@@ -91,6 +91,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
     read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
     read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
+    // A dedicated http_connection_manager fuzzer can be found in test/common/http/conn_manager_impl_fuzz_test.cc
     read_filter_callbacks_->connection_.local_address_ = ipv4_addr_;
     read_filter_callbacks_->connection_.remote_address_ = ipv4_addr_;
   } else if (filter_name == NetworkFilterNames::get().RateLimit) {
