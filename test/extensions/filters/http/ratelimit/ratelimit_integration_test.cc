@@ -10,6 +10,7 @@
 #include "common/grpc/common.h"
 
 #include "extensions/filters/http/ratelimit/config.h"
+#include "extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"
@@ -374,13 +375,20 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
                         Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{});
   waitForSuccessfulUpstreamResponse();
 
-  EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitLimit,
-                                  "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""));
-  EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitRemaining, "2"));
-  EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitReset, "3"));
+  EXPECT_THAT(
+      response_.get()->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitLimit,
+          "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""));
+  EXPECT_THAT(
+      response_.get()->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitRemaining,
+          "2"));
+  EXPECT_THAT(
+      response_.get()->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitReset, "3"));
 
   cleanup();
 
@@ -403,13 +411,20 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
                         Http::TestRequestHeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
 
-  EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitLimit,
-                                  "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""));
-  EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitRemaining, "2"));
-  EXPECT_THAT(response_.get()->headers(),
-              Http::HeaderValueOf(Http::CustomHeaders::get().XRateLimitReset, "3"));
+  EXPECT_THAT(
+      response_.get()->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitLimit,
+          "1, 1;window=60;name=\"first\", 4;window=3600;name=\"second\""));
+  EXPECT_THAT(
+      response_.get()->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitRemaining,
+          "2"));
+  EXPECT_THAT(
+      response_.get()->headers(),
+      Http::HeaderValueOf(
+          Extensions::HttpFilters::RateLimitFilter::XRateLimitHeaders::get().XRateLimitReset, "3"));
 
   cleanup();
 

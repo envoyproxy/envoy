@@ -2,6 +2,8 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/singleton/const_singleton.h"
+
 #include "extensions/filters/common/ratelimit/ratelimit.h"
 
 namespace Envoy {
@@ -9,7 +11,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
-class RateLimitHeaders {
+class XRateLimitHeaderValues {
+public:
+  const Http::LowerCaseString XRateLimitLimit{"x-ratelimit-limit"};
+  const Http::LowerCaseString XRateLimitRemaining{"x-ratelimit-remaining"};
+  const Http::LowerCaseString XRateLimitReset{"x-ratelimit-reset"};
+
+  struct {
+    const std::string Window{"window"};
+    const std::string Name{"name"};
+  } QuotaPolicyKeys;
+};
+using XRateLimitHeaders = ConstSingleton<XRateLimitHeaderValues>;
+
+class XRateLimitHeaderUtils {
 public:
   static Http::ResponseHeaderMapPtr
   create(Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses);

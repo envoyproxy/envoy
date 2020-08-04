@@ -19,10 +19,6 @@ using Envoy::RateLimit::buildDescriptorStatus;
 using Filters::Common::RateLimit::DescriptorStatusList;
 
 struct RateLimitHeadersTestCase {
-
-  //  absl::string_view expected_rate_limit_limit_header;
-  //  absl::string_view expected_rate_limit_remaining_header;
-  //  absl::string_view expected_rate_limit_reset_header;
   Http::TestResponseHeaderMapImpl expected_headers;
   DescriptorStatusList descriptor_statuses;
 };
@@ -93,7 +89,7 @@ INSTANTIATE_TEST_SUITE_P(RateLimitHeadersTest, RateLimitHeadersTest,
                          testing::ValuesIn(RateLimitHeadersTest::getTestCases()));
 
 TEST_P(RateLimitHeadersTest, RateLimitHeadersTest) {
-  Http::ResponseHeaderMapPtr result = RateLimitHeaders::create(
+  Http::ResponseHeaderMapPtr result = XRateLimitHeaderUtils::create(
       std::make_unique<DescriptorStatusList>(GetParam().descriptor_statuses));
   EXPECT_THAT(result, HeaderMapEqual(&GetParam().expected_headers));
 }

@@ -166,7 +166,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   if (config_->enableXRateLimitHeaders()) {
     Http::ResponseHeaderMapPtr rate_limit_headers =
-        RateLimitHeaders::create(std::move(descriptor_statuses));
+        XRateLimitHeaderUtils::create(std::move(descriptor_statuses));
     if (response_headers_to_add_ == nullptr) {
       response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
     }
