@@ -295,20 +295,23 @@ rds:
 
   Event::PostCb post_cb;
   testing::NiceMock<Event::MockDispatcher> local_thread_dispatcher;
+  testing::MockFunction<void(bool)> mock_callback;
   {
     auto rds = RouteConfigProviderUtil::create(
         parseHttpConnectionManagerFromYaml(rds_config), server_factory_context_,
         validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
 
     EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
-    rds->requestVirtualHostsUpdate("testing", local_thread_dispatcher,
-                                   std::make_shared<Http::RouteConfigUpdatedCallback>(
-                                       Http::RouteConfigUpdatedCallback([](bool) -> void {})));
+    rds->requestVirtualHostsUpdate(
+        "testing", local_thread_dispatcher,
+        std::make_shared<Http::RouteConfigUpdatedCallback>(
+            Http::RouteConfigUpdatedCallback(mock_callback.AsStdFunction())));
   }
 
   // Invoke the callback that was scheduled on the main thread
   // RdsRouteConfigProvider in rds is out of scope and callback's captured parameters are no longer
   // valid
+  EXPECT_CALL(mock_callback, Call(_)).Times(0);
   EXPECT_NO_THROW(post_cb());
 }
 
