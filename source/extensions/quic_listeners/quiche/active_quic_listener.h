@@ -66,7 +66,7 @@ private:
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   Network::Socket& listen_socket_;
   Runtime::FeatureFlag enabled_;
-  Network::UdpPacketWriterPtr udp_packet_writer_;
+  Network::UdpPacketWriter* udp_packet_writer_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
