@@ -44,6 +44,8 @@ public:
     return Type::Ip;
   }
 
+  const std::string& socketInterface() const { return address_; }
+
 private:
   const std::string address_{"synthetic"};
 };
