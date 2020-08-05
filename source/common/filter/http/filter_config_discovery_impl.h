@@ -52,6 +52,7 @@ private:
 
   FilterConfigSubscriptionSharedPtr subscription_;
   const std::set<std::string> require_type_urls_;
+  absl::optional<Envoy::Http::FilterFactoryCb> config_;
   ThreadLocal::SlotPtr tls_;
 
   // Local initialization target to ensure that the subscription starts in
