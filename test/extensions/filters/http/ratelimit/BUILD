@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/http/ratelimit:ratelimit_lib",
         "//test/extensions/filters/common/ratelimit:ratelimit_mocks",
+        "//test/extensions/filters/common/ratelimit:ratelimit_utils",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
@@ -58,11 +59,24 @@ envoy_extension_cc_test(
         "//source/common/grpc:common_lib",
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/extensions/filters/common/ratelimit:ratelimit_utils",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ratelimit_headers_test",
+    srcs = ["ratelimit_headers_test.cc"],
+    extension_name = "envoy.filters.http.cache",
+    deps = [
+        "//source/extensions/filters/http/ratelimit:ratelimit_headers_lib",
+        "//test/extensions/filters/common/ratelimit:ratelimit_utils",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

@@ -630,7 +630,17 @@ MATCHER_P(HeaderMapEqual, rhs, "") {
   return equal;
 }
 
-MATCHER_P(HeaderMapEqualRef, rhs, "") { return arg == *rhs; }
+MATCHER_P(HeaderMapEqualRef, rhs, "") {
+  const bool equal = (arg == *rhs);
+  if (!equal) {
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("header map:") << "\n"
+                     << *rhs << TestUtility::addLeftAndRightPadding("is not equal to:") << "\n"
+                     << arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
+}
 
 // Test that a HeaderMapPtr argument includes a given key-value pair, e.g.,
 //  HeaderHasValue("Upgrade", "WebSocket")

@@ -19,10 +19,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
+
+  // Defines the version of the standard to use for X-RateLimit headers.
+  enum XRateLimitHeadersRFCVersion {
+    // X-RateLimit headers disabled.
+    OFF = 0;
+
+    // Use `draft RFC Version 02 <https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html>`_.
+    DRAFT_VERSION_02 = 1;
+  }
 
   // The rate limit domain to use when calling the rate limit service.
   string domain = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -64,4 +73,30 @@ message RateLimit {
   // success.
   config.ratelimit.v3.RateLimitServiceConfig rate_limit_service = 7
       [(validate.rules).message = {required: true}];
+
+  // Defines the standard version to use for X-RateLimit headers emitted by the filter:
+  //
+  // * ``X-RateLimit-Limit`` - indicates the request-quota associated to the
+  //   client in the current time-window followed by the description of the
+  //   quota policy. The values are returned by the rate limiting service in
+  //   :ref:`current_limit<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.current_limit>`
+  //   field. Example: `10, 10;w=1;name="per-ip", 1000;w=3600`.
+  // * ``X-RateLimit-Remaining`` - indicates the remaining requests in the
+  //   current time-window. The values are returned by the rate limiting service
+  //   in :ref:`limit_remaining<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.limit_remaining>`
+  //   field.
+  // * ``X-RateLimit-Reset`` - indicates the number of seconds until reset of
+  //   the current time-window. The values are returned by the rate limiting service
+  //   in :ref:`duration_until_reset<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.duration_until_reset>`
+  //   field.
+  //
+  // In case rate limiting policy specifies more then one time window, the values
+  // above represent the window that is closest to reaching its limit.
+  //
+  // For more information about the headers specification see selected version of
+  // the `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html>`_.
+  //
+  // Disabled by default.
+  XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
+      [(validate.rules).enum = {defined_only: true}];
 }

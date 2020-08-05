@@ -7,7 +7,6 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
-#include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -101,7 +100,10 @@ void GrpcClientImpl::onSuccess(
       request_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
   }
-  callbacks_->complete(status, std::move(response_headers_to_add),
+
+  DescriptorStatusListPtr descriptor_statuses = std::make_unique<DescriptorStatusList>(
+      response->statuses().begin(), response->statuses().end());
+  callbacks_->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
                        std::move(request_headers_to_add));
   callbacks_ = nullptr;
 }
@@ -109,7 +111,7 @@ void GrpcClientImpl::onSuccess(
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
-  callbacks_->complete(LimitStatus::Error, nullptr, nullptr);
+  callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr);
   callbacks_ = nullptr;
 }
 
