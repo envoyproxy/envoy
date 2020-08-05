@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -170,6 +171,25 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "set_response_code_filter_lib",
+    srcs = [
+        "set_response_code_filter.cc",
+    ],
+    deps = [
+        ":set_response_code_filter_config_proto_cc_proto",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "set_response_code_filter_config_proto",
+    srcs = [":set_response_code_filter_config.proto"],
 )
 
 envoy_cc_test_library(
