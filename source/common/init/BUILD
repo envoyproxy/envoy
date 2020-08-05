@@ -35,6 +35,7 @@ envoy_cc_library(
     deps = [
         ":watcher_lib",
         "//include/envoy/init:manager_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:logger_lib",
     ],
 )

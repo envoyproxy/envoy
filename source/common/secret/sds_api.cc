@@ -34,7 +34,14 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
   // each init manager has a chance to initialize its targets.
-  init_manager.add(init_target_);
+  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
+  std::unique_ptr<Cleanup> resume_sds;
+  Init::ManagerImpl::maybeCreateNoopInitManager(
+      init_manager, fmt::format("SdsApi {}", sds_config_name), noop_init_manager, resume_sds);
+
+  Init::Manager& init_manager_to_use =
+      noop_init_manager == nullptr ? init_manager : *noop_init_manager;
+  init_manager_to_use.add(init_target_);
 }
 
 void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

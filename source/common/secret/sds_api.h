@@ -23,6 +23,7 @@
 #include "common/common/cleanup.h"
 #include "common/config/subscription_base.h"
 #include "common/config/utility.h"
+#include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"

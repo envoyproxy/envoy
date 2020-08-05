@@ -9,6 +9,22 @@ ManagerImpl::ManagerImpl(absl::string_view name)
     : name_(fmt::format("init manager {}", name)), state_(State::Uninitialized), count_(0),
       watcher_(name_, [this]() { onTargetReady(); }) {}
 
+void ManagerImpl::maybeCreateNoopInitManager(Manager& local_init_manager, absl::string_view name,
+                                             std::unique_ptr<Init::ManagerImpl>& init_manager,
+                                             std::unique_ptr<Cleanup>& init) {
+  if (local_init_manager.state() == Init::Manager::State::Initialized) {
+    init_manager = std::make_unique<Init::ManagerImpl>(name);
+    init = std::make_unique<Cleanup>([&init_manager, name] {
+      // For new RDS subscriptions created after listener warming up, we don't wait for them to warm
+      // up.
+      Init::WatcherImpl noop_watcher(
+          // Note: we just throw it away.
+          fmt::format("{} ConfigUpdate watcher", name), []() { /*Do nothing.*/ });
+      init_manager->initialize(noop_watcher);
+    });
+  }
+}
+
 Manager::State ManagerImpl::state() const { return state_; }
 
 void ManagerImpl::add(const Target& target) {

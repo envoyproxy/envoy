@@ -25,6 +25,7 @@
 using ::testing::_;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
+using ::testing::Return;
 
 namespace Envoy {
 namespace Secret {
@@ -64,6 +65,20 @@ TEST_F(SdsApiTest, BasicTest) {
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
   initialize();
+}
+
+// Validate that a noop init manager is used if the InitManger passed into the constructor
+// has been already initialized. This is a regression test for
+// https://github.com/envoyproxy/envoy/issues/12013
+TEST_F(SdsApiTest, InitManagerInitialised) {
+  NiceMock<Server::MockInstance> server;
+  envoy::config::core::v3::ConfigSource config_source;
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initialized));
+  EXPECT_CALL(init_manager_, add(_)).Times(0);
+
+  TlsCertificateSdsApi(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
+      server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
 }
 
 // Validate that bad ConfigSources are caught at construction time. This is a regression test for

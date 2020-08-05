@@ -4,6 +4,7 @@
 
 #include "envoy/init/manager.h"
 
+#include "common/common/cleanup.h"
 #include "common/common/logger.h"
 #include "common/init/watcher_impl.h"
 
@@ -29,6 +30,10 @@ public:
    * @param name a human-readable manager name, for logging / debugging.
    */
   ManagerImpl(absl::string_view name);
+
+  static void maybeCreateNoopInitManager(Manager& current_init_manager, absl::string_view name,
+                                         std::unique_ptr<Init::ManagerImpl>& init_manager,
+                                         std::unique_ptr<Cleanup>& init);
 
   // Init::Manager
   State state() const override;
