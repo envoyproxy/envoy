@@ -460,7 +460,7 @@ private:
         : active_stream_(active_stream), filter_manager_callbacks_(filter_manager_callbacks),
           buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
           stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
-    ~FilterManager() {
+    ~FilterManager() override {
       for (const auto& log_handler : access_log_handlers_) {
         log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                          stream_info_);
