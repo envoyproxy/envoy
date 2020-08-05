@@ -1131,7 +1131,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   }
   dispatcher_ = api_->allocateDispatcher("test_thread");
   socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(
