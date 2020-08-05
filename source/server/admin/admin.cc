@@ -58,37 +58,26 @@ namespace Server {
 namespace {
 
 /**
- * Favicon base64 image was harvested by screen-capturing the favicon from a
- * Chrome tab while visiting https://www.envoyproxy.io/. The resulting PNG was
- * translated to base64 by dropping it into https://www.base64-image.de/ and
- * then pasting the resulting string below.
+ * Favicon base64 image was harvested by screen-capturing the favicon from a Chrome tab
+ * while visiting https://www.envoyproxy.io/. The resulting PNG was translated to base64
+ * by dropping it into https://www.base64-image.de/ and then pasting the resulting string
+ * below.
  *
- * The actual favicon source for that, https://www.envoyproxy.io/img/favicon.ico
- * is nicer because it's transparent, but is also 67646 bytes, which is annoying
- * to inline. We could just reference that rather than inlining it, but then the
- * favicon won't work when visiting the admin page from a network that can't see
- * the internet.
+ * The actual favicon source for that, https://www.envoyproxy.io/img/favicon.ico is nicer
+ * because it's transparent, but is also 67646 bytes, which is annoying to inline. We could
+ * just reference that rather than inlining it, but then the favicon won't work when visiting
+ * the admin page from a network that can't see the internet.
  */
 const char EnvoyFavicon[] =
-    "data:image/"
-    "png;base64,"
-    "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1"
-    "BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAH9SURBVEhL7ZRdTttAFIUrUFaAX5w9g"
-    "IhgUfzshFRK+gIbaVbA"
-    "zwaqCly1dSpKk5A485/YCdXpHTB4BsdgVe0bD0cZ3Xsm38yZ8byTUuJ/"
-    "6g3wqqoBrBhPTzmmLfptMbAzttJTpTKAF2MWC"
-    "7ADCdNIwXZpvMMwayiIwwS874CcOc9VuQPR1dBBChPMITpFXXU45hukIIH6kHhzVqkEYB8F5HY"
-    "GvZ5B7EvwmHt9K/59Cr"
-    "U3QbY2RNYaQPYmJc+jPIBICNCcg20ZsAsCPfbcrFlRF+cJZpvXSJt9yMTxO/"
-    "IAzJrCOfhJXiOgFEX/SbZmezTWxyNk4Q9"
-    "anHMmjnzAhEyhAW8LCE6wl26J7ZFHH1FMYQxh567weQBOO1AW8D7P/UXAQySq/"
-    "QvL8Fu9HfCEw4SKALm5BkC3bwjwhSKr"
-    "A5hYAMXTJnPNiMyRBVzVjcgCyHiSm+8P+"
-    "WGlnmwtP2RzbCMiQJ0d2KtmmmPorRHEhfMROVfTG5/fYrF5iWXzE80tfy9WP"
-    "sCqx5Buj7FYH0LvDyHiqd+3otpsr4/"
-    "fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5"
-    "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/"
-    "QGeEUSfwBAkmWHn5Bb/gAAAABJRU5"
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1"
+    "BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAH9SURBVEhL7ZRdTttAFIUrUFaAX5w9gIhgUfzshFRK+gIbaVbA"
+    "zwaqCly1dSpKk5A485/YCdXpHTB4BsdgVe0bD0cZ3Xsm38yZ8byTUuJ/6g3wqqoBrBhPTzmmLfptMbAzttJTpTKAF2MWC"
+    "7ADCdNIwXZpvMMwayiIwwS874CcOc9VuQPR1dBBChPMITpFXXU45hukIIH6kHhzVqkEYB8F5HYGvZ5B7EvwmHt9K/59Cr"
+    "U3QbY2RNYaQPYmJc+jPIBICNCcg20ZsAsCPfbcrFlRF+cJZpvXSJt9yMTxO/IAzJrCOfhJXiOgFEX/SbZmezTWxyNk4Q9"
+    "anHMmjnzAhEyhAW8LCE6wl26J7ZFHH1FMYQxh567weQBOO1AW8D7P/UXAQySq/QvL8Fu9HfCEw4SKALm5BkC3bwjwhSKr"
+    "A5hYAMXTJnPNiMyRBVzVjcgCyHiSm+8P+WGlnmwtP2RzbCMiQJ0d2KtmmmPorRHEhfMROVfTG5/fYrF5iWXzE80tfy9WP"
+    "sCqx5Buj7FYH0LvDyHiqd+3otpsr4/fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5"
+    "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5"
     "ErkJggg==";
 
 const char AdminHtmlStart[] = R"(
@@ -147,8 +136,8 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
-// Helper method that ensures that we've setting flags based on all the health
-// flag values on the host.
+// Helper method that ensures that we've setting flags based on all the health flag values on the
+// host.
 void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
                    envoy::admin::v3::HostHealthStatus& health_status) {
   switch (flag) {
@@ -207,8 +196,8 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
 void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Message& message) {
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
-  // Figure out which paths cover Any fields. For each field, gather the paths
-  // to an inner mask, switch the outer mask to cover only the original field.
+  // Figure out which paths cover Any fields. For each field, gather the paths to
+  // an inner mask, switch the outer mask to cover only the original field.
   Protobuf::FieldMask outer_field_mask;
   Protobuf::FieldMask inner_field_mask;
   std::string any_field_name;
@@ -529,8 +518,8 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       config->PackFrom(msg);
     }
 
-    // We found the desired resource so there is no need to continue iterating
-    // over the other keys.
+    // We found the desired resource so there is no need to continue iterating over
+    // the other keys.
     return absl::nullopt;
   }
 
@@ -665,8 +654,8 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
                                   Network::Address::InstanceConstSharedPtr address,
                                   const Network::Socket::OptionsSharedPtr& socket_options,
                                   Stats::ScopePtr&& listener_scope) {
-  // TODO(mattklein123): Allow admin to use normal access logger extension
-  // loading and avoid the hard dependency here.
+  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
+  // hard dependency here.
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
@@ -697,8 +686,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       scoped_route_config_provider_(server.timeSource()), stats_handler_(server),
       logs_handler_(server), profiling_handler_(profile_path), runtime_handler_(server),
       listeners_handler_(server), server_cmd_handler_(server), server_info_handler_(server),
-      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set
-      // values
+      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine",
@@ -773,8 +761,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
 
 bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
                                          const std::vector<Network::FilterFactoryCb>&) {
-  // Pass in the null overload manager so that the admin interface is accessible
-  // even when Envoy is overloaded.
+  // Pass in the null overload manager so that the admin interface is accessible even when Envoy is
+  // overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpContext(), server_.runtime(),
       server_.localInfo(), server_.clusterManager(), null_overload_manager_,
@@ -789,6 +777,7 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
+
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -816,13 +805,12 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
   }
 
   if (!found_handler) {
-    // Extra space is emitted below to have "invalid path." be a separate
-    // sentence in the 404 output from "admin commands are:" in handlerHelp.
+    // Extra space is emitted below to have "invalid path." be a separate sentence in the
+    // 404 output from "admin commands are:" in handlerHelp.
     response.add("invalid path. ");
     handlerHelp(path_and_query, response_headers, response, admin_stream);
     code = Http::Code::NotFound;
   }
-
   Memory::Utils::tryShrinkHeap(server_.runtime().threadsafeSnapshot()->getInteger(
       "envoy.memory.heap_shrink_threshold", static_cast<uint64_t>(100 * 1024 * 1024UL)));
   return code;
@@ -833,8 +821,7 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
   for (const UrlHandler& handler : handlers_) {
     sorted_handlers.push_back(&handler);
   }
-  // Note: it's generally faster to sort a vector with std::vector than to
-  // construct a std::map.
+  // Note: it's generally faster to sort a vector with std::vector than to construct a std::map.
   std::sort(sorted_handlers.begin(), sorted_handlers.end(),
             [](const UrlHandler* h1, const UrlHandler* h2) { return h1->prefix_ < h2->prefix_; });
   return sorted_handlers;
@@ -844,8 +831,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
                                   Buffer::Instance& response, AdminStream&) {
   response.add("admin commands are:\n");
 
-  // Prefix order is used during searching, but for printing do them in alpha
-  // order.
+  // Prefix order is used during searching, but for printing do them in alpha order.
   for (const UrlHandler* handler : sortedHandlers()) {
     response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
   }
@@ -858,8 +844,7 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
 
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
 
-  // Prefix order is used during searching, but for printing do them in alpha
-  // order.
+  // Prefix order is used during searching, but for printing do them in alpha order.
   for (const UrlHandler* handler : sortedHandlers()) {
     absl::string_view path = handler->prefix_;
 
@@ -881,18 +866,17 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
     ASSERT(path[0] == '/');
     path = path.substr(1);
 
-    // For handlers that mutate state, render the link as a button in a POST
-    // form, rather than an anchor tag. This should discourage crawlers that
-    // find the / page from accidentally mutating all the server state by
-    // GETting all the hrefs.
-    const char* link_format = handler->mutates_server_state_
-                                  ? "<form action='{}' method='post' "
-                                    "class='home-form'><button>{}</button></form>"
-                                  : "<a href='{}'>{}</a>";
+    // For handlers that mutate state, render the link as a button in a POST form,
+    // rather than an anchor tag. This should discourage crawlers that find the /
+    // page from accidentally mutating all the server state by GETting all the hrefs.
+    const char* link_format =
+        handler->mutates_server_state_
+            ? "<form action='{}' method='post' class='home-form'><button>{}</button></form>"
+            : "<a href='{}'>{}</a>";
     const std::string link = fmt::format(link_format, path, path);
 
-    // Handlers are all specified by statically above, and are thus trusted and
-    // do not require escaping.
+    // Handlers are all specified by statically above, and are thus trusted and do
+    // not require escaping.
     response.add(fmt::format("<tr class='home-row'><td class='home-data'>{}</td>"
                              "<td class='home-data'>{}</td></tr>\n",
                              link, Html::Utility::sanitize(handler->help_text_)));
