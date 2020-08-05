@@ -1,5 +1,7 @@
 #include "test/server/admin/admin_instance.h"
 
+#include "test/mocks/runtime/mocks.h"
+
 namespace Envoy {
 namespace Server {
 

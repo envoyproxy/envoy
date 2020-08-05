@@ -18,6 +18,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
@@ -43,8 +44,8 @@ public:
     EXPECT_CALL(dispatcher_, createTimer_(_));
     xds_context_ = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
-        local_info_);
+        envoy::config::core::v3::ApiVersion::AUTO, random_, runtime_, stats_store_,
+        rate_limit_settings_, local_info_);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         xds_context_, callbacks_, resource_decoder_, stats_,
         Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false);
@@ -195,6 +196,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
   NewGrpcMuxImplSharedPtr xds_context_;

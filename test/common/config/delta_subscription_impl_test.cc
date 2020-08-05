@@ -7,6 +7,7 @@
 #include "common/config/api_version.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"
+#include "test/mocks/runtime/mocks.h"
 
 namespace Envoy {
 namespace Config {
@@ -125,6 +126,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
 
 TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   Stats::IsolatedStoreImpl stats_store;
+  NiceMock<Runtime::MockLoader> runtime;
+
   SubscriptionStats stats(Utility::generateStats(stats_store));
 
   envoy::config::core::v3::Node node;
@@ -144,7 +147,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
           "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
   NewGrpcMuxImplSharedPtr xds_context = std::make_shared<NewGrpcMuxImpl>(
       std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
-      envoy::config::core::v3::ApiVersion::AUTO, random, stats_store, rate_limit_settings,
+      envoy::config::core::v3::ApiVersion::AUTO, random, runtime, stats_store, rate_limit_settings,
       local_info);
 
   GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(

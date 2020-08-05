@@ -33,6 +33,8 @@ public:
   std::string cpu_profile_path_;
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
+  std::shared_ptr<NiceMock<Runtime::MockSnapshot>> threadsafe_snapshot_{
+      std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   AdminImpl admin_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Server::AdminFilter admin_filter_;
