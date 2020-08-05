@@ -175,6 +175,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
         "//source/common/memory:utils_lib",
+        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
