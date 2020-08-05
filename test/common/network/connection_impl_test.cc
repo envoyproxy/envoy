@@ -107,7 +107,7 @@ protected:
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
     socket_ = std::make_shared<Network::TcpListenSocket>(
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->localAddress(), source_address_,
@@ -292,7 +292,7 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // immediate error return from connect().
   Address::InstanceConstSharedPtr broadcast_address;
   socket_ = std::make_shared<Network::TcpListenSocket>(
-    Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   if (socket_->localAddress()->ip()->version() == Address::IpVersion::v4) {
     broadcast_address = std::make_shared<Address::Ipv4Instance>("224.0.0.1", 0);
   } else {
@@ -807,7 +807,7 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   client_connection_->addReadFilter(client_read_filter);
   connect();
-  
+
   auto on_filter_data_exit = [&](Buffer::Instance&, bool) -> FilterStatus {
     dispatcher_->exit();
     return FilterStatus::StopIteration;
@@ -819,8 +819,7 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   {
     Buffer::OwnedImpl buffer("data");
     server_connection_->write(buffer, false);
-    EXPECT_CALL(*client_read_filter, onData(_, false))
-        .WillOnce(Invoke(on_filter_data_exit));
+    EXPECT_CALL(*client_read_filter, onData(_, false)).WillOnce(Invoke(on_filter_data_exit));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_TRUE(testClientConnection()->readBuffer().highWatermarkTriggered());
@@ -843,8 +842,7 @@ TEST_P(ConnectionImplTest, ReadWatermarks) {
   {
     Buffer::OwnedImpl buffer("bye");
     server_connection_->write(buffer, false);
-    EXPECT_CALL(*client_read_filter, onData(_, false))
-        .WillOnce(Invoke(on_filter_data_exit));
+    EXPECT_CALL(*client_read_filter, onData(_, false)).WillOnce(Invoke(on_filter_data_exit));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_TRUE(testClientConnection()->readBuffer().highWatermarkTriggered());
@@ -1133,7 +1131,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   }
   dispatcher_ = api_->allocateDispatcher("test_thread");
   socket_ = std::make_shared<Network::TcpListenSocket>(
-    Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -2239,7 +2237,7 @@ public:
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_ = api_->allocateDispatcher("test_thread");
     socket_ = std::make_shared<Network::TcpListenSocket>(
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(

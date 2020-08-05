@@ -208,7 +208,7 @@ TEST_P(ListenerImplTest, GlobalConnectionLimitEnforcement) {
 
 TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   auto socket = std::make_shared<TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
@@ -285,7 +285,7 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   testing::InSequence s1;
 
   auto socket = std::make_shared<TcpListenSocket>(
-    Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
+      Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   MockListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
