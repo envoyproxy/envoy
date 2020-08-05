@@ -74,8 +74,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "connection_impl_test",
     srcs = ["connection_impl_test.cc"],
-    # Times out on Windows
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
@@ -181,8 +179,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_impl_test",
     srcs = ["listener_impl_test.cc"],
-    # Times out on Windows
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
