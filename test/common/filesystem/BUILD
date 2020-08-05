@@ -29,7 +29,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "watcher_impl_test",
     srcs = ["watcher_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/event:dispatcher_includes",

@@ -43,7 +43,7 @@ void LibeventScheduler::run(Dispatcher::RunType mode) {
     // This is because libevent only supports level triggering on Windows, and so the write
     // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
     // loop will run at most once
-    flag |= EVLOOP_NONBLOCK | EVLOOP_ONCE;
+    flag |= EVLOOP_ONCE;
 #endif
     break;
   case Dispatcher::RunType::Block:
