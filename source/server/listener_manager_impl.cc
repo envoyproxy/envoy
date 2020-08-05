@@ -648,16 +648,6 @@ std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl
   return ret;
 }
 
-std::vector<std::reference_wrapper<Network::ListenerConfig>>
-ListenerManagerImpl::warmingListeners() {
-  std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
-  ret.reserve(warming_listeners_.size());
-  for (const auto& listener : warming_listeners_) {
-    ret.push_back(*listener);
-  }
-  return ret;
-}
-
 void ListenerManagerImpl::addListenerToWorker(Worker& worker,
                                               absl::optional<uint64_t> overridden_listener,
                                               ListenerImpl& listener,
