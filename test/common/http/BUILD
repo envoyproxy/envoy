@@ -50,8 +50,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
-    # IpVersions/CodecNetworkTest.SendData/IPv4: Test times out on Windows.
-    tags = ["fails_on_windows"],
     deps = [
         ":common_lib",
         "//source/common/buffer:buffer_lib",
