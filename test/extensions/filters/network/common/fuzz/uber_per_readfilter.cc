@@ -25,21 +25,16 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
     const auto factories = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ExtAuthorization,
-        NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RedisProxy,
-        NetworkFilterNames::get().ClientSslAuth,
-        NetworkFilterNames::get().Echo,
-        NetworkFilterNames::get().DirectResponse,
-        NetworkFilterNames::get().DubboProxy,
-        NetworkFilterNames::get().SniCluster,
-        NetworkFilterNames::get().ThriftProxy,
-        NetworkFilterNames::get().ZooKeeperProxy,
+        NetworkFilterNames::get().ExtAuthorization, NetworkFilterNames::get().LocalRateLimit,
+        NetworkFilterNames::get().RedisProxy, NetworkFilterNames::get().ClientSslAuth,
+        NetworkFilterNames::get().Echo, NetworkFilterNames::get().DirectResponse,
+        NetworkFilterNames::get().DubboProxy, NetworkFilterNames::get().SniCluster,
+        // A dedicated http_connection_manager fuzzer can be found in
+        // test/common/http/conn_manager_impl_fuzz_test.cc
         NetworkFilterNames::get().HttpConnectionManager,
-        NetworkFilterNames::get().SniDynamicForwardProxy,
-        NetworkFilterNames::get().KafkaBroker,
-        NetworkFilterNames::get().RocketmqProxy,
-        NetworkFilterNames::get().RateLimit,
+        NetworkFilterNames::get().ThriftProxy, NetworkFilterNames::get().ZooKeeperProxy,
+        NetworkFilterNames::get().SniDynamicForwardProxy, NetworkFilterNames::get().KafkaBroker,
+        NetworkFilterNames::get().RocketmqProxy, NetworkFilterNames::get().RateLimit,
         NetworkFilterNames::get().Rbac
         // TODO(jianwendong): cover mongo_proxy, mysql_proxy, postgres_proxy, tcp_proxy.
     };
@@ -91,9 +86,8 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
     read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
     read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
-    // A dedicated http_connection_manager fuzzer can be found in test/common/http/conn_manager_impl_fuzz_test.cc
-    read_filter_callbacks_->connection_.local_address_ = ipv4_addr_;
-    read_filter_callbacks_->connection_.remote_address_ = ipv4_addr_;
+    read_filter_callbacks_->connection_.local_address_ = pipe_addr_; // modified here
+    read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
   } else if (filter_name == NetworkFilterNames::get().RateLimit) {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
@@ -126,8 +120,9 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name,
                                                   Protobuf::Message* config_message) {
   // System calls such as reading files are prohibited in this fuzzer. Some input that crashes the
-  // mock/fake objects are also prohibited. For now there are only two filters {DirectResponse,
-  // LocalRateLimit} on which we have constraints.
+  // mock/fake objects are also prohibited. We could also avoid fuzzing some unfinished features by
+  // checking them here. For now there are only three filters {DirectResponse, LocalRateLimit,
+  // HttpConnectionManager} on which we have constraints.
   const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
       std::string(filter_name));
   if (filter_name == NetworkFilterNames::get().DirectResponse) {
@@ -150,6 +145,18 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       throw EnvoyException(
           absl::StrCat("local_ratelimit trying to set a large fill_interval. Config:\n{}",
                        config.DebugString()));
+    }
+  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config = dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
+                                  HttpConnectionManager&>(*config_message);
+    if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
+                                   HttpConnectionManager::HTTP3) {
+      // Quiche is still in progress and http_conn_manager has a dedicated fuzzer.
+      // So we won't fuzz it here with complex mocks.
+      throw EnvoyException(absl::StrCat(
+          "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
+          config.DebugString()));
     }
   }
 }

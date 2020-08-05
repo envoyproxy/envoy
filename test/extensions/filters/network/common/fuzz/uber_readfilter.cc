@@ -18,7 +18,7 @@ void UberFilterFuzzer::reset() {
   // Clear the pointers inside the mock_dispatcher
   Event::MockDispatcher& mock_dispatcher =
       dynamic_cast<Event::MockDispatcher&>(read_filter_callbacks_->connection_.dispatcher_);
-  mock_dispatcher.to_delete_.clear();
+  mock_dispatcher.clearDeferredDeleteList();
   read_filter_.reset();
 }
 
@@ -45,7 +45,6 @@ void UberFilterFuzzer::fuzzerSetup() {
   factory_context_.prepareSimulatedSystemTime();
   // Prepare address for filters such as ext_authz filter.
   pipe_addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
-  ipv4_addr_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
 }
 
