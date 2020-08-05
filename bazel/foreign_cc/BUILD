@@ -281,12 +281,16 @@ envoy_cmake_external(
 
                 # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
                 "WITH_OPTIM": "on",
+                # However turning off SSE4 fixes it.
+                "WITH_SSE4": "off",
+
                 # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
-                "WITH_NEW_STRATEGIES": "on",
+                # Turning this off means falling into NO_QUICK_STRATEGY route.
+                "WITH_NEW_STRATEGIES": "off",
 
                 # zlib-ng advance build options. Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
-                # Since UNALIGNED_OK is on by default, it is assumed to be one of the optimizations.
-                "UNALIGNED_OK": "on",
+                # Only allow aligned address.
+                "UNALIGNED_OK": "off",
             },
             "lib_source": "@com_github_zlib_ng_zlib_ng//:all",
         },
