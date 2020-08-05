@@ -39,40 +39,40 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
 
 private:
-  // Utility functions; make any necessary checks and call the corresponding lookup_ functions
+  // Utility functions: make any necessary checks and call the corresponding lookup_ functions.
   void getBody();
   void getTrailers();
 
-  // Callbacks for HttpCache to call when headers/body/trailers are ready
+  // Callbacks for HttpCache to call when headers/body/trailers are ready.
   void onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers);
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
-  // Precondition: lookup_result_ points to a cache lookup result that requires validation
-  //               filter_state_ is ValidatingCachedResponse
-  // Serves a validated cached response after updating it with a 304 response
+  // Precondition: lookup_result_ points to a cache lookup result that requires validation.
+  //               filter_state_ is ValidatingCachedResponse.
+  // Serves a validated cached response after updating it with a 304 response.
   void processSuccessfulValidation(Http::ResponseHeaderMap& response_headers);
 
-  // Precondition: lookup_result_ points to a cache lookup result that requires validation
-  //               filter_state_ is ValidatingCachedResponse
-  // Checks if a cached entry should be updated with a 304 response
+  // Precondition: lookup_result_ points to a cache lookup result that requires validation.
+  //               filter_state_ is ValidatingCachedResponse.
+  // Checks if a cached entry should be updated with a 304 response.
   bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
 
-  // Precondition: lookup_result_ points to a cache lookup result that requires validation
-  // Should only be called during onHeaders as it modifies RequestHeaderMap
+  // Precondition: lookup_result_ points to a cache lookup result that requires validation.
+  // Should only be called during onHeaders as it modifies RequestHeaderMap.
   // Adds required conditional headers for cache validation to the request headers
-  // according to the present cache lookup result headers
+  // according to the present cache lookup result headers.
   void injectValidationHeaders(Http::RequestHeaderMap& request_headers);
 
-  // Precondition: lookup_result_ points to a fresh or validated cache look up result
-  //               filter_state_ is ValidatingCachedResponse
-  // Adds a cache lookup result to the response encoding stream
-  // Can be called during decoding if a valid cache hit is found
-  // or during encoding if a cache entry was validated successfully
+  // Precondition: lookup_result_ points to a fresh or validated cache look up result.
+  //               filter_state_ is ValidatingCachedResponse.
+  // Adds a cache lookup result to the response encoding stream.
+  // Can be called during decoding if a valid cache hit is found,
+  // or during encoding if a cache entry was validated successfully.
   void encodeCachedResponse();
 
-  // Precondition: finished adding a response from cache to the response encoding stream
-  // Updates filter_state_ and continues the encoding stream if necessary
+  // Precondition: finished adding a response from cache to the response encoding stream.
+  // Updates filter_state_ and continues the encoding stream if necessary.
   void finalizeEncodingCachedResponse();
 
   TimeSource& time_source_;
@@ -98,24 +98,24 @@ private:
 
     // CacheFilter::decodeHeaders called lookup->getHeaders() but onHeaders was not called yet
     // (lookup result not ready) -- the decoding stream should be stopped until the cache lookup
-    // result is ready
+    // result is ready.
     WaitingForCacheLookup,
 
     // CacheFilter::encodeHeaders called encodeCachedResponse() but encoding the cached response is
-    // not finished yet -- the encoding stream should be stopped until it is finished
+    // not finished yet -- the encoding stream should be stopped until it is finished.
     WaitingForCacheBody,
 
-    // Cache lookup did not find a cached response for this request
+    // Cache lookup did not find a cached response for this request.
     NoCachedResponseFound,
 
-    // Cache lookup found a cached response that requires validation
+    // Cache lookup found a cached response that requires validation.
     ValidatingCachedResponse,
 
-    // Cache lookup found a fresh cached response and it is being added to the encoding stream
+    // Cache lookup found a fresh cached response and it is being added to the encoding stream.
     DecodeServingFromCache,
 
     // The cached response was successfully added to the encoding stream (either during decoding or
-    // encoding)
+    // encoding).
     ResponseServedFromCache
   };
   FilterState filter_state_ = FilterState::Initial;

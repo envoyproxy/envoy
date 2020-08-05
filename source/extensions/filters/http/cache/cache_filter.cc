@@ -62,15 +62,15 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   lookup_->getHeaders(
       [this, &headers](LookupResult&& result) { onHeaders(std::move(result), headers); });
 
-  // If the cache called onHeaders synchronously it will have advanced the filter_state_
+  // If the cache called onHeaders synchronously it will have advanced the filter_state_.
   switch (filter_state_) {
   case FilterState::Initial:
-    // Headers are not fetched from cache yet -- wait until cache lookup is completed
+    // Headers are not fetched from cache yet -- wait until cache lookup is completed.
     filter_state_ = FilterState::WaitingForCacheLookup;
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   case FilterState::DecodeServingFromCache:
   case FilterState::ResponseServedFromCache:
-    // A fresh cached response was found -- no need to continue the decoding stream
+    // A fresh cached response was found -- no need to continue the decoding stream.
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   default:
     return Http::FilterHeadersStatus::Continue;
@@ -80,7 +80,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                      bool end_stream) {
   if (filter_state_ == FilterState::DecodeServingFromCache) {
-    // This call was invoked by decoder_callbacks_->encodeHeaders -- ignore it
+    // This call was invoked by decoder_callbacks_->encodeHeaders -- ignore it.
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -92,17 +92,17 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
   if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
     processSuccessfulValidation(headers);
     if (filter_state_ != FilterState::ResponseServedFromCache) {
-      // Response is still being fetched from cache -- wait until it is fetched & encoded
+      // Response is still being fetched from cache -- wait until it is fetched & encoded.
       filter_state_ = FilterState::WaitingForCacheBody;
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Either a cache miss or a cache entry that is no longer valid
-  // Check if the new response can be cached
+  // Either a cache miss or a cache entry that is no longer valid.
+  // Check if the new response can be cached.
   if (request_allows_inserts_ && CacheabilityUtils::isCacheableResponse(headers)) {
-    // TODO(#12140): Add date internal header or metadata to cached responses
+    // TODO(#12140): Add date internal header or metadata to cached responses.
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     insert_->insertHeaders(headers, end_stream);
@@ -112,11 +112,11 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
 
 Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (filter_state_ == FilterState::DecodeServingFromCache) {
-    // This call was invoked by decoder_callbacks_->encodeData -- ignore it
+    // This call was invoked by decoder_callbacks_->encodeData -- ignore it.
     return Http::FilterDataStatus::Continue;
   }
   if (filter_state_ == FilterState::WaitingForCacheBody) {
-    // Encoding stream stopped waiting for cached body (and trailers) to be encoded
+    // Encoding stream stopped waiting for cached body (and trailers) to be encoded.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
   if (insert_) {
@@ -143,16 +143,17 @@ void CacheFilter::getTrailers() {
 }
 
 void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
-  // TODO(yosrym93): Handle request only-if-cached directive
+  // TODO(yosrym93): Handle request only-if-cached directive.
   bool should_continue_decoding = false;
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::NotSatisfiableRange: // TODO(#10132): create 416 response.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;          // We don't yet return or support these codes.
   case CacheEntryStatus::RequiresValidation:
-    // If a cache entry requires validation inject validation headers in the request and let it
-    // pass through as if no cache entry was found. If the cache entry was valid the response
-    // status should be 304 (unmodified), and the cache entry will be injected in the response body
+    // If a cache entry requires validation, inject validation headers in the request and let it
+    // pass through as if no cache entry was found.
+    // If the cache entry was valid, the response status should be 304 (unmodified) and the cache
+    // entry will be injected in the response body.
     lookup_result_ = std::make_unique<LookupResult>(std::move(result));
     should_continue_decoding = filter_state_ == FilterState::WaitingForCacheLookup;
     filter_state_ = FilterState::ValidatingCachedResponse;
@@ -170,15 +171,15 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     encodeCachedResponse();
   }
   if (should_continue_decoding) {
-    // decodeHeaders returned StopIteration waiting for this callback -- continue decoding
+    // decodeHeaders returned StopIteration waiting for this callback -- continue decoding.
     decoder_callbacks_->continueDecoding();
   }
 }
 
 // TODO(toddmgreer): Handle downstream backpressure.
 void CacheFilter::onBody(Buffer::InstancePtr&& body) {
-  // Can be called during decoding if a valid cache hit is found
-  // or during encoding if a cache entry was being validated
+  // Can be called during decoding if a valid cache hit is found,
+  // or during encoding if a cache entry was being validated.
   ASSERT(!remaining_body_.empty(),
          "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
          "bogus callback.");
@@ -212,8 +213,8 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 }
 
 void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
-  // Can be called during decoding if a valid cache hit is found
-  // or during encoding if a cache entry was being validated
+  // Can be called during decoding if a valid cache hit is found,
+  // or during encoding if a cache entry was being validated.
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   } else {
@@ -231,21 +232,21 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   ASSERT(isResponseNotModified(response_headers),
          "processSuccessfulValidation must only be called with 304 responses");
 
-  // Check whether the cached entry should be updated before modifying the 304 response
+  // Check whether the cached entry should be updated before modifying the 304 response.
   const bool should_update_cached_entry = shouldUpdateCachedEntry(response_headers);
 
-  // Update the 304 response status code and content-length
+  // Update the 304 response status code and content-length.
   response_headers.setStatus(lookup_result_->headers_->getStatusValue());
   response_headers.setContentLength(lookup_result_->headers_->getContentLengthValue());
 
-  // A cache entry was successfully validated; encode cached body and trailers.
+  // A cache entry was successfully validated -> encode cached body and trailers.
   // encodeCachedResponse also adds the age header to lookup_result_
   // so it should be called before headers are merged.
   encodeCachedResponse();
 
   // Add any missing headers from the cached response to the 304 response.
   lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
-    // TODO(yosrym93): Try to avoid copying the header key twice
+    // TODO(yosrym93): Try to avoid copying the header key twice.
     Http::LowerCaseString key(std::string(cached_header.key().getStringView()));
     absl::string_view value = cached_header.value().getStringView();
     if (!response_headers.get(key)) {
@@ -255,7 +256,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   });
 
   if (should_update_cached_entry) {
-    // TODO(yosrym93): else the cached entry should be deleted
+    // TODO(yosrym93): else the cached entry should be deleted.
     cache_.updateHeaders(*lookup_, response_headers);
   }
 }
@@ -271,8 +272,8 @@ bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& respons
 
   // According to: https://httpwg.org/specs/rfc7234.html#freshening.responses,
   // and assuming a single cached response per key:
-  // If the 304 response contains a strong validator (etag) that does not match the cached response
-  // the cached response should not be updated
+  // If the 304 response contains a strong validator (etag) that does not match the cached response,
+  // the cached response should not be updated.
   const Http::HeaderEntry* response_etag = response_headers.get(Http::CustomHeaders::get().Etag);
   const Http::HeaderEntry* cached_etag =
       lookup_result_->headers_->get(Http::CustomHeaders::get().Etag);
@@ -297,11 +298,13 @@ void CacheFilter::injectValidationHeaders(Http::RequestHeaderMap& request_header
     request_headers.setReferenceKey(Http::CustomHeaders::get().IfNoneMatch, etag);
   }
   if (CacheHeadersUtils::httpTime(last_modified_header) != SystemTime()) {
-    // Valid Last-Modified header exists
+    // Valid Last-Modified header exists.
     absl::string_view last_modified = last_modified_header->value().getStringView();
     request_headers.setReferenceKey(Http::CustomHeaders::get().IfModifiedSince, last_modified);
   } else {
-    // Either Last-Modified is missing or invalid, fallback to Date
+    // Either Last-Modified is missing or invalid, fallback to Date.
+    // A correct behaviour according to:
+    // https://httpwg.org/specs/rfc7232.html#header.if-modified-since
     absl::string_view date = lookup_result_->headers_->getDateValue();
     request_headers.setReferenceKey(Http::CustomHeaders::get().IfModifiedSince, date);
   }
@@ -316,7 +319,7 @@ void CacheFilter::encodeCachedResponse() {
   // TODO(toddmgreer): Calculate age per https://httpwg.org/specs/rfc7234.html#age.calculations
   lookup_result_->headers_->addReferenceKey(Http::Headers::get().Age, 0);
 
-  // Set appropriate response flags and codes
+  // Set appropriate response flags and codes.
   Http::StreamFilterCallbacks* callbacks =
       filter_state_ == FilterState::DecodeServingFromCache
           ? static_cast<Http::StreamFilterCallbacks*>(decoder_callbacks_)
@@ -326,8 +329,8 @@ void CacheFilter::encodeCachedResponse() {
   callbacks->streamInfo().setResponseCodeDetails(
       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
 
-  // If the filter is encoding, 304 response headers and cached headers are merged in encodeHeaders
-  // If the filter is decoding, we need to serve response headers from cache directly
+  // If the filter is encoding, 304 response headers and cached headers are merged in encodeHeaders.
+  // If the filter is decoding, we need to serve response headers from cache directly.
   if (filter_state_ == FilterState::DecodeServingFromCache) {
     decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream);
   }
@@ -343,7 +346,7 @@ void CacheFilter::encodeCachedResponse() {
 void CacheFilter::finalizeEncodingCachedResponse() {
   if (filter_state_ == FilterState::WaitingForCacheBody) {
     // encodeHeaders returned StopIteration waiting for finishing encoding the cached response --
-    // continue encoding
+    // continue encoding.
     encoder_callbacks_->continueEncoding();
   }
   filter_state_ = FilterState::ResponseServedFromCache;

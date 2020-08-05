@@ -129,32 +129,33 @@ TEST_P(CacheIntegrationTest, SuccessfulValidation) {
   simTime().advanceTimeWait(std::chrono::seconds(10));
   const std::string not_modified_date = formatter_.now(simTime());
 
-  // Send second request, the cached response should be validated then served
+  // Send second request, the cached response should be validated then served.
   IntegrationStreamDecoderPtr response_decoder =
       codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  // Check for injected precondition headers (no Last-Modified header so should fallback to Date)
+  // Check for injected conditional headers -- no "Last-Modified" header so should fallback to
+  // "Date".
   Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"},
                                                      {"if-modified-since", original_response_date}};
   EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
-  // Create a 304 (not modified) response -> cached response is valid
+  // Create a 304 (not modified) response -> cached response is valid.
   Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
                                                                    {"date", not_modified_date}};
   upstream_request_->encodeHeaders(not_modified_response_headers, /*end_stream=*/true);
 
-  // The original response headers should be updated with 304 response headers
+  // The original response headers should be updated with 304 response headers.
   response_headers.setDate(not_modified_date);
 
   // Wait for the response to be read by the codec client.
   response_decoder->waitForEndStream();
 
-  // Check that the served response is the cached response
+  // Check that the served response is the cached response.
   EXPECT_TRUE(response_decoder->complete());
   EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
   EXPECT_EQ(response_decoder->body(), std::string(42, 'a'));
-  // Check that age header exists as this is a cached response
+  // Check that age header exists as this is a cached response.
   EXPECT_NE(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
 
   // Advance time to force a log flush.
@@ -199,33 +200,34 @@ TEST_P(CacheIntegrationTest, UnsuccessfulValidation) {
   }
 
   simTime().advanceTimeWait(std::chrono::seconds(10));
+  // Any response with status other than 304 should be passed to the client as-is.
   Http::TestResponseHeaderMapImpl updated_response_headers = {{":status", "200"},
                                                               {"date", formatter_.now(simTime())},
                                                               {"cache-control", "max-age=0"},
                                                               {"content-length", "20"},
                                                               {"etag", "a2"}};
 
-  // Send second request, validation of the cached response should be attempted but should fail
+  // Send second request, validation of the cached response should be attempted but should fail.
   IntegrationStreamDecoderPtr response_decoder =
       codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  // Check for injected precondition headers
+  // Check for injected precondition headers.
   Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "a1"}};
   EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
-  // Reply with the updated response -> cached response is invalid
+  // Reply with the updated response -> cached response is invalid.
   upstream_request_->encodeHeaders(updated_response_headers, /*end_stream=*/false);
   // send 20 'a's
   upstream_request_->encodeData(20, true);
 
   // Wait for the response to be read by the codec client.
   response_decoder->waitForEndStream();
-  // Check that the served response is the updated response
+  // Check that the served response is the updated response.
   EXPECT_TRUE(response_decoder->complete());
   EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(updated_response_headers));
   EXPECT_EQ(response_decoder->body(), std::string(20, 'a'));
-  // Check that age header does not exist as this is not a cached response
+  // Check that age header does not exist as this is not a cached response.
   EXPECT_EQ(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
 
   // Advance time to force a log flush.
@@ -233,7 +235,7 @@ TEST_P(CacheIntegrationTest, UnsuccessfulValidation) {
   EXPECT_EQ(waitForAccessLog(access_log_name_, 1), "- via_upstream\n");
 }
 
-// Send the same GET request twice with body and trailers twice, then check that the response
+// Send the same GET request with body and trailers twice, then check that the response
 // doesn't have an age header, to confirm that it wasn't served from cache.
 TEST_P(CacheIntegrationTest, GetRequestWithBodyAndTrailers) {
   // Set system time to cause Envoy's cached formatted time to match time on this thread.
