@@ -22,4 +22,8 @@ struct DemoFilter: ResponseFilter {
   func onResponseTrailers(_ trailers: ResponseTrailers) -> FilterTrailersStatus<ResponseTrailers> {
     return .continue(trailers)
   }
+
+  func onError(_ error: EnvoyError) {}
+
+  func onCancel() {}
 }
