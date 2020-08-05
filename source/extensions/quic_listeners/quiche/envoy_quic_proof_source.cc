@@ -30,12 +30,6 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   const std::string& chain_str = cert_config.certificateChain();
   std::stringstream pem_stream(chain_str);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
-  if (chain.empty()) {
-    const std::string& path = cert_config.certificateChainPath();
-    ENVOY_LOG(warn, "Failed to load certificate chain from %s", path);
-    return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
-        new quic::ProofSource::Chain({}));
-  }
   return quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>(
       new quic::ProofSource::Chain(chain));
 }
@@ -89,7 +83,6 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   const Network::FilterChain* filter_chain =
       filter_chain_manager_.findFilterChain(connection_socket);
   if (filter_chain == nullptr) {
-    ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     listener_stats_.no_filter_chain_match_.inc();
     return {absl::nullopt, absl::nullopt};
   }

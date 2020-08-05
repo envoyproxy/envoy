@@ -116,6 +116,34 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
             error_details);
 }
 
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
+  configCertVerificationDetails(true);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  const std::vector<std::string> certs{"invalid leaf cert"};
+  EXPECT_EQ(quic::QUIC_FAILURE,
+            verifier_->VerifyCertChain("www.google.com", 54321, certs, ocsp_response, cert_sct,
+                                       nullptr, &error_details, nullptr, nullptr));
+  EXPECT_EQ("d2i_X509: fail to parse DER", error_details);
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureLeafCertWithGarbage) {
+  configCertVerificationDetails(true);
+  std::unique_ptr<quic::CertificateView> cert_view =
+      quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string cert_with_trailing_garbage = absl::StrCat(leaf_cert_, "AAAAAA");
+  std::string error_details;
+  EXPECT_EQ(quic::QUIC_FAILURE,
+            verifier_->VerifyCertChain(std::string(cert_view->subject_alt_name_domains()[0]), 54321,
+                                       {cert_with_trailing_garbage}, ocsp_response, cert_sct,
+                                       nullptr, &error_details, nullptr, nullptr))
+      << error_details;
+  EXPECT_EQ("There is trailing garbage in DER.", error_details);
+}
+
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   configCertVerificationDetails(true);
   std::unique_ptr<quic::CertificateView> cert_view =
@@ -164,6 +192,43 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureInvalidLeafCert) {
                                    server_config, version, chlo_hash, certs, cert_sct, "signature",
                                    nullptr, &error_details, nullptr, nullptr));
   EXPECT_EQ("Invalid leaf cert.", error_details);
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureUnsupportedRsaKey) {
+  configCertVerificationDetails(true);
+  quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
+  quiche::QuicheStringPiece chlo_hash{"aaaaa"};
+  std::string server_config{"Server Config"};
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  // This is a EC cert with secp384r1 curve which is not supported by Envoy.
+  const std::string certs{R"(-----BEGIN CERTIFICATE-----
+MIICkDCCAhagAwIBAgIUTZbykU9eQL3GdrNlodxrOJDecIQwCgYIKoZIzj0EAwIw
+fzELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAk1BMRIwEAYDVQQHDAlDYW1icmlkZ2Ux
+DzANBgNVBAoMBkdvb2dsZTEOMAwGA1UECwwFZW52b3kxDTALBgNVBAMMBHRlc3Qx
+HzAdBgkqhkiG9w0BCQEWEGRhbnpoQGdvb2dsZS5jb20wHhcNMjAwODA1MjAyMDI0
+WhcNMjIwODA1MjAyMDI0WjB/MQswCQYDVQQGEwJVUzELMAkGA1UECAwCTUExEjAQ
+BgNVBAcMCUNhbWJyaWRnZTEPMA0GA1UECgwGR29vZ2xlMQ4wDAYDVQQLDAVlbnZv
+eTENMAsGA1UEAwwEdGVzdDEfMB0GCSqGSIb3DQEJARYQZGFuemhAZ29vZ2xlLmNv
+bTB2MBAGByqGSM49AgEGBSuBBAAiA2IABGRaEAtVq+xHXfsF4R/j+mqVN2E29ZYL
+oFlvnelKeeT2B51bSfUv+X+Ci1BSa2OxPCVS6o0vpcF6YOlz4CS7QcXZIoRfhsv7
+O2Hz/IdxAPhX/gdK/70T1x+V/6nvIHiiw6NTMFEwHQYDVR0OBBYEFF75rDce6xNJ
+GfpKbUg4emG2KWRMMB8GA1UdIwQYMBaAFF75rDce6xNJGfpKbUg4emG2KWRMMA8G
+A1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDaAAwZQIxAIyZghTK3cmyrRWkxfQ7
+xEc11gujcT8nbytYbM6jodKwcbtR6SOmLx2ychXrCMm2ZAIwXqmrTYBtrbqb3mBx
+VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
+-----END CERTIFICATE-----)"};
+  std::stringstream pem_stream(certs);
+  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  std::unique_ptr<quic::CertificateView> cert_view =
+      quic::CertificateView::ParseSingleCertificate(chain[0]);
+  ASSERT(cert_view);
+  EXPECT_EQ(quic::QUIC_FAILURE,
+            verifier_->VerifyProof("www.google.com", 54321, server_config, version, chlo_hash,
+                                   chain, cert_sct, "signature", nullptr, &error_details, nullptr,
+                                   nullptr));
+  EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureInvalidSignature) {

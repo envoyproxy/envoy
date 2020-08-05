@@ -180,8 +180,7 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     sign_alg = SSL_SIGN_RSA_PSS_RSAE_SHA256;
   } break;
   default:
-    *error_details =
-        "Invalid leaf cert, only RSA and ECDSA certificates are supported in FIPS mode";
+    *error_details = "Invalid leaf cert, only RSA and ECDSA certificates are supported";
   }
   return sign_alg;
 }

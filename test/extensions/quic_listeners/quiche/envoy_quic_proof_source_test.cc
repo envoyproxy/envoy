@@ -130,10 +130,48 @@ public:
   EnvoyQuicProofSourceTest()
       : server_address_(quic::QuicIpAddress::Loopback4(), 12345),
         client_address_(quic::QuicIpAddress::Loopback4(), 54321),
+        transport_socket_factory_(std::make_unique<Ssl::MockServerContextConfig>()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {}
+
+  void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key) {
+    EXPECT_CALL(listen_socket_, ioHandle()).Times(expect_private_key ? 2u : 1u);
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+        .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
+          EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
+                    *connection_socket.localAddress());
+          EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
+                    *connection_socket.remoteAddress());
+          EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
+                    connection_socket.detectedTransportProtocol());
+          EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
+          return &filter_chain_;
+        }));
+    EXPECT_CALL(filter_chain_, transportSocketFactory())
+        .WillRepeatedly(ReturnRef(transport_socket_factory_));
+
+    std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
+        std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
+    EXPECT_CALL(dynamic_cast<const Ssl::MockServerContextConfig&>(
+                    transport_socket_factory_.serverContextConfig()),
+                tlsCertificates())
+        .WillRepeatedly(Return(tls_cert_configs));
+    EXPECT_CALL(tls_cert_config_, certificateChain()).WillOnce(ReturnRef(cert));
+    if (expect_private_key) {
+      EXPECT_CALL(tls_cert_config_, privateKey()).WillOnce(ReturnRef(pkey_));
+    }
+  }
+
+  void testGetProof(bool expect_success) {
+    bool called = false;
+    auto callback = std::make_unique<TestGetProofCallback>(called, expect_success, server_config_,
+                                                           version_, chlo_hash_, filter_chain_);
+    proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
+                           chlo_hash_, std::move(callback));
+    EXPECT_TRUE(called);
+  }
 
 protected:
   std::string hostname_{"www.fake.com"};
@@ -148,42 +186,15 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
+  QuicServerTransportSocketFactory transport_socket_factory_;
+  Ssl::MockTlsCertificateConfig tls_cert_config_;
   Server::ListenerStats listener_stats_;
   EnvoyQuicProofSource proof_source_;
 };
 
 TEST_F(EnvoyQuicProofSourceTest, TestGetProof) {
-  bool called = false;
-  auto callback = std::make_unique<TestGetProofCallback>(called, true, server_config_, version_,
-                                                         chlo_hash_, filter_chain_);
-  EXPECT_CALL(listen_socket_, ioHandle()).Times(2);
-  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
-        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                  *connection_socket.localAddress());
-        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                  *connection_socket.remoteAddress());
-        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                  connection_socket.detectedTransportProtocol());
-        EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
-        return &filter_chain_;
-      }));
-  auto server_context_config = std::make_unique<Ssl::MockServerContextConfig>();
-  auto server_context_config_ptr = server_context_config.get();
-  QuicServerTransportSocketFactory transport_socket_factory(std::move(server_context_config));
-  EXPECT_CALL(filter_chain_, transportSocketFactory())
-      .WillRepeatedly(ReturnRef(transport_socket_factory));
-
-  Ssl::MockTlsCertificateConfig tls_cert_config;
-  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
-      std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config)};
-  EXPECT_CALL(*server_context_config_ptr, tlsCertificates())
-      .WillRepeatedly(Return(tls_cert_configs));
-  EXPECT_CALL(tls_cert_config, certificateChain()).WillOnce(ReturnRef(expected_certs_));
-  EXPECT_CALL(tls_cert_config, privateKey()).WillOnce(ReturnRef(pkey_));
-  proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
-                         chlo_hash_, std::move(callback));
-  EXPECT_TRUE(called);
+  expectCertChainAndPrivateKey(expected_certs_, true);
+  testGetProof(true);
 }
 
 TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoFilterChain) {
@@ -199,30 +210,36 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoFilterChain) {
 }
 
 TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidCert) {
-  bool called = false;
-  auto callback = std::make_unique<TestGetProofCallback>(called, false, server_config_, version_,
-                                                         chlo_hash_, filter_chain_);
-  EXPECT_CALL(listen_socket_, ioHandle());
-  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
-  auto server_context_config = std::make_unique<Ssl::MockServerContextConfig>();
-  auto server_context_config_ptr = server_context_config.get();
-  QuicServerTransportSocketFactory transport_socket_factory(std::move(server_context_config));
-  EXPECT_CALL(filter_chain_, transportSocketFactory())
-      .WillRepeatedly(ReturnRef(transport_socket_factory));
+  std::string invalid_cert{R"(-----BEGIN CERTIFICATE-----
+    invalid certificate
+    -----END CERTIFICATE-----)"};
+  expectCertChainAndPrivateKey(invalid_cert, false);
+  testGetProof(false);
+}
 
-  Ssl::MockTlsCertificateConfig tls_cert_config;
-  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
-      std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config)};
-  EXPECT_CALL(*server_context_config_ptr, tlsCertificates())
-      .WillRepeatedly(Return(tls_cert_configs));
-  std::string invalid_cert{"invalid certificate"};
-  EXPECT_CALL(tls_cert_config, certificateChain()).WillOnce(ReturnRef(invalid_cert));
-  std::string path("some path");
-  EXPECT_CALL(tls_cert_config, certificateChainPath()).WillOnce(ReturnRef(path));
-  proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
-                         chlo_hash_, std::move(callback));
-  EXPECT_TRUE(called);
+TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidPublicKeyInCert) {
+  // This is a valid cert with RSA public key. But we don't support RSA key with
+  // length < 1024.
+  std::string cert_with_rsa_1024{R"(-----BEGIN CERTIFICATE-----
+MIIC2jCCAkOgAwIBAgIUDBHEwlCvLGh3w0O8VwIW+CjYXY8wDQYJKoZIhvcNAQEL
+BQAwfzELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAk1BMRIwEAYDVQQHDAlDYW1icmlk
+Z2UxDzANBgNVBAoMBkdvb2dsZTEOMAwGA1UECwwFZW52b3kxDTALBgNVBAMMBHRl
+c3QxHzAdBgkqhkiG9w0BCQEWEGRhbnpoQGdvb2dsZS5jb20wHhcNMjAwODA0MTg1
+OTQ4WhcNMjEwODA0MTg1OTQ4WjB/MQswCQYDVQQGEwJVUzELMAkGA1UECAwCTUEx
+EjAQBgNVBAcMCUNhbWJyaWRnZTEPMA0GA1UECgwGR29vZ2xlMQ4wDAYDVQQLDAVl
+bnZveTENMAsGA1UEAwwEdGVzdDEfMB0GCSqGSIb3DQEJARYQZGFuemhAZ29vZ2xl
+LmNvbTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAykCZNjxws+sNfnp18nsp
++7LN81J/RSwAHLkGnwEtd3OxSUuiCYHgYlyuEAwJdf99+SaFrgcA4LvYJ/Mhm/fZ
+msnpfsAvoQ49+ax0fm1x56ii4KgNiu9iFsWwwVmkHkgjlRcRsmhr4WeIf14Yvpqs
+JNsbNVSCZ4GLQ2V6BqIHlhcCAwEAAaNTMFEwHQYDVR0OBBYEFDO1KPYcdRmeKDvL
+H2Yzj8el2Xe1MB8GA1UdIwQYMBaAFDO1KPYcdRmeKDvLH2Yzj8el2Xe1MA8GA1Ud
+EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADgYEAnwWVmwSK9TDml7oHGBavzOC1
+f/lOd5zz2e7Tu2pUtx1sX1tlKph1D0ANpJwxRV78R2hjmynLSl7h4Ual9NMubqkD
+x96rVeUbRJ/qU4//nNM/XQa9vIAIcTZ0jFhmb0c3R4rmoqqC3vkSDwtaE5yuS5T4
+GUy+n0vQNB0cXGzgcGI=
+-----END CERTIFICATE-----)"};
+  expectCertChainAndPrivateKey(cert_with_rsa_1024, false);
+  testGetProof(false);
 }
 
 TEST_F(EnvoyQuicProofSourceTest, InvalidPrivateKey) {
