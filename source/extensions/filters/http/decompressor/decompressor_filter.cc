@@ -71,13 +71,13 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
                      *decoder_callbacks_, headers.getInlineValue(accept_encoding_handle.handle()));
   }
 
-  // Headers-only requests do not, by defition, get decompressed.
+  // Headers-only requests do not, by definition, get decompressed.
   if (end_stream) {
     return Http::FilterHeadersStatus::Continue;
   }
   ENVOY_STREAM_LOG(debug, "DecompressorFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
 
-  // 2. Setup request decompression if all checks comply.
+  //   2. Setup request decompression if all checks comply.
   return maybeInitDecompress(config_->requestDirectionConfig(), request_decompressor_,
                              *decoder_callbacks_, headers);
 };
