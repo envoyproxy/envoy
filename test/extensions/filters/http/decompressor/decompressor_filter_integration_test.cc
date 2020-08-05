@@ -233,11 +233,6 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
                 ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
                 ->value()
                 .getStringView());
-  EXPECT_EQ("4097",
-            upstream_request_->trailers()
-                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
-                ->value()
-                .getStringView());
 
   // Verify stats. While the stream was decompressed, there should be a decompression failure.
   test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.request.decompressed",
@@ -276,11 +271,6 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
   EXPECT_EQ(std::to_string(compressed_response_length),
             response->trailers()
                 ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))
-                ->value()
-                .getStringView());
-  EXPECT_EQ("4097",
-            response->trailers()
-                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))
                 ->value()
                 .getStringView());
 
