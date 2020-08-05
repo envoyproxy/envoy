@@ -319,9 +319,16 @@ private:
   ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
 
   /**
-   * Helper methods for the /config_dump url handler to add unready targets config
+   * Helper methods for the /config_dump url handler to add unready targets config.
    */
-  ProtobufTypes::MessagePtr dumpUnreadyTargetsConfigs() const;
+  ProtobufTypes::MessagePtr
+  dumpUnreadyTargetsConfigs(const absl::optional<std::string>& mask) const;
+
+  /**
+   * Helper methods for the /config_dump url handler to add unready targets config of listeners.
+   */
+  ProtobufTypes::MessagePtr dumpListenerUnreadyTargetsConfigs() const;
+
   /**
    * URL handlers.
    */

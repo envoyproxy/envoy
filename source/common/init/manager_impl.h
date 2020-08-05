@@ -41,12 +41,9 @@ public:
   const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const;
 
 private:
-  // Callback function without parameters, decrease unready targets count by 1.
-  void onTargetReady();
-
   // Callback function with an additional target_name parameter, decrease unready targets count by
   // 1, update target_names_count_ hash map.
-  void onTargetReadySendTargetName(absl::string_view target_name);
+  void onTargetReady(absl::string_view target_name);
 
   void ready();
 
