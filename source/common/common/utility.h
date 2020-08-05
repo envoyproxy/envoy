@@ -552,6 +552,10 @@ template <class Value> struct TrieEntry {
  * A trie used for faster lookup with lookup time at most equal to the size of the key.
  */
 template <class Value> struct TrieLookupTable {
+  /**
+   * A custom destructor helps avoid a stack overflow issue when trie depth is great and default
+   * destructor recursively collects unique_ptr.
+   */
   ~TrieLookupTable() {
     // Use a stack to store non-nullptr nodes which should be deleted, and their children will be
     // pushed into this stack and will be deleted later.
@@ -570,12 +574,10 @@ template <class Value> struct TrieLookupTable {
     while (!to_delete.empty()) {
       TrieEntry<Value>* current = to_delete.top();
       to_delete.pop();
-      bool empty_entry = true;
       // Push children into to_delete.
       for (unsigned long i = 0; i < current->entries_.size(); i++) {
         auto entry = std::move(current->entries_[i]);
         if (entry != nullptr) {
-          empty_entry = false;
           to_delete.push(entry.release());
         }
       }
