@@ -38,7 +38,8 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
 
 private:
-  // Utility functions: make any necessary checks and call the corresponding lookup_ functions.
+  // Utility functions; make any necessary checks and call the corresponding lookup_ functions
+  void getHeaders(Http::RequestHeaderMap& request_headers);
   void getBody();
   void getTrailers();
 

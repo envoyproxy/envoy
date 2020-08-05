@@ -7,6 +7,7 @@
 #include "extensions/filters/http/cache/cacheability_utils.h"
 #include "extensions/filters/http/cache/inline_headers_handles.h"
 
+#include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -58,12 +59,10 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   lookup_ = cache_.makeLookupContext(std::move(lookup_request));
 
   ASSERT(lookup_);
+  getHeaders(headers);
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
 
-  lookup_->getHeaders(
-      [this, &headers](LookupResult&& result) { onHeaders(std::move(result), headers); });
-
-  // If the cache called onHeaders synchronously it will have advanced the filter_state_.
+  // If the cache called onHeaders synchronously it will have advanced the filter_state_
   switch (filter_state_) {
   case FilterState::Initial:
     // Headers are not fetched from cache yet -- wait until cache lookup is completed.
@@ -129,23 +128,58 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::Continue;
 }
 
+void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
+  ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
+  lookup_->getHeaders([this, &request_headers,
+                       &dispatcher = decoder_callbacks_->dispatcher()](LookupResult&& result) {
+    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
+    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
+    // LookupResult is non-copyable as LookupResult::headers_ is a unique_ptr, which is
+    // non-copyable. Hence, "result" is decomposed when captured, and reinstantiatied inside the
+    // lambda so that "result.headers_" can be captured as a raw pointer, then wrapped in a
+    // unique_ptr when the result is reinstantiatied.
+    dispatcher.post(
+        [this, &request_headers, status = result.cache_entry_status_,
+         headers = result.headers_.release(), response_ranges = std::move(result.response_ranges_),
+         content_length = result.content_length_, has_trailers = result.has_trailers_]() mutable {
+          onHeaders(LookupResult{status, absl::WrapUnique(headers), content_length, response_ranges,
+                                 has_trailers},
+                    request_headers);
+        });
+  });
+}
+
 void CacheFilter::getBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
-  lookup_->getBody(remaining_body_[0],
-                   [this](Buffer::InstancePtr&& body) { onBody(std::move(body)); });
+
+  lookup_->getBody(remaining_body_[0], [this, &dispatcher = decoder_callbacks_->dispatcher()](
+                                           Buffer::InstancePtr&& body) {
+    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
+    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
+    // "body" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw pointer then
+    // wrapped in a unique_ptr inside the lambda.
+    dispatcher.post([this, body = body.release()] { onBody(absl::WrapUnique(body)); });
+  });
 }
 
 void CacheFilter::getTrailers() {
   ASSERT(lookup_, "CacheFilter is trying to call getTrailers with no LookupContext");
   ASSERT(response_has_trailers_, "No reason to call getTrailers when there's no trailers to get.");
-  lookup_->getTrailers(
-      [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailers(std::move(trailers)); });
+
+  lookup_->getTrailers([this, &dispatcher = decoder_callbacks_->dispatcher()](
+                           Http::ResponseTrailerMapPtr&& trailers) {
+    // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
+    // initialize a std::function. Therefore, it cannot capture anything non-copyable.
+    // "trailers" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw
+    // pointer then wrapped in a unique_ptr inside the lambda.
+    dispatcher.post(
+        [this, trailers = trailers.release()] { onTrailers(absl::WrapUnique(trailers)); });
+  });
 }
 
 void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
-  // TODO(yosrym93): Handle request only-if-cached directive.
-  bool should_continue_decoding = false;
+  // TODO(yosrym93): Handle request only-if-cached directive
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::NotSatisfiableRange: // TODO(#10132): create 416 response.
@@ -156,12 +190,10 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     // If the cache entry was valid, the response status should be 304 (unmodified) and the cache
     // entry will be injected in the response body.
     lookup_result_ = std::make_unique<LookupResult>(std::move(result));
-    should_continue_decoding = filter_state_ == FilterState::WaitingForCacheLookup;
     filter_state_ = FilterState::ValidatingCachedResponse;
     injectValidationHeaders(request_headers);
     break;
   case CacheEntryStatus::Unusable:
-    should_continue_decoding = filter_state_ == FilterState::WaitingForCacheLookup;
     filter_state_ = FilterState::NoCachedResponseFound;
     break;
   case CacheEntryStatus::SatisfiableRange: // TODO(#10132): break response content to the ranges
@@ -171,10 +203,8 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
     filter_state_ = FilterState::DecodeServingFromCache;
     encodeCachedResponse();
   }
-  if (should_continue_decoding) {
-    // decodeHeaders returned StopIteration waiting for this callback -- continue decoding.
-    decoder_callbacks_->continueDecoding();
-  }
+  // decodeHeaders returned StopIteration waiting for this callback -- continue decoding
+  decoder_callbacks_->continueDecoding();
 }
 
 // TODO(toddmgreer): Handle downstream backpressure.
