@@ -87,8 +87,8 @@ The following attributes are exposed to the language runtime:
    response.flags, int, Additional details about the response beyond the standard response code
    source.address, string, Downstream connection remote address
    source.port, int, Downstream connection remote port
-   destination.address, string, Downstream connection local address
-   destination.port, int, Downstream connection local port
+   destination.address, string, Upstream connection local address
+   destination.port, int, Upstream connection local port
    metadata, :ref:`Metadata<envoy_api_msg_core.Metadata>`, Dynamic metadata
    connection.mtls, bool, Indicates whether TLS is applied to the downstream connection and the peer ceritificate is presented
    connection.requested_server_name, string, Requested server name in the downstream TLS connection
