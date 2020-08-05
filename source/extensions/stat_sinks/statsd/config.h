@@ -24,6 +24,8 @@ public:
   std::string name() const override;
 };
 
+DECLARE_FACTORY(StatsdSinkFactory);
+
 } // namespace Statsd
 } // namespace StatSinks
 } // namespace Extensions

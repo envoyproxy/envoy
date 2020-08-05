@@ -44,5 +44,7 @@ private:
       Stats::ScopePtr&& stats_scope) override;
 };
 
+DECLARE_FACTORY(StaticClusterFactory);
+
 } // namespace Upstream
 } // namespace Envoy
