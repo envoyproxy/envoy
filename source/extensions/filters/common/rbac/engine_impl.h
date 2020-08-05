@@ -32,10 +32,10 @@ public:
 
   bool handleAction(const Network::Connection& connection,
                     const Envoy::Http::RequestHeaderMap& headers, StreamInfo::StreamInfo& info,
-                    std::string* effective_policy_id) override;
+                    std::string* effective_policy_id) const override;
 
   bool handleAction(const Network::Connection& connection, StreamInfo::StreamInfo& info,
-                    std::string* effective_policy_id) override;
+                    std::string* effective_policy_id) const override;
 
 private:
   // Checks whether the request matches any policies

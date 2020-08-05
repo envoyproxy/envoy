@@ -28,7 +28,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
 
 bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& connection,
                                                     StreamInfo::StreamInfo& info,
-                                                    std::string* effective_policy_id) {
+                                                    std::string* effective_policy_id) const {
   return handleAction(connection, *Http::StaticEmptyHeaders::get().request_headers, info,
                       effective_policy_id);
 }
@@ -36,7 +36,7 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
 bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& connection,
                                                     const Envoy::Http::RequestHeaderMap& headers,
                                                     StreamInfo::StreamInfo& info,
-                                                    std::string* effective_policy_id) {
+                                                    std::string* effective_policy_id) const {
   bool matched = checkPolicyMatch(connection, info, headers, effective_policy_id);
 
   switch (action_) {

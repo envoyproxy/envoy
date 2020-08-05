@@ -18,15 +18,15 @@ public:
              const EnforcementMode mode = EnforcementMode::Shadow)
       : RoleBasedAccessControlEngineImpl(rules, mode){};
 
-  // MOCK_METHOD(bool, allowed,
-  //             (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
-  //              const StreamInfo::StreamInfo&, std::string* effective_policy_id),
-  //             (const));
+  MOCK_METHOD(bool, handleAction,
+              (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               StreamInfo::StreamInfo&, std::string* effective_policy_id),
+              (const));
 
-  // MOCK_METHOD(bool, allowed,
-  //             (const Envoy::Network::Connection&, const StreamInfo::StreamInfo&,
-  //              std::string* effective_policy_id),
-  //             (const));
+  MOCK_METHOD(bool, handleAction,
+              (const Envoy::Network::Connection&, StreamInfo::StreamInfo&,
+               std::string* effective_policy_id),
+              (const));
 };
 
 } // namespace RBAC

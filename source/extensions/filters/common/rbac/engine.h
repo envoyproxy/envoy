@@ -31,7 +31,7 @@ public:
    */
   virtual bool handleAction(const Network::Connection& connection,
                             const Envoy::Http::RequestHeaderMap& headers,
-                            StreamInfo::StreamInfo& info, std::string* effective_policy_id) PURE;
+                            StreamInfo::StreamInfo& info, std::string* effective_policy_id) const PURE;
 
   /**
    * Handles action-specific operations and returns whether or not the request is permitted.
@@ -43,7 +43,7 @@ public:
    *                   which is used to identity the source of the allow/deny.
    */
   virtual bool handleAction(const Network::Connection& connection, StreamInfo::StreamInfo& info,
-                            std::string* effective_policy_id) PURE;
+                            std::string* effective_policy_id) const PURE;
 };
 
 } // namespace RBAC

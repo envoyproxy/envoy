@@ -203,22 +203,22 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ("rbac_access_denied", callbacks_.details_);
 }
 
-// TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
-//   setDestinationPort(456);
+TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
+  setDestinationPort(456);
 
-//   envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
-//   route_config.mutable_rbac()->mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
-//   NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules()};
-//   NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config};
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
+  route_config.mutable_rbac()->mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
+  NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules()};
+  NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config};
 
-//   // EXPECT_CALL(engine, allowed(_, _, _, _)).WillRepeatedly(Return(true));
-//   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
+  EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
-//   EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Rbac))
-//       .WillRepeatedly(Return(&per_route_config_));
+  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Rbac))
+      .WillRepeatedly(Return(&per_route_config_));
 
-//   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));
-// }
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));
+}
 
 // Log Tests
 TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {

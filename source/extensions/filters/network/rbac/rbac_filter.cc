@@ -16,17 +16,9 @@ namespace RBACFilter {
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
-      enforcement_type_(proto_config.enforcement_type()) {
-  engine_ = proto_config.has_rules()
-                ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
-                      proto_config.rules(), Filters::Common::RBAC::EnforcementMode::Enforced)
-                : nullptr;
-  shadow_engine_ =
-      proto_config.has_shadow_rules()
-          ? std::make_unique<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
-                proto_config.shadow_rules(), Filters::Common::RBAC::EnforcementMode::Shadow)
-          : nullptr;
-}
+      engine_(Filters::Common::RBAC::createEngine(proto_config)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
+      enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   ENVOY_LOG(debug,
@@ -90,8 +82,7 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
 
 EngineResult
 RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
-  auto engine = config_->engine(mode);
-
+  const auto engine = config_->engine(mode);
   if (engine != nullptr) {
     std::string effective_policy_id;
 
