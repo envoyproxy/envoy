@@ -85,12 +85,7 @@ public:
   }
 
   void setState(const std::string& action, OverloadActionState state) {
-    auto it = actions_.find(action);
-    if (it == actions_.end()) {
-      actions_.emplace(action, state);
-    } else {
-      it->second = state;
-    }
+    actions_.insert_or_assign(action, state);
   }
 
 private:
