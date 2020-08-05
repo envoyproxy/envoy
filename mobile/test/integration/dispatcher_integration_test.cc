@@ -57,7 +57,7 @@ public:
       // Thus, the ApiListener has to be added in addition to the already existing listener in the
       // config.
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(
-          Server::parseListenerFromV2Yaml(api_listener_config()));
+          Server::parseListenerFromV3Yaml(api_listener_config()));
     });
     BaseIntegrationTest::initialize();
   }
