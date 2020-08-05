@@ -467,16 +467,13 @@ protected:
 // A GuardDogAction that raises the specified signal.
 class AssertGuardDogAction : public Configuration::GuardDogAction {
 public:
-  AssertGuardDogAction(const std::string& message) : message_(message) {}
+  AssertGuardDogAction() = default;
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent /*event*/,
            std::vector<std::pair<Thread::ThreadId, MonotonicTime>> /*thread_ltt_pairs*/,
            MonotonicTime /*now*/) override {
-    RELEASE_ASSERT(false, message_);
+    RELEASE_ASSERT(false, "ASSERT_GUARDDOG_ACTION");
   }
-
-protected:
-  const std::string message_;
 };
 
 // Test factory for consuming Watchdog configs and creating GuardDogActions.
@@ -510,10 +507,10 @@ public:
   AssertGuardDogActionFactory(const std::string& name) : name_(name) {}
 
   Configuration::GuardDogActionPtr createGuardDogActionFromProto(
-      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
+      const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& /*config*/,
       Configuration::GuardDogActionFactoryContext& /*context*/) override {
     // Return different actions depending on the config.
-    return std::make_unique<AssertGuardDogAction>(config.config().typed_config().value());
+    return std::make_unique<AssertGuardDogAction>();
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -541,8 +538,7 @@ protected:
           "config": {
             "name": "AssertFactory",
             "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.StringValue",
-              "value": "MultiKill conditions triggered."
+              "@type": "type.googleapis.com/google.protobuf.Empty"
             }
           },
           "event": "MULTIKILL"
@@ -553,8 +549,7 @@ protected:
           "config": {
             "name": "AssertFactory",
             "typed_config": {
-              "@type": "type.googleapis.com/google.protobuf.StringValue",
-              "value": "Kill conditions triggered."
+              "@type": "type.googleapis.com/google.protobuf.Empty"
             }
           },
           "event": "KILL"
@@ -594,7 +589,7 @@ protected:
   std::vector<std::string> events_;
   RecordGuardDogActionFactory<Envoy::ProtobufWkt::Empty> log_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_log_factory_;
-  AssertGuardDogActionFactory<Envoy::ProtobufWkt::StringValue> assert_factory_;
+  AssertGuardDogActionFactory<Envoy::ProtobufWkt::Empty> assert_factory_;
   Registry::InjectFactory<Configuration::GuardDogActionFactory> register_assert_factory_;
   NiceMock<Stats::MockStore> fake_stats_;
   WatchDogSharedPtr first_dog_;
@@ -611,7 +606,6 @@ TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
   second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
   time_system_->advanceTimeWait(std::chrono::milliseconds(99));
   second_dog_->touch();
-  ASSERT_EQ(events_.size(), 0);
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(2));
   guard_dog_->forceCheckForTest();
@@ -630,8 +624,6 @@ TEST_P(GuardDogActionsTest, MissShouldBeAbleToReportMultipleThreads) {
   first_dog_->touch();
   second_dog_->touch();
 
-  ASSERT_EQ(events_.size(), 0);
-
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
   EXPECT_THAT(events_, ElementsAre(absl::StrCat(
@@ -643,8 +635,6 @@ TEST_P(GuardDogActionsTest, MissShouldSaturateOnMissEvent) {
   const NiceMock<Configuration::MockMain> config(100, DISABLE_MISS, DISABLE_KILL, DISABLE_MULTIKILL,
                                                  0, getActionsConfig());
   setupFirstDog(config);
-
-  ASSERT_EQ(events_.size(), 0);
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -675,7 +665,6 @@ TEST_P(GuardDogActionsTest, MegaMissShouldOnlyReportRelevantThreads) {
   second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
   time_system_->advanceTimeWait(std::chrono::milliseconds(99));
   second_dog_->touch();
-  ASSERT_EQ(events_.size(), 0);
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(2));
   guard_dog_->forceCheckForTest();
@@ -694,8 +683,6 @@ TEST_P(GuardDogActionsTest, MegaMissShouldBeAbleToReportMultipleThreads) {
   first_dog_->touch();
   second_dog_->touch();
 
-  ASSERT_EQ(events_.size(), 0);
-
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
   EXPECT_THAT(events_, ElementsAre(absl::StrCat(
@@ -707,8 +694,6 @@ TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
   const NiceMock<Configuration::MockMain> config(DISABLE_MISS, 100, DISABLE_KILL, DISABLE_MULTIKILL,
                                                  0, getActionsConfig());
   setupFirstDog(config);
-
-  ASSERT_EQ(events_.size(), 0);
 
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
@@ -749,7 +734,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
   };
 
   // We expect only the kill action to have fired
-  EXPECT_DEATH(kill_function(), "Kill conditions triggered.");
+  EXPECT_DEATH(kill_function(), "ASSERT_GUARDDOG_ACTION");
 
   // Multikill event should fire before the others
   auto multikill_function = [&]() -> void {
@@ -764,13 +749,12 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
     guard_dog_->forceCheckForTest();
   };
 
-  EXPECT_DEATH(multikill_function(), "MultiKill conditions triggered.");
+  EXPECT_DEATH(multikill_function(), "ASSERT_GUARDDOG_ACTION");
 
   // We expect megamiss to fire before miss
   const NiceMock<Configuration::MockMain> config(100, 100, DISABLE_KILL, DISABLE_MULTIKILL, 0,
                                                  getActionsConfig());
   setupFirstDog(config);
-  ASSERT_EQ(events_.size(), 0);
   time_system_->advanceTimeWait(std::chrono::milliseconds(101));
   guard_dog_->forceCheckForTest();
   EXPECT_THAT(
@@ -789,7 +773,7 @@ TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
     guard_dog_->forceCheckForTest();
   };
 
-  EXPECT_DEATH(die_function(), "Kill conditions triggered.");
+  EXPECT_DEATH(die_function(), "ASSERT_GUARDDOG_ACTION");
 }
 
 TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
@@ -804,7 +788,7 @@ TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
     guard_dog_->forceCheckForTest();
   };
 
-  EXPECT_DEATH(die_function(), "MultiKill conditions triggered.");
+  EXPECT_DEATH(die_function(), "ASSERT_GUARDDOG_ACTION");
 }
 
 TEST_P(GuardDogActionsTest, ShouldErrorOnUnknownEvent) {
