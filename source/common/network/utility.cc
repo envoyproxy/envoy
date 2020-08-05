@@ -379,6 +379,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
   }
 
   sockaddr_storage orig_addr;
+  memset(&orig_addr, 0, sizeof(orig_addr));
   socklen_t addr_len = sizeof(sockaddr_storage);
   int status;
 

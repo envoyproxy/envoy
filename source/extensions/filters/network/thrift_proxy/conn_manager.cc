@@ -171,7 +171,7 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
 
   ActiveRpcPtr new_rpc(new ActiveRpc(*this));
   new_rpc->createFilterChain();
-  new_rpc->moveIntoList(std::move(new_rpc), rpcs_);
+  LinkedList::moveIntoList(std::move(new_rpc), rpcs_);
 
   return **rpcs_.begin();
 }

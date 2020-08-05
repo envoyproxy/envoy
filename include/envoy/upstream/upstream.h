@@ -731,6 +731,11 @@ public:
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return how many streams should be anticipated per each current stream.
+   */
+  virtual float prefetchRatio() const PURE;
+
+  /**
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
@@ -772,8 +777,8 @@ public:
   }
 
   /**
-   * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
-   *         load balancers for this cluster.
+   * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
+   * all load balancers for this cluster.
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
@@ -806,8 +811,8 @@ public:
   lbRingHashConfig() const PURE;
 
   /**
-   * @return const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& the configuration
-   *         for the Original Destination load balancing policy, only used if type is set to
+   * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
+   * configuration for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.
    */
   virtual const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
@@ -899,7 +904,7 @@ public:
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
+   * @return const envoy::config::core::v3::Metadata& the configuration metadata for this cluster.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 
