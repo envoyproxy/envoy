@@ -97,7 +97,7 @@ void LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   // We need to keep track of which listeners need to remove.
   // Specifically, it's [listeners we currently have] - [listeners found in the response].
   absl::node_hash_set<std::string> listeners_to_remove;
-  for (const auto& listener : listener_manager_.allListeners()) {
+  for (const auto& listener : listener_manager_.listeners(ListenerManager::ListenerState::ALL)) {
     listeners_to_remove.insert(listener.get().name());
   }
   for (const auto& resource : resources) {

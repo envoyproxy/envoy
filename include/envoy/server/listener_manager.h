@@ -131,6 +131,14 @@ public:
     All,
   };
 
+  enum class ListenerState {
+    ACTIVE = 1,
+    WARMING = 2,
+    DRAINING = 3,
+    // all active and warming listeners, but not draining
+    ALL = 4
+  };
+
   virtual ~ListenerManager() = default;
 
   /**
@@ -161,19 +169,14 @@ public:
   virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
 
   /**
-   * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently
-   * loaded listeners. Note that this routine returns references to the existing listeners. The
-   * references are only valid in the context of the current call stack and should not be stored.
+   * @param state the type of listener to be returned (defaults to ACTIVE)
+   * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of currently known
+   * listeners in the requested state. Note that this routine returns references to the existing
+   * listeners. The references are only valid in the context of the current call stack and should
+   * not be stored.
    */
-  virtual std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() PURE;
-
-  /**
-   * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of all currently
-   * known listeners, both active and warming. Note that this routine returns references to the
-   * existing listeners. The references are only valid in the context of the current call stack and
-   * should not be stored.
-   */
-  virtual std::vector<std::reference_wrapper<Network::ListenerConfig>> allListeners() PURE;
+  virtual std::vector<std::reference_wrapper<Network::ListenerConfig>>
+  listeners(ListenerState state = ListenerState::ACTIVE) PURE;
 
   /**
    * @return uint64_t the total number of connections owned by all listeners across all workers.

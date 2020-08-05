@@ -639,23 +639,39 @@ ListenerManagerImpl::getListenerByName(ListenerList& listeners, const std::strin
   return ret;
 }
 
-std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl::allListeners() {
+std::vector<std::reference_wrapper<Network::ListenerConfig>>
+ListenerManagerImpl::listeners(ListenerState state) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
-  ret.reserve(active_listeners_.size() + warming_listeners_.size());
-  for (const auto& listener : active_listeners_) {
-    ret.push_back(*listener);
-  }
-  for (const auto& listener : warming_listeners_) {
-    ret.push_back(*listener);
-  }
-  return ret;
-}
-
-std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl::listeners() {
-  std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
-  ret.reserve(active_listeners_.size());
-  for (const auto& listener : active_listeners_) {
-    ret.push_back(*listener);
+  switch (state) {
+  case ListenerState::ACTIVE:
+    ret.reserve(active_listeners_.size());
+    for (const auto& listener : active_listeners_) {
+      ret.push_back(*listener);
+    }
+    break;
+  case ListenerState::WARMING:
+    ret.reserve(warming_listeners_.size());
+    for (const auto& listener : warming_listeners_) {
+      ret.push_back(*listener);
+    }
+    break;
+  case ListenerState::DRAINING:
+    ret.reserve(draining_listeners_.size());
+    for (const auto& draining_listener : draining_listeners_) {
+      ret.push_back(*(draining_listener.listener_));
+    }
+    break;
+  case ListenerState::ALL:
+    ret.reserve(active_listeners_.size() + warming_listeners_.size());
+    for (const auto& listener : active_listeners_) {
+      ret.push_back(*listener);
+    }
+    for (const auto& listener : warming_listeners_) {
+      ret.push_back(*listener);
+    }
+    break;
+  default:
+    break;
   }
   return ret;
 }
