@@ -195,11 +195,11 @@ public:
 
   void setUpBufferLimits() {
     ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
+    EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
     EXPECT_CALL(stream_, addCallbacks(_))
         .WillOnce(Invoke(
             [&](Http::StreamCallbacks& callbacks) -> void { stream_callbacks_ = &callbacks; }));
     EXPECT_CALL(stream_, setFlushTimeout(_));
-    EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
   }
 
   // If request_with_data_and_trailers is true, includes data and trailers in the request. If
@@ -5954,7 +5954,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
           std::stringstream out;
           object->dumpState(out);
           std::string state = out.str();
-          EXPECT_THAT(state, testing::HasSubstr("request_headers_: null"));
+          EXPECT_THAT(state, testing::HasSubstr("filter_manager_.requestHeaders(): null"));
           EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
           return nullptr;
         }))
@@ -5976,7 +5976,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
           std::stringstream out;
           object->dumpState(out);
           std::string state = out.str();
-          EXPECT_THAT(state, testing::HasSubstr("request_headers_: \n"));
+          EXPECT_THAT(state, testing::HasSubstr("filter_manager_.requestHeaders(): \n"));
           EXPECT_THAT(state, testing::HasSubstr("':authority', 'host'\n"));
           EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
           return nullptr;

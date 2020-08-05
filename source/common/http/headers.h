@@ -66,6 +66,7 @@ public:
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
+  const LowerCaseString Pragma{"pragma"};
   const LowerCaseString Referer{"referer"};
   const LowerCaseString Vary{"vary"};
 
@@ -191,6 +192,7 @@ public:
   const LowerCaseString Path{":path"};
   const LowerCaseString Protocol{":protocol"};
   const LowerCaseString ProxyConnection{"proxy-connection"};
+  const LowerCaseString Range{"range"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
   const LowerCaseString Server{"server"};
