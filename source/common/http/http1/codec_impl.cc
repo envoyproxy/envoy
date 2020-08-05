@@ -890,8 +890,7 @@ int ServerConnectionImpl::onHeadersComplete() {
 
     // Reject request with Http::Code::BadRequest by default or remove Content-Length header
     // and serve request if allowed by http1 codec settings.
-    if (parser_.uses_transfer_encoding != 0 &&
-        (parser_.content_length > 0 && parser_.content_length != ULLONG_MAX)) {
+    if (parser_.uses_transfer_encoding != 0 && headers->ContentLength()) {
       if ((parser_.flags & F_CHUNKED) && codec_settings_.allow_chunked_length_) {
         headers->removeContentLength();
       } else {
