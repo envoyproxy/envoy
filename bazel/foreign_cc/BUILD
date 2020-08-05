@@ -153,10 +153,10 @@ envoy_cmake_external(
             },
         },
         {
-            "name": "curl_with_zlib_ng_with_optimization",
+            "name": "curl_with_zlib_ng_with_optimizations",
             "cache_entries": {
-                "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib_ng_with_optimization",
-                "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib_ng_with_optimization/include",
+                "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib_ng_with_optimizations",
+                "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib_ng_with_optimizations/include",
             },
         },
     ],
@@ -273,7 +273,7 @@ envoy_cmake_external(
             "lib_source": "@com_github_zlib_ng_zlib_ng//:all",
         },
         {
-            "name": "zlib_ng_with_optimization",
+            "name": "zlib_ng_with_optimizations",
             "cache_entries": {
                 # zlib-ng build options. Reference: https://github.com/zlib-ng/zlib-ng#build-options.
                 "ZLIB_COMPAT": "on",
