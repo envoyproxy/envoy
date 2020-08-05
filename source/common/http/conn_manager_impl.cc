@@ -526,8 +526,10 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback route_config_updated_cb) {
-  if (!scoped_route_config_provider_)
-    ENVOY_LOG(debug, "request with nullptr.");
+  if (!scoped_route_config_provider_) {
+    thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
+    return;
+  }
   scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
                                                    move(route_config_updated_cb));
 }
@@ -1559,7 +1561,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
                 if (scope_exist) {
                   refreshCachedRoute();
                 }
-                (*cb)(scope_exist && hasCachedRoute());
+                (*cb)(hasCachedRoute());
               }
             });
     route_config_update_requester_->requestSrdsUpdate(*scope_key_hash_, thread_local_dispatcher,

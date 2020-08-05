@@ -433,8 +433,7 @@ private:
         : route_config_provider_(route_config_provider) {}
     RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider)
         : scoped_route_config_provider_(
-              dynamic_cast<Router::ScopedRoutesConfigProviderBase*>(scoped_route_config_provider)) {
-    }
+              dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)) {}
     void
     requestVhdsUpdate(const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
                       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
@@ -442,7 +441,7 @@ private:
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
-    Router::ScopedRoutesConfigProviderBase* scoped_route_config_provider_;
+    Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
   };
 
   class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {

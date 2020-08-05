@@ -95,9 +95,6 @@ fragments:
           grpc_service = srds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
         });
-    config_helper_.addFilter(R"EOF(
-    name: envoy.filters.http.on_demand
-    )EOF");
     HttpIntegrationTest::initialize();
   }
 
@@ -443,11 +440,15 @@ key:
       /*cluster_0*/ 0);
 }
 
-TEST_P(ScopedRdsIntegrationTest, OnDemandUpdate) {
-  // 'name' will fail to validate due to empty string.
+// Test that a bad config update updates the corresponding stats.
+TEST_P(ScopedRdsIntegrationTest, OnDemandBasicSuccess) {
+  config_helper_.addFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
   const std::string scope_route1 = R"EOF(
-name:
+name: foo_scope1
 route_configuration_name: foo_route1
+priority: Secondary
 key:
   fragments:
     - string_key: foo
@@ -457,31 +458,6 @@ key:
     sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
   };
   initialize();
-
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
-                                 1);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=foo"}});
-  response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
-  cleanupUpstreamAndDownstream();
-
-  // SRDS update fixed the problem.
-  const std::string scope_route2 = R"EOF(
-name: foo_scope1
-route_configuration_name: foo_route1
-key:
-  fragments:
-    - string_key: foo
-)EOF";
-  sendSrdsResponse({scope_route2}, {scope_route2}, {}, "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
-  createRdsStream("foo_route1");
   const std::string route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
@@ -491,16 +467,83 @@ key:
         - match: {{ prefix: "/" }}
           route: {{ cluster: {} }}
 )EOF";
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
-  sendRequestAndVerifyResponse(
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
                                      {":authority", "host"},
                                      {":scheme", "http"},
-                                     {"Addr", "x-foo-key=foo"}},
-      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
-      /*cluster_0*/ 0);
+                                     {"Addr", "x-foo-key=foo"}});
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
+  createRdsStream("foo_route1");
+  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  response->waitForEndStream();
+  cleanupUpstreamAndDownstream();
+}
+
+// Scopes of different priority share the same route configuration
+TEST_P(ScopedRdsIntegrationTest, DifferentPriorityScopeShareRoute) {
+  const std::string scope_route1 = R"EOF(
+name: foo_scope
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  const std::string scope_route2 = R"EOF(
+name: bar_scope
+route_configuration_name: foo_route1
+priority: Secondary
+key:
+  fragments:
+    - string_key: bar
+)EOF";
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [&]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1, scope_route2}, {scope_route1, scope_route2}, {}, "1");
+    createRdsStream("foo_route1");
+    // CreateRdsStream waits for connection which is fired by RDS subscription.
+    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  // No scope key matches "xyz-route".
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=xyz-route"}});
+  response->waitForEndStream();
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+
+  // Test "foo-route" and 'bar-route' both gets routed to cluster_0.
+
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+  for (const std::string& scope_key : std::vector<std::string>{"foo-route", "bar-route"}) {
+    sendRequestAndVerifyResponse(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/meh"},
+                                       {":authority", "host"},
+                                       {":scheme", "http"},
+                                       {"Addr", fmt::format("x-foo-key={}", scope_key)}},
+        456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123, 0);
+  }
 }
 
 } // namespace
