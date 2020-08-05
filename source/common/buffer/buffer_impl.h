@@ -49,7 +49,10 @@ public:
   absl::Span<const uint8_t> getData() const override {
     return {base_ + data_, reservable_ - data_};
   };
-  absl::Span<uint8_t> getMutableData() override { return {nullptr, 0}; }
+  absl::Span<uint8_t> getMutableData() override {
+    RELEASE_ASSERT(isMutable(), "Not allowed to call getMutableData if slice is immutable");
+    return {base_ + data_, reservable_ - data_};
+  }
 
   /**
    * @return a pointer to the start of the usable content.
@@ -270,7 +273,6 @@ public:
 
   // SliceData
   bool isMutable() const override { return true; };
-  absl::Span<uint8_t> getMutableData() override { return {base_ + data_, reservable_ - data_}; }
 
 private:
   OwnedSlice(uint64_t size) : Slice(0, 0, size) { base_ = storage_; }

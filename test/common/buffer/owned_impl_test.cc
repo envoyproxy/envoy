@@ -482,11 +482,6 @@ TEST_F(OwnedImplTest, ExtractUnownedSlice) {
             absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
   EXPECT_EQ(expected_length1, buffer.length());
 
-  // The immutable slice should not have mutable data.
-  auto slice_mutable_data = slice->getMutableData();
-  EXPECT_EQ(slice_mutable_data.data(), nullptr);
-  EXPECT_EQ(slice_mutable_data.size(), 0);
-
   // This test now has ownership of the unowned slice, which means that the
   // release callback will only be called once the slice is destroyed.
   EXPECT_FALSE(release_callback_called_);
