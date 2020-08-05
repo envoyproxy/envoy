@@ -14,26 +14,33 @@
 namespace Envoy {
 
 // A test filter that responds directly with a code on a prefix match.
-class SetResponseCodeFilter : public Http::PassThroughFilter {
+class SetResponseCodeFilterConfig {
 public:
-  SetResponseCodeFilter(const std::string& prefix, uint32_t code,
-                        Server::Configuration::FactoryContext& context)
+  SetResponseCodeFilterConfig(const std::string& prefix, uint32_t code,
+                              Server::Configuration::FactoryContext& context)
       : prefix_(prefix), code_(code), tls_slot_(context.threadLocal().allocateSlot()) {}
 
+  const std::string prefix_;
+  const uint32_t code_;
+  // Allocate a slot to validate that it is destroyed on a main thread only.
+  ThreadLocal::SlotPtr tls_slot_;
+};
+
+class SetResponseCodeFilter : public Http::PassThroughFilter {
+public:
+  SetResponseCodeFilter(std::shared_ptr<SetResponseCodeFilterConfig> config) : config_(config) {}
+
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    if (absl::StartsWith(headers.Path()->value().getStringView(), prefix_)) {
-      decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(code_), "", nullptr, absl::nullopt,
-                                         "");
+    if (absl::StartsWith(headers.Path()->value().getStringView(), config_->prefix_)) {
+      decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(config_->code_), "", nullptr,
+                                         absl::nullopt, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
   }
 
 private:
-  const std::string prefix_;
-  const uint32_t code_;
-  // Allocate a slot to validate that it is destroyed on a main thread only.
-  ThreadLocal::SlotPtr tls_slot_;
+  const std::shared_ptr<SetResponseCodeFilterConfig> config_;
 };
 
 class SetResponseCodeFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
@@ -45,10 +52,10 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::SetResponseCodeFilterConfig& proto_config,
       const std::string&, Server::Configuration::FactoryContext& context) override {
-    auto filter_config = std::make_shared<SetResponseCodeFilter>(proto_config.prefix(),
-                                                                 proto_config.code(), context);
+    auto filter_config = std::make_shared<SetResponseCodeFilterConfig>(
+        proto_config.prefix(), proto_config.code(), context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(filter_config);
+      callbacks.addStreamFilter(std::make_shared<SetResponseCodeFilter>(filter_config));
     };
   }
 };
