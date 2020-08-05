@@ -31,11 +31,11 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
     Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket)
-    : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory,
-                                new EnvoyQuicPacketWriter(std::unique_ptr<Network::UdpPacketWriter>(
-                                    new Network::UdpDefaultWriter(connection_socket->ioHandle()))),
-                                true, supported_versions, dispatcher,
-                                std::move(connection_socket)) {}
+    : EnvoyQuicClientConnection(
+          server_connection_id, helper, alarm_factory,
+          new EnvoyQuicPacketWriter(
+              std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
+          true, supported_versions, dispatcher, std::move(connection_socket)) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,

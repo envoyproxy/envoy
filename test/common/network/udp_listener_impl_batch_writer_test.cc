@@ -136,8 +136,9 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
                   .value(),
               internal_buffer.length());
 
+    // Verify that the total_bytes_sent is only updated when the packets
+    // are actually sent to the client, and not on being buffered.
     if (send_buffered_pkts) {
-      // Verify Correct content is received at the client
       for (const auto& pkt : pkts_to_send) {
         total_bytes_sent += pkt.length();
       }

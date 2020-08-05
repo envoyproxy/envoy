@@ -118,7 +118,6 @@ UdpGsoBatchWriterFactory::UdpGsoBatchWriterFactory() = default;
 
 Network::UdpPacketWriterPtr
 UdpGsoBatchWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope) {
-  // Keep It Simple for now
   return std::make_unique<UdpGsoBatchWriter>(io_handle, scope);
 }
 
