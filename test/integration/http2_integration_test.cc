@@ -830,6 +830,7 @@ TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
   initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sends a request.
@@ -1494,6 +1495,84 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
   EXPECT_EQ(served_by.size(), 1);
 }
 
+void Http2FrameIntegrationTest::startHttp2Session() {
+  ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
+
+  // Send empty initial SETTINGS frame.
+  auto settings = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+
+  // Read initial SETTINGS frame from the server.
+  readFrame();
+
+  // Send an SETTINGS ACK.
+  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+
+  // read pending SETTINGS and WINDOW_UPDATE frames
+  readFrame();
+  readFrame();
+}
+
+void Http2FrameIntegrationTest::beginSession() {
+  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  // set lower outbound frame limits to make tests run faster
+  config_helper_.setOutboundFramesLimits(1000, 100);
+  initialize();
+  // Set up a raw connection to easily send requests without reading responses.
+  auto options = std::make_shared<Network::Socket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
+  tcp_client_ = makeTcpConnection(lookupPort("http"), options);
+  startHttp2Session();
+}
+
+Http2Frame Http2FrameIntegrationTest::readFrame() {
+  Http2Frame frame;
+  EXPECT_TRUE(tcp_client_->waitForData(frame.HeaderSize));
+  frame.setHeader(tcp_client_->data());
+  tcp_client_->clearData(frame.HeaderSize);
+  auto len = frame.payloadSize();
+  if (len) {
+    EXPECT_TRUE(tcp_client_->waitForData(len));
+    frame.setPayload(tcp_client_->data());
+    tcp_client_->clearData(len);
+  }
+  return frame;
+}
+
+void Http2FrameIntegrationTest::sendFrame(const Http2Frame& frame) {
+  ASSERT_TRUE(tcp_client_->connected());
+  ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
+}
+
+// Regression test.
+TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
+  autonomous_upstream_ = true;
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  beginSession();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  // Send two concatenated frames, the first with too many headers, and the second an invalid frame
+  // (push_promise)
+  std::string bad_frame =
+      "00006d0104000000014083a8749783ee3a3fbebebebebebebebebebebebebebebebebebebebebebebebebebebebe"
+      "bebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebebe"
+      "bebebebebebebebebebebebebebebebebebebebebebebebebebe0001010500000000018800a065";
+  Http2Frame request = Http2Frame::makeGenericFrameFromHexDump(bad_frame);
+  sendFrame(request);
+  tcp_client_->close();
+
+  // Expect that the details for the first frame are kept.
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 namespace {
 const int64_t TransmitThreshold = 100 * 1024 * 1024;
 } // namespace
@@ -1530,44 +1609,6 @@ void Http2FloodMitigationTest::beginSession() {
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
   tcp_client_ = makeTcpConnection(lookupPort("http"), options);
   startHttp2Session();
-}
-
-Http2Frame Http2FloodMitigationTest::readFrame() {
-  Http2Frame frame;
-  EXPECT_TRUE(tcp_client_->waitForData(frame.HeaderSize));
-  frame.setHeader(tcp_client_->data());
-  tcp_client_->clearData(frame.HeaderSize);
-  auto len = frame.payloadSize();
-  if (len) {
-    EXPECT_TRUE(tcp_client_->waitForData(len));
-    frame.setPayload(tcp_client_->data());
-    tcp_client_->clearData(len);
-  }
-  return frame;
-}
-
-void Http2FloodMitigationTest::sendFrame(const Http2Frame& frame) {
-  ASSERT_TRUE(tcp_client_->connected());
-  ASSERT_TRUE(tcp_client_->write(std::string(frame), false, false));
-}
-
-void Http2FloodMitigationTest::startHttp2Session() {
-  ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
-
-  // Send empty initial SETTINGS frame.
-  auto settings = Http2Frame::makeEmptySettingsFrame();
-  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
-
-  // Read initial SETTINGS frame from the server.
-  readFrame();
-
-  // Send an SETTINGS ACK.
-  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
-  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
-
-  // read pending SETTINGS and WINDOW_UPDATE frames
-  readFrame();
-  readFrame();
 }
 
 // Verify that the server detects the flood of the given frame.
