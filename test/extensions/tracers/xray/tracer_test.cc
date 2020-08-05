@@ -105,6 +105,8 @@ TEST_F(XRayTracerTest, BaggageNotImplemented) {
   auto span = tracer.createNonSampledSpan();
   span->setBaggage("baggage_key", "baggage_value");
   span->finishSpan();
+
+  // Baggage isn't supported so getBaggage should always return empty
   ASSERT_EQ("", span->getBaggage("baggage_key"));
 }
 
