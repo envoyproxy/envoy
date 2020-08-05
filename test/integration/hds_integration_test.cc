@@ -496,40 +496,30 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 
   // Receive updates until the one we expect arrives
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!(checkEndpointHealthResponse(response_.endpoint_health_response()
-                                           .cluster_endpoints_health(0)
-                                           .locality_endpoints_health(0)
-                                           .endpoints_health(0),
-                                       envoy::config::core::v3::UNHEALTHY,
-                                       host_upstream_->localAddress()) &&
-           checkEndpointHealthResponse(response_.endpoint_health_response()
-                                           .cluster_endpoints_health(0)
-                                           .locality_endpoints_health(0)
-                                           .endpoints_health(1),
-                                       envoy::config::core::v3::HEALTHY,
-                                       host2_upstream_->localAddress()))) {
+  while (!response_.has_endpoint_health_response()) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   }
 
-  // Endpoint health response nested layout assertions.
+  // Ensure we have at least one cluster before trying to read it.
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
-  EXPECT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
-            "anna");
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health_size(),
-            1);
-  EXPECT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health(0)
-                .locality()
-                .sub_zone(),
-            "hobbiton");
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health(0)
-                .endpoints_health_size(),
-            2);
+
+  // store cluster response info for easier reference.
+  const auto& cluster_response = response_.endpoint_health_response().cluster_endpoints_health(0);
+
+  // Check cluster has correct name and number of localities (1)
+  EXPECT_EQ(cluster_response.cluster_name(), "anna");
+  ASSERT_EQ(cluster_response.locality_endpoints_health_size(), 1);
+
+  // check the only locality and its endpoints.
+  const auto& locality_response = cluster_response.locality_endpoints_health(0);
+  EXPECT_EQ(locality_response.locality().sub_zone(), "hobbiton");
+  ASSERT_EQ(locality_response.endpoints_health_size(), 2);
+  EXPECT_TRUE(checkEndpointHealthResponse(locality_response.endpoints_health(0),
+                                          envoy::config::core::v3::UNHEALTHY,
+                                          host_upstream_->localAddress()));
+  EXPECT_TRUE(checkEndpointHealthResponse(locality_response.endpoints_health(1),
+                                          envoy::config::core::v3::HEALTHY,
+                                          host2_upstream_->localAddress()));
 
   checkCounters(1, 2, 1, 1);
 
@@ -574,51 +564,33 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
 
   // Receive updates until the one we expect arrives
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!(checkEndpointHealthResponse(response_.endpoint_health_response()
-                                           .cluster_endpoints_health(0)
-                                           .locality_endpoints_health(0)
-                                           .endpoints_health(0),
-                                       envoy::config::core::v3::UNHEALTHY,
-                                       host_upstream_->localAddress()) &&
-           checkEndpointHealthResponse(response_.endpoint_health_response()
-                                           .cluster_endpoints_health(0)
-                                           .locality_endpoints_health(1)
-                                           .endpoints_health(0),
-                                       envoy::config::core::v3::HEALTHY,
-                                       host2_upstream_->localAddress()))) {
+  while (!response_.has_endpoint_health_response()) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   }
-
-  // Endpoint health response nested layout assertions.
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
-  EXPECT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
-            "anna");
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health_size(),
-            2);
-  EXPECT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health(0)
-                .locality()
-                .sub_zone(),
-            "hobbiton");
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health(0)
-                .endpoints_health_size(),
-            1);
-  EXPECT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health(1)
-                .locality()
-                .sub_zone(),
-            "emplisi");
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health(1)
-                .endpoints_health_size(),
-            1);
+
+  // store cluster response info for easier reference.
+  const auto& cluster_response = response_.endpoint_health_response().cluster_endpoints_health(0);
+
+  // Check cluster has correct name and number of localities (2)
+  EXPECT_EQ(cluster_response.cluster_name(), "anna");
+  ASSERT_EQ(cluster_response.locality_endpoints_health_size(), 2);
+
+  // check first locality.
+  const auto& locality_resp0 = cluster_response.locality_endpoints_health(0);
+  EXPECT_EQ(locality_resp0.locality().sub_zone(), "hobbiton");
+  ASSERT_EQ(locality_resp0.endpoints_health_size(), 1);
+  EXPECT_TRUE(checkEndpointHealthResponse(locality_resp0.endpoints_health(0),
+                                          envoy::config::core::v3::UNHEALTHY,
+                                          host_upstream_->localAddress()));
+
+  // check second locality.
+  const auto& locality_resp1 = cluster_response.locality_endpoints_health(1);
+  EXPECT_EQ(locality_resp1.locality().sub_zone(), "emplisi");
+  ASSERT_EQ(locality_resp1.endpoints_health_size(), 1);
+  EXPECT_TRUE(checkEndpointHealthResponse(locality_resp1.endpoints_health(0),
+                                          envoy::config::core::v3::HEALTHY,
+                                          host2_upstream_->localAddress()));
 
   checkCounters(1, 2, 1, 1);
 
@@ -674,56 +646,38 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
 
   // Receive updates until the one we expect arrives
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!(checkEndpointHealthResponse(response_.endpoint_health_response()
-                                           .cluster_endpoints_health(0)
-                                           .locality_endpoints_health(0)
-                                           .endpoints_health(0),
-                                       envoy::config::core::v3::UNHEALTHY,
-                                       host_upstream_->localAddress()) &&
-           checkEndpointHealthResponse(response_.endpoint_health_response()
-                                           .cluster_endpoints_health(1)
-                                           .locality_endpoints_health(0)
-                                           .endpoints_health(0),
-                                       envoy::config::core::v3::HEALTHY,
-                                       host2_upstream_->localAddress()))) {
+  while (!response_.has_endpoint_health_response()) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   }
-
-  // Endpoint health response nested layout assertions.
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 2);
-  EXPECT_EQ(response_.endpoint_health_response().cluster_endpoints_health(0).cluster_name(),
-            "anna");
-  EXPECT_EQ(response_.endpoint_health_response().cluster_endpoints_health(1).cluster_name(), "cat");
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health_size(),
-            1);
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(1)
-                .locality_endpoints_health_size(),
-            1);
-  EXPECT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health(0)
-                .locality()
-                .sub_zone(),
-            "hobbiton");
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(0)
-                .locality_endpoints_health(0)
-                .endpoints_health_size(),
-            1);
-  EXPECT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(1)
-                .locality_endpoints_health(0)
-                .locality()
-                .sub_zone(),
-            "paris");
-  ASSERT_EQ(response_.endpoint_health_response()
-                .cluster_endpoints_health(1)
-                .locality_endpoints_health(0)
-                .endpoints_health_size(),
-            1);
+
+  // store cluster response info for easier reference.
+  const auto& cluster_resp0 = response_.endpoint_health_response().cluster_endpoints_health(0);
+  const auto& cluster_resp1 = response_.endpoint_health_response().cluster_endpoints_health(1);
+
+  // check cluster info and sizes.
+  EXPECT_EQ(cluster_resp0.cluster_name(), "anna");
+  ASSERT_EQ(cluster_resp0.locality_endpoints_health_size(), 1);
+  EXPECT_EQ(cluster_resp1.cluster_name(), "cat");
+  ASSERT_EQ(cluster_resp1.locality_endpoints_health_size(), 1);
+
+  // store locality response info for easier reference.
+  const auto& locality_resp0 = cluster_resp0.locality_endpoints_health(0);
+  const auto& locality_resp1 = cluster_resp1.locality_endpoints_health(0);
+
+  // check locality info and sizes.
+  EXPECT_EQ(locality_resp0.locality().sub_zone(), "hobbiton");
+  ASSERT_EQ(locality_resp0.endpoints_health_size(), 1);
+  EXPECT_EQ(locality_resp1.locality().sub_zone(), "paris");
+  ASSERT_EQ(locality_resp1.endpoints_health_size(), 1);
+
+  // check endpoints.
+  EXPECT_TRUE(checkEndpointHealthResponse(locality_resp0.endpoints_health(0),
+                                          envoy::config::core::v3::UNHEALTHY,
+                                          host_upstream_->localAddress()));
+  EXPECT_TRUE(checkEndpointHealthResponse(locality_resp1.endpoints_health(0),
+                                          envoy::config::core::v3::HEALTHY,
+                                          host2_upstream_->localAddress()));
 
   checkCounters(1, 2, 0, 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cat.health_check.success")->value());
