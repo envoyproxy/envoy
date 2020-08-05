@@ -1881,15 +1881,24 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
-  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
-      connection_manager_.codec_->protocol() < Protocol::Http2) {
-    // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
-    // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
-    // payload is no longer HTTP/1.1)
-    if (!Utility::isUpgrade(headers) &&
-        !HeaderUtility::isConnectResponse(filter_manager_.requestHeaders(),
-                                          *filter_manager_.responseHeaders())) {
-      headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
+  if (connection_manager_.drain_state_ != DrainState::NotDraining) {
+    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+      // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
+      // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
+      // payload is no longer HTTP/1.1)
+      if (!Utility::isUpgrade(headers) &&
+          !HeaderUtility::isConnectResponse(filter_manager_.requestHeaders(),
+                                            *filter_manager_.responseHeaders())) {
+        headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
+        headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
+      }
+    } else {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.connection_manager_drain_http2")) {
+        // For H2, send a GOAWAY frame to tell the client that no further requests will be accepted
+        // on this connection.
+        connection_manager_.codec_->goAway();
+      }
     }
   }
 

@@ -57,11 +57,12 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     "envoy.reloadable_features.connection_header_sanitization",
     // Begin alphabetically sorted section.
+    "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.activate_fds_next_event_loop",
     "envoy.reloadable_features.allow_500_after_100",
-    "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.allow_prefetch",
     "envoy.reloadable_features.allow_response_for_timeout",
+    "envoy.reloadable_features.connection_manager_drain_http2",
     "envoy.reloadable_features.consume_all_retry_headers",
     "envoy.reloadable_features.disallow_unbounded_access_logs",
     "envoy.reloadable_features.early_errors_via_hcm",
@@ -71,6 +72,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.fix_upgrade_response",
     "envoy.reloadable_features.fix_wildcard_matching",
     "envoy.reloadable_features.fixed_connection_close",
+    "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.http_default_alpn",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
@@ -78,7 +80,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.preserve_query_string_in_path_redirects",
     "envoy.reloadable_features.preserve_upstream_date",
     "envoy.reloadable_features.stop_faking_paths",
-    "envoy.reloadable_features.hcm_stream_error_on_invalid_message",
     "envoy.reloadable_features.strict_1xx_and_204_response_headers",
 };
 
