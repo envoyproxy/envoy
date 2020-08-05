@@ -312,8 +312,8 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
       [subscription = std::weak_ptr<RdsRouteConfigSubscription>(subscription_),
        config_cbs = std::weak_ptr<std::list<UpdateOnDemandCallback>>(config_update_callbacks_),
        alias, &thread_local_dispatcher, route_config_updated_cb]() -> void {
-        auto sub = subscription.lock();
         if (auto callbacks = config_cbs.lock()) {
+          auto sub = subscription.lock();
           sub->updateOnDemand(alias);
           callbacks->push_back({alias, thread_local_dispatcher, route_config_updated_cb});
         }
