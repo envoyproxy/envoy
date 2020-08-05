@@ -77,7 +77,7 @@ public:
 
   const std::string enable_x_ratelimit_headers_config_ = R"EOF(
   domain: foo
-  enable_x_ratelimit_headers: DRAFT_VERSION_02
+  enable_x_ratelimit_headers: DRAFT_VERSION_03
   )EOF";
 
   const std::string filter_config_ = R"EOF(
