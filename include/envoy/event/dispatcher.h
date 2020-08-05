@@ -158,7 +158,6 @@ public:
    * Creates a logical udp listener on a specific port.
    * @param socket supplies the socket to listen on.
    * @param cb supplies the udp listener callbacks to invoke for listener events.
-   * @param config provides information to create udp packet writer object
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,

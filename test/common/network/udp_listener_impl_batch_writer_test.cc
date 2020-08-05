@@ -87,8 +87,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplBatchWriterTest,
  *     - When payload size < gso_size verify that the new payload is
  *       sent along with the already buffered payloads.
  *  3. Call UdpPacketWriter's External Flush
- *     - Verify that the internal buffer is emptied and its contents
- *       are delivered to the client.
+ *     - Verify that the internal buffer is emptied and the
+ *       total_bytes_sent counter is updated accordingly.
  */
 TEST_P(UdpListenerImplBatchWriterTest, SendData) {
   EXPECT_TRUE(udp_packet_writer_->isBatchMode());

@@ -321,8 +321,8 @@ public:
   virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
 
   /**
-   * Flushes out internal buffer data through the underlying socket.
-   * Flush is a no-op if internal buffer is empty or if it does not exist.
+   * Flushes out remaining buffered data since last call of send().
+   * This is a no-op if the implementation doesn't buffer data while sending.
    *
    * @return the error code of the underlying flush api.
    */
