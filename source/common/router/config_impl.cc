@@ -33,6 +33,7 @@
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/router/reset_header_parser.h"
 #include "common/router/retry_state_impl.h"
 #include "common/runtime/runtime_features.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -122,7 +123,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
   }
 
   if (retry_policy.has_rate_limited_retry_back_off()) {
-    reset_headers_ = Http::HeaderUtility::buildResetHeaderParserVector(
+    reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(
         retry_policy.rate_limited_retry_back_off().reset_headers());
 
     absl::optional<std::chrono::milliseconds> reset_max_interval =

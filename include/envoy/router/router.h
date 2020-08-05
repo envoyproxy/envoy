@@ -151,6 +151,23 @@ public:
 };
 
 /**
+ * An interface to be implemented by rate limited reset header parsers.
+ */
+class ResetHeaderParser {
+public:
+  virtual ~ResetHeaderParser() = default;
+
+  /**
+   * Iterate over the headers, choose the first one that matches by name, and try to parse its
+   * value.
+   */
+  virtual absl::optional<std::chrono::milliseconds>
+  parseInterval(TimeSource& time_source, const Http::HeaderMap& headers) const PURE;
+};
+
+using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
+
+/**
  * Route level retry policy.
  */
 class RetryPolicy {
@@ -240,10 +257,10 @@ public:
    * @return std::vector<Http::ResetHeaderParserSharedPtr>& list of reset header
    * parsers that will be used to extract a retry back-off interval from response headers.
    */
-  virtual const std::vector<Http::ResetHeaderParserSharedPtr>& resetHeaders() const PURE;
+  virtual const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const PURE;
 
   /**
-   * @return absl::optional<std::chrono::milliseconds> upper limit placed on a retry
+   * @return std::chrono::milliseconds upper limit placed on a retry
    * back-off interval parsed from response headers.
    */
   virtual std::chrono::milliseconds resetMaxInterval() const PURE;
@@ -389,7 +406,6 @@ public:
       const Upstream::PrioritySet& priority_set,
       const Upstream::HealthyAndDegradedLoad& original_priority_load,
       const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) PURE;
-
   /**
    * return how many times host selection should be reattempted during host selection.
    */

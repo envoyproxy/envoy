@@ -4,6 +4,7 @@
 #include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
+#include "common/router/reset_header_parser.h"
 #include "common/router/retry_state_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
@@ -941,7 +942,7 @@ TEST_F(RouterRetryStateImplTest, ParseRateLimitedResetInterval) {
   reset_header_2->set_name("X-RateLimit-Reset");
   reset_header_2->set_format(envoy::config::route::v3::RetryPolicy::UNIX_TIMESTAMP);
 
-  policy_.reset_headers_ = Http::HeaderUtility::buildResetHeaderParserVector(reset_headers);
+  policy_.reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
 
   // Failure case: Matches reset header (seconds) but exceeds max_interval (>5min)
   {
@@ -1008,7 +1009,7 @@ TEST_F(RouterRetryStateImplTest, RateLimitedRetryBackoffStrategy) {
   reset_header->set_format(envoy::config::route::v3::RetryPolicy::SECONDS);
 
   policy_.num_retries_ = 3;
-  policy_.reset_headers_ = Http::HeaderUtility::buildResetHeaderParserVector(reset_headers);
+  policy_.reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(reset_headers);
 
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
   setup(request_headers);

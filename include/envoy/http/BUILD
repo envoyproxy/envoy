@@ -102,7 +102,6 @@ envoy_cc_library(
         "abseil_inlined_vector",
     ],
     deps = [
-        "//include/envoy/common:time_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
     ],

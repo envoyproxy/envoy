@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/common/time.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -781,23 +780,6 @@ public:
 };
 
 using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
-
-/**
- * An interface to be implemented by rate limited reset header parsers.
- */
-class ResetHeaderParser {
-public:
-  virtual ~ResetHeaderParser() = default;
-
-  /**
-   * Iterate over the headers, choose the first one that matches by name, and try to parse its
-   * value.
-   */
-  virtual absl::optional<std::chrono::milliseconds>
-  parseInterval(TimeSource& time_source, const HeaderMap& headers) const PURE;
-};
-
-using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 
 } // namespace Http
 } // namespace Envoy

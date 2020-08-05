@@ -20,7 +20,6 @@ namespace Http {
 class HeaderUtility {
 public:
   enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix };
-  enum class ResetHeaderFormat { Seconds, UnixTimestamp };
 
   /**
    * Get all instances of the header key specified, and return the values in the vector provided.
@@ -91,35 +90,6 @@ public:
 
   static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
-  // A ResetHeaderData specifies a header name and a format to match against
-  // response headers that are used to signal a rate limit interval reset, such
-  // as Retry-After or X-RateLimit-Reset.
-  struct ResetHeaderData : public ResetHeaderParser {
-    ResetHeaderData(const envoy::config::route::v3::RetryPolicy::ResetHeader& config);
-
-    const LowerCaseString name_;
-    ResetHeaderFormat format_;
-
-    // RateLimitedResetHeaderParser
-    absl::optional<std::chrono::milliseconds>
-    parseInterval(TimeSource& time_source, const HeaderMap& headers) const override;
-  };
-
-  using ResetHeaderDataPtr = std::unique_ptr<ResetHeaderData>;
-
-  /**
-   * Build a vector of ResetHeaderParserSharedPtr given input config.
-   */
-  static std::vector<Http::ResetHeaderParserSharedPtr> buildResetHeaderParserVector(
-      const Protobuf::RepeatedPtrField<envoy::config::route::v3::RetryPolicy::ResetHeader>&
-          reset_headers) {
-    std::vector<Http::ResetHeaderParserSharedPtr> ret;
-    for (const auto& reset_header : reset_headers) {
-      ret.emplace_back(std::make_shared<HeaderUtility::ResetHeaderData>(reset_header));
-    }
-    return ret;
-  }
-
   /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
@@ -188,6 +158,5 @@ public:
    */
   static void stripPortFromHost(RequestHeaderMap& headers, uint32_t listener_port);
 };
-
 } // namespace Http
 } // namespace Envoy
