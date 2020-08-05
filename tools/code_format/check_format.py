@@ -103,6 +103,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
+DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -567,7 +568,11 @@ def tokenInLine(token, line):
   index = 0
   while True:
     index = line.find(token, index)
-    if index < 1:
+    # the following check has been changed from index < 1 to index < 0 because
+    # this function incorrectly returns false when the token in question is the
+    # first one in a line. The following line returns false when the token is present:
+    # (no leading whitespace) violating_symbol foo;
+    if index < 0:
       break
     if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
       if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
@@ -620,6 +625,12 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  duration_arg = DURATION_VALUE_REGEX.search(line)
+  if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
+    # Matching duration(int-const or float-const) other than zero
+    reportError(
+        "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
+    )
   if not allowlistedForRegisterFactory(file_path):
     if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
       reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
@@ -660,6 +671,15 @@ def checkSourceLine(line, file_path, reportError):
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
     reportError("Don't use free std::atomic_* functions, use std::atomic<T> members instead.")
+  # Blocking the use of std::any, std::optional, std::variant for now as iOS 11/macOS 10.13
+  # does not support these functions at runtime.
+  # See: https://github.com/envoyproxy/envoy/issues/12341
+  if tokenInLine("std::any", line):
+    reportError("Don't use std::any; use absl::any instead")
+  if tokenInLine("std::optional", line):
+    reportError("Don't use std::optional; use absl::optional instead")
+  if tokenInLine("std::variant", line):
+    reportError("Don't use std::variant; use absl::variant instead")
   if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
     # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
     # can be used instead
