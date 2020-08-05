@@ -108,6 +108,7 @@ HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
+DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -358,9 +359,10 @@ def allowlistedForUnpackTo(file_path):
       "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
   ]
 
+
 def denylistedForExceptions(file_path):
-    return (file_path in EXCEPTION_DENYLIST or isInSubdir(file_path, 'tools/testdata')) and \
-        not file_path.endswith(DOCS_SUFFIX)
+  return (file_path in EXCEPTION_DENYLIST or isInSubdir(file_path, 'tools/testdata')) and \
+      not file_path.endswith(DOCS_SUFFIX)
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   text = readFile(file_path)
@@ -575,7 +577,11 @@ def tokenInLine(token, line):
   index = 0
   while True:
     index = line.find(token, index)
-    if index < 1:
+    # the following check has been changed from index < 1 to index < 0 because
+    # this function incorrectly returns false when the token in question is the
+    # first one in a line. The following line returns false when the token is present:
+    # (no leading whitespace) violating_symbol foo;
+    if index < 0:
       break
     if index == 0 or not (line[index - 1].isalnum() or line[index - 1] == '_'):
       if index + len(token) >= len(line) or not (line[index + len(token)].isalnum() or
@@ -628,6 +634,12 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  duration_arg = DURATION_VALUE_REGEX.search(line)
+  if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
+    # Matching duration(int-const or float-const) other than zero
+    reportError(
+        "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
+    )
   if not allowlistedForRegisterFactory(file_path):
     if "Registry::RegisterFactory<" in line or "REGISTER_FACTORY" in line:
       reportError("Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
@@ -742,13 +754,12 @@ def checkSourceLine(line, file_path, reportError):
                     "Grpc::GoogleGrpcContext. See #8282")
 
   if denylistedForExceptions(file_path):
-      throw = line.find("throw")
-      if throw != -1:
-          comment_match = COMMENT_REGEX.search(line)
-          if comment_match is None or comment_match.start(0) > throw:
-              reportError("Don't introduce throws into exception-free files, use error " +
-                          "statuses instead.")
-
+    throw = line.find("throw")
+    if throw != -1:
+      comment_match = COMMENT_REGEX.search(line)
+      if comment_match is None or comment_match.start(0) > throw:
+        reportError("Don't introduce throws into exception-free files, use error " +
+                    "statuses instead.")
 
 
 def checkBuildLine(line, file_path, reportError):

@@ -38,6 +38,64 @@ public:
   DangerousDeprecatedTestTime test_time_;
 };
 
+// Validate that the host header is the cluster name in grpc config.
+TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "test_cluster";
+              })));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validate that the host header is the authority field in grpc config.
+TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
+  envoy::config::core::v3::GrpcService config;
+  config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
+  config.mutable_envoy_grpc()->set_authority("demo.com");
+
+  grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("test_cluster"))
+      .WillRepeatedly(ReturnRef(http_client_));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(grpc_callbacks,
+              onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
+                return headers.Host()->value() == "demo.com";
+              })));
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validate that a failure in the HTTP client returns immediately with status
 // UNAVAILABLE.
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
@@ -46,7 +104,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpStartFail) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
-  EXPECT_TRUE(grpc_stream == nullptr);
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 // Validate that a failure in the HTTP client returns immediately with status
@@ -98,7 +156,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Internal, ""));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
-  EXPECT_TRUE(grpc_stream == nullptr);
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 // Validate that a failure to sendHeaders() in the HTTP client returns
@@ -150,7 +208,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
               onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, "Cluster not available"));
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
-  EXPECT_TRUE(grpc_stream == nullptr);
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 } // namespace
