@@ -77,6 +77,8 @@ message ScopedRouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.ScopedRouteConfiguration";
 
+  // In Scoped rds, scope routes with primary priority will be loaded eagerly,
+  // scope routes with secondary priority will be loaded lazily on config update.
   enum ScopePriority {
     Primary = 0;
     Secondary = 1;

@@ -136,15 +136,14 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
       })) {}
 
 ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProviderHelper(
-    ScopedRdsConfigSubscription& parent, std::string scope_name,
-    envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds)
-    : parent_(parent), scope_name_(scope_name), rds_(rds) {}
+    ScopedRdsConfigSubscription& parent, std::string scope_name)
+    : parent_(parent), scope_name_(scope_name) {}
 
 void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::addOnDemandUpdateCallback(
     std::function<void()> callback) {
   // If route table has been initialized, run the callback to continue in filter chain, otherwise
   // cache it and wait for the route table to be initialized.
-  if (route_provider_ && routeConfig()) {
+  if (route_provider_ && routeConfig() != std::make_shared<NullConfigImpl>()) {
     callback();
     return;
   }
@@ -165,18 +164,31 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
   }
   std::unique_ptr<Init::ManagerImpl> srds_init_mgr =
       std::make_unique<Init::ManagerImpl>(fmt::format("SRDS : "));
+  std::unique_ptr<Cleanup> srds_initialization_continuation =
+      std::make_unique<Cleanup>([this, &srds_init_mgr] {
+        // For new RDS subscriptions created after listener warming up, we don't wait for them to
+        // warm up.
+        Init::WatcherImpl noop_watcher(
+            // Note: we just throw it away.
+            fmt::format("SRDS ConfigUpdate watcher: {}", scope_name_), []() { /*Do nothing.*/ });
+        srds_init_mgr->initialize(noop_watcher);
+      });
+  envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
+  rds.mutable_config_source()->MergeFrom(parent_.rds_config_source_);
+  rds.set_route_config_name(
+      parent_.scoped_route_map_[scope_name_]->configProto().route_configuration_name());
   route_provider_ = std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
       parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
-          *rds_, parent_.factory_context_, parent_.stat_prefix_, *srds_init_mgr));
+          rds, parent_.factory_context_, parent_.stat_prefix_, *srds_init_mgr));
 
   rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
     // Subscribe to RDS update.
     parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
   });
   // If route configuration hasn't been initialized, return.
-  if (!routeConfig())
+  if (routeConfig() == std::make_shared<NullConfigImpl>())
     return;
-  // Update scoped route configuration.
+  ENVOY_LOG(debug, "on demand update");
   std::shared_ptr<ScopedRouteInfo> scoped_route_info =
       std::make_shared<ScopedRouteInfo>(envoy::config::route::v3::ScopedRouteConfiguration(
                                             parent_.scoped_route_map_[scope_name_]->configProto()),
@@ -221,7 +233,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
     } else {
       // For secondary scopes, create a rds helper with rds provider uninitialized.
       rds_config_provider_helper =
-          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds);
+          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
       // scope_route_info->routeConfig() will be nullptr
       scoped_route_info =
           std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);

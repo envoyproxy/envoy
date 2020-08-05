@@ -39,16 +39,8 @@ Envoy::Config::ConfigProviderPtr create(
 
 class ScopedRoutesConfigProviderManager;
 
-struct ScopedRoutesConfigProviderBase : virtual public Envoy::Config::ConfigProvider {
-  virtual void
-  onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-                    Http::RouteConfigUpdatedCallback route_config_updated_cb) const PURE;
-  virtual ~ScopedRoutesConfigProviderBase() = default;
-};
-
 // A ConfigProvider for inline scoped routing configuration.
-class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase,
-                                         ScopedRoutesConfigProviderBase {
+class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase {
 public:
   InlineScopedRoutesConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
                                    std::string name,
@@ -74,11 +66,6 @@ public:
 
   std::string getConfigVersion() const override { return ""; }
   ConfigConstSharedPtr getConfig() const override { return config_; }
-
-  void onDemandRdsUpdate(uint64_t, Event::Dispatcher& thread_local_dispatcher,
-                         Http::RouteConfigUpdatedCallback route_config_updated_cb) const override {
-    thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
-  }
 
 private:
   const std::string name_;
@@ -137,9 +124,7 @@ private:
         envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
         Init::Manager& init_manager);
 
-    RdsRouteConfigProviderHelper(
-        ScopedRdsConfigSubscription& parent, std::string scope_name,
-        envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds);
+    RdsRouteConfigProviderHelper(ScopedRdsConfigSubscription& parent, std::string scope_name);
 
     ~RdsRouteConfigProviderHelper() {
       if (route_provider_) {
@@ -158,7 +143,6 @@ private:
     // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
     std::list<std::function<void()>> on_demand_update_callbacks_;
-    absl::optional<envoy::extensions::filters::network::http_connection_manager::v3::Rds> rds_;
   };
 
   using RdsRouteConfigProviderHelperPtr = std::unique_ptr<RdsRouteConfigProviderHelper>;
@@ -228,8 +212,7 @@ using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubs
 
 // A ConfigProvider for scoped RDS that dynamically fetches scoped routing configuration via a
 // subscription.
-class ScopedRdsConfigProvider : public Envoy::Config::MutableConfigProviderCommonBase,
-                                ScopedRoutesConfigProviderBase {
+class ScopedRdsConfigProvider : public Envoy::Config::MutableConfigProviderCommonBase {
 public:
   ScopedRdsConfigProvider(ScopedRdsConfigSubscriptionSharedPtr&& subscription);
 
@@ -237,7 +220,7 @@ public:
     return *static_cast<ScopedRdsConfigSubscription*>(subscription_.get());
   }
   void onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-                         Http::RouteConfigUpdatedCallback route_config_updated_cb) const override {
+                         Http::RouteConfigUpdatedCallback route_config_updated_cb) const {
     subscription().onDemandRdsUpdate(key_hash, thread_local_dispatcher,
                                      move(route_config_updated_cb));
   }

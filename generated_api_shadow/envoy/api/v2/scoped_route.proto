@@ -75,6 +75,13 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // RouteConfiguration being assigned to the HTTP request/stream.
 //
 message ScopedRouteConfiguration {
+  // In Scoped rds, scope routes with primary priority will be loaded eagerly,
+  // scope routes with secondary priority will be loaded lazily on config update.
+  enum ScopePriority {
+    Primary = 0;
+    Secondary = 1;
+  }
+
   // Specifies a key which is matched against the output of the
   // :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v2.ScopedRoutes.scope_key_builder>`
   // specified in the HttpConnectionManager. The matching is done per HTTP
@@ -106,4 +113,6 @@ message ScopedRouteConfiguration {
 
   // The key to match against.
   Key key = 3 [(validate.rules).message = {required: true}];
+
+  ScopePriority priority = 4;
 }

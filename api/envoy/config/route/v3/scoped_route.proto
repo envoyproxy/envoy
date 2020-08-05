@@ -76,6 +76,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ScopedRouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.ScopedRouteConfiguration";
+
   // In Scoped rds, scope routes with primary priority will be loaded eagerly,
   // scope routes with secondary priority will be loaded lazily on config update.
   enum ScopePriority {
