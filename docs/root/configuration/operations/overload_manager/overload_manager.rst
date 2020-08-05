@@ -40,6 +40,24 @@ The overload manager uses Envoy's :ref:`extension <extending>` framework for def
 resource monitors. Envoy's builtin resource monitors are listed
 :ref:`here <config_resource_monitors>`.
 
+Triggers
+--------
+
+Triggers connect resource monitors to actions. There are two types of triggers supported:
+
+.. list-table::
+  :header-rows: 1
+  :widths: 1, 2
+
+  * - Type
+    - Description
+  * - :ref:`threshold <envoy_v3_api_msg_config.overload.v3.ThresholdTrigger>`
+    - Sets the action state to 1 (= *saturated*) when the resource pressure is above a threshold, and to 0 otherwise.
+  * - :ref:`range <envoy_v3_api_msg_config.overload.v3.RangeTrigger>`
+    - Sets the action state to 0 when the resource pressure is below the min threshold,
+      `(pressure - min)/(max - min)` when `min < pressure < max`,
+      and to 1 (*saturated*) when the pressure is above the max."
+
 Overload actions
 ----------------
 
