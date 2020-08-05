@@ -29,8 +29,8 @@ message RateLimit {
     // X-RateLimit headers disabled.
     OFF = 0;
 
-    // Use `draft RFC Version 02 <https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html>`_.
-    DRAFT_VERSION_02 = 1;
+    // Use `draft RFC Version 03 <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
+    DRAFT_VERSION_03 = 1;
   }
 
   // The rate limit domain to use when calling the rate limit service.
@@ -94,7 +94,7 @@ message RateLimit {
   // above represent the window that is closest to reaching its limit.
   //
   // For more information about the headers specification see selected version of
-  // the `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html>`_.
+  // the `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
   //
   // Disabled by default.
   XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
