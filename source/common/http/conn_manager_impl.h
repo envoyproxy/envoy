@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
@@ -29,6 +30,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -449,18 +451,46 @@ private:
      * Called when the stream write buffer is above above the high watermark.
      */
     virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+    /**
+     * Called when the FilterManager creates an Upgrade filter chain.
+     */
+    virtual void upgradeFilterChainCreated() PURE;
   };
 
   /**
    * FilterManager manages decoding a request through a series of decoding filter and the encoding
    * of the resulting response.
    */
-  class FilterManager {
+  class FilterManager : public FilterChainFactoryCallbacks {
   public:
     FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& filter_manager_callbacks,
-                  uint32_t buffer_limit)
+                  uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
+                  Http::Protocol protocol, TimeSource& time_source,
+                  StreamInfo::FilterStateSharedPtr parent_filter_state,
+                  StreamInfo::FilterState::LifeSpan filter_state_life_span)
         : active_stream_(active_stream), filter_manager_callbacks_(filter_manager_callbacks),
-          buffer_limit_(buffer_limit) {}
+          buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
+          stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
+    ~FilterManager() override {
+      for (const auto& log_handler : access_log_handlers_) {
+        log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+                         stream_info_);
+      }
+    }
+
+    // Http::FilterChainFactoryCallbacks
+    void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
+      addStreamDecoderFilterWorker(filter, false);
+    }
+    void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
+      addStreamEncoderFilterWorker(filter, false);
+    }
+    void addStreamFilter(StreamFilterSharedPtr filter) override {
+      addStreamDecoderFilterWorker(filter, true);
+      addStreamEncoderFilterWorker(filter, true);
+    }
+    void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
     void destroyFilters() {
       for (auto& filter : decoder_filters_) {
@@ -586,6 +616,13 @@ private:
      */
     ResponseTrailerMap* responseTrailers() const { return response_trailers_.get(); }
 
+    // TODO(snowp): This should probably return a StreamInfo instead of the impl.
+    StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
+    const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
+
+    // Set up the Encoder/Decoder filter chain.
+    bool createFilterChain();
+
   private:
     // Indicates which filter to start the iteration with.
     enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
@@ -657,6 +694,7 @@ private:
 
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
+    std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
 
     ResponseHeaderMapPtr continue_headers_;
     ResponseHeaderMapPtr response_headers_;
@@ -673,6 +711,8 @@ private:
     uint32_t high_watermark_count_{0};
     std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
 
+    FilterChainFactory& filter_chain_factory_;
+    StreamInfo::StreamInfoImpl stream_info_;
     // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
     // at which point they no longer need to be friends.
     friend ActiveStreamFilterBase;
@@ -688,7 +728,6 @@ private:
                         public Event::DeferredDeletable,
                         public StreamCallbacks,
                         public RequestDecoder,
-                        public FilterChainFactoryCallbacks,
                         public Tracing::Config,
                         public ScopeTrackedObject,
                         public FilterManagerCallbacks {
@@ -726,19 +765,6 @@ private:
     void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
 
-    // Http::FilterChainFactoryCallbacks
-    void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
-      filter_manager_.addStreamDecoderFilterWorker(filter, false);
-    }
-    void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
-      filter_manager_.addStreamEncoderFilterWorker(filter, false);
-    }
-    void addStreamFilter(StreamFilterSharedPtr filter) override {
-      filter_manager_.addStreamDecoderFilterWorker(filter, true);
-      filter_manager_.addStreamEncoderFilterWorker(filter, true);
-    }
-    void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
-
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
     const Tracing::CustomTagMap* customTags() const override;
@@ -757,7 +783,7 @@ private:
       DUMP_DETAILS(filter_manager_.requestTrailers());
       DUMP_DETAILS(filter_manager_.responseHeaders());
       DUMP_DETAILS(filter_manager_.responseTrailers());
-      DUMP_DETAILS(&stream_info_);
+      DUMP_DETAILS(&filter_manager_.streamInfo());
     }
 
     // FilterManagerCallbacks
@@ -768,6 +794,10 @@ private:
     void encodeMetadata(MetadataMapVector& metadata) override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
+    void upgradeFilterChainCreated() override {
+      connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
+      connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
+    }
 
     void traceRequest();
 
@@ -861,8 +891,6 @@ private:
       ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
     };
 
-    // Set up the Encoder/Decoder filter chain.
-    bool createFilterChain();
     // Per-stream idle timeout callback.
     void onIdleTimeout();
     // Reset per-stream idle timer.
@@ -895,7 +923,6 @@ private:
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     ResponseEncoder* response_encoder_{};
-    std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
     Event::TimerPtr stream_idle_timer_;
@@ -905,7 +932,6 @@ private:
     Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
-    StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
