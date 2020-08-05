@@ -430,31 +430,32 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
 
   // Make sure the overflow threshold will be above std::numeric_limits<uint32_t>::max()
-  Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "3"}});
-  const uint32_t high_watermark_threshold = (std::numeric_limits<uint32_t>::max() / 3) + 1;
+  const uint64_t overflow_multiplier = 3;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.buffer.overflow_multiplier", std::to_string(overflow_multiplier)}});
+  const uint32_t high_watermark_threshold =
+      (std::numeric_limits<uint32_t>::max() / overflow_multiplier) + 1;
   buffer1.setWatermarks(high_watermark_threshold);
 
-  // Add many segments instead of full uint32_t::max to get around std::bad_alloc exception
-  const uint32_t segment_denominator = 128;
-  const uint32_t big_segment_len = std::numeric_limits<uint32_t>::max() / segment_denominator + 1;
-  const std::string big_segment_str = std::string(big_segment_len, 'a');
-  // Fill the buffer with more than uint32_t::max bytes
-  EXPECT_GT(static_cast<uint64_t>(segment_denominator) * big_segment_len,
-            std::numeric_limits<uint32_t>::max());
-  for (uint32_t i = 0; i < segment_denominator; ++i) {
-    buffer1.add(big_segment_str.data(), big_segment_len);
-  }
+  Buffer::RawSlice iovec;
+  // Reserve and commit uint32_t::max + 1 bytes
+  uint64_t num_reserved =
+      buffer1.reserve(std::numeric_limits<uint32_t>::max() + UINT64_C(1), &iovec, 1);
+  EXPECT_EQ(num_reserved, 1);
+  buffer1.commit(&iovec, 1);
   EXPECT_GT(buffer1.length(), std::numeric_limits<uint32_t>::max());
+  EXPECT_LT(buffer1.length(), high_watermark_threshold * overflow_multiplier);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  EXPECT_LT(buffer1.length(), high_watermark_threshold * UINT64_C(3));
-  // Add more data to the buffer beyond the expected high_watermark_threshold*overflow_multiplier
-  // threshold. Adding high_watermark_threshold * UINT64_C(3) - buffer1.length() + 1 bytes
-  const std::string bytes_to_add(3, 'a');
-  buffer1.add(bytes_to_add.data(), bytes_to_add.size());
-  EXPECT_EQ(buffer1.length(),
-            static_cast<uint64_t>(segment_denominator) * big_segment_len + bytes_to_add.size());
-  EXPECT_GT(buffer1.length(), high_watermark_threshold * UINT64_C(3));
+
+  // Reserve and commit additional space on the buffer beyond the expected
+  // high_watermark_threshold * overflow_multiplier threshold.
+  // Adding high_watermark_threshold * overflow_multiplier - buffer1.length() + 1 bytes
+  num_reserved = buffer1.reserve(
+      high_watermark_threshold * overflow_multiplier - buffer1.length() + 1, &iovec, 1);
+  EXPECT_EQ(num_reserved, 1);
+  buffer1.commit(&iovec, 1);
+  EXPECT_EQ(buffer1.length(), high_watermark_threshold * overflow_multiplier + 1);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
 #endif
