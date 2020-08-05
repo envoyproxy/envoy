@@ -92,7 +92,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     }
 
     ProtobufWkt::Struct metrics;
-    
+
     auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
       *fields[Filters::Common::RBAC::DynamicMetadataKeysSingleton::get()

@@ -31,7 +31,8 @@ public:
    */
   virtual bool handleAction(const Network::Connection& connection,
                             const Envoy::Http::RequestHeaderMap& headers,
-                            StreamInfo::StreamInfo& info, std::string* effective_policy_id) const PURE;
+                            StreamInfo::StreamInfo& info,
+                            std::string* effective_policy_id) const PURE;
 
   /**
    * Handles action-specific operations and returns whether or not the request is permitted.
