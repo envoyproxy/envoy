@@ -431,6 +431,11 @@ private:
     virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
 
     /**
+     * Called after encoding has completed.
+     */
+    virtual void endStream() PURE;
+
+    /**
      * Called when the stream write buffer is no longer above the low watermark.
      */
     virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
@@ -450,7 +455,7 @@ private:
    * FilterManager manages decoding a request through a series of decoding filter and the encoding
    * of the resulting response.
    */
-  class FilterManager : public FilterChainFactoryCallbacks {
+  class FilterManager : public ScopeTrackedObject, FilterChainFactoryCallbacks {
   public:
     FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& filter_manager_callbacks,
                   uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
@@ -465,6 +470,22 @@ private:
         log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                          stream_info_);
       }
+
+      ASSERT(state_.filter_call_state_ == 0);
+    }
+
+    // ScopeTrackedObject
+    void dumpState(std::ostream& os, int indent_level = 0) const override {
+      const char* spaces = spacesForLevel(indent_level);
+      os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_)
+         << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
+         << "\n";
+
+      DUMP_DETAILS(request_headers_);
+      DUMP_DETAILS(request_trailers_);
+      DUMP_DETAILS(response_headers_);
+      DUMP_DETAILS(response_trailers_);
+      DUMP_DETAILS(&stream_info_);
     }
 
     // Http::FilterChainFactoryCallbacks
@@ -481,6 +502,8 @@ private:
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
     void destroyFilters() {
+      state_.destroyed_ = true;
+
       for (auto& filter : decoder_filters_) {
         filter->handle_->onDestroy();
       }
@@ -583,6 +606,43 @@ private:
       // don't assert here.
       response_headers_ = std::move(response_headers);
     }
+
+    /**
+     * Whether the filters have been destroyed.
+     */
+    bool destroyed() const { return state_.destroyed_; }
+
+    /**
+     * Whether local processing has been marked as complete.
+     */
+    bool localComplete() const { return state_.local_complete_; }
+
+    /**
+     * Whether remote processing has been marked as complete.
+     */
+    bool remoteComplete() const { return state_.remote_complete_; }
+
+    /**
+     * Marks local processing as complete.
+     */
+    void setLocalComplete() {
+      ASSERT(!state_.local_complete_);
+      state_.local_complete_ = true;
+    }
+
+    /**
+     * Marks remote processing as complete.
+     */
+    void setRemoteComplete() {
+      ASSERT(!state_.remote_complete_);
+      state_.remote_complete_ = true;
+    }
+
+    void setEncoderFiltersStreaming(bool streaming) {
+      state_.encoder_filters_streaming_ = streaming;
+    }
+
+    void skipFilterChainCreation() { state_.created_filter_chain_ = true; }
 
     /**
      * Returns the current request headers, or nullptr if header decoding hasn't started yet.
@@ -706,6 +766,64 @@ private:
     friend ActiveStreamFilterBase;
     friend ActiveStreamDecoderFilter;
     friend ActiveStreamEncoderFilter;
+
+    /**
+     * Flags that keep track of which filter calls are currently in progress.
+     */
+    // clang-format off
+    struct FilterCallState {
+      static constexpr uint32_t DecodeHeaders   = 0x01;
+      static constexpr uint32_t DecodeData      = 0x02;
+      static constexpr uint32_t DecodeTrailers  = 0x04;
+      static constexpr uint32_t EncodeHeaders   = 0x08;
+      static constexpr uint32_t EncodeData      = 0x10;
+      static constexpr uint32_t EncodeTrailers  = 0x20;
+      // Encode100ContinueHeaders is a bit of a special state as 100 continue
+      // headers may be sent during request processing. This state is only used
+      // to verify we do not encode100Continue headers more than once per
+      // filter.
+      static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
+      // Used to indicate that we're processing the final [En|De]codeData frame,
+      // i.e. end_stream = true
+      static constexpr uint32_t LastDataFrame = 0x80;
+    };
+    // clang-format on
+
+    struct State {
+      State()
+          : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
+            created_filter_chain_(false) {}
+
+      uint32_t filter_call_state_{0};
+
+      bool remote_complete_ : 1;
+      bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
+                                // A filter can still stop the stream from being complete as seen
+                                // by the codec.
+      // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
+      // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
+      bool has_continue_headers_ : 1;
+      bool created_filter_chain_ : 1;
+
+      // The following 3 members are booleans rather than part of the space-saving bitfield as they
+      // are passed as arguments to functions expecting bools. Extend State using the bitfield
+      // where possible.
+      bool encoder_filters_streaming_{true};
+      bool decoder_filters_streaming_{true};
+      bool destroyed_{false};
+      // Whether a filter has indicated that the response should be treated as a headers only
+      // response.
+      bool encoding_headers_only_{false};
+      // Whether a filter has indicated that the request should be treated as a headers only
+      // request.
+      bool decoding_headers_only_{false};
+
+      // Used to track which filter is the latest filter that has received data.
+      ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
+      ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
+    };
+
+    State state_;
   };
 
   /**
@@ -763,15 +881,9 @@ private:
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_)
-         << DUMP_MEMBER(state_.has_continue_headers_) << DUMP_MEMBER(state_.is_head_request_)
-         << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
-         << "\n";
+         << DUMP_MEMBER(state_.is_head_request_);
 
-      DUMP_DETAILS(filter_manager_.requestHeaders());
-      DUMP_DETAILS(filter_manager_.requestTrailers());
-      DUMP_DETAILS(filter_manager_.responseHeaders());
-      DUMP_DETAILS(filter_manager_.responseTrailers());
-      DUMP_DETAILS(&filter_manager_.streamInfo());
+      DUMP_DETAILS(&filter_manager_);
     }
 
     // FilterManagerCallbacks
@@ -780,11 +892,19 @@ private:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
     void encodeMetadata(MetadataMapVector& metadata) override;
+    void endStream() override {
+      ASSERT(!state_.codec_saw_local_complete_);
+      state_.codec_saw_local_complete_ = true;
+      filter_manager_.streamInfo().onLastDownstreamTxByteSent();
+      request_response_timespan_->complete();
+      connection_manager_.doEndStream(*this);
+    }
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void upgradeFilterChainCreated() override {
       connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
       connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
+      state_.successful_upgrade_ = true;
     }
 
     void traceRequest();
@@ -802,74 +922,26 @@ private:
 
     void refreshCachedTracingCustomTags();
 
-    /**
-     * Flags that keep track of which filter calls are currently in progress.
-     */
-    // clang-format off
-    struct FilterCallState {
-      static constexpr uint32_t DecodeHeaders   = 0x01;
-      static constexpr uint32_t DecodeData      = 0x02;
-      static constexpr uint32_t DecodeTrailers  = 0x04;
-      static constexpr uint32_t EncodeHeaders   = 0x08;
-      static constexpr uint32_t EncodeData      = 0x10;
-      static constexpr uint32_t EncodeTrailers  = 0x20;
-      // Encode100ContinueHeaders is a bit of a special state as 100 continue
-      // headers may be sent during request processing. This state is only used
-      // to verify we do not encode100Continue headers more than once per
-      // filter.
-      static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
-      // Used to indicate that we're processing the final [En|De]codeData frame,
-      // i.e. end_stream = true
-      static constexpr uint32_t LastDataFrame = 0x80;
-    };
-    // clang-format on
-
     // All state for the stream. Put here for readability.
     struct State {
       State()
-          : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
-            saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
-            is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
+          : codec_saw_local_complete_(false), saw_connection_close_(false),
+            successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true),
             is_head_request_(false), non_100_response_headers_encoded_(false) {}
 
-      uint32_t filter_call_state_{0};
-      // The following 3 members are booleans rather than part of the space-saving bitfield as they
-      // are passed as arguments to functions expecting bools. Extend State using the bitfield
-      // where possible.
-      bool encoder_filters_streaming_{true};
-      bool decoder_filters_streaming_{true};
-      bool destroyed_{false};
-      bool remote_complete_ : 1;
-      bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
-                                // A filter can still stop the stream from being complete as seen
-                                // by the codec.
       bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
                                           // the way through to the codec.
       bool saw_connection_close_ : 1;
       bool successful_upgrade_ : 1;
-      bool created_filter_chain_ : 1;
 
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
 
       bool decorated_propagate_ : 1;
-      // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
-      // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
-      bool has_continue_headers_ : 1;
       bool is_head_request_ : 1;
       // Tracks if headers other than 100-Continue have been encoded to the codec.
       bool non_100_response_headers_encoded_ : 1;
-      // Whether a filter has indicated that the request should be treated as a headers only
-      // request.
-      bool decoding_headers_only_{false};
-      // Whether a filter has indicated that the response should be treated as a headers only
-      // response.
-      bool encoding_headers_only_{false};
-
-      // Used to track which filter is the latest filter that has received data.
-      ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
-      ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
     };
 
     // Per-stream idle timeout callback.
