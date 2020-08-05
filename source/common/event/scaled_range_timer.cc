@@ -46,8 +46,6 @@ public:
   void enableTimer(const std::chrono::milliseconds& min_ms, const std::chrono::milliseconds& max_ms,
                    const ScopeTrackedObject* scope) override {
     disableTimer();
-    const MonotonicTime now = manager_.dispatcher_.approximateMonotonicTime();
-    const MonotonicTime latest_trigger = now + max_ms;
     scope_ = scope;
     ENVOY_LOG_MISC(trace, "enableTimer called on {} for ({}ms, {}ms)", static_cast<void*>(this),
                    min_ms.count(), max_ms.count());
@@ -55,7 +53,7 @@ public:
       auto it = manager_.add(*this, max_ms);
       state_.emplace<ScalingMax>(max_ms, it);
     } else {
-      state_.emplace<WaitingForMin>(latest_trigger);
+      state_.emplace<WaitingForMin>(max_ms - min_ms);
       pending_timer_->enableTimer(min_ms);
     }
   }
@@ -63,7 +61,7 @@ public:
   bool enabled() override { return !absl::holds_alternative<Inactive>(state_); }
 
   void trigger() {
-    ASSERT(absl::holds_alternative<ScalingMax>(state_));
+    ASSERT(!absl::holds_alternative<Inactive>(state_));
     ENVOY_LOG_MISC(trace, "RangeTimerImpl triggered: {}", static_cast<void*>(this));
     state_.emplace<Inactive>();
     if (scope_ == nullptr) {
@@ -81,10 +79,10 @@ private:
   struct Inactive {};
 
   struct WaitingForMin {
-    WaitingForMin(MonotonicTime latest_trigger) : latest_trigger(latest_trigger) {}
+    WaitingForMin(MonotonicTime::duration scaling_duration) : scaling_duration(scaling_duration) {}
 
-    // The latest time that this timer can legally be triggered (if there is no scaling).
-    const MonotonicTime latest_trigger;
+    // The maximum amount of time that this timer should scale to.
+    const MonotonicTime::duration scaling_duration;
   };
 
   struct ScalingMax {
@@ -105,9 +103,12 @@ private:
     ASSERT(absl::holds_alternative<WaitingForMin>(state_));
     WaitingForMin& pending = absl::get<WaitingForMin>(state_);
 
-    const MonotonicTime now = manager_.dispatcher_.approximateMonotonicTime();
-    auto it = manager_.add(*this, pending.latest_trigger - now);
-    state_.emplace<ScalingMax>(pending.latest_trigger - now, it);
+    if (pending.scaling_duration <= MonotonicTime::duration::zero()) {
+      trigger();
+    } else {
+      auto it = manager_.add(*this, pending.scaling_duration);
+      state_.emplace<ScalingMax>(pending.scaling_duration, it);
+    }
   }
 
   ScaledRangeTimerManager& manager_;
@@ -154,7 +155,7 @@ void ScaledRangeTimerManager::Bucket::updateTimer(ScaledRangeTimerManager& manag
       auto& entry = scaled_timers.front();
       timer->enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(
           manager.scale_factor_.value() *
-          (entry.latest_trigger_time - manager.dispatcher_.approximateMonotonicTime())));
+          (entry.latest_trigger_time - manager.dispatcher_.timeSource().monotonicTime())));
     }
   }
 }
@@ -170,7 +171,7 @@ ScaledRangeTimerManager::add(RangeTimerImpl& timer, const MonotonicTime::duratio
   const auto quantized_duration = getBucketedDuration(max_duration);
 
   bucket.scaled_timers.emplace_back(timer,
-                                    quantized_duration + dispatcher_.approximateMonotonicTime());
+                                    quantized_duration + dispatcher_.timeSource().monotonicTime());
   bucket.updateTimer(*this, false);
   return --(bucket.scaled_timers.end());
 }
