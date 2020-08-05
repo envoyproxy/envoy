@@ -102,9 +102,10 @@ protected:
 
     auto* locality_endpoints = health_check->add_locality_endpoints();
     // add locality information to this endpoint set of one endpoint.
-    locality_endpoints->mutable_locality()->set_region("middle_earth");
-    locality_endpoints->mutable_locality()->set_zone("shire");
-    locality_endpoints->mutable_locality()->set_sub_zone("hobbiton");
+    auto* locality = locality_endpoints->mutable_locality();
+    locality->set_region("middle_earth");
+    locality->set_zone("shire");
+    locality->set_sub_zone("hobbiton");
 
     // add one endpoint to this locality grouping.
     auto* socket_address =
@@ -118,7 +119,7 @@ protected:
   // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
   // with only one health check type.
   envoy::service::health::v3::HealthCheckSpecifier*
-  createComplexSpecifier(const int n_clusters, const int n_localities, const int n_endpoints) {
+  createComplexSpecifier(int n_clusters, int n_localities, int n_endpoints) {
     // Final specifier to return.
     envoy::service::health::v3::HealthCheckSpecifier* msg =
         new envoy::service::health::v3::HealthCheckSpecifier;
@@ -129,29 +130,34 @@ protected:
     for (int cluster_num = 0; cluster_num < n_clusters; cluster_num++) {
       // add a cluster with a name by iteration, with path /healthcheck
       auto* health_check = msg->add_cluster_health_checks();
-      health_check->set_cluster_name("anna" + std::to_string(cluster_num));
+      health_check->set_cluster_name(absl::StrCat("anna", cluster_num));
       health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
-      health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
-      health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
-      health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
-      health_check->mutable_health_checks(0)->mutable_grpc_health_check();
-      health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
-          envoy::type::v3::HTTP1);
-      health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+
+      auto* health_check_info = health_check->mutable_health_checks(0);
+      health_check_info->mutable_interval()->set_seconds(1);
+      health_check_info->mutable_unhealthy_threshold()->set_value(2);
+      health_check_info->mutable_healthy_threshold()->set_value(2);
+
+      auto* health_check_http = health_check_info->mutable_http_health_check();
+      health_check_http->set_codec_client_type(envoy::type::v3::HTTP1);
+      health_check_http->set_path("/healthcheck");
 
       // add some locality groupings with iterative names for verification.
       for (int loc_num = 0; loc_num < n_localities; loc_num++) {
         auto* locality_endpoints = health_check->add_locality_endpoints();
-        locality_endpoints->mutable_locality()->set_region("region" + std::to_string(cluster_num));
-        locality_endpoints->mutable_locality()->set_zone("zone" + std::to_string(loc_num));
-        locality_endpoints->mutable_locality()->set_sub_zone("subzone" + std::to_string(loc_num));
+
+        // set the locality information for this group.
+        auto* locality = locality_endpoints->mutable_locality();
+        locality->set_region(absl::StrCat("region", cluster_num));
+        locality->set_zone(absl::StrCat("zone", loc_num));
+        locality->set_sub_zone(absl::StrCat("subzone", loc_num));
 
         // add some endpoints to the locality group with iterative naming for verification.
         for (int endpoint_num = 0; endpoint_num < n_endpoints; endpoint_num++) {
           auto* socket_address =
               locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
-          socket_address->set_address("127." + std::to_string(cluster_num) + "." +
-                                      std::to_string(loc_num) + "." + std::to_string(endpoint_num));
+          socket_address->set_address(
+              absl::StrCat("127.", cluster_num, ".", loc_num, ".", endpoint_num));
           socket_address->set_port_value(1234);
         }
       }
@@ -429,7 +435,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
     const auto& cluster = response.cluster_endpoints_health(i);
 
     // Expect the correct cluster name by index
-    EXPECT_EQ(cluster.cluster_name(), "anna" + std::to_string(i));
+    EXPECT_EQ(cluster.cluster_name(), absl::StrCat("anna", i));
 
     // Every cluster should have two locality groupings
     ASSERT_EQ(cluster.locality_endpoints_health_size(), NumLocalities);
@@ -437,9 +443,9 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
     for (int j = 0; j < NumLocalities; j++) {
       // Every locality should have a number based on its index
       const auto& loc_group = cluster.locality_endpoints_health(j);
-      EXPECT_EQ(loc_group.locality().region(), "region" + std::to_string(i));
-      EXPECT_EQ(loc_group.locality().zone(), "zone" + std::to_string(j));
-      EXPECT_EQ(loc_group.locality().sub_zone(), "subzone" + std::to_string(j));
+      EXPECT_EQ(loc_group.locality().region(), absl::StrCat("region", i));
+      EXPECT_EQ(loc_group.locality().zone(), absl::StrCat("zone", j));
+      EXPECT_EQ(loc_group.locality().sub_zone(), absl::StrCat("subzone", j));
 
       // Every locality should have two endpoints.
       ASSERT_EQ(loc_group.endpoints_health_size(), NumEndpoints);
@@ -449,7 +455,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
         // every endpoint's address is based on all 3 index values.
         const auto& endpoint_health = loc_group.endpoints_health(k);
         EXPECT_EQ(endpoint_health.endpoint().address().socket_address().address(),
-                  "127." + std::to_string(i) + "." + std::to_string(j) + "." + std::to_string(k));
+                  absl::StrCat("127.", i, ".", j, ".", k));
         EXPECT_EQ(endpoint_health.health_status(), envoy::config::core::v3::UNHEALTHY);
       }
     }
