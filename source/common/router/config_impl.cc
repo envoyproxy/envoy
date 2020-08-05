@@ -287,12 +287,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                     ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(
                                           route.route().host_rewrite_header()))
                                     : absl::nullopt),
-      host_rewrite_path_(
-          route.route().has_host_rewrite_path()
-              ? Regex::Utility::parseRegex(route.route().host_rewrite_path().pattern())
+      host_rewrite_path_regex_(
+          route.route().has_host_rewrite_path_regex()
+              ? Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern())
               : nullptr),
-      host_rewrite_path_substitution_(route.route().has_host_rewrite_path()
-                                          ? route.route().host_rewrite_path().substitution()
+      host_rewrite_path_regex_substitution_(route.route().has_host_rewrite_path_regex()
+                                          ? route.route().host_rewrite_path_regex().substitution()
                                           : ""),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
@@ -534,10 +534,10 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
         headers.setHost(header_value);
       }
     }
-  } else if (host_rewrite_path_ != nullptr) {
+  } else if (host_rewrite_path_regex_ != nullptr) {
     const std::string path(headers.getPathValue());
     absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(path));
-    headers.setHost(host_rewrite_path_->replaceAll(just_path, host_rewrite_path_substitution_));
+    headers.setHost(host_rewrite_path_regex_->replaceAll(just_path, host_rewrite_path_regex_substitution_));
   }
 
   // Handle path rewrite

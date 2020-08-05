@@ -759,7 +759,7 @@ virtual_hosts:
       path: "/rewrite-host-with-path-regex/envoyproxy.io"
     route:
       cluster: ats
-      host_rewrite_path:
+      host_rewrite_path_regex:
         pattern:
           google_re2: {}
           regex: "^/.+/(.+)$"

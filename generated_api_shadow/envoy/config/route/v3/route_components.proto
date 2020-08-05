@@ -908,14 +908,14 @@ message RouteAction {
     //
     //   .. code-block:: yaml
     //
-    //     host_rewrite_path:
+    //     host_rewrite_path_regex:
     //       pattern:
     //         google_re2: {}
     //         regex: "^/(.+)/.+$"
     //       substitution: \1
     //
     // Would rewrite the host header to `envoyproxy.io` given the path `/envoyproxy.io/some/path`.
-    type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path = 35;
+    type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path_regex = 35;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
