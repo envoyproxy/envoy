@@ -568,7 +568,7 @@ template <class Value> struct TrieLookupTable {
       moveChildTriesToStack(current, to_delete);
       // Now all the entries inside the current node are released and pushed into the stack.
       // We can safely delete the current node now.
-      // All raw pointers in to_delete will finally be popped out and deleted.
+      // Finally all raw pointers in to_delete will be popped out and deleted.
       delete current;
     }
   }
