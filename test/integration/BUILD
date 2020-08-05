@@ -781,6 +781,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
+    shard_count = 2,
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
