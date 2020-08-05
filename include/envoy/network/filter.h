@@ -355,7 +355,7 @@ class FilterChain {
 public:
   virtual ~FilterChain() = default;
 
-  virtual void loadRealFilterChain(Network::FilterChainSharedPtr real_filter_chain) PURE;
+  virtual void storeRealFilterChain(Network::FilterChainSharedPtr real_filter_chain) PURE;
 
   /**
    * @return const TransportSocketFactory& a transport socket factory to be used by the new

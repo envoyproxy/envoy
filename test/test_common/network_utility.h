@@ -147,7 +147,7 @@ public:
       : filter_chain_message_(filter_chain), is_fake_placeholder_(true),
         has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
 
-  void loadRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+  void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     has_rebuilt_filter_chain_ = true;
     rebuilt_filter_chain_ = rebuilt_filter_chain;
   }

@@ -182,7 +182,7 @@ public:
 
   // Network::DrainableFilterChain
   MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
-  MOCK_METHOD(void, loadRealFilterChain, (Network::FilterChainSharedPtr));
+  MOCK_METHOD(void, storeRealFilterChain, (Network::FilterChainSharedPtr));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(bool, isFakeFilterChain, (), (const));

@@ -248,6 +248,7 @@ void PerFilterChainRebuilder::callbackToWorkers() {
   // Find all matching workers and listeners, send callback.
   for (const auto& worker_name : workers_to_callback_) {
     ENVOY_LOG(debug, "rebuild completed, callback to worker: {}", worker_name);
+    // TODO(ASOPVII): add completion status to callback.
     listener_.getWorkerByName(worker_name)->notifyListeners(filter_chain_);
   }
   workers_to_callback_.clear();

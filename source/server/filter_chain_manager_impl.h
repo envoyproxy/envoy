@@ -99,10 +99,12 @@ public:
       : filter_chain_message_(filter_chain), is_fake_placeholder_(true),
         has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
 
-  void loadRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+  void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+    absl::MutexLock lock(&lock_);
+
     is_fake_placeholder_ = false;
     has_rebuilt_filter_chain_ = true;
-    rebuilt_filter_chain_ = rebuilt_filter_chain;
+    rebuilt_filter_chain_ = std::move(rebuilt_filter_chain);
   }
 
   // Network::FilterChain
@@ -130,7 +132,10 @@ public:
     factory_context_ = std::move(filter_chain_factory_context);
   }
 
-  bool isFakeFilterChain() const override { return is_fake_placeholder_; }
+  bool isFakeFilterChain() const override {
+    absl::MutexLock lock(&lock_);
+    return is_fake_placeholder_;
+  }
 
   const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
     return filter_chain_message_;
@@ -142,6 +147,10 @@ private:
   const std::vector<Network::FilterFactoryCb> filters_factory_;
 
   const envoy::config::listener::v3::FilterChain* const filter_chain_message_;
+
+  // pthread_mutex_t lock_;
+  mutable absl::Mutex lock_;
+
   // On-demand filter chain is built with a placeholder, set this to true. After it is rebuilt, flip
   // this to false.
   bool is_fake_placeholder_;

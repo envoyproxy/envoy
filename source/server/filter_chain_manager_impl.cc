@@ -328,11 +328,12 @@ void FilterChainManagerImpl::addRealFilterChain(
   auto filter_chain_impl =
       filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
 
-  ENVOY_LOG(debug, "placeholder->loadRealFilterChain");
+  ENVOY_LOG(debug, "placeholder->storeRealFilterChain");
 
   // TODO(ASOPVII): Call Ctor/Point of this placeholder to update its context.
   auto placeholder = std::move(fc_contexts_[*filter_chain]);
-  placeholder->loadRealFilterChain(filter_chain_impl);
+  // multi-threaded shared_ptr: lock before mutate.
+  placeholder->storeRealFilterChain(std::move(filter_chain_impl));
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(

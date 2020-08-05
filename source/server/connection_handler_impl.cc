@@ -136,13 +136,13 @@ void ConnectionHandlerImpl::retryAllConnections(
                                             socket_metadata_pair.second);
         }
         // Clear this listener from the retry connection list.
-        // listener_sockets_map.erase(listener_name);
+        listener_sockets_map.erase(listener_name);
       }
     }
   }
   // TODO(ASOPVII): check whether to erase this part. For future usage(this filter chain has been
   // rebuilt).
-  // sockets_using_filter_chain_.erase(filter_chain_message);
+  sockets_using_filter_chain_.erase(filter_chain_message);
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
@@ -446,8 +446,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 
   // const auto filter_chain_impl = dynamic_cast<const Server::FilterChainImpl*>(filter_chain);
-  bool is_fake_filter_chain = filter_chain->isFakeFilterChain();
-  if (is_fake_filter_chain) {
+  if (filter_chain->isFakeFilterChain()) {
     ENVOY_LOG(debug, "found a filter chain placeholder, start rebuilding request");
     const auto& worker_name = parent_.dispatcher_.name();
     const auto& listener_name = config_->name();
