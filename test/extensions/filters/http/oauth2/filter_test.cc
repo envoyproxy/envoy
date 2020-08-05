@@ -387,44 +387,6 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
   EXPECT_FALSE(cookie_validator->isValid());
 }
 
-/**
- * Testing the setXForwardedOauthHeaders function.
- *
- * Expected behavior: the current HeaderMap should reflect the newly added x-forwarded headers.
- */
-TEST_F(OAuth2Test, OAuthTestSetOAuthHeaders) {
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
-      {Http::Headers::get().Cookie.get(),
-       "OauthHMAC="
-       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
-  };
-
-  Http::TestRequestHeaderMapImpl expected_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=123;version=test"},
-      {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
-      {Http::Headers::get().Cookie.get(),
-       "OauthHMAC="
-       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
-       "RlNjMxZTJmNTZkYzRmZTM0ZQ====;version=test"},
-      {Http::CustomHeaders::get().Authorization.get(), "Bearer xyztoken"},
-  };
-
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
-  cookie_validator->setParams(request_headers, "mock-secret");
-  filter_->setBearerToken(request_headers, cookie_validator->token());
-
-  EXPECT_EQ(request_headers, expected_headers);
-}
-
 // Verify that we 401 the request if the state query param doesn't contain a valid URL.
 TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
   Http::TestRequestHeaderMapImpl request_headers{
