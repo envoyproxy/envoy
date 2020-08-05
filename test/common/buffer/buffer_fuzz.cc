@@ -14,7 +14,6 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
-#include "absl/types/span.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
