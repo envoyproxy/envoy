@@ -560,17 +560,15 @@ template <class Value> struct TrieLookupTable {
     // Use a stack to store non-nullptr nodes which should be deleted, and their children will be
     // pushed into this stack and will be deleted later.
     std::stack<TrieEntry<Value>*> to_delete;
-    // Release all pointers in root_ and push them into the stack.
     moveChildTriesToStack(&root_, to_delete);
     // Now all unique_ptr in root_ are released and raw pointers are stored inside the stack.
-    // We will delete all of the raw pointers in below while loop.
-    // All raw pointers in to_delete will finally be deleted and popped out.
     while (!to_delete.empty()) {
       TrieEntry<Value>* current = to_delete.top();
       to_delete.pop();
       moveChildTriesToStack(current, to_delete);
-      // Now all the entries inside current node are released and pushed into the stack.
-      // We can safely delete it now.
+      // Now all the entries inside the current node are released and pushed into the stack.
+      // We can safely delete the current node now.
+      // All raw pointers in to_delete will finally be popped out and deleted.
       delete current;
     }
   }
