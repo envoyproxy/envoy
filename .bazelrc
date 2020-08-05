@@ -20,7 +20,8 @@ build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
 
 # Enable position independent code, this option is not supported on Windows and default on on macOS.
-build:linux --force_pic
+# --copt=-fPIC is workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421
+build:linux --force_pic --copt=-fPIC
 build:linux --cxxopt=-std=c++17
 build:linux --conlyopt=-fexceptions
 
