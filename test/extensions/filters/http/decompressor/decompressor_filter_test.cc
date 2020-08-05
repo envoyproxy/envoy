@@ -311,6 +311,17 @@ TEST_P(DecompressorFilterTest, NoDecompressionHeadersOnly) {
   Http::TestRequestHeaderMapImpl headers_before_filter;
   std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
       doHeaders(headers_before_filter, true /* end_stream */);
+
+  if (isRequestDirection()) {
+    ASSERT_EQ(headers_after_filter->get(Http::LowerCaseString("accept-encoding"))
+                  ->value()
+                  .getStringView(),
+              "mock");
+    // The request direction adds Accept-Encoding by default, even for header-only requests.
+    // Other than this header, the rest of the headers should be the same before and after the
+    // filter.
+    headers_after_filter->remove(Http::LowerCaseString("accept-encoding"));
+  }
   EXPECT_THAT(headers_after_filter, HeaderMapEqualIgnoreOrder(&headers_before_filter));
 }
 
