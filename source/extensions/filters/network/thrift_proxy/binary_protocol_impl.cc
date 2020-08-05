@@ -17,6 +17,14 @@ namespace ThriftProxy {
 
 const uint16_t BinaryProtocolImpl::Magic = 0x8001;
 
+template <typename T> T peekIntWrapper(Buffer::Instance& buffer, uint64_t start = 0) {
+  StatusOr<T> result = buffer.peekIntNoExcept<T>(start);
+  if (result.status().code() != absl::StatusCode::kOk) {
+    throw EnvoyException("buffer underflow");
+  }
+  return *result;
+}
+
 bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
   if (buffer.length() < MinMessageBeginLength) {
     return false;
@@ -30,7 +38,7 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetad
 
   // The byte at offset 2 is unused and ignored.
 
-  MessageType type = static_cast<MessageType>(buffer.peekInt<int8_t>(3));
+  MessageType type = static_cast<MessageType>(peekIntWrapper<int8_t>(buffer, 3));
   if (type < MessageType::Call || type > MessageType::LastMessageType) {
     throw EnvoyException(
         fmt::format("invalid binary protocol message type {}", static_cast<int8_t>(type)));
@@ -79,7 +87,7 @@ bool BinaryProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& n
     return false;
   }
 
-  FieldType type = static_cast<FieldType>(buffer.peekInt<int8_t>());
+  FieldType type = static_cast<FieldType>(peekIntWrapper<int8_t>(buffer));
   if (type == FieldType::Stop) {
     field_id = 0;
     buffer.drain(1);
@@ -117,8 +125,8 @@ bool BinaryProtocolImpl::readMapBegin(Buffer::Instance& buffer, FieldType& key_t
     return false;
   }
 
-  FieldType ktype = static_cast<FieldType>(buffer.peekInt<int8_t>(0));
-  FieldType vtype = static_cast<FieldType>(buffer.peekInt<int8_t>(1));
+  FieldType ktype = static_cast<FieldType>(peekIntWrapper<int8_t>(buffer, 0));
+  FieldType vtype = static_cast<FieldType>(peekIntWrapper<int8_t>(buffer, 1));
   int32_t s = buffer.peekBEInt<int32_t>(2);
   if (s < 0) {
     throw EnvoyException(absl::StrCat("negative binary protocol map size ", s));
@@ -147,7 +155,7 @@ bool BinaryProtocolImpl::readListBegin(Buffer::Instance& buffer, FieldType& elem
     return false;
   }
 
-  FieldType type = static_cast<FieldType>(buffer.peekInt<int8_t>());
+  FieldType type = static_cast<FieldType>(peekIntWrapper<int8_t>(buffer));
   int32_t s = buffer.peekBEInt<int32_t>(1);
   if (s < 0) {
     throw EnvoyException(fmt::format("negative binary protocol list/set size {}", s));
@@ -371,7 +379,7 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMe
     return false;
   }
 
-  MessageType type = static_cast<MessageType>(buffer.peekInt<int8_t>(name_len + 4));
+  MessageType type = static_cast<MessageType>(peekIntWrapper<int8_t>(buffer, name_len + 4));
   if (type < MessageType::Call || type > MessageType::LastMessageType) {
     throw EnvoyException(
         fmt::format("invalid (lax) binary protocol message type {}", static_cast<int8_t>(type)));

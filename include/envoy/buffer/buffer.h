@@ -12,8 +12,10 @@
 #include "envoy/network/io_handle.h"
 
 #include "common/common/byte_order.h"
+#include "common/common/statusor.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -262,6 +264,42 @@ public:
 
     if (length() < start + Size) {
       throw EnvoyException("buffer underflow");
+    }
+
+    constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
+
+    auto result = static_cast<T>(0);
+    constexpr const auto all_bits_enabled = static_cast<T>(~static_cast<T>(0));
+
+    int8_t* bytes = reinterpret_cast<int8_t*>(std::addressof(result));
+    copyOut(start, Size, &bytes[displacement]);
+
+    constexpr const auto most_significant_read_byte =
+        Endianness == ByteOrder::BigEndian ? displacement : Size - 1;
+
+    // If Size == sizeof(T), we need to make sure we don't generate an invalid left shift
+    // (e.g. int32 << 32), even though we know that that branch of the conditional will.
+    // not be taken. Size % sizeof(T) gives us the correct left shift when Size < sizeof(T),
+    // and generates a left shift of 0 bits when Size == sizeof(T)
+    const auto sign_extension_bits =
+        std::is_signed<T>::value && Size < sizeof(T) && bytes[most_significant_read_byte] < 0
+            ? static_cast<T>(static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
+                             << ((Size % sizeof(T)) * CHAR_BIT))
+            : static_cast<T>(0);
+
+    return fromEndianness<Endianness>(static_cast<T>(result)) | sign_extension_bits;
+  }
+  /**
+   * A non-exception throwing replica of peekInt()
+   * This is created because the call site of peekInt() is large and the change requires
+   * more than a single PR. 
+   */ 
+  template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
+  StatusOr<T> peekIntNoExcept(uint64_t start = 0) {
+    static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
+
+    if (length() < start + Size) {
+      return absl::Status(absl::StatusCode::kInvalidArgument, "buffer underflow");
     }
 
     constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;

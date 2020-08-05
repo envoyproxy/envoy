@@ -55,9 +55,17 @@ bool isValidResponseStatus(ResponseStatus status) {
   return true;
 }
 
+template <typename T> T peekIntWrapper(Buffer::Instance& buffer, uint64_t start = 0) {
+  StatusOr<T> result = buffer.peekIntNoExcept<T>(start);
+  if (result.status().code() != absl::StatusCode::kOk) {
+    throw EnvoyException("buffer underflow");
+  }
+  return *result;
+}
+
 void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageMetadataSharedPtr metadata) {
   ASSERT(data.length() >= DubboProtocolImpl::MessageSize);
-  uint8_t flag = data.peekInt<uint8_t>(FlagOffset);
+  uint8_t flag = peekIntWrapper<uint8_t>(data, FlagOffset);
   bool is_two_way = (flag & TwoWayMask) == TwoWayMask ? true : false;
   SerializationType type = static_cast<SerializationType>(flag & SerializationTypeMask);
   if (!isValidSerializationType(type)) {
@@ -75,7 +83,8 @@ void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageMetadataSharedPtr
 
 void parseResponseInfoFromBuffer(Buffer::Instance& buffer, MessageMetadataSharedPtr metadata) {
   ASSERT(buffer.length() >= DubboProtocolImpl::MessageSize);
-  ResponseStatus status = static_cast<ResponseStatus>(buffer.peekInt<uint8_t>(StatusOffset));
+  ResponseStatus status =
+      static_cast<ResponseStatus>(peekIntWrapper<uint8_t>(buffer, StatusOffset));
   if (!isValidResponseStatus(status)) {
     throw EnvoyException(
         absl::StrCat("invalid dubbo message response status ",
@@ -100,7 +109,7 @@ DubboProtocolImpl::decodeHeader(Buffer::Instance& buffer, MessageMetadataSharedP
     throw EnvoyException(absl::StrCat("invalid dubbo message magic number ", magic_number));
   }
 
-  uint8_t flag = buffer.peekInt<uint8_t>(FlagOffset);
+  uint8_t flag = peekIntWrapper<uint8_t>(buffer, FlagOffset);
   MessageType type =
       (flag & MessageTypeMask) == MessageTypeMask ? MessageType::Request : MessageType::Response;
   bool is_event = (flag & EventMask) == EventMask ? true : false;

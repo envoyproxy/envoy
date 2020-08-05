@@ -18,6 +18,14 @@ namespace ThriftProxy {
 const uint16_t CompactProtocolImpl::Magic = 0x8201;
 const uint16_t CompactProtocolImpl::MagicMask = 0xFF1F;
 
+template <typename T> T peekIntWrapper(Buffer::Instance& buffer, uint64_t start = 0) {
+  StatusOr<T> result = buffer.peekIntNoExcept<T>(start);
+  if (result.status().code() != absl::StatusCode::kOk) {
+    throw EnvoyException("buffer underflow");
+  }
+  return *result;
+}
+
 bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
   // Minimum message length:
   //   protocol, message type, and version: 2 bytes +
@@ -112,7 +120,7 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
     return false;
   }
 
-  uint8_t delta_and_type = buffer.peekInt<int8_t>();
+  uint8_t delta_and_type = peekIntWrapper<int8_t>(buffer);
   if ((delta_and_type & 0x0f) == 0) {
     // Type is stop, no need to do further decoding.
     name.clear();
@@ -194,7 +202,7 @@ bool CompactProtocolImpl::readMapBegin(Buffer::Instance& buffer, FieldType& key_
     return false;
   }
 
-  uint8_t types = buffer.peekInt<int8_t>(s_size);
+  uint8_t types = peekIntWrapper<int8_t>(buffer, s_size);
   FieldType ktype = convertCompactFieldType(static_cast<CompactFieldType>(types >> 4));
   FieldType vtype = convertCompactFieldType(static_cast<CompactFieldType>(types & 0xF));
 
@@ -223,7 +231,7 @@ bool CompactProtocolImpl::readListBegin(Buffer::Instance& buffer, FieldType& ele
 
   uint32_t sz = 0;
   int s_size = 0;
-  uint8_t size_and_type = buffer.peekInt<int8_t>();
+  uint8_t size_and_type = peekIntWrapper<int8_t>(buffer);
   if ((size_and_type & 0xF0) != 0xF0) {
     // Short form list header: size and type byte.
     sz = static_cast<uint32_t>(size_and_type >> 4);

@@ -26,8 +26,11 @@ int64_t BufferHelper::peekInt64(Buffer::Instance& buffer, uint64_t& offset) {
 bool BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset) {
   ensureMaxLen(1);
 
-  const char byte = buffer.peekInt<char, ByteOrder::Host, 1>(offset);
-  const bool val = static_cast<bool>(byte);
+  const StatusOr<char> byte = buffer.peekIntNoExcept<char, ByteOrder::Host, 1>(offset);
+  if (byte.status().code() != absl::StatusCode::kOk) {
+    throw EnvoyException("buffer underflow");
+  }
+  const bool val = static_cast<bool>(*byte);
   offset += 1;
   return val;
 }

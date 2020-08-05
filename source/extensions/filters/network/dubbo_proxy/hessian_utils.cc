@@ -26,6 +26,14 @@ typename std::enable_if<std::is_signed<T>::value, T>::type leftShift(T left, uin
   return left << bit_number;
 }
 
+template <typename T> T peekIntWrapper(Buffer::Instance& buffer, uint64_t start = 0) {
+  StatusOr<T> result = buffer.peekIntNoExcept<T>(start);
+  if (result.status().code() != absl::StatusCode::kOk) {
+    throw EnvoyException("buffer underflow");
+  }
+  return *result;
+}
+
 inline void addByte(Buffer::Instance& buffer, const uint8_t value) { buffer.add(&value, 1); }
 
 void addSeq(Buffer::Instance& buffer, const std::initializer_list<uint8_t>& values) {
@@ -88,7 +96,7 @@ char* allocStringBuffer(std::string* str, size_t length) {
 
 std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
-  const uint8_t code = buffer.peekInt<uint8_t>(offset);
+  const uint8_t code = peekIntWrapper<uint8_t>(buffer, offset);
   size_t delta_length = 0;
   std::string result;
   switch (code) {
@@ -140,7 +148,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
       throw EnvoyException("buffer underflow");
     }
 
-    delta_length = (code - 0x30) * 256 + buffer.peekInt<uint8_t>(offset + 1);
+    delta_length = (code - 0x30) * 256 + peekIntWrapper<uint8_t>(buffer, offset + 1);
     if (delta_length + 2 + offset > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
@@ -189,7 +197,7 @@ std::string HessianUtils::readString(Buffer::Instance& buffer) {
 long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   long result;
-  uint8_t code = buffer.peekInt<uint8_t>(offset);
+  uint8_t code = peekIntWrapper<uint8_t>(buffer, offset);
   switch (code) {
   case 0xd8:
   case 0xd9:
@@ -236,7 +244,7 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = leftShift<int16_t>(code - 0xf8, 8) + buffer.peekInt<uint8_t>(offset + 1);
+    result = leftShift<int16_t>(code - 0xf8, 8) + peekIntWrapper<uint8_t>(buffer, offset + 1);
     *size = 2;
     return result;
 
@@ -253,8 +261,9 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = leftShift<int32_t>(code - 0x3c, 16) + (buffer.peekInt<uint8_t>(offset + 1) << 8) +
-             buffer.peekInt<uint8_t>(offset + 2);
+    result = leftShift<int32_t>(code - 0x3c, 16) +
+             (peekIntWrapper<uint8_t>(buffer, offset + 1) << 8) +
+             peekIntWrapper<uint8_t>(buffer, offset + 2);
     *size = 3;
     return result;
 
@@ -292,7 +301,7 @@ long HessianUtils::readLong(Buffer::Instance& buffer) {
 bool HessianUtils::peekBool(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   bool result;
-  const uint8_t code = buffer.peekInt<uint8_t>(offset);
+  const uint8_t code = peekIntWrapper<uint8_t>(buffer, offset);
   if (code == 0x46) {
     result = false;
     *size = 1;
@@ -317,7 +326,7 @@ bool HessianUtils::readBool(Buffer::Instance& buffer) {
 
 int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
-  const uint8_t code = buffer.peekInt<uint8_t>(offset);
+  const uint8_t code = peekIntWrapper<uint8_t>(buffer, offset);
   int result;
 
   // Compact int
@@ -347,7 +356,7 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
       throw EnvoyException("buffer underflow");
     }
 
-    result = leftShift<int16_t>(code - 0xc8, 8) + buffer.peekInt<uint8_t>(offset + 1);
+    result = leftShift<int16_t>(code - 0xc8, 8) + peekIntWrapper<uint8_t>(buffer, offset + 1);
     *size = 2;
     return result;
 
@@ -362,8 +371,9 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
     if (offset + 3 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = leftShift<int32_t>(code - 0xd4, 16) + (buffer.peekInt<uint8_t>(offset + 1) << 8) +
-             buffer.peekInt<uint8_t>(offset + 2);
+    result = leftShift<int32_t>(code - 0xd4, 16) +
+             (peekIntWrapper<uint8_t>(buffer, offset + 1) << 8) +
+             peekIntWrapper<uint8_t>(buffer, offset + 2);
     *size = 3;
     return result;
 
@@ -389,7 +399,7 @@ int HessianUtils::readInt(Buffer::Instance& buffer) {
 double HessianUtils::peekDouble(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   double result;
-  uint8_t code = buffer.peekInt<uint8_t>(offset);
+  uint8_t code = peekIntWrapper<uint8_t>(buffer, offset);
   switch (code) {
   case 0x5b:
     result = 0.0;
@@ -405,7 +415,7 @@ double HessianUtils::peekDouble(Buffer::Instance& buffer, size_t* size, uint64_t
     if (offset + 2 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = static_cast<double>(buffer.peekInt<int8_t>(offset + 1));
+    result = static_cast<double>(peekIntWrapper<int8_t>(buffer, offset + 1));
     *size = 2;
     return result;
 
@@ -413,8 +423,8 @@ double HessianUtils::peekDouble(Buffer::Instance& buffer, size_t* size, uint64_t
     if (offset + 3 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = static_cast<double>(256 * buffer.peekInt<int8_t>(offset + 1) +
-                                 buffer.peekInt<uint8_t>(offset + 2));
+    result = static_cast<double>(256 * peekIntWrapper<int8_t>(buffer, offset + 1) +
+                                 peekIntWrapper<uint8_t>(buffer, offset + 2));
     *size = 3;
     return result;
 
@@ -447,7 +457,7 @@ double HessianUtils::readDouble(Buffer::Instance& buffer) {
 
 void HessianUtils::peekNull(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
-  uint8_t code = buffer.peekInt<uint8_t>(offset);
+  uint8_t code = peekIntWrapper<uint8_t>(buffer, offset);
   if (code == 0x4e) {
     *size = 1;
     return;
@@ -466,7 +476,7 @@ std::chrono::milliseconds HessianUtils::peekDate(Buffer::Instance& buffer, size_
                                                  uint64_t offset) {
   ASSERT(buffer.length() > offset);
   std::chrono::milliseconds result;
-  uint8_t code = buffer.peekInt<uint8_t>(offset);
+  uint8_t code = peekIntWrapper<uint8_t>(buffer, offset);
   switch (code) {
   case 0x4b:
     if (offset + 5 > buffer.length()) {
@@ -500,7 +510,7 @@ std::chrono::milliseconds HessianUtils::readDate(Buffer::Instance& buffer) {
 std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   std::string result;
-  uint8_t code = buffer.peekInt<uint8_t>(offset);
+  uint8_t code = peekIntWrapper<uint8_t>(buffer, offset);
   size_t delta_length = 0;
   switch (code) {
   case 0x20:

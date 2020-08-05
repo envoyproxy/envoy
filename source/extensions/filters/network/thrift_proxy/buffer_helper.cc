@@ -39,14 +39,16 @@ uint64_t BufferHelper::peekVarInt(Buffer::Instance& buffer, uint64_t offset, int
   uint8_t shift = 0;
   uint64_t result = 0;
   for (uint64_t i = 0; i < last; i++) {
-    uint8_t b = buffer.peekInt<uint8_t>(offset + i);
-
+    StatusOr<uint8_t> b = buffer.peekIntNoExcept<uint8_t>(offset + i);
+    if (b.status().code() != absl::StatusCode::kOk) {
+      throw EnvoyException("buffer underflow");
+    }
     // Note: the compact protocol spec says these variable-length ints are encoded as big-endian,
     // but the Apache C++, Java, and Python implementations read and write them little-endian.
-    result |= static_cast<uint64_t>(b & 0x7f) << shift;
+    result |= static_cast<uint64_t>(*b & 0x7f) << shift;
     shift += 7;
 
-    if ((b & 0x80) == 0) {
+    if ((*b & 0x80) == 0) {
       // End of encoded int.
       size = i + 1;
       return result;
