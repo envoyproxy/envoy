@@ -492,7 +492,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
-  MOCK_METHOD(Network::IoHandle&, ioHandle, ());
+  MOCK_METHOD(Api::IoCallUint64Result, flush, ());
 
   Event::MockDispatcher dispatcher_;
 };

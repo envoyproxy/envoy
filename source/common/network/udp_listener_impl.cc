@@ -119,5 +119,10 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   return send_result;
 }
 
+Api::IoCallUint64Result UdpListenerImpl::flush() {
+  ENVOY_UDP_LOG(trace, "flush");
+  return cb_.udpPacketWriter().flush();
+}
+
 } // namespace Network
 } // namespace Envoy

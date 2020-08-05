@@ -319,6 +319,14 @@ public:
    * sender.
    */
   virtual Api::IoCallUint64Result send(const UdpSendData& data) PURE;
+
+  /**
+   * Flushes out internal buffer data through the underlying socket.
+   * Flush is a no-op if internal buffer is empty or if it does not exist.
+   *
+   * @return the error code of the underlying flush api.
+   */
+  virtual Api::IoCallUint64Result flush() PURE;
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
