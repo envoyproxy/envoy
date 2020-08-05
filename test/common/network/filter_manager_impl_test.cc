@@ -416,7 +416,7 @@ stat_prefix: name
       .WillOnce(Return(&conn_pool));
 
   request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
-                              nullptr);
+                              nullptr, nullptr);
 
   conn_pool.poolReady(upstream_connection);
 
