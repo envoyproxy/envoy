@@ -63,10 +63,11 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
           cb();
         }
         return previous;
-      }, [this, config]() {
-         // This happens after all workers have discarded the previous config so it can be safely
-         // deleted on the main thread by an update with the new config.
-         this->config_ = config;
+      },
+      [this, config]() {
+        // This happens after all workers have discarded the previous config so it can be safely
+        // deleted on the main thread by an update with the new config.
+        this->config_ = config;
       });
 }
 
