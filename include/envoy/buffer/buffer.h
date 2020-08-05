@@ -62,10 +62,20 @@ public:
 class SliceData {
 public:
   virtual ~SliceData() = default;
+
   /**
-   * @return absl::Span<uint8_t> a span of the slice data.
+   * @return true if the underlying slice data is mutable.
    */
-  virtual absl::Span<uint8_t> getData() PURE;
+  virtual bool isMutable() const PURE;
+  /**
+   * @return an immutable view of the slice data.
+   */
+  virtual absl::Span<const uint8_t> getData() const PURE;
+  /**
+   * @return a mutable view of the slice data, but only if isMutable() returns true.
+   * If isMutable() returns false then the mutable view will be {nullptr,0}.
+   */
+  virtual absl::Span<uint8_t> getMutableData() PURE;
 };
 
 using SliceDataPtr = std::unique_ptr<SliceData>;
@@ -165,6 +175,7 @@ public:
    * @return pointer to SliceData object that wraps the front slice
    */
   virtual SliceDataPtr extractFrontSlice() PURE;
+  virtual SliceDataPtr extractMutableFrontSlice() PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).

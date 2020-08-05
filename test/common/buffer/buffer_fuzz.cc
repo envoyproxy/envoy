@@ -134,10 +134,9 @@ public:
     return mutableStart();
   }
 
-  Buffer::SliceDataPtr extractFrontSlice() override {
-    // not used
-    return Buffer::SliceDataPtr{};
-  }
+  Buffer::SliceDataPtr extractFrontSlice() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  Buffer::SliceDataPtr extractMutableFrontSlice() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 

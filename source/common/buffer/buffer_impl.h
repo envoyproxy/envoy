@@ -42,7 +42,14 @@ public:
   }
 
   // SliceData
-  absl::Span<uint8_t> getData() override { return {base_ + data_, reservable_ - data_}; }
+  bool isMutable() const override {
+    // Extracted slice data is immutable by default.
+    return false;
+  };
+  absl::Span<const uint8_t> getData() const override {
+    return {base_ + data_, reservable_ - data_};
+  };
+  absl::Span<uint8_t> getMutableData() override { return {nullptr, 0}; }
 
   /**
    * @return a pointer to the start of the usable content.
@@ -260,6 +267,10 @@ public:
     slice->reservable_ = size;
     return slice;
   }
+
+  // SliceData
+  bool isMutable() const override { return true; };
+  absl::Span<uint8_t> getMutableData() override { return {base_ + data_, reservable_ - data_}; }
 
 private:
   OwnedSlice(uint64_t size) : Slice(0, 0, size) { base_ = storage_; }
@@ -543,6 +554,7 @@ public:
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
   SliceDataPtr extractFrontSlice() override;
+  SliceDataPtr extractMutableFrontSlice() override;
   uint64_t length() const override;
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;

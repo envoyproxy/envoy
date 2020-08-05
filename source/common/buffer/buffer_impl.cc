@@ -208,10 +208,25 @@ SliceDataPtr OwnedImpl::extractFrontSlice() {
   }
   ASSERT(!slices_.empty());
   ASSERT(slices_.front());
-  length_ -= slices_.front()->dataSize();
   auto slice = std::move(slices_.front());
+  length_ -= slice->dataSize();
   slices_.pop_front();
   return slice;
+}
+
+SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
+  auto slice_data = extractFrontSlice();
+  if (!slice_data->isMutable()) {
+    // Create a mutable copy of the immutable slice data
+    auto immutable_data = slice_data->getData();
+    ASSERT(immutable_data.data() != nullptr);
+    auto mutable_slice = OwnedSlice::create(immutable_data.size());
+    auto copy_size = mutable_slice->append(immutable_data.data(), immutable_data.size());
+    ASSERT(copy_size == immutable_data.size());
+    return mutable_slice;
+  } else {
+    return slice_data;
+  }
 }
 
 uint64_t OwnedImpl::length() const {

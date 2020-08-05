@@ -361,6 +361,7 @@ TEST_F(OwnedImplTest, ExtractOwnedSlice) {
   // Extract first slice.
   auto slice = buffer.extractFrontSlice();
   ASSERT_TRUE(slice);
+  ASSERT_TRUE(slice->isMutable());
   auto slice_data = slice->getData();
   ASSERT_NE(slice_data.data(), nullptr);
   EXPECT_EQ(slice_data.size(), expected_length0);
@@ -368,19 +369,57 @@ TEST_F(OwnedImplTest, ExtractOwnedSlice) {
             absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
   EXPECT_EQ(buffer.toString(), "123");
 
-  // Re-add extracted first slice to the end of the buffer.
-  buffer.appendSliceForTest(slice_data.data(), slice_data.size());
-  EXPECT_EQ(buffer.toString(), "123abcde");
+  // Modify and re-add extracted first slice data to the end of the buffer.
+  auto slice_mutable_data = slice->getMutableData();
+  ASSERT_NE(slice_mutable_data.data(), nullptr);
+  EXPECT_EQ(slice_mutable_data.size(), expected_length0);
+  *slice_mutable_data.data() = 'A';
+  buffer.appendSliceForTest(slice_mutable_data.data(), slice_mutable_data.size());
+  EXPECT_EQ(buffer.toString(), "123Abcde");
 
   // Extract second slice, leaving only the original first slice.
-  slice = buffer.extractFrontSlice();
+  slice = buffer.extractMutableFrontSlice();
   ASSERT_TRUE(slice);
+  ASSERT_TRUE(slice->isMutable());
   slice_data = slice->getData();
   ASSERT_NE(slice_data.data(), nullptr);
   EXPECT_EQ(slice_data.size(), expected_length1);
   EXPECT_EQ("123",
             absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(buffer.toString(), "Abcde");
+}
+
+TEST_F(OwnedImplTest, ExtractAfterSentinelDiscard) {
+  // Create a buffer with a sentinel and one owned slice.
+  Buffer::OwnedImpl buffer;
+  bool sentinel_discarded = false;
+  const Buffer::OwnedBufferFragmentImpl::Releasor sentinel_releasor{
+      [&](const Buffer::OwnedBufferFragmentImpl* sentinel) {
+        sentinel_discarded = true;
+        delete sentinel;
+      }};
+  auto sentinel =
+      Buffer::OwnedBufferFragmentImpl::create(absl::string_view("", 0), sentinel_releasor);
+  buffer.addBufferFragment(*sentinel.release());
+
+  buffer.appendSliceForTest("abcde");
+  const uint64_t expected_length = 5;
   EXPECT_EQ(buffer.toString(), "abcde");
+  RawSliceVector slices = buffer.getRawSlices(); // only returns slices with data
+  EXPECT_EQ(1, slices.size());
+
+  // Extract owned slice after discarding sentinel.
+  EXPECT_FALSE(sentinel_discarded);
+  auto slice = buffer.extractFrontSlice();
+  ASSERT_TRUE(slice);
+  ASSERT_TRUE(slice->isMutable());
+  EXPECT_TRUE(sentinel_discarded);
+  auto slice_data = slice->getData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length);
+  EXPECT_EQ("abcde",
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(0, buffer.length());
 }
 
 TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
@@ -401,6 +440,7 @@ TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
   // Extracted partially drained first slice, leaving the second slice.
   auto slice = buffer.extractFrontSlice();
   ASSERT_TRUE(slice);
+  ASSERT_TRUE(slice->isMutable());
   auto slice_data = slice->getData();
   ASSERT_NE(slice_data.data(), nullptr);
   EXPECT_EQ(slice_data.size(), expected_length0 - partial_drain_size);
@@ -434,6 +474,7 @@ TEST_F(OwnedImplTest, ExtractUnownedSlice) {
   // Extract what remains of the unowned slice, leaving only the owned slice
   auto slice = buffer.extractFrontSlice();
   ASSERT_TRUE(slice);
+  ASSERT_FALSE(slice->isMutable());
   auto slice_data = slice->getData();
   ASSERT_NE(slice_data.data(), nullptr);
   EXPECT_EQ(slice_data.size(), expected_length0 - partial_drain_size);
@@ -441,10 +482,42 @@ TEST_F(OwnedImplTest, ExtractUnownedSlice) {
             absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
   EXPECT_EQ(expected_length1, buffer.length());
 
+  // The immutable slice should not have mutable data.
+  auto slice_mutable_data = slice->getMutableData();
+  EXPECT_EQ(slice_mutable_data.data(), nullptr);
+  EXPECT_EQ(slice_mutable_data.size(), 0);
+
   // This test now has ownership of the unowned slice, which means that the
   // release callback will only be called once the slice is destroyed.
   EXPECT_FALSE(release_callback_called_);
   slice.reset();
+  EXPECT_TRUE(release_callback_called_);
+}
+
+TEST_F(OwnedImplTest, ExtractMutableUnownedSlice) {
+  // Create a buffer with an unowned slice.
+  std::string input{"unowned test slice"};
+  const size_t expected_length = input.size();
+  auto frag = OwnedBufferFragmentImpl::create(
+      {input.c_str(), expected_length},
+      [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
+  Buffer::OwnedImpl buffer;
+  buffer.addBufferFragment(*frag);
+
+  // Extract a mutable copy of the unowned slice.
+  EXPECT_FALSE(release_callback_called_);
+  auto slice = buffer.extractMutableFrontSlice();
+  ASSERT_TRUE(slice);
+  ASSERT_TRUE(slice->isMutable());
+  auto slice_data = slice->getMutableData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length);
+  EXPECT_EQ(input.data(),
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(0, buffer.length());
+
+  // The unowned slice was discarded as part of the extract, which means that the
+  // release callback was also called as part of the extract.
   EXPECT_TRUE(release_callback_called_);
 }
 
