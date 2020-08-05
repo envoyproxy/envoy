@@ -472,41 +472,67 @@ TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
-TEST(TimerImplTest, TimerEnabledDisabled) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  Event::TimerPtr timer = dispatcher->createTimer([] {});
+class TimerImplTest : public testing::Test {
+protected:
+  void SetUp() override {
+    // Update time cache to provide a stable time reference for timer registration.
+    event_base_update_cache_time(&libevent_base_);
+  }
+
+  // Advance time forward while updating the libevent's time cache and monotonic time reference.
+  // Pushing the monotonic time reference forward eliminates the possibility of time moving
+  // backwards and breaking the overly picky TimerImpl tests below.
+  void advanceLibeventTime(absl::Duration duration) {
+    timeval start_tv;
+    {
+      int ret = event_base_gettimeofday_cached(&libevent_base_, &start_tv);
+      RELEASE_ASSERT(ret == 0, "event_base_gettimeofday_cached failed");
+    }
+
+    timeval now_tv;
+    do {
+      absl::SleepFor(duration);
+      event_base_update_cache_time(&libevent_base_);
+      int ret = event_base_gettimeofday_cached(&libevent_base_, &now_tv);
+      RELEASE_ASSERT(ret == 0, "event_base_gettimeofday_cached failed");
+    } while (duration > absl::DurationFromTimeval(now_tv) - absl::DurationFromTimeval(start_tv));
+  }
+
+  Api::ApiPtr api_{Api::createApiForTest()};
+  DispatcherPtr dispatcher_{api_->allocateDispatcher("test_thread")};
+  event_base& libevent_base_{static_cast<DispatcherImpl&>(*dispatcher_).base()};
+};
+
+TEST_F(TimerImplTest, TimerEnabledDisabled) {
+  Event::TimerPtr timer = dispatcher_->createTimer([] {});
   EXPECT_FALSE(timer->enabled());
   timer->enableTimer(std::chrono::milliseconds(0));
   EXPECT_TRUE(timer->enabled());
-  dispatcher->run(Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
   timer->enableHRTimer(std::chrono::milliseconds(0));
   EXPECT_TRUE(timer->enabled());
-  dispatcher->run(Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
 }
 
 // Timers scheduled at different times execute in order.
-TEST(TimerImplTest, TimerOrdering) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-
+TEST_F(TimerImplTest, TimerOrdering) {
   ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher->createTimer([&] { watcher1.ready(); });
+  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
   ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
 
   ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
 
   timer1->enableTimer(std::chrono::milliseconds(0));
   timer2->enableTimer(std::chrono::milliseconds(1));
   timer3->enableTimer(std::chrono::milliseconds(2));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -517,22 +543,19 @@ TEST(TimerImplTest, TimerOrdering) {
   EXPECT_CALL(watcher1, ready());
   EXPECT_CALL(watcher2, ready());
   EXPECT_CALL(watcher3, ready());
-  dispatcher->run(Dispatcher::RunType::Block);
+  dispatcher_->run(Dispatcher::RunType::Block);
 }
 
 // Alarms that are scheduled to execute and are cancelled do not trigger.
-TEST(TimerImplTest, TimerOrderAndDisableAlarm) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-
+TEST_F(TimerImplTest, TimerOrderAndDisableAlarm) {
   ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
 
   ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
 
   ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher->createTimer([&] {
+  Event::TimerPtr timer1 = dispatcher_->createTimer([&] {
     timer2->disableTimer();
     watcher1.ready();
   });
@@ -541,8 +564,8 @@ TEST(TimerImplTest, TimerOrderAndDisableAlarm) {
   timer2->enableTimer(std::chrono::milliseconds(1));
   timer3->enableTimer(std::chrono::milliseconds(2));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -552,26 +575,23 @@ TEST(TimerImplTest, TimerOrderAndDisableAlarm) {
   InSequence s;
   EXPECT_CALL(watcher1, ready());
   EXPECT_CALL(watcher3, ready());
-  dispatcher->run(Dispatcher::RunType::Block);
+  dispatcher_->run(Dispatcher::RunType::Block);
 }
 
 // Change the registration time for a timer that is already activated by disabling and re-enabling
 // the timer. Verify that execution is delayed.
-TEST(TimerImplTest, TimerOrderDisableAndReschedule) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-
+TEST_F(TimerImplTest, TimerOrderDisableAndReschedule) {
   ReadyWatcher watcher4;
-  Event::TimerPtr timer4 = dispatcher->createTimer([&] { watcher4.ready(); });
+  Event::TimerPtr timer4 = dispatcher_->createTimer([&] { watcher4.ready(); });
 
   ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
 
   ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
 
   ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher->createTimer([&] {
+  Event::TimerPtr timer1 = dispatcher_->createTimer([&] {
     timer2->disableTimer();
     timer2->enableTimer(std::chrono::milliseconds(0));
     timer3->disableTimer();
@@ -584,8 +604,8 @@ TEST(TimerImplTest, TimerOrderDisableAndReschedule) {
   timer3->enableTimer(std::chrono::milliseconds(2));
   timer4->enableTimer(std::chrono::milliseconds(3));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -599,26 +619,23 @@ TEST(TimerImplTest, TimerOrderDisableAndReschedule) {
   EXPECT_CALL(watcher4, ready());
   EXPECT_CALL(watcher2, ready());
   EXPECT_CALL(watcher3, ready());
-  dispatcher->run(Dispatcher::RunType::Block);
+  dispatcher_->run(Dispatcher::RunType::Block);
 }
 
 // Change the registration time for a timer that is already activated by re-enabling the timer
 // without calling disableTimer first.
-TEST(TimerImplTest, TimerOrderAndReschedule) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-
+TEST_F(TimerImplTest, TimerOrderAndReschedule) {
   ReadyWatcher watcher4;
-  Event::TimerPtr timer4 = dispatcher->createTimer([&] { watcher4.ready(); });
+  Event::TimerPtr timer4 = dispatcher_->createTimer([&] { watcher4.ready(); });
 
   ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher->createTimer([&] { watcher3.ready(); });
+  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
 
   ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher->createTimer([&] { watcher2.ready(); });
+  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
 
   ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher->createTimer([&] {
+  Event::TimerPtr timer1 = dispatcher_->createTimer([&] {
     timer2->enableTimer(std::chrono::milliseconds(0));
     timer3->enableTimer(std::chrono::milliseconds(1));
     watcher1.ready();
@@ -629,8 +646,8 @@ TEST(TimerImplTest, TimerOrderAndReschedule) {
   timer3->enableTimer(std::chrono::milliseconds(2));
   timer4->enableTimer(std::chrono::milliseconds(3));
 
-  // Sleep for 5ms so timers above all trigger in the same loop iteration.
-  absl::SleepFor(absl::Milliseconds(5));
+  // Advance time by 5ms so timers above all trigger in the same loop iteration.
+  advanceLibeventTime(absl::Milliseconds(5));
 
   EXPECT_TRUE(timer1->enabled());
   EXPECT_TRUE(timer2->enabled());
@@ -645,30 +662,27 @@ TEST(TimerImplTest, TimerOrderAndReschedule) {
   EXPECT_CALL(watcher2, ready());
   EXPECT_CALL(watcher4, ready());
   EXPECT_CALL(watcher3, ready());
-  dispatcher->run(Dispatcher::RunType::Block);
+  dispatcher_->run(Dispatcher::RunType::Block);
 }
 
-TEST(TimerImplTest, TimerChaining) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-
+TEST_F(TimerImplTest, TimerChaining) {
   ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher->createTimer([&] { watcher1.ready(); });
+  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
   ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher->createTimer([&] {
+  Event::TimerPtr timer2 = dispatcher_->createTimer([&] {
     watcher2.ready();
     timer1->enableTimer(std::chrono::milliseconds(0));
   });
 
   ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher->createTimer([&] {
+  Event::TimerPtr timer3 = dispatcher_->createTimer([&] {
     watcher3.ready();
     timer2->enableTimer(std::chrono::milliseconds(0));
   });
 
   ReadyWatcher watcher4;
-  Event::TimerPtr timer4 = dispatcher->createTimer([&] {
+  Event::TimerPtr timer4 = dispatcher_->createTimer([&] {
     watcher4.ready();
     timer3->enableTimer(std::chrono::milliseconds(0));
   });
@@ -683,7 +697,7 @@ TEST(TimerImplTest, TimerChaining) {
   EXPECT_CALL(watcher3, ready());
   EXPECT_CALL(watcher2, ready());
   EXPECT_CALL(watcher1, ready());
-  dispatcher->run(Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
 
   EXPECT_FALSE(timer1->enabled());
   EXPECT_FALSE(timer2->enabled());
@@ -691,10 +705,7 @@ TEST(TimerImplTest, TimerChaining) {
   EXPECT_FALSE(timer4->enabled());
 }
 
-TEST(TimerImplTest, TimerChainDisable) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-
+TEST_F(TimerImplTest, TimerChainDisable) {
   ReadyWatcher watcher;
   Event::TimerPtr timer1;
   Event::TimerPtr timer2;
@@ -707,9 +718,9 @@ TEST(TimerImplTest, TimerChainDisable) {
     timer3->disableTimer();
   };
 
-  timer1 = dispatcher->createTimer(timer_cb);
-  timer2 = dispatcher->createTimer(timer_cb);
-  timer3 = dispatcher->createTimer(timer_cb);
+  timer1 = dispatcher_->createTimer(timer_cb);
+  timer2 = dispatcher_->createTimer(timer_cb);
+  timer3 = dispatcher_->createTimer(timer_cb);
 
   timer3->enableTimer(std::chrono::milliseconds(0));
   timer2->enableTimer(std::chrono::milliseconds(0));
@@ -720,13 +731,10 @@ TEST(TimerImplTest, TimerChainDisable) {
   EXPECT_TRUE(timer3->enabled());
   // Only 1 call to watcher ready since the other 2 timers were disabled by the first timer.
   EXPECT_CALL(watcher, ready());
-  dispatcher->run(Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
-TEST(TimerImplTest, TimerChainDelete) {
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-
+TEST_F(TimerImplTest, TimerChainDelete) {
   ReadyWatcher watcher;
   Event::TimerPtr timer1;
   Event::TimerPtr timer2;
@@ -739,9 +747,9 @@ TEST(TimerImplTest, TimerChainDelete) {
     timer3.reset();
   };
 
-  timer1 = dispatcher->createTimer(timer_cb);
-  timer2 = dispatcher->createTimer(timer_cb);
-  timer3 = dispatcher->createTimer(timer_cb);
+  timer1 = dispatcher_->createTimer(timer_cb);
+  timer2 = dispatcher_->createTimer(timer_cb);
+  timer3 = dispatcher_->createTimer(timer_cb);
 
   timer3->enableTimer(std::chrono::milliseconds(0));
   timer2->enableTimer(std::chrono::milliseconds(0));
@@ -752,7 +760,7 @@ TEST(TimerImplTest, TimerChainDelete) {
   EXPECT_TRUE(timer3->enabled());
   // Only 1 call to watcher ready since the other 2 timers were deleted by the first timer.
   EXPECT_CALL(watcher, ready());
-  dispatcher->run(Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
 class TimerImplTimingTest : public testing::Test {
