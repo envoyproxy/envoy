@@ -622,22 +622,6 @@ private:
      */
     bool remoteComplete() const { return state_.remote_complete_; }
 
-    /**
-     * Marks local processing as complete.
-     */
-    void setLocalComplete() {
-      ASSERT(!state_.local_complete_);
-      state_.local_complete_ = true;
-    }
-
-    /**
-     * Marks remote processing as complete.
-     */
-    void setRemoteComplete() {
-      ASSERT(!state_.remote_complete_);
-      state_.remote_complete_ = true;
-    }
-
     void setEncoderFiltersStreaming(bool streaming) {
       state_.encoder_filters_streaming_ = streaming;
     }

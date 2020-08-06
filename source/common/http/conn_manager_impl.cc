@@ -203,7 +203,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
     ENVOY_STREAM_LOG(debug, "doEndStream() resetting stream", stream);
-    // stream.filter_manager_.setLocalComplete();
+    // TODO(snowp): Removing this doesn't seem to break any tests? Can we remove this?
+    // stream.filter_manager_.state_.local_complete_ = true;
     stream.state_.codec_saw_local_complete_ = true;
     stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
     reset_stream = true;
@@ -1595,6 +1596,9 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     // reply directly to the codec.
     //
     // Make sure we won't end up with nested watermark calls from the body buffer.
+
+    // TODO(snowp): Add a "send direct local reply" function to the FM that encapsulates all the calls into the
+    // FM but doesn't send the response through the filters.
     filter_manager_.setEncoderFiltersStreaming(true);
     Http::Utility::sendLocalReply(
         filter_manager_.destroyed(),
