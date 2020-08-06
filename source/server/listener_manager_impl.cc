@@ -643,7 +643,7 @@ std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl
   std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
   ret.reserve(active_listeners_.size());
   for (const auto& listener : active_listeners_) {
-    ret.emplace_back(*listener);
+    ret.push_back(*listener);
   }
   return ret;
 }
