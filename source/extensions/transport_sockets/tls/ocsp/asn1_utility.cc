@@ -115,20 +115,6 @@ std::vector<uint8_t> Asn1Utility::parseOctetString(CBS& cbs) {
   return {data, data + CBS_len(&value)};
 }
 
-std::string Asn1Utility::parseAlgorithmIdentifier(CBS& cbs) {
-  // AlgorithmIdentifier  ::=  SEQUENCE  {
-  //    algorithm               OBJECT IDENTIFIER,
-  //    parameters              ANY DEFINED BY algorithm OPTIONAL
-  // }
-  CBS elem;
-  if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_SEQUENCE)) {
-    throw Envoy::EnvoyException("AlgorithmIdentifier is not a well-formed ASN.1 SEQUENCE");
-  }
-
-  return parseOid(elem);
-  // Ignore `parameters`.
-}
-
 void Asn1Utility::skipOptional(CBS& cbs, unsigned tag) {
   if (!CBS_get_optional_asn1(&cbs, nullptr, nullptr, tag)) {
     throw Envoy::EnvoyException("Failed to parse ASN.1 element tag");

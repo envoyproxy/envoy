@@ -54,7 +54,6 @@ public:
 /*   expectThrowOnWrongTag(Asn1Utility::parseGeneralizedTime); */
 /*   expectThrowOnWrongTag(Asn1Utility::parseInteger); */
 /*   expectThrowOnWrongTag(Asn1Utility::parseOctetString); */
-/*   expectThrowOnWrongTag(Asn1Utility::parseAlgorithmIdentifier); */
 /* } */
 
 TEST_F(Asn1UtilityTest, ToStringTest) {
@@ -68,8 +67,9 @@ TEST_F(Asn1UtilityTest, ParseSequenceOfEmptySequenceTest) {
   CBS cbs;
   CBS_init(&cbs, asn1_empty_seq.data(), asn1_empty_seq.size());
 
-  std::vector<std::string> vec;
-  auto actual = Asn1Utility::parseSequenceOf<std::string>(cbs, [](CBS&) { return ""; });
+  std::vector<std::vector<uint8_t>> vec;
+  auto actual = absl::get<0>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs,
+        Asn1Utility::parseOctetString));
   EXPECT_EQ(vec, actual);
 }
 
@@ -98,7 +98,7 @@ TEST_F(Asn1UtilityTest, ParseSequenceOfMultipleElementSequenceTest) {
   CBS_init(&cbs, octet_seq.data(), octet_seq.size());
 
   std::vector<std::vector<uint8_t>> vec = {{0x1, 0x2}, {0x3, 0x4}, {0x5, 0x6}};
-  auto actual = Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString);
+  auto actual = absl::get<0>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString));
   EXPECT_EQ(vec, actual);
 }
 
@@ -116,9 +116,8 @@ TEST_F(Asn1UtilityTest, SequenceOfLengthMismatchErrorTest) {
   CBS cbs;
   CBS_init(&cbs, malformed.data(), malformed.size());
 
-  EXPECT_THROW_WITH_MESSAGE(
-      Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString), EnvoyException,
-      "Input is not a well-formed ASN.1 OCTETSTRING");
+  EXPECT_EQ("Input is not a well-formed ASN.1 OCTETSTRING",
+      absl::get<1>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString)));
 }
 
 TEST_F(Asn1UtilityTest, SequenceOfMixedTypeErrorTest) {
@@ -139,9 +138,8 @@ TEST_F(Asn1UtilityTest, SequenceOfMixedTypeErrorTest) {
   CBS cbs;
   CBS_init(&cbs, mixed_type.data(), mixed_type.size());
 
-  EXPECT_THROW_WITH_MESSAGE(
-      Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString), EnvoyException,
-      "Input is not a well-formed ASN.1 OCTETSTRING");
+  EXPECT_EQ("Input is not a well-formed ASN.1 OCTETSTRING",
+      absl::get<1>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString)));
 }
 
 TEST_F(Asn1UtilityTest, IsOptionalPresentTest) {
@@ -183,11 +181,11 @@ TEST_F(Asn1UtilityTest, ParseOptionalTest) {
   };
 
   absl::optional<bool> expected(true);
-  EXPECT_EQ(expected, Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true, parseBool, 0));
+  EXPECT_EQ(expected, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true, parseBool, 0)));
   EXPECT_EQ(absl::nullopt,
-            Asn1Utility::parseOptional<bool>(cbs_empty_seq, parseBool, CBS_ASN1_BOOLEAN));
+            absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_empty_seq, parseBool, CBS_ASN1_BOOLEAN)));
   EXPECT_EQ(absl::nullopt,
-            Asn1Utility::parseOptional<bool>(cbs_nothing, parseBool, CBS_ASN1_BOOLEAN));
+            absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_nothing, parseBool, CBS_ASN1_BOOLEAN)));
 }
 
 TEST_F(Asn1UtilityTest, ParseOidTest) {
@@ -306,26 +304,6 @@ TEST_F(Asn1UtilityTest, ParseOctetStringTest) {
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, data_str, CBS_ASN1_OCTETSTRING));
 
   EXPECT_EQ(data, Asn1Utility::parseOctetString(cbs));
-}
-
-TEST_F(Asn1UtilityTest, ParseAlgorithmIdentifierTest) {
-  std::string sha256 = "2.16.840.1.101.3.4.2.1";
-
-  bssl::ScopedCBB cbb;
-  CBB seq, oid;
-  ASSERT_TRUE(CBB_init(cbb.get(), 0));
-  ASSERT_TRUE(CBB_add_asn1(cbb.get(), &seq, CBS_ASN1_SEQUENCE));
-  ASSERT_TRUE(CBB_add_asn1(&seq, &oid, CBS_ASN1_OBJECT));
-  ASSERT_TRUE(CBB_add_asn1_oid_from_text(&oid, sha256.c_str(), sha256.size()));
-
-  uint8_t* buf;
-  size_t buf_len;
-  CBS cbs;
-  ASSERT_TRUE(CBB_finish(cbb.get(), &buf, &buf_len));
-  CBS_init(&cbs, buf, buf_len);
-  bssl::UniquePtr<uint8_t> scoped(buf);
-
-  EXPECT_EQ(sha256, Asn1Utility::parseAlgorithmIdentifier(cbs));
 }
 
 TEST_F(Asn1UtilityTest, SkipOptionalPresentAdvancesTest) {

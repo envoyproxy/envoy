@@ -269,14 +269,13 @@ CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
     throw EnvoyException("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
   }
 
-  // We use just the issuer name + the serial number to uniquely identify
-  // a certificate.
-  auto alg = Asn1Utility::parseAlgorithmIdentifier(elem);
-  auto issuer_name_hash = Asn1Utility::parseOctetString(elem);
+  // We use just the serial number to uniquely identify a certificate.
+  Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE);
+  Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING);
   Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING);
   auto serial_number = Asn1Utility::parseInteger(elem);
 
-  return {serial_number, alg, issuer_name_hash};
+  return {serial_number};
 }
 
 CertStatus Asn1OcspUtility::parseCertStatus(CBS& cbs) {
