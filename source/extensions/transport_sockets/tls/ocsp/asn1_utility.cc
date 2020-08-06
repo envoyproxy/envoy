@@ -115,16 +115,19 @@ ParsingResult<std::vector<uint8_t>> Asn1Utility::parseOctetString(CBS& cbs) {
   return std::vector<uint8_t>{data, data + CBS_len(&value)};
 }
 
-void Asn1Utility::skipOptional(CBS& cbs, unsigned tag) {
+ParsingResult<absl::monostate> Asn1Utility::skipOptional(CBS& cbs, unsigned tag) {
   if (!CBS_get_optional_asn1(&cbs, nullptr, nullptr, tag)) {
-    throw Envoy::EnvoyException("Failed to parse ASN.1 element tag");
+    return "Failed to parse ASN.1 element tag";
   }
+  return absl::monostate();
 }
 
-void Asn1Utility::skip(CBS& cbs, unsigned tag) {
+ParsingResult<absl::monostate> Asn1Utility::skip(CBS& cbs, unsigned tag) {
   if (!CBS_get_asn1(&cbs, nullptr, tag)) {
-    throw Envoy::EnvoyException("Failed to parse ASN.1 element");
+    return "Failed to parse ASN.1 element";
   }
+
+  return absl::monostate();
 }
 
 } // namespace Ocsp

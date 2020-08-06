@@ -311,7 +311,7 @@ TEST_F(Asn1UtilityTest, SkipOptionalPresentAdvancesTest) {
   CBS_init(&cbs, asn1_empty_seq.data(), asn1_empty_seq.size());
 
   const uint8_t* start = CBS_data(&cbs);
-  EXPECT_NO_THROW({ Asn1Utility::skipOptional(cbs, CBS_ASN1_SEQUENCE); });
+  EXPECT_NO_THROW(absl::get<0>(Asn1Utility::skipOptional(cbs, CBS_ASN1_SEQUENCE)));
   EXPECT_EQ(start + 2, CBS_data(&cbs));
 }
 
@@ -320,7 +320,7 @@ TEST_F(Asn1UtilityTest, SkipOptionalNotPresentDoesNotAdvanceTest) {
   CBS_init(&cbs, asn1_empty_seq.data(), asn1_empty_seq.size());
 
   const uint8_t* start = CBS_data(&cbs);
-  EXPECT_NO_THROW({ Asn1Utility::skipOptional(cbs, CBS_ASN1_BOOLEAN); });
+  EXPECT_NO_THROW(absl::get<0>(Asn1Utility::skipOptional(cbs, CBS_ASN1_BOOLEAN)));
   EXPECT_EQ(start, CBS_data(&cbs));
 }
 
@@ -329,8 +329,8 @@ TEST_F(Asn1UtilityTest, SkipOptionalMalformedTagTest) {
   CBS cbs;
   CBS_init(&cbs, malformed_seq.data(), malformed_seq.size());
 
-  EXPECT_THROW_WITH_MESSAGE(Asn1Utility::skipOptional(cbs, CBS_ASN1_SEQUENCE), EnvoyException,
-                            "Failed to parse ASN.1 element tag");
+  EXPECT_EQ("Failed to parse ASN.1 element tag",
+      absl::get<1>(Asn1Utility::skipOptional(cbs, CBS_ASN1_SEQUENCE)));
 }
 
 } // namespace

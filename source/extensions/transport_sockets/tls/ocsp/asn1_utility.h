@@ -147,7 +147,7 @@ public:
    * @param tag the tag of the value to skip
    * @throws Envoy::EnvoyException if `cbs` is a malformed TLV bytestring
    */
-  static void skipOptional(CBS& cbs, unsigned tag);
+  static ParsingResult<absl::monostate> skipOptional(CBS& cbs, unsigned tag);
 
   /**
    * Advance `cbs` over an ASN.1 value of the class `tag`.
@@ -157,7 +157,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
    * element with tag `tag`.
    */
-  static void skip(CBS& cbs, unsigned tag);
+  static ParsingResult<absl::monostate> skip(CBS& cbs, unsigned tag);
 };
 
 template <typename T>

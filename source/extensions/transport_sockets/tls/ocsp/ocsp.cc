@@ -18,10 +18,10 @@ namespace {
 template<typename T>
 T unwrap(ParsingResult<T> res) {
   if (absl::holds_alternative<T>(res)) {
-    return absl::get<T>(res);
+    return absl::get<0>(res);
   }
 
-  throw EnvoyException(absl::get<absl::string_view>(res));
+  throw EnvoyException(std::string(absl::get<1>(res)));
 }
 
 unsigned parseTag(CBS& cbs) {
@@ -75,8 +75,7 @@ SingleResponse::SingleResponse(CertId cert_id, CertStatus status, Envoy::SystemT
                                absl::optional<Envoy::SystemTime> next_update)
     : cert_id_(cert_id), status_(status), this_update_(this_update), next_update_(next_update) {}
 
-CertId::CertId(std::string serial_number, std::string alg_oid, std::vector<uint8_t> issuer_name_hash)
-    : serial_number_(serial_number), alg_oid_(alg_oid), issuer_name_hash_(issuer_name_hash) {}
+CertId::CertId(std::string serial_number) : serial_number_(serial_number) {}
 
 OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, TimeSource& time_source)
     : raw_bytes_(std::move(der_response)), response_(readDerEncodedOcspResponse(raw_bytes_)),
@@ -225,10 +224,12 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
     throw EnvoyException("OCSP ResponseData is not a well-formed ASN.1 SEQUENCE");
   }
 
-  Asn1Utility::skipOptional(elem, 0);
+  unwrap(Asn1Utility::skipOptional(elem, 0));
   skipResponderId(elem);
-  Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME);
-  auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(elem, parseSingleResponse));
+  unwrap(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
+  auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(elem, [](CBS& cbs) -> ParsingResult<SingleResponse> {
+        return parseSingleResponse(cbs);
+  }));
   // Extensions currently ignored
 
   return {std::move(responses)};
@@ -250,7 +251,7 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   auto cert_id = Asn1OcspUtility::parseCertId(elem);
   auto status = Asn1OcspUtility::parseCertStatus(elem);
   auto this_update = unwrap(Asn1Utility::parseGeneralizedTime(elem));
-  auto next_update = unwrap(Asn1Utility::parseOptional<ParsingResult<Envoy::SystemTime>>(
+  auto next_update = unwrap(Asn1Utility::parseOptional<Envoy::SystemTime>(
       elem, Asn1Utility::parseGeneralizedTime, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
   // Extensions currently ignored
 
@@ -270,9 +271,9 @@ CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
   }
 
   // We use just the serial number to uniquely identify a certificate.
-  Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE);
-  Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING);
-  Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING);
+  unwrap(Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE));
+  unwrap(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
+  unwrap(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
   auto serial_number = Asn1Utility::parseInteger(elem);
 
   return {serial_number};
