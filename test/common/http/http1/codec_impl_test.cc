@@ -381,7 +381,7 @@ void Http1ServerConnectionImplTest::testAllowChunkedContentLength(uint32_t conte
   } else {
     EXPECT_TRUE(isCodecProtocolError(status));
     EXPECT_EQ(status.message(),
-              "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encdoding' are set.");
+              "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
     EXPECT_EQ("http1.content_length_not_allowed", response_encoder->getStream().responseDetails());
   }
 }

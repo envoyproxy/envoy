@@ -897,7 +897,7 @@ int ServerConnectionImpl::onHeadersComplete() {
         error_code_ = Http::Code::BadRequest;
         sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
         throw CodecProtocolException(
-            "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encdoding' are set.");
+            "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
       }
     }
 
@@ -1155,7 +1155,7 @@ int ClientConnectionImpl::onHeadersComplete() {
       } else {
         sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
         throw CodecProtocolException(
-            "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encdoding' are set.");
+            "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
       }
     }
 
