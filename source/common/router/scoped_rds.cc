@@ -163,14 +163,15 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
     return;
   }
   std::unique_ptr<Init::ManagerImpl> srds_init_mgr =
-      std::make_unique<Init::ManagerImpl>(fmt::format("SRDS : "));
+      std::make_unique<Init::ManagerImpl>(fmt::format("SRDS on demand init manager."));
   std::unique_ptr<Cleanup> srds_initialization_continuation =
       std::make_unique<Cleanup>([this, &srds_init_mgr] {
         // For new RDS subscriptions created after listener warming up, we don't wait for them to
         // warm up.
         Init::WatcherImpl noop_watcher(
             // Note: we just throw it away.
-            fmt::format("SRDS ConfigUpdate watcher: {}", scope_name_), []() { /*Do nothing.*/ });
+            fmt::format("SRDS on demand ConfigUpdate watcher: {}", scope_name_),
+            []() { /*Do nothing.*/ });
         srds_init_mgr->initialize(noop_watcher);
       });
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
@@ -185,10 +186,10 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
     // Subscribe to RDS update.
     parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
   });
+  ENVOY_LOG(debug, fmt::format("on demand update: {}", scope_name_));
   // If route configuration hasn't been initialized, return.
   if (routeConfig() == std::make_shared<NullConfigImpl>())
     return;
-  ENVOY_LOG(debug, "on demand update");
   std::shared_ptr<ScopedRouteInfo> scoped_route_info =
       std::make_shared<ScopedRouteInfo>(envoy::config::route::v3::ScopedRouteConfiguration(
                                             parent_.scoped_route_map_[scope_name_]->configProto()),
@@ -450,6 +451,7 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
 void ScopedRdsConfigSubscription::onDemandRdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback route_config_updated_cb) {
+  ENVOY_LOG(debug, "provider on demand");
   factory_context_.dispatcher().post([this, &thread_local_dispatcher, key_hash,
                                       route_config_updated_cb]() {
     auto iter = scope_name_by_hash_.find(key_hash);
