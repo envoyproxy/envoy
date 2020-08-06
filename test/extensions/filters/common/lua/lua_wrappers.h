@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/thread_local/mocks.h"
@@ -18,7 +20,7 @@ template <class T> class LuaWrappersTestBase : public testing::Test {
 public:
   virtual void setup(const std::string& code) {
     coroutine_.reset();
-    state_.reset(new ThreadLocalState(code, tls_));
+    state_ = std::make_unique<ThreadLocalState>(code, tls_);
     state_->registerType<T>();
     coroutine_ = state_->createCoroutine();
     lua_pushlightuserdata(coroutine_->luaState(), this);

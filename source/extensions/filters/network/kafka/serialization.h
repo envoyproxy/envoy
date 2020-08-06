@@ -66,8 +66,6 @@ public:
  */
 template <typename T> class IntDeserializer : public Deserializer<T> {
 public:
-  IntDeserializer() : written_{0} {};
-
   uint32_t feed(absl::string_view& data) override {
     const uint32_t available = std::min<uint32_t>(sizeof(buf_) - written_, data.size());
     memcpy(buf_ + written_, data.data(), available);
@@ -86,7 +84,7 @@ public:
 
 protected:
   char buf_[sizeof(T) / sizeof(char)];
-  uint32_t written_;
+  uint32_t written_{0};
   bool ready_{false};
 };
 
