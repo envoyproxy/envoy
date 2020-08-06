@@ -376,22 +376,22 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
 
 // TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
-  for (auto& cluster : server_.clusterManager().clusters()) {
-    addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
-                   response);
+  for (auto& cluster_pair : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_pair.second.get();
+    const std::string& cluster_name = cluster.info()->name();
+    addOutlierInfo(cluster_name, cluster.outlierDetector(), response);
 
-    addCircuitSettings(
-        cluster.second.get().info()->name(), "default",
-        cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::Default),
-        response);
-    addCircuitSettings(
-        cluster.second.get().info()->name(), "high",
-        cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::High), response);
+    addCircuitSettings(cluster_name, "default",
+                       cluster.info()->resourceManager(Upstream::ResourcePriority::Default),
+                       response);
+    addCircuitSettings(cluster_name, "high",
+                       cluster.info()->resourceManager(Upstream::ResourcePriority::High), response);
 
-    response.add(fmt::format("{}::added_via_api::{}\n", cluster.second.get().info()->name(),
-                             cluster.second.get().info()->addedViaApi()));
-    for (auto& host_set : cluster.second.get().prioritySet().hostSetsPerPriority()) {
+    response.add(
+        fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
+    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
+        const std::string& host_address = host->address()->asString();
         std::map<absl::string_view, uint64_t> all_stats;
         for (const auto& counter : host->counters()) {
           all_stats[counter.first] = counter.second.get().value();
@@ -402,35 +402,32 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
         }
 
         for (const auto& stat : all_stats) {
-          response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
-                                   host->address()->asString(), stat.first, stat.second));
+          response.add(
+              fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat.first, stat.second));
         }
 
-        response.add(fmt::format("{}::{}::hostname::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->hostname()));
-        response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(),
+        response.add(
+            fmt::format("{}::{}::hostname::{}\n", cluster_name, host_address, host->hostname()));
+        response.add(fmt::format("{}::{}::health_flags::{}\n", cluster_name, host_address,
                                  Upstream::HostUtility::healthFlagsToString(*host)));
-        response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->weight()));
-        response.add(fmt::format("{}::{}::region::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->locality().region()));
-        response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->locality().zone()));
-        response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->locality().sub_zone()));
-        response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->canary()));
-        response.add(fmt::format("{}::{}::priority::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->priority()));
+        response.add(
+            fmt::format("{}::{}::weight::{}\n", cluster_name, host_address, host->weight()));
+        response.add(fmt::format("{}::{}::region::{}\n", cluster_name, host_address,
+                                 host->locality().region()));
+        response.add(
+            fmt::format("{}::{}::zone::{}\n", cluster_name, host_address, host->locality().zone()));
+        response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster_name, host_address,
+                                 host->locality().sub_zone()));
+        response.add(
+            fmt::format("{}::{}::canary::{}\n", cluster_name, host_address, host->canary()));
+        response.add(
+            fmt::format("{}::{}::priority::{}\n", cluster_name, host_address, host->priority()));
         response.add(fmt::format(
-            "{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
-            host->address()->asString(),
+            "{}::{}::success_rate::{}\n", cluster_name, host_address,
             host->outlierDetector().successRate(
                 Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
         response.add(fmt::format(
-            "{}::{}::local_origin_success_rate::{}\n", cluster.second.get().info()->name(),
-            host->address()->asString(),
+            "{}::{}::local_origin_success_rate::{}\n", cluster_name, host_address,
             host->outlierDetector().successRate(
                 Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
       }
