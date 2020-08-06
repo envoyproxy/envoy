@@ -74,7 +74,6 @@ TEST_F(SdsApiTest, BasicTest) {
 // https://github.com/envoyproxy/envoy/issues/12013
 TEST_F(SdsApiTest, InitManagerInitialised) {
   NiceMock<Server::MockInstance> server;
-  //     - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
   std::string sds_config =
       R"EOF(
   resources:
