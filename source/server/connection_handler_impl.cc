@@ -515,31 +515,31 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
-
-  active_connections_.listener_.stats_.downstream_cx_total_.inc();
-  active_connections_.listener_.stats_.downstream_cx_active_.inc();
-  active_connections_.listener_.per_worker_stats_.downstream_cx_total_.inc();
-  active_connections_.listener_.per_worker_stats_.downstream_cx_active_.inc();
+  auto& listener = active_connections_.listener_;
+  listener.stats_.downstream_cx_total_.inc();
+  listener.stats_.downstream_cx_active_.inc();
+  listener.per_worker_stats_.downstream_cx_total_.inc();
+  listener.per_worker_stats_.downstream_cx_active_.inc();
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept
   // path if there is no configured balancer.
-  ++active_connections_.listener_.parent_.num_handler_connections_;
+  ++listener.parent_.num_handler_connections_;
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
-  emitLogs(*active_connections_.listener_.config_, *stream_info_);
-
-  active_connections_.listener_.stats_.downstream_cx_active_.dec();
-  active_connections_.listener_.stats_.downstream_cx_destroy_.inc();
-  active_connections_.listener_.per_worker_stats_.downstream_cx_active_.dec();
+  emitLogs(*listener.config_, *stream_info_);
+  auto& listener = active_connections_.listener_;
+  listener.stats_.downstream_cx_active_.dec();
+  listener.stats_.downstream_cx_destroy_.inc();
+  listener.per_worker_stats_.downstream_cx_active_.dec();
   conn_length_->complete();
 
   // Active listener connections (not handler).
-  active_connections_.listener_.decNumConnections();
+  listener.decNumConnections();
 
   // Active handler connections (not listener).
-  active_connections_.listener_.parent_.decNumConnections();
+  listener.parent_.decNumConnections();
 }
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
