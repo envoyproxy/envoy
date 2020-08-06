@@ -211,7 +211,7 @@ class RatelimitFilterHeadersEnabledIntegrationTest : public RatelimitIntegration
 public:
   RatelimitFilterHeadersEnabledIntegrationTest() {
     enable_x_ratelimit_headers_ =
-        envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_02;
+        envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_03;
   }
 };
 
