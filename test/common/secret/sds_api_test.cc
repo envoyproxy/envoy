@@ -24,10 +24,8 @@
 #include "gtest/gtest.h"
 
 using ::testing::_;
-using ::testing::ByMove;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
-using ::testing::Return;
 
 namespace Envoy {
 namespace Secret {
