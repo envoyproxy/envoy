@@ -1664,7 +1664,7 @@ void ConnectionManagerImpl::FilterManager::sendDirectLocalReply(
               modify_headers(*response_headers);
             }
 
-            // Move the response headers into the FilterManager to make sure they're visibile to
+            // Move the response headers into the FilterManager to make sure they're visible to
             // access logs.
             response_headers_ = std::move(response_headers);
             filter_manager_callbacks_.encodeHeaders(*response_headers_, end_stream);
