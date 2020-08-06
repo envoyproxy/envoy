@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 # L7 HTTP filter which implements CSRF processing (https://www.owasp.org/index.php/Cross-Site_Request_Forgery_(CSRF))
 # Public docs: docs/root/configuration/http_filters/csrf_filter.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "csrf_filter_lib",
