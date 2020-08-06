@@ -16,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,6 +25,7 @@ using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -72,44 +74,82 @@ public:
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
   }
 
-  TestCodecClient& createTestClient() {
-    test_clients_.emplace_back();
-    TestCodecClient& test_client = test_clients_.back();
-    test_client.connection_ = new NiceMock<Network::MockClientConnection>();
-    test_client.codec_ = new NiceMock<Http::MockClientConnection>();
-    test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    test_client.client_dispatcher_ = api_->allocateDispatcher("test_thread");
-    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
+  void createTestClients(int num_clients) {
+    // Create N clients.
+    for (int i = 0; i < num_clients; ++i) {
+      test_clients_.emplace_back();
+      TestCodecClient& test_client = test_clients_.back();
+      test_client.connection_ = new NiceMock<Network::MockClientConnection>();
+      test_client.codec_ = new NiceMock<Http::MockClientConnection>();
+      test_client.connect_timer_ = new NiceMock<Event::MockTimer>();
+      test_client.client_dispatcher_ = api_->allocateDispatcher("test_thread");
+    }
 
-    return test_client;
+    // Outside the for loop, set the createTimer expectations.
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .Times(num_clients)
+        .WillRepeatedly(Invoke([this](Event::TimerCb cb) {
+          test_clients_[timer_index_].connect_timer_->callback_ = cb;
+          return test_clients_[timer_index_++].connect_timer_;
+        }));
+    // Loop again through the last num_clients entries to set enableTimer expectations.
+    // Ideally this could be done in the loop above but it breaks InSequence
+    // assertions.
+    for (size_t i = test_clients_.size() - num_clients; i < test_clients_.size(); ++i) {
+      TestCodecClient& test_client = test_clients_[i];
+      EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
+    }
   }
 
-  void expectConnectionSetupForClient(TestCodecClient& test_client,
+  void expectConnectionSetupForClient(int num_clients,
                                       absl::optional<uint32_t> buffer_limits = {}) {
+    // Set the createClientConnection mocks. The createCodecClient_ invoke
+    // below takes care of making sure connection_index_ is updated.
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(Return(test_client.connection_));
-    auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-    Network::ClientConnectionPtr connection{test_client.connection_};
-    test_client.codec_client_ = new CodecClientForTest(
-        CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
-        [this](CodecClient*) -> void { onClientDestroy(); },
-        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
-    if (buffer_limits) {
-      EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes()).WillOnce(Return(*buffer_limits));
-      EXPECT_CALL(*test_clients_.back().connection_, setBufferLimits(*buffer_limits));
+        .Times(num_clients)
+        .WillRepeatedly(InvokeWithoutArgs([this]() -> Network::ClientConnection* {
+          return test_clients_[connection_index_].connection_;
+        }));
+
+    // Loop through the last num_clients clients, setting up codec clients and
+    // per-client mocks.
+    for (size_t i = test_clients_.size() - num_clients; i < test_clients_.size(); ++i) {
+      TestCodecClient& test_client = test_clients_[i];
+      auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+      Network::ClientConnectionPtr connection{test_client.connection_};
+      test_client.codec_client_ = new CodecClientForTest(
+          CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
+          [this](CodecClient*) -> void { onClientDestroy(); },
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
+      if (buffer_limits) {
+        EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes())
+            .Times(num_clients)
+            .WillRepeatedly(Return(*buffer_limits));
+        EXPECT_CALL(*test_client.connection_, setBufferLimits(*buffer_limits)).Times(1);
+      }
     }
+    // Finally (for InSequence tests) set up createCodecClient and make sure the
+    // index is incremented to avoid returning the same client more than once.
     EXPECT_CALL(*pool_, createCodecClient_(_))
-        .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
-          return test_clients_.back().codec_client_;
+        .Times(num_clients)
+        .WillRepeatedly(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
+          return test_clients_[connection_index_++].codec_client_;
         }));
   }
 
   // Creates a new test client, expecting a new connection to be created and associated
   // with the new client.
   void expectClientCreate(absl::optional<uint32_t> buffer_limits = {}) {
-    expectConnectionSetupForClient(createTestClient(), buffer_limits);
+    createTestClients(1);
+    expectConnectionSetupForClient(1, buffer_limits);
+  }
+  void expectClientsCreate(int num_clients) {
+    createTestClients(num_clients);
+    expectConnectionSetupForClient(num_clients, absl::nullopt);
   }
 
+  // Connects a pending connection for client with the given index.
+  void expectClientConnect(size_t index);
   // Connects a pending connection for client with the given index, asserting
   // that the provided request receives onPoolReady.
   void expectClientConnect(size_t index, ActiveTestRequest& r);
@@ -128,6 +168,11 @@ public:
   void closeClient(size_t index);
 
   /**
+   * Closes all test clients.
+   */
+  void closeAllClients();
+
+  /**
    * Completes an active request. Useful when this flow is not part of the main test assertions.
    */
   void completeRequest(ActiveTestRequest& r);
@@ -140,6 +185,8 @@ public:
 
   MOCK_METHOD(void, onClientDestroy, ());
 
+  int timer_index_{};
+  int connection_index_{};
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -171,10 +218,14 @@ public:
   ConnectionPool::Cancellable* handle_{};
 };
 
-void Http2ConnPoolImplTest::expectClientConnect(size_t index, ActiveTestRequest& r) {
-  expectStreamConnect(index, r);
+void Http2ConnPoolImplTest::expectClientConnect(size_t index) {
   EXPECT_CALL(*test_clients_[index].connect_timer_, disableTimer());
   test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+}
+
+void Http2ConnPoolImplTest::expectClientConnect(size_t index, ActiveTestRequest& r) {
+  expectStreamConnect(index, r);
+  expectClientConnect(index);
 }
 
 void Http2ConnPoolImplTest::expectStreamConnect(size_t index, ActiveTestRequest& r) {
@@ -203,6 +254,14 @@ void Http2ConnPoolImplTest::expectStreamReset(ActiveTestRequest& r) {
 void Http2ConnPoolImplTest::closeClient(size_t index) {
   test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+void Http2ConnPoolImplTest::closeAllClients() {
+  for (auto& test_client : test_clients_) {
+    test_client.connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  }
+  EXPECT_CALL(*this, onClientDestroy()).Times(test_clients_.size());
   dispatcher_.clearDeferredDeleteList();
 }
 
@@ -261,7 +320,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   // This requires some careful set up of expectations ordering: the call to createTransportSocket
   // happens before all the connection set up but after the test client is created (due to some)
   // of the mocks that are constructed as part of the test client.
-  auto& client = createTestClient();
+  createTestClients(1);
   EXPECT_CALL(*factory_ptr, createTransportSocket(_))
       .WillOnce(Invoke(
           [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
@@ -270,7 +329,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
                       Http::Utility::AlpnNames::get().Http2);
             return std::make_unique<Network::RawBufferSocket>();
           }));
-  expectConnectionSetupForClient(client);
+  expectConnectionSetupForClient(1);
   ActiveTestRequest r(*this, 0, false);
   expectClientConnect(0, r);
   EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
@@ -780,8 +839,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsRequestOverflow) {
   expectStreamConnect(0, r1);
   expectStreamReset(r2);
   expectStreamReset(r3);
-  EXPECT_CALL(*test_clients_[0].connect_timer_, disableTimer());
-  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  expectClientConnect(0);
 
   // Clean up everything.
   for (uint64_t i = 0; i < requests.max() - 1; ++i) {
@@ -817,8 +875,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsMaxPendingCircuitBreaker) {
   EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks));
 
   expectStreamConnect(0, r1);
-  EXPECT_CALL(*test_clients_[0].connect_timer_, disableTimer());
-  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  expectClientConnect(0);
 
   // Clean up everything.
   for (uint64_t i = 0; i < pending_reqs.max() - 1; ++i) {
@@ -1257,6 +1314,145 @@ TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
 
   closeClient(0);
 }
+
+TEST_F(Http2ConnPoolImplTest, PrefetchWithoutMultiplexing) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+
+  // With one request per connection, and prefetch 1.5, the first request will
+  // kick off 2 connections.
+  expectClientsCreate(2);
+  ActiveTestRequest r1(*this, 0, false);
+
+  // With another incoming request, we'll have 2 in flight and want 1.5*2 so
+  // create one connection.
+  expectClientsCreate(1);
+  ActiveTestRequest r2(*this, 0, false);
+
+  // With a third request we'll have 3 in flight and want 1.5*3 -> 5 so kick off
+  // two again.
+  expectClientsCreate(2);
+  ActiveTestRequest r3(*this, 0, false);
+
+  r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  r3.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  pool_->drainConnections();
+
+  closeAllClients();
+}
+
+TEST_F(Http2ConnPoolImplTest, PrefetchOff) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.allow_prefetch", "false"}});
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+
+  // Despite the prefetch ratio, no prefetch will happen due to the runtime
+  // disable.
+  expectClientsCreate(1);
+  ActiveTestRequest r1(*this, 0, false);
+
+  // Clean up.
+  r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  pool_->drainConnections();
+  closeAllClients();
+}
+
+TEST_F(Http2ConnPoolImplTest, PrefetchWithMultiplexing) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+
+  // With two requests per connection, and prefetch 1.5, the first request will
+  // only kick off 1 connection.
+  expectClientsCreate(1);
+  ActiveTestRequest r1(*this, 0, false);
+
+  // With another incoming request, we'll have capacity(2) in flight and want 1.5*2 so
+  // create an additional connection.
+  expectClientsCreate(1);
+  ActiveTestRequest r2(*this, 0, false);
+
+  // Clean up.
+  r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  pool_->drainConnections();
+  closeAllClients();
+}
+
+TEST_F(Http2ConnPoolImplTest, PrefetchEvenWhenReady) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+
+  // With one request per connection, and prefetch 1.5, the first request will
+  // kick off 2 connections.
+  expectClientsCreate(2);
+  ActiveTestRequest r1(*this, 0, false);
+
+  // When the first client connects, r1 will be assigned.
+  expectClientConnect(0, r1);
+  // When the second connects, there is no waiting stream request to assign.
+  expectClientConnect(1);
+
+  // The next incoming request will immediately be assigned a stream, and also
+  // kick off a prefetch.
+  expectClientsCreate(1);
+  ActiveTestRequest r2(*this, 1, true);
+
+  // Clean up.
+  completeRequest(r1);
+  completeRequest(r2);
+  pool_->drainConnections();
+  closeAllClients();
+}
+
+TEST_F(Http2ConnPoolImplTest, PrefetchAfterTimeout) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.5));
+
+  expectClientsCreate(2);
+  ActiveTestRequest r1(*this, 0, false);
+
+  // When the first client connects, r1 will be assigned.
+  expectClientConnect(0, r1);
+
+  // Now cause the prefetched connection to fail. We should try to create
+  // another in its place.
+  expectClientsCreate(1);
+  test_clients_[1].connect_timer_->invokeCallback();
+
+  // Clean up.
+  completeRequest(r1);
+  pool_->drainConnections();
+  closeAllClients();
+}
+
+TEST_F(Http2ConnPoolImplTest, CloseExcessWithPrefetch) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(1);
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(1.00));
+
+  // First request prefetches an additional connection.
+  expectClientsCreate(1);
+  ActiveTestRequest r1(*this, 0, false);
+
+  // Second request does not prefetch.
+  expectClientsCreate(1);
+  ActiveTestRequest r2(*this, 0, false);
+
+  // Change the prefetch ratio to force the connection to no longer be excess.
+  ON_CALL(*cluster_, prefetchRatio).WillByDefault(Return(2));
+  // Closing off the second request should bring us back to 1 request in queue,
+  // desired capacity 2, so will not close the connection.
+  EXPECT_CALL(*this, onClientDestroy()).Times(0);
+  r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+
+  // Clean up.
+  r1.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+  pool_->drainConnections();
+  closeAllClients();
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

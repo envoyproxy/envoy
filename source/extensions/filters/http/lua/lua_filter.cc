@@ -19,6 +19,11 @@ namespace Lua {
 
 namespace {
 
+struct HttpResponseCodeDetailValues {
+  const absl::string_view LuaResponse = "lua_response";
+};
+using HttpResponseCodeDetails = ConstSingleton<HttpResponseCodeDetailValues>;
+
 const std::string DEPRECATED_LUA_NAME = "envoy.lua";
 
 std::atomic<bool>& deprecatedNameLogged() {
@@ -721,6 +726,7 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
+  callbacks_->streamInfo().setResponseCodeDetails(HttpResponseCodeDetails::get().LuaResponse);
   callbacks_->encodeHeaders(std::move(headers), body == nullptr);
   if (body && !parent_.destroyed_) {
     callbacks_->encodeData(*body, true);

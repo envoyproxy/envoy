@@ -45,6 +45,8 @@ TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers_, true));
+  ASSERT_TRUE(callbacks_.stream_info_.responseCodeDetails().has_value());
+  EXPECT_EQ(callbacks_.stream_info_.responseCodeDetails().value(), "admin_filter_response");
 }
 
 TEST_P(AdminFilterTest, Body) {

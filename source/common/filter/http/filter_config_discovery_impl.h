@@ -41,7 +41,8 @@ public:
   absl::optional<Envoy::Http::FilterFactoryCb> config() override;
   void validateConfig(const ProtobufWkt::Any& proto_config,
                       Server::Configuration::NamedHttpFilterConfigFactory&) override;
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&) override;
+  void onConfigUpdate(Envoy::Http::FilterFactoryCb config, const std::string&,
+                      Config::ConfigAppliedCb cb) override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -51,6 +52,9 @@ private:
 
   FilterConfigSubscriptionSharedPtr subscription_;
   const std::set<std::string> require_type_urls_;
+  // Currently applied configuration to ensure that the main thread deletes the last reference to
+  // it.
+  absl::optional<Envoy::Http::FilterFactoryCb> current_config_{absl::nullopt};
   ThreadLocal::SlotPtr tls_;
 
   // Local initialization target to ensure that the subscription starts in
@@ -146,7 +150,8 @@ public:
                       Server::Configuration::NamedHttpFilterConfigFactory&) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdate(Envoy::Http::FilterFactoryCb, const std::string&) override {
+  void onConfigUpdate(Envoy::Http::FilterFactoryCb, const std::string&,
+                      Config::ConfigAppliedCb) override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 

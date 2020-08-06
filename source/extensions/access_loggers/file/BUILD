@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,12 +10,14 @@ licenses(["notice"])  # Apache 2
 # Access log implementation that writes to a file.
 # Public docs: docs/root/configuration/access_log.rst
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "file_access_log_lib",
     srcs = ["file_access_log_impl.cc"],
     hdrs = ["file_access_log_impl.h"],
+    # The file based access logger is core code.
+    visibility = ["//visibility:public"],
     deps = [
         "//source/extensions/access_loggers/common:access_log_base",
     ],
@@ -26,6 +28,11 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
+    # TODO(#9953) determine if this is core or should be cleaned up.
+    visibility = [
+        "//:extension_config",
+        "//test:__subpackages__",
+    ],
     deps = [
         ":file_access_log_lib",
         "//include/envoy/registry",
