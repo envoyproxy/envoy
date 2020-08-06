@@ -44,8 +44,8 @@ cc_library(
 cc_library(
     name = "icuuc",
     srcs = glob([
-        "source/common/**/*.c",
-        "source/common/**/*.cpp",
+        "source/common/*.c",
+        "source/common/*.cpp",
         "source/stubdata/*.cpp",
     ]),
     hdrs = glob(["source/common/*.h"]),
