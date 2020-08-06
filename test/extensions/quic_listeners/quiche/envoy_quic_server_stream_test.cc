@@ -7,6 +7,7 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 
 #include "quiche/quic/test_tools/quic_connection_peer.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #pragma GCC diagnostic pop
 
 #include "common/event/libevent_scheduler.h"
@@ -39,7 +40,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_29, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::CurrentSupportedVersions()[0];
@@ -57,6 +58,7 @@ public:
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
+    quic::SetVerbosityLogThreshold(1);
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic::test::QuicConnectionPeer::SetAddressValidated(&quic_connection_);
@@ -97,6 +99,10 @@ public:
 
   void TearDown() override {
     if (quic_connection_.connected()) {
+      std::cerr << "=============== active streams2: " << quic_session_.GetNumActiveStreams()
+                << " draining stream "
+                << quic::test::QuicSessionPeer::GetNumDrainingStreams(&quic_session_) << "\n";
+
       quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
   }
@@ -184,6 +190,7 @@ TEST_P(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
                                    request_headers);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+  std::cerr << "=============== active streams: " << quic_session_.GetNumActiveStreams() << "\n";
 }
 
 TEST_P(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
