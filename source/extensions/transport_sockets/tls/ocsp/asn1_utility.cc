@@ -1,4 +1,5 @@
 #include "extensions/transport_sockets/tls/ocsp/asn1_utility.h"
+
 #include "common/common/c_smart_ptr.h"
 
 #include "absl/strings/ascii.h"
@@ -10,18 +11,16 @@ namespace Tls {
 namespace Ocsp {
 
 namespace {
-  // A type adapter since OPENSSL_free accepts void*.
-  void freeOpensslString(char* str) {
-    OPENSSL_free(str);
-  }
+// A type adapter since OPENSSL_free accepts void*.
+void freeOpensslString(char* str) { OPENSSL_free(str); }
 
-  // ASN1_INTEGER is a type alias for ASN1_STRING.
-  // This static_cast is intentional to avoid the
-  // c-style cast performed in M_ASN1_INTEGER_free.
-  void freeAsn1Integer(ASN1_INTEGER* integer) {
-    ASN1_STRING_free(static_cast<ASN1_STRING*>(integer));
-  }
+// ASN1_INTEGER is a type alias for ASN1_STRING.
+// This static_cast is intentional to avoid the
+// c-style cast performed in M_ASN1_INTEGER_free.
+void freeAsn1Integer(ASN1_INTEGER* integer) {
+  ASN1_STRING_free(static_cast<ASN1_STRING*>(integer));
 }
+} // namespace
 
 absl::string_view Asn1Utility::cbsToString(CBS& cbs) {
   auto str_head = reinterpret_cast<const char*>(CBS_data(&cbs));
@@ -63,8 +62,7 @@ ParsingResult<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   // Local time or time differential, though a part of the ASN.1
   // GENERALIZEDTIME spec, are not supported.
   // Reference: https://tools.ietf.org/html/rfc5280#section-4.1.2.5.2
-  if (time_str.length() > 0 &&
-      absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
+  if (time_str.length() > 0 && absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
     return "GENERALIZEDTIME must be in UTC";
   }
 
@@ -86,7 +84,8 @@ ParsingResult<std::string> Asn1Utility::parseInteger(CBS& cbs) {
   }
 
   auto head = CBS_data(&num);
-  CSmartPtr<ASN1_INTEGER, freeAsn1Integer> asn1_integer(c2i_ASN1_INTEGER(nullptr, &head, CBS_len(&num)));
+  CSmartPtr<ASN1_INTEGER, freeAsn1Integer> asn1_integer(
+      c2i_ASN1_INTEGER(nullptr, &head, CBS_len(&num)));
   if (asn1_integer != nullptr) {
     BIGNUM num_bn;
     BN_init(&num_bn);

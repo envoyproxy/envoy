@@ -15,8 +15,7 @@ namespace CertUtility = Envoy::Extensions::TransportSockets::Tls::Utility;
 
 namespace {
 
-template<typename T>
-T unwrap(ParsingResult<T> res) {
+template <typename T> T unwrap(ParsingResult<T> res) {
   if (absl::holds_alternative<T>(res)) {
     return absl::get<0>(res);
   }
@@ -53,8 +52,10 @@ void skipResponderId(CBS& cbs) {
   // KeyHash ::= OCTET STRING -- SHA-1 hash of responder's public key
   //    (excluding the tag and length fields)
 
-  if (unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
-      unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
+  if (unwrap(Asn1Utility::getOptional(cbs, nullptr,
+                                      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
+      unwrap(Asn1Utility::getOptional(cbs, nullptr,
+                                      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
     return;
   }
 
@@ -62,16 +63,17 @@ void skipResponderId(CBS& cbs) {
 }
 
 void skipCertStatus(CBS& cbs) {
-    // CertStatus ::= CHOICE {
-    //  good                [0] IMPLICIT NULL,
-    //  revoked             [1] IMPLICIT RevokedInfo,
-    //  unknown             [2] IMPLICIT UnknownInfo
-    // }
-    if (!(unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 0)) ||
-          unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
-          unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
-      throw EnvoyException(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
-    }
+  // CertStatus ::= CHOICE {
+  //  good                [0] IMPLICIT NULL,
+  //  revoked             [1] IMPLICIT RevokedInfo,
+  //  unknown             [2] IMPLICIT UnknownInfo
+  // }
+  if (!(unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 0)) ||
+        unwrap(Asn1Utility::getOptional(cbs, nullptr,
+                                        CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
+        unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
+    throw EnvoyException(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
+  }
 }
 
 } // namespace
@@ -142,7 +144,8 @@ std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {
 
   CBS bytes;
   ResponsePtr resp = nullptr;
-  if (unwrap(Asn1Utility::getOptional(elem, &bytes, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0))) {
+  if (unwrap(Asn1Utility::getOptional(elem, &bytes,
+                                      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0))) {
     resp = Asn1OcspUtility::parseResponseBytes(bytes);
   }
 
@@ -243,9 +246,10 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
   unwrap(Asn1Utility::skipOptional(elem, 0));
   skipResponderId(elem);
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
-  auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(elem, [](CBS& cbs) -> ParsingResult<SingleResponse> {
+  auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(
+      elem, [](CBS& cbs) -> ParsingResult<SingleResponse> {
         return ParsingResult<SingleResponse>(parseSingleResponse(cbs));
-  }));
+      }));
   // Extensions currently ignored
 
   return {std::move(responses)};
@@ -268,7 +272,8 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   skipCertStatus(elem);
   auto this_update = unwrap(Asn1Utility::parseGeneralizedTime(elem));
   auto next_update = unwrap(Asn1Utility::parseOptional<Envoy::SystemTime>(
-      elem, Asn1Utility::parseGeneralizedTime, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
+      elem, Asn1Utility::parseGeneralizedTime,
+      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
   // Extensions currently ignored
 
   return {cert_id, this_update, next_update};

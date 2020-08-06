@@ -49,8 +49,9 @@ public:
 };
 
 TEST_F(Asn1UtilityTest, ParseMethodsWrongTagTest) {
-  expectParseResultErrorOnWrongTag<std::vector<std::vector<uint8_t>>>(
-      [](CBS& cbs) { return Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString); });
+  expectParseResultErrorOnWrongTag<std::vector<std::vector<uint8_t>>>([](CBS& cbs) {
+    return Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString);
+  });
   expectParseResultErrorOnWrongTag<std::string>(Asn1Utility::parseOid);
   expectParseResultErrorOnWrongTag<Envoy::SystemTime>(Asn1Utility::parseGeneralizedTime);
   expectParseResultErrorOnWrongTag<std::string>(Asn1Utility::parseInteger);
@@ -69,8 +70,8 @@ TEST_F(Asn1UtilityTest, ParseSequenceOfEmptySequenceTest) {
   CBS_init(&cbs, asn1_empty_seq.data(), asn1_empty_seq.size());
 
   std::vector<std::vector<uint8_t>> vec;
-  auto actual = absl::get<0>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs,
-        Asn1Utility::parseOctetString));
+  auto actual = absl::get<0>(
+      Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString));
   EXPECT_EQ(vec, actual);
 }
 
@@ -99,7 +100,8 @@ TEST_F(Asn1UtilityTest, ParseSequenceOfMultipleElementSequenceTest) {
   CBS_init(&cbs, octet_seq.data(), octet_seq.size());
 
   std::vector<std::vector<uint8_t>> vec = {{0x1, 0x2}, {0x3, 0x4}, {0x5, 0x6}};
-  auto actual = absl::get<0>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString));
+  auto actual = absl::get<0>(
+      Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString));
   EXPECT_EQ(vec, actual);
 }
 
@@ -118,7 +120,8 @@ TEST_F(Asn1UtilityTest, SequenceOfLengthMismatchErrorTest) {
   CBS_init(&cbs, malformed.data(), malformed.size());
 
   EXPECT_EQ("Input is not a well-formed ASN.1 OCTETSTRING",
-      absl::get<1>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString)));
+            absl::get<1>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(
+                cbs, Asn1Utility::parseOctetString)));
 }
 
 TEST_F(Asn1UtilityTest, SequenceOfMixedTypeErrorTest) {
@@ -140,7 +143,8 @@ TEST_F(Asn1UtilityTest, SequenceOfMixedTypeErrorTest) {
   CBS_init(&cbs, mixed_type.data(), mixed_type.size());
 
   EXPECT_EQ("Input is not a well-formed ASN.1 OCTETSTRING",
-      absl::get<1>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString)));
+            absl::get<1>(Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(
+                cbs, Asn1Utility::parseOctetString)));
 }
 
 TEST_F(Asn1UtilityTest, IsOptionalPresentTest) {
@@ -161,7 +165,7 @@ TEST_F(Asn1UtilityTest, IsOptionalPresentMissingValueTest) {
   CBS_init(&cbs, missing_val_bool.data(), missing_val_bool.size());
 
   EXPECT_EQ("Failed to parse ASN.1 element tag",
-      absl::get<1>(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN)));
+            absl::get<1>(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN)));
 }
 
 TEST_F(Asn1UtilityTest, ParseOptionalTest) {
@@ -182,11 +186,12 @@ TEST_F(Asn1UtilityTest, ParseOptionalTest) {
   };
 
   absl::optional<bool> expected(true);
-  EXPECT_EQ(expected, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true, parseBool, 0)));
-  EXPECT_EQ(absl::nullopt,
-            absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_empty_seq, parseBool, CBS_ASN1_BOOLEAN)));
-  EXPECT_EQ(absl::nullopt,
-            absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_nothing, parseBool, CBS_ASN1_BOOLEAN)));
+  EXPECT_EQ(expected, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_explicit_optional_true,
+                                                                    parseBool, 0)));
+  EXPECT_EQ(absl::nullopt, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_empty_seq, parseBool,
+                                                                         CBS_ASN1_BOOLEAN)));
+  EXPECT_EQ(absl::nullopt, absl::get<0>(Asn1Utility::parseOptional<bool>(cbs_nothing, parseBool,
+                                                                         CBS_ASN1_BOOLEAN)));
 }
 
 TEST_F(Asn1UtilityTest, ParseOidTest) {
@@ -214,7 +219,7 @@ TEST_F(Asn1UtilityTest, ParseGeneralizedTimeWrongFormatErrorTest) {
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, invalid_time, CBS_ASN1_GENERALIZEDTIME));
   Asn1Utility::parseGeneralizedTime(cbs);
   EXPECT_EQ("Input is not a well-formed ASN.1 GENERALIZEDTIME",
-      absl::get<absl::string_view>(Asn1Utility::parseGeneralizedTime(cbs)));
+            absl::get<absl::string_view>(Asn1Utility::parseGeneralizedTime(cbs)));
 }
 
 TEST_F(Asn1UtilityTest, ParseGeneralizedTimeTest) {
@@ -234,7 +239,8 @@ TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeRejectsNonUTCTime) {
   CBS cbs;
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, local_time, CBS_ASN1_GENERALIZEDTIME));
 
-  EXPECT_EQ("GENERALIZEDTIME must be in UTC", absl::get<absl::string_view>(Asn1Utility::parseGeneralizedTime(cbs)));
+  EXPECT_EQ("GENERALIZEDTIME must be in UTC",
+            absl::get<absl::string_view>(Asn1Utility::parseGeneralizedTime(cbs)));
 }
 
 TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeInvalidTime) {
@@ -243,7 +249,7 @@ TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeInvalidTime) {
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, ymd, CBS_ASN1_GENERALIZEDTIME));
 
   EXPECT_EQ("Error parsing string of GENERALIZEDTIME format",
-      absl::get<1>(Asn1Utility::parseGeneralizedTime(cbs)));
+            absl::get<1>(Asn1Utility::parseGeneralizedTime(cbs)));
 }
 
 // Taken from
@@ -298,7 +304,7 @@ TEST_F(Asn1UtilityTest, ParseIntegerTest) {
 }
 
 TEST_F(Asn1UtilityTest, ParseOctetStringTest) {
-  std::vector<uint8_t> data = { 0x1, 0x2, 0x3 };
+  std::vector<uint8_t> data = {0x1, 0x2, 0x3};
   std::string data_str(data.begin(), data.end());
   CBS cbs;
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, data_str, CBS_ASN1_OCTETSTRING));
@@ -330,7 +336,7 @@ TEST_F(Asn1UtilityTest, SkipOptionalMalformedTagTest) {
   CBS_init(&cbs, malformed_seq.data(), malformed_seq.size());
 
   EXPECT_EQ("Failed to parse ASN.1 element tag",
-      absl::get<1>(Asn1Utility::skipOptional(cbs, CBS_ASN1_SEQUENCE)));
+            absl::get<1>(Asn1Utility::skipOptional(cbs, CBS_ASN1_SEQUENCE)));
 }
 
 } // namespace

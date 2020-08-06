@@ -85,7 +85,8 @@ public:
    * else nullopt
    */
   template <typename T>
-  static ParsingResult<absl::optional<T>> parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag);
+  static ParsingResult<absl::optional<T>> parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
+                                                        unsigned tag);
 
   /**
    * Returns whether or not an element explicitly tagged with `tag` is present
@@ -161,7 +162,8 @@ public:
 };
 
 template <typename T>
-ParsingResult<std::vector<T>> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1ParsingFunc<T> parse_element) {
+ParsingResult<std::vector<T>> Asn1Utility::parseSequenceOf(CBS& cbs,
+                                                           Asn1ParsingFunc<T> parse_element) {
   CBS seq_elem;
   std::vector<T> vec;
 
@@ -187,7 +189,8 @@ ParsingResult<std::vector<T>> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1Parsing
 }
 
 template <typename T>
-ParsingResult<absl::optional<T>> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag) {
+ParsingResult<absl::optional<T>> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
+                                                            unsigned tag) {
   CBS data;
   auto is_present = getOptional(cbs, &data, tag);
 

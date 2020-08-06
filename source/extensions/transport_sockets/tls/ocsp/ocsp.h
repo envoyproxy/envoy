@@ -7,8 +7,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
 
-#include "absl/types/optional.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "openssl/bytestring.h"
 #include "openssl/ssl.h"
 
@@ -157,6 +157,7 @@ public:
   // Identified as `id-pkix-ocsp-basic` in
   // https://tools.ietf.org/html/rfc6960#appendix-B.2
   constexpr static absl::string_view OID = "1.3.6.1.5.5.7.48.1.1";
+
 private:
   const ResponseData data_;
 };
