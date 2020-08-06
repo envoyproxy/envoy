@@ -332,10 +332,10 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         host_status.set_hostname(host->hostname());
         host_status.mutable_locality()->MergeFrom(host->locality());
 
-        for (const auto& [name, count] : host->counters()) {
+        for (const auto& [name, counter] : host->counters()) {
           auto& metric = *host_status.add_stats();
           metric.set_name(std::string(name));
-          metric.set_value(count.get().value());
+          metric.set_value(counter.get().value());
           metric.set_type(envoy::admin::v3::SimpleMetric::COUNTER);
         }
 
@@ -393,8 +393,8 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
       for (auto& host : host_set->hosts()) {
         const std::string& host_address = host->address()->asString();
         std::map<absl::string_view, uint64_t> all_stats;
-        for (const auto& [name, count] : host->counters()) {
-          all_stats[name] = count.get().value();
+        for (const auto& [name, counter] : host->counters()) {
+          all_stats[name] = counter.get().value();
         }
 
         for (const auto& [name, gauge] : host->gauges()) {
