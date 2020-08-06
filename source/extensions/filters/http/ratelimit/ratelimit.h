@@ -43,6 +43,9 @@ public:
                                                     : stringToType(config.request_type())),
         local_info_(local_info), scope_(scope), runtime_(runtime),
         failure_mode_deny_(config.failure_mode_deny()),
+        enable_x_ratelimit_headers_(
+            config.enable_x_ratelimit_headers() ==
+            envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_03),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
@@ -55,6 +58,7 @@ public:
   Stats::Scope& scope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
   bool failureModeAllow() const { return !failure_mode_deny_; }
+  bool enableXRateLimitHeaders() const { return enable_x_ratelimit_headers_; }
   const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
@@ -80,6 +84,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
+  const bool enable_x_ratelimit_headers_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
   Filters::Common::RateLimit::StatNames stat_names_;
@@ -117,6 +122,7 @@ public:
 
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
+                Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
                 Http::RequestHeaderMapPtr&& request_headers_to_add) override;
 
