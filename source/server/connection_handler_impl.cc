@@ -395,7 +395,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::setupNewConnection(
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
     active_connection->connection_->addConnectionCallbacks(*active_connection);
-    active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
+    LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
 }
 
