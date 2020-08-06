@@ -138,7 +138,7 @@ public:
     ACTIVE = 1 << 0,
     WARMING = 1 << 1,
     DRAINING = 1 << 2,
-    ALL = 1 << 3
+    ALL = ACTIVE | WARMING | DRAINING
   };
 
   virtual ~ListenerManager() = default;

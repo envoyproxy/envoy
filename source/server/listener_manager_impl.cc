@@ -642,9 +642,6 @@ ListenerManagerImpl::getListenerByName(ListenerList& listeners, const std::strin
 std::vector<std::reference_wrapper<Network::ListenerConfig>>
 ListenerManagerImpl::listeners(ListenerState state) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> ret;
-  if (state & ALL) {
-    state = WARMING | ACTIVE | DRAINING;
-  }
 
   size_t size = 0;
   size += state & WARMING ? warming_listeners_.size() : 0;
