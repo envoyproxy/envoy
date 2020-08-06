@@ -1,7 +1,6 @@
 #include "extensions/transport_sockets/tls/ocsp/asn1_utility.h"
 #include "common/common/c_smart_ptr.h"
 
-#include "absl/strings/str_cat.h"
 #include "absl/strings/ascii.h"
 
 namespace Envoy {
@@ -29,23 +28,23 @@ absl::string_view Asn1Utility::cbsToString(CBS& cbs) {
   return {str_head, CBS_len(&cbs)};
 }
 
-bool Asn1Utility::getOptional(CBS& cbs, CBS* data, unsigned tag) {
+ParsingResult<bool> Asn1Utility::getOptional(CBS& cbs, CBS* data, unsigned tag) {
   int is_present;
   if (!CBS_get_optional_asn1(&cbs, data, &is_present, tag)) {
-    throw Envoy::EnvoyException("Failed to parse ASN.1 element tag");
+    return "Failed to parse ASN.1 element tag";
   }
 
-  return is_present;
+  return static_cast<bool>(is_present);
 }
 
-std::string Asn1Utility::parseOid(CBS& cbs) {
+ParsingResult<std::string> Asn1Utility::parseOid(CBS& cbs) {
   CBS oid;
   if (!CBS_get_asn1(&cbs, &oid, CBS_ASN1_OBJECT)) {
-    throw Envoy::EnvoyException("Input is not a well-formed ASN.1 OBJECT");
+    return absl::string_view("Input is not a well-formed ASN.1 OBJECT");
   }
   CSmartPtr<char, freeOpensslString> oid_text(CBS_asn1_oid_to_text(&oid));
   if (oid_text == nullptr) {
-    throw Envoy::EnvoyException("Failed to parse oid");
+    return absl::string_view("Failed to parse oid");
   }
 
   std::string oid_text_str(oid_text.get());
@@ -73,18 +72,17 @@ ParsingResult<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   auto utc_time_str = time_str.substr(0, time_str.length() - 1);
   std::string parse_error;
   if (!absl::ParseTime(GENERALIZED_TIME_FORMAT, utc_time_str, &time, &parse_error)) {
-    return absl::StrCat("Error parsing timestamp ", time_str, " with format ",
-                        GENERALIZED_TIME_FORMAT, ". Error: ", parse_error);
+    return "Error parsing string of GENERALIZEDTIME format";
   }
   return absl::ToChronoTime(time);
 }
 
 // Performs the following conversions to go from bytestring to hex integer
 // CBS -> ASN1_INTEGER -> BIGNUM -> String
-std::string Asn1Utility::parseInteger(CBS& cbs) {
+ParsingResult<std::string> Asn1Utility::parseInteger(CBS& cbs) {
   CBS num;
   if (!CBS_get_asn1(&cbs, &num, CBS_ASN1_INTEGER)) {
-    throw Envoy::EnvoyException("Input is not a well-formed ASN.1 INTEGER");
+    return absl::string_view("Input is not a well-formed ASN.1 INTEGER");
   }
 
   auto head = CBS_data(&num);
@@ -102,7 +100,7 @@ std::string Asn1Utility::parseInteger(CBS& cbs) {
     }
   }
 
-  throw Envoy::EnvoyException("Failed to parse ASN.1 INTEGER");
+  return absl::string_view("Failed to parse ASN.1 INTEGER");
 }
 
 ParsingResult<std::vector<uint8_t>> Asn1Utility::parseOctetString(CBS& cbs) {

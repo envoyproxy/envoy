@@ -53,8 +53,8 @@ void skipResponderId(CBS& cbs) {
   // KeyHash ::= OCTET STRING -- SHA-1 hash of responder's public key
   //    (excluding the tag and length fields)
 
-  if (Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1) ||
-      Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2)) {
+  if (unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
+      unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
     return;
   }
 
@@ -99,7 +99,10 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
   }
 }
 
-// TODO(daniel-goldstein): This should also check the issuer
+// We use just the serial number to uniquely identify a certificate.
+// Though different issuers could produce certificates with the same serial
+// number, this is check is to prevent operator error and a collision in this
+// case is unlikely.
 bool OcspResponseWrapper::matchesCertificate(X509& cert) {
   std::string cert_serial_number = CertUtility::getSerialNumberFromCertificate(cert);
   std::string resp_cert_serial_number = response_->response_->getCertSerialNumber();
@@ -126,7 +129,7 @@ std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {
 
   CBS bytes;
   ResponsePtr resp = nullptr;
-  if (Asn1Utility::getOptional(elem, &bytes, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0)) {
+  if (unwrap(Asn1Utility::getOptional(elem, &bytes, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0))) {
     resp = Asn1OcspUtility::parseResponseBytes(bytes);
   }
 
@@ -179,7 +182,7 @@ ResponsePtr Asn1OcspUtility::parseResponseBytes(CBS& cbs) {
     throw EnvoyException("OCSP ResponseBytes is not a well-formed SEQUENCE");
   }
 
-  auto oid_str = Asn1Utility::parseOid(elem);
+  auto oid_str = unwrap(Asn1Utility::parseOid(elem));
   if (!CBS_get_asn1(&elem, &response, CBS_ASN1_OCTETSTRING)) {
     throw EnvoyException("Expected ASN.1 OCTETSTRING for response");
   }
@@ -228,7 +231,7 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
   skipResponderId(elem);
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
   auto responses = unwrap(Asn1Utility::parseSequenceOf<SingleResponse>(elem, [](CBS& cbs) -> ParsingResult<SingleResponse> {
-        return parseSingleResponse(cbs);
+        return ParsingResult<SingleResponse>(parseSingleResponse(cbs));
   }));
   // Extensions currently ignored
 
@@ -270,11 +273,10 @@ CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
     throw EnvoyException("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
   }
 
-  // We use just the serial number to uniquely identify a certificate.
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE));
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
   unwrap(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
-  auto serial_number = Asn1Utility::parseInteger(elem);
+  auto serial_number = unwrap(Asn1Utility::parseInteger(elem));
 
   return {serial_number};
 }
@@ -285,13 +287,13 @@ CertStatus Asn1OcspUtility::parseCertStatus(CBS& cbs) {
   //    revoked             [1] IMPLICIT RevokedInfo,
   //    unknown             [2] IMPLICIT UnknownInfo
   // }
-  if (Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 0)) {
+  if (unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 0))) {
     return CertStatus::GOOD;
   }
-  if (Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) {
+  if (unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1))) {
     return CertStatus::REVOKED;
   }
-  if (Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 2)) {
+  if (unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
     return CertStatus::UNKNOWN;
   }
 

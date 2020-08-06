@@ -100,7 +100,7 @@ public:
    * @returns bool whether `cbs` points to an element tagged with `tag`
    * @throws Envoy::EnvoyException if `cbs` is a malformed TLV bytestring
    */
-  static bool getOptional(CBS& cbs, CBS* data, unsigned tag);
+  static ParsingResult<bool> getOptional(CBS& cbs, CBS* data, unsigned tag);
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 OBJECT IDENTIFIER element
@@ -108,7 +108,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
    * OBJECT IDENTIFIER
    */
-  static std::string parseOid(CBS& cbs);
+  static ParsingResult<std::string> parseOid(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 GENERALIZEDTIME element
@@ -129,7 +129,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
    * INTEGER
    */
-  static std::string parseInteger(CBS& cbs);
+  static ParsingResult<std::string> parseInteger(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 OCTETSTRING element
@@ -189,7 +189,13 @@ ParsingResult<std::vector<T>> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1Parsing
 template <typename T>
 ParsingResult<absl::optional<T>> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag) {
   CBS data;
-  if (getOptional(cbs, &data, tag)) {
+  auto is_present = getOptional(cbs, &data, tag);
+
+  if (absl::holds_alternative<absl::string_view>(is_present)) {
+    return absl::get<absl::string_view>(is_present);
+  }
+
+  if (absl::get<bool>(is_present)) {
     auto res = parse_data(data);
     if (absl::holds_alternative<T>(res)) {
       return absl::get<0>(res);

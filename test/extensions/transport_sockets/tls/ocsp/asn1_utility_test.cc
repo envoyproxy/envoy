@@ -37,24 +37,25 @@ public:
     return buf;
   }
 
-  /* void expectThrowOnWrongTag(std::function<void(CBS&)> parse) { */
-  /*   CBS cbs; */
-  /*   CBS_init(&cbs, asn1_true.data(), asn1_true.size()); */
-  /*   EXPECT_THROW(parse(cbs), EnvoyException); */
-  /* } */
+  template <typename T>
+  void expectParseResultErrorOnWrongTag(std::function<ParsingResult<T>(CBS&)> parse) {
+    CBS cbs;
+    CBS_init(&cbs, asn1_true.data(), asn1_true.size());
+    EXPECT_NO_THROW(absl::get<1>(parse(cbs)));
+  }
 
   const std::vector<uint8_t> asn1_true = {0x1u, 1, 0xff};
   const std::vector<uint8_t> asn1_empty_seq = {0x30, 0};
 };
 
-/* TEST_F(Asn1UtilityTest, ParseMethodsWrongTagTest) { */
-/*   expectThrowOnWrongTag( */
-/*       [](CBS& cbs) { Asn1Utility::parseSequenceOf<absl::string_view>(cbs, [](CBS&) { return ""; }); }); */
-/*   expectThrowOnWrongTag(Asn1Utility::parseOid); */
-/*   expectThrowOnWrongTag(Asn1Utility::parseGeneralizedTime); */
-/*   expectThrowOnWrongTag(Asn1Utility::parseInteger); */
-/*   expectThrowOnWrongTag(Asn1Utility::parseOctetString); */
-/* } */
+TEST_F(Asn1UtilityTest, ParseMethodsWrongTagTest) {
+  expectParseResultErrorOnWrongTag<std::vector<std::vector<uint8_t>>>(
+      [](CBS& cbs) { return Asn1Utility::parseSequenceOf<std::vector<uint8_t>>(cbs, Asn1Utility::parseOctetString); });
+  expectParseResultErrorOnWrongTag<std::string>(Asn1Utility::parseOid);
+  expectParseResultErrorOnWrongTag<Envoy::SystemTime>(Asn1Utility::parseGeneralizedTime);
+  expectParseResultErrorOnWrongTag<std::string>(Asn1Utility::parseInteger);
+  expectParseResultErrorOnWrongTag<std::vector<uint8_t>>(Asn1Utility::parseOctetString);
+}
 
 TEST_F(Asn1UtilityTest, ToStringTest) {
   CBS cbs;
@@ -147,10 +148,10 @@ TEST_F(Asn1UtilityTest, IsOptionalPresentTest) {
   CBS_init(&cbs, asn1_true.data(), asn1_true.size());
 
   const uint8_t* start = CBS_data(&cbs);
-  EXPECT_FALSE(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_INTEGER));
+  EXPECT_FALSE(absl::get<0>(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_INTEGER)));
   EXPECT_EQ(start, CBS_data(&cbs));
 
-  EXPECT_TRUE(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN));
+  EXPECT_TRUE(absl::get<0>(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN)));
   EXPECT_EQ(0xff, *CBS_data(&value));
 }
 
@@ -159,8 +160,8 @@ TEST_F(Asn1UtilityTest, IsOptionalPresentMissingValueTest) {
   CBS cbs, value;
   CBS_init(&cbs, missing_val_bool.data(), missing_val_bool.size());
 
-  EXPECT_THROW_WITH_MESSAGE(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN),
-                            EnvoyException, "Failed to parse ASN.1 element tag");
+  EXPECT_EQ("Failed to parse ASN.1 element tag",
+      absl::get<1>(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN)));
 }
 
 TEST_F(Asn1UtilityTest, ParseOptionalTest) {
@@ -204,7 +205,7 @@ TEST_F(Asn1UtilityTest, ParseOidTest) {
   CBS_init(&cbs, buf, buf_len);
   bssl::UniquePtr<uint8_t> scoped(buf);
 
-  EXPECT_EQ(oid, Asn1Utility::parseOid(cbs));
+  EXPECT_EQ(oid, absl::get<0>(Asn1Utility::parseOid(cbs)));
 }
 
 TEST_F(Asn1UtilityTest, ParseGeneralizedTimeWrongFormatErrorTest) {
@@ -236,15 +237,14 @@ TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeRejectsNonUTCTime) {
   EXPECT_EQ("GENERALIZEDTIME must be in UTC", absl::get<absl::string_view>(Asn1Utility::parseGeneralizedTime(cbs)));
 }
 
-// TODO(daniel-goldstein): wat
-/* TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeInvalidTime) { */
-/*   std::string ymd = "20070601Z"; */
-/*   CBS cbs; */
-/*   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, ymd, CBS_ASN1_GENERALIZEDTIME)); */
+TEST_F(Asn1UtilityTest, TestParseGeneralizedTimeInvalidTime) {
+  std::string ymd = "20070601Z";
+  CBS cbs;
+  bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, ymd, CBS_ASN1_GENERALIZEDTIME));
 
-/*   EXPECT_EQ("Error parsing timestamp 20070601Z with format %E4Y%m%d%H%M%S. Error: Failed to parse input", */
-/*       absl::get<absl::string_view>(Asn1Utility::parseGeneralizedTime(cbs))); */
-/* } */
+  EXPECT_EQ("Error parsing string of GENERALIZEDTIME format",
+      absl::get<1>(Asn1Utility::parseGeneralizedTime(cbs)));
+}
 
 // Taken from
 // https://boringssl.googlesource.com/boringssl/+/master/crypto/bytestring/cbb.c#531
@@ -292,7 +292,7 @@ TEST_F(Asn1UtilityTest, ParseIntegerTest) {
     CBS_init(&cbs, buf, buf_len);
     bssl::UniquePtr<uint8_t> scoped_buf(buf);
 
-    EXPECT_EQ(int_and_hex.second, Asn1Utility::parseInteger(cbs));
+    EXPECT_EQ(int_and_hex.second, absl::get<0>(Asn1Utility::parseInteger(cbs)));
     cbb.Reset();
   }
 }
