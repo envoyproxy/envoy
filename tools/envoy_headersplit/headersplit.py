@@ -73,7 +73,6 @@ def get_directives(stranslation_unit: Type[TranslationUnit]) -> str:
         the include statements into generated headers. Return string seems more convenient
     """
 
-
   cursor = translation_unit.cursor
   for descendant in cursor.walk_preorder():
     if descendant.location.file is not None and descendant.location.file.name == cursor.displayname:
