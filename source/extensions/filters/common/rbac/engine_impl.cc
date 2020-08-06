@@ -58,8 +58,6 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-
-  return true;
 }
 
 bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
