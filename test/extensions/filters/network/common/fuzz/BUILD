@@ -42,6 +42,7 @@ envoy_cc_test_library(
     deps = [
         ":network_readfilter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
+        "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:utility_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
@@ -50,6 +51,7 @@ envoy_cc_test_library(
         "//test/mocks/network:network_mocks",
         "@envoy_api//envoy/extensions/filters/network/direct_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/local_ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -57,6 +59,7 @@ envoy_cc_fuzz_test(
     name = "network_readfilter_fuzz_test",
     srcs = ["network_readfilter_fuzz_test.cc"],
     corpus = "network_readfilter_corpus",
+    dictionaries = ["network_readfilter_fuzz_test.dict"],
     # All Envoy network filters must be linked to the test in order for the fuzzer to pick
     # these up via the NamedNetworkFilterConfigFactory.
     deps = [
