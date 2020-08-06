@@ -25,7 +25,7 @@ public:
    * @param headers    the headers of the incoming request used to identify the action/principal. An
    *                   empty map should be used if there are no headers available.
    * @param info       the per-request or per-connection stream info with additional information
-   *                   about the action/principal. Can be modified by an Action.
+   *                   about the action/principal. Can be modified by the LOG Action.
    * @param effective_policy_id  it will be filled by the matching policy's ID,
    *                   which is used to identity the source of the allow/deny.
    */
@@ -39,7 +39,7 @@ public:
    *
    * @param connection the downstream connection used to identify the action/principal.
    * @param info       the per-request or per-connection stream info with additional information
-   *                   about the action/principal. Can be modified by an Action.
+   *                   about the action/principal. Can be modified by the LOG Action.
    * @param effective_policy_id  it will be filled by the matching policy's ID,
    *                   which is used to identity the source of the allow/deny.
    */

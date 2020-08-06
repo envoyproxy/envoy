@@ -24,6 +24,8 @@ namespace HttpFilters {
 namespace RBACFilter {
 namespace {
 
+enum class LogResult { Yes, No, Undecided };
+
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
   RoleBasedAccessControlFilterConfigSharedPtr
@@ -52,14 +54,12 @@ public:
   }
 
   RoleBasedAccessControlFilterTest()
-      : config_(setupConfig(envoy::config::rbac::v3::RBAC::ALLOW)), filter_(config_),
-        log_config_(setupConfig(envoy::config::rbac::v3::RBAC::LOG)), log_filter_(log_config_) {}
+      : config_(setupConfig(envoy::config::rbac::v3::RBAC::ALLOW)), filter_(config_) {}
 
   void SetUp() override {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     filter_.setDecoderFilterCallbacks(callbacks_);
-    log_filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
   void setDestinationPort(uint16_t port) {
@@ -72,13 +72,19 @@ public:
     ON_CALL(connection_, requestedServerName()).WillByDefault(Return(requested_server_name_));
   }
 
-  void checkAccessLogMetadata(bool expected) {
-    auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
-        Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
-    EXPECT_EQ(expected,
-              filter_meta.fields()
-                  .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
-                  .bool_value());
+  void checkAccessLogMetadata(LogResult expected) {
+    if (expected != LogResult::Undecided) {
+      auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
+          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
+      EXPECT_EQ(expected == LogResult::Yes,
+                filter_meta.fields()
+                    .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
+                    .bool_value());
+    } else {
+      EXPECT_EQ(req_info_.dynamicMetadata().filter_metadata().end(),
+                req_info_.dynamicMetadata().filter_metadata().find(
+                    Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
+    }
   }
 
   void setMetadata() {
@@ -105,8 +111,6 @@ public:
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
   RoleBasedAccessControlFilter filter_;
-  RoleBasedAccessControlFilterConfigSharedPtr log_config_;
-  RoleBasedAccessControlFilter log_filter_;
 
   Network::Address::InstanceConstSharedPtr address_;
   std::string requested_server_name_;
@@ -116,6 +120,7 @@ public:
 
 TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   setDestinationPort(123);
+  setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
@@ -126,11 +131,14 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
+
+  checkAccessLogMetadata(LogResult::Undecided);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   setDestinationPort(999);
   setRequestedServerName("www.cncf.io");
+  setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
@@ -142,18 +150,12 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
 
-  // Check Log
-  setMetadata();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
-      Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
-  EXPECT_EQ(true, filter_meta.fields()
-                      .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
-                      .bool_value());
+  checkAccessLogMetadata(LogResult::Undecided);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Path) {
   setDestinationPort(999);
+  setMetadata();
 
   auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
@@ -162,23 +164,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Path) {
       {":authority", "host"},
   };
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
-
-  headers = Http::TestRequestHeaderMapImpl{
-      {":method", "GET"},
-      {":path", "prefix/suffix/next"},
-      {":scheme", "http"},
-      {":authority", "host"},
-  };
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
-
-  // Check Log
-  setMetadata();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers, false));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
-      Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
-  EXPECT_EQ(false, filter_meta.fields()
-                       .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
-                       .bool_value());
+  checkAccessLogMetadata(LogResult::Undecided);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Denied) {
@@ -201,10 +187,12 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
   EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policy_id").string_value());
   EXPECT_EQ("rbac_access_denied", callbacks_.details_);
+  checkAccessLogMetadata(LogResult::Undecided);
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   setDestinationPort(456);
+  setMetadata();
 
   envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
   route_config.mutable_rbac()->mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
@@ -218,49 +206,46 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));
+  checkAccessLogMetadata(LogResult::Undecided);
 }
 
 // Log Tests
 TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
-  setDestinationPort(123);
-  setMetadata();
+  config_ = setupConfig(envoy::config::rbac::v3::RBAC::LOG);
+  filter_ = RoleBasedAccessControlFilter(config_);
+  filter_.setDecoderFilterCallbacks(callbacks_);
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
-  EXPECT_EQ(1U, log_config_->stats().allowed_.value());
-  EXPECT_EQ(0U, log_config_->stats().shadow_denied_.value());
-
-  Buffer::OwnedImpl data("");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
-
-  checkAccessLogMetadata(true);
-}
-
-TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
-  setDestinationPort(456);
-  setMetadata();
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, log_filter_.decodeHeaders(headers_, false));
-  EXPECT_EQ(1U, log_config_->stats().allowed_.value());
-  EXPECT_EQ(0U, log_config_->stats().shadow_denied_.value());
-
-  Buffer::OwnedImpl data("");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, log_filter_.decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, log_filter_.decodeTrailers(trailers_));
-
-  checkAccessLogMetadata(false);
-}
-
-TEST_F(RoleBasedAccessControlFilterTest, AllowNoChangeLog) {
   setDestinationPort(123);
   setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
 
-  // Check that Allow action does not set access log metadata
-  EXPECT_EQ(req_info_.dynamicMetadata().filter_metadata().end(),
-            req_info_.dynamicMetadata().filter_metadata().find(
-                Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
+
+  checkAccessLogMetadata(LogResult::Yes);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
+  config_ = setupConfig(envoy::config::rbac::v3::RBAC::LOG);
+  filter_ = RoleBasedAccessControlFilter(config_);
+  filter_.setDecoderFilterCallbacks(callbacks_);
+
+  setDestinationPort(456);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers_));
+
+  checkAccessLogMetadata(LogResult::No);
 }
 
 } // namespace

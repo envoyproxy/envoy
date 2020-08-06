@@ -15,7 +15,7 @@ namespace RBAC {
 class MockEngine : public RoleBasedAccessControlEngineImpl {
 public:
   MockEngine(const envoy::config::rbac::v3::RBAC& rules,
-             const EnforcementMode mode = EnforcementMode::Shadow)
+             const EnforcementMode mode = EnforcementMode::Enforced)
       : RoleBasedAccessControlEngineImpl(rules, mode){};
 
   MOCK_METHOD(bool, handleAction,

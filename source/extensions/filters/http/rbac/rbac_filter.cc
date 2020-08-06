@@ -109,7 +109,6 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   const auto engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
-    // Check authorization decision and do Action operations
     if (engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
                              nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");

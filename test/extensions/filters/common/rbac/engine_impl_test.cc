@@ -27,34 +27,18 @@ namespace {
 enum class LogResult { Yes, No, Undecided };
 
 void checkEngine(
-    RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected, StreamInfo::StreamInfo& info,
+    RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected, LogResult expectedLog,
+    StreamInfo::StreamInfo& info,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
 
   bool engineRes = engine.handleAction(connection, headers, info, nullptr);
   EXPECT_EQ(expected, engineRes);
-}
 
-void checkEngine(
-    RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected,
-    const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
-    const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
-
-  NiceMock<StreamInfo::MockStreamInfo> empty_info;
-  checkEngine(engine, expected, empty_info, connection, headers);
-}
-
-void checkEngineLog(
-    RBAC::RoleBasedAccessControlEngineImpl& engine, LogResult expected,
-    NiceMock<StreamInfo::MockStreamInfo>& info,
-    const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
-    const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
-  engine.handleAction(connection, headers, info, nullptr);
-
-  if (expected != LogResult::Undecided) {
+  if (expectedLog != LogResult::Undecided) {
     auto filter_meta = info.dynamicMetadata().filter_metadata().at(
         RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
-    EXPECT_EQ(expected == LogResult::Yes,
+    EXPECT_EQ(expectedLog == LogResult::Yes,
               filter_meta.fields()
                   .at(RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
                   .bool_value());
@@ -63,6 +47,15 @@ void checkEngineLog(
               info.dynamicMetadata().filter_metadata().find(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
   }
+}
+
+void checkEngine(
+    RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected, LogResult expectedLog,
+    const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
+    const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
+
+  NiceMock<StreamInfo::MockStreamInfo> empty_info;
+  checkEngine(engine, expected, expectedLog, empty_info, connection, headers);
 }
 
 void onMetadata(NiceMock<StreamInfo::MockStreamInfo>& info) {
@@ -76,11 +69,11 @@ TEST(RoleBasedAccessControlEngineImpl, Disabled) {
   envoy::config::rbac::v3::RBAC rbac;
   rbac.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
   RBAC::RoleBasedAccessControlEngineImpl engine_allow(rbac);
-  checkEngine(engine_allow, false);
+  checkEngine(engine_allow, false, LogResult::Undecided);
 
   rbac.set_action(envoy::config::rbac::v3::RBAC::DENY);
   RBAC::RoleBasedAccessControlEngineImpl engine_deny(rbac);
-  checkEngine(engine_deny, true);
+  checkEngine(engine_deny, true, LogResult::Undecided);
 }
 
 // Test various invalid policies to validate the fix for
@@ -185,11 +178,11 @@ TEST(RoleBasedAccessControlEngineImpl, AllowedAllowlist) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
-  checkEngine(engine, true, info, conn, headers);
+  checkEngine(engine, true, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
-  checkEngine(engine, false, info, conn, headers);
+  checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, DeniedDenylist) {
@@ -208,11 +201,11 @@ TEST(RoleBasedAccessControlEngineImpl, DeniedDenylist) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
-  checkEngine(engine, false, info, conn, headers);
+  checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
-  checkEngine(engine, true, info, conn, headers);
+  checkEngine(engine, true, LogResult::Undecided, info, conn, headers);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, BasicCondition) {
@@ -229,7 +222,7 @@ TEST(RoleBasedAccessControlEngineImpl, BasicCondition) {
   rbac.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
-  checkEngine(engine, false);
+  checkEngine(engine, false, LogResult::Undecided);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, MalformedCondition) {
@@ -271,7 +264,7 @@ TEST(RoleBasedAccessControlEngineImpl, MistypedCondition) {
   rbac.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
-  checkEngine(engine, false);
+  checkEngine(engine, false, LogResult::Undecided);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, ErrorCondition) {
@@ -296,7 +289,7 @@ TEST(RoleBasedAccessControlEngineImpl, ErrorCondition) {
   rbac.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
-  checkEngine(engine, false, Envoy::Network::MockConnection());
+  checkEngine(engine, false, LogResult::Undecided, Envoy::Network::MockConnection());
 }
 
 TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
@@ -332,7 +325,7 @@ TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
   std::string value = "bar";
   headers.setReference(key, value);
 
-  checkEngine(engine, true, Envoy::Network::MockConnection(), headers);
+  checkEngine(engine, true, LogResult::Undecided, Envoy::Network::MockConnection(), headers);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
@@ -377,7 +370,7 @@ TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
-  checkEngine(engine, true, info, Envoy::Network::MockConnection(), headers);
+  checkEngine(engine, true, LogResult::Undecided, info, Envoy::Network::MockConnection(), headers);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
@@ -401,7 +394,7 @@ TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(1).WillRepeatedly(ReturnRef(addr));
-  checkEngine(engine, false, info, conn, headers);
+  checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 
 // Log tests
@@ -412,7 +405,7 @@ TEST(RoleBasedAccessControlEngineImpl, DisabledLog) {
   envoy::config::rbac::v3::RBAC rbac;
   rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
-  checkEngineLog(engine, RBAC::LogResult::No, info);
+  checkEngine(engine, true, RBAC::LogResult::No, info);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
@@ -433,78 +426,11 @@ TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
-  checkEngineLog(engine, RBAC::LogResult::Yes, info, conn, headers);
+  checkEngine(engine, true, RBAC::LogResult::Yes, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
-  checkEngineLog(engine, RBAC::LogResult::No, info, conn, headers);
-}
-
-TEST(RoleBasedAccessControlEngineImpl, LogAllowUndecided) {
-  envoy::config::rbac::v3::Policy policy;
-  policy.add_permissions()->set_destination_port(123);
-  policy.add_principals()->set_any(true);
-
-  envoy::config::rbac::v3::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
-  (*rbac.mutable_policies())["foo"] = policy;
-  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
-
-  Envoy::Network::MockConnection conn;
-  Envoy::Http::TestRequestHeaderMapImpl headers;
-  NiceMock<StreamInfo::MockStreamInfo> info;
-  onMetadata(info);
-
-  Envoy::Network::Address::InstanceConstSharedPtr addr =
-      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  checkEngineLog(engine, RBAC::LogResult::Undecided, info, conn, headers);
-
-  addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  checkEngineLog(engine, RBAC::LogResult::Undecided, info, conn, headers);
-}
-
-TEST(RoleBasedAccessControlEngineImpl, LogDenyUndecided) {
-  envoy::config::rbac::v3::Policy policy;
-  policy.add_permissions()->set_destination_port(123);
-  policy.add_principals()->set_any(true);
-
-  envoy::config::rbac::v3::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v3::RBAC::DENY);
-  (*rbac.mutable_policies())["foo"] = policy;
-  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
-
-  Envoy::Network::MockConnection conn;
-  Envoy::Http::TestRequestHeaderMapImpl headers;
-  NiceMock<StreamInfo::MockStreamInfo> info;
-  onMetadata(info);
-
-  Envoy::Network::Address::InstanceConstSharedPtr addr =
-      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  checkEngineLog(engine, RBAC::LogResult::Undecided, info, conn, headers);
-
-  addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  checkEngineLog(engine, RBAC::LogResult::Undecided, info, conn, headers);
-}
-
-TEST(RoleBasedAccessControlEngineImpl, LogAllowAll) {
-  envoy::config::rbac::v3::Policy policy;
-  policy.add_permissions()->set_destination_port(123);
-  policy.add_principals()->set_any(true);
-
-  envoy::config::rbac::v3::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v3::RBAC::LOG);
-  (*rbac.mutable_policies())["foo"] = policy;
-  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
-
-  Envoy::Network::MockConnection conn;
-  Envoy::Http::TestRequestHeaderMapImpl headers;
-  NiceMock<StreamInfo::MockStreamInfo> info;
-  Envoy::Network::Address::InstanceConstSharedPtr addr =
-      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  checkEngine(engine, true, info, conn, headers);
-
-  addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  checkEngine(engine, true, info, conn, headers);
+  checkEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
 }
 
 } // namespace

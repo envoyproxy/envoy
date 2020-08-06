@@ -56,7 +56,7 @@ bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& c
     return true;
   }
   default:
-    return true;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return true;

@@ -65,14 +65,17 @@ typed_config:
 )EOF";
 
 const std::string RBAC_CONFIG_WITH_LOG_ACTION = R"EOF(
-rules:
-  action: LOG
-  policies:
-    foo:
-      permissions:
-        - header: { name: ":method", exact_match: "GET" }
-      principals:
-        - any: true
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: LOG
+    policies:
+      foo:
+        permissions:
+          - header: { name: ":method", exact_match: "GET" }
+        principals:
+          - any: true
 )EOF";
 
 using RBACIntegrationTest = HttpProtocolIntegrationTest;
@@ -288,20 +291,8 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
   }
 }
 
-std::string getRBACFilterConfig(const std::string& config_str) {
-  envoy::extensions::filters::http::rbac::v3::RBAC rbac_config;
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter http_filter;
-
-  TestUtility::loadFromYaml(config_str, rbac_config);
-
-  http_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().Rbac);
-  http_filter.mutable_typed_config()->PackFrom(rbac_config);
-
-  return MessageUtil::getJsonStringFromMessage(http_filter);
-}
-
 TEST_P(RBACIntegrationTest, LogConnectionAllow) {
-  config_helper_.addFilter(getRBACFilterConfig(RBAC_CONFIG_WITH_LOG_ACTION));
+  config_helper_.addFilter(RBAC_CONFIG_WITH_LOG_ACTION);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
