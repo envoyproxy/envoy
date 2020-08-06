@@ -140,7 +140,7 @@ RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::waitForConnection() {
   while (!callbacks_->connected() && !callbacks_->closed()) {
-    Event::GlobalTimeSystem().timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    Event::GlobalTimeSystem().timeSystem().advanceTimeWait(std::chrono::milliseconds(10), true);
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 }

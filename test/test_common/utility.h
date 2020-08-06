@@ -792,9 +792,8 @@ public:
   void wait();
 
 private:
-  Thread::CondVar cv_;
-  Thread::MutexBasicLockable mutex_;
-  bool ready_{false};
+  absl::Mutex mutex_;
+  bool ready_ ABSL_GUARDED_BY(mutex_){false};
 };
 
 namespace Http {

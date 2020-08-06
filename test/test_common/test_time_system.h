@@ -25,10 +25,11 @@ public:
    * use this variant.
    *
    * @param duration The amount of time to sleep.
+   * @param fixfix
    */
-  virtual void advanceTimeWait(const Duration& duration) PURE;
-  template <class D> void advanceTimeWait(const D& duration) {
-    advanceTimeWait(std::chrono::duration_cast<Duration>(duration));
+  virtual void advanceTimeWaitImpl(const Duration& duration, bool always_sleep) PURE;
+  template <class D> void advanceTimeWait(const D& duration, bool always_sleep = false) {
+    advanceTimeWaitImpl(std::chrono::duration_cast<Duration>(duration), always_sleep);
   }
 
   /**
@@ -41,10 +42,11 @@ public:
    * loop. Unit tests will often use this variant.
    *
    * @param duration The amount of time to sleep.
+   * @param fixfix
    */
-  virtual void advanceTimeAsync(const Duration& duration) PURE;
-  template <class D> void advanceTimeAsync(const D& duration) {
-    advanceTimeAsync(std::chrono::duration_cast<Duration>(duration));
+  virtual void advanceTimeAsyncImpl(const Duration& duration, bool always_sleep) PURE;
+  template <class D> void advanceTimeAsync(const D& duration, bool always_sleep = false) {
+    advanceTimeAsyncImpl(std::chrono::duration_cast<Duration>(duration), always_sleep);
   }
 
   /**
@@ -54,18 +56,18 @@ public:
    * @param mutex A mutex which must be held before calling this function.
    * @param condvar The condition to wait on.
    * @param duration The maximum amount of time to wait.
+   * @param fixfix
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
-  virtual Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex,
-                                              Thread::CondVar& condvar,
-                                              const Duration& duration) noexcept
+  virtual bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
+                           const Duration& duration, bool always_sleep) noexcept
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
 
   template <class D>
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const D& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    return waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
+  bool waitFor(absl::Mutex& mutex, const absl::Condition& condition, const D& duration,
+               bool always_sleep = false) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    return waitForImpl(mutex, condition, std::chrono::duration_cast<Duration>(duration),
+                       always_sleep);
   }
 };
 
@@ -102,17 +104,16 @@ private:
 // subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
-  void advanceTimeAsync(const Duration& duration) override {
-    timeSystem().advanceTimeAsync(duration);
+  void advanceTimeAsyncImpl(const Duration& duration, bool always_sleep) override {
+    timeSystem().advanceTimeAsyncImpl(duration, always_sleep);
   }
-  void advanceTimeWait(const Duration& duration) override {
-    timeSystem().advanceTimeWait(duration);
+  void advanceTimeWaitImpl(const Duration& duration, bool always_sleep) override {
+    timeSystem().advanceTimeWaitImpl(duration, always_sleep);
   }
 
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return timeSystem().waitFor(mutex, condvar, duration);
+  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition, const Duration& duration,
+                   bool always_sleep) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return timeSystem().waitForImpl(mutex, condition, duration, always_sleep);
   }
 
   SchedulerPtr createScheduler(Scheduler& base_scheduler,

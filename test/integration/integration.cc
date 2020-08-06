@@ -279,7 +279,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(10), true);
   ON_CALL(*mock_buffer_factory_, create_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
@@ -504,7 +504,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }
-      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10), true);
     }
 
     registerTestServerPorts(port_names);
@@ -706,7 +706,7 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
                                nullptr, true);
       return AssertionSuccess();
     } catch (const EnvoyException&) {
-      timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(100), true);
     }
   }
 

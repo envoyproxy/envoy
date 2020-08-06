@@ -289,19 +289,25 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
   EXPECT_EQ(start_system_time_, time_system_.systemTime());
 
   // Run an event loop in the background to activate timers.
-  std::atomic<bool> done(false);
-  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
-    while (!done) {
+  absl::Mutex mutex;
+  bool done(false);
+  auto thread = Thread::threadFactoryForTest().createThread([this, &mutex, &done]() {
+    for (;;) {
+      {
+        absl::MutexLock lock(&mutex);
+        if (done) {
+          return;
+        }
+      }
+
       base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
-  Thread::MutexBasicLockable mutex;
-  Thread::CondVar condvar;
+
   TimerPtr timer = scheduler_->createTimer(
-      [&condvar, &mutex, &done]() {
-        Thread::LockGuard lock(mutex);
+      [&mutex, &done]() {
+        absl::MutexLock lock(&mutex);
         done = true;
-        condvar.notifyOne();
       },
       dispatcher_);
   timer->enableTimer(std::chrono::seconds(60));
@@ -310,9 +316,8 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
   // activate the alarm. We'll get a fast automatic timeout in waitFor because
   // there are no pending timers.
   {
-    Thread::LockGuard lock(mutex);
-    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
-              time_system_.waitFor(mutex, condvar, std::chrono::seconds(50)));
+    absl::MutexLock lock(&mutex);
+    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(50)));
   }
   EXPECT_FALSE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(50)), time_system_.monotonicTime());
@@ -320,13 +325,8 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
   // Waiting another 20 simulated seconds will activate the alarm after 10,
   // and the event-loop thread will call the corresponding callback quickly.
   {
-    Thread::LockGuard lock(mutex);
-    // We don't check for the return value of waitFor() as it can spuriously
-    // return timeout even if the condition is satisfied before entering into
-    // the waitFor().
-    //
-    // TODO(jmarantz): just drop the return value in the API.
-    time_system_.waitFor(mutex, condvar, std::chrono::seconds(10));
+    absl::MutexLock lock(&mutex);
+    EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(10)));
   }
   EXPECT_TRUE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), time_system_.monotonicTime());
@@ -335,9 +335,8 @@ TEST_P(SimulatedTimeSystemTest, WaitFor) {
   // the max duration and return a timeout.
   done = false;
   {
-    Thread::LockGuard lock(mutex);
-    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
-              time_system_.waitFor(mutex, condvar, std::chrono::seconds(20)));
+    absl::MutexLock lock(&mutex);
+    EXPECT_FALSE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(20)));
   }
   EXPECT_FALSE(done);
   EXPECT_EQ(MonotonicTime(std::chrono::seconds(80)), time_system_.monotonicTime());
@@ -442,26 +441,32 @@ TEST_P(SimulatedTimeSystemTest, DuplicateTimer) {
   EXPECT_EQ("2", output_);
 
   // Now set an alarm which requires 10ms of progress and make sure waitFor works.
-  std::atomic<bool> done(false);
-  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
-    while (!done) {
+  absl::Mutex mutex;
+  bool done(false);
+  auto thread = Thread::threadFactoryForTest().createThread([this, &mutex, &done]() {
+    for (;;) {
+      {
+        absl::MutexLock lock(&mutex);
+        if (done) {
+          return;
+        }
+      }
+
       base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
-  Thread::MutexBasicLockable mutex;
-  Thread::CondVar condvar;
+
   TimerPtr timer = scheduler_->createTimer(
-      [&condvar, &mutex, &done]() {
-        Thread::LockGuard lock(mutex);
+      [&mutex, &done]() {
+        absl::MutexLock lock(&mutex);
         done = true;
-        condvar.notifyOne();
       },
       dispatcher_);
   timer->enableTimer(std::chrono::seconds(10));
 
   {
-    Thread::LockGuard lock(mutex);
-    time_system_.waitFor(mutex, condvar, std::chrono::seconds(10));
+    absl::MutexLock lock(&mutex);
+    EXPECT_TRUE(time_system_.waitFor(mutex, absl::Condition(&done), std::chrono::seconds(10)));
   }
   EXPECT_TRUE(done);
 

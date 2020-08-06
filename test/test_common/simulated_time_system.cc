@@ -216,21 +216,27 @@ MonotonicTime SimulatedTimeSystemHelper::monotonicTime() {
   return monotonic_time_;
 }
 
-void SimulatedTimeSystemHelper::advanceTimeAsync(const Duration& duration) {
+void SimulatedTimeSystemHelper::advanceTimeAsyncImpl(const Duration& duration, bool always_sleep) {
   only_one_thread_.checkOneThread();
   absl::MutexLock lock(&mutex_);
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   setMonotonicTimeLockHeld(monotonic_time);
+  if (always_sleep) {
+    std::this_thread::sleep_for(duration);
+  }
 }
 
-void SimulatedTimeSystemHelper::advanceTimeWait(const Duration& duration) {
+void SimulatedTimeSystemHelper::advanceTimeWaitImpl(const Duration& duration, bool always_sleep) {
   only_one_thread_.checkOneThread();
   absl::MutexLock lock(&mutex_);
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   setMonotonicTimeLockHeld(monotonic_time);
   waitForNoPendingLockHeld();
+  if (always_sleep) {
+    std::this_thread::sleep_for(duration);
+  }
 }
 
 void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
@@ -240,24 +246,18 @@ void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
       &pending_alarms_));
 }
 
-Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasicLockable& mutex,
-                                                               Thread::CondVar& condvar,
-                                                               const Duration& duration) noexcept
+bool SimulatedTimeSystemHelper::waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
+                                            const Duration& duration, bool always_sleep) noexcept
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
 
-  // TODO(#10568): This real-time polling delay should not be necessary. Without
-  // it, test/extensions/filters/http/cache:cache_filter_integration_test fails
-  // about 40% of the time.
-  const Duration real_time_poll_delay(
-      std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
   const MonotonicTime end_time = monotonicTime() + duration;
 
   bool timeout_not_reached = true;
   while (timeout_not_reached) {
     // First check to see if the condition is already satisfied without advancing sim time.
-    if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
-      return Thread::CondVar::WaitStatus::NoTimeout;
+    if (condition.Eval()) {
+      return true;
     }
 
     // This function runs with the caller-provided mutex held. We need to
@@ -265,7 +265,7 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasi
     // callbacks completing. To avoid potential deadlock we must drop
     // the caller's mutex before taking ours. We also must care to avoid
     // break/continue/return/throw during this non-RAII lock operation.
-    mutex.unlock();
+    mutex.Unlock();
     {
       absl::MutexLock lock(&mutex_);
       if (monotonic_time_ < end_time) {
@@ -275,8 +275,12 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasi
           const AlarmRegistration& alarm_registration = *alarms_.begin();
           next_wakeup = std::min(alarm_registration.time_, next_wakeup);
         }
+        const auto sleep_duration = next_wakeup - monotonic_time_;
         setMonotonicTimeLockHeld(next_wakeup);
         waitForNoPendingLockHeld();
+        if (always_sleep) {
+          std::this_thread::sleep_for(sleep_duration);
+        }
       } else {
         // If we reached our end_time, break the loop and return timeout. We
         // don't break immediately as we have to drop mutex_ and re-take mutex,
@@ -284,9 +288,9 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasi
         timeout_not_reached = false;
       }
     }
-    mutex.lock();
+    mutex.Lock();
   }
-  return Thread::CondVar::WaitStatus::Timeout;
+  return false;
 }
 
 void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm& alarm) ABSL_NO_THREAD_SAFETY_ANALYSIS {

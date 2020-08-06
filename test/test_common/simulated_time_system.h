@@ -29,11 +29,10 @@ public:
   SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
   // TestTimeSystem
-  void advanceTimeWait(const Duration& duration) override;
-  void advanceTimeAsync(const Duration& duration) override;
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+  void advanceTimeWaitImpl(const Duration& duration, bool always_sleep) override;
+  void advanceTimeAsyncImpl(const Duration& duration, bool always_sleep) override;
+  bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition, const Duration& duration,
+                   bool always_sleep) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // TimeSource
   SystemTime systemTime() override;

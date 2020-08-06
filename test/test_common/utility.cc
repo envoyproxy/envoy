@@ -367,29 +367,27 @@ bool TestUtility::gaugesZeroed(
 }
 
 void ConditionalInitializer::setReady() {
-  Thread::LockGuard lock(mutex_);
+  absl::MutexLock lock(&mutex_);
   EXPECT_FALSE(ready_);
   ready_ = true;
-  cv_.notifyAll();
 }
 
 void ConditionalInitializer::waitReady() {
-  Thread::LockGuard lock(mutex_);
+  absl::MutexLock lock(&mutex_);
   if (ready_) {
     ready_ = false;
     return;
   }
 
-  cv_.wait(mutex_);
+  mutex_.Await(absl::Condition(&ready_));
   EXPECT_TRUE(ready_);
   ready_ = false;
 }
 
 void ConditionalInitializer::wait() {
-  Thread::LockGuard lock(mutex_);
-  while (!ready_) {
-    cv_.wait(mutex_);
-  }
+  absl::MutexLock lock(&mutex_);
+  mutex_.Await(absl::Condition(&ready_));
+  EXPECT_TRUE(ready_);
 }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
