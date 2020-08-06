@@ -25,8 +25,6 @@ public:
   EnvoyQuicServerStream(quic::PendingStream* pending, quic::QuicSpdySession* session,
                         quic::StreamType type);
 
-  ~EnvoyQuicServerStream() override { std::cerr << "================= ~EnvoyQuicServerStream\n"; }
-
   void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
 
   // Http::StreamEncoder

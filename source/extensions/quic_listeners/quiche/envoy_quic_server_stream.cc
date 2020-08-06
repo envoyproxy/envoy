@@ -239,7 +239,6 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
 }
 
 void EnvoyQuicServerStream::OnClose() {
-  std::cerr << "============== OnClose\n";
   quic::QuicSpdyServerStreamBase::OnClose();
   if (BufferedDataBytes() > 0) {
     // If the stream is closed without sending out all buffered data, regard
