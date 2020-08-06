@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 
 #include "absl/types/optional.h"
+#include "absl/types/variant.h"
 #include "openssl/bn.h"
 #include "openssl/bytestring.h"
 #include "openssl/ssl.h"
@@ -22,11 +23,13 @@ namespace Ocsp {
 
 constexpr absl::string_view GENERALIZED_TIME_FORMAT = "%E4Y%m%d%H%M%S";
 
+template <typename T> using ParsingResult = absl::variant<T, absl::string_view>;
+
 /**
  * Construct a `T` from the data contained in the CBS&. Functions
  * of this type must advance the input CBS& over the element.
  */
-template <typename T> using Asn1ParsingFunc = std::function<T(CBS&)>;
+template <typename T> using Asn1ParsingFunc = std::function<ParsingResult<T>(CBS&)>;
 
 /**
  * Utility functions for parsing DER-encoded ASN.1 objects.
@@ -113,7 +116,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
    * GENERALIZEDTIME
    */
-  static Envoy::SystemTime parseGeneralizedTime(CBS& cbs);
+  static ParsingResult<Envoy::SystemTime> parseGeneralizedTime(CBS& cbs);
 
   /**
    * Parses an ASN.1 INTEGER type into its hex string representation.

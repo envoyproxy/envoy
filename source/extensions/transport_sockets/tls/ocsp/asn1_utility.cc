@@ -52,10 +52,10 @@ std::string Asn1Utility::parseOid(CBS& cbs) {
   return oid_text_str;
 }
 
-Envoy::SystemTime Asn1Utility::parseGeneralizedTime(CBS& cbs) {
+ParsingResult<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   CBS elem;
   if (!CBS_get_asn1(&cbs, &elem, CBS_ASN1_GENERALIZEDTIME)) {
-    throw Envoy::EnvoyException("Input is not a well-formed ASN.1 GENERALIZEDTIME");
+    return "Input is not a well-formed ASN.1 GENERALIZEDTIME";
   }
 
   auto time_str = cbsToString(elem);
@@ -64,16 +64,17 @@ Envoy::SystemTime Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   // Local time or time differential, though a part of the ASN.1
   // GENERALIZEDTIME spec, are not supported.
   // Reference: https://tools.ietf.org/html/rfc5280#section-4.1.2.5.2
-  if (absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
-    throw Envoy::EnvoyException("GENERALIZEDTIME must be in UTC");
+  if (time_str.length() > 0 &&
+      absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
+    return "GENERALIZEDTIME must be in UTC";
   }
 
   absl::Time time;
   auto utc_time_str = time_str.substr(0, time_str.length() - 1);
   std::string parse_error;
   if (!absl::ParseTime(GENERALIZED_TIME_FORMAT, utc_time_str, &time, &parse_error)) {
-    throw Envoy::EnvoyException(absl::StrCat("Error parsing timestamp ", time_str, " with format ",
-                                             GENERALIZED_TIME_FORMAT, ". Error: ", parse_error));
+    return absl::StrCat("Error parsing timestamp ", time_str, " with format ",
+                        GENERALIZED_TIME_FORMAT, ". Error: ", parse_error);
   }
   return absl::ToChronoTime(time);
 }

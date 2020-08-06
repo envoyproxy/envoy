@@ -15,6 +15,15 @@ namespace CertUtility = Envoy::Extensions::TransportSockets::Tls::Utility;
 
 namespace {
 
+template<typename T>
+T unwrap(ParsingResult<T> res) {
+  if (absl::holds_alternative<T>(res)) {
+    return absl::get<T>(res);
+  }
+
+  throw EnvoyException(absl::get<absl::string_view>(res));
+}
+
 unsigned parseTag(CBS& cbs) {
   unsigned tag;
   if (!CBS_get_any_asn1_element(&cbs, nullptr, &tag, nullptr)) {
@@ -240,9 +249,9 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
 
   auto cert_id = Asn1OcspUtility::parseCertId(elem);
   auto status = Asn1OcspUtility::parseCertStatus(elem);
-  auto this_update = Asn1Utility::parseGeneralizedTime(elem);
-  auto next_update = Asn1Utility::parseOptional<Envoy::SystemTime>(
-      elem, Asn1Utility::parseGeneralizedTime, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0);
+  auto this_update = unwrap(Asn1Utility::parseGeneralizedTime(elem));
+  auto next_update = unwrap(Asn1Utility::parseOptional<ParsingResult<Envoy::SystemTime>>(
+      elem, Asn1Utility::parseGeneralizedTime, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
   // Extensions currently ignored
 
   return {cert_id, status, this_update, next_update};
