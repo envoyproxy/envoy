@@ -7,6 +7,7 @@
 #include "envoy/service/secret/v3/sds.pb.h"
 
 #include "common/config/datasource.h"
+#include "common/config/filesystem_subscription_impl.h"
 #include "common/secret/sds_api.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
@@ -23,8 +24,10 @@
 #include "gtest/gtest.h"
 
 using ::testing::_;
+using ::testing::ByMove;
 using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
+using ::testing::Return;
 
 namespace Envoy {
 namespace Secret {
@@ -64,6 +67,56 @@ TEST_F(SdsApiTest, BasicTest) {
       config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
       server.stats(), init_manager_, []() {}, *dispatcher_, *api_);
   initialize();
+}
+
+// Validate that a noop init manager is used if the InitManger passed into the constructor
+// has been already initialized. This is a regression test for
+// https://github.com/envoyproxy/envoy/issues/12013
+TEST_F(SdsApiTest, InitManagerInitialised) {
+  NiceMock<Server::MockInstance> server;
+  //     - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+  std::string sds_config =
+      R"EOF(
+  resources:
+    - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+      name: "abc.com"
+      tls_certificate:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+     )EOF";
+
+  const std::string sds_config_path = TestEnvironment::writeStringToFileForTest(
+      "sds.yaml", TestEnvironment::substitute(sds_config), false);
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::extensions::transport_sockets::tls::v3::Secret>
+      resource_decoder("name");
+  Config::SubscriptionStats stats(Config::Utility::generateStats(server.stats()));
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  envoy::config::core::v3::ConfigSource config_source;
+
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _))
+      .WillOnce(Invoke([this, &sds_config_path, &resource_decoder,
+                        &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                Stats::Scope&, Config::SubscriptionCallbacks& cbs,
+                                Config::OpaqueResourceDecoder&) -> Config::SubscriptionPtr {
+        return std::make_unique<Config::FilesystemSubscriptionImpl>(*dispatcher_, sds_config_path,
+                                                                    cbs, resource_decoder, stats,
+                                                                    validation_visitor_, *api_);
+      }));
+
+  auto init_manager = Init::ManagerImpl("testing");
+  auto noop_init_target =
+      Init::TargetImpl(fmt::format("noop test init target"), [] { /*Do nothing.*/ });
+  init_manager.add(noop_init_target);
+  auto noop_watcher = Init::WatcherImpl(fmt::format("noop watcher"), []() { /*Do nothing.*/ });
+  init_manager.initialize(noop_watcher);
+
+  EXPECT_EQ(Init::Manager::State::Initializing, init_manager.state());
+  EXPECT_NO_THROW(TlsCertificateSdsApi(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_,
+      server.stats(), init_manager, []() {}, *dispatcher_, *api_));
 }
 
 // Validate that bad ConfigSources are caught at construction time. This is a regression test for
@@ -136,7 +189,9 @@ public:
                  Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(
             config_source, "abc.com", subscription_factory, time_source, validation_visitor_,
-            server.stats(), init_manager, []() {}, dispatcher, api) {}
+            server.stats(), init_manager, []() {}, dispatcher, api) {
+    init_manager.add(init_target_);
+  }
 
   MOCK_METHOD(void, onConfigUpdate,
               (const std::vector<Config::DecodedResourceRef>&, const std::string&));
