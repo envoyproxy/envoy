@@ -361,8 +361,8 @@ x-envoy-upstream-service-time
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Contains the time in milliseconds spent by the upstream host processing the request and the network 
-latency between envoy and upstream host. This is useful if the client wants to determine service time 
-compared to network latency between client and envoy. This header is set on responses.
+latency between Envoy and upstream host. This is useful if the client wants to determine service time 
+compared to network latency between client and Envoy. This header is set on responses.
 
 .. _config_http_filters_router_x-envoy-overloaded_set:
 
