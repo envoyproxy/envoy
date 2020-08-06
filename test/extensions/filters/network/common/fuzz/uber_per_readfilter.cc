@@ -85,7 +85,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
     read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
     read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
-    read_filter_callbacks_->connection_.local_address_ = pipe_addr_; // modified here
+    read_filter_callbacks_->connection_.local_address_ = pipe_addr_;
     read_filter_callbacks_->connection_.remote_address_ = pipe_addr_;
   } else if (filter_name == NetworkFilterNames::get().RateLimit) {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
