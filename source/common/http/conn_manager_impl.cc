@@ -520,6 +520,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                                                   uint32_t buffer_limit)
     : connection_manager_(connection_manager),
       filter_manager_(*this, *this, buffer_limit, connection_manager_.config_.filterFactory(),
+                      connection_manager_.config_.localReply(),
                       connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
                       connection_manager_.read_callbacks_->connection().streamInfo().filterState(),
                       StreamInfo::FilterState::LifeSpan::Connection),
@@ -1595,37 +1596,8 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     // state machine screwed up, bypass the filter chain and send the local
     // reply directly to the codec.
     //
-    // Make sure we won't end up with nested watermark calls from the body buffer.
-
-    // TODO(snowp): Add a "send direct local reply" function to the FM that encapsulates all the
-    // calls into the FM but doesn't send the response through the filters.
-    filter_manager_.setEncoderFiltersStreaming(true);
-    Http::Utility::sendLocalReply(
-        filter_manager_.destroyed(),
-        Utility::EncodeFunctions{
-            [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
-                absl::string_view& content_type) -> void {
-              connection_manager_.config_.localReply().rewrite(
-                  filter_manager_.requestHeaders(), response_headers, filter_manager_.streamInfo(),
-                  code, body, content_type);
-            },
-            [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
-              if (modify_headers != nullptr) {
-                modify_headers(*response_headers);
-              }
-              // TODO(snowp): This is kinda awkward but we need to do this so that the access log
-              // sees these headers. Is there a better way?
-              filter_manager_.setResponseHeaders(std::move(response_headers));
-              encodeHeaders(*filter_manager_.responseHeaders(), end_stream);
-              filter_manager_.maybeEndEncode(end_stream);
-            },
-            [&](Buffer::Instance& data, bool end_stream) -> void {
-              encodeData(data, end_stream);
-              filter_manager_.maybeEndEncode(end_stream);
-            }},
-        Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*filter_manager_.requestHeaders()),
-                                code, body, grpc_status, state_.is_head_request_});
-    filter_manager_.maybeEndEncode(filter_manager_.localComplete());
+    filter_manager_.sendDirectLocalReply(code, body, modify_headers, state_.is_head_request_,
+                                         grpc_status);
   } else {
     filter_manager_.streamInfo().setResponseCodeDetails(details);
     // If we land in this branch, response headers have already been sent to the client.
@@ -1671,6 +1643,40 @@ void ConnectionManagerImpl::FilterManager::sendLocalReplyViaFilterChain(
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},
       Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
+}
+
+void ConnectionManagerImpl::FilterManager::sendDirectLocalReply(
+    Code code, absl::string_view body,
+    const std::function<void(ResponseHeaderMap&)>& modify_headers, bool is_head_request,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+  // Make sure we won't end up with nested watermark calls from the body buffer.
+  state_.encoder_filters_streaming_ = true;
+  Http::Utility::sendLocalReply(
+      state_.destroyed_,
+      Utility::EncodeFunctions{
+          [&](ResponseHeaderMap& response_headers, Code& code, std::string& body,
+              absl::string_view& content_type) -> void {
+            local_reply_.rewrite(request_headers_.get(), response_headers, stream_info_, code, body,
+                                 content_type);
+          },
+          [&](ResponseHeaderMapPtr&& response_headers, bool end_stream) -> void {
+            if (modify_headers != nullptr) {
+              modify_headers(*response_headers);
+            }
+
+            // Move the response headers into the FilterManager to make sure they're visibile to
+            // access logs.
+            response_headers_ = std::move(response_headers);
+            filter_manager_callbacks_.encodeHeaders(*response_headers_, end_stream);
+            maybeEndEncode(end_stream);
+          },
+          [&](Buffer::Instance& data, bool end_stream) -> void {
+            filter_manager_callbacks_.encodeData(data, end_stream);
+            maybeEndEncode(end_stream);
+          }},
+      Utility::LocalReplyData{Grpc::Common::hasGrpcContentType(*request_headers_), code, body,
+                              grpc_status, is_head_request});
+  maybeEndEncode(state_.local_complete_);
 }
 
 void ConnectionManagerImpl::FilterManager::encode100ContinueHeaders(
@@ -2608,7 +2614,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers,
                                                                      bool end_stream) {
-  parent_.setResponseHeaders(std::move(headers));
+  parent_.response_headers_ = std::move(headers);
   parent_.encodeHeaders(nullptr, *parent_.response_headers_, end_stream);
 }
 

@@ -40,6 +40,7 @@
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
+#include "common/local_reply/local_reply.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -459,11 +460,12 @@ private:
   public:
     FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& filter_manager_callbacks,
                   uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
-                  Http::Protocol protocol, TimeSource& time_source,
-                  StreamInfo::FilterStateSharedPtr parent_filter_state,
+                  const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
+                  TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
                   StreamInfo::FilterState::LifeSpan filter_state_life_span)
         : active_stream_(active_stream), filter_manager_callbacks_(filter_manager_callbacks),
           buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
+          local_reply_(local_reply),
           stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
     ~FilterManager() override {
       for (const auto& log_handler : access_log_handlers_) {
@@ -578,6 +580,15 @@ private:
         const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
         const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
 
+    /**
+     * Sends a local reply by constructing a response and skipping the encoder filters. The
+     * resulting response will be passed out via the FilterManagerCallbacks.
+     */
+    void sendDirectLocalReply(Code code, absl::string_view body,
+                              const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                              bool is_head_request,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
 
@@ -601,32 +612,24 @@ private:
       request_headers_ = std::move(request_headers);
     }
 
-    void setResponseHeaders(ResponseHeaderMapPtr&& response_headers) {
-      // Note: sometimes the headers get reset (local reply while response is buffering), so we
-      // don't assert here.
-      response_headers_ = std::move(response_headers);
-    }
-
     /**
      * Whether the filters have been destroyed.
      */
     bool destroyed() const { return state_.destroyed_; }
 
     /**
-     * Whether local processing has been marked as complete.
-     */
-    bool localComplete() const { return state_.local_complete_; }
-
-    /**
      * Whether remote processing has been marked as complete.
      */
     bool remoteComplete() const { return state_.remote_complete_; }
 
-    void setEncoderFiltersStreaming(bool streaming) {
-      state_.encoder_filters_streaming_ = streaming;
+    /**
+     * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
+     * a local reply without the overhead of creating and traversing the filters.
+     */
+    void skipFilterChainCreation() {
+      ASSERT(!state_.created_filter_chain_);
+      state_.created_filter_chain_ = true;
     }
-
-    void skipFilterChainCreation() { state_.created_filter_chain_ = true; }
 
     /**
      * Returns the current request headers, or nullptr if header decoding hasn't started yet.
@@ -744,6 +747,7 @@ private:
     std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
 
     FilterChainFactory& filter_chain_factory_;
+    const LocalReply::LocalReply& local_reply_;
     StreamInfo::StreamInfoImpl stream_info_;
     // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
     // at which point they no longer need to be friends.
