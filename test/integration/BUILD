@@ -8,7 +8,7 @@ load(
     "envoy_package",
     "envoy_proto_library",
     "envoy_select_hot_restart",
-    "envoy_select_legacy_codecs_in_integration_tests",
+    "envoy_select_new_codecs_in_integration_tests",
     "envoy_sh_test",
 )
 
@@ -576,8 +576,8 @@ envoy_cc_test_library(
         "ssl_utility.h",
         "utility.h",
     ],
-    copts = envoy_select_legacy_codecs_in_integration_tests(
-        ["-DENVOY_USE_LEGACY_CODECS_IN_INTEGRATION_TESTS"],
+    copts = envoy_select_new_codecs_in_integration_tests(
+        ["-DENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS"],
         "@envoy",
     ),
     data = ["//test/common/runtime:filesystem_test_data"],
