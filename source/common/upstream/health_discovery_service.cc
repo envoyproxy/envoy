@@ -163,6 +163,7 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
           }
         }
 
+        // TODO(drewsortega): remove this once we are on v4 and endpoint_health_response is removed.
         // copy this endpoint's health info to the legacy flat-list.
         response.mutable_endpoint_health_response()->add_endpoints_health()->MergeFrom(*endpoint);
       }
