@@ -208,7 +208,7 @@ public:
   bool maybeDirectDispatch(Buffer::Instance& data);
   virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
   Http::Http1::CodecStats& stats() { return stats_; }
-  bool enableTrailers() const { return enable_trailers_; }
+  bool enableTrailers() const { return codec_settings_.enable_trailers_; }
 
   // Http::Connection
   Http::Status dispatch(Buffer::Instance& data) override;
@@ -224,7 +224,7 @@ public:
 protected:
   ConnectionImpl(Network::Connection& connection, Http::Http1::CodecStats& stats,
                  http_parser_type type, uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 Http::Http1::HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
+                 Http::Http1::HeaderKeyFormatterPtr&& header_key_formatter, Http1Settings settings);
 
   bool resetStreamCalled() { return reset_stream_called_; }
   void onMessageBeginBase();
@@ -258,7 +258,7 @@ protected:
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
   const bool connection_header_sanitization_ : 1;
-  const bool enable_trailers_ : 1;
+  Http1Settings codec_settings_;
   const bool strict_1xx_and_204_headers_ : 1;
 
 private:
@@ -504,7 +504,6 @@ private:
 
   ServerConnectionCallbacks& callbacks_;
   absl::optional<ActiveRequest> active_request_;
-  Http1Settings codec_settings_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
   // This defaults to 2, which functionally disables pipelining. If any users
@@ -581,7 +580,6 @@ private:
     }
   }
 
-  Http1Settings codec_settings_;
   absl::optional<PendingResponse> pending_response_;
   // TODO(mattklein123): The following bool tracks whether a pending response is complete before
   // dispatching callbacks. This is needed so that pending_response_ stays valid during callbacks

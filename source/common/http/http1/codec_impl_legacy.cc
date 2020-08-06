@@ -449,13 +449,13 @@ http_parser_settings ConnectionImpl::settings_{
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
-                               HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
+                               HeaderKeyFormatterPtr&& header_key_formatter, Http1Settings settings)
     : connection_(connection), stats_(stats),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
-      enable_trailers_(enable_trailers),
+      codec_settings_(settings),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
@@ -586,7 +586,7 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
   // We previously already finished up the headers, these headers are
   // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
-    if (!enable_trailers_) {
+    if (!enableTrailers()) {
       // Ignore trailers.
       return;
     }
@@ -604,7 +604,7 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
-  if (header_parsing_state_ == HeaderParsingState::Done && !enable_trailers_) {
+  if (header_parsing_state_ == HeaderParsingState::Done && !enableTrailers()) {
     // Ignore trailers.
     return;
   }
@@ -769,8 +769,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
-                     max_request_headers_count, formatter(settings), settings.enable_trailers_),
-      callbacks_(callbacks), codec_settings_(settings),
+                     max_request_headers_count, formatter(settings), settings),
+      callbacks_(callbacks), 
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
       }),
@@ -1084,8 +1084,7 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Code
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
     : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count, formatter(settings), settings.enable_trailers_),
-      codec_settings_(settings) {}
+                     max_response_headers_count, formatter(settings), settings) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {
