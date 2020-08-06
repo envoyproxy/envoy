@@ -194,7 +194,7 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureInvalidLeafCert) {
   EXPECT_EQ("Invalid leaf cert.", error_details);
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureUnsupportedRsaKey) {
+TEST_F(EnvoyQuicProofVerifierTest, VerifyProofFailureUnsupportedECKey) {
   configCertVerificationDetails(true);
   quic::QuicTransportVersion version{quic::QUIC_VERSION_UNSUPPORTED};
   quiche::QuicheStringPiece chlo_hash{"aaaaa"};
