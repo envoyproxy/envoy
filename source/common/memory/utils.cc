@@ -16,8 +16,6 @@ void Utils::releaseFreeMemory() {
 #endif
 }
 
-constexpr uint64_t MAX_UNFREED_MEMORY_BYTE = 100 * 1024 * 1024;
-
 /*
   The purpose of this function is to release the cache introduced by tcmalloc,
   mainly in xDS config updates, admin handler, and so on. all work on the main thread,
@@ -26,7 +24,8 @@ constexpr uint64_t MAX_UNFREED_MEMORY_BYTE = 100 * 1024 * 1024;
 */
 void Utils::tryShrinkHeap(absl::optional<uint64_t> threshold) {
 #ifdef TCMALLOC
-  auto shrink_threshold = threshold.value_or(MAX_UNFREED_MEMORY_BYTE);
+  constexpr uint64_t default_unfreed_memory = 100 * 1024 * 1024;
+  auto shrink_threshold = threshold.value_or(default_unfreed_memory);
   auto total_physical_bytes = Stats::totalPhysicalBytes();
   auto allocated_size_by_app = Stats::totalCurrentlyAllocated();
 
