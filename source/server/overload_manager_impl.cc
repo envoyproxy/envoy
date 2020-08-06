@@ -19,10 +19,10 @@ namespace Server {
 
 namespace {
 
-class ThresholdTriggerImpl : public OverloadAction::Trigger {
+class ThresholdTriggerImpl final : public OverloadAction::Trigger {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v3::ThresholdTrigger& config)
-      : threshold_(config.value()) {}
+      : threshold_(config.value()), state_(OverloadActionState::inactive()) {}
 
   bool updateValue(double value) override {
     const OverloadActionState state = actionState();
@@ -31,44 +31,42 @@ public:
     return state.value() != actionState().value();
   }
 
-  OverloadActionState actionState() const override {
-    return state_.value_or(OverloadActionState::inactive());
-  }
+  OverloadActionState actionState() const override { return state_; }
 
 private:
   const double threshold_;
-  absl::optional<OverloadActionState> state_;
+  OverloadActionState state_;
 };
 
 class RangeTriggerImpl final : public OverloadAction::Trigger {
 public:
-  RangeTriggerImpl(const envoy::config::overload::v3::RangeTrigger& config)
-      : minimum_(config.min_value()), maximum_(config.max_value()) {
-    if (minimum_ >= maximum_) {
+  RangeTriggerImpl(const envoy::config::overload::v3::ScaledTrigger& config)
+      : scaling_threshold_(config.min_value()), saturated_threshold_(config.max_value()),
+        state_(OverloadActionState::inactive()) {
+    if (scaling_threshold_ >= saturated_threshold_) {
       throw EnvoyException("min_value must be less than max_value");
     }
   }
 
   bool updateValue(double value) override {
     const OverloadActionState old_state = actionState();
-    if (value <= minimum_) {
+    if (value <= scaling_threshold_) {
       state_ = OverloadActionState::inactive();
-    } else if (value >= maximum_) {
+    } else if (value >= saturated_threshold_) {
       state_ = OverloadActionState::saturated();
     } else {
-      state_ = OverloadActionState((value - minimum_) / (maximum_ - minimum_));
+      state_ = OverloadActionState((value - scaling_threshold_) /
+                                   (saturated_threshold_ - scaling_threshold_));
     }
     return state_->value() != old_state.value();
   }
 
-  OverloadActionState actionState() const override {
-    return state_.value_or(OverloadActionState::inactive());
-  }
+  OverloadActionState actionState() const override { return state_; }
 
 private:
-  const double minimum_;
-  const double maximum_;
-  absl::optional<OverloadActionState> state_;
+  const double scaling_threshold_;
+  const double saturated_threshold_;
+  OverloadActionState state_;
 };
 
 /**
@@ -121,8 +119,8 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
     case envoy::config::overload::v3::Trigger::TriggerOneofCase::kThreshold:
       trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
       break;
-    case envoy::config::overload::v3::Trigger::TriggerOneofCase::kRange:
-      trigger = std::make_unique<RangeTriggerImpl>(trigger_config.range());
+    case envoy::config::overload::v3::Trigger::TriggerOneofCase::kScaled:
+      trigger = std::make_unique<RangeTriggerImpl>(trigger_config.scaled());
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -151,6 +149,7 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
   scale_percent_gauge_.set(trigger_new_state.value() * 100);
 
   {
+    // Compute the new state as the maximum over all trigger states.
     OverloadActionState new_state = OverloadActionState::inactive();
     for (auto& trigger : triggers_) {
       const auto trigger_state = trigger.second->actionState();

@@ -52,14 +52,14 @@ message ThresholdTrigger {
   double value = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 }
 
-message RangeTrigger {
+message ScaledTrigger {
   // If the resource pressure is greater than this value, the trigger will be in the
   // :ref:`scaling <arch_overview_overload_manager-triggers-state>` state with value
-  // `(pressure - min_value) / (max_value - min_value)`.
-  double min_value = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+  // `(pressure - scaling_threshold) / (saturation_threshold - scaling_threshold)`.
+  double scaling_threshold = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 
   // If the resource pressure is greater than this value, the trigger will enter saturation.
-  double max_value = 2 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
+  double saturation_threshold = 2 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 }
 
 message Trigger {
@@ -74,7 +74,7 @@ message Trigger {
 
     ThresholdTrigger threshold = 2;
 
-    RangeTrigger range = 3;
+    ScaledTrigger scaled = 3;
   }
 }
 
