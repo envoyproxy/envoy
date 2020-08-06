@@ -76,7 +76,7 @@ public:
       listeners_.back().name_ = name;
       refs.emplace_back(listeners_.back());
     }
-    EXPECT_CALL(listener_manager_, listeners(ListenerManager::ListenerState::ALL))
+    EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
         .WillOnce(Return(refs));
     EXPECT_CALL(listener_manager_, beginListenerUpdate());
   }
@@ -121,7 +121,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   socket_address->set_port_value(1);
   listener.add_filter_chains();
 
-  EXPECT_CALL(listener_manager_, listeners(ListenerManager::ListenerState::ALL))
+  EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
       .WillOnce(Return(existing_listeners));
 
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
@@ -143,7 +143,7 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
-  EXPECT_CALL(listener_manager_, listeners(ListenerManager::ListenerState::ALL))
+  EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
       .WillOnce(Return(existing_listeners));
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, endListenerUpdate(_))
@@ -167,7 +167,7 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
   const auto listener_2 = buildListener("valid-listener-2");
   const auto listener_3 = buildListener("invalid-listener-2");
 
-  EXPECT_CALL(listener_manager_, listeners(ListenerManager::ListenerState::ALL))
+  EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
       .WillOnce(Return(existing_listeners));
 
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
@@ -199,7 +199,7 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
   const auto listener = buildListener("duplicate_listener");
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
-  EXPECT_CALL(listener_manager_, listeners(ListenerManager::ListenerState::ALL))
+  EXPECT_CALL(listener_manager_, listeners(ListenerManager::WARMING | ListenerManager::ACTIVE))
       .WillOnce(Return(existing_listeners));
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true)).WillOnce(Return(true));
