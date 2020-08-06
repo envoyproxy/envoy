@@ -175,14 +175,14 @@ void FilterChainManagerImpl::addFilterChain(
     destination_ips.reserve(filter_chain_match.prefix_ranges().size());
     for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
       const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
-      destination_ips.emplace_back(cidr_range.asString());
+      destination_ips.push_back(cidr_range.asString());
     }
 
     std::vector<std::string> source_ips;
     source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
     for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
       const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
-      source_ips.emplace_back(cidr_range.asString());
+      source_ips.push_back(cidr_range.asString());
     }
 
     // Reject partial wildcards, we don't match on them.
@@ -567,7 +567,7 @@ void FilterChainManagerImpl::convertIPsToTries() {
     destination_ips_list.reserve(destination_ips_map.size());
 
     for (const auto& entry : destination_ips_map) {
-      destination_ips_list.emplace_back(makeCidrListEntry(entry.first, entry.second));
+      destination_ips_list.push_back(makeCidrListEntry(entry.first, entry.second));
 
       // This hugely nested for loop greatly pains me, but I'm not sure how to make it better.
       // We need to get access to all of the source IP strings so that we can convert them into
@@ -583,7 +583,7 @@ void FilterChainManagerImpl::convertIPsToTries() {
               source_ips_list.reserve(source_ips_map.size());
 
               for (auto& source_ip : source_ips_map) {
-                source_ips_list.emplace_back(makeCidrListEntry(source_ip.first, source_ip.second));
+                source_ips_list.push_back(makeCidrListEntry(source_ip.first, source_ip.second));
               }
 
               source_array_entry.second = std::make_unique<SourceIPsTrie>(source_ips_list, true);
