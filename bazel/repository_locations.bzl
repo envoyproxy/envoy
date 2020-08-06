@@ -415,11 +415,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
-        # TODO(dio): Change to static snapshot of https://quiche.googlesource.com/googleurl/ when
-        # https://quiche-review.googlesource.com/c/googleurl/+/10620 is merged.
-        sha256 = "d53be6ffa129223b03d54ebc941f320f8acebc5f7a708477643eb7de1a7f1409",
-        strip_prefix = "quiche-googleurl-a21257e29ffdec52b10ad32cc92b99179cbdbd34",
-        urls = ["https://github.com/dio/quiche-googleurl/archive/a21257e29ffdec52b10ad32cc92b99179cbdbd34.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ef0d23689e240e6c8de4c3a5296b209128c87373.tar.gz.
+        sha256 = "d769283fed1319bca68bae8bdd47fbc3a7933999329eee850eff1f1ea61ce176",
+        # 2020-08-05
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_ef0d23689e240e6c8de4c3a5296b209128c87373.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
