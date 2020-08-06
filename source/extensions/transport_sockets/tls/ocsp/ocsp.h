@@ -18,8 +18,8 @@
  *
  * WARNING: This module is meant to validate that OCSP responses are well-formed
  * and extract useful fields for OCSP stapling. This assumes that responses are
- * provided from configs or another trusted source and does not perform the
- * necessary checks to verify responses coming from an upstream server.
+ * provided from configs or another trusted source and does not perform
+ * checks necessary to verify responses coming from an upstream server.
  */
 
 namespace Envoy {
@@ -51,8 +51,8 @@ enum class OcspResponseStatus {
 };
 
 /**
- * Reflection of the ASN.1 CertId structure.
- * Contains the information to uniquely identify an SSL Certificate.
+ * Partial reflection of the ASN.1 CertId structure.
+ * Contains the information to identify an SSL Certificate.
  * Serial numbers are guaranteed to be
  * unique per issuer but not necessarily universally.
  */
@@ -63,7 +63,7 @@ struct CertId {
 };
 
 /**
- * Reflection of the ASN.1 SingleResponse structure.
+ * Partial reflection of the ASN.1 SingleResponse structure.
  * Contains information about the OCSP status of a single certificate.
  * An OCSP request may request the status of multiple certificates and
  * therefore responses may contain multiple SingleResponses.
@@ -83,7 +83,7 @@ struct SingleResponse {
 };
 
 /**
- * Reflection of the ASN.1 ResponseData structure.
+ * Partial reflection of the ASN.1 ResponseData structure.
  * Contains an OCSP response for each certificate in a given request
  * as well as the time at which the response was produced.
  */
@@ -97,7 +97,7 @@ struct ResponseData {
  * An abstract type for OCSP response formats. Which variant of `Response` is
  * used in an `OcspResponse` is indicated by the structure's OID.
  *
- * We currently enforce that OCSP responses must be for a single certificate
+ * Envoy enforces that OCSP responses must be for a single certificate
  * only. The methods on this class extract the relevant information for the
  * single certificate contained in the response.
  */
@@ -135,6 +135,8 @@ using ResponsePtr = std::unique_ptr<Response>;
 /**
  * Reflection of the ASN.1 BasicOcspResponse structure.
  * Contains the full data of an OCSP response.
+ * Envoy enforces that OCSP responses contain a response for only
+ * a single certificate.
  *
  * BasicOcspResponse is the only supported Response type in RFC 6960.
  */
@@ -225,7 +227,7 @@ using OcspResponseWrapperPtr = std::unique_ptr<OcspResponseWrapper>;
 class Asn1OcspUtility {
 public:
   /**
-   * @param cbs a CBS& that refers to an ASN.1 OcspResponse element
+   * @param `cbs` a CBS& that refers to an ASN.1 OcspResponse element
    * @returns std::unique_ptr<OcspResponse> the OCSP response encoded in `cbs`
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed OcspResponse
    * element.

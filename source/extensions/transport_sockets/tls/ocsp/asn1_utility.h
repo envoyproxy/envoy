@@ -23,6 +23,10 @@ namespace Ocsp {
 
 constexpr absl::string_view GENERALIZED_TIME_FORMAT = "%E4Y%m%d%H%M%S";
 
+/**
+ * The result of parsing an ASN.1 structure or an `absl::string_view` error
+ * description.
+ */
 template <typename T> using ParsingResult = absl::variant<T, absl::string_view>;
 
 /**
@@ -56,7 +60,7 @@ public:
   /**
    * Extracts the full contents of `cbs` as a string.
    *
-   * @param cbs a CBS& that refers to the current document position
+   * @param `cbs` a CBS& that refers to the current document position
    * @returns absl::string_view containing the contents of `cbs`
    */
   static absl::string_view cbsToString(CBS& cbs);
@@ -67,8 +71,8 @@ public:
    *
    * @param cbs a CBS& that refers to an ASN.1 SEQUENCE OF object
    * @param parse_element an Asn1ParsingFunc<T> used to parse each element
-   * @returns std::vector<T> containing the parsed elements of the sequence.
-   * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
+   * @returns ParsingResult<std::vector<T>> containing the parsed elements of the sequence
+   * or an error string if `cbs` does not point to a well-formed
    * SEQUENCE OF object.
    */
   template <typename T>
@@ -81,8 +85,8 @@ public:
    *
    * @param cbs a CBS& that refers to the current document position
    * @param parse_data an Asn1ParsingFunc<T> used to parse the data if present
-   * @return absl::optional<T> with a T if `cbs` is of the specified tag,
-   * else nullopt
+   * @return ParsingResult<absl::optional<T>> with a `T` if `cbs` is of the specified tag,
+   * nullopt if the element has a different tag, or an error string if parsing fails.
    */
   template <typename T>
   static ParsingResult<absl::optional<T>> parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
@@ -96,25 +100,24 @@ public:
    *
    * @param cbs a CBS& that refers to the current document position
    * @param data a CBS* that is set to the contents of `cbs` if present
-   * @param an explicit tag indicating an optional value
+   * @param an unsigned explicit tag indicating an optional value
    *
-   * @returns bool whether `cbs` points to an element tagged with `tag`
-   * @throws Envoy::EnvoyException if `cbs` is a malformed TLV bytestring
+   * @returns ParsingResult<bool> whether `cbs` points to an element tagged with `tag` or
+   * an error string if parsing fails.
    */
   static ParsingResult<bool> getOptional(CBS& cbs, CBS* data, unsigned tag);
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 OBJECT IDENTIFIER element
-   * @returns std::string the OID encoded in `cbs`
-   * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
-   * OBJECT IDENTIFIER
+   * @returns ParsingResult<std::string> the OID encoded in `cbs` or an error
+   * string if `cbs` does not point to a well-formed OBJECT IDENTIFIER
    */
   static ParsingResult<std::string> parseOid(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 GENERALIZEDTIME element
-   * @returns Envoy::SystemTime the UTC timestamp encoded in `cbs`
-   * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
+   * @returns ParsingResult<Envoy::SystemTime> the UTC timestamp encoded in `cbs`
+   * or an error string if `cbs` does not point to a well-formed
    * GENERALIZEDTIME
    */
   static ParsingResult<Envoy::SystemTime> parseGeneralizedTime(CBS& cbs);
@@ -126,17 +129,15 @@ public:
    * use CBS_get_asn1_* functions for the given integer type instead.
    *
    * @param cbs a CBS& that refers to an ASN.1 INTEGER element
-   * @returns std::string a hex representation of the integer
-   * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
-   * INTEGER
+   * @returns ParsingResult<std::string> a hex representation of the integer
+   * or an error string if `cbs` does not point to a well-formed INTEGER
    */
   static ParsingResult<std::string> parseInteger(CBS& cbs);
 
   /**
    * @param cbs a CBS& that refers to an ASN.1 OCTETSTRING element
-   * @returns absl::string_view of the octets in `cbs`
-   * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
-   * OCTETSTRING
+   * @returns ParsingResult<std::vector<uint8_t>> the octets in `cbs` or
+   * an error string if `cbs` does not point to a well-formed OCTETSTRING
    */
   static ParsingResult<std::vector<uint8_t>> parseOctetString(CBS& cbs);
 
@@ -146,7 +147,8 @@ public:
    *
    * @param cbs a CBS& that refers to the current document position
    * @param tag the tag of the value to skip
-   * @throws Envoy::EnvoyException if `cbs` is a malformed TLV bytestring
+   * @returns ParsingResult<absl::monostate> a unit type denoting success
+   * or an error string if parsing fails.
    */
   static ParsingResult<absl::monostate> skipOptional(CBS& cbs, unsigned tag);
 
@@ -155,8 +157,8 @@ public:
    *
    * @param cbs a CBS& that refers to the current document position
    * @param tag the tag of the value to skip
-   * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
-   * element with tag `tag`.
+   * @returns ParsingResult<absl::monostate> a unit type denoting success
+   * or an error string if parsing fails.
    */
   static ParsingResult<absl::monostate> skip(CBS& cbs, unsigned tag);
 };
