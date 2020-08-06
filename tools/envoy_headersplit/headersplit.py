@@ -98,18 +98,29 @@ def class_definitions(cursor: Cursor) -> List[Cursor]:
 
     """
   class_cursors = []
-  for i in cursor.walk_preorder():
-    if i.location.file is None:
+  for descendant in cursor.walk_preorder():
+    # We don't want Cursors from files other than the one belonging to
+    # translation_unit, otherwise we get definitions for every file included
+    # when clang parsed the input file (i.e. if we don't limit descendant loction,
+    # it will check definitions from included headers and get class defns like std::string)
+    if descendant.location.file is None:
       continue
-    if i.location.file.name != cursor.displayname:
+    if descendant.location.file.name != cursor.displayname:
       continue
-    if i.kind != CursorKind.CLASS_DECL:
+
+    # check if descendant is pointing a class delaration block.
+    if descendant.kind != CursorKind.CLASS_DECL:
       continue
-    if not i.is_definition():
+    if not descendant.is_definition():
       continue
-    if i.semantic_parent.kind != CursorKind.NAMESPACE:
+    
+    # check if this class is directly enclosed by a namespace. 
+    # if it's not, then it's a nested class, our divided results
+    # should not contain nested classes.
+    if descendant.semantic_parent.kind != CursorKind.NAMESPACE:
       continue
-    class_cursors.append(i)
+
+    class_cursors.append(descendant)
   return class_cursors
 
 
@@ -125,15 +136,19 @@ def class_implementations(cursor: Cursor) -> List[Cursor]:
 
     """
   impl_cursors = []
-  for i in cursor.walk_preorder():
-    if i.location.file is None:
+  for descendant in cursor.walk_preorder():
+    # We don't want Cursors from files other than the one belonging to
+    # translation_unit, otherwise we get definitions for every file included
+    # when clang parsed the input file (i.e. if we don't limit descendant loction,
+    # it will check definitions from included headers and get class defns like std::string)
+    if descendant.location.file is None:
       continue
-    if i.location.file.name != cursor.displayname:
+    if descendant.location.file.name != cursor.displayname:
       continue
-    if i.kind == CursorKind.NAMESPACE:
+    if descendant.kind == CursorKind.NAMESPACE:
       continue
-    if i.semantic_parent is not None and i.semantic_parent.kind == CursorKind.CLASS_DECL:
-      impl_cursors.append(i)
+    if descendant.semantic_parent is not None and descendant.semantic_parent.kind == CursorKind.CLASS_DECL:
+      impl_cursors.append(descendant)
   return impl_cursors
 
 
