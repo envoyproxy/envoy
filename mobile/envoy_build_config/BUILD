@@ -23,6 +23,7 @@ envoy_cc_library(
         "@envoy//source/extensions/stat_sinks/metrics_service:config",
         "@envoy//source/extensions/transport_sockets/tls:config",
         "@envoy//source/extensions/upstreams/http/generic:config",
+        "@envoy_mobile//library/common/extensions/filters/http/assertion:config",
         "@envoy_mobile//library/common/extensions/filters/http/platform_bridge:config",
     ],
 )

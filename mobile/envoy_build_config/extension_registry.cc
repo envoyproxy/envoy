@@ -7,9 +7,11 @@ namespace Envoy {
 void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
   Envoy::Extensions::Compression::Gzip::Decompressor::forceRegisterGzipDecompressorLibraryFactory();
+  Envoy::Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
   Envoy::Extensions::HttpFilters::Decompressor::forceRegisterDecompressorFilterFactory();
   Envoy::Extensions::HttpFilters::DynamicForwardProxy::
       forceRegisterDynamicForwardProxyFilterFactory();
+  Envoy::Extensions::HttpFilters::PlatformBridge::forceRegisterPlatformBridgeFilterFactory();
   Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
@@ -17,7 +19,6 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::TransportSockets::Tls::forceRegisterUpstreamSslSocketFactory();
   Envoy::Extensions::Upstreams::Http::Generic::forceRegisterGenericGenericConnPoolFactory();
   Envoy::Upstream::forceRegisterLogicalDnsClusterFactory();
-  Envoy::Extensions::HttpFilters::PlatformBridge::forceRegisterPlatformBridgeFilterFactory();
 
   // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
   // in such a way that does not depend on the statically initialized variable.
