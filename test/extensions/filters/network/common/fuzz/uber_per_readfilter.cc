@@ -31,11 +31,10 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         NetworkFilterNames::get().DubboProxy, NetworkFilterNames::get().SniCluster,
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
-        NetworkFilterNames::get().HttpConnectionManager,
-        NetworkFilterNames::get().ThriftProxy, NetworkFilterNames::get().ZooKeeperProxy,
-        NetworkFilterNames::get().SniDynamicForwardProxy, NetworkFilterNames::get().KafkaBroker,
-        NetworkFilterNames::get().RocketmqProxy, NetworkFilterNames::get().RateLimit,
-        NetworkFilterNames::get().Rbac
+        NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().ThriftProxy,
+        NetworkFilterNames::get().ZooKeeperProxy, NetworkFilterNames::get().SniDynamicForwardProxy,
+        NetworkFilterNames::get().KafkaBroker, NetworkFilterNames::get().RocketmqProxy,
+        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac
         // TODO(jianwendong): cover mongo_proxy, mysql_proxy, postgres_proxy, tcp_proxy.
     };
     // Check whether each filter is loaded into Envoy.
