@@ -210,6 +210,8 @@ private:
   bool addOrUpdateListenerInternal(const envoy::config::listener::v3::Listener& config,
                                    const std::string& version_info, bool added_via_api,
                                    const std::string& name);
+  bool removeListenerInternal(const std::string& listener_name, bool dynamic_listeners_only);
+
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
         : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
@@ -318,15 +320,14 @@ public:
       ListenerComponentFactory& listener_component_factory,
       Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
 
-  std::shared_ptr<Network::DrainableFilterChain>
+  Network::DrainableFilterChainSharedPtr
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const override;
 
 private:
-  std::shared_ptr<Network::DrainableFilterChain>
-  buildFilterChainInternal(const envoy::config::listener::v3::FilterChain& filter_chain,
-                           std::unique_ptr<Configuration::FilterChainFactoryContext>&&
-                               filter_chain_factory_context) const;
+  Network::DrainableFilterChainSharedPtr buildFilterChainInternal(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const;
 
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;

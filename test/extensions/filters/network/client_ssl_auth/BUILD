@@ -36,7 +36,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/client_ssl_auth:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/network/client_ssl_auth/v3:pkg_cc_proto",
     ],
 )

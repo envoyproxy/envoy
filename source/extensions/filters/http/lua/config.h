@@ -14,7 +14,9 @@ namespace Lua {
 /**
  * Config registration for the Lua filter. @see NamedHttpFilterConfigFactory.
  */
-class LuaFilterConfig : public Common::FactoryBase<envoy::extensions::filters::http::lua::v3::Lua> {
+class LuaFilterConfig
+    : public Common::FactoryBase<envoy::extensions::filters::http::lua::v3::Lua,
+                                 envoy::extensions::filters::http::lua::v3::LuaPerRoute> {
 public:
   LuaFilterConfig() : FactoryBase(HttpFilterNames::get().Lua) {}
 
@@ -22,6 +24,11 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::lua::v3::Lua& proto_config, const std::string&,
       Server::Configuration::FactoryContext& context) override;
+
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace Lua

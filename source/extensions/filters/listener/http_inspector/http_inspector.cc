@@ -105,9 +105,9 @@ ParseState Filter::onRead() {
   const Api::SysCallSizeResult result =
       os_syscalls.recv(socket.ioHandle().fd(), buf_, Config::MAX_INSPECT_SIZE, MSG_PEEK);
   ENVOY_LOG(trace, "http inspector: recv: {}", result.rc_);
-  if (result.rc_ == -1 && result.errno_ == EAGAIN) {
+  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_AGAIN) {
     return ParseState::Continue;
-  } else if (result.rc_ < 0) {
+  } else if (SOCKET_FAILURE(result.rc_)) {
     config_->stats().read_error_.inc();
     return ParseState::Error;
   }

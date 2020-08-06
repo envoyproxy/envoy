@@ -8,6 +8,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -146,6 +147,11 @@ public:
   virtual ConnectionBalancer& connectionBalancer() PURE;
 
   /**
+   * Open connection resources for this listener.
+   */
+  virtual ResourceLimit& openConnections() PURE;
+
+  /**
    * @return std::vector<AccessLog::InstanceSharedPtr> access logs emitted by the listener.
    */
   virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
@@ -168,6 +174,10 @@ public:
     UNREFERENCED_PARAMETER(server_conn);
     UNREFERENCED_PARAMETER(socket);
   }
+  /**
+   * Called when a new connection is rejected.
+   */
+  virtual void onReject() PURE;
 };
 
 /**
@@ -303,14 +313,6 @@ public:
 };
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
-
-/**
- * Thrown when there is a runtime error creating/binding a listener.
- */
-class CreateListenerException : public EnvoyException {
-public:
-  CreateListenerException(const std::string& what) : EnvoyException(what) {}
-};
 
 } // namespace Network
 } // namespace Envoy

@@ -2,20 +2,22 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/common/matchers.h"
 #include "common/grpc/status.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/node_hash_set.h"
 #include "absl/hash/hash.h"
 
 namespace Envoy {
@@ -30,7 +32,7 @@ public:
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
   static FilterPtr fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             Runtime::Loader& runtime, Random::RandomGenerator& random,
                              ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
@@ -85,7 +87,7 @@ class OperatorFilter : public Filter {
 public:
   OperatorFilter(
       const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Runtime::Loader& runtime, Random::RandomGenerator& random,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
 protected:
@@ -98,7 +100,7 @@ protected:
 class AndFilter : public OperatorFilter {
 public:
   AndFilter(const envoy::config::accesslog::v3::AndFilter& config, Runtime::Loader& runtime,
-            Runtime::RandomGenerator& random,
+            Random::RandomGenerator& random,
             ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
@@ -113,8 +115,7 @@ public:
 class OrFilter : public OperatorFilter {
 public:
   OrFilter(const envoy::config::accesslog::v3::OrFilter& config, Runtime::Loader& runtime,
-           Runtime::RandomGenerator& random,
-           ProtobufMessage::ValidationVisitor& validation_visitor);
+           Random::RandomGenerator& random, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
@@ -152,7 +153,7 @@ public:
 class RuntimeFilter : public Filter {
 public:
   RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& config, Runtime::Loader& runtime,
-                Runtime::RandomGenerator& random);
+                Random::RandomGenerator& random);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
@@ -161,7 +162,7 @@ public:
 
 private:
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   const std::string runtime_key_;
   const envoy::type::v3::FractionalPercent percent_;
   const bool use_independent_randomness_;
@@ -207,7 +208,7 @@ private:
 class GrpcStatusFilter : public Filter {
 public:
   using GrpcStatusHashSet =
-      std::unordered_set<Grpc::Status::GrpcStatus, absl::Hash<Grpc::Status::GrpcStatus>>;
+      absl::node_hash_set<Grpc::Status::GrpcStatus, absl::Hash<Grpc::Status::GrpcStatus>>;
 
   GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatusFilter& config);
 
@@ -229,6 +230,27 @@ private:
 };
 
 /**
+ * Filters requests based on dynamic metadata
+ */
+class MetadataFilter : public Filter {
+public:
+  MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config);
+
+  bool evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+                const Http::ResponseHeaderMap& response_headers,
+                const Http::ResponseTrailerMap& response_trailers) const override;
+
+private:
+  Matchers::ValueMatcherConstSharedPtr present_matcher_;
+  Matchers::ValueMatcherConstSharedPtr value_matcher_;
+
+  std::vector<std::string> path_;
+
+  const bool default_match_;
+  const std::string filter_;
+};
+
+/**
  * Extension filter factory that reads from ExtensionFilter proto.
  */
 class ExtensionFilterFactory : public Config::TypedFactory {
@@ -245,7 +267,7 @@ public:
    * @return an instance of extension filter implementation from a config proto.
    */
   virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                                 Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
+                                 Runtime::Loader& runtime, Random::RandomGenerator& random) PURE;
 
   std::string category() const override { return "envoy.access_logger.extension_filters"; }
 };

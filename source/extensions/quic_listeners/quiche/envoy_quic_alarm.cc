@@ -19,7 +19,8 @@ void EnvoyQuicAlarm::SetImpl() {
   // in QUICHE, and we are working on the fix. Once QUICHE is fixed of expecting this behavior, we
   // no longer need to round up the duration.
   // TODO(antoniovicente) improve the timer behavior in such case.
-  timer_->enableHRTimer(std::chrono::microseconds(std::max(1l, duration.ToMicroseconds())));
+  timer_->enableHRTimer(
+      std::chrono::microseconds(std::max(static_cast<int64_t>(1), duration.ToMicroseconds())));
 }
 
 void EnvoyQuicAlarm::UpdateImpl() {

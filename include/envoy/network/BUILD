@@ -53,6 +53,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "exception_interface",
+    hdrs = ["exception.h"],
+)
+
+envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
@@ -60,6 +65,7 @@ envoy_cc_library(
         ":transport_socket_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/upstream:host_description_interface",
+        "//source/common/protobuf",
     ],
 )
 
@@ -90,6 +96,7 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":io_handle_interface",
+        "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -109,6 +116,7 @@ envoy_cc_library(
     hdrs = ["transport_socket.h"],
     deps = [
         ":io_handle_interface",
+        ":proxy_protocol_options_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/ssl:connection_interface",
     ],
@@ -143,5 +151,13 @@ envoy_cc_library(
         ":address_interface",
         "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "proxy_protocol_options_lib",
+    hdrs = ["proxy_protocol.h"],
+    deps = [
+        ":address_interface",
     ],
 )

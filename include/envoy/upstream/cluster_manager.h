@@ -4,10 +4,10 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -30,6 +30,9 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -122,7 +125,7 @@ public:
   virtual void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
-  using ClusterInfoMap = std::unordered_map<std::string, std::reference_wrapper<const Cluster>>;
+  using ClusterInfoMap = absl::node_hash_map<std::string, std::reference_wrapper<const Cluster>>;
 
   /**
    * @return ClusterInfoMap all current clusters. These are the primary (not thread local)
@@ -130,7 +133,7 @@ public:
    */
   virtual ClusterInfoMap clusters() PURE;
 
-  using ClusterSet = std::unordered_set<std::string>;
+  using ClusterSet = absl::flat_hash_set<std::string>;
 
   /**
    * @return const ClusterSet& providing the cluster names that are eligible as
@@ -158,11 +161,13 @@ public:
    *
    * Can return nullptr if there is no host available in the cluster or if the cluster does not
    * exist.
+   *
+   * To resolve the protocol to use, we provide the downstream protocol (if one exists).
    */
-  virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                                 ResourcePriority priority,
-                                                                 Http::Protocol protocol,
-                                                                 LoadBalancerContext* context) PURE;
+  virtual Http::ConnectionPool::Instance*
+  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                         absl::optional<Http::Protocol> downstream_protocol,
+                         LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that
@@ -209,8 +214,8 @@ public:
   virtual void shutdown() PURE;
 
   /**
-   * @return const envoy::api::v2::core::BindConfig& cluster manager wide bind configuration for new
-   *         upstream connections.
+   * @return const envoy::config::core::v3::BindConfig& cluster manager wide bind configuration for
+   * new upstream connections.
    */
   virtual const envoy::config::core::v3::BindConfig& bindConfig() const PURE;
 
@@ -365,7 +370,7 @@ public:
     ClusterManager& cm_;
     const LocalInfo::LocalInfo& local_info_;
     Event::Dispatcher& dispatcher_;
-    Runtime::RandomGenerator& random_;
+    Random::RandomGenerator& random_;
     Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
     ProtobufMessage::ValidationVisitor& validation_visitor_;

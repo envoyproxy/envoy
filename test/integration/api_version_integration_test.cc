@@ -316,9 +316,11 @@ TEST_P(ApiVersionIntegrationTest, Eds) {
 
 TEST_P(ApiVersionIntegrationTest, Rtds) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* admin_layer = bootstrap.mutable_layered_runtime()->add_layers();
-    admin_layer->set_name("admin layer");
-    admin_layer->mutable_admin_layer();
+    if (bootstrap.mutable_layered_runtime()->layers_size() == 0) {
+      auto* admin_layer = bootstrap.mutable_layered_runtime()->add_layers();
+      admin_layer->set_name("admin layer");
+      admin_layer->mutable_admin_layer();
+    }
     auto* rtds_layer = bootstrap.mutable_layered_runtime()->add_layers();
     rtds_layer->set_name("rtds_layer");
     setupConfigSource(*rtds_layer->mutable_rtds_layer()->mutable_rtds_config());

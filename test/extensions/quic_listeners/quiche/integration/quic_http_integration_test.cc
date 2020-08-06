@@ -54,9 +54,9 @@ public:
             return quic::CurrentSupportedVersionsWithQuicCrypto();
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
-          SetQuicReloadableFlag(quic_enable_version_draft_28, use_http3);
-          SetQuicReloadableFlag(quic_enable_version_draft_27, use_http3);
-          SetQuicReloadableFlag(quic_enable_version_draft_25_v3, use_http3);
+          SetQuicReloadableFlag(quic_enable_version_draft_29, use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_27, !use_http3);
+          SetQuicReloadableFlag(quic_disable_version_draft_25, !use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         crypto_config_(std::make_unique<EnvoyQuicFakeProofVerifier>()), conn_helper_(*dispatcher_),
@@ -77,7 +77,7 @@ public:
     // TODO(danzh) Implement retry upon version mismatch and modify test frame work to specify a
     // different version set on server side to test that.
     auto connection = std::make_unique<EnvoyQuicClientConnection>(
-        getNextServerDesignatedConnectionId(), server_addr_, conn_helper_, alarm_factory_,
+        getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
     auto session = std::make_unique<EnvoyQuicClientSession>(
@@ -92,8 +92,11 @@ public:
   // TODO(#8479) Propagate INVALID_VERSION error to caller and let caller to use server advertised
   // version list to create a new connection with mutually supported version and make client codec
   // again.
-  IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn) override {
-    IntegrationCodecClientPtr codec = HttpIntegrationTest::makeRawHttpConnection(std::move(conn));
+  IntegrationCodecClientPtr makeRawHttpConnection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
+    IntegrationCodecClientPtr codec =
+        HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
     if (codec->disconnected()) {
       // Connection may get closed during version negotiation or handshake.
       ENVOY_LOG(error, "Fail to connect to server with error: {}",
@@ -104,14 +107,13 @@ public:
     return codec;
   }
 
-  quic::QuicConnectionId getNextServerDesignatedConnectionId() {
-    quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
-    // If the cached state indicates that we should use a server-designated
-    // connection ID, then return that connection ID.
-    quic::QuicConnectionId conn_id = cached->has_server_designated_connection_id()
-                                         ? cached->GetNextServerDesignatedConnectionId()
-                                         : quic::EmptyQuicConnectionId();
-    return conn_id.IsEmpty() ? quic::QuicUtils::CreateRandomConnectionId() : conn_id;
+  quic::QuicConnectionId getNextConnectionId() {
+    if (designated_connection_ids_.empty()) {
+      return quic::QuicUtils::CreateRandomConnectionId();
+    }
+    quic::QuicConnectionId cid = designated_connection_ids_.front();
+    designated_connection_ids_.pop_front();
+    return cid;
   }
 
   void initialize() override {
@@ -186,6 +188,7 @@ protected:
   bool set_reuse_port_{false};
   const std::string injected_resource_filename_;
   AtomicFileUpdater file_updater_;
+  std::list<quic::QuicConnectionId> designated_connection_ids_;
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
@@ -287,13 +290,12 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
   set_reuse_port_ = true;
   initialize();
   std::vector<IntegrationCodecClientPtr> codec_clients;
-  quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
   for (size_t i = 1; i <= concurrency_; ++i) {
     // The BPF filter looks at the 1st word of connection id in the packet
     // header. And currently all QUIC versions support 8 bytes connection id. So
     // create connections with the first 4 bytes of connection id different from each
     // other so they should be evenly distributed.
-    cached->add_server_designated_connection_id(quic::test::TestConnectionId(i << 32));
+    designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
     codec_clients.push_back(makeHttpConnection(lookupPort("http")));
   }
   if (GetParam().first == Network::Address::IpVersion::v4) {
@@ -330,13 +332,12 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
 #undef SO_ATTACH_REUSEPORT_CBPF
 #endif
   std::vector<IntegrationCodecClientPtr> codec_clients;
-  quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
   for (size_t i = 1; i <= concurrency_; ++i) {
     // The BPF filter looks at the 1st byte of connection id in the packet
     // header. And currently all QUIC versions support 8 bytes connection id. So
     // create connections with the first 4 bytes of connection id different from each
     // other so they should be evenly distributed.
-    cached->add_server_designated_connection_id(quic::test::TestConnectionId(i << 32));
+    designated_connection_ids_.push_back(quic::test::TestConnectionId(i << 32));
     codec_clients.push_back(makeHttpConnection(lookupPort("http")));
   }
   if (GetParam().first == Network::Address::IpVersion::v4) {
@@ -424,7 +425,7 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                1);
-  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
   // Reduce load a little to allow the connection to be accepted connection.
@@ -452,7 +453,8 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   EXPECT_EQ("envoy overloaded", response2->body());
   codec_client_->close();
 
-  EXPECT_TRUE(makeRawHttpConnection(makeClientConnection((lookupPort("http"))))->disconnected());
+  EXPECT_TRUE(makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt)
+                  ->disconnected());
 }
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {

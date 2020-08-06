@@ -65,7 +65,7 @@ envoy_cc_test(
     data = ["//test/config/integration:google_com_proxy_port_0"],
     deps = [
         "//source/common/api:api_lib",
-        "//source/exe:envoy_main_common_lib",
+        "//source/exe:main_common_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",

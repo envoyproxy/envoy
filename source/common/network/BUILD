@@ -17,10 +17,10 @@ envoy_cc_library(
     hdrs = [
         "address_impl.h",
         "io_socket_handle_impl.h",
-        "socket_interface_impl.h",
     ],
     deps = [
         ":io_socket_error_lib",
+        ":socket_interface_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/network:io_handle_interface",
@@ -48,7 +48,6 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":utility_lib",
-        "//include/envoy/json:json_object_interface",
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
@@ -158,18 +157,33 @@ envoy_cc_library(
     deps = [
         "//include/envoy/api:io_error_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
 envoy_cc_library(
     name = "lc_trie_lib",
     hdrs = ["lc_trie.h"],
-    external_deps = ["abseil_int128"],
+    external_deps = [
+        "abseil_node_hash_set",
+        "abseil_int128",
+    ],
     deps = [
         ":address_lib",
         ":cidr_range_lib",
         ":utility_lib",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_interface_lib",
+    hdrs = ["socket_interface.h"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:socket_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:bootstrap_extension_config_interface",
     ],
 )
 
@@ -185,9 +199,11 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
+        ":socket_interface_lib",
         "//include/envoy/network:socket_interface",
         "//source/common/common:assert_lib",
-        "//source/common/singleton:threadsafe_singleton",
+        "//source/common/common:utility_lib",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )
 
@@ -198,6 +214,7 @@ envoy_cc_library(
     deps = [
         ":socket_lib",
         ":utility_lib",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -221,7 +238,9 @@ envoy_cc_library(
         ":listen_socket_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
+        "//include/envoy/network:exception_interface",
         "//include/envoy/network:listener_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
@@ -292,6 +311,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -354,8 +374,10 @@ envoy_cc_library(
     hdrs = ["transport_socket_options_impl.h"],
     deps = [
         ":application_protocol_lib",
+        ":proxy_protocol_filter_state_lib",
         ":upstream_server_name_lib",
         ":upstream_subject_alt_names_lib",
+        "//include/envoy/network:proxy_protocol_options_lib",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:scalar_to_byte_vector_lib",
@@ -396,5 +418,16 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "proxy_protocol_filter_state_lib",
+    srcs = ["proxy_protocol_filter_state.cc"],
+    hdrs = ["proxy_protocol_filter_state.h"],
+    deps = [
+        "//include/envoy/network:proxy_protocol_options_lib",
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
     ],
 )

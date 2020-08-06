@@ -3,7 +3,7 @@
 
 #include "extensions/filters/http/aws_request_signing/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

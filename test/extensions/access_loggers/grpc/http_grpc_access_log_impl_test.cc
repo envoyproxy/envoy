@@ -122,7 +122,7 @@ response: {{}}
   envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
-  std::unique_ptr<HttpGrpcAccessLog> access_log_;
+  HttpGrpcAccessLogPtr access_log_;
 };
 
 class TestSerializedFilterState : public StreamInfo::FilterState::Object {

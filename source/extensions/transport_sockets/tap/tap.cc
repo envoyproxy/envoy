@@ -11,18 +11,13 @@ namespace Tap {
 
 TapSocket::TapSocket(SocketTapConfigSharedPtr config,
                      Network::TransportSocketPtr&& transport_socket)
-    : config_(config), transport_socket_(std::move(transport_socket)) {}
+    : PassthroughSocket(std::move(transport_socket)), config_(config) {}
 
 void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!tapper_);
   transport_socket_->setTransportSocketCallbacks(callbacks);
   tapper_ = config_ ? config_->createPerSocketTapper(callbacks.connection()) : nullptr;
 }
-
-std::string TapSocket::protocol() const { return transport_socket_->protocol(); }
-absl::string_view TapSocket::failureReason() const { return transport_socket_->failureReason(); }
-
-bool TapSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 
 void TapSocket::closeSocket(Network::ConnectionEvent event) {
   if (tapper_ != nullptr) {
@@ -50,10 +45,6 @@ Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   }
   return result;
 }
-
-void TapSocket::onConnected() { transport_socket_->onConnected(); }
-
-Ssl::ConnectionInfoConstSharedPtr TapSocket::ssl() const { return transport_socket_->ssl(); }
 
 TapSocketFactory::TapSocketFactory(
     const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,

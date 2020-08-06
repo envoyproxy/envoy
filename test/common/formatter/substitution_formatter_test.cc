@@ -759,6 +759,41 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::nullValue()));
   }
   {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_sha = "685a2db593d5f86d346cb1a297009c3b467ad77f1944aa799039a2fb3d531f3f";
+    EXPECT_CALL(*connection_info, sha1PeerCertificateDigest())
+        .WillRepeatedly(ReturnRef(expected_sha));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ(expected_sha, upstream_format.format(request_headers, response_headers,
+                                                   response_trailers, stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue(expected_sha)));
+  }
+  {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_sha;
+    EXPECT_CALL(*connection_info, sha1PeerCertificateDigest())
+        .WillRepeatedly(ReturnRef(expected_sha));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+    EXPECT_EQ("-", upstream_format.format(request_headers, response_headers, response_trailers,
+                                          stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_1");
+    EXPECT_EQ("-", upstream_format.format(request_headers, response_headers, response_trailers,
+                                          stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::string serial_number = "b8b5ecc898f2124a";
@@ -1459,7 +1494,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
 }
 
 void verifyJsonOutput(std::string json_string,
-                      std::unordered_map<std::string, std::string> expected_map) {
+                      absl::node_hash_map<std::string, std::string> expected_map) {
   const auto parsed = Json::Factory::loadFromString(json_string);
 
   // Every json log line should have only one newline character, and it should be the last character
@@ -1485,7 +1520,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  std::unordered_map<std::string, std::string> expected_json_map = {
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"plain_string", "plain_string_value"}};
 
   absl::flat_hash_map<std::string, std::string> key_mapping = {
@@ -1509,7 +1544,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  std::unordered_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
+  absl::node_hash_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
 
   absl::flat_hash_map<std::string, std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
   JsonFormatterImpl formatter(key_mapping, false);
@@ -1526,7 +1561,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
 
-  std::unordered_map<std::string, std::string> expected_json_map = {
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"protocol", "HTTP/1.1"},
       {"some_request_header", "SOME_REQUEST_HEADER"},
       {"nonexistent_response_header", "-"},
@@ -1556,7 +1591,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
 
-  std::unordered_map<std::string, std::string> expected_json_map = {
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"request_present_header_or_request_absent_header", "REQUEST_PRESENT_HEADER"},
       {"request_absent_header_or_request_present_header", "REQUEST_PRESENT_HEADER"},
       {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
@@ -1593,7 +1628,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
-  std::unordered_map<std::string, std::string> expected_json_map = {
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"test_key", "\"test_value\""},
       {"test_obj", "{\"inner_key\":\"inner_value\"}"},
       {"test_obj.inner_key", "\"inner_value\""}};
@@ -1655,7 +1690,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
                                      StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
-  std::unordered_map<std::string, std::string> expected_json_map = {
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"test_key", "\"test_value\""}, {"test_obj", "{\"inner_key\":\"inner_value\"}"}};
 
   absl::flat_hash_map<std::string, std::string> key_mapping = {
@@ -1711,7 +1746,7 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
       StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
-  std::unordered_map<std::string, std::string> expected_json_map = {
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"test_key_plain", "test_value By PLAIN"},
       {"test_key_typed", "\"test_value By TYPED\""},
   };
@@ -1788,7 +1823,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
   SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
 
-  std::unordered_map<std::string, std::string> expected_json_map = {
+  absl::node_hash_map<std::string, std::string> expected_json_map = {
       {"simple_date", "2018/03/28"},
       {"test_time", fmt::format("{}", expected_time_in_epoch)},
       {"bad_format", "bad_format"},
@@ -1817,7 +1852,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
     Http::TestResponseTrailerMapImpl response_trailer;
     std::string body;
 
-    std::unordered_map<std::string, std::string> expected_json_map = {
+    absl::node_hash_map<std::string, std::string> expected_json_map = {
         {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
 
     absl::flat_hash_map<std::string, std::string> key_mapping = {

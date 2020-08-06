@@ -108,14 +108,14 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version);
 
 /**
  * Bind a socket to a free port on a loopback address, and return the socket's fd and bound address.
- * Enables a test server to reliably "select" a port to listen on. Note that the socket option
- * SO_REUSEADDR has NOT been set on the socket.
+ * Enables a test server to reliably "select" a port to listen on.
  * @param version the IP version of the loopback address.
  * @param type the type of socket to be bound.
+ * @param reuse_port specifies whether the socket option SO_REUSEADDR has been set on the socket.
  * @returns the address and the fd of the socket bound to that address.
  */
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
-bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type);
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_port = false);
 
 /**
  * Create a transport socket for testing purposes.

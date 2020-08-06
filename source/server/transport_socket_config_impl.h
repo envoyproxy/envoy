@@ -15,7 +15,7 @@ public:
   TransportSocketFactoryContextImpl(
       Server::Admin& admin, Ssl::ContextManager& context_manager, Stats::Scope& stats_scope,
       Upstream::ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
-      Event::Dispatcher& dispatcher, Envoy::Runtime::RandomGenerator& random, Stats::Store& stats,
+      Event::Dispatcher& dispatcher, Envoy::Random::RandomGenerator& random, Stats::Store& stats,
       Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
       : admin_(admin), context_manager_(context_manager), stats_scope_(stats_scope),
@@ -39,7 +39,7 @@ public:
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  Envoy::Runtime::RandomGenerator& random() override { return random_; }
+  Envoy::Random::RandomGenerator& random() override { return random_; }
   Stats::Store& stats() override { return stats_; }
   Init::Manager& initManager() override {
     ASSERT(init_manager_ != nullptr);
@@ -59,7 +59,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
-  Envoy::Runtime::RandomGenerator& random_;
+  Envoy::Random::RandomGenerator& random_;
   Stats::Store& stats_;
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;

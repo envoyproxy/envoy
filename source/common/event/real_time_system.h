@@ -13,7 +13,7 @@ namespace Event {
 class RealTimeSystem : public TimeSystem {
 public:
   // TimeSystem
-  SchedulerPtr createScheduler(Scheduler&) override;
+  SchedulerPtr createScheduler(Scheduler&, CallbackScheduler&) override;
 
   // TimeSource
   SystemTime systemTime() override { return time_source_.systemTime(); }

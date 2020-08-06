@@ -6,7 +6,10 @@
 #include "server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_component_factory.h"
+#include "test/mocks/server/worker.h"
+#include "test/mocks/server/worker_factory.h"
 #include "test/server/utility.h"
 #include "test/test_common/utility.h"
 
@@ -52,7 +55,7 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
@@ -78,7 +81,7 @@ api_listener:
         path: eds path
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
@@ -112,7 +115,7 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
-  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 

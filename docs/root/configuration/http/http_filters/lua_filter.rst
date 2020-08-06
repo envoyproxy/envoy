@@ -23,10 +23,6 @@ supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT docu
   supports more 5.2 features and additional architectures. Envoy can be built with moonjit support
   by using the following bazel option: ``--//source/extensions/filters/common/lua:moonjit=1``.
 
-The filter only supports loading Lua code in-line in the configuration. If local filesystem code
-is desired, a trivial in-line script can be used to load the rest of the code from the local
-environment.
-
 The design of the filter and Lua support at a high level is as follows:
 
 * All Lua environments are :ref:`per worker thread <arch_overview_threading>`. This means that
@@ -62,6 +58,83 @@ Configuration
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
 * This filter should be configured with the name *envoy.filters.http.lua*.
+
+A simple example of configuring Lua HTTP filter that contains only :ref:`inline_code
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` is as follow:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    inline_code: |
+      -- Called on the request path.
+      function envoy_on_request(request_handle)
+        -- Do something.
+      end
+      -- Called on the response path.
+      function envoy_on_response(response_handle)
+        -- Do something.
+      end
+
+By default, Lua script defined in ``inline_code`` will be treated as a ``GLOBAL`` script. Envoy will
+execute it for every HTTP request.
+
+Per-Route Configuration
+-----------------------
+
+The Lua HTTP filter also can be disabled or overridden on a per-route basis by providing a
+:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration
+on the virtual host, route, or weighted cluster.
+
+As a concrete example, given the following Lua filter configuration:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    inline_code: |
+      function envoy_on_request(request_handle)
+        -- do something
+      end
+    source_codes:
+      hello.lua:
+        inline_string: |
+          function envoy_on_request(request_handle)
+            request_handle:logInfo("Hello World.")
+          end
+      bye.lua:
+        inline_string: |
+          function envoy_on_response(response_handle)
+            response_handle:logInfo("Bye Bye.")
+          end
+
+The HTTP Lua filter can be disabled on some virtual host, route, or weighted cluster by the
+:ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration as
+follow:
+
+.. code-block:: yaml
+
+  per_filter_config:
+    envoy.filters.http.lua:
+      disabled: true
+
+We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
+The ``GLOBAL`` Lua script will be overridden by the referenced script:
+
+.. code-block:: yaml
+
+  per_filter_config:
+    envoy.filters.http.lua:
+      name: hello.lua
+
+.. attention::
+
+  The name ``GLOBAL`` is reserved for :ref:`Lua.inline_code
+  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use
+  ``GLOBAL`` as name for other Lua scripts.
+
 
 Script examples
 ---------------
@@ -489,6 +562,17 @@ dynamicMetadata()
 
 Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
 
+downstreamSslConnection()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:downstreamSslConnection()
+
+Returns :repo:`information <include/envoy/ssl/connection.h>` related to the current SSL connection.
+
+Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+
 .. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
 
 Dynamic metadata object API
@@ -552,7 +636,7 @@ Connection object API
 ---------------------
 
 ssl()
-^^^^^^^^
+^^^^^
 
 .. code-block:: lua
 
@@ -565,6 +649,207 @@ ssl()
 Returns :repo:`SSL connection <include/envoy/ssl/connection.h>` object when the connection is
 secured and *nil* when it is not.
 
-.. note::
+Returns an :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
-  Currently the SSL connection object has no exposed APIs.
+.. _config_http_filters_lua_ssl_socket_info:
+
+SSL connection object API
+-------------------------
+
+peerCertificatePresented()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  if downstreamSslConnection:peerCertificatePresented() then
+    print("peer certificate is presented")
+  end
+
+Returns bool whether the peer certificate is presented.
+
+peerCertificateValidated()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  if downstreamSslConnection:peerCertificateVaidated() then
+    print("peer certificate is valiedated")
+  end
+
+Returns bool whether the peer certificate was validated.
+
+uriSanLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  -- For example, uriSanLocalCertificate contains {"san1", "san2"}
+  local certs = downstreamSslConnection:uriSanLocalCertificate()
+
+  -- The following prints san1,san2
+  handle:logTrace(table.concat(certs, ","))
+
+Returns the URIs (as a table) in the SAN field of the local certificate. Returns an empty table if
+there is no local certificate, or no SAN field, or no URI SAN entries.
+
+sha256PeerCertificateDigest()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sha256PeerCertificateDigest()
+
+Returns the SHA256 digest of the peer certificate. Returns ``""`` if there is no peer certificate
+which can happen in TLS (non-mTLS) connections.
+
+serialNumberPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:serialNumberPeerCertificate()
+
+Returns the serial number field of the peer certificate. Returns ``""`` if there is no peer
+certificate, or no serial number.
+
+issuerPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:issuerPeerCertificate()
+
+Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
+peer certificate, or no issuer.
+
+subjectPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:subjectPeerCertificate()
+
+Return the subject field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
+peer certificate, or no subject.
+
+uriSanPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:uriSanPeerCertificate()
+
+Returns the URIs (as a table) in the SAN field of the peer certificate. Returns en empty table if
+there is no peer certificate, or no SAN field, or no URI SAN entries.
+
+subjectLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:subjectLocalCertificate()
+
+Returns the subject field of the local certificate in RFC 2253 format. Returns ``""`` if there is no
+local certificate, or no subject.
+
+urlEncodedPemEncodedPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificate()
+
+Returns the URL-encoded PEM-encoded representation of the peer certificate. Returns ``""`` if there
+is no peer certificate or encoding fails.
+
+urlEncodedPemEncodedPeerCertificateChain()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
+
+Returnns the URL-encoded PEM-encoded representation of the full peer certificate chain including the
+leaf certificate. Returns ``""`` if there is no peer certificate or encoding fails.
+
+dnsSansPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:dnsSansPeerCertificate()
+
+Returns the DNS entries (as a table) in the SAN field of the peer certificate. Returns an empty
+table if there is no peer certificate, or no SAN field, or no DNS SAN entries.
+
+dnsSansLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:dnsSansLocalCertificate()
+
+Returns the DNS entries (as a table) in the SAN field of the local certificate. Returns an empty
+table if there is no local certificate, or no SAN field, or no DNS SAN entries.
+
+validFromPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:validFromPeerCertificate()
+
+Returns the time (timestamp-since-epoch in seconds) that the peer certificate was issued and should
+be considered valid from. Returns ``0`` if there is no peer certificate.
+
+In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
+
+expirationPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:validFromPeerCertificate()
+
+Returns the time (timestamp-since-epoch in seconds) that the peer certificate expires and should not
+be considered valid after. Returns ``0`` if there is no peer certificate.
+
+In Lua, we usually use ``os.time(os.date("!*t"))`` to get current timestamp-since-epoch in seconds.
+
+sessionId()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sessionId()
+
+Returns the hex-encoded TLS session ID as defined in RFC 5246.
+
+ciphersuiteId()
+^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:ciphersuiteId()
+
+Returns the standard ID (hex-encoded) for the ciphers used in the established TLS connection.
+Returns ``"0xffff"`` if there is no current negotiated ciphersuite.
+
+ciphersuiteString()
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:ciphersuiteString()
+
+Returns the OpenSSL name for the set of ciphers used in the established TLS connection. Returns
+``""`` if there is no current negotiated ciphersuite.
+
+tlsVersion()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:urlEncodedPemEncodedPeerCertificateChain()
+
+Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS connection.

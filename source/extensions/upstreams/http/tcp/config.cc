@@ -1,6 +1,6 @@
 #include "extensions/upstreams/http/tcp/config.h"
 
-#include "common/router/upstream_request.h"
+#include "extensions/upstreams/http/tcp/upstream_request.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,9 +9,10 @@ namespace Http {
 namespace Tcp {
 
 Router::GenericConnPoolPtr TcpGenericConnPoolFactory::createGenericConnPool(
-    Upstream::ClusterManager& cm, bool, const Router::RouteEntry& route_entry,
-    Envoy::Http::Protocol protocol, Upstream::LoadBalancerContext* ctx) const {
-  auto ret = std::make_unique<Router::TcpConnPool>(cm, route_entry, protocol, ctx);
+    Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
+    absl::optional<Envoy::Http::Protocol> downstream_protocol,
+    Upstream::LoadBalancerContext* ctx) const {
+  auto ret = std::make_unique<TcpConnPool>(cm, is_connect, route_entry, downstream_protocol, ctx);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 

@@ -30,7 +30,7 @@ envoy_cc_test(
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/proto:deprecated_proto_cc_proto",
         "//test/proto:sensitive_proto_cc_proto",
         "//test/test_common:environment_lib",

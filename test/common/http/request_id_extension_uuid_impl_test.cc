@@ -1,9 +1,9 @@
 #include <string>
 
+#include "common/common/random_generator.h"
 #include "common/http/request_id_extension_uuid_impl.h"
-#include "common/runtime/runtime_impl.h"
 
-#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/common.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Http {
 
 TEST(UUIDRequestIDExtensionTest, SetRequestID) {
-  testing::StrictMock<Runtime::MockRandomGenerator> random;
+  testing::StrictMock<Random::MockRandomGenerator> random;
   UUIDRequestIDExtension uuid_utils(random);
   TestRequestHeaderMapImpl request_headers;
 
@@ -28,7 +28,7 @@ TEST(UUIDRequestIDExtensionTest, SetRequestID) {
 }
 
 TEST(UUIDRequestIDExtensionTest, EnsureRequestID) {
-  testing::StrictMock<Runtime::MockRandomGenerator> random;
+  testing::StrictMock<Random::MockRandomGenerator> random;
   UUIDRequestIDExtension uuid_utils(random);
   TestRequestHeaderMapImpl request_headers;
 
@@ -42,7 +42,7 @@ TEST(UUIDRequestIDExtensionTest, EnsureRequestID) {
 }
 
 TEST(UUIDRequestIDExtensionTest, PreserveRequestIDInResponse) {
-  testing::StrictMock<Runtime::MockRandomGenerator> random;
+  testing::StrictMock<Random::MockRandomGenerator> random;
   UUIDRequestIDExtension uuid_utils(random);
   TestRequestHeaderMapImpl request_headers;
   TestResponseHeaderMapImpl response_headers;
@@ -65,7 +65,7 @@ TEST(UUIDRequestIDExtensionTest, PreserveRequestIDInResponse) {
 }
 
 TEST(UUIDRequestIDExtensionTest, ModRequestIDBy) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   UUIDRequestIDExtension uuid_utils(random);
   TestRequestHeaderMapImpl request_headers;
 
@@ -115,7 +115,7 @@ TEST(UUIDRequestIDExtensionTest, ModRequestIDBy) {
 }
 
 TEST(UUIDRequestIDExtensionTest, RequestIDModDistribution) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   UUIDRequestIDExtension uuid_utils(random);
   TestRequestHeaderMapImpl request_headers;
 
@@ -145,7 +145,7 @@ TEST(UUIDRequestIDExtensionTest, RequestIDModDistribution) {
 }
 
 TEST(UUIDRequestIDExtensionTest, DISABLED_benchmark) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
 
   for (int i = 0; i < 100000000; ++i) {
     random.uuid();
@@ -153,7 +153,7 @@ TEST(UUIDRequestIDExtensionTest, DISABLED_benchmark) {
 }
 
 TEST(UUIDRequestIDExtensionTest, SetTraceStatus) {
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   UUIDRequestIDExtension uuid_utils(random);
   TestRequestHeaderMapImpl request_headers;
   request_headers.setRequestId(random.uuid());

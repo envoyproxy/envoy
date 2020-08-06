@@ -9,7 +9,6 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -30,9 +29,9 @@ const int FirstUpstreamIndex = 2;
 const int SecondUpstreamIndex = 3;
 
 const std::string& config() {
-  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
@@ -48,7 +47,7 @@ dynamic_resources:
 static_resources:
   clusters:
   - name: my_cds_cluster
-    http2_protocol_options: {}
+    http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_cds_cluster
       endpoints:
@@ -61,6 +60,7 @@ static_resources:
   - name: aggregate_cluster
     connect_timeout: 0.25s
     lb_policy: CLUSTER_PROVIDED
+    protocol_selection: USE_DOWNSTREAM_PROTOCOL # this should be ignored, as cluster_1 and cluster_2 specify HTTP/2.
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
@@ -108,7 +108,8 @@ static_resources:
                 match:
                   prefix: "/aggregatecluster"
               domains: "*"
-)EOF");
+)EOF",
+                                                  TestEnvironment::nullDevicePath()));
 }
 
 class AggregateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -129,16 +130,16 @@ public:
     defer_listener_finalization_ = true;
     HttpIntegrationTest::initialize();
 
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
                                                   timeSystem(), enable_half_close_));
     fake_upstreams_[FirstUpstreamIndex]->set_allow_unexpected_disconnects(false);
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_,
+    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
                                                   timeSystem(), enable_half_close_));
     fake_upstreams_[SecondUpstreamIndex]->set_allow_unexpected_disconnects(false);
-    cluster1_ = ConfigHelper::buildCluster(
+    cluster1_ = ConfigHelper::buildStaticCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));
-    cluster2_ = ConfigHelper::buildCluster(
+    cluster2_ = ConfigHelper::buildStaticCluster(
         SecondClusterName, fake_upstreams_[SecondUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));
 
@@ -275,8 +276,11 @@ TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
   waitForNextUpstreamRequest(FirstUpstreamIndex);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
+
   waitForNextUpstreamRequest(SecondUpstreamIndex);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 

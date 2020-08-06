@@ -14,7 +14,7 @@ framework for writing Clang tools in the style of `clang-format` and
 To build tools in this tree, a Clang binary install must be available. If you
 are building Envoy with `clang`, this should already be true of your system. You
 can find prebuilt binary releases of Clang at https://releases.llvm.org. You
-will need the Clang version used by Envoy in CI (currently clang-9.0).
+will need the Clang version used by Envoy in CI (currently clang-10.0).
 
 To build a tool, set the following environment variable:
 
@@ -36,7 +36,7 @@ generates this and also does setup of the Bazel cache paths to allow external
 dependencies to be located:
 
 ```console
-tools/gen_compilation_database.py --run_bazel_build --include_headers
+tools/gen_compilation_database.py --include_headers
 ```
 
 Finally, the tool can be run against source files in the Envoy tree:

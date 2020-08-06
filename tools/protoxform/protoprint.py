@@ -30,7 +30,7 @@ from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
 # Note: we have to include those proto definitions to make FormatOptions work,
-# this also serves as whitelist of extended options.
+# this also serves as allowlist of extended options.
 from google.api import annotations_pb2 as _
 from validate import validate_pb2 as _
 from envoy.annotations import deprecation_pb2 as _

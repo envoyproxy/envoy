@@ -6,6 +6,8 @@
 
 #include "extensions/common/tap/tap.h"
 
+#include "absl/container/node_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -80,7 +82,7 @@ private:
 
   Server::Admin& admin_;
   Event::Dispatcher& main_thread_dispatcher_;
-  std::unordered_map<std::string, std::unordered_set<ExtensionConfig*>> config_id_map_;
+  absl::node_hash_map<std::string, absl::node_hash_set<ExtensionConfig*>> config_id_map_;
   absl::optional<const AttachedRequest> attached_request_;
 };
 

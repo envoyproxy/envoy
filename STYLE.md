@@ -16,6 +16,11 @@
 
 * Please see [REPO_LAYOUT.md](REPO_LAYOUT.md).
 
+# Documentation
+
+* If you are modifying the data plane structually, please keep the [Life of a
+  Request](docs/root/intro/life_of_a_request.md) documentation up-to-date.
+
 # Deviations from Google C++ style guidelines
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add

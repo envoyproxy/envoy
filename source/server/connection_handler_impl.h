@@ -28,7 +28,9 @@ namespace Server {
 
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
   COUNTER(downstream_cx_destroy)                                                                   \
+  COUNTER(downstream_cx_overflow)                                                                  \
   COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_global_cx_overflow)                                                           \
   COUNTER(downstream_pre_cx_timeout)                                                               \
   COUNTER(no_filter_chain_match)                                                                   \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
@@ -113,17 +115,24 @@ private:
     ActiveTcpListener(ConnectionHandlerImpl& parent, Network::ListenerPtr&& listener,
                       Network::ListenerConfig& config);
     ~ActiveTcpListener() override;
+    bool listenerConnectionLimitReached() const {
+      // TODO(tonya11en): Delegate enforcement of per-listener connection limits to overload
+      // manager.
+      return !config_->openConnections().canCreate();
+    }
     void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections, bool rebalanced);
     void decNumConnections() {
       ASSERT(num_listener_connections_ > 0);
       --num_listener_connections_;
+      config_->openConnections().dec();
     }
 
     // Network::ListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
     void setupNewConnection(Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) override;
 
+    void onReject() override { stats_.downstream_global_cx_overflow_.inc(); }
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
@@ -133,7 +142,10 @@ private:
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
-    void incNumConnections() override { ++num_listener_connections_; }
+    void incNumConnections() override {
+      ++num_listener_connections_;
+      config_->openConnections().inc();
+    }
     void post(Network::ConnectionSocketPtr&& socket) override;
 
     /**
@@ -145,7 +157,8 @@ private:
     /**
      * Create a new connection from a socket accepted by the listener.
      */
-    void newConnection(Network::ConnectionSocketPtr&& socket);
+    void newConnection(Network::ConnectionSocketPtr&& socket,
+                       const envoy::config::core::v3::Metadata& dynamic_metadata);
 
     /**
      * Return the active connections container attached with the given filter chain.
@@ -170,7 +183,7 @@ private:
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::list<ActiveTcpSocketPtr> sockets_;
-    std::unordered_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
+    absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
 
     // The number of connections currently active on this listener. This is typically used for
     // connection balancing across per-handler listeners.
@@ -296,6 +309,9 @@ private:
     Network::ConnectionSocket& socket() override { return *socket_.get(); }
     Event::Dispatcher& dispatcher() override { return listener_.parent_.dispatcher_; }
     void continueFilterChain(bool success) override;
+    void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
+    envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
+    const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
 
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
@@ -303,6 +319,7 @@ private:
     std::list<ListenerFilterWrapperPtr> accept_filters_;
     std::list<ListenerFilterWrapperPtr>::iterator iter_;
     Event::TimerPtr timer_;
+    envoy::config::core::v3::Metadata metadata_{};
   };
 
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;

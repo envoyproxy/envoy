@@ -16,6 +16,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -43,7 +44,7 @@ private:
   Event::MockDispatcher dispatcher_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl store_;
-  Runtime::MockRandomGenerator generator_;
+  Random::MockRandomGenerator generator_;
   Api::ApiPtr api_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;

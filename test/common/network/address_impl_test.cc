@@ -62,7 +62,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   // Bind the socket to the desired address and port.
   const Api::SysCallIntResult result = sock.bind(addr_port);
-  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
                            << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
@@ -83,7 +83,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
     // Connect to the server.
     const Api::SysCallIntResult result = client_sock.connect(addr_port);
-    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
 
@@ -331,7 +331,7 @@ TEST(PipeInstanceTest, BasicPermission) {
   ASSERT_GE(sock.ioHandle().fd(), 0) << pipe.asString();
 
   Api::SysCallIntResult result = sock.bind(address);
-  ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << strerror(result.errno_)
+  ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
                            << "\terrno: " << result.errno_;
 
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
@@ -341,7 +341,7 @@ TEST(PipeInstanceTest, BasicPermission) {
   // Get file permissions bits
   ASSERT_EQ(stat_buf.st_mode & 07777, mode)
       << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
-      << (stat_buf.st_mode) << strerror(result.errno_);
+      << (stat_buf.st_mode) << errorDetails(result.errno_);
 }
 #endif
 
@@ -431,7 +431,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
 
     const Api::SysCallIntResult result = sock.bind(address);
 
-    ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << strerror(result.errno_)
+    ASSERT_EQ(result.rc_, 0) << pipe.asString() << "\nerror: " << errorDetails(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
 
@@ -448,9 +448,9 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &sin.sin_addr));
   sin.sin_port = htons(6502);
 
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, sizeof(sockaddr_in) - 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, sizeof(sockaddr_in) + 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in) - 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in) + 1), "ss_len");
 
   EXPECT_EQ("1.2.3.4:6502", addressFromSockAddr(ss, sizeof(sockaddr_in))->asString());
 
@@ -467,9 +467,9 @@ TEST(AddressFromSockAddrDeathTest, IPv6) {
   EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &sin6.sin6_addr));
   sin6.sin6_port = htons(32000);
 
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, sizeof(sockaddr_in6) - 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, sizeof(sockaddr_in6) + 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in6) - 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in6) + 1), "ss_len");
 
   EXPECT_EQ("[1:23::ef]:32000", addressFromSockAddr(ss, sizeof(sockaddr_in6))->asString());
 
@@ -490,9 +490,8 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 
   StringUtil::strlcpy(sun.sun_path, "/some/path", sizeof sun.sun_path);
 
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH_LOG_TO_STDERR(addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path)),
-                             "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path)), "ss_len");
 
   socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
   EXPECT_EQ("/some/path", addressFromSockAddr(ss, ss_len)->asString());

@@ -450,7 +450,7 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, UsageOfInjectDataMethodsShouldBe
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
   tcp_client->waitForData("hello");
 
   tcp_client->close();
@@ -468,12 +468,12 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, FilterChainMismatch) {
   initialize();
 
   auto tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
 
   std::string access_log =
       absl::StrCat("NR ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr(access_log));
-  tcp_client->close();
+  tcp_client->waitForDisconnect();
 }
 
 /**
@@ -499,7 +499,7 @@ TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShou
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  tcp_client->write("hello");
+  ASSERT_TRUE(tcp_client->write("hello"));
 
   std::string observed_data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(5, &observed_data));
@@ -508,7 +508,7 @@ TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShou
   ASSERT_TRUE(fake_upstream_connection->write("hi"));
   tcp_client->waitForData("hi");
 
-  tcp_client->write(" world!", true);
+  ASSERT_TRUE(tcp_client->write(" world!", true));
   observed_data.clear();
   ASSERT_TRUE(fake_upstream_connection->waitForData(12, &observed_data));
   EXPECT_EQ("hello world!", observed_data);

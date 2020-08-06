@@ -17,8 +17,10 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
-      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
+      service_method_(
+          Grpc::VersionedMethods("envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats",
+                                 "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
+              .getMethodDescriptorForVersion(transport_api_version)),
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
@@ -71,8 +73,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
-    if (cluster.info()->eds_service_name().has_value()) {
-      cluster_stats->set_cluster_service_name(cluster.info()->eds_service_name().value());
+    if (cluster.info()->edsServiceName().has_value()) {
+      cluster_stats->set_cluster_service_name(cluster.info()->edsServiceName().value());
     }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
@@ -138,9 +140,9 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& me
 void LoadStatsReporter::onReceiveMessage(
     std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
-  stats_.requests_.inc();
   message_ = std::move(message);
   startLoadReportPeriod();
+  stats_.requests_.inc();
 }
 
 void LoadStatsReporter::startLoadReportPeriod() {
@@ -150,7 +152,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // problems due to referencing of temporaries in the below loop with Google's
   // internal string type. Consider this optimization when the string types
   // converge.
-  std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
+  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   if (message_->send_all_clusters()) {
     for (const auto& p : cm_.clusters()) {
       const std::string& cluster_name = p.first;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
@@ -26,7 +27,7 @@ public:
   /**
    * @return RandomGenerator& the random generator for the server.
    */
-  virtual Envoy::Runtime::RandomGenerator& random() PURE;
+  virtual Envoy::Random::RandomGenerator& random() PURE;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used

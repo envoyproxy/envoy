@@ -27,6 +27,7 @@
 
 #include "tools/type_whisperer/api_type_db.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 
 // Enable to see debug log messages.
@@ -243,7 +244,7 @@ private:
                        const clang::SourceManager& source_manager) {
     auto* direct_callee = call_expr.getDirectCallee();
     if (direct_callee != nullptr) {
-      const std::unordered_map<std::string, int> ValidateNameToArg = {
+      const absl::node_hash_map<std::string, int> ValidateNameToArg = {
           {"loadFromYamlAndValidate", 1},
           {"loadFromFileAndValidate", 1},
           {"downcastAndValidate", -1},
@@ -489,7 +490,7 @@ private:
                !absl::StartsWith(proto_type_name, "envoy.test") &&
                !absl::StartsWith(proto_type_name, "envoy.tracers.xray.daemon")) {
       // Die hard if we don't have a useful proto type for something that looks
-      // like an API type(modulo a short whitelist).
+      // like an API type(modulo a short allowlist).
       std::cerr << "Unknown API type: " << proto_type_name << std::endl;
       // TODO(htuch): maybe there is a nicer way to terminate AST traversal?
       ::exit(1);

@@ -76,7 +76,7 @@ public:
   /**
    * @return the underlying connection ID.
    */
-  uint64_t id() { return connection_->id(); }
+  uint64_t id() const { return connection_->id(); }
 
   /**
    * @return the underlying codec protocol.
@@ -131,9 +131,9 @@ protected:
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
 
   // Http::ConnectionCallbacks
-  void onGoAway() override {
+  void onGoAway(GoAwayErrorCode error_code) override {
     if (codec_callbacks_) {
-      codec_callbacks_->onGoAway();
+      codec_callbacks_->onGoAway(error_code);
     }
   }
 
@@ -155,9 +155,11 @@ protected:
   }
 
   const Type type_;
-  ClientConnectionPtr codec_;
-  Network::ClientConnectionPtr connection_;
+  // The order of host_, connection_, and codec_ matter as during destruction each can refer to
+  // the previous, at least in tests.
   Upstream::HostDescriptionConstSharedPtr host_;
+  Network::ClientConnectionPtr connection_;
+  ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
 

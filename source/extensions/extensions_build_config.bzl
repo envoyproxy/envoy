@@ -41,6 +41,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
+    "envoy.filters.http.admission_control":             "//source/extensions/filters/http/admission_control:config",
     "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
@@ -159,6 +160,7 @@ EXTENSIONS = {
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
+    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_proxy_protocol",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
@@ -190,11 +192,15 @@ EXTENSIONS = {
     "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
     "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
 
-    # Http Upstreams
-
-    "envoy.upstreams.http.generic":                     "//source/extensions/upstreams/http/generic:config",
+    # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
     "envoy.upstreams.http.http":                     "//source/extensions/upstreams/http/http:config",
     "envoy.upstreams.http.tcp":                     "//source/extensions/upstreams/http/tcp:config",
 
 
 }
+
+# This can be used to extend the visibility rules for Envoy extensions
+# (//:extension_config and //:extension_library in //BUILD)
+# if downstream Envoy builds need to directly reference envoy extensions.
+ADDITIONAL_VISIBILITY = [
+  ]

@@ -124,6 +124,9 @@ to perform a release within this time window. If there are exceptional circumsta
 security team will raise this window to four weeks. The release window will be reduced if the
 security issue is public or embargo is broken.
 
+We will endeavor not to overlap this three week window with or place it adjacent to major corporate
+holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), where possible.
+
 ### Fix and disclosure SLOs
 
 * All reports to envoy-security@googlegroups.com will be triaged and have an
@@ -172,7 +175,8 @@ patches, understand exact mitigation steps, etc.
   should be reserved for remotely exploitable or privilege escalation issues. Otherwise, this
   process can be skipped.
 - The Fix Lead will email the patches to cncf-envoy-distributors-announce@lists.cncf.io so
-  distributors can prepare builds to be available to users on the day of the issue's announcement.
+  distributors can prepare builds to be available to users on the day of the issue's announcement. Any 
+  patches against main will be updated and resent weekly.
   Distributors should read about the [Private Distributors List](#private-distributors-list) to find
   out the requirements for being added to this list.
 - **What if a vendor breaks embargo?** The PST will assess the damage. The Fix Lead will make the
@@ -326,7 +330,7 @@ use of Envoy should:
    have a way to privately stage and validate your updates that does not violate
    the embargo.
 7. Be willing to [contribute back](#contributing-back) as outlined above.
-8. Be able to perform a security release of your product within a two week window from candidate fix
+8. Be able to perform a security release of your product within a three week window from candidate fix
    patch availability.
 9. Have someone already on the list vouch for the person requesting membership
    on behalf of your distribution.
@@ -406,7 +410,7 @@ We accept.
 
 We are definitely willing to help!
 
-> 8. Be able to perform a security release of your product within a two week window from candidate fix
+> 8. Be able to perform a security release of your product within a three week window from candidate fix
      patch availability.
 
 We affirm we can spin out new security releases within a 2 week window.

@@ -37,6 +37,11 @@ message HealthCheck {
   // If operating in non-pass-through mode, specifies a set of upstream cluster
   // names and the minimum percentage of servers in each of those clusters that
   // must be healthy or degraded in order for the filter to return a 200.
+  //
+  // .. note::
+  //
+  //    This value is interpreted as an integer by truncating, so 12.50% will be calculated
+  //    as if it were 12%.
   map<string, type.Percent> cluster_min_healthy_percentages = 4;
 
   // Specifies a set of health check request headers to match on. The health check filter will

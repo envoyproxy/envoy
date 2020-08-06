@@ -1,4 +1,5 @@
 #include "common/common/hex.h"
+#include "common/http/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "extensions/filters/listener/http_inspector/http_inspector.h"
@@ -353,7 +354,7 @@ TEST_F(HttpInspectorTest, ReadError) {
   init();
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-    return Api::SysCallSizeResult{ssize_t(-1), ENOTSUP};
+    return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_NOT_SUP};
   }));
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
@@ -375,7 +376,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
     InSequence s;
 
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
     for (size_t i = 1; i <= 24; i++) {
@@ -408,7 +409,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
     InSequence s;
 
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
     for (size_t i = 1; i <= data.size(); i++) {
@@ -440,7 +441,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
     InSequence s;
 
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
     for (size_t i = 1; i <= data.size(); i++) {
@@ -474,7 +475,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteHeader) {
     InSequence s;
 
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
     for (size_t i = 1; i <= data.size(); i++) {
@@ -506,7 +507,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
     InSequence s;
 
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
     for (size_t i = 1; i <= data.size(); i++) {
@@ -540,7 +541,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
     InSequence s;
 
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
     for (size_t i = 1; i <= truncate_header.size(); i++) {
@@ -574,7 +575,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
     InSequence s;
 
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
     uint64_t num_loops = Config::MAX_INSPECT_SIZE;
@@ -620,7 +621,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeHeader) {
     InSequence s;
 
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
     for (size_t i = 1; i <= 20; i++) {

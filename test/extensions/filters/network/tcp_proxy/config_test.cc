@@ -5,7 +5,7 @@
 
 #include "extensions/filters/network/tcp_proxy/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -91,7 +91,7 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   )EOF";
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proto_config;
-  TestUtility::loadFromJson(json_string, proto_config);
+  TestUtility::loadFromJson(json_string, proto_config, true, false);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;

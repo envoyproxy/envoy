@@ -5,6 +5,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/network/exception.h"
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -45,6 +46,7 @@ void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
       hooks_.onWorkerListenerAdded();
       completion(true);
     } catch (const Network::CreateListenerException& e) {
+      ENVOY_LOG(error, "failed to add listener on worker: {}", e.what());
       completion(false);
     }
   });

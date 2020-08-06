@@ -13,7 +13,6 @@ envoy_py_test_binary(
     srcs = ["configgen.py"],
     data = glob([
         "*.yaml",
-        "*.json",
     ]),
     external_deps = ["jinja2"],
 )

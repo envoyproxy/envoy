@@ -38,7 +38,7 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
 // The returned header map has all keys in lower case.
 template <class T>
 std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
-  auto headers = std::make_unique<T>();
+  auto headers = T::create();
   for (const auto& entry : header_list) {
     // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
     headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
@@ -48,7 +48,7 @@ std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_
 
 template <class T>
 std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
-  auto headers = std::make_unique<T>();
+  auto headers = T::create();
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
     std::string key(entry.first);
@@ -68,6 +68,10 @@ Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorC
 
 // Called when underlying QUIC connection is closed either locally or by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error);
+
+// Called when a GOAWAY frame is received.
+ABSL_MUST_USE_RESULT
+Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept;
 
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.

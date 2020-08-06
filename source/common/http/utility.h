@@ -116,38 +116,28 @@ struct OptionsLimits {
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options);
 
+envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
 
 namespace Http {
 namespace Utility {
 
-/**
- * Given a fully qualified URL, splits the string_view provided into scheme,
- * host and path with query parameters components.
- */
-class Url {
-public:
-  bool initialize(absl::string_view absolute_url, bool is_connect_request);
-  absl::string_view scheme() { return scheme_; }
-  absl::string_view hostAndPort() { return host_and_port_; }
-  absl::string_view pathAndQueryParams() { return path_and_query_params_; }
-
-private:
-  absl::string_view scheme_;
-  absl::string_view host_and_port_;
-  absl::string_view path_and_query_params_;
-};
-
 class PercentEncoding {
 public:
   /**
-   * Encodes string view to its percent encoded representation.
+   * Encodes string view to its percent encoded representation. Non-visible ASCII is always escaped,
+   * in addition to a given list of reserved chars.
+   *
    * @param value supplies string to be encoded.
-   * @return std::string percent-encoded string based on
-   * https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
+   * @param reserved_chars list of reserved chars to escape. By default the escaped chars in
+   *        https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses are used.
+   * @return std::string percent-encoded string.
    */
-  static std::string encode(absl::string_view value);
+  static std::string encode(absl::string_view value, absl::string_view reserved_chars = "%");
 
   /**
    * Decodes string view from its percent encoded representation.
@@ -158,7 +148,8 @@ public:
 
 private:
   // Encodes string view to its percent encoded representation, with start index.
-  static std::string encode(absl::string_view value, const size_t index);
+  static std::string encode(absl::string_view value, const size_t index,
+                            const absl::flat_hash_set<char>& reserved_char_set);
 };
 
 /**
@@ -190,6 +181,13 @@ std::string createSslRedirectPath(const RequestHeaderMap& headers);
 QueryParams parseQueryString(absl::string_view url);
 
 /**
+ * Parse a URL into query parameters.
+ * @param url supplies the url to parse.
+ * @return QueryParams the parsed and percent-decoded parameters, if any.
+ */
+QueryParams parseAndDecodeQueryString(absl::string_view url);
+
+/**
  * Parse a a request body into query parameters.
  * @param body supplies the body to parse.
  * @return QueryParams the parsed parameters, if any.
@@ -200,9 +198,11 @@ QueryParams parseFromBody(absl::string_view body);
  * Parse query parameters from a URL or body.
  * @param data supplies the data to parse.
  * @param start supplies the offset within the data.
+ * @param decode_params supplies the flag whether to percent-decode the parsed parameters (both name
+ *        and value). Set to false to keep the parameters encoded.
  * @return QueryParams the parsed parameters, if any.
  */
-QueryParams parseParameters(absl::string_view data, size_t start);
+QueryParams parseParameters(absl::string_view data, size_t start, bool decode_params);
 
 /**
  * Finds the start of the query string in a path
@@ -265,7 +265,7 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * @return Http1Settings An Http1Settings populated from the
- * envoy::api::v2::core::Http1ProtocolOptions config.
+ * envoy::config::core::v3::Http1ProtocolOptions config.
  */
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 

@@ -138,7 +138,7 @@ route_config:
             key: "x-foo"
             value: "value1"
         - header:
-            key: "authorization"
+            key: "user-agent"
             value: "token1"
       routes:
         - match: { prefix: "/test" }
@@ -149,7 +149,7 @@ route_config:
                 key: "x-foo"
                 value: "value2"
             - header:
-                key: "authorization"
+                key: "user-agent"
                 value: "token2"
     - name: path-sanitization
       domains: ["path-sanitization.com"]
@@ -997,14 +997,14 @@ TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
           {":path", "/test"},
           {":scheme", "http"},
           {":authority", "append-same-headers.com"},
-          {"authorization", "token3"},
+          {"user-agent", "token3"},
           {"x-foo", "value3"},
       },
       Http::TestRequestHeaderMapImpl{
           {":authority", "append-same-headers.com"},
           {":path", "/test"},
           {":method", "GET"},
-          {"authorization", "token3,token2,token1"},
+          {"user-agent", "token3,token2,token1"},
           {"x-foo", "value3"},
           {"x-foo", "value2"},
           {"x-foo", "value1"},

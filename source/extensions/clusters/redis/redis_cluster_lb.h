@@ -31,12 +31,12 @@ static const uint64_t MaxSlot = 16384;
 
 class ClusterSlot {
 public:
-  ClusterSlot(int64_t start, int64_t end, Network::Address::InstanceConstSharedPtr master)
-      : start_(start), end_(end), master_(std::move(master)) {}
+  ClusterSlot(int64_t start, int64_t end, Network::Address::InstanceConstSharedPtr primary)
+      : start_(start), end_(end), primary_(std::move(primary)) {}
 
   int64_t start() const { return start_; }
   int64_t end() const { return end_; }
-  Network::Address::InstanceConstSharedPtr master() const { return master_; }
+  Network::Address::InstanceConstSharedPtr primary() const { return primary_; }
   const absl::flat_hash_set<Network::Address::InstanceConstSharedPtr>& replicas() const {
     return replicas_;
   }
@@ -49,7 +49,7 @@ public:
 private:
   int64_t start_;
   int64_t end_;
-  Network::Address::InstanceConstSharedPtr master_;
+  Network::Address::InstanceConstSharedPtr primary_;
   absl::flat_hash_set<Network::Address::InstanceConstSharedPtr> replicas_;
 };
 
@@ -82,7 +82,7 @@ public:
                                bool is_redis_cluster,
                                const NetworkFilters::Common::Redis::RespValue& request,
                                NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
-                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Master);
+                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
 
   // Upstream::LoadBalancerContextBase
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
@@ -130,7 +130,7 @@ using ClusterSlotUpdateCallBackSharedPtr = std::shared_ptr<ClusterSlotUpdateCall
 class RedisClusterLoadBalancerFactory : public ClusterSlotUpdateCallBack,
                                         public Upstream::LoadBalancerFactory {
 public:
-  RedisClusterLoadBalancerFactory(Runtime::RandomGenerator& random) : random_(random) {}
+  RedisClusterLoadBalancerFactory(Random::RandomGenerator& random) : random_(random) {}
 
   // ClusterSlotUpdateCallBack
   bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap all_hosts) override;
@@ -143,9 +143,9 @@ public:
 private:
   class RedisShard {
   public:
-    RedisShard(Upstream::HostConstSharedPtr master, Upstream::HostVectorConstSharedPtr replicas,
+    RedisShard(Upstream::HostConstSharedPtr primary, Upstream::HostVectorConstSharedPtr replicas,
                Upstream::HostVectorConstSharedPtr all_hosts)
-        : master_(std::move(master)) {
+        : primary_(std::move(primary)) {
       replicas_.updateHosts(Upstream::HostSetImpl::partitionHosts(
                                 std::move(replicas), Upstream::HostsPerLocalityImpl::empty()),
                             nullptr, {}, {});
@@ -153,12 +153,12 @@ private:
                                  std::move(all_hosts), Upstream::HostsPerLocalityImpl::empty()),
                              nullptr, {}, {});
     }
-    const Upstream::HostConstSharedPtr master() const { return master_; }
+    const Upstream::HostConstSharedPtr primary() const { return primary_; }
     const Upstream::HostSetImpl& replicas() const { return replicas_; }
     const Upstream::HostSetImpl& allHosts() const { return all_hosts_; }
 
   private:
-    const Upstream::HostConstSharedPtr master_;
+    const Upstream::HostConstSharedPtr primary_;
     Upstream::HostSetImpl replicas_{0, absl::nullopt};
     Upstream::HostSetImpl all_hosts_{0, absl::nullopt};
   };
@@ -183,7 +183,7 @@ private:
   class RedisClusterLoadBalancer : public Upstream::LoadBalancer {
   public:
     RedisClusterLoadBalancer(SlotArraySharedPtr slot_array, ShardVectorSharedPtr shard_vector,
-                             Runtime::RandomGenerator& random)
+                             Random::RandomGenerator& random)
         : slot_array_(std::move(slot_array)), shard_vector_(std::move(shard_vector)),
           random_(random) {}
 
@@ -193,14 +193,14 @@ private:
   private:
     const SlotArraySharedPtr slot_array_;
     const ShardVectorSharedPtr shard_vector_;
-    Runtime::RandomGenerator& random_;
+    Random::RandomGenerator& random_;
   };
 
   absl::Mutex mutex_;
   SlotArraySharedPtr slot_array_ ABSL_GUARDED_BY(mutex_);
   ClusterSlotsSharedPtr current_cluster_slot_;
   ShardVectorSharedPtr shard_vector_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
 };
 
 class RedisClusterThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {

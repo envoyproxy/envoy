@@ -5,6 +5,7 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "common/common/assert.h"
+#include "common/http/headers.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"
 
@@ -14,6 +15,9 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer_handle(Http::CustomHeaders::get().Referer);
 
 HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
     GrpcCommon::GrpcAccessLoggerSharedPtr logger)
@@ -86,8 +90,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   if (request_headers.UserAgent() != nullptr) {
     request_properties->set_user_agent(std::string(request_headers.getUserAgentValue()));
   }
-  if (request_headers.Referer() != nullptr) {
-    request_properties->set_referer(std::string(request_headers.getRefererValue()));
+  if (request_headers.getInline(referer_handle.handle()) != nullptr) {
+    request_properties->set_referer(
+        std::string(request_headers.getInlineValue(referer_handle.handle())));
   }
   if (request_headers.ForwardedFor() != nullptr) {
     request_properties->set_forwarded_for(std::string(request_headers.getForwardedForValue()));

@@ -56,14 +56,15 @@ public:
    * @param duration The maximum amount of time to wait.
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
-  virtual Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
+  virtual Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex,
+                                              Thread::CondVar& condvar,
+                                              const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
 
   template <class D>
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const D& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                      const D& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     return waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
   }
 };
@@ -108,14 +109,15 @@ public:
     timeSystem().advanceTimeWait(duration);
   }
 
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                      const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     return timeSystem().waitFor(mutex, condvar, duration);
   }
 
-  SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
-    return timeSystem().createScheduler(base_scheduler);
+  SchedulerPtr createScheduler(Scheduler& base_scheduler,
+                               CallbackScheduler& cb_scheduler) override {
+    return timeSystem().createScheduler(base_scheduler, cb_scheduler);
   }
   SystemTime systemTime() override { return timeSystem().systemTime(); }
   MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }

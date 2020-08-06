@@ -40,8 +40,13 @@ Example Configuration
       client_config:
         resolution_timeout: 5s
         upstream_resolvers:
-        - "8.8.8.8"
-        - "8.8.4.4"
+        - socket_address:
+            address: "8.8.8.8"
+            port_value: 53
+        - socket_address:
+            address: "8.8.4.4"
+            port_value: 53
+        max_pending_lookups: 256
       server_config:
         inline_dns_table:
           known_suffixes:

@@ -169,6 +169,7 @@ public:
   static const uint32_t RETRY_ON_RETRIABLE_STATUS_CODES  = 0x400;
   static const uint32_t RETRY_ON_RESET                   = 0x800;
   static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
+  static const uint32_t RETRY_ON_ENVOY_RATE_LIMITED      = 0x2000;
   // clang-format on
 
   virtual ~RetryPolicy() = default;
@@ -812,7 +813,7 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
    * this route.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
@@ -1096,7 +1097,6 @@ public:
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 class GenericConnectionPoolCallbacks;
-class UpstreamRequest;
 class GenericUpstream;
 
 /**
@@ -1139,6 +1139,22 @@ public:
 };
 
 /**
+ * An API for the interactions the upstream stream needs to have with the downstream stream
+ * and/or router components
+ */
+class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
+public:
+  /**
+   * @return return the routeEntry for the downstream stream.
+   */
+  virtual const RouteEntry& routeEntry() const PURE;
+  /**
+   * @return return the connection for the downstream stream.
+   */
+  virtual const Network::Connection& connection() const PURE;
+};
+
+/**
  * An API for wrapping callbacks from either an HTTP or a TCP connection pool.
  *
  * Just like the connection pool callbacks, the GenericConnectionPoolCallbacks
@@ -1174,10 +1190,12 @@ public:
                            const Network::Address::InstanceConstSharedPtr& upstream_local_address,
                            const StreamInfo::StreamInfo& info) PURE;
 
-  // TODO(alyssawilk) This exists because the Connection Pool creates the GenericUpstream, and the
-  // GenericUpstream needs a handle back to the upstream request to pass on events, as upstream
-  // data flows in. Do interface clean up in a follow-up PR.
-  virtual UpstreamRequest* upstreamRequest() PURE;
+  // @return the UpstreamToDownstream interface for this stream.
+  //
+  // This is the interface for all interactions the upstream stream needs to have with the
+  // downstream stream. It is in the GenericConnectionPoolCallbacks as the GenericConnectionPool
+  // creates the GenericUpstream, and the GenericUpstream will need this interface.
+  virtual UpstreamToDownstream& upstreamToDownstream() PURE;
 };
 
 /**
@@ -1234,10 +1252,11 @@ public:
    * @param options for creating the transport socket
    * @return may be null
    */
-  virtual GenericConnPoolPtr createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
-                                                   const RouteEntry& route_entry,
-                                                   Http::Protocol protocol,
-                                                   Upstream::LoadBalancerContext* ctx) const PURE;
+  virtual GenericConnPoolPtr
+  createGenericConnPool(Upstream::ClusterManager& cm, bool is_connect,
+                        const RouteEntry& route_entry,
+                        absl::optional<Http::Protocol> downstream_protocol,
+                        Upstream::LoadBalancerContext* ctx) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

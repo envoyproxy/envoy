@@ -1,3 +1,4 @@
+#include "common/http/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -94,7 +95,7 @@ TEST_P(TlsInspectorTest, ConnectionClosed) {
 TEST_P(TlsInspectorTest, ReadError) {
   init();
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-    return Api::SysCallSizeResult{ssize_t(-1), ENOTSUP};
+    return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_NOT_SUP};
   }));
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
@@ -159,7 +160,7 @@ TEST_P(TlsInspectorTest, MultipleReads) {
     InSequence s;
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(InvokeWithoutArgs([]() -> Api::SysCallSizeResult {
-          return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+          return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
         }));
     for (size_t i = 1; i <= client_hello.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))

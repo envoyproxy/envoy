@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/socket_interface_impl.h"
@@ -10,12 +11,8 @@
 namespace Envoy {
 namespace Network {
 
-SocketImpl::SocketImpl(Socket::Type type, Address::Type addr_type, Address::IpVersion version)
-    : io_handle_(SocketInterfaceSingleton::get().socket(type, addr_type, version)),
-      sock_type_(type), addr_type_(addr_type) {}
-
 SocketImpl::SocketImpl(Socket::Type sock_type, const Address::InstanceConstSharedPtr addr)
-    : io_handle_(SocketInterfaceSingleton::get().socket(sock_type, addr)), sock_type_(sock_type),
+    : io_handle_(ioHandleForAddr(sock_type, addr)), sock_type_(sock_type),
       addr_type_(addr->type()) {}
 
 SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
@@ -56,19 +53,19 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
       unlink(pipe_sa->sun_path);
     }
     // Not storing a reference to syscalls singleton because of unit test mocks
-    bind_result = io_handle_->bind(address->sockAddr(), address->sockAddrLen());
+    bind_result = io_handle_->bind(address);
     if (pipe->mode() != 0 && !abstract_namespace && bind_result.rc_ == 0) {
       auto set_permissions = Api::OsSysCallsSingleton::get().chmod(pipe_sa->sun_path, pipe->mode());
       if (set_permissions.rc_ != 0) {
         throw EnvoyException(fmt::format("Failed to create socket with mode {}: {}",
                                          std::to_string(pipe->mode()),
-                                         strerror(set_permissions.errno_)));
+                                         errorDetails(set_permissions.errno_)));
       }
     }
     return bind_result;
   }
 
-  bind_result = io_handle_->bind(address->sockAddr(), address->sockAddrLen());
+  bind_result = io_handle_->bind(address);
   if (bind_result.rc_ == 0 && address->ip()->port() == 0) {
     local_address_ = io_handle_->localAddress();
   }
@@ -78,7 +75,7 @@ Api::SysCallIntResult SocketImpl::bind(Network::Address::InstanceConstSharedPtr 
 Api::SysCallIntResult SocketImpl::listen(int backlog) { return io_handle_->listen(backlog); }
 
 Api::SysCallIntResult SocketImpl::connect(const Network::Address::InstanceConstSharedPtr address) {
-  auto result = io_handle_->connect(address->sockAddr(), address->sockAddrLen());
+  auto result = io_handle_->connect(address);
   if (address->type() == Address::Type::Ip) {
     local_address_ = io_handle_->localAddress();
   }

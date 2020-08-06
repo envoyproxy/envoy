@@ -4,7 +4,7 @@
 
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 
 #include "gmock/gmock.h"
 

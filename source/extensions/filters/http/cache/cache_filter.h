@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/http_cache.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -42,10 +43,6 @@ private:
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
-  // These don't require private access, but are members per envoy convention.
-  static bool isCacheableRequest(Http::RequestHeaderMap& headers);
-  static bool isCacheableResponse(Http::ResponseHeaderMap& headers);
-
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;
@@ -58,7 +55,11 @@ private:
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
-  bool response_has_trailers_;
+  bool response_has_trailers_ = false;
+
+  // True if a request allows cache inserts according to:
+  // https://httpwg.org/specs/rfc7234.html#response.cacheability
+  bool request_allows_inserts_ = false;
 
   // Used for coordinating between decodeHeaders and onHeaders.
   enum class GetHeadersState { Initial, FinishedGetHeadersCall, GetHeadersResultUnusable };

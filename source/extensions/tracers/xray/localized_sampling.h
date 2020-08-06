@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "envoy/common/time.h"
-#include "envoy/runtime/runtime.h"
 
 #include "common/common/logger.h"
+#include "common/common/random_generator.h"
 
 #include "extensions/tracers/xray/reservoir.h"
 #include "extensions/tracers/xray/sampling_strategy.h"
@@ -137,7 +137,7 @@ private:
 
 class LocalizedSamplingStrategy : public SamplingStrategy {
 public:
-  LocalizedSamplingStrategy(const std::string& sampling_rules_json, Runtime::RandomGenerator& rng,
+  LocalizedSamplingStrategy(const std::string& sampling_rules_json, Random::RandomGenerator& rng,
                             TimeSource& time_source)
       : SamplingStrategy(rng), default_manifest_(LocalizedSamplingManifest::createDefault()),
         custom_manifest_(sampling_rules_json), time_source_(time_source),

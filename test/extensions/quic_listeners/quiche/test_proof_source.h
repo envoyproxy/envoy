@@ -13,6 +13,8 @@
 #endif
 
 #include <memory>
+
+#include "test/mocks/network/mocks.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
 
 namespace Envoy {
@@ -35,13 +37,18 @@ public:
                       const std::string& /*hostname*/, uint16_t /*signature_algorithm*/,
                       quiche::QuicheStringPiece in,
                       std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override {
-    callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"), nullptr);
+    callback->Run(true, absl::StrCat("Fake signature for { ", in, " }"),
+                  std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain_));
   }
+
+  const Network::MockFilterChain& filterChain() const { return filter_chain_; }
 
 private:
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> cert_chain_{
       new quic::ProofSource::Chain(
           std::vector<std::string>{std::string(quic::test::kTestCertificate)})};
+
+  Network::MockFilterChain filter_chain_;
 };
 
 } // namespace Quic
