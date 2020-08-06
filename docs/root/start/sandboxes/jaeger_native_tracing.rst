@@ -17,8 +17,11 @@ native client instead of with Envoy's builtin Zipkin client has the following ad
 
 This sandbox is very similar to the front proxy architecture described above, with one difference:
 service1 makes an API call to service2 before returning a response.
-The three containers will be deployed inside a virtual network called ``envoymesh``. (Note: the sandbox
-only works on x86-64).
+The three containers will be deployed inside a virtual network called ``envoymesh``.
+
+.. note::
+
+   The jaeger native tracing sandbox only works on x86-64.
 
 All incoming requests are routed via the front Envoy, which is acting as a reverse proxy
 sitting on the edge of the ``envoymesh`` network. Port ``8000`` is exposed
@@ -49,7 +52,9 @@ as is described in the image above.
 
 **Step 1: Build the sandbox**
 
-To build this sandbox example, and start the example apps run the following commands::
+To build this sandbox example, and start the example apps run the following commands:
+
+.. code-block:: console
 
     $ pwd
     envoy/examples/jaeger-native-tracing
@@ -66,7 +71,9 @@ To build this sandbox example, and start the example apps run the following comm
 
 **Step 2: Generate some load**
 
-You can now send a request to service1 via the front-envoy as follows::
+You can now send a request to service1 via the front-envoy as follows:
+
+.. code-block:: console
 
     $ curl -v localhost:8000/trace/1
     *   Trying 192.168.99.100...
