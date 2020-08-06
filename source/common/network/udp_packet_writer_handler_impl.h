@@ -28,7 +28,7 @@ public:
   Network::UdpPacketWriterBuffer
   getNextWriteLocation(const Address::Ip* /*local_ip*/,
                        const Address::Instance& /*peer_address*/) override {
-    return {nullptr, nullptr};
+    return {nullptr, 0, nullptr};
   }
   Api::IoCallUint64Result flush() override {
     return Api::IoCallUint64Result(

@@ -114,7 +114,8 @@ protected:
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test
     ON_CALL(listener_config_, udpPacketWriterFactory())
-        .WillByDefault(Return(&udp_packet_writer_factory_));
+        .WillByDefault(Return(
+            std::reference_wrapper<Network::UdpPacketWriterFactory>(udp_packet_writer_factory_)));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
         .WillByDefault(Invoke(
             [&](Network::IoHandle& io_handle, Stats::Scope& scope) -> Network::UdpPacketWriterPtr {

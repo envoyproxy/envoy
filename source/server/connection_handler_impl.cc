@@ -580,7 +580,7 @@ ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
   }
 
   // Create udp_packet_writer
-  udp_packet_writer_ = config.udpPacketWriterFactory()->createUdpPacketWriter(
+  udp_packet_writer_ = config.udpPacketWriterFactory()->get().createUdpPacketWriter(
       listen_socket_.ioHandle(), config.listenerScope());
 }
 

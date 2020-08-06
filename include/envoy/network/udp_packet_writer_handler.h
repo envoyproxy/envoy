@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <memory>
 
-#include "envoy/api/io_error.h"    // IoCallUint64Result
-#include "envoy/buffer/buffer.h"   // Buffer
-#include "envoy/network/address.h" // Address
-#include "envoy/network/socket.h"  // Socket
+#include "envoy/api/io_error.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/address.h"
+#include "envoy/network/socket.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -24,10 +24,12 @@ static const uint64_t K_MAX_OUTGOING_PACKET_SIZE = 1452;
  */
 struct UdpPacketWriterBuffer {
   UdpPacketWriterBuffer() = default;
-  UdpPacketWriterBuffer(char* buffer, std::function<void(const char*)> release_buffer)
-      : buffer_(buffer), release_buffer_(std::move(release_buffer)) {}
+  UdpPacketWriterBuffer(uint8_t* buffer, size_t length,
+                        std::function<void(const char*)> release_buffer)
+      : buffer_(buffer), length_(length), release_buffer_(std::move(release_buffer)) {}
 
-  char* buffer_ = nullptr;
+  uint8_t* buffer_ = nullptr;
+  size_t length_ = 0;
   std::function<void(const char*)> release_buffer_;
 };
 
@@ -111,6 +113,7 @@ public:
 };
 
 using UdpPacketWriterFactoryPtr = std::unique_ptr<UdpPacketWriterFactory>;
+using UdpPacketWriterFactoryOptRef = absl::optional<std::reference_wrapper<UdpPacketWriterFactory>>;
 
 } // namespace Network
 } // namespace Envoy

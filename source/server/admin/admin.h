@@ -379,7 +379,7 @@ private:
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    Network::UdpPacketWriterFactory* udpPacketWriterFactory() override {
+    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
     envoy::config::core::v3::TrafficDirection direction() const override {

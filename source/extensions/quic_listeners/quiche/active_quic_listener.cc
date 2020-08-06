@@ -70,7 +70,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
-      listener_config.udpPacketWriterFactory()->createUdpPacketWriter(
+      listener_config.udpPacketWriterFactory()->get().createUdpPacketWriter(
           listen_socket_.ioHandle(), listener_config.listenerScope());
   udp_packet_writer_ = udp_packet_writer.get();
   if (udp_packet_writer->isBatchMode()) {

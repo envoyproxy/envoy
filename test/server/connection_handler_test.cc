@@ -96,8 +96,8 @@ public:
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
-    Network::UdpPacketWriterFactory* udpPacketWriterFactory() override {
-      return udp_writer_factory_.get();
+    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+      return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
     }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;

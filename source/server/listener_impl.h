@@ -302,8 +302,8 @@ public:
   Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
-  Network::UdpPacketWriterFactory* udpPacketWriterFactory() override {
-    return udp_writer_factory_.get();
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+    return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 

@@ -101,7 +101,7 @@ udp_writer_config:
       manager_->listeners().front().get().listenSocketFactory().getListenSocket();
 
   Network::UdpPacketWriterPtr udp_packet_writer =
-      manager_->listeners().front().get().udpPacketWriterFactory()->createUdpPacketWriter(
+      manager_->listeners().front().get().udpPacketWriterFactory()->get().createUdpPacketWriter(
           listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
   EXPECT_TRUE(udp_packet_writer->isBatchMode());
 

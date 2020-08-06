@@ -139,7 +139,7 @@ public:
    * @return factory pointer if writing on UDP socket, otherwise return
    * nullptr.
    */
-  virtual UdpPacketWriterFactory* udpPacketWriterFactory() PURE;
+  virtual UdpPacketWriterFactoryOptRef udpPacketWriterFactory() PURE;
 
   /**
    * @return traffic direction of the listener.

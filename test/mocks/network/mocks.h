@@ -354,7 +354,7 @@ public:
   MOCK_METHOD(uint64_t, listenerTag, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(Network::ActiveUdpListenerFactory*, udpListenerFactory, ());
-  MOCK_METHOD(Network::UdpPacketWriterFactory*, udpPacketWriterFactory, ());
+  MOCK_METHOD(Network::UdpPacketWriterFactoryOptRef, udpPacketWriterFactory, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
 
