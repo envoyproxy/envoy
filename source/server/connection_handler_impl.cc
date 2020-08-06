@@ -528,7 +528,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
-  emitLogs(*listener.config_, *stream_info_);
+  emitLogs(*active_connections_.listener_.config_, *stream_info_);
   auto& listener = active_connections_.listener_;
   listener.stats_.downstream_cx_active_.dec();
   listener.stats_.downstream_cx_destroy_.inc();
