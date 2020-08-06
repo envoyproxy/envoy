@@ -246,7 +246,6 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     testDecodeRequestMiss(filter);
 
     // Encode response
-
     // Add Etag & Last-Modified headers to the response for validation
     response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
     response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
@@ -265,6 +264,9 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     // Make request require validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
 
+    // Decoding the request should find a cached response that requires validation.
+    // As far as decoding the request is concerned, this is the same as a cache miss with the
+    // exception of injecting validation precondition headers.
     testDecodeRequestMiss(filter);
 
     // Make sure validation conditional headers are added
@@ -326,7 +328,6 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     testDecodeRequestMiss(filter);
 
     // Encode response
-
     // Add Etag & Last-Modified headers to the response for validation
     response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
     response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
@@ -345,6 +346,9 @@ TEST_F(CacheFilterTest, UnsuccessfulValidation) {
     // Make request require validation
     request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
 
+    // Decoding the request should find a cached response that requires validation.
+    // As far as decoding the request is concerned, this is the same as a cache miss with the
+    // exception of injecting validation precondition headers.
     testDecodeRequestMiss(filter);
 
     // Make sure validation conditional headers are added
