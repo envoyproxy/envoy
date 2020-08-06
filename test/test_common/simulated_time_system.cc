@@ -8,6 +8,7 @@
 #include "common/common/lock_guard.h"
 #include "common/event/real_time_system.h"
 #include "common/event/timer_impl.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Event {
@@ -50,9 +51,11 @@ private:
 // mechanism used in RealTimeSystem timers is employed for simulated alarms.
 class SimulatedTimeSystemHelper::Alarm : public Timer {
 public:
-  Alarm(SimulatedTimeSystemHelper& time_system, CallbackScheduler& cb_scheduler, TimerCb cb)
+  Alarm(SimulatedScheduler& simulated_scheduler, SimulatedTimeSystemHelper& time_system,
+        CallbackScheduler& cb_scheduler, TimerCb cb)
       : cb_(cb_scheduler.createSchedulableCallback([this, cb] { runAlarm(cb); })),
-        time_system_(time_system), armed_(false), pending_(false) {}
+        simulated_scheduler_(simulated_scheduler), time_system_(time_system), armed_(false),
+        pending_(false) {}
 
   ~Alarm() override;
 
@@ -108,6 +111,7 @@ private:
   }
 
   SchedulableCallbackPtr cb_;
+  SimulatedScheduler& simulated_scheduler_;
   SimulatedTimeSystemHelper& time_system_;
   bool armed_ ABSL_GUARDED_BY(time_system_.mutex_);
   bool pending_ ABSL_GUARDED_BY(time_system_.mutex_);
@@ -120,14 +124,19 @@ private:
 class SimulatedTimeSystemHelper::SimulatedScheduler : public Scheduler {
 public:
   SimulatedScheduler(SimulatedTimeSystemHelper& time_system, CallbackScheduler& cb_scheduler)
-      : time_system_(time_system), cb_scheduler_(cb_scheduler) {}
+      : time_system_(time_system), cb_scheduler_(cb_scheduler),
+        schedule_ready_alarms_cb_(cb_scheduler.createSchedulableCallback(
+            [this] { time_system_.scheduleReadyAlarms(); })) {}
   TimerPtr createTimer(const TimerCb& cb, Dispatcher& /*dispatcher*/) override {
-    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, cb_scheduler_, cb);
+    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(*this, time_system_, cb_scheduler_,
+                                                              cb);
   };
+  void scheduleReadyAlarms() { schedule_ready_alarms_cb_->scheduleCallbackNextIteration(); }
 
 private:
   SimulatedTimeSystemHelper& time_system_;
   CallbackScheduler& cb_scheduler_;
+  SchedulableCallbackPtr schedule_ready_alarms_cb_;
 };
 
 SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
@@ -168,10 +177,11 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
   }
 
   armed_ = true;
-  if (duration.count() == 0) {
+  if (duration.count() == 0 && !Runtime::runtimeFeatureEnabled(
+                                   "envoy.reloadable_features.activate_timers_next_event_loop")) {
     activateLockHeld();
   } else {
-    time_system_.addAlarmLockHeld(*this, duration);
+    time_system_.addAlarmLockHeld(*this, duration, simulated_scheduler_);
   }
 }
 
@@ -287,7 +297,8 @@ void SimulatedTimeSystemHelper::alarmActivateLockHeld(Alarm& alarm) ABSL_NO_THRE
 }
 
 void SimulatedTimeSystemHelper::addAlarmLockHeld(
-    Alarm& alarm, const std::chrono::microseconds& duration) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+    Alarm& alarm, const std::chrono::microseconds& duration,
+    SimulatedScheduler& simulated_scheduler) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   ASSERT(&(alarm.timeSystem()) == this);
   ASSERT(alarms_.size() == alarm_registrations_map_.size());
   ASSERT(alarm_registrations_map_.find(&alarm) == alarm_registrations_map_.end());
@@ -295,6 +306,18 @@ void SimulatedTimeSystemHelper::addAlarmLockHeld(
   auto insert_result = alarms_.insert({monotonic_time_ + duration, random_source_.random(), alarm});
   ASSERT(insert_result.second);
   alarm_registrations_map_.emplace(&alarm, insert_result.first);
+  if (duration.count() == 0) {
+    // Force the event loop to check for timers that are ready to execute since we just added an 0
+    // delay alarm which is ready to execution in the next iteration of the event loop.
+    // TODO(antoniovicente) Refactor alarm tracking so it happens per scheduler and limit wakeup to
+    // a single event loop.
+
+    // We don't want to activate the alarm under lock, as it will make a libevent call, and libevent
+    // itself uses locks:
+    // https://github.com/libevent/libevent/blob/29cc8386a2f7911eaa9336692a2c5544d8b4734f/event.c#L1917
+    UnlockGuard unlocker(mutex_);
+    simulated_scheduler.scheduleReadyAlarms();
+  }
 
   // Sanity check that the parallel data structures used for alarm registration have the same number
   // of entries.
@@ -320,33 +343,40 @@ SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& /*base_schedu
 }
 
 void SimulatedTimeSystemHelper::setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time) {
+  only_one_thread_.checkOneThread();
   // We don't have a MutexLock construct that allows temporarily
   // dropping the lock to run a callback. The main issue here is that we must
   // be careful not to be holding mutex_ when an exception can be thrown.
   // That can only happen here in alarm->activate(), which is run with the mutex
   // released.
   if (monotonic_time >= monotonic_time_) {
-    // Alarms is a std::set ordered by wakeup time, so pulling off begin() each
-    // iteration gives you wakeup order. Also note that alarms may be added
-    // or removed during the call to activate() so it would not be correct to
-    // range-iterate over the set.
-    while (!alarms_.empty()) {
-      const AlarmRegistration& alarm_registration = *alarms_.begin();
-      MonotonicTime alarm_time = alarm_registration.time_;
-      if (alarm_time > monotonic_time) {
-        break;
-      }
-      ASSERT(alarm_time >= monotonic_time_);
-      system_time_ +=
-          std::chrono::duration_cast<SystemTime::duration>(alarm_time - monotonic_time_);
-      monotonic_time_ = alarm_time;
-      Alarm& alarm = alarm_registration.alarm_;
-      removeAlarmLockHeld(alarm);
-      alarmActivateLockHeld(alarm);
-    }
     system_time_ +=
         std::chrono::duration_cast<SystemTime::duration>(monotonic_time - monotonic_time_);
     monotonic_time_ = monotonic_time;
+    scheduleReadyAlarmsLockHeld();
+  }
+}
+
+void SimulatedTimeSystemHelper::scheduleReadyAlarms() {
+  absl::MutexLock lock(&mutex_);
+  scheduleReadyAlarmsLockHeld();
+}
+
+void SimulatedTimeSystemHelper::scheduleReadyAlarmsLockHeld() {
+  // Alarms is a std::set ordered by wakeup time, so pulling off begin() each
+  // iteration gives you wakeup order. Also note that alarms may be added
+  // or removed during the call to activate() so it would not be correct to
+  // range-iterate over the set.
+  while (!alarms_.empty()) {
+    const AlarmRegistration& alarm_registration = *alarms_.begin();
+    MonotonicTime alarm_time = alarm_registration.time_;
+    if (alarm_time > monotonic_time_) {
+      break;
+    }
+
+    Alarm& alarm = alarm_registration.alarm_;
+    removeAlarmLockHeld(alarm);
+    alarmActivateLockHeld(alarm);
   }
 }
 
