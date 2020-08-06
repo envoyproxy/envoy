@@ -91,6 +91,8 @@ static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_passHeader = env->GetMethodID(jcls_JvmCallbackContext, "passHeader", "([B[BZ)V");
   env->PushLocalFrame(headers.length * 2);
+  jboolean start_headers = JNI_TRUE;
+
   for (envoy_header_size_t i = 0; i < headers.length; i++) {
     // Note this is just an initial implementation, and we will pass a more optimized structure in
     // the future.
@@ -117,12 +119,13 @@ static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) 
     env->ReleasePrimitiveArrayCritical(value, critical_value, 0);
 
     // Pass this header pair to the platform
-    jboolean end_headers = i == headers.length - 1 ? JNI_TRUE : JNI_FALSE;
-    env->CallVoidMethod(j_context, jmid_passHeader, key, value, end_headers);
+    env->CallVoidMethod(j_context, jmid_passHeader, key, value, start_headers);
 
     // We don't release local refs currently because we've pushed a large enough frame, but we could
     // consider this and/or periodically popping the frame.
+    start_headers = JNI_FALSE;
   }
+
   env->PopLocalFrame(nullptr);
   env->DeleteLocalRef(jcls_JvmCallbackContext);
   release_envoy_headers(headers);
@@ -143,28 +146,31 @@ static JNIEnv* get_env() {
   return env;
 }
 
-static void jvm_on_headers(envoy_headers headers, bool end_stream, void* context) {
+static void* jvm_on_headers(envoy_headers headers, bool end_stream, void* context) {
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
+  pass_headers(env, headers, j_context);
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmCallbackContext, "onHeaders", "(JZ)V");
+  jmethodID jmid_onHeaders =
+      env->GetMethodID(jcls_JvmCallbackContext, "onHeaders", "(JZ)Ljava/lang/Object;");
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
-  env->CallVoidMethod(j_context, jmid_onHeaders, (jlong)headers.length,
-                      end_stream ? JNI_TRUE : JNI_FALSE);
+  jobject result = env->CallObjectMethod(j_context, jmid_onHeaders, (jlong)headers.length,
+                                         end_stream ? JNI_TRUE : JNI_FALSE);
 
   env->DeleteLocalRef(jcls_JvmCallbackContext);
-  pass_headers(env, headers, j_context);
+  return result;
 }
 
-static void jvm_on_data(envoy_data data, bool end_stream, void* context) {
+static void* jvm_on_data(envoy_data data, bool end_stream, void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_data");
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onData = env->GetMethodID(jcls_JvmCallbackContext, "onData", "([BZ)V");
+  jmethodID jmid_onData =
+      env->GetMethodID(jcls_JvmCallbackContext, "onData", "([BZ)Ljava/lang/Object;");
 
   jbyteArray j_data = env->NewByteArray(data.length);
   // TODO: check if copied via isCopy.
@@ -175,41 +181,47 @@ static void jvm_on_data(envoy_data data, bool end_stream, void* context) {
   // Here '0' (for which there is no named constant) indicates we want to commit the changes back
   // to the JVM and free the c array, where applicable.
   env->ReleasePrimitiveArrayCritical(j_data, critical_data, 0);
-  env->CallVoidMethod(j_context, jmid_onData, j_data, end_stream ? JNI_TRUE : JNI_FALSE);
+  jobject result =
+      env->CallObjectMethod(j_context, jmid_onData, j_data, end_stream ? JNI_TRUE : JNI_FALSE);
 
   data.release(data.context);
   env->DeleteLocalRef(j_data);
   env->DeleteLocalRef(jcls_JvmCallbackContext);
+  return result;
 }
 
-static void jvm_on_metadata(envoy_headers metadata, void* context) {
+static void* jvm_on_metadata(envoy_headers metadata, void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_metadata");
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", std::to_string(metadata.length).c_str());
+  return NULL;
 }
 
-static void jvm_on_trailers(envoy_headers trailers, void* context) {
+static void* jvm_on_trailers(envoy_headers trailers, void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_trailers");
 
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
+  pass_headers(env, trailers, j_context);
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onTrailers = env->GetMethodID(jcls_JvmCallbackContext, "onTrailers", "(J)V");
+  jmethodID jmid_onTrailers =
+      env->GetMethodID(jcls_JvmCallbackContext, "onTrailers", "(J)Ljava/lang/Object;");
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
-  env->CallVoidMethod(j_context, jmid_onTrailers, (jlong)trailers.length);
+  jobject result = env->CallObjectMethod(j_context, jmid_onTrailers, (jlong)trailers.length);
 
   env->DeleteLocalRef(jcls_JvmCallbackContext);
-  pass_headers(env, trailers, j_context);
+  return result;
 }
 
-static void jvm_on_error(envoy_error error, void* context) {
+static void* jvm_on_error(envoy_error error, void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_error");
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onError = env->GetMethodID(jcls_JvmObserverContext, "onError", "(I[BI)V");
+  jmethodID jmid_onError =
+      env->GetMethodID(jcls_JvmObserverContext, "onError", "(I[BI)Ljava/lang/Object;");
 
   jbyteArray j_error_message = env->NewByteArray(error.message.length);
   // TODO: check if copied via isCopy.
@@ -221,32 +233,36 @@ static void jvm_on_error(envoy_error error, void* context) {
   // to the JVM and free the c array, where applicable.
   env->ReleasePrimitiveArrayCritical(j_error_message, critical_error_message, 0);
 
-  env->CallVoidMethod(j_context, jmid_onError, error.error_code, j_error_message,
-                      error.attempt_count);
+  jobject result = env->CallObjectMethod(j_context, jmid_onError, error.error_code, j_error_message,
+                                         error.attempt_count);
 
   error.message.release(error.message.context);
   // No further callbacks happen on this context. Delete the reference held by native code.
   env->DeleteGlobalRef(j_context);
+  return result;
 }
 
-static void jvm_on_complete(void* context) {
+static void* jvm_on_complete(void* context) {
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
   env->DeleteGlobalRef(j_context);
+  return NULL;
 }
 
-static void jvm_on_cancel(void* context) {
+static void* jvm_on_cancel(void* context) {
   __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_cancel");
 
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
 
   jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
-  jmethodID jmid_onCancel = env->GetMethodID(jcls_JvmObserverContext, "onCancel", "()V");
-  env->CallVoidMethod(j_context, jmid_onCancel);
+  jmethodID jmid_onCancel =
+      env->GetMethodID(jcls_JvmObserverContext, "onCancel", "()Ljava/lang/Object;");
+  jobject result = env->CallObjectMethod(j_context, jmid_onCancel);
 
   // No further callbacks happen on this context. Delete the reference held by native code.
   env->DeleteGlobalRef(j_context);
+  return result;
 }
 
 // Utility functions

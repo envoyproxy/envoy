@@ -28,6 +28,7 @@ java_library(
         "EnvoyEngineImpl.java",
         "EnvoyHTTPStream.java",
         "JniLibrary.java",
+        "JvmBridgeUtility.java",
         "JvmCallbackContext.java",
     ],
     visibility = ["//visibility:public"],
