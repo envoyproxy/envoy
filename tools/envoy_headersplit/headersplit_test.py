@@ -35,7 +35,7 @@ class HeadersplitTest(unittest.TestCase):
     self.assertEqual(headersplit.to_filename("TestRetryHostPredicateFactory"),
                      "test_retry_host_predicate_factory")
 
-  def test_get_headers(self):
+  def test_get_directives(self):
     includes = """// your first c++ program
 // NOLINT(namespace-envoy)
 #include <iostream>
@@ -48,7 +48,7 @@ class HeadersplitTest(unittest.TestCase):
 
     translation_unit_hello_world = TranslationUnit.from_source(
         "code_corpus/hello.h", options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
-    self.assertEqual(headersplit.get_headers(translation_unit_hello_world), includes)
+    self.assertEqual(headersplit.get_directives(translation_unit_hello_world), includes)
 
   def test_class_definitions(self):
     # class_definitions() should return a list of cursors, each pointing to one of those classes

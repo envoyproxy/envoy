@@ -38,9 +38,9 @@ def to_filename(classname: str) -> str:
   return ret.lower()
 
 
-def get_headers(translation_unit: Type[TranslationUnit]) -> str:
+def get_directives(stranslation_unit: Type[TranslationUnit]) -> str:
   """
-    "extracts" all head includes statements from the target code file (translation_unit)
+    "extracts" all head includes statements and other directives from the target code file (translation_unit)
 
     for instance:
         foo.h:
@@ -323,11 +323,11 @@ def main(args):
   impl_translation_unit = TranslationUnit.from_source(
       impl_filename, options=TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
-  impl_includes = get_headers(impl_translation_unit)
+  impl_includes = get_directives(impl_translation_unit)
 
   decl_translation_unit = idx.parse(decl_filename, ['-x', 'c++'])
   defns = class_definitions(decl_translation_unit.cursor)
-  decl_includes = get_headers(decl_translation_unit)
+  decl_includes = get_directives(decl_translation_unit)
 
   impl_cursors = class_implementations(impl_translation_unit.cursor)
 
