@@ -1,0 +1,235 @@
+static_resources {
+  clusters {
+    name: "9NP3372036854775807"
+    connect_timeout {
+      nanos: 250000050
+    }
+    http2_protocol_options {
+      max_outbound_frames {
+        value: 40
+      }
+      stream_error_on_invalid_http_messaging: true
+    }
+    outlier_detection {
+      base_ejection_time {
+        nanos: 25344
+      }
+      enforcing_success_rate {
+        value: 2
+      }
+      success_rate_request_volume {
+        value: 40
+      }
+      enforcing_consecutive_gateway_failure {
+        value: 2
+      }
+      consecutive_local_origin_failure {
+        value: 2
+      }
+    }
+    load_assignment {
+      cluster_name: "."
+      endpoints {
+        locality {
+          sub_zone: "\037\037\037\037\037\037\037\037\037\000\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\031\037\037\037\037\037\037\037\037\037\037\037\037"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: DRAINING
+        }
+      }
+      endpoints {
+        locality {
+          zone: "\177"
+          sub_zone: "\177"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+          metadata {
+            filter_metadata {
+              key: "\177"
+              value {
+              }
+            }
+          }
+        }
+      }
+      endpoints {
+        priority: 16
+      }
+      endpoints {
+        proximity {
+          value: 2
+        }
+      }
+      endpoints {
+        priority: 36
+      }
+    }
+    track_timeout_budgets: true
+  }
+  clusters {
+    name: "ser"
+    connect_timeout {
+      nanos: 813
+    }
+    per_connection_buffer_limit_bytes {
+    }
+    lb_policy: RING_HASH
+    health_checks {
+      timeout {
+        seconds: 1999999
+        nanos: 95
+      }
+      interval {
+        seconds: 165537
+        nanos: 95
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "h"
+        path: "&"
+      }
+      no_traffic_interval {
+        nanos: 25344
+      }
+      healthy_edge_interval {
+        nanos: 54784
+      }
+      always_log_health_check_failures: true
+      transport_socket_match_criteria {
+        fields {
+          key: ""
+          value {
+            number_value: 0
+          }
+        }
+        fields {
+          key: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+          value {
+          }
+        }
+      }
+    }
+    outlier_detection {
+      base_ejection_time {
+        nanos: 243315247
+      }
+      enforcing_success_rate {
+        value: 2
+      }
+      success_rate_request_volume {
+        value: 40
+      }
+      consecutive_gateway_failure {
+        value: 512
+      }
+      enforcing_consecutive_gateway_failure {
+        value: 2
+      }
+      consecutive_local_origin_failure {
+        value: 2
+      }
+    }
+    common_lb_config {
+    }
+    alt_stat_name: "\360\240\240\240\360\240\240\240\360\240\240\240\360\240\240\240\360\240\240\240\360\240\240\240\360\240\240\240\340\240\240"
+    common_http_protocol_options {
+      idle_timeout {
+        nanos: 95
+      }
+    }
+    load_assignment {
+      cluster_name: ".."
+      endpoints {
+        locality {
+          sub_zone: "\037\037\037\037\037\037\037\037\037\000\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\031\037\037\037\037\037\037\037\037\037\037\037\037"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+          metadata {
+            filter_metadata {
+              key: "\177"
+              value {
+              }
+            }
+          }
+        }
+        priority: 2
+      }
+      endpoints {
+        locality {
+          sub_zone: "\177"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+        }
+      }
+      endpoints {
+        priority: 16
+      }
+      endpoints {
+        proximity {
+          value: 2
+        }
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+        }
+      }
+    }
+    use_tcp_for_dns_lookups: true
+  }
+}
+watchdog {
+  miss_timeout {
+    nanos: 4096
+  }
+}
+hds_config {
+  api_type: GRPC
+  grpc_services {
+    envoy_grpc {
+      cluster_name: "\\"
+    }
+  }
+  transport_api_version: V2
+}

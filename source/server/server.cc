@@ -523,21 +523,30 @@ void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
 
 void InstanceImpl::onRuntimeReady() {
   // Begin initializing secondary clusters after RTDS configuration has been applied.
-  clusterManager().initializeSecondaryClusters(bootstrap_);
+  try {
+    clusterManager().initializeSecondaryClusters(bootstrap_);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
+  }
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
-    async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
-    hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        stats_store_,
-        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                       stats_store_, false)
-            ->create(),
-        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
-        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
-        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
-        messageValidationContext().dynamicValidationVisitor(), *api_);
+    try {
+      async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
+          *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
+      hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
+          stats_store_,
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
+                                                         stats_store_, false)
+              ->create(),
+          hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
+          stats_store_, *ssl_context_manager_, *random_generator_, info_factory_,
+          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+          *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
+          *api_);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
+    }
   }
 
   // If there is no global limit to the number of active connections, warn on startup.

@@ -1,0 +1,122 @@
+static_resources {
+  clusters {
+    name: "ser"
+    connect_timeout {
+      nanos: 813
+    }
+    per_connection_buffer_limit_bytes {
+    }
+    lb_policy: RING_HASH
+    health_checks {
+      timeout {
+        nanos: 95
+      }
+      interval {
+        seconds: 165537
+        nanos: 95
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "h"
+        path: "&"
+      }
+      no_traffic_interval {
+        nanos: 25344
+      }
+      healthy_edge_interval {
+        nanos: 95
+      }
+    }
+    http2_protocol_options {
+    }
+    outlier_detection {
+      enforcing_consecutive_local_origin_failure {
+        value: 64
+      }
+    }
+    load_assignment {
+      cluster_name: "."
+      endpoints {
+        locality {
+          sub_zone: "\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+          metadata {
+            filter_metadata {
+              key: ")"
+              value {
+              }
+            }
+          }
+        }
+      }
+      endpoints {
+        locality {
+          sub_zone: "\037\037\037\037\037\037\037\037\037\000\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\031\037\037\037\037\037\037\037\037\037\037\037\037"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: DRAINING
+        }
+      }
+      endpoints {
+        priority: 16
+      }
+      endpoints {
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+        }
+        load_balancing_weight {
+          value: 32768
+        }
+        priority: 16
+      }
+    }
+    least_request_lb_config {
+      choice_count {
+        value: 2046820352
+      }
+    }
+    use_tcp_for_dns_lookups: true
+  }
+}
+stats_flush_interval {
+  nanos: 16777216
+}
+admin {
+  access_log_path: "f"
+  socket_options {
+    level: 4702337453602635775
+  }
+}
+hds_config {
+  cluster_names: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+}
+enable_dispatcher_stats: true
+use_tcp_for_dns_lookups: true

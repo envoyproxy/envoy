@@ -1,0 +1,135 @@
+static_resources {
+  clusters {
+    name: "ser"
+    connect_timeout {
+      nanos: 813
+    }
+    lb_policy: RING_HASH
+    health_checks {
+      timeout {
+        nanos: 926363914
+      }
+      interval {
+        seconds: 165537
+        nanos: 95
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "h"
+        path: "\001"
+      }
+      no_traffic_interval {
+        nanos: 25344
+      }
+      healthy_edge_interval {
+        nanos: 54784
+      }
+    }
+    ignore_health_on_host_removal: true
+    load_assignment {
+      cluster_name: "."
+      endpoints {
+        locality {
+          sub_zone: "\037\037\037\037\037\037\037\037\037\037\037U4037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+        }
+      }
+      endpoints {
+        locality {
+          sub_zone: "\037\037\037\037\037\037\037\037\037\000\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\031\037\037\037\037\037\037\037\037\037\037\037\037"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: DRAINING
+        }
+      }
+      endpoints {
+        priority: 16
+      }
+      endpoints {
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: HEALTHY
+        }
+        priority: 64
+      }
+    }
+    use_tcp_for_dns_lookups: true
+    track_timeout_budgets: true
+  }
+  clusters {
+    name: "7"
+    connect_timeout {
+      nanos: 926363914
+    }
+    http_protocol_options {
+      allow_absolute_url {
+        value: true
+      }
+      enable_trailers: true
+    }
+    dns_lookup_family: V6_ONLY
+    transport_socket {
+      name: "raw_buffer"
+    }
+    protocol_selection: USE_DOWNSTREAM_PROTOCOL
+    common_lb_config {
+      healthy_panic_threshold {
+      }
+    }
+  }
+}
+cluster_manager {
+  load_stats_config {
+    api_type: GRPC
+    grpc_services {
+      google_grpc {
+        target_uri: "2"
+        call_credentials {
+          service_account_jwt_access {
+            json_key: "\"a"
+            token_lifetime_seconds: 140737488355326
+          }
+        }
+        call_credentials {
+          service_account_jwt_access {
+            json_key: "\"a"
+            token_lifetime_seconds: 140737488355326
+          }
+        }
+        stat_prefix: "*"
+        credentials_factory_name: "unix"
+      }
+    }
+    request_timeout {
+      nanos: 14024704
+    }
+  }
+}
+header_prefix: "\001"
