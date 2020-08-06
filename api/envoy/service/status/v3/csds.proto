@@ -61,6 +61,9 @@ message ClientStatusRequest {
   // Management server can use these match criteria to identify clients.
   // The match follows OR semantics.
   repeated type.matcher.v3.NodeMatcher node_matchers = 1;
+
+  // [#not-implemented-hide:]
+  string id = 2;
 }
 
 // Detailed config (per xDS) with status.
