@@ -613,6 +613,13 @@ private:
     }
 
     /**
+     * Marks local processing as complete.
+     */
+    void setLocalComplete() {
+      state_.local_complete_ = true;
+    }
+
+    /**
      * Whether the filters have been destroyed.
      */
     bool destroyed() const { return state_.destroyed_; }
