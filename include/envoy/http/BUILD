@@ -91,6 +91,7 @@ envoy_cc_library(
     deps = [
         ":header_map_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/stream_info:filter_state_interface",
     ],
 )
 

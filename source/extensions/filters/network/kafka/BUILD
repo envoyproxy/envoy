@@ -97,6 +97,7 @@ envoy_cc_library(
     ],
     deps = [
         ":serialization_lib",
+        ":tagged_fields_lib",
     ],
 )
 
@@ -160,6 +161,7 @@ envoy_cc_library(
     ],
     deps = [
         ":serialization_lib",
+        ":tagged_fields_lib",
     ],
 )
 

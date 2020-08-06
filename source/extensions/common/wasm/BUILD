@@ -30,6 +30,7 @@ envoy_cc_library(
     name = "wasm_vm_base",
     hdrs = ["wasm_vm_base.h"],
     deps = [
+        ":wasm_vm_interface",
         "//source/common/stats:stats_lib",
     ],
 )
