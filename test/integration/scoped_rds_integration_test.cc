@@ -441,7 +441,7 @@ key:
 }
 
 // Test that a bad config update updates the corresponding stats.
-TEST_P(ScopedRdsIntegrationTest, OnDemandBasicSuccess) {
+TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
   config_helper_.addFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
@@ -480,10 +480,22 @@ key:
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
   response->waitForEndStream();
   cleanupUpstreamAndDownstream();
+  // The scoped route configuration have been loaded.
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo"}},
+      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
+      /*cluster_0*/ 0);
 }
 
 // Scopes of different priority share the same route configuration
 TEST_P(ScopedRdsIntegrationTest, DifferentPriorityScopeShareRoute) {
+  config_helper_.addFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
   const std::string scope_route1 = R"EOF(
 name: foo_scope
 route_configuration_name: foo_route1
@@ -519,23 +531,13 @@ key:
   };
   initialize();
   registerTestServerPorts({"http"});
-
-  // No scope key matches "xyz-route".
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=xyz-route"}});
-  response->waitForEndStream();
-  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+
   cleanupUpstreamAndDownstream();
-
-  // Test "foo-route" and 'bar-route' both gets routed to cluster_0.
-
+  // Test "foo" and 'bar' both gets routed to cluster_0.
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
-  for (const std::string& scope_key : std::vector<std::string>{"foo-route", "bar-route"}) {
+
+  for (const std::string& scope_key : std::vector<std::string>{"foo", "bar"}) {
     sendRequestAndVerifyResponse(
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                        {":path", "/meh"},
