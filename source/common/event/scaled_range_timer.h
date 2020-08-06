@@ -41,14 +41,18 @@ protected:
     MonotonicTime latest_trigger_time;
   };
 
+  using BucketHandle = int;
   using BucketEnabledList = std::list<BucketedEnabledTimer>;
 
   void enqueuePendingTimer(RangeTimerImpl& timer);
   void disablePendingTimer(RangeTimerImpl& timer);
 
-  BucketEnabledList::iterator add(RangeTimerImpl& timer, MonotonicTime::duration max_duration);
-  void disableActiveTimer(MonotonicTime::duration max_duration,
+  BucketEnabledList::iterator add(RangeTimerImpl& timer, BucketHandle bucket_handle);
+  void disableActiveTimer(BucketHandle bucket_handle,
                           const BucketEnabledList::iterator& bucket_position);
+
+  BucketHandle getBucketForDuration(std::chrono::milliseconds duration) const;
+  std::chrono::milliseconds getBucketDuration(BucketHandle bucket_index) const;
 
 private:
   struct Bucket {
@@ -67,13 +71,12 @@ private:
   };
 
   static constexpr int kBucketScaleFactor = 2;
-  static MonotonicTime::duration getBucketedDuration(MonotonicTime::duration duration);
 
-  Bucket& getOrCreateBucket(MonotonicTime::duration max_duration);
+  Bucket& getOrCreateBucket(BucketHandle handle);
   void onBucketTimer(int index);
 
   Dispatcher& dispatcher_;
-  const MonotonicTime::duration minimum_duration_;
+  const std::chrono::milliseconds minimum_duration_;
 
   DurationScaleFactor scale_factor_;
   std::vector<Bucket> buckets_;

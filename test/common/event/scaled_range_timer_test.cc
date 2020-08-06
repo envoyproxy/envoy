@@ -10,6 +10,14 @@
 
 #include "gtest/gtest.h"
 
+namespace std {
+namespace chrono {
+void PrintTo(const std::chrono::milliseconds& ms, std::ostream* os) { (*os) << ms.count() << "ms"; }
+void PrintTo(const std::chrono::microseconds& ms, std::ostream* os) { (*os) << ms.count() << "us"; }
+void PrintTo(const std::chrono::nanoseconds& ms, std::ostream* os) { (*os) << ms.count() << "ns"; }
+} // namespace chrono
+} // namespace std
+
 namespace Envoy {
 namespace Event {
 namespace {
@@ -33,6 +41,16 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
+
+// Test-only subclass of ScaledRangeTimerManager to expose some protected behavior for testing.
+class TestScaledRangeTimerManager : public ScaledRangeTimerManager {
+public:
+  using ScaledRangeTimerManager::getBucketForDuration;
+  using ScaledRangeTimerManager::ScaledRangeTimerManager;
+  std::chrono::milliseconds getBucketedDuration(std::chrono::milliseconds input) {
+    return getBucketDuration(getBucketForDuration(input));
+  }
+};
 
 class ScaledRangeTimerManagerTest : public testing::Test {
 public:
@@ -114,15 +132,20 @@ TEST_F(ScaledRangeTimerManagerTest, CreateAndDestroyTimer) {
 }
 
 TEST_F(ScaledRangeTimerManagerTest, CreateSingleScaledTimer) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  TestScaledRangeTimerManager manager(dispatcher_, 1.0);
+  const std::chrono::milliseconds real_scaling_duration =
+      manager.getBucketedDuration(std::chrono::seconds(5));
+  EXPECT_THAT(real_scaling_duration,
+              InRange(std::chrono::milliseconds(2500), std::chrono::milliseconds(5000)));
 
   RangeTimerGroup range_timer(manager, dispatcher_);
-  EXPECT_CALL(*range_timer.pending_timer, enableTimer(std::chrono::milliseconds(5000), _));
+  EXPECT_CALL(*range_timer.pending_timer,
+              enableTimer(std::chrono::seconds(10) - real_scaling_duration, _));
 
   EXPECT_CALL(*range_timer.callback, Call());
 
   range_timer.timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(10));
-  dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(5));
+  dispatcher_.time_system_.timeSystem().advanceTimeWait(range_timer.pending_timer->duration_ms_);
   range_timer.pending_timer->invokeCallback();
   dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(5));
   fireReadyTimers(dispatcher_.timeSource().monotonicTime(), bucket_timers_);
@@ -133,7 +156,11 @@ TEST_F(ScaledRangeTimerManagerTest, EnableAndDisableTimer) {
 
   RangeTimerGroup range_timer(manager, dispatcher_);
 
-  EXPECT_CALL(*range_timer.pending_timer, enableTimer(std::chrono::milliseconds(5000), _));
+  EXPECT_CALL(
+      *range_timer.pending_timer,
+      enableTimer(InRange(std::chrono::seconds(5),
+                          std::chrono::milliseconds(17500) /* = 5 + (30 - 5) / 2 seconds */),
+                  _));
   EXPECT_CALL(*range_timer.pending_timer, disableTimer);
 
   range_timer.timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(30));
@@ -183,21 +210,24 @@ TEST_F(ScaledRangeTimerManagerTest, DisableWhileActive) {
 }
 
 class ScaledRangeTimerManagerTestWithScope : public ScaledRangeTimerManagerTest,
-                                             public testing::WithParamInterface<bool> {};
+                                             public testing::WithParamInterface<bool> {
+public:
+  ScopeTrackedObject* GetScope() { return GetParam() ? &scope_ : nullptr; }
+  MockScopedTrackedObject scope_;
+};
 
 TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
   ScaledRangeTimerManager manager(dispatcher_, 1.0);
-  MockScopedTrackedObject scope;
 
   RangeTimerGroup timer(manager, dispatcher_);
   if (GetParam()) {
     InSequence s;
-    EXPECT_CALL(dispatcher_, setTrackedObject(&scope));
+    EXPECT_CALL(dispatcher_, setTrackedObject(GetScope()));
     EXPECT_CALL(*timer.callback, Call).WillOnce([&] {
-      timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2), &scope);
+      timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2), GetScope());
     });
     EXPECT_CALL(dispatcher_, setTrackedObject(nullptr));
-    EXPECT_CALL(dispatcher_, setTrackedObject(&scope));
+    EXPECT_CALL(dispatcher_, setTrackedObject(GetScope()));
     EXPECT_CALL(*timer.callback, Call);
     EXPECT_CALL(dispatcher_, setTrackedObject(nullptr));
   } else {
@@ -207,8 +237,7 @@ TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
         .WillOnce([] {});
   }
 
-  timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2),
-                           GetParam() ? &scope : nullptr);
+  timer.timer->enableTimer(std::chrono::seconds(1), std::chrono::seconds(2), GetScope());
   dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(1));
   timer.pending_timer->invokeCallback();
   dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(1));
@@ -228,23 +257,23 @@ TEST_P(ScaledRangeTimerManagerTestWithScope, ReRegisterOnCallback) {
 
 TEST_P(ScaledRangeTimerManagerTestWithScope, ScheduleWithScalingFactorZero) {
   ScaledRangeTimerManager manager(dispatcher_, 1.0);
-  MockScopedTrackedObject scope;
 
   RangeTimerGroup timer(manager, dispatcher_);
   manager.setScaleFactor(0);
 
   if (GetParam()) {
     InSequence s;
-    EXPECT_CALL(dispatcher_, setTrackedObject(&scope));
+    EXPECT_CALL(dispatcher_, setTrackedObject(GetScope()));
     EXPECT_CALL(*timer.callback, Call);
     EXPECT_CALL(dispatcher_, setTrackedObject(nullptr));
   } else {
     EXPECT_CALL(*timer.callback, Call);
   }
 
-  timer.timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(1),
-                           GetParam() ? &scope : nullptr);
-  EXPECT_FALSE(timer.pending_timer->enabled());
+  timer.timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(1), GetScope());
+  dispatcher_.time_system_.timeSystem().advanceTimeWait(timer.pending_timer->duration_ms_);
+  timer.pending_timer->invokeCallback();
+
   fireReadyTimers(dispatcher_.timeSource().monotonicTime(), bucket_timers_);
 }
 
@@ -252,20 +281,22 @@ INSTANTIATE_TEST_SUITE_P(WithAndWithoutScope, ScaledRangeTimerManagerTestWithSco
                          testing::Bool());
 
 TEST_F(ScaledRangeTimerManagerTest, SingleTimerTriggeredNoScaling) {
-  ScaledRangeTimerManager manager(dispatcher_, 1.0);
+  TestScaledRangeTimerManager manager(dispatcher_, 1.0);
   const MonotonicTime T0 = dispatcher_.timeSource().monotonicTime();
 
   RangeTimerGroup timer(manager, dispatcher_);
-  EXPECT_CALL(*timer.pending_timer, enableTimer(std::chrono::milliseconds(5000), _));
+  EXPECT_CALL(
+      *timer.pending_timer,
+      enableTimer(InRange(std::chrono::seconds(4), std::chrono::seconds(7 /* > 4 + (9 - 4)/2 */)),
+                  _));
   EXPECT_CALL(*timer.callback, Call());
 
   timer.timer->enableTimer(std::chrono::seconds(5), std::chrono::seconds(9));
-  auto timer_range = InRange(T0 + std::chrono::milliseconds(4500), T0 + std::chrono::seconds(9));
-  dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(5));
+  dispatcher_.time_system_.timeSystem().advanceTimeWait(timer.pending_timer->duration_ms_);
   timer.pending_timer->invokeCallback();
 
   // Verify that there is at least one bucket whose timer is approximately 4 seconds.
-  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(timer_range)));
+  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(T0 + std::chrono::seconds(9))));
   dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(4));
   fireReadyTimers(dispatcher_.timeSource().monotonicTime(), bucket_timers_);
 }
@@ -298,36 +329,37 @@ TEST_F(ScaledRangeTimerManagerTest, MultipleTimersNoScaling) {
   timers[1].timer->enableTimer(std::chrono::seconds(2), std::chrono::seconds(6));
   timers[2].timer->enableTimer(std::chrono::seconds(0), std::chrono::seconds(9));
 
-  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(InRange(T0 + std::chrono::seconds(4),
-                                                           T0 + std::chrono::seconds(9)))));
   EXPECT_THAT(timers[0].pending_timer->enabled_, true);
   EXPECT_THAT(timers[1].pending_timer->enabled_, true);
-  EXPECT_THAT(timers[2].pending_timer->enabled_, false);
+  // timers[2] will be enabled even with a min of 0 because 9 seconds is not an exact bucket
+  // duration.
+  EXPECT_THAT(timers[2].pending_timer->enabled_, true);
+  ASSERT_THAT(timers[0].pending_timer->duration_ms_, Le(timers[2].pending_timer->duration_ms_));
 
-  // Advance time by 1 second, so timers[0] hits its min.
-  dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  // Advance time until timers[0] hits its min, then timers[2].
+  dispatcher_.time_system_.timeSystem().advanceTimeWait(timers[0].pending_timer->duration_ms_);
   timers[0].pending_timer->invokeCallback();
+  dispatcher_.time_system_.timeSystem().advanceTimeWait(timers[2].pending_timer->duration_ms_ -
+                                                        timers[0].pending_timer->duration_ms_);
+  timers[2].pending_timer->invokeCallback();
   EXPECT_THAT(timers[0].pending_timer->enabled_, false);
-  // Now T = 1s; the minimum deadline is for timers[0] @ T = 3 seconds.
-  const MonotonicTime T1 = dispatcher_.timeSource().monotonicTime();
-  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(InRange(T1 + std::chrono::seconds(1),
-                                                           T1 + std::chrono::seconds(2)))));
+  EXPECT_THAT(timers[2].pending_timer->enabled_, false);
+  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(T0 + std::chrono::seconds(3))));
+  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(T0 + std::chrono::seconds(9))));
 
-  dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  dispatcher_.time_system_.timeSystem().advanceTimeWait(timers[1].pending_timer->duration_ms_ -
+                                                        timers[2].pending_timer->duration_ms_);
   timers[1].pending_timer->invokeCallback();
   EXPECT_THAT(timers[1].pending_timer->enabled_, false);
-  // Now T = 2s; the first bucket deadline is for timers[0] @ T = 3 seconds.
-  const MonotonicTime T2 = dispatcher_.timeSource().monotonicTime();
-  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(InRange(T2 + std::chrono::seconds(0),
-                                                           T2 + std::chrono::seconds(1)))));
-  dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(T0 + std::chrono::seconds(6))));
+  dispatcher_.time_system_.timeSystem().advanceTimeWait(
+      std::chrono::seconds(3) - (dispatcher_.timeSource().monotonicTime() - T0));
   fireReadyTimers(dispatcher_.timeSource().monotonicTime(), bucket_timers_);
+  Mock::VerifyAndClearExpectations(timers[0].callback.get());
 
   // Now T = 3s; the minimum deadline is for timers[1] @ T = 6 seconds.
-  const MonotonicTime T3 = dispatcher_.timeSource().monotonicTime();
-  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(InRange(T3 + std::chrono::seconds(1),
-                                                           T3 + std::chrono::seconds(3)))));
-  Mock::VerifyAndClearExpectations(timers[0].callback.get());
+  ASSERT_EQ(dispatcher_.timeSource().monotonicTime(), T0 + std::chrono::seconds(3));
+  EXPECT_THAT(bucket_timers_, Contains(HasDeadline(T0 + std::chrono::seconds(6))));
 
   // Advancing time in a big leap should be okay.
   dispatcher_.time_system_.timeSystem().advanceTimeWait(std::chrono::seconds(8));
