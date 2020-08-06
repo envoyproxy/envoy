@@ -51,19 +51,6 @@ enum class OcspResponseStatus {
 };
 
 /**
- * Reflection of the ASN.1 CertStatus enumeration.
- * The status of a single SSL certificate in an OCSP response.
- */
-enum class CertStatus {
-  // The certificate is known to be valid
-  GOOD,
-  // The certificate has been revoked
-  REVOKED,
-  // The responder has no record of the certificate and cannot confirm its validity
-  UNKNOWN
-};
-
-/**
  * Reflection of the ASN.1 CertId structure.
  * Contains the information to uniquely identify an SSL Certificate.
  * Serial numbers are guaranteed to be
@@ -87,11 +74,10 @@ struct CertId {
  * and invalid for stapling.
  */
 struct SingleResponse {
-  SingleResponse(CertId cert_id, CertStatus status, Envoy::SystemTime this_update,
+  SingleResponse(CertId cert_id, Envoy::SystemTime this_update,
                  absl::optional<Envoy::SystemTime> next_update);
 
   const CertId cert_id_;
-  const CertStatus status_;
   const Envoy::SystemTime this_update_;
   const absl::optional<Envoy::SystemTime> next_update_;
 };
@@ -123,11 +109,6 @@ public:
    * @return The number of certs reported on by this response.
    */
   virtual size_t getNumCerts() PURE;
-
-  /**
-   * @return The revocation status of the certificate.
-   */
-  virtual CertStatus getCertRevocationStatus() PURE;
 
   /**
    * @return The serial number of the certificate.
@@ -163,7 +144,6 @@ public:
 
   // Response
   size_t getNumCerts() override { return data_.single_responses_.size(); }
-  CertStatus getCertRevocationStatus() override { return data_.single_responses_[0].status_; }
   const std::string& getCertSerialNumber() override {
     return data_.single_responses_[0].cert_id_.serial_number_;
   }
@@ -210,11 +190,6 @@ public:
    * or a status indicating an error in the OCSP process
    */
   OcspResponseStatus getResponseStatus() { return response_->status_; }
-
-  /**
-   * @returns CertStatus for the single SSL certificate reported on by this response
-   */
-  CertStatus getCertRevocationStatus() { return response_->response_->getCertRevocationStatus(); }
 
   /**
    * @param cert a X509& SSL certificate
@@ -306,14 +281,6 @@ public:
    * CertId element.
    */
   static CertId parseCertId(CBS& cbs);
-
-  /**
-   * @param cbs a CBS& that refers to an ASN.1 CertStatus element
-   * @returns CertStatus the revocation status of a given certificate.
-   * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
-   * CertStatus element.
-   */
-  static CertStatus parseCertStatus(CBS& cbs);
 };
 
 } // namespace Ocsp

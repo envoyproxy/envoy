@@ -61,6 +61,19 @@ void skipResponderId(CBS& cbs) {
   throw EnvoyException(absl::StrCat("Unknown choice for Responder ID: ", parseTag(cbs)));
 }
 
+void skipCertStatus(CBS& cbs) {
+    // CertStatus ::= CHOICE {
+    //  good                [0] IMPLICIT NULL,
+    //  revoked             [1] IMPLICIT RevokedInfo,
+    //  unknown             [2] IMPLICIT UnknownInfo
+    // }
+    if (!(unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 0)) ||
+          unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
+          unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
+      throw EnvoyException(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
+    }
+}
+
 } // namespace
 
 OcspResponse::OcspResponse(OcspResponseStatus status, ResponsePtr response)
@@ -71,9 +84,9 @@ BasicOcspResponse::BasicOcspResponse(ResponseData data) : data_(data) {}
 ResponseData::ResponseData(std::vector<SingleResponse> single_responses)
     : single_responses_(std::move(single_responses)) {}
 
-SingleResponse::SingleResponse(CertId cert_id, CertStatus status, Envoy::SystemTime this_update,
+SingleResponse::SingleResponse(CertId cert_id, Envoy::SystemTime this_update,
                                absl::optional<Envoy::SystemTime> next_update)
-    : cert_id_(cert_id), status_(status), this_update_(this_update), next_update_(next_update) {}
+    : cert_id_(cert_id), this_update_(this_update), next_update_(next_update) {}
 
 CertId::CertId(std::string serial_number) : serial_number_(serial_number) {}
 
@@ -252,13 +265,13 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   }
 
   auto cert_id = Asn1OcspUtility::parseCertId(elem);
-  auto status = Asn1OcspUtility::parseCertStatus(elem);
+  skipCertStatus(elem);
   auto this_update = unwrap(Asn1Utility::parseGeneralizedTime(elem));
   auto next_update = unwrap(Asn1Utility::parseOptional<Envoy::SystemTime>(
       elem, Asn1Utility::parseGeneralizedTime, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
   // Extensions currently ignored
 
-  return {cert_id, status, this_update, next_update};
+  return {cert_id, this_update, next_update};
 }
 
 CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
@@ -279,25 +292,6 @@ CertId Asn1OcspUtility::parseCertId(CBS& cbs) {
   auto serial_number = unwrap(Asn1Utility::parseInteger(elem));
 
   return {serial_number};
-}
-
-CertStatus Asn1OcspUtility::parseCertStatus(CBS& cbs) {
-  // CertStatus ::= CHOICE {
-  //    good                [0] IMPLICIT NULL,
-  //    revoked             [1] IMPLICIT RevokedInfo,
-  //    unknown             [2] IMPLICIT UnknownInfo
-  // }
-  if (unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 0))) {
-    return CertStatus::GOOD;
-  }
-  if (unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1))) {
-    return CertStatus::REVOKED;
-  }
-  if (unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
-    return CertStatus::UNKNOWN;
-  }
-
-  throw EnvoyException(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
 }
 
 } // namespace Ocsp

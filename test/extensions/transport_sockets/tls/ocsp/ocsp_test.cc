@@ -44,9 +44,8 @@ public:
     EXPECT_EQ(response_->rawBytes(), der_response);
   }
 
-  void expectCertStatus(CertStatus expected_status) {
+  void expectSuccessful() {
     EXPECT_EQ(OcspResponseStatus::Successful, response_->getResponseStatus());
-    EXPECT_EQ(expected_status, response_->getCertRevocationStatus());
   }
 
   void expectCertificateMatches(std::string cert_filename) {
@@ -61,7 +60,7 @@ protected:
 
 TEST_F(OcspFullResponseParsingTest, GoodCertTest) {
   setup("good_ocsp_resp.der");
-  expectCertStatus(CertStatus::GOOD);
+  expectSuccessful();
   expectCertificateMatches("good_cert.pem");
 
   auto cert = readCertFromFile(fullPath("revoked_cert.pem"));
@@ -73,14 +72,14 @@ TEST_F(OcspFullResponseParsingTest, GoodCertTest) {
 
 TEST_F(OcspFullResponseParsingTest, RevokedCertTest) {
   setup("revoked_ocsp_resp.der");
-  expectCertStatus(CertStatus::REVOKED);
+  expectSuccessful();
   expectCertificateMatches("revoked_cert.pem");
   EXPECT_TRUE(response_->isExpired());
 }
 
 TEST_F(OcspFullResponseParsingTest, UnknownCertTest) {
   setup("unknown_ocsp_resp.der");
-  expectCertStatus(CertStatus::UNKNOWN);
+  expectSuccessful();
   expectCertificateMatches("good_cert.pem");
   EXPECT_TRUE(response_->isExpired());
 }
@@ -102,7 +101,7 @@ TEST_F(OcspFullResponseParsingTest, ThisUpdateAfterNowTest) {
 
 TEST_F(OcspFullResponseParsingTest, ResponderIdKeyHashTest) {
   setup("responder_key_hash_ocsp_resp.der");
-  expectCertStatus(CertStatus::GOOD);
+  expectSuccessful();
   expectCertificateMatches("good_cert.pem");
   EXPECT_TRUE(response_->isExpired());
 }
@@ -266,24 +265,6 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseBytesUnknownResponseTypeTest) {
 
   EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseResponseBytes(cbs), EnvoyException,
                             "Unknown OCSP Response type with OID: 1.1.1.1.1.1.1");
-}
-
-TEST_F(Asn1OcspUtilityTest, ParseCertStatusInvalidVariantTest) {
-  std::vector<uint8_t> invalid_choice = {3, 0};
-  CBS cbs;
-  CBS_init(&cbs, invalid_choice.data(), invalid_choice.size());
-
-  EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseCertStatus(cbs), EnvoyException,
-                            "Unknown OcspCertStatus tag: 3");
-}
-
-TEST_F(Asn1OcspUtilityTest, ParseCertStatusInvalidByteStringTest) {
-  std::vector<uint8_t> invalid_choice;
-  CBS cbs;
-  CBS_init(&cbs, invalid_choice.data(), invalid_choice.size());
-
-  EXPECT_THROW_WITH_MESSAGE(Asn1OcspUtility::parseCertStatus(cbs), EnvoyException,
-                            "Failed to parse ASN.1 element tag");
 }
 
 } // namespace
