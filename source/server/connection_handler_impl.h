@@ -362,7 +362,10 @@ public:
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
   void shutdownListener() override {
-    // The read_filter_ should be deleted before the udp_listener_ is deleted.
+    // The read filter should be deleted before the UDP listener is deleted.
+    // The read filter refers to the UDP listener to send packets to downstream.
+    // If the UDP listener is deleted before the read filter, the read filter may try to use it
+    // after deletion.
     read_filter_.reset();
     udp_listener_.reset();
   }
