@@ -20,8 +20,7 @@ public:
   TransportSockeMatchIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
-                            ConfigHelper::httpProxyConfig()),
-        num_hosts_{2} {
+                            ConfigHelper::httpProxyConfig()) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
   }
@@ -163,7 +162,7 @@ require_client_certificate: true
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
   }
 
-  const uint32_t num_hosts_;
+  const uint32_t num_hosts_{2};
   Http::TestRequestHeaderMapImpl type_a_request_headers_{{":method", "GET"},
                                                          {":path", "/test"},
                                                          {":scheme", "http"},
