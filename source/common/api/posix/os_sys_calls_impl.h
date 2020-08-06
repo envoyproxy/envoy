@@ -43,6 +43,8 @@ public:
   SysCallIntResult socketpair(int domain, int type, int protocol, os_fd_t sv[2]) override;
   SysCallIntResult listen(os_fd_t sockfd, int backlog) override;
   SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) override;
+  SysCallSocketResult accept(os_fd_t socket, struct sockaddr* addr, socklen_t* addrlen,
+                             int flags) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

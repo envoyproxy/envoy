@@ -387,6 +387,15 @@ Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
 }
 
+IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen, int flags) {
+  auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen, flags);
+  if (result.rc_ < 0) {
+    return nullptr;
+  }
+
+  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_);
+}
+
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
   return Api::OsSysCallsSingleton::get().connect(fd_, address->sockAddr(), address->sockAddrLen());
 }

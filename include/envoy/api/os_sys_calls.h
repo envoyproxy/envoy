@@ -155,6 +155,12 @@ public:
    * @see man 2 write
    */
   virtual SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) PURE;
+
+  /**
+   * @see man 2 accept
+   */
+  virtual SysCallSocketResult accept(os_fd_t socket, struct sockaddr* addr, socklen_t* addrlen,
+                                     int flags) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

@@ -43,85 +43,92 @@ bool ListenerImpl::rejectCxOverGlobalLimit() {
   return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
 }
 
-void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
-                                  int remote_addr_len, void* arg) {
-  ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
+void ListenerImpl::onSocketEvent(short flags) {
+  ASSERT(flags & (Event::FileReadyType::Read));
 
-  // Wrap raw socket fd in IoHandle.
-  IoHandlePtr io_handle = SocketInterfaceSingleton::get().socket(fd);
+  while (1) {
+    if (!socket_->ioHandle().isOpen()) {
+      PANIC(fmt::format("listener accept failure: {}", errorDetails(errno)));
+    }
 
-  if (rejectCxOverGlobalLimit()) {
-    // The global connection limit has been reached.
-    io_handle->close();
-    listener->cb_.onReject();
-    return;
+    struct sockaddr_storage remote_addr;
+    socklen_t remote_addr_len = sizeof(remote_addr);
+
+    IoHandlePtr io_handle = socket_->ioHandle().accept(
+        reinterpret_cast<struct sockaddr*>(&remote_addr), &remote_addr_len, SOCK_NONBLOCK);
+    if (io_handle == nullptr) {
+      break;
+    }
+
+    if (rejectCxOverGlobalLimit()) {
+      // The global connection limit has been reached.
+      io_handle->close();
+      cb_.onReject();
+      continue;
+    }
+
+    // Get the local address from the new socket if the listener is listening on IP ANY
+    // (e.g., 0.0.0.0 for IPv4) (local_address_ is nullptr in this case).
+    const Address::InstanceConstSharedPtr& local_address =
+        local_address_ ? local_address_ : io_handle->localAddress();
+
+    // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
+    // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
+    // `sockaddr_un` associated with the client socket when starting from the server socket.
+    // We work around this by using our own name for the socket in this case.
+    // Pass the 'v6only' parameter as true if the local_address is an IPv6 address. This has no
+    // effect if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote
+    // address if an IPv4 local_address was created from an IPv6 mapped IPv4 address.
+    const Address::InstanceConstSharedPtr& remote_address =
+        (remote_addr.ss_family == AF_UNIX)
+            ? io_handle->peerAddress()
+            : Address::addressFromSockAddr(remote_addr, remote_addr_len,
+                                           local_address->ip()->version() ==
+                                               Address::IpVersion::v6);
+
+    cb_.onAccept(
+        std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
   }
-
-  // Get the local address from the new socket if the listener is listening on IP ANY
-  // (e.g., 0.0.0.0 for IPv4) (local_address_ is nullptr in this case).
-  const Address::InstanceConstSharedPtr& local_address =
-      listener->local_address_ ? listener->local_address_ : io_handle->localAddress();
-
-  // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
-  // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
-  // `sockaddr_un` associated with the client socket when starting from the server socket.
-  // We work around this by using our own name for the socket in this case.
-  // Pass the 'v6only' parameter as true if the local_address is an IPv6 address. This has no effect
-  // if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote address if an
-  // IPv4 local_address was created from an IPv6 mapped IPv4 address.
-  const Address::InstanceConstSharedPtr& remote_address =
-      (remote_addr->sa_family == AF_UNIX)
-          ? io_handle->peerAddress()
-          : Address::addressFromSockAddr(*reinterpret_cast<const sockaddr_storage*>(remote_addr),
-                                         remote_addr_len,
-                                         local_address->ip()->version() == Address::IpVersion::v6);
-  listener->cb_.onAccept(
-      std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
 }
 
 void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
-  listener_.reset(
-      evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.ioHandle().fd()));
+#ifdef WIN32
+  auto trigger = Event::FileTriggerType::Level;
+#else
+  auto trigger = Event::FileTriggerType::Edge;
+#endif
+  socket.ioHandle().listen(128);
+  file_event_ = dispatcher.createFileEvent(
+      socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); }, trigger,
+      Event::FileReadyType::Read);
 
-  if (!listener_) {
-    throw CreateListenerException(
-        fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
-  }
+  RELEASE_ASSERT(file_event_, "file event must be valid");
 
   if (!Network::Socket::applyOptions(socket.options(), socket,
                                      envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
     throw CreateListenerException(fmt::format("cannot set post-listen socket option on socket: {}",
                                               socket.localAddress()->asString()));
   }
-
-  evconnlistener_set_error_cb(listener_.get(), errorCallback);
 }
 
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
                            ListenerCallbacks& cb, bool bind_to_port)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), listener_(nullptr) {
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
   }
 }
 
-void ListenerImpl::errorCallback(evconnlistener*, void*) {
-  // We should never get an error callback. This can happen if we run out of FDs or memory. In those
-  // cases just crash.
-  PANIC(fmt::format("listener accept failure: {}", errorDetails(errno)));
-}
-
-void ListenerImpl::enable() {
-  if (listener_.get()) {
-    evconnlistener_enable(listener_.get());
+ListenerImpl::~ListenerImpl() {
+  if (file_event_.get()) {
+    disable();
+    file_event_.reset();
   }
 }
 
-void ListenerImpl::disable() {
-  if (listener_.get()) {
-    evconnlistener_disable(listener_.get());
-  }
-}
+void ListenerImpl::enable() { file_event_->setEnabled(Event::FileReadyType::Read); }
+
+void ListenerImpl::disable() { file_event_->setEnabled(0); }
 
 } // namespace Network
 } // namespace Envoy
