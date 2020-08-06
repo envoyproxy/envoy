@@ -96,28 +96,20 @@ private:
   enum class FilterState {
     Initial,
 
-    // CacheFilter::decodeHeaders called lookup->getHeaders() but onHeaders was not called yet
-    // (lookup result not ready) -- the decoding stream should be stopped until the cache lookup
-    // result is ready.
-    WaitingForCacheLookup,
-
-    // CacheFilter::encodeHeaders called encodeCachedResponse() but encoding the cached response is
-    // not finished yet -- the encoding stream should be stopped until it is finished.
-    WaitingForCacheBody,
-
-    // Cache lookup did not find a cached response for this request.
-    NoCachedResponseFound,
-
-    // Cache lookup found a cached response that requires validation.
+    // Cache lookup found a cached response that requires validation
     ValidatingCachedResponse,
 
     // Cache lookup found a fresh cached response and it is being added to the encoding stream.
     DecodeServingFromCache,
 
+    // A cached response was successfully validated and it is being added to the encoding stream
+    EncodeServingFromCache,
+
     // The cached response was successfully added to the encoding stream (either during decoding or
     // encoding).
     ResponseServedFromCache
   };
+
   FilterState filter_state_ = FilterState::Initial;
 };
 
