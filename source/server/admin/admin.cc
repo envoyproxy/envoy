@@ -402,8 +402,7 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
         }
 
         for (const auto& [name, stat] : all_stats) {
-          response.add(
-              fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, name, stat));
+          response.add(fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, name, stat));
         }
 
         response.add(
