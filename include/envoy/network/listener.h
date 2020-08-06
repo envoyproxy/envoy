@@ -4,7 +4,6 @@
 #include <memory>
 #include <string>
 
-#include "common/common/macros.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
@@ -14,6 +13,8 @@
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
+
+#include "common/common/macros.h"
 
 namespace Envoy {
 namespace Network {

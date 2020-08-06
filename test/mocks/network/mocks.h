@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "common/network/address_impl.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/connection.h"
@@ -424,6 +425,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, connect, (os_fd_t), (const));
   MOCK_METHOD(Address::Ip*, ip, (), (const));
   MOCK_METHOD(Address::Pipe*, pipe, (), (const));
+  MOCK_METHOD(Address::EnvoyInternalAddress*, envoyInternalAddress, (), (const));
   MOCK_METHOD(IoHandlePtr, socket, (Socket::Type), (const));
   MOCK_METHOD(Address::Type, type, (), (const));
   MOCK_METHOD(sockaddr*, sockAddr, (), (const));

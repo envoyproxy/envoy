@@ -1,10 +1,11 @@
 #include "common/network/buffer_source_socket.h"
 
+#include "envoy/network/transport_socket.h"
+
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/http/headers.h"
-#include "include/envoy/network/_virtual_includes/transport_socket_interface/envoy/network/transport_socket.h"
 
 namespace Envoy {
 namespace Network {

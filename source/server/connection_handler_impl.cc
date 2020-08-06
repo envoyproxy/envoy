@@ -8,13 +8,13 @@
 #include "envoy/stats/timespan.h"
 
 #include "common/event/deferred_task.h"
+#include "common/network/buffer_source_socket.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/timespan_impl.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
 
-#include "common/network/buffer_source_socket.h"
 namespace Envoy {
 namespace Server {
 
@@ -352,7 +352,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::setupNewConnection(
     Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) {
   // Compenstate the connection here since pipe listener bypass the regular listener selection.
   incNumConnections();
-  
+
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());

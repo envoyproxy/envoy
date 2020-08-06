@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/transport_socket.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -18,7 +19,6 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "envoy/network/transport_socket.h"
 
 namespace Envoy {
 namespace Network {

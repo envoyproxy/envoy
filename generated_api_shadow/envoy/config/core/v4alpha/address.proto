@@ -30,6 +30,14 @@ message Pipe {
   uint32 mode = 2 [(validate.rules).uint32 = {lte: 511}];
 }
 
+message EnvoyInternalAddress {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.EnvoyInternalAddress";
+
+  // A special listener as the peer address.
+  string peer_listener_name = 1 [(validate.rules).string = {min_bytes: 1}];
+}
+
 // [#next-free-field: 7]
 message SocketAddress {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.SocketAddress";
@@ -129,6 +137,8 @@ message Address {
     SocketAddress socket_address = 1;
 
     Pipe pipe = 2;
+
+    EnvoyInternalAddress envoy_internal_address = 3;
   }
 }
 

@@ -218,8 +218,9 @@ class PeeringPipe {
 public:
   virtual ~PeeringPipe() = default;
   void setPeer(PeeringPipe* peer) { peer_ = peer; }
-  virtual void onReadReady() PURE;   
+  virtual void onReadReady() PURE;
   virtual void closeSocket(ConnectionEvent close_type) PURE;
+
 protected:
   PeeringPipe* peer_;
 };
@@ -381,7 +382,7 @@ private:
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
   // The flag of isOpen replacing the one in io handle.
-  bool is_open_ {true};
+  bool is_open_{true};
 
   const Address::InstanceConstSharedPtr remote_address_;
   const Address::InstanceConstSharedPtr source_address_;
@@ -390,7 +391,9 @@ private:
   uint32_t events_{0};
 };
 
-class ServerPipeImpl : public ConnectionImplBase, public TransportSocketCallbacks, public PeeringPipe {
+class ServerPipeImpl : public ConnectionImplBase,
+                       public TransportSocketCallbacks,
+                       public PeeringPipe {
 public:
   ServerPipeImpl(Event::Dispatcher& dispatcher,
                  const Address::InstanceConstSharedPtr& remote_address,
@@ -429,9 +432,10 @@ public:
   bool localAddressRestored() const override { return true; }
   bool aboveHighWatermark() const override { return write_buffer_above_high_watermark_; }
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override { return options_; }
-  absl::string_view requestedServerName() const override { 
+  absl::string_view requestedServerName() const override {
     // TODO(lambdai): requested server name is required by tcp proxy.
-    return ""; }
+    return "";
+  }
   StreamInfo::StreamInfo& streamInfo() override { return *stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
   absl::string_view transportFailureReason() const override;
@@ -543,7 +547,7 @@ private:
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
   // The flag of isOpen replacing the one in io handle.
-  bool is_open_ {true};
+  bool is_open_{true};
 
   const Address::InstanceConstSharedPtr remote_address_;
   const Address::InstanceConstSharedPtr source_address_;

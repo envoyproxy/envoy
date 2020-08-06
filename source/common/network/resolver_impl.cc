@@ -49,8 +49,12 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
     return resolveProtoSocketAddress(address.socket_address());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
     return InstanceConstSharedPtr{new PipeInstance(address.pipe().path())};
+  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
+    return InstanceConstSharedPtr{
+        new EnvoyInternalInstance(address.envoy_internal_address().peer_listener_name())};
   default:
-    throw EnvoyException("Address must be a socket or pipe: " + address.DebugString());
+    throw EnvoyException("Address must be a socket, pipe or envoy internal: " +
+                         address.DebugString());
   }
 }
 

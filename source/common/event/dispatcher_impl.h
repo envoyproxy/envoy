@@ -61,9 +61,9 @@ public:
   void registerPipeFactory(const std::string& pipe_listener_id, PipeFactory pipe_callback);
 
   // TODO(lambdai): Pass connection attributes including dest address.
-  Network::ClientConnectionPtr createUserspacePipe(
-      Network::Address::InstanceConstSharedPtr address,
-      Network::Address::InstanceConstSharedPtr local_address) override;
+  Network::ClientConnectionPtr
+  createUserspacePipe(Network::Address::InstanceConstSharedPtr address,
+                      Network::Address::InstanceConstSharedPtr local_address) override;
 
   Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
@@ -132,7 +132,7 @@ private:
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
   MonotonicTime approximate_monotonic_time_;
-  std::unordered_map<std::string, PipeFactory> pipe_listeners_;
+  absl::flat_hash_map<std::string, PipeFactory> pipe_listeners_;
 };
 
 } // namespace Event

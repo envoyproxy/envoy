@@ -85,7 +85,7 @@ void ListenerImpl::setupPipeListener(Event::DispatcherImpl& dispatcher,
                                      const std::string& pipe_listener_id) {
   dispatcher.registerPipeFactory(
       pipe_listener_id,
-      [this](const Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn){
+      [this](const Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn) {
         Network::ConnectionSocketPtr socket = std::make_unique<Network::ConnectionSocketImpl>(
             nullptr,
             // Local

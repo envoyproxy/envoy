@@ -44,7 +44,8 @@ public:
   virtual absl::uint128 address() const PURE;
 
   /**
-   * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
+   * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false
+   * otherwise
    */
   virtual bool v6only() const PURE;
 };
@@ -69,25 +70,27 @@ public:
   virtual bool isAnyAddress() const PURE;
 
   /**
-   * @return whether this address is a valid unicast address, i.e., not an wild card, broadcast, or
-   * multicast address.
+   * @return whether this address is a valid unicast address, i.e., not an wild
+   * card, broadcast, or multicast address.
    */
   virtual bool isUnicastAddress() const PURE;
 
   /**
-   * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise nullptr.
+   * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise
+   * nullptr.
    */
   virtual const Ipv4* ipv4() const PURE;
 
   /**
-   * @return Ipv6 address data IFF version() == IpVersion::v6, otherwise nullptr.
+   * @return Ipv6 address data IFF version() == IpVersion::v6, otherwise
+   * nullptr.
    */
   virtual const Ipv6* ipv6() const PURE;
 
   /**
-   * @return the port associated with the address. Port may be zero if not specified, not
-   * determinable before socket creation, or not applicable.
-   * The port is in host byte order.
+   * @return the port associated with the address. Port may be zero if not
+   * specified, not determinable before socket creation, or not applicable. The
+   * port is in host byte order.
    */
   virtual uint32_t port() const PURE;
 
@@ -114,7 +117,17 @@ public:
   virtual mode_t mode() const PURE;
 };
 
-enum class Type { Ip, Pipe };
+class EnvoyInternalAddress {
+public:
+  virtual ~EnvoyInternalAddress() = default;
+
+  /**
+   * @return an listener name as the peer address.
+   */
+  virtual std::string listenerName() const PURE;
+};
+
+enum class Type { Ip, Pipe, EnvoyInternal };
 
 /**
  * Interface for all network addresses.
@@ -153,14 +166,22 @@ public:
   virtual const std::string& logicalName() const PURE;
 
   /**
-   * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
+   * @return the IP address information IFF type() == Type::Ip, otherwise
+   * nullptr.
    */
   virtual const Ip* ip() const PURE;
 
   /**
-   * @return the pipe address information IFF type() == Type::Pipe, otherwise nullptr.
+   * @return the pipe address information IFF type() == Type::Pipe, otherwise
+   * nullptr.
    */
   virtual const Pipe* pipe() const PURE;
+
+  /**
+   * @return the envoy internal address information IFF type() ==
+   * Type::EnvoyInternal, otherwise nullptr.
+   */
+  virtual const EnvoyInternalAddress* envoyInternalAddress() const PURE;
 
   /**
    * @return the underlying structure wherein the address is stored

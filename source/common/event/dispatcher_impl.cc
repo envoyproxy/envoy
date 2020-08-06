@@ -18,12 +18,11 @@
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
+#include "common/network/buffer_source_socket.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/udp_listener_impl.h"
-
-#include "common/network/buffer_source_socket.h"
 
 #include "event2/event.h"
 
@@ -126,36 +125,36 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 }
 
 Network::ClientConnectionPtr
-DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr address,
+DispatcherImpl::createUserspacePipe(Network::Address::InstanceConstSharedPtr peer_address,
                                     Network::Address::InstanceConstSharedPtr local_address) {
   ASSERT(isThreadSafe());
-  if (address == nullptr) {
+  if (peer_address == nullptr) {
     return nullptr;
   }
   // Find the listener callback. The listener is supposed to setup the server connection.
-  auto iter = pipe_listeners_.find(address->asString());
+  auto iter = pipe_listeners_.find(peer_address->asString());
   if (iter == pipe_listeners_.end()) {
-    ENVOY_LOG_MISC(debug, "lambdai: no valid pipe listener registered for address {}",
-                   address->asString());
+    ENVOY_LOG_MISC(debug, "lambdai: no valid listener registered for envoy internal address {}",
+                   peer_address->asString());
     return nullptr;
   }
   auto client_socket = std::make_unique<Network::BufferSourceSocket>();
   auto server_socket = std::make_unique<Network::BufferSourceSocket>();
   auto client_socket_raw = client_socket.get();
   auto server_socket_raw = server_socket.get();
-  auto client_conn = std::make_unique<Network::ClientPipeImpl>(*this, address, local_address,
+  auto client_conn = std::make_unique<Network::ClientPipeImpl>(*this, peer_address, local_address,
                                                                std::move(client_socket), nullptr);
-  auto server_conn = std::make_unique<Network::ServerPipeImpl>(*this, local_address, address,
+  auto server_conn = std::make_unique<Network::ServerPipeImpl>(*this, local_address, peer_address,
                                                                std::move(server_socket), nullptr);
   server_conn->setPeer(client_conn.get());
   client_conn->setPeer(server_conn.get());
   // TODO(lambdai): Retrieve buffer each time when supporting close.
   // TODO(lambdai): Add to dest buffer to generic IoHandle, or TransportSocketCallback.
-  //client_socket_raw->setReadSourceBuffer(&server_conn->getWriteBuffer().buffer);
+  // client_socket_raw->setReadSourceBuffer(&server_conn->getWriteBuffer().buffer);
   client_socket_raw->setWriteDestBuffer(&server_socket_raw->getTransportSocketBuffer());
-  //server_socket_raw->setReadSourceBuffer(&client_conn->getWriteBuffer().buffer);
+  // server_socket_raw->setReadSourceBuffer(&client_conn->getWriteBuffer().buffer);
   server_socket_raw->setWriteDestBuffer(&client_socket_raw->getTransportSocketBuffer());
-  (iter->second)(address, std::move(server_conn));
+  (iter->second)(peer_address, std::move(server_conn));
   return client_conn;
 }
 

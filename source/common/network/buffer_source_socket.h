@@ -4,8 +4,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/common/logger.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Network {

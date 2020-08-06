@@ -9,6 +9,8 @@
 #include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -82,6 +84,7 @@ public:
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
   const Pipe* pipe() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
   }
@@ -153,6 +156,7 @@ public:
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return &ip_; }
   const Pipe* pipe() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
   }
@@ -215,6 +219,7 @@ public:
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return nullptr; }
   const Pipe* pipe() const override { return &pipe_; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&pipe_.address_);
   }
@@ -239,6 +244,26 @@ private:
   };
 
   PipeHelper pipe_;
+};
+
+class EnvoyInternalInstance : public InstanceBase {
+public:
+  /**
+   * Construct from a string name.
+   */
+  explicit EnvoyInternalInstance(const std::string& envoy_internal_address,
+                                 absl::string_view sock_interface = "");
+
+  // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override;
+  const Ip* ip() const override { return nullptr; }
+  const Pipe* pipe() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
+  const sockaddr* sockAddr() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  socklen_t sockAddrLen() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+private:
+  std::string envoy_internal_address_;
 };
 
 } // namespace Address

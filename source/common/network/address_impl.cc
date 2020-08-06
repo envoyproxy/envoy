@@ -38,7 +38,8 @@ void validateIpv6Supported(const std::string& address) {
   }
 }
 
-// Constructs a readable string with the embedded nulls in the abstract path replaced with '@'.
+// Constructs a readable string with the embedded nulls in the abstract path
+// replaced with '@'.
 std::string friendlyNameFromAbstractPath(absl::string_view path) {
   std::string friendly_name(path.data(), path.size());
   std::replace(friendly_name.begin(), friendly_name.end(), '\0', '@');
@@ -96,7 +97,8 @@ Ipv4Instance::Ipv4Instance(const sockaddr_in* address, absl::string_view sock_in
   ip_.ipv4_.address_ = *address;
   ip_.friendly_address_ = sockaddrToString(*address);
 
-  // Based on benchmark testing, this reserve+append implementation runs faster than absl::StrCat.
+  // Based on benchmark testing, this reserve+append implementation runs faster
+  // than absl::StrCat.
   fmt::format_int port(ntohs(address->sin_port));
   friendly_name_.reserve(ip_.friendly_address_.size() + 1 + port.size());
   friendly_name_.append(ip_.friendly_address_);
@@ -211,7 +213,8 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
   } else {
     ip_.ipv6_.address_.sin6_addr = in6addr_any;
   }
-  // Just in case address is in a non-canonical format, format from network address.
+  // Just in case address is in a non-canonical format, format from network
+  // address.
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
   validateIpv6Supported(friendly_name_);
@@ -264,9 +267,10 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
   pipe_.address_.sun_family = AF_UNIX;
   if (pipe_path[0] == '@') {
     // This indicates an abstract namespace.
-    // In this case, null bytes in the name have no special significance, and so we copy all
-    // characters of pipe_path to sun_path, including null bytes in the name. The pathname must also
-    // be null terminated. The friendly name is the address path with embedded nulls replaced with
+    // In this case, null bytes in the name have no special significance, and so
+    // we copy all characters of pipe_path to sun_path, including null bytes in
+    // the name. The pathname must also be null terminated. The friendly name is
+    // the address path with embedded nulls replaced with
     // '@' for consistency with the first character.
 #if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
@@ -294,6 +298,16 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
 }
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
+
+EnvoyInternalInstance::EnvoyInternalInstance(const std::string& name,
+                                             absl::string_view sock_interface)
+    : InstanceBase(Type::EnvoyInternal, sock_interface), envoy_internal_address_(name) {
+  friendly_name_ = absl::StrCat("envoy:://", name);
+}
+
+bool EnvoyInternalInstance::operator==(const Instance& rhs) const {
+  return rhs.type() == Type::EnvoyInternal && asString() == rhs.asString();
+}
 
 } // namespace Address
 } // namespace Network

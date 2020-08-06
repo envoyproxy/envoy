@@ -130,7 +130,8 @@ private:
 
     // Network::ListenerCallbacks
     void onAccept(Network::ConnectionSocketPtr&& socket) override;
-    void setupNewConnection(Network::ConnectionPtr server_conn, Network::ConnectionSocketPtr socket) override;
+    void setupNewConnection(Network::ConnectionPtr server_conn,
+                            Network::ConnectionSocketPtr socket) override;
 
     void onReject() override { stats_.downstream_global_cx_overflow_.inc(); }
 
