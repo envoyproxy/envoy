@@ -21,7 +21,7 @@ void UberWriteFilterFuzzer::reset() {
   // Clear the pointers inside the mock_dispatcher
   Event::MockDispatcher& mock_dispatcher =
       dynamic_cast<Event::MockDispatcher&>(write_filter_callbacks_->connection_.dispatcher_);
-  mock_dispatcher.to_delete_.clear();
+  mock_dispatcher.clearDeferredDeleteList();
   write_filter_.reset();
 }
 
@@ -78,12 +78,12 @@ void UberWriteFilterFuzzer::fuzz(
     // Try to create the filter callback(cb_). Exit early if the config is invalid or violates PGV
     // constraints.
     const std::string& filter_name = proto_config.name();
-    ENVOY_LOG_MISC(info, "filter name {}", filter_name);
+    ENVOY_LOG_MISC(debug, "filter name {}", filter_name);
     auto& factory = Config::Utility::getAndCheckFactoryByName<
         Server::Configuration::NamedNetworkFilterConfigFactory>(filter_name);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         proto_config, factory_context_.messageValidationVisitor(), factory);
-    ENVOY_LOG_MISC(info, "Config content after decoded: {}", message->DebugString());
+    ENVOY_LOG_MISC(debug, "Config content after decoded: {}", message->DebugString());
     cb_ = factory.createFilterFactoryFromProto(*message, factory_context_);
     // Add filter to connection_.
     cb_(write_filter_callbacks_->connection_);
@@ -92,7 +92,7 @@ void UberWriteFilterFuzzer::fuzz(
     return;
   }
   for (const auto& action : actions) {
-    ENVOY_LOG_MISC(info, "action {}", action.DebugString());
+    ENVOY_LOG_MISC(debug, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
     case test::extensions::filters::network::WriteAction::kOnWrite: {
       ASSERT(write_filter_ != nullptr);
