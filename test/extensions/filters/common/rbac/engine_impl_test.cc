@@ -27,7 +27,7 @@ namespace {
 enum class LogResult { Yes, No, Undecided };
 
 void checkEngine(
-    RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected, LogResult expectedLog,
+    RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected, LogResult expected_log,
     StreamInfo::StreamInfo& info,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
@@ -35,10 +35,10 @@ void checkEngine(
   bool engineRes = engine.handleAction(connection, headers, info, nullptr);
   EXPECT_EQ(expected, engineRes);
 
-  if (expectedLog != LogResult::Undecided) {
+  if (expected_log != LogResult::Undecided) {
     auto filter_meta = info.dynamicMetadata().filter_metadata().at(
         RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
-    EXPECT_EQ(expectedLog == LogResult::Yes,
+    EXPECT_EQ(expected_log == LogResult::Yes,
               filter_meta.fields()
                   .at(RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
                   .bool_value());
@@ -50,12 +50,12 @@ void checkEngine(
 }
 
 void checkEngine(
-    RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected, LogResult expectedLog,
+    RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected, LogResult expected_log,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::TestRequestHeaderMapImpl()) {
 
   NiceMock<StreamInfo::MockStreamInfo> empty_info;
-  checkEngine(engine, expected, expectedLog, empty_info, connection, headers);
+  checkEngine(engine, expected, expected_log, empty_info, connection, headers);
 }
 
 void onMetadata(NiceMock<StreamInfo::MockStreamInfo>& info) {
