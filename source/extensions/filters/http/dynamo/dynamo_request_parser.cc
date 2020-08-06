@@ -39,6 +39,7 @@ const std::vector<std::string> RequestParser::SUPPORTED_ERROR_TYPES{
     "ConditionalCheckFailedException",
     "IdempotentParameterMismatchException",
     "IncompleteSignatureException",
+    "InvalidSignatureException",
     "ItemCollectionSizeLimitExceededException",
     "LimitExceededException",
     "MissingAuthenticationTokenException",
