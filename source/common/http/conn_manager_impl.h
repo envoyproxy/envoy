@@ -615,9 +615,7 @@ private:
     /**
      * Marks local processing as complete.
      */
-    void setLocalComplete() {
-      state_.local_complete_ = true;
-    }
+    void setLocalComplete() { state_.local_complete_ = true; }
 
     /**
      * Whether the filters have been destroyed.
