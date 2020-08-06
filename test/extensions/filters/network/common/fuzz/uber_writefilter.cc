@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 void UberWriteFilterFuzzer::reset() {
-  // Reset the state of dependancies so that a new fuzz input starts in a clean state.
+  // Reset the state of dependencies so that a new fuzz input starts in a clean state.
 
   // Close the connection to make sure the filter's callback is set to nullptr.
   write_filter_callbacks_->connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
