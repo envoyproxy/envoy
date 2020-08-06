@@ -5,6 +5,8 @@ package envoy.service.ratelimit.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -110,6 +112,9 @@ message RateLimitResponse {
 
     // The limit remaining in the current time unit.
     uint32 limit_remaining = 3;
+
+    // Duration until reset of the current limit window.
+    google.protobuf.Duration duration_until_reset = 4;
   }
 
   // The overall response code which takes into account all of the descriptors that were passed
