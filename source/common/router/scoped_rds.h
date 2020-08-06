@@ -127,11 +127,13 @@ private:
     RdsRouteConfigProviderHelper(ScopedRdsConfigSubscription& parent, std::string scope_name);
 
     ~RdsRouteConfigProviderHelper() {
+      // Only remove the rds update when the rds provider has been initialized.
       if (route_provider_) {
         rds_update_callback_handle_->remove();
       }
     }
     ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
+
     void addOnDemandUpdateCallback(std::function<void()> callback);
     void runOnDemandUpdateCallback();
     void initRdsConfigProvider();

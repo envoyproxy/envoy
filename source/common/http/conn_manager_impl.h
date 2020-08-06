@@ -431,9 +431,13 @@ private:
   public:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
+
+    // Only on demand update for ScopeRdsConfigProvider is supported.
+    // InlineScopedRoutesConfigProvider will cast to nullptr in this ctor.
     RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider)
         : scoped_route_config_provider_(
               dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)) {}
+
     void
     requestVhdsUpdate(const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
                       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;

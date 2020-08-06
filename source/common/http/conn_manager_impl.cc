@@ -1568,7 +1568,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
                                                       scoped_route_config_updated_cb);
     return;
   }
-  ENVOY_STREAM_LOG(debug, "on demand srds fail.", *this);
+  // Continue the filter chain if no on demand update is requested.
   thread_local_dispatcher.post(
       [weak_route_config_updated_cb =
            std::weak_ptr<Http::RouteConfigUpdatedCallback>(route_config_updated_cb)] {
