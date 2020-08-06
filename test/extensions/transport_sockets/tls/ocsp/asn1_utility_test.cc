@@ -17,7 +17,7 @@ namespace {
 
 class Asn1UtilityTest : public testing::Test {
 public:
-  // DER encoding of a single TLV ASN.1 element.
+  // DER encoding of a single TLV `ASN.1` element.
   // returns a pointer to the underlying buffer and transfers
   // ownership to the caller.
   uint8_t* asn1Encode(CBS& cbs, std::string& value, unsigned tag) {
@@ -147,7 +147,7 @@ TEST_F(Asn1UtilityTest, SequenceOfMixedTypeErrorTest) {
                 cbs, Asn1Utility::parseOctetString)));
 }
 
-TEST_F(Asn1UtilityTest, IsOptionalPresentTest) {
+TEST_F(Asn1UtilityTest, GetOptionalTest) {
   CBS cbs, value;
   CBS_init(&cbs, asn1_true.data(), asn1_true.size());
 
@@ -159,7 +159,7 @@ TEST_F(Asn1UtilityTest, IsOptionalPresentTest) {
   EXPECT_EQ(0xff, *CBS_data(&value));
 }
 
-TEST_F(Asn1UtilityTest, IsOptionalPresentMissingValueTest) {
+TEST_F(Asn1UtilityTest, GetOptionalMissingValueTest) {
   std::vector<uint8_t> missing_val_bool = {0x1u, 1};
   CBS cbs, value;
   CBS_init(&cbs, missing_val_bool.data(), missing_val_bool.size());

@@ -14,9 +14,9 @@ namespace {
 // A type adapter since OPENSSL_free accepts void*.
 void freeOpensslString(char* str) { OPENSSL_free(str); }
 
-// ASN1_INTEGER is a type alias for ASN1_STRING.
+// `ASN1_INTEGER` is a type alias for `ASN1_STRING`.
 // This static_cast is intentional to avoid the
-// c-style cast performed in M_ASN1_INTEGER_free.
+// c-style cast performed in `M_ASN1_INTEGER_free`.
 void freeAsn1Integer(ASN1_INTEGER* integer) {
   ASN1_STRING_free(static_cast<ASN1_STRING*>(integer));
 }
@@ -57,10 +57,10 @@ ParsingResult<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   }
 
   auto time_str = cbsToString(elem);
-  // OCSP follows the RFC 5280 enforcement that GENERALIZEDTIME
+  // OCSP follows the RFC 5280 enforcement that `GENERALIZEDTIME`
   // fields MUST be in UTC, so must be suffixed with a Z character.
-  // Local time or time differential, though a part of the ASN.1
-  // GENERALIZEDTIME spec, are not supported.
+  // Local time or time differential, though a part of the `ASN.1`
+  // `GENERALIZEDTIME` spec, are not supported.
   // Reference: https://tools.ietf.org/html/rfc5280#section-4.1.2.5.2
   if (time_str.length() > 0 && absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
     return "GENERALIZEDTIME must be in UTC";
@@ -76,7 +76,7 @@ ParsingResult<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
 }
 
 // Performs the following conversions to go from bytestring to hex integer
-// CBS -> ASN1_INTEGER -> BIGNUM -> String.
+// `CBS` -> `ASN1_INTEGER` -> `BIGNUM` -> String.
 ParsingResult<std::string> Asn1Utility::parseInteger(CBS& cbs) {
   CBS num;
   if (!CBS_get_asn1(&cbs, &num, CBS_ASN1_INTEGER)) {

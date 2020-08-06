@@ -213,8 +213,8 @@ std::unique_ptr<BasicOcspResponse> Asn1OcspUtility::parseBasicOcspResponse(CBS& 
   // BasicOCSPResponse       ::= SEQUENCE {
   //    tbsResponseData      ResponseData,
   //    signatureAlgorithm   AlgorithmIdentifier{SIGNATURE-ALGORITHM,
-  //                             {sa-dsaWithSHA1 | sa-rsaWithSHA1 |
-  //                                  sa-rsaWithMD5 | sa-rsaWithMD2, ...}},
+  //                             {`sa-dsaWithSHA1` | `sa-rsaWithSHA1` |
+  //                                  `sa-rsaWithMD5` | `sa-rsaWithMD2`, ...}},
   //    signature            BIT STRING,
   //    certs            [0] EXPLICIT SEQUENCE OF Certificate OPTIONAL
   // }

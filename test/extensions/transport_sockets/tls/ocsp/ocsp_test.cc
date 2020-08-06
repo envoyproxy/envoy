@@ -135,7 +135,7 @@ TEST_F(OcspFullResponseParsingTest, OnlyOneResponseInByteStringTest) {
 
 TEST_F(OcspFullResponseParsingTest, ParseOcspResponseWrongTagTest) {
   auto resp_bytes = readFile("good_ocsp_resp.der");
-  // Change the SEQUENCE tag to an OCTETSTRING tag
+  // Change the SEQUENCE tag to an `OCTETSTRING` tag
   resp_bytes[0] = 0x4u;
   EXPECT_THROW_WITH_MESSAGE(OcspResponseWrapper response_wrapper(resp_bytes, time_system_),
                             EnvoyException, "OCSP Response is not a well-formed ASN.1 SEQUENCE");
@@ -232,7 +232,7 @@ TEST_F(Asn1OcspUtilityTest, ParseResponseBytesNoOctetStringTest) {
   ASSERT_TRUE(CBB_add_asn1(cbb.get(), &seq, CBS_ASN1_SEQUENCE));
   ASSERT_TRUE(CBB_add_asn1(&seq, &oid, CBS_ASN1_OBJECT));
   ASSERT_TRUE(CBB_add_asn1_oid_from_text(&oid, oid_str.c_str(), oid_str.size()));
-  // Empty sequence instead of OCTETSTRING with the response
+  // Empty sequence instead of `OCTETSTRING` with the response
   ASSERT_TRUE(CBB_add_asn1(&seq, &obj, CBS_ASN1_SEQUENCE));
   ASSERT_TRUE(CBB_finish(cbb.get(), &buf, &buf_len));
 

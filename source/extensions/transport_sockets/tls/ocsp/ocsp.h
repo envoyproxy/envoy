@@ -29,7 +29,7 @@ namespace Tls {
 namespace Ocsp {
 
 /**
- * Reflection of the ASN.1 OcspResponseStatus enumeration.
+ * Reflection of the `ASN.1` OcspResponseStatus enumeration.
  * The possible statuses that can accompany an OCSP response.
  */
 enum class OcspResponseStatus {
@@ -51,7 +51,7 @@ enum class OcspResponseStatus {
 };
 
 /**
- * Partial reflection of the ASN.1 CertId structure.
+ * Partial reflection of the `ASN.1` CertId structure.
  * Contains the information to identify an SSL Certificate.
  * Serial numbers are guaranteed to be
  * unique per issuer but not necessarily universally.
@@ -63,7 +63,7 @@ struct CertId {
 };
 
 /**
- * Partial reflection of the ASN.1 SingleResponse structure.
+ * Partial reflection of the `ASN.1` SingleResponse structure.
  * Contains information about the OCSP status of a single certificate.
  * An OCSP request may request the status of multiple certificates and
  * therefore responses may contain multiple SingleResponses.
@@ -83,7 +83,7 @@ struct SingleResponse {
 };
 
 /**
- * Partial reflection of the ASN.1 ResponseData structure.
+ * Partial reflection of the `ASN.1` ResponseData structure.
  * Contains an OCSP response for each certificate in a given request
  * as well as the time at which the response was produced.
  */
@@ -95,7 +95,7 @@ struct ResponseData {
 
 /**
  * An abstract type for OCSP response formats. Which variant of `Response` is
- * used in an `OcspResponse` is indicated by the structure's OID.
+ * used in an `OcspResponse` is indicated by the structure's `OID`.
  *
  * Envoy enforces that OCSP responses must be for a single certificate
  * only. The methods on this class extract the relevant information for the
@@ -133,7 +133,7 @@ public:
 using ResponsePtr = std::unique_ptr<Response>;
 
 /**
- * Reflection of the ASN.1 BasicOcspResponse structure.
+ * Reflection of the `ASN.1` BasicOcspResponse structure.
  * Contains the full data of an OCSP response.
  * Envoy enforces that OCSP responses contain a response for only
  * a single certificate.
@@ -165,7 +165,7 @@ private:
 };
 
 /**
- * Reflection of the ASN.1 OcspResponse structure.
+ * Reflection of the `ASN.1` OcspResponse structure.
  * This is the top-level data structure for OCSP responses.
  */
 struct OcspResponse {
@@ -219,7 +219,7 @@ private:
 using OcspResponseWrapperPtr = std::unique_ptr<OcspResponseWrapper>;
 
 /**
- * ASN.1 DER-encoded parsing functions similar to Asn1Utility but specifically
+ * `ASN.1` DER-encoded parsing functions similar to `Asn1Utility` but specifically
  * for structures related to OCSP.
  *
  * Each function must advance `cbs` across the element it refers to.
@@ -227,7 +227,7 @@ using OcspResponseWrapperPtr = std::unique_ptr<OcspResponseWrapper>;
 class Asn1OcspUtility {
 public:
   /**
-   * @param `cbs` a CBS& that refers to an ASN.1 OcspResponse element
+   * @param `cbs` a CBS& that refers to an `ASN.1` OcspResponse element
    * @returns std::unique_ptr<OcspResponse> the OCSP response encoded in `cbs`
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed OcspResponse
    * element.
@@ -235,7 +235,7 @@ public:
   static std::unique_ptr<OcspResponse> parseOcspResponse(CBS& cbs);
 
   /**
-   * @param cbs a CBS& that refers to an ASN.1 OcspResponseStatus element
+   * @param cbs a CBS& that refers to an `ASN.1` OcspResponseStatus element
    * @returns OcspResponseStatus the OCSP response encoded in `cbs`
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * OcspResponseStatus element.
@@ -243,7 +243,7 @@ public:
   static OcspResponseStatus parseResponseStatus(CBS& cbs);
 
   /**
-   * @param cbs a CBS& that refers to an ASN.1 Response element
+   * @param cbs a CBS& that refers to an `ASN.1` Response element
    * @returns Response containing the content of an OCSP response
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * structure that is a valid Response type.
@@ -251,7 +251,7 @@ public:
   static ResponsePtr parseResponseBytes(CBS& cbs);
 
   /**
-   * @param cbs a CBS& that refers to an ASN.1 BasicOcspResponse element
+   * @param cbs a CBS& that refers to an `ASN.1` BasicOcspResponse element
    * @returns BasicOcspResponse containing the content of an OCSP response
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
    * BasicOcspResponse element.
@@ -259,7 +259,7 @@ public:
   static std::unique_ptr<BasicOcspResponse> parseBasicOcspResponse(CBS& cbs);
 
   /**
-   * @param cbs a CBS& that refers to an ASN.1 ResponseData element
+   * @param cbs a CBS& that refers to an `ASN.1` ResponseData element
    * @returns ResponseData containing the content of an OCSP response relating
    * to certificate statuses.
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
@@ -268,7 +268,7 @@ public:
   static ResponseData parseResponseData(CBS& cbs);
 
   /**
-   * @param cbs a CBS& that refers to an ASN.1 SingleResponse element
+   * @param cbs a CBS& that refers to an `ASN.1` SingleResponse element
    * @returns SingleResponse containing the id and revocation status of
    * a single certificate.
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed
@@ -277,7 +277,7 @@ public:
   static SingleResponse parseSingleResponse(CBS& cbs);
 
   /**
-   * @param cbs a CBS& that refers to an ASN.1 CertId element
+   * @param cbs a CBS& that refers to an `ASN.1` CertId element
    * @returns CertId containing the information necessary to uniquely identify
    * an SSL certificate.
    * @throws Envoy::EnvoyException if `cbs` does not contain a well-formed

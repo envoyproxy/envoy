@@ -15,7 +15,6 @@ API
 ARN
 ASAN
 ASCII
-ASN
 ASSERTs
 AST
 AWS
@@ -68,7 +67,6 @@ DNS
 DQUOTE
 DRYs
 DS
-DSA
 DST
 DW
 EADDRINUSE
@@ -121,7 +119,6 @@ GCE
 GCM
 GCOVR
 GCP
-GENERALIZEDTIME
 GETting
 GLB
 GOAWAY
@@ -186,7 +183,6 @@ MB
 MD
 MERCHANTABILITY
 MGET
-MONOSTATE
 MQ
 MSET
 MSVC
@@ -214,7 +210,6 @@ NUL
 Nilsson
 Nonhashable
 OCSP
-OID
 OK
 OOM
 OOMs
@@ -426,7 +421,6 @@ bidi
 bignum
 bitfield
 bitset
-bitstring
 bitwise
 blackhole
 blackholed
@@ -817,7 +811,6 @@ num
 numkeys
 observability
 ocagent
-octetstring
 offsetof
 oneof
 oneway
