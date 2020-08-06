@@ -23,6 +23,7 @@
 #include "common/common/backoff_strategy.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
+#include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -217,13 +218,13 @@ public:
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
-      throw EnvoyException("Provided name for static registration lookup was empty.");
+      ExceptionUtil::ThrowEnvoyException("Provided name for static registration lookup was empty.");
     }
 
     Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
 
     if (factory == nullptr) {
-      throw EnvoyException(
+      ExceptionUtil::ThrowEnvoyException(
           fmt::format("Didn't find a registered implementation for name: '{}'", name));
     }
 
@@ -399,11 +400,12 @@ public:
                                       const char* filter_chain_type, bool is_terminal_filter,
                                       bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
-      throw EnvoyException(fmt::format("Error: terminal filter named {} of type {} must be the "
-                                       "last filter in a {} filter chain.",
-                                       name, filter_type, filter_chain_type));
+      ExceptionUtil::ThrowEnvoyException(
+          fmt::format("Error: terminal filter named {} of type {} must be the "
+                      "last filter in a {} filter chain.",
+                      name, filter_type, filter_chain_type));
     } else if (!is_terminal_filter && last_filter_in_current_config) {
-      throw EnvoyException(fmt::format(
+      ExceptionUtil::ThrowEnvoyException(fmt::format(
           "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
           name, filter_type, filter_chain_type));
     }
@@ -425,8 +427,9 @@ public:
       uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config.dns_failure_refresh_rate(),
                                                             max_interval, base_interval_ms * 10);
       if (max_interval_ms < base_interval_ms) {
-        throw EnvoyException("dns_failure_refresh_rate must have max_interval greater than "
-                             "or equal to the base_interval");
+        ExceptionUtil::ThrowEnvoyException(
+            "dns_failure_refresh_rate must have max_interval greater than "
+            "or equal to the base_interval");
       }
       return std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
     }

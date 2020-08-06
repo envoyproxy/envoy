@@ -12,6 +12,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/config/api_type_oracle.h"
 #include "common/protobuf/utility.h"
 
@@ -217,7 +218,8 @@ public:
                               absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
-      throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
+      ExceptionUtil::ThrowEnvoyException(
+          fmt::format("Double registration for name: '{}'", factory.name()));
     }
 
     if (!instead_value.empty()) {
@@ -234,7 +236,8 @@ public:
                               absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
-      throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
+      ExceptionUtil::ThrowEnvoyException(
+          fmt::format("Double registration for name: '{}'", factory.name()));
     }
     versionedFactories().emplace(std::make_pair(name, version));
     if (!instead_value.empty()) {

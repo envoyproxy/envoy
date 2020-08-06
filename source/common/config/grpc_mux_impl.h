@@ -16,6 +16,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
@@ -159,7 +160,10 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
                            OpaqueResourceDecoder&) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
+    ExceptionUtil::ThrowEnvoyException("ADS must be configured to support an ADS config source");
+    // it should never reach here but the compiler complains and the alternative will be to change
+    // the return type of the parent virtual function to absl::<optional<current_return_type>>
+    return nullptr;
   }
 
   void onWriteable() override {}

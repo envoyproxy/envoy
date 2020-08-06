@@ -12,6 +12,7 @@
 #include "envoy/network/io_handle.h"
 
 #include "common/common/byte_order.h"
+#include "common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
@@ -261,7 +262,7 @@ public:
     static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
 
     if (length() < start + Size) {
-      throw EnvoyException("buffer underflow");
+      ExceptionUtil::ThrowEnvoyException("buffer underflow");
     }
 
     constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;

@@ -572,4 +572,8 @@ InlineString::InlineString(const char* str, size_t size) : size_(size) {
   memcpy(data_, str, size);
 }
 
+void ExceptionUtil::ThrowEnvoyException(const std::string& message) {
+  throw EnvoyException(message);
+}
+
 } // namespace Envoy
