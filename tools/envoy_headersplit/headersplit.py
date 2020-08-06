@@ -38,7 +38,7 @@ def to_filename(classname: str) -> str:
   return ret.lower()
 
 
-def get_directives(stranslation_unit: Type[TranslationUnit]) -> str:
+def get_directives(translation_unit: Type[TranslationUnit]) -> str:
   """
     "extracts" all head includes statements and other directives from the target code file (translation_unit)
 
