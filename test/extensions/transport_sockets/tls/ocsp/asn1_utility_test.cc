@@ -303,7 +303,7 @@ TEST_F(Asn1UtilityTest, ParseOctetStringTest) {
   CBS cbs;
   bssl::UniquePtr<uint8_t> scoped(asn1Encode(cbs, data_str, CBS_ASN1_OCTETSTRING));
 
-  EXPECT_EQ(data, Asn1Utility::parseOctetString(cbs));
+  EXPECT_EQ(data, absl::get<0>(Asn1Utility::parseOctetString(cbs)));
 }
 
 TEST_F(Asn1UtilityTest, SkipOptionalPresentAdvancesTest) {

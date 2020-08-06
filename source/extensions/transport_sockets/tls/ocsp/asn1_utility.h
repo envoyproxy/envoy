@@ -137,7 +137,7 @@ public:
    * @throws Envoy::EnvoyException if `cbs` does not point to a well-formed
    * OCTETSTRING
    */
-  static std::vector<uint8_t> parseOctetString(CBS& cbs);
+  static ParsingResult<std::vector<uint8_t>> parseOctetString(CBS& cbs);
 
   /**
    * Advance `cbs` over an ASN.1 value of the class `tag` if that
@@ -167,14 +167,14 @@ ParsingResult<std::vector<T>> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1Parsing
 
   // Initialize seq_elem to first element in sequence.
   if (!CBS_get_asn1(&cbs, &seq_elem, CBS_ASN1_SEQUENCE)) {
-    throw Envoy::EnvoyException("Expected sequence of ASN.1 elements.");
+    return "Expected sequence of ASN.1 elements.";
   }
 
   while (CBS_data(&seq_elem) < CBS_data(&cbs)) {
     // parse_element MUST advance seq_elem
     auto elem_res = parse_element(seq_elem);
     if (absl::holds_alternative<T>(elem_res)) {
-      vec.push_back(absl::get<0>(parse_element(seq_elem)));
+      vec.push_back(absl::get<0>(elem_res));
     } else {
       return absl::get<1>(elem_res);
     }
@@ -187,8 +187,7 @@ ParsingResult<std::vector<T>> Asn1Utility::parseSequenceOf(CBS& cbs, Asn1Parsing
 }
 
 template <typename T>
-ParsingResult<absl::optional<T>> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
-                                             unsigned tag) {
+ParsingResult<absl::optional<T>> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag) {
   CBS data;
   if (getOptional(cbs, &data, tag)) {
     auto res = parse_data(data);
