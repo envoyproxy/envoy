@@ -440,7 +440,7 @@ key:
       /*cluster_0*/ 0);
 }
 
-// Test that a bad config update updates the corresponding stats.
+// Test that a scoped route config update is performed on demand and http request will succeed.
 TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
   config_helper_.addFilter(R"EOF(
     name: envoy.filters.http.on_demand
@@ -468,6 +468,7 @@ key:
           route: {{ cluster: {} }}
 )EOF";
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Request that match lazily loaded scope will trigger on demand loading.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
@@ -480,7 +481,7 @@ key:
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
   response->waitForEndStream();
   cleanupUpstreamAndDownstream();
-  // The scoped route configuration have been loaded.
+  // The scoped route configuration have been loaded, http request succeed with 200.
   sendRequestAndVerifyResponse(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
@@ -496,6 +497,7 @@ TEST_P(ScopedRdsIntegrationTest, DifferentPriorityScopeShareRoute) {
   config_helper_.addFilter(R"EOF(
     name: envoy.filters.http.on_demand
     )EOF");
+  // Primary and secondary priority scope share the same route.
   const std::string scope_route1 = R"EOF(
 name: foo_scope
 route_configuration_name: foo_route1
@@ -532,11 +534,10 @@ key:
   initialize();
   registerTestServerPorts({"http"});
   codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  cleanupUpstreamAndDownstream();
-  // Test "foo" and 'bar' both gets routed to cluster_0.
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
-
+  cleanupUpstreamAndDownstream();
+  // "foo" request should succeed because it is of primary priority.
+  // "bar" request will initialize rds provider on demand and also succeed.
   for (const std::string& scope_key : std::vector<std::string>{"foo", "bar"}) {
     sendRequestAndVerifyResponse(
         Http::TestRequestHeaderMapImpl{{":method", "GET"},
