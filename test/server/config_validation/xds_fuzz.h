@@ -16,6 +16,7 @@
 #include "test/server/config_validation/xds_verifier.h"
 
 #include "absl/types/optional.h"
+#include "test/fuzz/utility.h"
 
 namespace Envoy {
 
