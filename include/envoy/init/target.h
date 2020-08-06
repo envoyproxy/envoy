@@ -27,7 +27,8 @@ struct TargetHandle {
   virtual bool initialize(const Watcher& watcher) const PURE;
 
   /**
-   * @return a human-readable target name, for logging / debugging.
+   * @return a human-readable target name, for logging / debugging / tracking target names.
+   * The target name has to be unique.
    */
   virtual absl::string_view name() const PURE;
 };

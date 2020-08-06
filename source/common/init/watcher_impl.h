@@ -25,8 +25,6 @@ using TargetAwareReadyFn = std::function<void(absl::string_view)>;
 class WatcherHandleImpl : public WatcherHandle, Logger::Loggable<Logger::Id::init> {
 private:
   friend class WatcherImpl;
-
-  // Ctor with std::function<void()> callback function.
   WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
                     std::weak_ptr<TargetAwareReadyFn> fn);
 
