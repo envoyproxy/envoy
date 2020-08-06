@@ -48,7 +48,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/fault:95.8"
 "source/extensions/filters/common/lua:95.9"
 "source/extensions/grpc_credentials:92.0"
-"source/extensions/grpc_credentials/aws_iam:86.8"
 "source/extensions/health_checkers:95.9"
 "source/extensions/health_checkers/redis:95.9"
 "source/extensions/quic_listeners:84.8"

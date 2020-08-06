@@ -664,7 +664,7 @@ resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
-      EnvoyException, "Only a single wildcard domain is permitted");
+      EnvoyException, "Only a single wildcard domain is permitted in route foo_route_config");
 
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();

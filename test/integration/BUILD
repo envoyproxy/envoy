@@ -805,6 +805,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hds_integration_test",
     srcs = ["hds_integration_test.cc"],
+    shard_count = 2,
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
@@ -883,10 +884,10 @@ envoy_cc_test(
     tags = ["fails_on_windows"],
     deps = [
         ":http_integration_lib",
-        "//source/extensions/filters/http/rbac:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/extension/v3:pkg_cc_proto",
     ],

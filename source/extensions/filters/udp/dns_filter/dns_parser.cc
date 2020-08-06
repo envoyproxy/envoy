@@ -340,6 +340,7 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::Instance
   case DNS_RECORD_TYPE_A:
     if (available_bytes >= sizeof(uint32_t)) {
       sockaddr_in sa4;
+      memset(&sa4, 0, sizeof(sa4));
       sa4.sin_addr.s_addr = buffer->peekLEInt<uint32_t>(data_offset);
       ip_addr = std::make_shared<Network::Address::Ipv4Instance>(&sa4);
       data_offset += data_length;
@@ -348,6 +349,7 @@ DnsAnswerRecordPtr DnsMessageParser::parseDnsAnswerRecord(const Buffer::Instance
   case DNS_RECORD_TYPE_AAAA:
     if (available_bytes >= sizeof(absl::uint128)) {
       sockaddr_in6 sa6;
+      memset(&sa6, 0, sizeof(sa6));
       uint8_t* address6_bytes = reinterpret_cast<uint8_t*>(&sa6.sin6_addr.s6_addr);
       static constexpr size_t count = sizeof(absl::uint128) / sizeof(uint8_t);
       for (size_t index = 0; index < count; index++) {
