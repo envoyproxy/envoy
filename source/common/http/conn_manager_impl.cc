@@ -1597,8 +1597,8 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     //
     // Make sure we won't end up with nested watermark calls from the body buffer.
 
-    // TODO(snowp): Add a "send direct local reply" function to the FM that encapsulates all the calls into the
-    // FM but doesn't send the response through the filters.
+    // TODO(snowp): Add a "send direct local reply" function to the FM that encapsulates all the
+    // calls into the FM but doesn't send the response through the filters.
     filter_manager_.setEncoderFiltersStreaming(true);
     Http::Utility::sendLocalReply(
         filter_manager_.destroyed(),
