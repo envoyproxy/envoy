@@ -155,6 +155,7 @@ public:
   DnsQueryPtrVec queries_;
   DnsAnswerMap answers_;
   DnsAnswerMap additional_;
+  bool in_callback_;
 };
 
 using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;
