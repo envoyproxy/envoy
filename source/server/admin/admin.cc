@@ -299,8 +299,8 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 // TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
   envoy::admin::v3::Clusters clusters;
-  for (auto& cluster_pair : server_.clusterManager().clusters()) {
-    const Upstream::Cluster& cluster = cluster_pair.second.get();
+  for (const auto& [name, cluster_ref] : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_ref.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
 
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
@@ -332,17 +332,17 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         host_status.set_hostname(host->hostname());
         host_status.mutable_locality()->MergeFrom(host->locality());
 
-        for (const auto& named_counter : host->counters()) {
+        for (const auto& [counter_name, counter] : host->counters()) {
           auto& metric = *host_status.add_stats();
-          metric.set_name(std::string(named_counter.first));
-          metric.set_value(named_counter.second.get().value());
+          metric.set_name(std::string(counter_name));
+          metric.set_value(counter.get().value());
           metric.set_type(envoy::admin::v3::SimpleMetric::COUNTER);
         }
 
-        for (const auto& named_gauge : host->gauges()) {
+        for (const auto& [gauge_name, gauge] : host->gauges()) {
           auto& metric = *host_status.add_stats();
-          metric.set_name(std::string(named_gauge.first));
-          metric.set_value(named_gauge.second.get().value());
+          metric.set_name(std::string(gauge_name));
+          metric.set_value(gauge.get().value());
           metric.set_type(envoy::admin::v3::SimpleMetric::GAUGE);
         }
 
@@ -376,61 +376,58 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
 
 // TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
-  for (auto& cluster : server_.clusterManager().clusters()) {
-    addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
-                   response);
+  for (const auto& [name, cluster_ref] : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_ref.get();
+    const std::string& cluster_name = cluster.info()->name();
+    addOutlierInfo(cluster_name, cluster.outlierDetector(), response);
 
-    addCircuitSettings(
-        cluster.second.get().info()->name(), "default",
-        cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::Default),
-        response);
-    addCircuitSettings(
-        cluster.second.get().info()->name(), "high",
-        cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::High), response);
+    addCircuitSettings(cluster_name, "default",
+                       cluster.info()->resourceManager(Upstream::ResourcePriority::Default),
+                       response);
+    addCircuitSettings(cluster_name, "high",
+                       cluster.info()->resourceManager(Upstream::ResourcePriority::High), response);
 
-    response.add(fmt::format("{}::added_via_api::{}\n", cluster.second.get().info()->name(),
-                             cluster.second.get().info()->addedViaApi()));
-    for (auto& host_set : cluster.second.get().prioritySet().hostSetsPerPriority()) {
+    response.add(
+        fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
+    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
+        const std::string& host_address = host->address()->asString();
         std::map<absl::string_view, uint64_t> all_stats;
-        for (const auto& counter : host->counters()) {
-          all_stats[counter.first] = counter.second.get().value();
+        for (const auto& [counter_name, counter] : host->counters()) {
+          all_stats[counter_name] = counter.get().value();
         }
 
-        for (const auto& gauge : host->gauges()) {
-          all_stats[gauge.first] = gauge.second.get().value();
+        for (const auto& [gauge_name, gauge] : host->gauges()) {
+          all_stats[gauge_name] = gauge.get().value();
         }
 
-        for (const auto& stat : all_stats) {
-          response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
-                                   host->address()->asString(), stat.first, stat.second));
+        for (const auto& [stat_name, stat] : all_stats) {
+          response.add(
+              fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat_name, stat));
         }
 
-        response.add(fmt::format("{}::{}::hostname::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->hostname()));
-        response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(),
+        response.add(
+            fmt::format("{}::{}::hostname::{}\n", cluster_name, host_address, host->hostname()));
+        response.add(fmt::format("{}::{}::health_flags::{}\n", cluster_name, host_address,
                                  Upstream::HostUtility::healthFlagsToString(*host)));
-        response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->weight()));
-        response.add(fmt::format("{}::{}::region::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->locality().region()));
-        response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->locality().zone()));
-        response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->locality().sub_zone()));
-        response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->canary()));
-        response.add(fmt::format("{}::{}::priority::{}\n", cluster.second.get().info()->name(),
-                                 host->address()->asString(), host->priority()));
+        response.add(
+            fmt::format("{}::{}::weight::{}\n", cluster_name, host_address, host->weight()));
+        response.add(fmt::format("{}::{}::region::{}\n", cluster_name, host_address,
+                                 host->locality().region()));
+        response.add(
+            fmt::format("{}::{}::zone::{}\n", cluster_name, host_address, host->locality().zone()));
+        response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster_name, host_address,
+                                 host->locality().sub_zone()));
+        response.add(
+            fmt::format("{}::{}::canary::{}\n", cluster_name, host_address, host->canary()));
+        response.add(
+            fmt::format("{}::{}::priority::{}\n", cluster_name, host_address, host->priority()));
         response.add(fmt::format(
-            "{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
-            host->address()->asString(),
+            "{}::{}::success_rate::{}\n", cluster_name, host_address,
             host->outlierDetector().successRate(
                 Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)));
         response.add(fmt::format(
-            "{}::{}::local_origin_success_rate::{}\n", cluster.second.get().info()->name(),
-            host->address()->asString(),
+            "{}::{}::local_origin_success_rate::{}\n", cluster_name, host_address,
             host->outlierDetector().successRate(
                 Upstream::Outlier::DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin)));
       }
@@ -464,8 +461,8 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
     }
   }
 
-  for (const auto& key_callback_pair : callbacks_map) {
-    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+  for (const auto& [name, callback] : callbacks_map) {
+    ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
     if (mask.has_value()) {
@@ -492,8 +489,8 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
     }
   }
 
-  for (const auto& key_callback_pair : callbacks_map) {
-    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+  for (const auto& [name, callback] : callbacks_map) {
+    ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
     auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
@@ -563,8 +560,8 @@ void AdminImpl::addLbEndpoint(
 ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
 
-  for (auto& cluster_pair : server_.clusterManager().clusters()) {
-    const Upstream::Cluster& cluster = cluster_pair.second.get();
+  for (const auto& [name, cluster_ref] : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_ref.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
