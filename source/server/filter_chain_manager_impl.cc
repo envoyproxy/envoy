@@ -558,42 +558,40 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
 }
 
 void FilterChainManagerImpl::convertIPsToTries() {
-  for (auto& port : destination_ports_map_) {
+  for (auto& [_, destination_ips_pair] : destination_ports_map_) {
     // These variables are used as we build up the destination CIDRs used for the trie.
-    auto& destination_ips_pair = port.second;
-    auto& destination_ips_map = destination_ips_pair.first;
+    auto& [destination_ips_map, destination_ips_trie] = destination_ips_pair;
     std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>>
         destination_ips_list;
     destination_ips_list.reserve(destination_ips_map.size());
 
-    for (const auto& entry : destination_ips_map) {
-      destination_ips_list.push_back(makeCidrListEntry(entry.first, entry.second));
+    for (const auto& [server_name, server_name_map_ptr] : destination_ips_map) {
+      destination_ips_list.push_back(makeCidrListEntry(server_name, server_name_map_ptr));
 
       // This hugely nested for loop greatly pains me, but I'm not sure how to make it better.
       // We need to get access to all of the source IP strings so that we can convert them into
       // a trie like we did for the destination IPs above.
-      for (auto& server_names_entry : *entry.second) {
-        for (auto& transport_protocols_entry : server_names_entry.second) {
-          for (auto& application_protocols_entry : transport_protocols_entry.second) {
-            for (auto& source_array_entry : application_protocols_entry.second) {
-              auto& source_ips_map = source_array_entry.first;
+      for (auto& [_, transport_protocols_map] : *server_name_map_ptr) {
+        for (auto& [_, application_protocols_map] : transport_protocols_map) {
+          for (auto& [_, source_arrays] : application_protocols_map) {
+            for (auto& [source_ips_map, source_ips_trie] : source_arrays) {
               std::vector<
                   std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>
                   source_ips_list;
               source_ips_list.reserve(source_ips_map.size());
 
-              for (auto& source_ip : source_ips_map) {
-                source_ips_list.push_back(makeCidrListEntry(source_ip.first, source_ip.second));
+              for (auto& [source_ip, source_port_map_ptr] : source_ips_map) {
+                source_ips_list.push_back(makeCidrListEntry(source_ip, source_port_map_ptr));
               }
 
-              source_array_entry.second = std::make_unique<SourceIPsTrie>(source_ips_list, true);
+              source_ips_trie = std::make_unique<SourceIPsTrie>(source_ips_list, true);
             }
           }
         }
       }
     }
 
-    destination_ips_pair.second = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
+    destination_ips_trie = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
   }
 }
 
