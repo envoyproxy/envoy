@@ -157,6 +157,12 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                                   "Comma-separated list of extensions to disable",
                                                   false, "", "string", cmd);
 
+  TCLAP::ValueArg<std::string> socket_path("", "socket-path", "Configurable socket file directory",
+                                           false, "abstract namespace", "string", cmd);
+
+  TCLAP::ValueArg<mode_t> socket_mode("", "socket-mode", "Socket file permission", false, S_IRWXU,
+                                      "mode_t", cmd);
+
   cmd.setExceptionHandling(false);
   try {
     cmd.parse(args);
@@ -259,6 +265,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
+  socket_path_ = socket_path.getValue();
+  socket_mode_ = socket_mode.getValue();
 
   if (drain_strategy.getValue() == "immediate") {
     drain_strategy_ = Server::DrainStrategy::Immediate;
@@ -388,6 +396,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   for (const auto& e : disabledExtensions()) {
     command_line_options->add_disabled_extensions(e);
   }
+  command_line_options->set_socket_path(socketPath());
+  command_line_options->set_socket_mode(socketMode());
   return command_line_options;
 }
 
@@ -401,7 +411,8 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       service_zone_(service_zone), file_flush_interval_msec_(10000), drain_time_(600),
       parent_shutdown_time_(900), drain_strategy_(Server::DrainStrategy::Gradual),
       mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
-      mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false) {}
+      mutex_tracing_enabled_(false), cpuset_threads_(false), fake_symbol_table_enabled_(false),
+      socket_path_("abstract namespace"), socket_mode_(S_IRWXU) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {
