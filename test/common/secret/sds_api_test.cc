@@ -188,7 +188,7 @@ public:
                  Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(
             config_source, "abc.com", subscription_factory, time_source, validation_visitor_,
-            server.stats(), init_manager, []() {}, dispatcher, api) {
+            server.stats(), []() {}, dispatcher, api) {
     init_manager.add(init_target_);
   }
 

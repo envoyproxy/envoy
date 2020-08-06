@@ -15,8 +15,7 @@ namespace Secret {
 SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
                Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-               Init::Manager&, std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
-               Api::Api& api)
+               std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api)
     : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
           sds_config.resource_api_version(), validation_visitor, "name"),
       init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
@@ -35,6 +34,9 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
   // each init manager has a chance to initialize its targets.
+  //
+  // Note that addition of initialization targets to init manager is handled in constructors SdsApi
+  // subclasses
 }
 
 void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

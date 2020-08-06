@@ -45,8 +45,7 @@ public:
   SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
          Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-         Init::Manager& init_manager, std::function<void()> destructor_cb,
-         Event::Dispatcher& dispatcher, Api::Api& api);
+         std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api);
 
   SecretData secretData();
 
@@ -127,7 +126,7 @@ public:
                        Init::Manager& init_manager, std::function<void()> destructor_cb,
                        Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, init_manager, std::move(destructor_cb), dispatcher, api) {
+               stats, std::move(destructor_cb), dispatcher, api) {
     init_manager.add(init_target_);
   }
 
@@ -191,7 +190,7 @@ public:
                                      std::function<void()> destructor_cb,
                                      Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, init_manager, std::move(destructor_cb), dispatcher, api) {
+               stats, std::move(destructor_cb), dispatcher, api) {
     init_manager.add(init_target_);
   }
 
@@ -265,7 +264,7 @@ public:
                              std::function<void()> destructor_cb, Event::Dispatcher& dispatcher,
                              Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, init_manager, std::move(destructor_cb), dispatcher, api) {
+               stats, std::move(destructor_cb), dispatcher, api) {
     init_manager.add(init_target_);
   }
 
@@ -336,7 +335,7 @@ public:
                       Init::Manager& init_manager, std::function<void()> destructor_cb,
                       Event::Dispatcher& dispatcher, Api::Api& api)
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
-               stats, init_manager, std::move(destructor_cb), dispatcher, api) {
+               stats, std::move(destructor_cb), dispatcher, api) {
     init_manager.add(init_target_);
   }
 
