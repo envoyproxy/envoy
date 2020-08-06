@@ -40,10 +40,11 @@ def to_filename(classname: str) -> str:
 
 def get_headers(translation_unit: Type[TranslationUnit]) -> str:
   """
-    extracts all head includes statements from the target code file (translation_unit)
+    "extracts" all head includes statements from the target code file (translation_unit)
 
     for instance:
         foo.h:
+        #pragma once
         #include "a.h"
         #include "b.h"
 
@@ -51,18 +52,27 @@ def get_headers(translation_unit: Type[TranslationUnit]) -> str:
 
         }
     this function should return
-    '#include "a.h"\n#include "b.h"'
+    '#pragma once\n#include "a.h"\n#include "b.h"'
 
     Args:
         translation_unit: parsing result of target source code by libclang
 
     Returns:
-        A string, contains all includes statements from the source code.
+        A string, contains all includes statements and other preprocessor directives before the
+        first non-directive statement.
+    
+    Notes:
+        This function actually find the first non-preprocessor directive statement and return 
+        all contents before it.
 
+        clang lib provides API like tranlation_unit.get_inludes() to get include directives.
+        But we can't use it as it requires presence of the included files to return the full list. 
+        To get this API work will need extra efforts than needed.
+
+        We choose to return the string insead of list of includes since we will simply copy-paste
+        the include statements into generated headers. Return string seems more convenient
     """
 
-  # clang lib provides API like tranlation_unit.get_inludes()
-  # But we can't use it since it requires presence of the included files to return the full list
 
   cursor = translation_unit.cursor
   for descendant in cursor.walk_preorder():
