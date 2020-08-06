@@ -45,6 +45,7 @@ configure_make(
         # https://github.com/envoyproxy/envoy/issues/6084
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_luajit_luajit//:all",
@@ -65,6 +66,7 @@ configure_make(
         # https://github.com/envoyproxy/envoy/issues/6084
         # TODO(htuch): Remove when #6084 is fixed
         "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
         "//conditions:default": {},
     }),
     lib_source = "@com_github_moonjit_moonjit//:all",

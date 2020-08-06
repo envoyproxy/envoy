@@ -79,7 +79,7 @@ index 0000000..9c71271
 +
 +    # Remove LuaJIT from ASAN for now.
 +    # TODO(htuch): Remove this when https://github.com/envoyproxy/envoy/issues/6084 is resolved.
-+    if "ENVOY_CONFIG_ASAN" in os.environ:
++    if "ENVOY_CONFIG_ASAN" in os.environ or "ENVOY_CONFIG_MSAN" in os.environ:
 +      os.environ["TARGET_CFLAGS"] += " -fsanitize-blacklist=%s/com_github_moonjit_moonjit/clang-asan-blocklist.txt" % os.environ["PWD"]
 +      with open("clang-asan-blocklist.txt", "w") as f:
 +        f.write("fun:*\n")

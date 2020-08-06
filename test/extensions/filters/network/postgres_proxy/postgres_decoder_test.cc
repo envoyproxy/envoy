@@ -41,7 +41,7 @@ protected:
 
   // fields often used
   Buffer::OwnedImpl data_;
-  char buf_[256];
+  char buf_[256]{};
   std::string payload_;
 };
 
