@@ -70,7 +70,7 @@ private:
     float value_;
   };
 
-  static constexpr int kBucketScaleFactor = 2;
+  static constexpr float kBucketScaleFactor = 1.41421356237; // = sqrt(2)
 
   Bucket& getOrCreateBucket(BucketHandle handle);
   void onBucketTimer(int index);
