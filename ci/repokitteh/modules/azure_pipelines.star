@@ -3,7 +3,7 @@ load("github.com/repokitteh/modules/lib/utils.star", "react")
 _azp_context_prefix = "ci/azp: "
 
 def _retry_azp(organization, project, build_id, token):
-    """Makes an Azupre Pipelines Build API request"""
+    """Makes an Azure Pipelines Build API request with retry"""
 
     url = "https://dev.azure.com/{organization}/{project}/_apis/build/builds/{buildId}?retry=true&api-version=5.1".format(organization = organization, project = project, buildId = build_id)
     return http(url = url, method = "PATCH", headers = {
