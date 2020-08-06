@@ -155,10 +155,10 @@ TEST_F(WatermarkBufferTest, Drain) {
 }
 
 TEST_F(WatermarkBufferTest, DrainUsingExtract) {
-  // Similar to `Drain` test, but using extractFrontSlice() instead of drain()
+  // Similar to `Drain` test, but using extractMutableFrontSlice() instead of drain().
   buffer_.add(TEN_BYTES, 10);
   ASSERT_EQ(buffer_.length(), 10);
-  buffer_.extractFrontSlice();
+  buffer_.extractMutableFrontSlice();
   EXPECT_EQ(0, times_high_watermark_called_);
   EXPECT_EQ(0, times_low_watermark_called_);
 
@@ -168,20 +168,20 @@ TEST_F(WatermarkBufferTest, DrainUsingExtract) {
   buffer_.appendSliceForTest(TEN_BYTES, 5);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(0, times_low_watermark_called_);
-  auto slice0 = buffer_.extractFrontSlice(); // essentially drain(5)
+  auto slice0 = buffer_.extractMutableFrontSlice(); // essentially drain(5)
   ASSERT_TRUE(slice0);
-  EXPECT_EQ(slice0->getData().size(), 5);
+  EXPECT_EQ(slice0->getMutableData().size(), 5);
   EXPECT_EQ(6, buffer_.length());
   EXPECT_EQ(0, times_low_watermark_called_);
 
   // Now drain below.
   auto slice1 = buffer_.extractMutableFrontSlice(); // essentially drain(1)
   ASSERT_TRUE(slice1);
-  EXPECT_EQ(slice1->getData().size(), 1);
+  EXPECT_EQ(slice1->getMutableData().size(), 1);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(1, times_low_watermark_called_);
 
-  // Going back above should trigger the high again
+  // Going back above should trigger the high again.
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(2, times_high_watermark_called_);
 }

@@ -34,7 +34,6 @@ public:
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  SliceDataPtr extractFrontSlice() override;
   SliceDataPtr extractMutableFrontSlice() override;
   Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;

@@ -199,7 +199,7 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
   return raw_slices;
 }
 
-SliceDataPtr OwnedImpl::extractFrontSlice() {
+SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
   RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
   // Remove zero byte fragments from the front of the queue to ensure
   // that the extracted slice has data.
@@ -209,23 +209,21 @@ SliceDataPtr OwnedImpl::extractFrontSlice() {
   ASSERT(!slices_.empty());
   ASSERT(slices_.front());
   auto slice = std::move(slices_.front());
-  length_ -= slice->dataSize();
+  auto size = slice->dataSize();
+  length_ -= size;
   slices_.pop_front();
-  return slice;
-}
-
-SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
-  auto slice_data = extractFrontSlice();
-  if (!slice_data->isMutable()) {
-    // Create a mutable copy of the immutable slice data
-    auto immutable_data = slice_data->getData();
-    ASSERT(immutable_data.data() != nullptr);
-    auto mutable_slice = OwnedSlice::create(immutable_data.size());
-    auto copy_size = mutable_slice->append(immutable_data.data(), immutable_data.size());
-    ASSERT(copy_size == immutable_data.size());
+  if (!slice->isMutable()) {
+    // Create a mutable copy of the immutable slice data.
+    auto mutable_slice = OwnedSlice::create(size);
+    auto copy_size = mutable_slice->append(slice->data(), size);
+    ASSERT(copy_size == size);
+    // Drain trackers for the immutable slice will be called as part of the slice destructor.
     return mutable_slice;
   } else {
-    return slice_data;
+    // Make sure drain trackers are called before ownership of the slice is transferred from
+    // the buffer to the caller.
+    slice->callAndClearDrainTrackers();
+    return slice;
   }
 }
 

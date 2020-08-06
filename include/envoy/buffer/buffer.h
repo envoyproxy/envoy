@@ -64,16 +64,7 @@ public:
   virtual ~SliceData() = default;
 
   /**
-   * @return true if the underlying slice data is mutable.
-   */
-  virtual bool isMutable() const PURE;
-  /**
-   * @return an immutable view of the slice data.
-   */
-  virtual absl::Span<const uint8_t> getData() const PURE;
-  /**
-   * Calling this method if isMutable() returns false will have undefined behavior.
-   * @return a mutable view of the slice data, but only if isMutable() returns true.
+   * @return a mutable view of the slice data.
    */
   virtual absl::Span<uint8_t> getMutableData() PURE;
 };
@@ -172,13 +163,7 @@ public:
   /**
    * Transfer ownership of the front slice to the caller. Must only be called if the
    * buffer is not empty otherwise the implementation will have undefined behavior.
-   * @return pointer to SliceData object that wraps the front slice
-   */
-  virtual SliceDataPtr extractFrontSlice() PURE;
-
-  /**
-   * Identical to extractFrontSlice() if the underlying slice is mutable. If the
-   * underlying slice is immutable then the implementation must create and return
+   * If the underlying slice is immutable then the implementation must create and return
    * a mutable slice that has a copy of the immutable data.
    * @return pointer to SliceData object that wraps the front slice
    */

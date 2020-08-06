@@ -42,17 +42,15 @@ public:
   }
 
   // SliceData
-  bool isMutable() const override {
-    // Extracted slice data is immutable by default.
-    return false;
-  };
-  absl::Span<const uint8_t> getData() const override {
-    return {base_ + data_, reservable_ - data_};
-  };
   absl::Span<uint8_t> getMutableData() override {
     RELEASE_ASSERT(isMutable(), "Not allowed to call getMutableData if slice is immutable");
     return {base_ + data_, reservable_ - data_};
   }
+
+  /**
+   * @return true if the data in the slice is mutable
+   */
+  virtual bool isMutable() const { return false; }
 
   /**
    * @return a pointer to the start of the usable content.
@@ -213,13 +211,30 @@ public:
     return SliceRepresentation{dataSize(), reservableSize(), capacity_};
   }
 
+  /**
+   * Move all drain trackers from the current slice to the destination slice.
+   */
   void transferDrainTrackersTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
   }
 
+  /**
+   * Add a drain tracker to the slice.
+   */
   void addDrainTracker(std::function<void()> drain_tracker) {
     drain_trackers_.emplace_back(std::move(drain_tracker));
+  }
+
+  /**
+   * Call all drain trackers associated with the slice, then clear
+   * the drain tracker list.
+   */
+  void callAndClearDrainTrackers() {
+    for (const auto& drain_tracker : drain_trackers_) {
+      drain_tracker();
+    }
+    drain_trackers_.clear();
   }
 
 protected:
@@ -271,11 +286,10 @@ public:
     return slice;
   }
 
-  // SliceData
-  bool isMutable() const override { return true; };
-
 private:
   OwnedSlice(uint64_t size) : Slice(0, 0, size) { base_ = storage_; }
+
+  bool isMutable() const override { return true; }
 
   /**
    * Compute a slice size big enough to hold a specified amount of data.
@@ -555,7 +569,6 @@ public:
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
-  SliceDataPtr extractFrontSlice() override;
   SliceDataPtr extractMutableFrontSlice() override;
   uint64_t length() const override;
   void* linearize(uint32_t size) override;
