@@ -35,6 +35,8 @@ void Utils::tryShrinkHeap(absl::optional<uint64_t> threshold) {
   if ((total_physical_bytes - allocated_size_by_app) >= shrink_threshold) {
     Utils::releaseFreeMemory();
   }
+#else
+  UNREFERENCED_PARAMETER(threshold);
 #endif
 }
 
