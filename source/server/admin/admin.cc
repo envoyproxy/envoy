@@ -299,8 +299,8 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 // TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
   envoy::admin::v3::Clusters clusters;
-  for (auto& cluster_pair : server_.clusterManager().clusters()) {
-    const Upstream::Cluster& cluster = cluster_pair.second.get();
+  for (const auto& [_, cluster_opt] : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_opt.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
 
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
@@ -332,17 +332,17 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         host_status.set_hostname(host->hostname());
         host_status.mutable_locality()->MergeFrom(host->locality());
 
-        for (const auto& named_counter : host->counters()) {
+        for (const auto& [name, count] : host->counters()) {
           auto& metric = *host_status.add_stats();
-          metric.set_name(std::string(named_counter.first));
-          metric.set_value(named_counter.second.get().value());
+          metric.set_name(std::string(name));
+          metric.set_value(count.get().value());
           metric.set_type(envoy::admin::v3::SimpleMetric::COUNTER);
         }
 
-        for (const auto& named_gauge : host->gauges()) {
+        for (const auto& [name, gauge] : host->gauges()) {
           auto& metric = *host_status.add_stats();
-          metric.set_name(std::string(named_gauge.first));
-          metric.set_value(named_gauge.second.get().value());
+          metric.set_name(std::string(name));
+          metric.set_value(gauge.get().value());
           metric.set_type(envoy::admin::v3::SimpleMetric::GAUGE);
         }
 
@@ -376,8 +376,8 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
 
 // TODO(efimki): Add support of text readouts stats.
 void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
-  for (auto& cluster_pair : server_.clusterManager().clusters()) {
-    const Upstream::Cluster& cluster = cluster_pair.second.get();
+  for (const auto& [_, cluster_opt] : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_opt.get();
     const std::string& cluster_name = cluster.info()->name();
     addOutlierInfo(cluster_name, cluster.outlierDetector(), response);
 
@@ -393,17 +393,17 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
       for (auto& host : host_set->hosts()) {
         const std::string& host_address = host->address()->asString();
         std::map<absl::string_view, uint64_t> all_stats;
-        for (const auto& counter : host->counters()) {
-          all_stats[counter.first] = counter.second.get().value();
+        for (const auto& [name, count] : host->counters()) {
+          all_stats[name] = count.get().value();
         }
 
-        for (const auto& gauge : host->gauges()) {
-          all_stats[gauge.first] = gauge.second.get().value();
+        for (const auto& [name, gauge] : host->gauges()) {
+          all_stats[name] = gauge.get().value();
         }
 
-        for (const auto& stat : all_stats) {
+        for (const auto& [name, stat] : all_stats) {
           response.add(
-              fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, stat.first, stat.second));
+              fmt::format("{}::{}::{}::{}\n", cluster_name, host_address, name, stat));
         }
 
         response.add(
@@ -461,8 +461,8 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
     }
   }
 
-  for (const auto& key_callback_pair : callbacks_map) {
-    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+  for (const auto& [_, callback] : callbacks_map) {
+    ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
     if (mask.has_value()) {
@@ -489,8 +489,8 @@ AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
     }
   }
 
-  for (const auto& key_callback_pair : callbacks_map) {
-    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+  for (const auto& [_, callback] : callbacks_map) {
+    ProtobufTypes::MessagePtr message = callback();
     ASSERT(message);
 
     auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
@@ -560,8 +560,8 @@ void AdminImpl::addLbEndpoint(
 ProtobufTypes::MessagePtr AdminImpl::dumpEndpointConfigs() const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
 
-  for (auto& cluster_pair : server_.clusterManager().clusters()) {
-    const Upstream::Cluster& cluster = cluster_pair.second.get();
+  for (const auto& [_, cluster_opt] : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_opt.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
 
