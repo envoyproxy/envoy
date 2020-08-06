@@ -76,7 +76,7 @@ ParsingResult<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
 }
 
 // Performs the following conversions to go from bytestring to hex integer
-// CBS -> ASN1_INTEGER -> BIGNUM -> String
+// CBS -> ASN1_INTEGER -> BIGNUM -> String.
 ParsingResult<std::string> Asn1Utility::parseInteger(CBS& cbs) {
   CBS num;
   if (!CBS_get_asn1(&cbs, &num, CBS_ASN1_INTEGER)) {

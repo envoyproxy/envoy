@@ -100,7 +100,7 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
     throw EnvoyException("OCSP response has no body");
   }
 
-  // We only permit a 1:1 of certificate to response
+  // We only permit a 1:1 of certificate to response.
   if (response_->response_->getNumCerts() != 1) {
     throw EnvoyException("OCSP Response must be for one certificate only");
   }
@@ -250,7 +250,7 @@ ResponseData Asn1OcspUtility::parseResponseData(CBS& cbs) {
       elem, [](CBS& cbs) -> ParsingResult<SingleResponse> {
         return ParsingResult<SingleResponse>(parseSingleResponse(cbs));
       }));
-  // Extensions currently ignored
+  // Extensions currently ignored.
 
   return {std::move(responses)};
 }
@@ -274,7 +274,7 @@ SingleResponse Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   auto next_update = unwrap(Asn1Utility::parseOptional<Envoy::SystemTime>(
       elem, Asn1Utility::parseGeneralizedTime,
       CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
-  // Extensions currently ignored
+  // Extensions currently ignored.
 
   return {cert_id, this_update, next_update};
 }
