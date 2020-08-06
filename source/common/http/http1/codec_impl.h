@@ -527,7 +527,6 @@ public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
                        const uint32_t max_response_headers_count);
-
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 
@@ -577,6 +576,7 @@ private:
     }
   }
 
+  Http1Settings codec_settings_;
   absl::optional<PendingResponse> pending_response_;
   // TODO(mattklein123): The following bool tracks whether a pending response is complete before
   // dispatching callbacks. This is needed so that pending_response_ stays valid during callbacks

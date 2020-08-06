@@ -328,7 +328,8 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
   EXPECT_TRUE(status.ok());
 }
 
-void Http1ServerConnectionImplTest::testAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length) {
+void Http1ServerConnectionImplTest::testAllowChunkedContentLength(uint32_t content_length,
+                                                                  bool allow_chunked_length) {
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
   if (GetParam()) {
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
@@ -366,12 +367,12 @@ void Http1ServerConnectionImplTest::testAllowChunkedContentLength(uint32_t conte
     EXPECT_CALL(decoder, sendLocalReply(false, Http::Code::BadRequest, "Bad Request", _, _, _));
   }
 
-  Buffer::OwnedImpl buffer(fmt::format(
-      "POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\ncontent-length: {}\r\n\r\n"
-      "6\r\nHello \r\n"
-      "5\r\nWorld\r\n"
-      "0\r\n\r\n", content_length)
-  );  
+  Buffer::OwnedImpl buffer(
+      fmt::format("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\ncontent-length: {}\r\n\r\n"
+                  "6\r\nHello \r\n"
+                  "5\r\nWorld\r\n"
+                  "0\r\n\r\n",
+                  content_length));
 
   auto status = codec_->dispatch(buffer);
 
@@ -379,7 +380,8 @@ void Http1ServerConnectionImplTest::testAllowChunkedContentLength(uint32_t conte
     EXPECT_TRUE(status.ok());
   } else {
     EXPECT_TRUE(isCodecProtocolError(status));
-    EXPECT_EQ(status.message(), "Both Content-Length and Transfer-Encdoding headers are set.");
+    EXPECT_EQ(status.message(),
+              "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encdoding' are set.");
     EXPECT_EQ("http1.content_length_not_allowed", response_encoder->getStream().responseDetails());
   }
 }
@@ -2891,7 +2893,7 @@ TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength1
   // content-length less than POST body size
   testAllowChunkedContentLength(1, false);
 }
- TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength100) {
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength100) {
   // content-length greater than POST body size
   testAllowChunkedContentLength(100, false);
 }
