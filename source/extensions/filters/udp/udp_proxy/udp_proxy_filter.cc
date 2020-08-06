@@ -2,6 +2,8 @@
 
 #include "envoy/network/listener.h"
 
+#include "common/network/socket_option_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -153,6 +155,7 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
                                              Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                              const Upstream::HostConstSharedPtr& host)
     : cluster_(cluster), addresses_(std::move(addresses)), host_(host),
+      use_original_src_ip_(cluster_.filter_.config_->usingOriginalSrcIp()),
       idle_timer_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createTimer(
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
@@ -170,6 +173,35 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       ->resourceManager(Upstream::ResourcePriority::Default)
       .connections()
       .inc();
+
+  if (use_original_src_ip_) {
+    ENVOY_LOG(debug, "The original src is enabled for address {}.",
+              addresses_.peer_->asStringView());
+
+    const auto ip_trans = ENVOY_SOCKET_IP_TRANSPARENT;
+    const auto host_addr = host_->address()->ip();
+    const int trans_value = 1;
+    Api::SysCallIntResult result;
+
+    if (host_addr->version() == Network::Address::IpVersion::v6) {
+      // set ipv6 option
+      const auto ipv6_trans = ENVOY_SOCKET_IPV6_TRANSPARENT;
+      result = io_handle_->setOption(ipv6_trans.level(), ipv6_trans.option(), &trans_value,
+                                     sizeof(trans_value));
+      RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
+      if (!host_addr->ipv6()->v6only()) {
+        // set ipv4 option
+        result = io_handle_->setOption(ip_trans.level(), ip_trans.option(), &trans_value,
+                                       sizeof(trans_value));
+        RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
+      }
+    } else {
+      // set ipv4 option
+      result = io_handle_->setOption(ip_trans.level(), ip_trans.option(), &trans_value,
+                                     sizeof(trans_value));
+      RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
+    }
+  }
 
   // TODO(mattklein123): Enable dropped packets socket option. In general the Socket abstraction
   // does not work well right now for client sockets. It's too heavy weight and is aimed at listener
@@ -222,10 +254,12 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
 
   // NOTE: On the first write, a local ephemeral port is bound, and thus this write can fail due to
   //       port exhaustion.
-  // NOTE: We do not specify the local IP to use for the sendmsg call. We allow the OS to select
-  //       the right IP based on outbound routing rules.
+  // NOTE: We do not specify the local IP to use for the sendmsg call if use_original_src_ip_ is not
+  // set.
+  //       We allow the OS to select the right IP based on outbound routing rules.
+  const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
   Api::IoCallUint64Result rc =
-      Network::Utility::writeToSocket(*io_handle_, buffer, nullptr, *host_->address());
+      Network::Utility::writeToSocket(*io_handle_, buffer, local_ip, *host_->address());
   if (!rc.ok()) {
     cluster_.cluster_stats_.sess_tx_errors_.inc();
   } else {

@@ -1,6 +1,8 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
+#include "common/network/socket_option_impl.h"
+
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/network/io_handle.h"
@@ -36,6 +38,13 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
   return no_error;
 }
 
+Api::SysCallIntResult makeNoError() {
+  Api::SysCallIntResult no_error;
+  no_error.rc_ = 0;
+  no_error.errno_ = 0;
+  return no_error;
+}
+
 Api::IoCallUint64Result makeError(int sys_errno) {
   return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(sys_errno),
                                                     Network::IoSocketError::deleteIoError));
@@ -49,16 +58,30 @@ public:
         : parent_(parent), upstream_address_(upstream_address),
           io_handle_(new Network::MockIoHandle()) {}
 
-    void expectUpstreamWrite(const std::string& data, int sys_errno = 0) {
+    void expectUpstreamWriteOriginalSrcIp() {
+      EXPECT_CALL(*io_handle_, setOption(_, _, _, _))
+          .WillRepeatedly(Invoke([this](int level, int optname, const void* optval,
+                                        socklen_t) -> Api::SysCallIntResult {
+            sock_opts_[level][optname] = *reinterpret_cast<const int*>(optval);
+            return makeNoError();
+          }));
+    }
+
+    void expectUpstreamWrite(const std::string& data, int sys_errno = 0,
+                             const Network::Address::Ip* local_ip = nullptr) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
-      EXPECT_CALL(*io_handle_, sendmsg(_, 1, 0, nullptr, _))
+      EXPECT_CALL(*io_handle_, sendmsg(_, 1, 0, local_ip, _))
           .WillOnce(Invoke(
-              [this, data, sys_errno](
-                  const Buffer::RawSlice* slices, uint64_t, int, const Network::Address::Ip*,
+              [this, data, local_ip, sys_errno](
+                  const Buffer::RawSlice* slices, uint64_t, int,
+                  const Network::Address::Ip* self_ip,
                   const Network::Address::Instance& peer_address) -> Api::IoCallUint64Result {
                 EXPECT_EQ(data, absl::string_view(static_cast<const char*>(slices[0].mem_),
                                                   slices[0].len_));
                 EXPECT_EQ(peer_address, *upstream_address_);
+                if (self_ip && local_ip) {
+                  EXPECT_EQ(self_ip->addressAsString(), local_ip->addressAsString());
+                }
                 return sys_errno == 0 ? makeNoError(data.size()) : makeError(sys_errno);
               }));
     }
@@ -115,6 +138,7 @@ public:
     const Network::Address::InstanceConstSharedPtr upstream_address_;
     Event::MockTimer* idle_timer_{};
     Network::MockIoHandle* io_handle_;
+    std::map<int, std::map<int, int>> sock_opts_;
     Event::FileReadyCb file_event_cb_;
   };
 
@@ -190,6 +214,28 @@ public:
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;
   const Network::Address::InstanceConstSharedPtr upstream_address_;
+};
+
+class UdpProxyFilterTestIpv6 : public UdpProxyFilterTest {
+public:
+  UdpProxyFilterTestIpv6()
+      : UdpProxyFilterTestIpv6(
+            Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::8a2e:370:7334]:443")) {}
+
+  explicit UdpProxyFilterTestIpv6(Network::Address::InstanceConstSharedPtr&& address)
+      : upstream_address_v6_(std::move(address)) {
+    EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
+        .WillRepeatedly(Return(upstream_address_v6_));
+  }
+
+  const Network::Address::InstanceConstSharedPtr upstream_address_v6_;
+};
+
+class UdpProxyFilterTestIpv4Ipv6 : public UdpProxyFilterTestIpv6 {
+public:
+  UdpProxyFilterTestIpv4Ipv6()
+      : UdpProxyFilterTestIpv6(Network::Utility::parseInternetAddressAndPort(
+            "[2001:db8:85a3::8a2e:370:7334]:443", false)) {}
 };
 
 // Basic UDP proxy flow with a single session.
@@ -478,6 +524,177 @@ cluster: fake_cluster
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+// Make sure socket option is set correctly if use_original_src_ip is set.
+TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
+  const auto ip_trans = ENVOY_SOCKET_IP_TRANSPARENT;
+  const auto ipv6_trans = ENVOY_SOCKET_IPV6_TRANSPARENT;
+
+  if (!(ip_trans.hasValue() && ipv6_trans.hasValue())) {
+    // The options are not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+)EOF");
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectUpstreamWriteOriginalSrcIp();
+  test_sessions_[0].expectUpstreamWrite(
+      "hello", 0, Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000")->ip());
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  EXPECT_EQ(1, test_sessions_[0].sock_opts_[ip_trans.level()][ip_trans.option()]);
+  EXPECT_EQ(0, test_sessions_[0].sock_opts_[ipv6_trans.level()][ipv6_trans.option()]);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+}
+
+// Make sure socket option is set correctly if use_original_src_ip is set in case of ipv6.
+TEST_F(UdpProxyFilterTestIpv6, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
+  const auto ip_trans = ENVOY_SOCKET_IP_TRANSPARENT;
+  const auto ipv6_trans = ENVOY_SOCKET_IPV6_TRANSPARENT;
+
+  if (!(ip_trans.hasValue() && ipv6_trans.hasValue())) {
+    // The options are not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+)EOF");
+
+  expectSessionCreate(upstream_address_v6_);
+  test_sessions_[0].expectUpstreamWriteOriginalSrcIp();
+  test_sessions_[0].expectUpstreamWrite(
+      "hello", 0,
+      Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::9a2e:370:7334]:1000")->ip());
+  recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000", "[2001:db8:85a3::9a2e:370:7335]:80",
+                         "hello");
+
+  EXPECT_EQ(0, test_sessions_[0].sock_opts_[ip_trans.level()][ip_trans.option()]);
+  EXPECT_EQ(1, test_sessions_[0].sock_opts_[ipv6_trans.level()][ipv6_trans.option()]);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+}
+
+// Make sure socket option is set correctly if use_original_src_ip is set in case of ipv4+ipv6.
+TEST_F(UdpProxyFilterTestIpv4Ipv6, SocketOptionForUseOriginalSrcIpInCaseOfIpv4Ipv6) {
+  const auto ip_trans = ENVOY_SOCKET_IP_TRANSPARENT;
+  const auto ipv6_trans = ENVOY_SOCKET_IPV6_TRANSPARENT;
+
+  if (!(ip_trans.hasValue() && ipv6_trans.hasValue())) {
+    // The options are not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: true
+)EOF");
+
+  expectSessionCreate(upstream_address_v6_);
+  test_sessions_[0].expectUpstreamWriteOriginalSrcIp();
+  test_sessions_[0].expectUpstreamWrite(
+      "hello", 0,
+      Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::9a2e:370:7334]:1000")->ip());
+  recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000", "[2001:db8:85a3::9a2e:370:7335]:80",
+                         "hello");
+
+  EXPECT_EQ(1, test_sessions_[0].sock_opts_[ip_trans.level()][ip_trans.option()]);
+  EXPECT_EQ(1, test_sessions_[0].sock_opts_[ipv6_trans.level()][ipv6_trans.option()]);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+}
+
+// Make sure socket option is not set correctly if use_original_src_ip is not set.
+TEST_F(UdpProxyFilterTestIpv4Ipv6, NoSocketOptionForDontUseOriginalSrcIp) {
+  const auto ip_trans = ENVOY_SOCKET_IP_TRANSPARENT;
+  const auto ipv6_trans = ENVOY_SOCKET_IPV6_TRANSPARENT;
+
+  if (!(ip_trans.hasValue() && ipv6_trans.hasValue())) {
+    // The options are not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_original_src_ip: false
+)EOF");
+
+  expectSessionCreate(upstream_address_v6_);
+  test_sessions_[0].expectUpstreamWrite("hello");
+  recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000", "[2001:db8:85a3::9a2e:370:7335]:80",
+                         "hello");
+
+  EXPECT_EQ(0, test_sessions_[0].sock_opts_[ip_trans.level()][ip_trans.option()]);
+  EXPECT_EQ(0, test_sessions_[0].sock_opts_[ipv6_trans.level()][ipv6_trans.option()]);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+}
+
+// Make sure socket option is not set correctly if use_original_src_ip is not mentioned.
+TEST_F(UdpProxyFilterTestIpv4Ipv6, NoSocketOptionForNoUseOriginalSrcIp) {
+  const auto ip_trans = ENVOY_SOCKET_IP_TRANSPARENT;
+  const auto ipv6_trans = ENVOY_SOCKET_IPV6_TRANSPARENT;
+
+  if (!(ip_trans.hasValue() && ipv6_trans.hasValue())) {
+    // The options are not supported on this platform. Just skip the test.
+    GTEST_SKIP();
+  }
+
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+)EOF");
+
+  expectSessionCreate(upstream_address_v6_);
+  test_sessions_[0].expectUpstreamWrite("hello");
+  recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000", "[2001:db8:85a3::9a2e:370:7335]:80",
+                         "hello");
+
+  EXPECT_EQ(0, test_sessions_[0].sock_opts_[ip_trans.level()][ip_trans.option()]);
+  EXPECT_EQ(0, test_sessions_[0].sock_opts_[ipv6_trans.level()][ipv6_trans.option()]);
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
 }
 
 } // namespace

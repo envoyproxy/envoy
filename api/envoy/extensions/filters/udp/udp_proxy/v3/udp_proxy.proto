@@ -35,4 +35,7 @@ message UdpProxyConfig {
   // The idle timeout for sessions. Idle is defined as no datagrams between received or sent by
   // the session. The default if not specified is 1 minute.
   google.protobuf.Duration idle_timeout = 3;
+
+  // Use the remote downstream ip address as sender ip address when send packets to upstreams.
+  bool use_original_src_ip = 4;
 }

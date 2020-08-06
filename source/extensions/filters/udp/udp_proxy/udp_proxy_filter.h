@@ -63,11 +63,13 @@ public:
                        const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
       : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
+        use_original_src_ip_(config.use_original_src_ip()),
         stats_(generateStats(config.stat_prefix(), root_scope)) {}
 
   const std::string& cluster() const { return cluster_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
+  bool usingOriginalSrcIp() const { return use_original_src_ip_; }
   UdpProxyDownstreamStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
 
@@ -83,6 +85,7 @@ private:
   TimeSource& time_source_;
   const std::string cluster_;
   const std::chrono::milliseconds session_timeout_;
+  const bool use_original_src_ip_;
   mutable UdpProxyDownstreamStats stats_;
 };
 
@@ -137,6 +140,7 @@ private:
     ClusterInfo& cluster_;
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     const Upstream::HostConstSharedPtr host_;
+    const bool use_original_src_ip_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
     // time stamp and a periodic scan of all sessions to look for timeouts. This solution is simple,
     // though it might not perform well for high volume traffic. Note that this is how TCP proxy
