@@ -95,7 +95,7 @@ public:
   // Used to test if trailers are decoded/encoded
   void expectTrailersTest(bool enable_trailers);
 
-  void testAllowChunkedContentLength(bool allow_chunked_length);
+  void testAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length);
 
   // Send the request, and validate the received request headers.
   // Then send a response just to clean up.
@@ -328,9 +328,8 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
   EXPECT_TRUE(status.ok());
 }
 
-void Http1ServerConnectionImplTest::testAllowChunkedContentLength(bool allow_chunked_length) {
+void Http1ServerConnectionImplTest::testAllowChunkedContentLength(uint32_t content_length, bool allow_chunked_length) {
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
-
   if (GetParam()) {
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
@@ -367,11 +366,12 @@ void Http1ServerConnectionImplTest::testAllowChunkedContentLength(bool allow_chu
     EXPECT_CALL(decoder, sendLocalReply(false, Http::Code::BadRequest, "Bad Request", _, _, _));
   }
 
-  Buffer::OwnedImpl buffer(
-      "POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\ncontent-length: 1\r\n\r\n"
+  Buffer::OwnedImpl buffer(fmt::format(
+      "POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\ncontent-length: {}\r\n\r\n"
       "6\r\nHello \r\n"
       "5\r\nWorld\r\n"
-      "0\r\n\r\n");
+      "0\r\n\r\n", content_length)
+  );  
 
   auto status = codec_->dispatch(buffer);
 
@@ -2884,12 +2884,28 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersAccepted) {
   status = codec_->dispatch(buffer);
 }
 
-TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength) {
-  testAllowChunkedContentLength(false);
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength0) {
+  testAllowChunkedContentLength(0, false);
+}
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength1) {
+  // content-length less than POST body size
+  testAllowChunkedContentLength(1, false);
+}
+ TEST_P(Http1ServerConnectionImplTest, TestSmugglingDisallowChunkedContentLength100) {
+  // content-length greater than POST body size
+  testAllowChunkedContentLength(100, false);
 }
 
-TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength) {
-  testAllowChunkedContentLength(true);
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength0) {
+  testAllowChunkedContentLength(0, true);
+}
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength1) {
+  // content-length less than POST body size
+  testAllowChunkedContentLength(1, true);
+}
+TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength100) {
+  // content-length greater than POST body size
+  testAllowChunkedContentLength(100, true);
 }
 
 } // namespace Http
