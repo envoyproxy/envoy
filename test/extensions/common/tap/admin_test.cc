@@ -49,7 +49,7 @@ public:
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:

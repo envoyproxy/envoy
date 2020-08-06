@@ -216,7 +216,7 @@ TEST_P(TapIntegrationTest, AdminBasicFlow) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     or_match:
       rules:
         - http_request_headers_match:
@@ -279,7 +279,7 @@ tap_config:
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     and_match:
       rules:
         - http_request_headers_match:
@@ -323,7 +323,7 @@ TEST_P(TapIntegrationTest, AdminTrailers) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     and_match:
       rules:
         - http_request_trailers_match:
@@ -364,7 +364,7 @@ TEST_P(TapIntegrationTest, AdminBodyAsBytes) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -395,7 +395,7 @@ TEST_P(TapIntegrationTest, AdminBodyAsString) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -427,7 +427,7 @@ TEST_P(TapIntegrationTest, AdminBodyAsBytesTruncated) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     max_buffered_rx_bytes: 3
@@ -550,7 +550,7 @@ TEST_P(TapIntegrationTest, AdminBodyMatching) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     and_match:
       rules:
         - http_request_generic_body_match:
