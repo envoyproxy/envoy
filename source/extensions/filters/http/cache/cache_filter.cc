@@ -33,8 +33,12 @@ CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha:
     : time_source_(time_source), cache_(http_cache) {}
 
 void CacheFilter::onDestroy() {
-  lookup_ = nullptr;
-  insert_ = nullptr;
+  if (lookup_) {
+    lookup_->onDestroy();
+  }
+  if (insert_) {
+    insert_->onDestroy();
+  }
 }
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -122,9 +126,9 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
     // LookupResult is non-copyable as LookupResult::headers_ is a unique_ptr, which is
-    // non-copyable. Hence, "result" is decomposed when captured, and reinstantiatied inside the
+    // non-copyable. Hence, "result" is decomposed when captured, and re-instantiated inside the
     // lambda so that "result.headers_" can be captured as a raw pointer, then wrapped in a
-    // unique_ptr when the result is reinstantiatied.
+    // unique_ptr when the result is re-instantiated.
     dispatcher.post(
         [this, &request_headers, status = result.cache_entry_status_,
          headers = result.headers_.release(), response_ranges = std::move(result.response_ranges_),
