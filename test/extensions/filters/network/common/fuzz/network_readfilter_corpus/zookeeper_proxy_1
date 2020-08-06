@@ -1,0 +1,34 @@
+config {
+  name: "envoy.filters.network.zookeeper_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy"
+    value: "\nVtype.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy\032\000"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 8257536
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 8257536
+  }
+}
+actions {
+  on_data {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 83886080
+  }
+}
