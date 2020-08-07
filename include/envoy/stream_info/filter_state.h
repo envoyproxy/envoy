@@ -95,7 +95,7 @@ public:
   template <typename T> const T& getDataReadOnly(absl::string_view data_name) const {
     const T* result = dynamic_cast<const T*>(getDataReadOnlyGeneric(data_name));
     if (!result) {
-      ExceptionUtil::ThrowEnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
     return *result;
@@ -112,7 +112,7 @@ public:
   template <typename T> T& getDataMutable(absl::string_view data_name) {
     T* result = dynamic_cast<T*>(getDataMutableGeneric(data_name));
     if (!result) {
-      ExceptionUtil::ThrowEnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
     return *result;

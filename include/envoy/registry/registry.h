@@ -218,7 +218,7 @@ public:
                               absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
-      ExceptionUtil::ThrowEnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Double registration for name: '{}'", factory.name()));
     }
 
@@ -236,7 +236,7 @@ public:
                               absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
-      ExceptionUtil::ThrowEnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Double registration for name: '{}'", factory.name()));
     }
     versionedFactories().emplace(std::make_pair(name, version));

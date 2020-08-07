@@ -1,6 +1,7 @@
 #include "common/common/utility.h"
 
 #include <array>
+#include <bits/stdint-uintn.h>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -572,7 +573,7 @@ InlineString::InlineString(const char* str, size_t size) : size_(size) {
   memcpy(data_, str, size);
 }
 
-void ExceptionUtil::ThrowEnvoyException(const std::string& message) {
+uint64_t ExceptionUtil::throwEnvoyException(const std::string& message) {
   throw EnvoyException(message);
 }
 

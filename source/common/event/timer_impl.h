@@ -30,7 +30,7 @@ public:
    */
   template <typename Duration> static void durationToTimeval(const Duration& d, timeval& tv) {
     if (d.count() < 0) {
-      ExceptionUtil::ThrowEnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Negative duration passed to durationToTimeval(): {}", d.count()));
     };
     constexpr int64_t clip_to = INT32_MAX; // 136.102208 years

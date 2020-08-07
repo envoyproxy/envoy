@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
 #include <chrono>
 #include <cstdint>
 #include <set>
@@ -625,7 +626,7 @@ template <class Value> struct TrieLookupTable {
  */
 class ExceptionUtil {
 public:
-  static void ThrowEnvoyException(const std::string& message);
+  static uint64_t throwEnvoyException(const std::string& message);
 };
 
 // Mix-in class for allocating classes with variable-sized inlined storage.
