@@ -381,3 +381,18 @@ message EndpointsConfigDump {
   // The dynamically loaded endpoint configs.
   repeated DynamicEndpointConfig dynamic_endpoint_configs = 3;
 }
+
+// Message of unready targets information of an init manager.
+message UnreadyTargetsConfigDump {
+  // Name of the init manager.
+  string name = 1;
+
+  // Names of unready targets in the hash map of the init manager.
+  repeated string target_names = 2;
+}
+
+// Envoy's admin fills this message with init managers, which provides the information of their unready targets.
+message UnreadyTargetsConfigDumpList {
+  // The list of each init manager's unready targets.
+  repeated UnreadyTargetsConfigDump unready_targets_configs = 1;
+}

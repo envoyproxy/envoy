@@ -16,6 +16,7 @@ public:
                bool modifiable));
   MOCK_METHOD(void, createLdsApi, (const envoy::config::core::v3::ConfigSource& lds_config));
   MOCK_METHOD(std::vector<std::reference_wrapper<Network::ListenerConfig>>, listeners, ());
+  MOCK_METHOD(std::vector<std::reference_wrapper<Network::ListenerConfig>>, warmingListeners, ());
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(bool, removeListener, (const std::string& listener_name));
   MOCK_METHOD(void, startWorkers, (GuardDog & guard_dog));
@@ -24,6 +25,7 @@ public:
   MOCK_METHOD(void, beginListenerUpdate, ());
   MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates &&));
   MOCK_METHOD(ApiListenerOptRef, apiListener, ());
+  MOCK_METHOD(bool, isWorkerStarted, ());
 };
 } // namespace Server
 } // namespace Envoy

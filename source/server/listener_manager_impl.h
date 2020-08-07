@@ -187,6 +187,7 @@ public:
     lds_api_ = factory_.createLdsApi(lds_config);
   }
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> warmingListeners() override;
   uint64_t numConnections() const override;
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog) override;
@@ -194,6 +195,7 @@ public:
   void stopWorkers() override;
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
+  bool isWorkerStarted() override { return workers_started_; }
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
 

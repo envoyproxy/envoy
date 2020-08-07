@@ -168,6 +168,13 @@ public:
   virtual std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() PURE;
 
   /**
+   * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently
+   * warming listeners. Note that this routine returns references to the existing listeners. The
+   * references are only valid in the context of the current call stack and should not be stored.
+   */
+  virtual std::vector<std::reference_wrapper<Network::ListenerConfig>> warmingListeners() PURE;
+
+  /**
    * @return uint64_t the total number of connections owned by all listeners across all workers.
    */
   virtual uint64_t numConnections() const PURE;
@@ -221,6 +228,8 @@ public:
    * @return the server's API Listener if it exists, nullopt if it does not.
    */
   virtual ApiListenerOptRef apiListener() PURE;
+
+  virtual bool isWorkerStarted() PURE;
 };
 
 } // namespace Server

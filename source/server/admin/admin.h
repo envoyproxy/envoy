@@ -296,7 +296,8 @@ private:
    * Helper methods for the /config_dump url handler.
    */
   void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                          const absl::optional<std::string>& mask, bool include_eds) const;
+                          const absl::optional<std::string>& mask, bool include_eds,
+                          bool include_listener_unready_targets) const;
   /**
    * Add the config matching the passed resource to the passed config dump.
    * @return absl::nullopt on success, else the Http::Code and an error message that should be added
@@ -304,7 +305,8 @@ private:
    */
   absl::optional<std::pair<Http::Code, std::string>>
   addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
-                    const std::string& resource, bool include_eds) const;
+                    const std::string& resource, bool include_eds,
+                    bool include_listener_unready_targets) const;
 
   std::vector<const UrlHandler*> sortedHandlers() const;
   envoy::admin::v3::ServerInfo::State serverState();
@@ -315,6 +317,18 @@ private:
   void addLbEndpoint(const Upstream::HostSharedPtr& host,
                      envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint) const;
   ProtobufTypes::MessagePtr dumpEndpointConfigs() const;
+
+  /**
+   * Helper methods for the /config_dump url handler to add unready targets config.
+   */
+  ProtobufTypes::MessagePtr
+  dumpUnreadyTargetsConfigs(const absl::optional<std::string>& mask) const;
+
+  /**
+   * Helper methods for the /config_dump url handler to add unready targets config of listeners.
+   */
+  ProtobufTypes::MessagePtr dumpListenerUnreadyTargetsConfigs() const;
+
   /**
    * URL handlers.
    */
