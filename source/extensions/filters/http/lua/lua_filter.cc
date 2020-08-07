@@ -602,7 +602,7 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
-  // Get input string
+  // Get input string.
   absl::string_view input = luaL_checkstring(state, 2);
   auto output = absl::Base64Escape(input);
   lua_pushlstring(state, output.data(), output.length());

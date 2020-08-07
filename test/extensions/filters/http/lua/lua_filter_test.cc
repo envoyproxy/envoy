@@ -2198,9 +2198,9 @@ TEST_F(LuaHttpFilterTest, LuaFilterBase64Escape) {
       request_handle:logTrace(base64Encoded)
     end
 
-    function envoy_on_response(request_handle)
-      local base64Encoded = request_handle:base64Escape("barfoo")
-      request_handle:logTrace(base64Encoded)
+    function envoy_on_response(response_handle)
+      local base64Encoded = response_handle:base64Escape("barfoo")
+      response_handle:logTrace(base64Encoded)
     end
   )EOF"};
 
