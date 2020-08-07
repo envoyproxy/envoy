@@ -13,11 +13,14 @@ mock_template:
   dns_failure_refresh_rate:
     base_interval: {{ dns_failure_refresh_rate_seconds_base }}s
     max_interval: {{ dns_failure_refresh_rate_seconds_max }}s
+  platform_filter_chain: {{ platform_filter_chain }}
   stats_flush_interval: {{ stats_flush_interval_seconds }}s
   app_version: {{ app_version }}
   app_id: {{ app_id }}
   virtual_clusters: {{ virtual_clusters }}
 """
+
+private struct TestFilter: Filter {}
 
 final class StreamClientBuilderTests: XCTestCase {
   override func tearDown() {
@@ -95,6 +98,21 @@ final class StreamClientBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testAddingPlatformFiltersToConfigurationWhenRunningEnvoy() throws {
+    let expectation = self.expectation(description: "Run called with expected data")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertEqual(1, config.httpFilterFactories.count)
+      XCTAssertEqual("TestFilter", config.httpFilterFactories[0].filterName)
+      expectation.fulfill()
+    }
+
+    _ = try StreamClientBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .addFilter("TestFilter", factory: TestFilter.init)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testAddingDNSFailureRefreshSecondsAddsToConfigurationWhenRunningEnvoy() throws {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -167,12 +185,13 @@ final class StreamClientBuilderTests: XCTestCase {
   }
 
   func testResolvesYAMLWithIndividuallySetValues() throws {
+    let filterFactory = EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init)
     let config = EnvoyConfiguration(statsDomain: "stats.envoyproxy.io",
                                     connectTimeoutSeconds: 200,
                                     dnsRefreshSeconds: 300,
                                     dnsFailureRefreshSecondsBase: 400,
                                     dnsFailureRefreshSecondsMax: 500,
-                                    filterChain: [],
+                                    filterChain: [filterFactory],
                                     statsFlushSeconds: 600,
                                     appVersion: "v1.2.3",
                                     appId: "com.envoymobile.ios",
@@ -183,6 +202,7 @@ final class StreamClientBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("dns_refresh_rate: 300s"))
     XCTAssertTrue(resolvedYAML.contains("base_interval: 400s"))
     XCTAssertTrue(resolvedYAML.contains("max_interval: 500s"))
+    XCTAssertTrue(resolvedYAML.contains("filter_name: TestFilter"))
     XCTAssertTrue(resolvedYAML.contains("stats_flush_interval: 600s"))
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
     XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))

@@ -1,6 +1,13 @@
 /**
  * Templated default configuration
  */
+const char* platform_filter_template = R"(
+          - name: envoy.filters.http.platform_bridge
+            typed_config:
+              "@type": type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge
+              platform_filter_name: {{ platform_filter_name }}
+)";
+
 const char* config_template = R"(
 static_resources:
   listeners:
@@ -32,6 +39,7 @@ static_resources:
                         base_interval: 0.25s
                         max_interval: 60s
         http_filters:
+{{ platform_filter_chain }}
           - name: envoy.filters.http.platform_bridge
             typed_config:
               "@type": type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge
