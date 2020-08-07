@@ -6,13 +6,16 @@ EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./jaeger-native-tracing|docke
 
 
 trap_errors () {
-    local frame=0 LINE SUB FILE
+    local frame=0 COMMAND LINE SUB FILE
+    if [ -n "$example_test" ]; then
+	COMMAND=" (${example_test})"
+    fi
     set +v
     while read -r LINE SUB FILE < <(caller "$frame"); do
 	if [ "$frame" -ne "0" ]; then
 	    FAILED+=("  > ${SUB}@ ${FILE} :${LINE}")
 	else
-	    FAILED+=("${SUB}@ ${FILE} :${LINE}")
+	    FAILED+=("${SUB}@ ${FILE} :${LINE}${COMMAND}")
 	fi
 	((frame++))
     done
@@ -20,6 +23,7 @@ trap_errors () {
 }
 
 trap trap_errors ERR
+trap exit 1 INT
 
 run_log () {
     local name
@@ -419,9 +423,10 @@ run_example_front_proxy () {
 }
 
 run_examples () {
-    local example example_test
+    local example examples example_test
     cd "${SRCDIR}/examples" || exit 1
-    for example in $(find . -mindepth 1 -maxdepth 1 -type d | sort); do
+    examples=$(find . -mindepth 1 -maxdepth 1 -type d | sort)
+    for example in $examples; do
 	example_test="run_example_$(echo "$example" | cut -d/ -f2 | tr '-' '_')"
 	$example_test
     done
