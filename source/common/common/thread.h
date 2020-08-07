@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <atomic>
@@ -28,14 +29,8 @@ public:
   bool tryLock() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) override { return mutex_.TryLock(); }
   void unlock() ABSL_UNLOCK_FUNCTION() override { mutex_.Unlock(); }
 
-  bool awaitWithTimeout(const bool& condition, const Duration& timeout) {
-    return mutex_.AwaitWithTimeout(absl::Condition(&condition), absl::FromChrono(timeout));
-  }
-  bool awaitWithTimeout(BoolFn check_condition, const Duration& timeout) {
-    auto cond_no_capture = +[](BoolFn* check_condition) -> bool { return (*check_condition)(); };
-    return mutex_.AwaitWithTimeout(absl::Condition(cond_no_capture, &check_condition),
-                                   absl::FromChrono(timeout));
-  }
+  bool awaitWithTimeout(const bool& condition, const Duration& timeout);
+  bool awaitWithTimeout(BoolFn check_condition, const Duration& timeout);
 
 private:
   friend class CondVar;

@@ -26,11 +26,26 @@ void TestRealTimeSystem::advanceTimeWait(const Duration& duration) {
 bool TestRealTimeSystem::await(const bool& condition, Thread::MutexBasicLockable& mutex,
                                const Duration& timeout) {
   return mutex.awaitWithTimeout(condition, timeout);
+  /*
+  const MonotonicTime end_time = monotonicTime() + timeout;
+  do {
+    if (mutex.awaitWithTimeout(condition, std::chrono::milliseconds(5))) {
+      return true;
+    }
+  } while (monotonicTime() < end_time);
+  return false;
+  */
 }
 
 bool TestRealTimeSystem::await(BoolFn check_condition, Thread::MutexBasicLockable& mutex,
                                const Duration& timeout) {
-  return mutex.awaitWithTimeout(check_condition, timeout);
+  const MonotonicTime end_time = monotonicTime() + timeout;
+  do {
+    if (mutex.awaitWithTimeout(check_condition, std::chrono::milliseconds(5))) {
+      return true;
+    }
+  } while (monotonicTime() < end_time);
+  return false;
 }
 
 void TestRealTimeSystem::advanceTimeAsync(const Duration& duration) { advanceTimeWait(duration); }
