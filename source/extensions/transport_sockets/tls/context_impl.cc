@@ -527,49 +527,50 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  Envoy::Ssl::SslExtendedSocketInfo* sslExtendedInfo =
+  auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
+  return impl->doVerifyCertChain(
+      store_ctx,
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
-          SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+          SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
+      *cert, static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl)));
+}
 
-  if (impl->verify_trusted_ca_) {
+int ContextImpl::doVerifyCertChain(
+    X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
+    const Network::TransportSocketOptions* transport_socket_options) {
+  if (verify_trusted_ca_) {
     int ret = X509_verify_cert(store_ctx);
-    if (sslExtendedInfo) {
-      sslExtendedInfo->setCertificateValidationStatus(
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(
           ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
                    : Envoy::Ssl::ClientValidationStatus::Failed);
     }
 
     if (ret <= 0) {
-      impl->stats_.fail_verify_error_.inc();
-      return impl->allow_untrusted_certificate_ ? 1 : ret;
+      stats_.fail_verify_error_.inc();
+      return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
 
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-
-  const Network::TransportSocketOptions* transport_socket_options =
-      static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
-
-  Envoy::Ssl::ClientValidationStatus validated = impl->verifyCertificate(
-      cert.get(),
+  Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(
+      &leaf_cert,
       transport_socket_options &&
               !transport_socket_options->verifySubjectAltNameListOverride().empty()
           ? transport_socket_options->verifySubjectAltNameListOverride()
-          : impl->verify_subject_alt_name_list_,
-      impl->subject_alt_name_matchers_);
+          : verify_subject_alt_name_list_,
+      subject_alt_name_matchers_);
 
-  if (sslExtendedInfo) {
-    if (sslExtendedInfo->certificateValidationStatus() ==
+  if (ssl_extended_info) {
+    if (ssl_extended_info->certificateValidationStatus() ==
         Envoy::Ssl::ClientValidationStatus::NotValidated) {
-      sslExtendedInfo->setCertificateValidationStatus(validated);
+      ssl_extended_info->setCertificateValidationStatus(validated);
     } else if (validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
-      sslExtendedInfo->setCertificateValidationStatus(validated);
+      ssl_extended_info->setCertificateValidationStatus(validated);
     }
   }
 
-  return impl->allow_untrusted_certificate_
-             ? 1
-             : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
+  return allow_untrusted_certificate_ ? 1
+                                      : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
 }
 
 Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
@@ -675,7 +676,7 @@ bool ContextImpl::matchSubjectAltName(
       if (general_name->type == GEN_DNS &&
                   config_san_matcher.matcher().match_pattern_case() ==
                       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-              ? dnsNameMatch(config_san_matcher.matcher().exact(), san.c_str())
+              ? dnsNameMatch(config_san_matcher.matcher().exact(), absl::string_view(san))
               : config_san_matcher.match(san)) {
         return true;
       }
@@ -703,20 +704,20 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool ContextImpl::dnsNameMatch(const std::string& dns_name, const char* pattern) {
+bool ContextImpl::dnsNameMatch(const absl::string_view dns_name, const absl::string_view pattern) {
   if (dns_name == pattern) {
     return true;
   }
 
-  size_t pattern_len = strlen(pattern);
+  size_t pattern_len = pattern.length();
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
     if (dns_name.length() > pattern_len - 1) {
       const size_t off = dns_name.length() - pattern_len + 1;
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_wildcard_matching")) {
         return dns_name.substr(0, off).find('.') == std::string::npos &&
-               dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+               dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
       } else {
-        return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+        return dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
       }
     }
   }
@@ -1392,6 +1393,28 @@ bool ServerContextImpl::TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t
     }
   }
   return false;
+}
+
+bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates,
+                                  std::string& error_details) {
+  bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
+  // It doesn't matter which SSL context is used, because they share the same
+  // cert validation config.
+  X509_STORE* store = SSL_CTX_get_cert_store(tls_contexts_[0].ssl_ctx_.get());
+  if (!X509_STORE_CTX_init(ctx.get(), store, &leaf_cert, &intermediates)) {
+    error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
+    return false;
+  }
+
+  int res = doVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
+  if (res <= 0) {
+    const int n = X509_STORE_CTX_get_error(ctx.get());
+    const int depth = X509_STORE_CTX_get_error_depth(ctx.get());
+    error_details = absl::StrCat("X509_verify_cert: certificate verification error at depth ",
+                                 depth, ": ", X509_verify_cert_error_string(n));
+    return false;
+  }
+  return true;
 }
 
 } // namespace Tls
