@@ -20,8 +20,7 @@ public:
   // Returns true if the condition was unsatisfied prior to the timeout.
   virtual bool await(const bool& cond, Thread::MutexBasicLockable& mutex,
                      const Duration& duration) PURE;
-  virtual bool await(BoolFn cond, Thread::MutexBasicLockable& mutex,
-                     const Duration& duration) PURE;
+  virtual bool await(BoolFn cond, Thread::MutexBasicLockable& mutex, const Duration& duration) PURE;
 
   /**
    * Advances time forward by the specified duration, running any timers
@@ -107,7 +106,8 @@ private:
 // subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
-  bool await(const bool& cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override {
+  bool await(const bool& cond, Thread::MutexBasicLockable& mutex,
+             const Duration& duration) override {
     return timeSystem().await(cond, mutex, duration);
   }
   bool await(BoolFn cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override {

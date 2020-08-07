@@ -29,7 +29,8 @@ public:
   SchedulerPtr createScheduler(Scheduler& base_scheduler, CallbackScheduler& cb_scheduler) override;
 
   // TestTimeSystem
-  bool await(const bool& cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override;
+  bool await(const bool& cond, Thread::MutexBasicLockable& mutex,
+             const Duration& duration) override;
   bool await(BoolFn cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override;
   void advanceTimeWait(const Duration& duration) override;
   void advanceTimeAsync(const Duration& duration) override;
@@ -94,8 +95,8 @@ private:
   };
   using AlarmSet = std::set<AlarmRegistration>;
 
-  template<typename Condition> bool awaitHelper(Condition cond, Thread::MutexBasicLockable& mutex,
-                                                const Duration& timeout);
+  template <typename Condition>
+  bool awaitHelper(Condition cond, Thread::MutexBasicLockable& mutex, const Duration& timeout);
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves
@@ -150,7 +151,8 @@ private:
 // to adjustments in time.
 class SimulatedTimeSystem : public DelegatingTestTimeSystem<SimulatedTimeSystemHelper> {
 public:
-  bool await(const bool& cond, Thread::MutexBasicLockable& mutex, const Duration& duration) override {
+  bool await(const bool& cond, Thread::MutexBasicLockable& mutex,
+             const Duration& duration) override {
     return timeSystem().await(cond, mutex, duration);
   }
 
@@ -170,7 +172,7 @@ public:
     setSystemTime(SystemTime(duration));
   }
 
- private:
+private:
 };
 
 // Class encapsulating a SimulatedTimeSystem, intended for integration tests.

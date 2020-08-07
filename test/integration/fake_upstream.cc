@@ -184,9 +184,8 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 
 static void wakeup(Event::Dispatcher& dispatcher, std::function<bool()> predicate) {
   if (!predicate()) {
-    auto timer = dispatcher.createTimer([&dispatcher, predicate]() {
-      wakeup(dispatcher, predicate);
-    });
+    auto timer =
+        dispatcher.createTimer([&dispatcher, predicate]() { wakeup(dispatcher, predicate); });
     timer->enableTimer(5ms);
   }
 }
@@ -367,7 +366,7 @@ AssertionResult SharedConnectionWrapper::waitForDisconnect(milliseconds timeout,
 
 AssertionResult FakeConnectionBase::waitForHalfClose(bool /*ignore_spurious_events*/,
                                                      milliseconds timeout) {
-  //auto end_time = time_system_.monotonicTime() + timeout;
+  // auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
   if (!time_system_.await(half_closed_, lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for half close.";
@@ -520,9 +519,9 @@ AssertionResult FakeUpstream::waitForHttpConnection(
   auto end_time = time_system.monotonicTime() + timeout;
   {
     Thread::LockGuard lock(lock_);
-    // TODO(jmarantz): we would like to use await() below and drop the condvars,
-    // but when we flip this switch, //test/integration:protocol_integration_test
-    // fails.
+    // TODO(jmarantz): we would like to use await() below and drop the
+    // conditional, variables, but when we flip this switch,
+    // //test/integration:protocol_integration_test fails.
 #if 1
     while (new_connections_.empty()) {
       if (time_system.monotonicTime() >= end_time) {
@@ -535,13 +534,15 @@ AssertionResult FakeUpstream::waitForHttpConnection(
       }
     }
 #else
-    if (!time_system.await([this, &client_dispatcher]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
-                             if (!new_connections_.empty()) {
-                               return true;
-                             }
-                             client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-                             return !new_connections_.empty();
-                           }, lock_, timeout)) {
+    if (!time_system.await(
+            [this, &client_dispatcher]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
+              if (!new_connections_.empty()) {
+                return true;
+              }
+              client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+              return !new_connections_.empty();
+            },
+            lock_, timeout)) {
       return AssertionFailure() << "Timed out waiting for new connection.";
     }
 #endif
@@ -598,8 +599,9 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
                                                    milliseconds timeout) {
   {
     Thread::LockGuard lock(lock_);
-    if (!time_system_.await([this]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
-                              return !new_connections_.empty(); }, lock_, timeout)) {
+    if (!time_system_.await(
+            [this]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool { return !new_connections_.empty(); },
+            lock_, timeout)) {
       return AssertionFailure() << "Timed out waiting for raw connection";
     }
     connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
@@ -621,8 +623,9 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
 testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& data_to_fill,
                                                           std::chrono::milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  if (!time_system_.await([this]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
-        return !received_datagrams_.empty(); }, lock_, timeout)) {
+  if (!time_system_.await(
+          [this]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool { return !received_datagrams_.empty(); },
+          lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for UDP datagram.";
   }
   data_to_fill = std::move(received_datagrams_.front());
@@ -649,8 +652,8 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
                                                milliseconds timeout) {
   Thread::LockGuard lock(lock_);
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
-  if (!time_system_.await([this, num_bytes]() -> bool { return data_.size() == num_bytes; },
-                          lock_, timeout)) {
+  if (!time_system_.await([this, num_bytes]() -> bool { return data_.size() == num_bytes; }, lock_,
+                          timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";
   }
   if (data != nullptr) {
@@ -664,8 +667,8 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
                                std::string* data, milliseconds timeout) {
   Thread::LockGuard lock(lock_);
   ENVOY_LOG(debug, "waiting for data");
-  if (!time_system_.await([this, data_validator]() -> bool { return data_validator(data_); },
-                          lock_, timeout)) {
+  if (!time_system_.await([this, data_validator]() -> bool { return data_validator(data_); }, lock_,
+                          timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";
   }
   if (data != nullptr) {

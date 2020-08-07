@@ -23,18 +23,19 @@ void TestRealTimeSystem::advanceTimeWait(const Duration& duration) {
   std::this_thread::sleep_for(duration);
 }
 
-bool TestRealTimeSystem::await(const bool& condition, Thread::MutexBasicLockable& mutex, const Duration& timeout) {
+bool TestRealTimeSystem::await(const bool& condition, Thread::MutexBasicLockable& mutex,
+                               const Duration& timeout) {
   return mutex.awaitWithTimeout(condition, timeout);
 }
 
-bool TestRealTimeSystem::await(BoolFn check_condition, Thread::MutexBasicLockable& mutex, const Duration& timeout) {
+bool TestRealTimeSystem::await(BoolFn check_condition, Thread::MutexBasicLockable& mutex,
+                               const Duration& timeout) {
   return mutex.awaitWithTimeout(check_condition, timeout);
 }
 
 void TestRealTimeSystem::advanceTimeAsync(const Duration& duration) { advanceTimeWait(duration); }
 
-void TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
-                                 Thread::CondVar& condvar,
+void TestRealTimeSystem::waitFor(Thread::MutexBasicLockable& lock, Thread::CondVar& condvar,
                                  const Duration& duration) noexcept {
   only_one_thread_.checkOneThread();
   condvar.waitFor(lock, duration);

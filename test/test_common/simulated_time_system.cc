@@ -240,8 +240,9 @@ void SimulatedTimeSystemHelper::waitForNoPendingLockHeld() const
       &pending_alarms_));
 }
 
-template<class Condition> bool SimulatedTimeSystemHelper::awaitHelper(
-    Condition condition, Thread::MutexBasicLockable& mutex, const Duration& duration)
+template <class Condition>
+bool SimulatedTimeSystemHelper::awaitHelper(Condition condition, Thread::MutexBasicLockable& mutex,
+                                            const Duration& duration)
     EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
 
@@ -299,9 +300,9 @@ bool SimulatedTimeSystemHelper::await(BoolFn check_condition, Thread::MutexBasic
   return awaitHelper<BoolFn>(check_condition, mutex, timeout);
 }
 
-void SimulatedTimeSystemHelper::waitFor(
-    Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-    const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+void SimulatedTimeSystemHelper::waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                        const Duration& duration) noexcept
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
   only_one_thread_.checkOneThread();
 
   // TODO(#10568): This real-time polling delay should not be necessary. Without
