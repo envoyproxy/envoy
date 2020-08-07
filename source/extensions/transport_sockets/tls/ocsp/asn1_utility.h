@@ -104,7 +104,7 @@ public:
    * @returns ParsingResult<bool> whether `cbs` points to an element tagged with `tag` or
    * an error string if parsing fails.
    */
-  static ParsingResult<bool> getOptional(CBS& cbs, CBS* data, unsigned tag);
+  static ParsingResult<absl::optional<CBS>> getOptional(CBS& cbs, unsigned tag);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` OBJECT IDENTIFIER element

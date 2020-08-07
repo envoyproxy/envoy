@@ -148,24 +148,24 @@ TEST_F(Asn1UtilityTest, SequenceOfMixedTypeErrorTest) {
 }
 
 TEST_F(Asn1UtilityTest, GetOptionalTest) {
-  CBS cbs, value;
+  CBS cbs;
   CBS_init(&cbs, asn1_true.data(), asn1_true.size());
 
   const uint8_t* start = CBS_data(&cbs);
-  EXPECT_FALSE(absl::get<0>(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_INTEGER)));
+  EXPECT_EQ(absl::nullopt, absl::get<0>(Asn1Utility::getOptional(cbs, CBS_ASN1_INTEGER)));
   EXPECT_EQ(start, CBS_data(&cbs));
 
-  EXPECT_TRUE(absl::get<0>(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN)));
+  EXPECT_TRUE(absl::get<0>(Asn1Utility::getOptional(cbs, CBS_ASN1_BOOLEAN)));
   EXPECT_EQ(0xff, *CBS_data(&value));
 }
 
 TEST_F(Asn1UtilityTest, GetOptionalMissingValueTest) {
   std::vector<uint8_t> missing_val_bool = {0x1u, 1};
-  CBS cbs, value;
+  CBS cbs;
   CBS_init(&cbs, missing_val_bool.data(), missing_val_bool.size());
 
   EXPECT_EQ("Failed to parse ASN.1 element tag",
-            absl::get<1>(Asn1Utility::getOptional(cbs, &value, CBS_ASN1_BOOLEAN)));
+            absl::get<1>(Asn1Utility::getOptional(cbs, CBS_ASN1_BOOLEAN)));
 }
 
 TEST_F(Asn1UtilityTest, ParseOptionalTest) {

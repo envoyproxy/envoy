@@ -52,9 +52,9 @@ void skipResponderId(CBS& cbs) {
   // KeyHash ::= OCTET STRING -- SHA-1 hash of responder's public key
   //    (excluding the tag and length fields)
 
-  if (unwrap(Asn1Utility::getOptional(cbs, nullptr,
+  if (unwrap(Asn1Utility::getOptional(cbs,
                                       CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
-      unwrap(Asn1Utility::getOptional(cbs, nullptr,
+      unwrap(Asn1Utility::getOptional(cbs,
                                       CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
     return;
   }
@@ -68,10 +68,10 @@ void skipCertStatus(CBS& cbs) {
   //  revoked             [1] IMPLICIT RevokedInfo,
   //  unknown             [2] IMPLICIT UnknownInfo
   // }
-  if (!(unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 0)) ||
-        unwrap(Asn1Utility::getOptional(cbs, nullptr,
+  if (!(unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 0)) ||
+        unwrap(Asn1Utility::getOptional(cbs,
                                         CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
-        unwrap(Asn1Utility::getOptional(cbs, nullptr, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
+        unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
     throw EnvoyException(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
   }
 }
@@ -141,12 +141,11 @@ std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {
   }
 
   OcspResponseStatus status = Asn1OcspUtility::parseResponseStatus(elem);
-
-  CBS bytes;
+  auto maybe_bytes = unwrap(Asn1Utility::getOptional(elem,
+                                      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
   ResponsePtr resp = nullptr;
-  if (unwrap(Asn1Utility::getOptional(elem, &bytes,
-                                      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0))) {
-    resp = Asn1OcspUtility::parseResponseBytes(bytes);
+  if (maybe_bytes) {
+    resp = Asn1OcspUtility::parseResponseBytes(maybe_bytes.get());
   }
 
   return std::make_unique<OcspResponse>(status, std::move(resp));
