@@ -98,6 +98,9 @@ private:
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {
 public:
+  static const std::string DEFAULT_CIPHER_SUITES;
+  static const std::string DEFAULT_CURVES;
+
   ClientContextConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
       absl::string_view sigalgs,
@@ -116,8 +119,6 @@ public:
 private:
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
-  static const std::string DEFAULT_CIPHER_SUITES;
-  static const std::string DEFAULT_CURVES;
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
