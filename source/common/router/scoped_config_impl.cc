@@ -1,5 +1,7 @@
 #include "common/router/scoped_config_impl.h"
 
+#include <bits/stdint-uintn.h>
+
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
@@ -142,15 +144,29 @@ void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope
 
 Router::ConfigConstSharedPtr
 ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers) const {
-  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
-  if (scope_key == nullptr) {
+  return getRouteConfig(computeKeyHash(headers));
+}
+
+Router::ConfigConstSharedPtr
+ScopedConfigImpl::getRouteConfig(absl::optional<uint64_t> key_hash) const {
+  if (!key_hash) {
     return nullptr;
   }
-  auto iter = scoped_route_info_by_key_.find(scope_key->hash());
+  auto iter = scoped_route_info_by_key_.find(*key_hash);
   if (iter != scoped_route_info_by_key_.end()) {
     return iter->second->routeConfig();
   }
   return nullptr;
+}
+
+absl::optional<uint64_t> ScopedConfigImpl::computeKeyHash(const Http::HeaderMap& headers) const {
+  ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers);
+  if (scope_key &&
+      scoped_route_info_by_key_.find(scope_key->hash()) != scoped_route_info_by_key_.end()) {
+    return scope_key->hash();
+  }
+
+  return {};
 }
 
 } // namespace Router

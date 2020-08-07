@@ -41,6 +41,7 @@
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
 #include "common/local_reply/local_reply.h"
+#include "common/router/scoped_rds.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -301,7 +302,6 @@ private:
 
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
 
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
@@ -368,8 +368,11 @@ private:
   class RouteConfigUpdateRequester {
   public:
     virtual ~RouteConfigUpdateRequester() = default;
-    virtual void requestRouteConfigUpdate(const std::string, Event::Dispatcher&,
-                                          Http::RouteConfigUpdatedCallbackSharedPtr) {
+    virtual void requestVhdsUpdate(const std::string, Event::Dispatcher&,
+                                   Http::RouteConfigUpdatedCallbackSharedPtr) {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    };
+    virtual void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     };
   };
@@ -378,12 +381,21 @@ private:
   public:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
-    void requestRouteConfigUpdate(
-        const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
-        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+
+    // Only on demand update for ScopeRdsConfigProvider is supported.
+    // InlineScopedRoutesConfigProvider will cast to nullptr in this ctor.
+    RdsRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider)
+        : scoped_route_config_provider_(
+              dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)) {}
+
+    void
+    requestVhdsUpdate(const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
+                      Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback) override;
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
+    Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
   };
 
   class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
@@ -909,8 +921,15 @@ private:
     void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);
     void
-    requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
-                             Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+
+    /**
+     *
+     * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS
+     * route config provider is used. Scoped RDS provides are not supported at the moment, as
+     * retrieval of a route configuration in their case requires passing of http request headers
+     * as a parameter.
+     */
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
     void refreshCachedTracingCustomTags();
@@ -984,6 +1003,7 @@ private:
     Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
+    absl::optional<uint64_t> scope_key_hash_;
 
     friend FilterManager;
   };

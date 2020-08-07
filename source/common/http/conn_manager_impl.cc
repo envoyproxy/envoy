@@ -67,8 +67,8 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 
   // We want to keep this pointing at the latest filter in the filter list that has received the
   // onData callback. To do so, we compare the current latest with the *previous* filter. If they
-  // match, then we must be processing a new filter for the first time. We omit this check if we're
-  // the first filter, since the above check handles that case.
+  // match, then we must be processing a new filter for the first time. We omit this check if
+  // we're the first filter, since the above check handles that case.
   //
   // We compare against the previous filter to avoid multiple filter iterations from resetting the
   // pointer: If we just set latest to current, then the first onData filter iteration would
@@ -189,10 +189,10 @@ void ConnectionManagerImpl::checkForDeferredClose() {
 void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // The order of what happens in this routine is important and a little complicated. We first see
   // if the stream needs to be reset. If it needs to be, this will end up invoking reset callbacks
-  // and then moving the stream to the deferred destruction list. If the stream has not been reset,
-  // we move it to the deferred deletion list here. Then, we potentially close the connection. This
-  // must be done after deleting the stream since the stream refers to the connection and must be
-  // deleted first.
+  // and then moving the stream to the deferred destruction list. If the stream has not been
+  // reset, we move it to the deferred deletion list here. Then, we potentially close the
+  // connection. This must be done after deleting the stream since the stream refers to the
+  // connection and must be deleted first.
   bool reset_stream = false;
   // If the response encoder is still associated with the stream, reset the stream. The exception
   // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
@@ -399,14 +399,13 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
       stats_.named_.downstream_cx_destroy_remote_.inc();
     }
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
-    // a local connection close, so we still guard against that here. A better solution would be to
-    // have some type of "pre-close" callback that we could hook for cleanup that would get called
-    // regardless of where local close is invoked from.
-    // NOTE: that this will cause doConnectionClose() to get called twice in the common local close
-    // cases, but the method protects against that.
-    // NOTE: In the case where a local close comes from outside the filter, this will cause any
-    // stream closures to increment remote close stats. We should do better here in the future,
-    // via the pre-close callback mentioned above.
+    // a local connection close, so we still guard against that here. A better solution would be
+    // to have some type of "pre-close" callback that we could hook for cleanup that would get
+    // called regardless of where local close is invoked from. NOTE: that this will cause
+    // doConnectionClose() to get called twice in the common local close cases, but the method
+    // protects against that. NOTE: In the case where a local close comes from outside the filter,
+    // this will cause any stream closures to increment remote close stats. We should do better
+    // here in the future, via the pre-close callback mentioned above.
     doConnectionClose(absl::nullopt, absl::nullopt);
   }
 }
@@ -509,11 +508,22 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
-void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
     const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
                                                     std::move(route_config_updated_cb));
+}
+
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
+    uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallback route_config_updated_cb) {
+  if (!scoped_route_config_provider_) {
+    thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
+    return;
+  }
+  scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
+                                                   move(route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
@@ -550,7 +560,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else if (connection_manager_.config_.isRoutable() &&
              connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
     route_config_update_requester_ =
-        std::make_unique<ConnectionManagerImpl::NullRouteConfigUpdateRequester>();
+        std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
+            connection_manager.config_.scopedRouteConfigProvider());
   }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
@@ -712,8 +723,8 @@ void ConnectionManagerImpl::FilterManager::addStreamDecoderFilterWorker(
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
   filter->setDecoderFilterCallbacks(*wrapper);
   // Note: configured decoder filters are appended to decoder_filters_.
-  // This means that if filters are configured in the following order (assume all three filters are
-  // both decoder/encoder filters):
+  // This means that if filters are configured in the following order (assume all three filters
+  // are both decoder/encoder filters):
   //   http_filters:
   //     - A
   //     - B
@@ -727,8 +738,8 @@ void ConnectionManagerImpl::FilterManager::addStreamEncoderFilterWorker(
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
   // Note: configured encoder filters are prepended to encoder_filters_.
-  // This means that if filters are configured in the following order (assume all three filters are
-  // both decoder/encoder filters):
+  // This means that if filters are configured in the following order (assume all three filters
+  // are both decoder/encoder filters):
   //   http_filters:
   //     - A
   //     - B
@@ -1030,7 +1041,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       idle_timeout_ms_ = route_entry->idleTimeout().value();
       response_encoder_->getStream().setFlushTimeout(idle_timeout_ms_);
       if (idle_timeout_ms_.count()) {
-        // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
+        // If we have a route-level idle timeout but no global stream idle timeout, create a
+        // timer.
         if (stream_idle_timer_ == nullptr) {
           stream_idle_timer_ =
               connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -1148,9 +1160,9 @@ void ConnectionManagerImpl::FilterManager::decodeHeaders(ActiveStreamDecoderFilt
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     const bool new_metadata_added = processNewlyAddedMetadata();
-    // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
-    // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
-    // after the new metadata.
+    // If end_stream is set in headers, and a filter adds new metadata, we need to delay
+    // end_stream in headers by inserting an empty data frame with end_stream set. The empty data
+    // frame is sent after the new metadata.
     if ((*entry)->end_stream_ && new_metadata_added && !buffered_request_data_) {
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(trace,
@@ -1260,8 +1272,8 @@ void ConnectionManagerImpl::FilterManager::decodeData(
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
-    // is called in decodeData during a previous filter invocation, at which point we communicate to
-    // the current and future filters that the stream has not yet ended.
+    // is called in decodeData during a previous filter invocation, at which point we communicate
+    // to the current and future filters that the stream has not yet ended.
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
@@ -1488,6 +1500,8 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
+  scope_key_hash_ =
+      snapped_scoped_routes_config_->computeKeyHash(*filter_manager_.requestHeaders());
   snapped_route_config_ =
       snapped_scoped_routes_config_->getRouteConfig(*filter_manager_.requestHeaders());
   if (snapped_route_config_ == nullptr) {
@@ -1552,20 +1566,52 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
 }
 
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
-    Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  ASSERT(!filter_manager_.requestHeaders()->Host()->value().empty());
-  const auto& host_header = absl::AsciiStrToLower(filter_manager_.requestHeaders()->getHostValue());
-  route_config_update_requester_->requestRouteConfigUpdate(host_header, thread_local_dispatcher,
-                                                           std::move(route_config_updated_cb));
+  absl::optional<Router::ConfigConstSharedPtr> route_config = routeConfig();
+  Event::Dispatcher& thread_local_dispatcher =
+      connection_manager_.read_callbacks_->connection().dispatcher();
+  if (route_config.has_value() && route_config.value()->usesVhds()) {
+    // On demand vhds
+    ASSERT(!filter_manager_.requestHeaders()->Host()->value().empty());
+    const auto& host_header =
+        absl::AsciiStrToLower(filter_manager_.requestHeaders()->getHostValue());
+    route_config_update_requester_->requestVhdsUpdate(host_header, thread_local_dispatcher,
+                                                      std::move(route_config_updated_cb));
+    return;
+  } else if (snapped_scoped_routes_config_ != nullptr && scope_key_hash_) {
+    // On demand srds
+    Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
+        Http::RouteConfigUpdatedCallback(
+            [this, weak_route_config_updated_cb = std::weak_ptr<Http::RouteConfigUpdatedCallback>(
+                       route_config_updated_cb)](bool scope_exist) {
+              // Refresh the route before continue the filter chain.
+              if (auto cb = weak_route_config_updated_cb.lock()) {
+                if (scope_exist) {
+                  refreshCachedRoute();
+                }
+                (*cb)(hasCachedRoute());
+              }
+            });
+    route_config_update_requester_->requestSrdsUpdate(*scope_key_hash_, thread_local_dispatcher,
+                                                      scoped_route_config_updated_cb);
+    return;
+  }
+  // Continue the filter chain if no on demand update is requested.
+  thread_local_dispatcher.post(
+      [weak_route_config_updated_cb =
+           std::weak_ptr<Http::RouteConfigUpdatedCallback>(route_config_updated_cb)] {
+        if (auto cb = weak_route_config_updated_cb.lock()) {
+          (*cb)(false);
+        }
+      });
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
-  if (connection_manager_.config_.routeConfigProvider() == nullptr) {
-    return {};
+  if (connection_manager_.config_.routeConfigProvider() != nullptr) {
+    return absl::optional<Router::ConfigConstSharedPtr>(
+        connection_manager_.config_.routeConfigProvider()->config());
   }
-  return absl::optional<Router::ConfigConstSharedPtr>(
-      connection_manager_.config_.routeConfigProvider()->config());
+  return {};
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -1817,7 +1863,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     connection_manager_.config_.dateProvider().setDateHeader(headers);
   }
 
-  // Following setReference() is safe because serverName() is constant for the life of the listener.
+  // Following setReference() is safe because serverName() is constant for the life of the
+  // listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
       (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT &&
@@ -2743,12 +2790,7 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::getUpstreamSocketOptions() con
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  parent_.active_stream_.requestRouteConfigUpdate(dispatcher(), std::move(route_config_updated_cb));
-}
-
-absl::optional<Router::ConfigConstSharedPtr>
-ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
-  return parent_.active_stream_.routeConfig();
+  parent_.active_stream_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {

@@ -77,6 +77,13 @@ message ScopedRouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.ScopedRouteConfiguration";
 
+  // In Scoped rds, scope routes with primary priority will be loaded eagerly,
+  // scope routes with secondary priority will be loaded lazily on config update.
+  enum ScopePriority {
+    Primary = 0;
+    Secondary = 1;
+  }
+
   // Specifies a key which is matched against the output of the
   // :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.ScopedRoutes.scope_key_builder>`
   // specified in the HttpConnectionManager. The matching is done per HTTP
@@ -103,6 +110,8 @@ message ScopedRouteConfiguration {
     // :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.ScopedRoutes.scope_key_builder>`.
     repeated Fragment fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
+
+  ScopePriority priority = 4;
 
   // The name assigned to the routing scope.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];

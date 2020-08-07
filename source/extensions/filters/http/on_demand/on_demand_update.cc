@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/logger.h"
 #include "common/http/codes.h"
 
 namespace Envoy {
@@ -10,8 +11,8 @@ namespace HttpFilters {
 namespace OnDemand {
 
 Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  if (callbacks_->route() != nullptr ||
-      !(callbacks_->routeConfig().has_value() && callbacks_->routeConfig().value()->usesVhds())) {
+
+  if (callbacks_->route() != nullptr) {
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return filter_iteration_state_;
   }
@@ -54,7 +55,6 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
       callbacks_->recreateStream()) {
     return;
   }
-
   // route cannot be resolved after an on-demand VHDS update or
   // recreating stream failed, continue the filter-chain
   callbacks_->continueDecoding();

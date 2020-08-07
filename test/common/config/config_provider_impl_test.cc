@@ -359,7 +359,7 @@ TEST_F(ConfigProviderImplTest, DuplicateConfigProto) {
   ConfigProviderPtr provider = provider_manager->createXdsConfigProvider(
       config_source_proto, server_factory_context_, init_manager_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
-  auto* typed_provider = static_cast<DummyDynamicConfigProvider*>(provider.get());
+  auto* typed_provider = dynamic_cast<DummyDynamicConfigProvider*>(provider.get());
   auto& subscription = static_cast<DummyConfigSubscription&>(typed_provider->subscription());
   EXPECT_EQ(subscription.getConfig(), nullptr);
   // First time issuing a configUpdate(). A new ConfigProvider::Config should be created.
