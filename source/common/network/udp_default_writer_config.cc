@@ -6,7 +6,6 @@
 #include "envoy/config/listener/v3/udp_default_writer_config.pb.h"
 
 #include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/network/well_known_names.h"
 
 namespace Envoy {
 namespace Network {
@@ -25,9 +24,7 @@ UdpDefaultWriterConfigFactory::createUdpPacketWriterFactory(const Protobuf::Mess
   return std::make_unique<UdpDefaultWriterFactory>();
 }
 
-std::string UdpDefaultWriterConfigFactory::name() const {
-  return UdpWriterNames::get().DefaultWriter;
-}
+std::string UdpDefaultWriterConfigFactory::name() const { return DefaultWriterName; }
 
 REGISTER_FACTORY(UdpDefaultWriterConfigFactory, Network::UdpPacketWriterConfigFactory);
 

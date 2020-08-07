@@ -2,7 +2,6 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/utility.h"
-#include "common/network/well_known_names.h"
 
 namespace Envoy {
 namespace Network {

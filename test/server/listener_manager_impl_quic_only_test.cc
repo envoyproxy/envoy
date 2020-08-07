@@ -1,8 +1,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
-#include "common/network/well_known_names.h"
-
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
 #include "test/server/listener_manager_impl_test.h"

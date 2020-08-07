@@ -20,7 +20,6 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
-#include "common/network/well_known_names.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_features.h"
 
@@ -380,7 +379,7 @@ void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
   if (socket_type == Network::Socket::Type::Datagram) {
     auto udp_writer_config = config_.udp_writer_config();
     if (!Api::OsSysCallsSingleton::get().supportsUdpGso() || udp_writer_config.name().empty()) {
-      udp_writer_config.set_name(Network::UdpWriterNames::get().DefaultWriter);
+      udp_writer_config.set_name(Network::DefaultWriterName);
     }
     auto& config_factory =
         Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(

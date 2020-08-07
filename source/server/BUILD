@@ -326,7 +326,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
-        "//source/common/network:well_known_names_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/listener:well_known_names",

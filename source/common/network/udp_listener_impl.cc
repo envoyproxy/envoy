@@ -17,7 +17,6 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
-#include "common/network/well_known_names.h"
 
 #include "absl/container/fixed_array.h"
 #include "event2/listener.h"
