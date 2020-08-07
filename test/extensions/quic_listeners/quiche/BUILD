@@ -91,6 +91,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+        "@com_googlesource_quiche//:quic_test_tools_session_peer_lib",
     ],
 )
 
