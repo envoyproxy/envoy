@@ -425,8 +425,7 @@ TEST_P(IntegrationTest, TestSmuggling) {
                                 "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
                                 smuggled_request;
     sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
-    // 'identity' encoding is not supported
-    EXPECT_THAT(response, HasSubstr("HTTP/1.1 501 Not Implemented\r\n"));
+    EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   }
 }
 

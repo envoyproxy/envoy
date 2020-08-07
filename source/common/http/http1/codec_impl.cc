@@ -689,6 +689,29 @@ int ConnectionImpl::onHeadersCompleteBase() {
     }
   }
 
+  // https://tools.ietf.org/html/rfc7230#section-3.3.3
+  // If a message is received with both a Transfer-Encoding and a
+  // Content-Length header field, the Transfer-Encoding overrides the
+  // Content-Length. Such a message might indicate an attempt to
+  // perform request smuggling (Section 9.5) or response splitting
+  // (Section 9.4) and ought to be handled as an error. A sender MUST
+  // remove the received Content-Length field prior to forwarding such
+  // a message.
+
+  // Reject message with Http::Code::BadRequest if both Transfer-Encoding and Content-Length
+  // headers are present or if allowed by http1 codec settings and 'Transfer-Encoding'
+  // is chunked - remove Content-Length and serve request.
+  if (parser_.uses_transfer_encoding != 0 && request_or_response_headers.ContentLength()) {
+    if ((parser_.flags & F_CHUNKED) && codec_settings_.allow_chunked_length_) {
+      request_or_response_headers.removeContentLength();
+    } else {
+      error_code_ = Http::Code::BadRequest;
+      sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
+      throw CodecProtocolException(
+          "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
+    }
+  }
+
   int rc = onHeadersComplete();
   header_parsing_state_ = HeaderParsingState::Done;
 
@@ -877,28 +900,6 @@ int ServerConnectionImpl::onHeadersComplete() {
       sendProtocolError(details.value().get());
       throw CodecProtocolException(
           "http/1.1 protocol error: request headers failed spec compliance checks");
-    }
-
-    // https://tools.ietf.org/html/rfc7230#section-3.3.3
-    // If a message is received with both a Transfer-Encoding and a
-    // Content-Length header field, the Transfer-Encoding overrides the
-    // Content-Length. Such a message might indicate an attempt to
-    // perform request smuggling (Section 9.5) or response splitting
-    // (Section 9.4) and ought to be handled as an error. A sender MUST
-    // remove the received Content-Length field prior to forwarding such
-    // a message.
-
-    // Reject request with Http::Code::BadRequest if Transfer-Encoding and Content-Length headers
-    // are present or remove Content-Length and serve request if allowed by http1 codec settings.
-    if (parser_.uses_transfer_encoding != 0 && headers->ContentLength()) {
-      if ((parser_.flags & F_CHUNKED) && codec_settings_.allow_chunked_length_) {
-        headers->removeContentLength();
-      } else {
-        error_code_ = Http::Code::BadRequest;
-        sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
-        throw CodecProtocolException(
-            "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
-      }
     }
 
     // Determine here whether we have a body or not. This uses the new RFC semantics where the
@@ -1135,27 +1136,6 @@ int ClientConnectionImpl::onHeadersComplete() {
                                  Headers::get().TransferEncodingValues.Chunked)) {
         sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
         throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
-      }
-    }
-
-    // https://tools.ietf.org/html/rfc7230#section-3.3.3
-    // If a message is received with both a Transfer-Encoding and a
-    // Content-Length header field, the Transfer-Encoding overrides the
-    // Content-Length. Such a message might indicate an attempt to
-    // perform request smuggling (Section 9.5) or response splitting
-    // (Section 9.4) and ought to be handled as an error. A sender MUST
-    // remove the received Content-Length field prior to forwarding such
-    // a message.
-
-    // Reject response if Transfer-Encoding and Content-Length headers are present
-    // or remove Content-Length and serve response if allowed by http1 codec settings.
-    if (parser_.uses_transfer_encoding != 0 && headers->ContentLength()) {
-      if ((parser_.flags & F_CHUNKED) && codec_settings_.allow_chunked_length_) {
-        headers->removeContentLength();
-      } else {
-        sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
-        throw CodecProtocolException(
-            "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
       }
     }
 
