@@ -86,8 +86,7 @@ Api::SysCallSizeResult FuzzedHeader::next(void* buffer, size_t length) {
   if (done()) {           // End of stream reached
     nread_ = nreads_ - 1; // Decrement to avoid out-of-range for last recv() call
   }
-  ASSERT(length >= indices_[nread_]);
-  memcpy(buffer, header_.data(), indices_[nread_]);
+  memcpy(buffer, header_.data(), std::min(indices_[nread_], length));
   return Api::SysCallSizeResult{static_cast<ssize_t>(indices_[nread_++]), 0};
 }
 
