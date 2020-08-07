@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/config/listener/v3/udp_default_writer_config.pb.h"
 
 #include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/network/well_known_names.h"
@@ -17,7 +17,7 @@ UdpPacketWriterPtr UdpDefaultWriterFactory::createUdpPacketWriter(Network::IoHan
 }
 
 ProtobufTypes::MessagePtr UdpDefaultWriterConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  return std::make_unique<envoy::config::listener::v3::UdpDefaultWriterOptions>();
 }
 
 UdpPacketWriterFactoryPtr

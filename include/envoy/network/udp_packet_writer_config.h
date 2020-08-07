@@ -8,16 +8,9 @@
 namespace Envoy {
 namespace Network {
 
-class UdpPacketWriterConfigFactory : public Config::UntypedFactory {
+class UdpPacketWriterConfigFactory : public Config::TypedFactory {
 public:
   ~UdpPacketWriterConfigFactory() override = default;
-
-  /**
-   * @brief Create a Empty Config Proto object which can be used
-   * for UdpPacketWriter creation
-   * @return ProtobufTypes::MessagePtr
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * Create an UdpPacketWriterFactory object according to given message.

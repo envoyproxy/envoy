@@ -389,8 +389,8 @@ void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
       udp_writer_config.set_name(Network::UdpWriterNames::get().DefaultWriter);
     }
     auto& config_factory =
-        Config::Utility::getAndCheckFactoryByName<Network::UdpPacketWriterConfigFactory>(
-            udp_writer_config.name());
+        Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(
+            udp_writer_config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         udp_writer_config.typed_config(), validation_visitor_, config_factory);
     udp_writer_factory_ = config_factory.createUdpPacketWriterFactory(*message);

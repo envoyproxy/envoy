@@ -1,6 +1,6 @@
 #include "extensions/quic_listeners/quiche/udp_gso_batch_writer_config.h"
 
-#include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/config/listener/v3/udp_gso_batch_writer_config.pb.h"
 
 #include "extensions/quic_listeners/quiche/udp_gso_batch_writer.h"
 
@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Quic {
 
 ProtobufTypes::MessagePtr UdpGsoBatchWriterConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  return std::make_unique<envoy::config::listener::v3::UdpGsoBatchWriterOptions>();
 }
 
 Network::UdpPacketWriterFactoryPtr

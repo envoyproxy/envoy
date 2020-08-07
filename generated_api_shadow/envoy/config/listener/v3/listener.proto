@@ -248,10 +248,14 @@ message Listener {
   // emitted by this listener.
   repeated accesslog.v3.AccessLog access_log = 22;
 
-  // UdpWriterProto in Listener Config
-  // This field specifies the udp_writer_name, e.g. "udp_default_writer" or
-  // "udp_gso_batch_writer", that can be used to instantiate udp_writer.
-  // If no configuration is specified, Envoy will use "udp_default_writer".
+  // If the protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies the actual udp
+  // writer to create, i.e. :ref:`name <envoy_api_field_config.core.v3.TypedExtensionConfig.name>`
+  //    = "udp_default_writer" for creating a udp writer with writing in passthrough mode,
+  //    = "udp_gso_batch_writer" for creating a udp writer with writing in batch mode.
+  // If not present, treat it as "udp_default_writer".
+  // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig udp_writer_config = 23;
 
   google.protobuf.BoolValue hidden_envoy_deprecated_use_original_dst = 4 [deprecated = true];

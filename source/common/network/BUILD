@@ -437,7 +437,7 @@ envoy_cc_library(
         ":well_known_names_lib",
         "//include/envoy/network:udp_packet_writer_config_interface",
         "//include/envoy/registry",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
