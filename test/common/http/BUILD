@@ -16,7 +16,6 @@ envoy_package()
 envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":common_lib",
         "//source/common/buffer:buffer_lib",
@@ -24,6 +23,7 @@ envoy_cc_test(
         "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
@@ -50,8 +50,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
-    # IpVersions/CodecNetworkTest.SendData/IPv4: Test times out on Windows.
-    tags = ["fails_on_windows"],
     deps = [
         ":common_lib",
         "//source/common/buffer:buffer_lib",
@@ -155,6 +153,7 @@ envoy_proto_library(
     srcs = ["conn_manager_impl_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
     ],
 )
 
@@ -181,6 +180,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -192,7 +192,6 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "conn_manager_impl_test",
     srcs = ["conn_manager_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
@@ -225,7 +224,9 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -342,6 +343,7 @@ envoy_cc_test(
 envoy_proto_library(
     name = "utility_fuzz_proto",
     srcs = ["utility_fuzz.proto"],
+    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
 )
 
 envoy_cc_fuzz_test(
@@ -362,10 +364,12 @@ envoy_cc_test(
     deps = [
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:url_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

@@ -50,6 +50,11 @@ public:
   virtual ~Socket() = default;
 
   /**
+   * Type of sockets supported. See man 2 socket for more details
+   */
+  enum class Type { Stream, Datagram };
+
+  /**
    * @return the local address of the socket.
    */
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
@@ -76,12 +81,17 @@ public:
   /**
    * @return the type (stream or datagram) of the socket.
    */
-  virtual Address::SocketType socketType() const PURE;
+  virtual Socket::Type socketType() const PURE;
 
   /**
    * @return the type (IP or pipe) of addresses used by the socket (subset of socket domain)
    */
   virtual Address::Type addressType() const PURE;
+
+  /**
+   * @return the IP version used by the socket if address type is IP, absl::nullopt otherwise
+   */
+  virtual absl::optional<Address::IpVersion> ipVersion() const PURE;
 
   /**
    * Close the underlying socket.
@@ -128,7 +138,7 @@ public:
    * Retrieves option from underlying socket (@see man 2 getsockopt)
    */
   virtual Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                                socklen_t* optlen) PURE;
+                                                socklen_t* optlen) const PURE;
 
   /**
    * Toggle socket blocking state
@@ -232,10 +242,11 @@ public:
    * @param type type of socket requested
    * @param addr_type type of address used with the socket
    * @param version IP version if address type is IP
+   * @param socket_v6only if the socket is ipv6 version only
    * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
-  virtual IoHandlePtr socket(Address::SocketType type, Address::Type addr_type,
-                             Address::IpVersion version) PURE;
+  virtual IoHandlePtr socket(Socket::Type type, Address::Type addr_type, Address::IpVersion version,
+                             bool socket_v6only) const PURE;
 
   /**
    * Low level api to create a socket in the underlying host stack. Does not create an
@@ -244,30 +255,24 @@ public:
    * @param addr address that is gleaned for address type and version if needed
    * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
-  virtual IoHandlePtr socket(Address::SocketType socket_type,
-                             const Address::InstanceConstSharedPtr addr) PURE;
+  virtual IoHandlePtr socket(Socket::Type socket_type,
+                             const Address::InstanceConstSharedPtr addr) const PURE;
+
+  /**
+   * Wrap socket file descriptor in IoHandle
+   * @param fd socket file descriptor to be wrapped
+   * @return @ref Network::IoHandlePtr that wraps the socket file descriptor
+   */
+  virtual IoHandlePtr socket(os_fd_t fd) PURE;
 
   /**
    * Returns true if the given family is supported on this machine.
    * @param domain the IP family.
    */
   virtual bool ipFamilySupported(int domain) PURE;
-
-  /**
-   * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
-   * @param fd socket file descriptor
-   * @return InstanceConstSharedPtr for bound address.
-   */
-  virtual Address::InstanceConstSharedPtr addressFromFd(os_fd_t fd) PURE;
-
-  /**
-   * Obtain the address of the peer of the socket with the specified file descriptor.
-   * Raises an EnvoyException on failure.
-   * @param fd socket file descriptor
-   * @return InstanceConstSharedPtr for peer address.
-   */
-  virtual Address::InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd) PURE;
 };
+
+using SocketInterfacePtr = std::unique_ptr<SocketInterface>;
 
 } // namespace Network
 } // namespace Envoy

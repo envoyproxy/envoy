@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -12,6 +13,7 @@
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
+#include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"
@@ -40,12 +42,12 @@ class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
   HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
-             const envoy::config::cluster::v3::Cluster& cluster,
+             envoy::config::cluster::v3::Cluster cluster,
              const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-             Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
+             Random::RandomGenerator& random, Singleton::Manager& singleton_manager,
              ThreadLocal::SlotAllocator& tls,
              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
@@ -62,7 +64,7 @@ public:
 
   // Creates and starts healthcheckers to its endpoints
   void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                         Random::RandomGenerator& random, Event::Dispatcher& dispatcher,
                          Api::Api& api);
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
@@ -76,7 +78,7 @@ private:
   std::function<void()> initialization_complete_callback_;
 
   Runtime::Loader& runtime_;
-  const envoy::config::cluster::v3::Cluster& cluster_;
+  const envoy::config::cluster::v3::Cluster cluster_;
   const envoy::config::core::v3::BindConfig& bind_config_;
   Stats::Store& stats_;
   Ssl::ContextManager& ssl_context_manager_;
@@ -118,7 +120,7 @@ public:
   HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
               envoy::config::core::v3::ApiVersion transport_api_version,
               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
-              Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
+              Ssl::ContextManager& ssl_context_manager, Random::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
               ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
               Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
@@ -158,7 +160,7 @@ private:
   Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats_;
   Ssl::ContextManager& ssl_context_manager_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   ClusterInfoFactory& info_factory_;
   AccessLog::AccessLogManager& access_log_manager_;
   ClusterManager& cm_;

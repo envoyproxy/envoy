@@ -2,7 +2,6 @@
 
 #include <functional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/time.h"

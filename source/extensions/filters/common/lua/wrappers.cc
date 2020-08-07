@@ -1,10 +1,49 @@
 #include "extensions/filters/common/lua/wrappers.h"
 
+#include <lua.h>
+
+#include <cstdint>
+
+#include "common/common/assert.h"
+#include "common/common/hex.h"
+
+#include "absl/time/time.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Lua {
+
+namespace {
+
+// Builds a Lua table from a list of strings.
+template <typename StringList>
+void createLuaTableFromStringList(lua_State* state, const StringList& list) {
+  lua_createtable(state, list.size(), 0);
+  for (size_t i = 0; i < list.size(); i++) {
+    lua_pushstring(state, list[i].c_str());
+    // After the list[i].c_str() is pushed to the stack, we need to set the "current element" with
+    // that value. The lua_rawseti(state, t, i) helps us to set the value of table t with key i.
+    // Given the index of the current element/table in the stack is below the pushed value i.e. -2
+    // and the key (refers to where the element is in the table) is i + 1 (note that in Lua index
+    // starts from 1), hence we have:
+    lua_rawseti(state, -2, i + 1);
+  }
+}
+
+// By default, LUA_INTEGER is https://en.cppreference.com/w/cpp/types/ptrdiff_t
+// (https://github.com/LuaJIT/LuaJIT/blob/8271c643c21d1b2f344e339f559f2de6f3663191/src/luaconf.h#L104),
+// which is large enough to hold timestamp-since-epoch in seconds. Note: In Lua, we usually use
+// os.time(os.date("!*t")) to get current timestamp-since-epoch in seconds.
+int64_t timestampInSeconds(const absl::optional<SystemTime>& system_time) {
+  return system_time.has_value() ? std::chrono::duration_cast<std::chrono::seconds>(
+                                       system_time.value().time_since_epoch())
+                                       .count()
+                                 : 0;
+}
+
+} // namespace
 
 int BufferWrapper::luaLength(lua_State* state) {
   lua_pushnumber(state, data_.length());
@@ -217,13 +256,109 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
   return 1;
 }
 
+int SslConnectionWrapper::luaPeerCertificatePresented(lua_State* state) {
+  lua_pushboolean(state, connection_info_.peerCertificatePresented());
+  return 1;
+}
+
+int SslConnectionWrapper::luaPeerCertificateValidated(lua_State* state) {
+  lua_pushboolean(state, connection_info_.peerCertificateValidated());
+  return 1;
+}
+
+int SslConnectionWrapper::luaUriSanLocalCertificate(lua_State* state) {
+  createLuaTableFromStringList(state, connection_info_.uriSanLocalCertificate());
+  return 1;
+}
+
+int SslConnectionWrapper::luaSha256PeerCertificateDigest(lua_State* state) {
+  lua_pushstring(state, connection_info_.sha256PeerCertificateDigest().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaSerialNumberPeerCertificate(lua_State* state) {
+  lua_pushstring(state, connection_info_.serialNumberPeerCertificate().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaIssuerPeerCertificate(lua_State* state) {
+  lua_pushstring(state, connection_info_.issuerPeerCertificate().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaSubjectPeerCertificate(lua_State* state) {
+  lua_pushstring(state, connection_info_.subjectPeerCertificate().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaUriSanPeerCertificate(lua_State* state) {
+  createLuaTableFromStringList(state, connection_info_.uriSanPeerCertificate());
+  return 1;
+}
+
+int SslConnectionWrapper::luaSubjectLocalCertificate(lua_State* state) {
+  lua_pushstring(state, connection_info_.subjectLocalCertificate().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaDnsSansPeerCertificate(lua_State* state) {
+  createLuaTableFromStringList(state, connection_info_.dnsSansPeerCertificate());
+  return 1;
+}
+
+int SslConnectionWrapper::luaDnsSansLocalCertificate(lua_State* state) {
+  createLuaTableFromStringList(state, connection_info_.dnsSansLocalCertificate());
+  return 1;
+}
+
+int SslConnectionWrapper::luaValidFromPeerCertificate(lua_State* state) {
+  lua_pushinteger(state, timestampInSeconds(connection_info_.validFromPeerCertificate()));
+  return 1;
+}
+
+int SslConnectionWrapper::luaExpirationPeerCertificate(lua_State* state) {
+  lua_pushinteger(state, timestampInSeconds(connection_info_.expirationPeerCertificate()));
+  return 1;
+}
+
+int SslConnectionWrapper::luaSessionId(lua_State* state) {
+  lua_pushstring(state, connection_info_.sessionId().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaCiphersuiteId(lua_State* state) {
+  lua_pushstring(state,
+                 absl::StrCat("0x", Hex::uint16ToHex(connection_info_.ciphersuiteId())).c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaCiphersuiteString(lua_State* state) {
+  lua_pushstring(state, connection_info_.ciphersuiteString().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaUrlEncodedPemEncodedPeerCertificate(lua_State* state) {
+  lua_pushstring(state, connection_info_.urlEncodedPemEncodedPeerCertificate().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaUrlEncodedPemEncodedPeerCertificateChain(lua_State* state) {
+  lua_pushstring(state, connection_info_.urlEncodedPemEncodedPeerCertificateChain().c_str());
+  return 1;
+}
+
+int SslConnectionWrapper::luaTlsVersion(lua_State* state) {
+  lua_pushstring(state, connection_info_.tlsVersion().c_str());
+  return 1;
+}
+
 int ConnectionWrapper::luaSsl(lua_State* state) {
   const auto& ssl = connection_->ssl();
   if (ssl != nullptr) {
     if (ssl_connection_wrapper_.get() != nullptr) {
       ssl_connection_wrapper_.pushStack();
     } else {
-      ssl_connection_wrapper_.reset(SslConnectionWrapper::create(state, ssl), true);
+      ssl_connection_wrapper_.reset(SslConnectionWrapper::create(state, *ssl), true);
     }
   } else {
     lua_pushnil(state);

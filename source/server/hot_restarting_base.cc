@@ -2,6 +2,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/utility.h"
+#include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -51,7 +52,7 @@ void HotRestartingBase::bindDomainSocket(uint64_t id, const std::string& role) {
     const auto msg = fmt::format(
         "unable to bind domain socket with base_id={}, id={}, errno={} (see --base-id option)",
         base_id_, id, result.errno_);
-    if (result.errno_ == EADDRINUSE) {
+    if (result.errno_ == SOCKET_ERROR_ADDR_IN_USE) {
       throw HotRestartDomainSocketInUseException(msg);
     }
     throw EnvoyException(msg);
@@ -186,7 +187,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
     message.msg_controllen = CMSG_SPACE(sizeof(int));
 
     const int recvmsg_rc = recvmsg(my_domain_socket_, &message, 0);
-    if (block == Blocking::No && recvmsg_rc == -1 && errno == EAGAIN) {
+    if (block == Blocking::No && recvmsg_rc == -1 && errno == SOCKET_ERROR_AGAIN) {
       return nullptr;
     }
     RELEASE_ASSERT(recvmsg_rc != -1, fmt::format("recvmsg() returned -1, errno = {}", errno));
@@ -222,6 +223,22 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
   }
   getPassedFdIfPresent(ret.get(), &message);
   return ret;
+}
+
+Stats::Gauge& HotRestartingBase::hotRestartGeneration(Stats::Scope& scope) {
+  // Track the hot-restart generation. Using gauge's accumulate semantics,
+  // the increments will be combined across hot-restart. This may be useful
+  // at some point, though the main motivation for this stat is to enable
+  // an integration test showing that dynamic stat-names can be coalesced
+  // across hot-restarts. There's no other reason this particular stat-name
+  // needs to be created dynamically.
+  //
+  // Note also, this stat cannot currently be represented as a counter due to
+  // the way stats get latched on sink update. See the comment in
+  // InstanceUtil::flushMetricsToSinks.
+  return Stats::Utility::gaugeFromElements(scope,
+                                           {Stats::DynamicName("server.hot_restart_generation")},
+                                           Stats::Gauge::ImportMode::Accumulate);
 }
 
 } // namespace Server

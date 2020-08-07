@@ -1,7 +1,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 
 namespace Envoy {
@@ -53,6 +53,8 @@ protected:
   void sendTrailers(FilterType* filter, const test::fuzz::HttpData& data) = delete;
 
 private:
+  // This keeps track of when a filter will stop decoding due to direct responses.
+  bool enabled_ = true;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};

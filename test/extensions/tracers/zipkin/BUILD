@@ -52,7 +52,8 @@ envoy_extension_cc_test(
     extension_name = "envoy.tracers.zipkin",
     deps = [
         "//source/extensions/tracers/zipkin:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/mocks/server:tracer_factory_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],

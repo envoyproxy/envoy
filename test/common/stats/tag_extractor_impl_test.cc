@@ -306,8 +306,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   client_ssl.name_ = tag_names.CLIENTSSL_PREFIX;
   client_ssl.value_ = "clientssl_prefix";
 
-  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_white_list",
-                         "auth.clientssl.auth_ip_white_list", {client_ssl});
+  regex_tester.testRegex("auth.clientssl.clientssl_prefix.auth_ip_allowlist",
+                         "auth.clientssl.auth_ip_allowlist", {client_ssl});
 
   // TCP Prefix
   Tag tcp_prefix;

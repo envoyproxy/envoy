@@ -26,32 +26,36 @@ filter_chains:
   filters: []
   transport_socket:
     name: envoy.transport_sockets.quic
-    config:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-          private_key:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-        validation_context:
-          trusted_ca:
-            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          match_subject_alt_names:
-          - exact: localhost
-          - exact: 127.0.0.1
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_subject_alt_names:
+            - exact: localhost
+            - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
   udp_listener_name: "quiche_quic_listener"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV2Yaml(yaml);
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
   EXPECT_CALL(server_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-#ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 3, // SO_REUSEPORT is on as configured
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
 #else
-                           /* expected_num_options */ 2,
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
 #endif
                            /* expected_creation_params */ {true, false});
 
@@ -65,11 +69,18 @@ udp_listener_config:
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #endif
-
   expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
                    /* expected_sockopt_name */ SO_REUSEPORT,
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
+#ifdef UDP_GRO
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
+                     /* expected_sockopt_name */ UDP_GRO,
+                     /* expected_value */ 1,
+                     /* expected_num_calls */ 1);
+  }
+#endif
 
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());

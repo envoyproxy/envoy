@@ -535,10 +535,10 @@ TEST(HeaderIsValidTest, IsConnectResponse) {
   TestResponseHeaderMapImpl success_response{{":status", "200"}};
   TestResponseHeaderMapImpl failure_response{{":status", "500"}};
 
-  EXPECT_TRUE(HeaderUtility::isConnectResponse(connect_request, success_response));
-  EXPECT_FALSE(HeaderUtility::isConnectResponse(connect_request, failure_response));
+  EXPECT_TRUE(HeaderUtility::isConnectResponse(connect_request.get(), success_response));
+  EXPECT_FALSE(HeaderUtility::isConnectResponse(connect_request.get(), failure_response));
   EXPECT_FALSE(HeaderUtility::isConnectResponse(nullptr, success_response));
-  EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request, success_response));
+  EXPECT_FALSE(HeaderUtility::isConnectResponse(get_request.get(), success_response));
 }
 
 TEST(HeaderAddTest, HeaderAdd) {
@@ -547,14 +547,11 @@ TEST(HeaderAddTest, HeaderAdd) {
 
   HeaderUtility::addHeaders(headers, headers_to_add);
 
-  headers_to_add.iterate(
-      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        TestRequestHeaderMapImpl* headers = static_cast<TestRequestHeaderMapImpl*>(context);
-        Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-        EXPECT_EQ(entry.value().getStringView(), headers->get(lower_key)->value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &headers);
+  headers_to_add.iterate([&headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
+    EXPECT_EQ(entry.value().getStringView(), headers.get(lower_key)->value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
 }
 
 TEST(HeaderIsValidTest, HeaderNameContainsUnderscore) {

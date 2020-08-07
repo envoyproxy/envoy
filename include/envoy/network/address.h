@@ -10,7 +10,6 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/io_handle.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
@@ -116,7 +115,6 @@ public:
 };
 
 enum class Type { Ip, Pipe };
-enum class SocketType { Stream, Datagram };
 
 /**
  * Interface for all network addresses.
@@ -178,6 +176,11 @@ public:
    * @return the type of address.
    */
   virtual Type type() const PURE;
+
+  /**
+   * @return name of socket interface that should be used with this address
+   */
+  virtual const std::string& socketInterface() const PURE;
 };
 
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;

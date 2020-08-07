@@ -2,6 +2,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -55,13 +56,13 @@ layered_runtime:
   - name: some_admin_layer
     admin_layer: {{}}
 admin:
-  access_log_path: /dev/null
+  access_log_path: {}
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
 )EOF",
-                     api_type);
+                     api_type, TestEnvironment::nullDevicePath());
 }
 
 class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
@@ -75,11 +76,7 @@ public:
     sotw_or_delta_ = sotwOrDelta();
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     // The tests infra expects the xDS server to be the second fake upstream, so
@@ -228,7 +225,6 @@ TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
   EXPECT_EQ(initial_load_success_ + 1, test_server_->counter("runtime.load_success")->value());
   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
-  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

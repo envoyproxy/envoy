@@ -4,8 +4,8 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
+#include "common/common/random_generator.h"
 #include "common/http/request_id_extension_impl.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -227,7 +227,7 @@ public:
     return upstream_cluster_info_;
   }
 
-  Runtime::RandomGeneratorImpl random_;
+  Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 

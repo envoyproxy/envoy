@@ -164,9 +164,9 @@ public:
 
     ret.reserve(factories().size());
 
-    for (const auto& factory : factories()) {
-      if (factory.second || include_disabled) {
-        ret.push_back(factory.first);
+    for (const auto& [factory_name, factory] : factories()) {
+      if (factory || include_disabled) {
+        ret.push_back(factory_name);
       }
     }
 
@@ -187,7 +187,7 @@ public:
    * Gets the current map of vendor specific factory versions.
    */
   static absl::flat_hash_map<std::string, envoy::config::core::v3::BuildVersion>&
-  versioned_factories() {
+  versionedFactories() {
     using VersionedFactoryMap =
         absl::flat_hash_map<std::string, envoy::config::core::v3::BuildVersion>;
     MUTABLE_CONSTRUCT_ON_FIRST_USE(VersionedFactoryMap);
@@ -236,7 +236,7 @@ public:
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
-    versioned_factories().emplace(std::make_pair(name, version));
+    versionedFactories().emplace(std::make_pair(name, version));
     if (!instead_value.empty()) {
       deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
     }
@@ -261,9 +261,9 @@ public:
     absl::string_view canonicalName = canonicalFactoryName(name);
 
     // Next, disable the factory by all its deprecated names.
-    for (const auto& entry : deprecatedFactoryNames()) {
-      if (entry.second == canonicalName) {
-        disable(entry.first);
+    for (const auto& [deprecated_name, mapped_canonical_name] : deprecatedFactoryNames()) {
+      if (mapped_canonical_name == canonicalName) {
+        disable(deprecated_name);
       }
     }
 
@@ -328,8 +328,8 @@ public:
    */
   static absl::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) {
-    auto it = versioned_factories().find(name);
-    if (it == versioned_factories().end()) {
+    auto it = versionedFactories().find(name);
+    if (it == versionedFactories().end()) {
       return absl::nullopt;
     }
     return it->second;
@@ -342,13 +342,13 @@ private:
   static std::unique_ptr<absl::flat_hash_map<std::string, Base*>> buildFactoriesByType() {
     auto mapping = std::make_unique<absl::flat_hash_map<std::string, Base*>>();
 
-    for (const auto& factory : factories()) {
-      if (factory.second == nullptr) {
+    for (const auto& [factory_name, factory] : factories()) {
+      if (factory == nullptr) {
         continue;
       }
 
       // Skip untyped factories.
-      std::string config_type = factory.second->configType();
+      std::string config_type = factory->configType();
       if (config_type.empty()) {
         continue;
       }
@@ -356,14 +356,14 @@ private:
       // Register config types in the mapping and traverse the deprecated message type chain.
       while (true) {
         auto it = mapping->find(config_type);
-        if (it != mapping->end() && it->second != factory.second) {
+        if (it != mapping->end() && it->second != factory) {
           // Mark double-registered types with a nullptr.
           // See issue https://github.com/envoyproxy/envoy/issues/9643.
           ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
-                    factory.second->name(), it->second ? it->second->name() : "");
+                    factory->name(), it->second ? it->second->name() : "");
           it->second = nullptr;
         } else {
-          mapping->emplace(std::make_pair(config_type, factory.second));
+          mapping->emplace(std::make_pair(config_type, factory));
         }
 
         const Protobuf::Descriptor* previous =
@@ -464,21 +464,22 @@ private:
                   prev_by_name->name(), prev_by_name->configType());
       }
 
-      for (auto mapping : prev_deprecated_names) {
-        deprecatedFactoryNames().erase(mapping.first);
+      for (auto [prev_deprecated_name, mapped_canonical_name] : prev_deprecated_names) {
+        deprecatedFactoryNames().erase(prev_deprecated_name);
 
-        ENVOY_LOG(info, "Removed deprecated name '{}'", mapping.first);
+        ENVOY_LOG(info, "Removed deprecated name '{}'", prev_deprecated_name);
 
-        if (!mapping.second.empty()) {
-          deprecatedFactoryNames().emplace(std::make_pair(mapping.first, mapping.second));
+        if (!mapped_canonical_name.empty()) {
+          deprecatedFactoryNames().emplace(
+              std::make_pair(prev_deprecated_name, mapped_canonical_name));
 
-          auto* deprecated_factory = getFactory(mapping.second);
+          auto* deprecated_factory = getFactory(mapped_canonical_name);
           RELEASE_ASSERT(deprecated_factory != nullptr,
                          "failed to restore deprecated factory name");
-          factories().emplace(mapping.second, deprecated_factory);
+          factories().emplace(mapped_canonical_name, deprecated_factory);
 
-          ENVOY_LOG(info, "Restored deprecated name '{}' (mapped to '{}'", mapping.first,
-                    mapping.second);
+          ENVOY_LOG(info, "Restored deprecated name '{}' (mapped to '{}'", prev_deprecated_name,
+                    mapped_canonical_name);
         }
       }
 
@@ -528,7 +529,8 @@ public:
     if (!instance_.name().empty()) {
       FactoryRegistry<Base>::registerFactory(instance_, instance_.name());
     } else {
-      ASSERT(deprecated_names.size() != 0);
+      ASSERT(deprecated_names.size() != 0,
+             "Attempted to register a factory without a name or deprecated name");
     }
 
     for (auto deprecated_name : deprecated_names) {

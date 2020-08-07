@@ -19,7 +19,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -27,6 +26,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http/http1:codec_legacy_lib",
         "//source/common/http/http1:codec_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -45,7 +45,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",

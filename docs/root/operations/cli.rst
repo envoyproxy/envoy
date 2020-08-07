@@ -114,13 +114,10 @@ following are the command line options that Envoy supports.
 .. option:: --log-format <format string>
 
    *(optional)* The format string to use for laying out the log message metadata. If this is not
-   set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] %v"`` is used.
+   set, a default format string ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"`` is used.
 
-   When used in conjunction with :option:`--log-format-prefix-with-location` set to 0, the logger can be
-   configured to not prefix ``%v`` by a file path and a line number.
-
-   **NOTE**: The default log format will be changed to ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"``
-   together with the default value of :option:`--log-format-prefix-with-location` to 0 at 1.16.0 release.
+   When used in conjunction with :option:`--log-format-prefix-with-location` set to 1, the logger can be
+   configured to prefix ``%v`` by a file path and a line number.
 
    When used in conjunction with :option:`--log-format-escaped`, the logger can be configured
    to log in a format that is parsable by log viewers. Known integrations are documented
@@ -167,10 +164,9 @@ following are the command line options that Envoy supports.
 
    *(optional)* This temporary flag allows replacing all entries of ``"%v"`` in the log format by
    ``"[%g:%#] %v"``. This flag is provided for migration purposes only. If this is not set, a
-   default value 1 is used.
+   default value 0 is used.
 
-   **NOTE**: The default value will be changed to 0 at 1.16.0 release and the flag will be
-   removed at 1.17.0 release.
+   **NOTE**: The flag will be removed at 1.17.0 release.
 
 .. option:: --log-format-escaped
 
@@ -262,6 +258,14 @@ following are the command line options that Envoy supports.
   desirable to have a very long drain time. In service to service scenarios, it might be possible
   to make the drain and shutdown time much shorter (e.g., 60s/90s).
 
+.. option:: --drain-strategy <string>
+
+  *(optional)* Determine behaviour of Envoy during the hot restart drain sequence. During the drain sequence, the drain manager encourages draining through terminating connections on request completion, sending "Connection: CLOSE" on HTTP1, and sending GOAWAY on HTTP2.
+
+  * ``gradual``: *(default)* The percentage of requests encouraged to drain increases to 100% as the drain time elapses.
+
+  * ``immediate``: All requests are encouraged to drain as soon as the drain sequence begins.
+
 .. option:: --parent-shutdown-time-s <integer>
 
   *(optional)* The time in seconds that Envoy will wait before shutting down the parent process
@@ -305,9 +309,9 @@ following are the command line options that Envoy supports.
 .. option:: --ignore-unknown-dynamic-fields
 
   *(optional)* This flag disables validation of protobuf configuration for unknown fields in dynamic
-   configuration. Unlike setting --reject-unknown-dynamic-fields to false, it does not log warnings or
-   count occurrences of unknown fields, in the interest of configuration processing speed. If
-   --reject-unknown-dynamic-fields is set to true, this flag has no effect.
+  configuration. Unlike setting :option:`--reject-unknown-dynamic-fields` to false, it does not log warnings
+  or count occurrences of unknown fields, in the interest of configuration processing speed. If
+  :option:`--reject-unknown-dynamic-fields` is set to true, this flag has no effect.
 
 .. option:: --disable-extensions <extension list>
 

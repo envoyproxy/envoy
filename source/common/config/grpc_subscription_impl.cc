@@ -10,15 +10,13 @@
 namespace Envoy {
 namespace Config {
 
-GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
-                                           SubscriptionCallbacks& callbacks,
-                                           SubscriptionStats stats, absl::string_view type_url,
-                                           Event::Dispatcher& dispatcher,
-                                           std::chrono::milliseconds init_fetch_timeout,
-                                           bool is_aggregated)
-    : grpc_mux_(grpc_mux), callbacks_(callbacks), stats_(stats), type_url_(type_url),
-      dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout),
-      is_aggregated_(is_aggregated) {}
+GrpcSubscriptionImpl::GrpcSubscriptionImpl(
+    GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats, absl::string_view type_url,
+    Event::Dispatcher& dispatcher, std::chrono::milliseconds init_fetch_timeout, bool is_aggregated)
+    : grpc_mux_(grpc_mux), callbacks_(callbacks), resource_decoder_(resource_decoder),
+      stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
+      init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
 
 // Config::Subscription
 void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
@@ -30,7 +28,7 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ = grpc_mux_->addWatch(type_url_, resources, *this);
+  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_);
 
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
@@ -51,9 +49,8 @@ void GrpcSubscriptionImpl::updateResourceInterest(
 }
 
 // Config::SubscriptionCallbacks
-void GrpcSubscriptionImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-    const std::string& version_info) {
+void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                          const std::string& version_info) {
   disableInitFetchTimeoutTimer();
   // TODO(mattklein123): In the future if we start tracking per-resource versions, we need to
   // supply those versions to onConfigUpdate() along with the xDS response ("system")
@@ -70,7 +67,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
 }
 
 void GrpcSubscriptionImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+    const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   disableInitFetchTimeoutTimer();
@@ -108,13 +105,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
   stats_.update_attempt_.inc();
 }
 
-std::string GrpcSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
-  return callbacks_.resourceName(resource);
-}
-
-void GrpcSubscriptionImpl::pause() { grpc_mux_->pause(type_url_); }
-
-void GrpcSubscriptionImpl::resume() { grpc_mux_->resume(type_url_); }
+ScopedResume GrpcSubscriptionImpl::pause() { return grpc_mux_->pause(type_url_); }
 
 void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
   if (init_fetch_timeout_timer_) {

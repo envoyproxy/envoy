@@ -52,12 +52,11 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quiche::QuicheStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, peer_address, *helper(), *alarm_factory(), writer(),
-      /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, listener_config_,
-      listener_stats_, listen_socket_);
+      /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, listen_socket_);
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       config(), quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
-      listener_config_.perConnectionBufferLimitBytes());
+      listener_config_.perConnectionBufferLimitBytes(), listener_config_);
   quic_session->Initialize();
   // Filter chain can't be retrieved here as self address is unknown at this
   // point.

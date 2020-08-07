@@ -430,10 +430,10 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
 
 void FaultFilter::abortWithStatus(Http::Code http_status_code,
                                   absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+  recordAbortsInjectedStats();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
   decoder_callbacks_->sendLocalReply(http_status_code, "fault filter abort", nullptr, grpc_status,
                                      RcDetails::get().FaultAbort);
-  recordAbortsInjectedStats();
 }
 
 bool FaultFilter::matchesTargetUpstreamCluster() {

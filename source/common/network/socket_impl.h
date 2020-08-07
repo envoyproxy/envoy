@@ -9,8 +9,7 @@ namespace Network {
 
 class SocketImpl : public virtual Socket {
 public:
-  SocketImpl(Address::SocketType type, Address::Type addr_type, Address::IpVersion version);
-  SocketImpl(Address::SocketType socket_type, const Address::InstanceConstSharedPtr addr);
+  SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr);
 
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
@@ -46,12 +45,13 @@ public:
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
                                         socklen_t optlen) override;
   Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                        socklen_t* optlen) override;
+                                        socklen_t* optlen) const override;
   Api::SysCallIntResult setBlockingForTest(bool blocking) override;
 
   const OptionsSharedPtr& options() const override { return options_; }
-  Address::SocketType socketType() const override { return sock_type_; }
+  Socket::Type socketType() const override { return sock_type_; }
   Address::Type addressType() const override { return addr_type_; }
+  absl::optional<Address::IpVersion> ipVersion() const override;
 
 protected:
   SocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address);
@@ -59,7 +59,7 @@ protected:
   const IoHandlePtr io_handle_;
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
-  Address::SocketType sock_type_;
+  Socket::Type sock_type_;
   Address::Type addr_type_;
 };
 

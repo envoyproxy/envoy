@@ -59,13 +59,13 @@ message DnsTable {
         "envoy.data.dns.v3.DnsTable.DnsVirtualDomain";
 
     // A domain name for which Envoy will respond to query requests
-    string name = 1 [(validate.rules).string = {min_len: 2 well_known_regex: HTTP_HEADER_NAME}];
+    string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
 
     // The configuration containing the method to determine the address of this endpoint
     DnsEndpoint endpoint = 2;
 
     // Sets the TTL in DNS answers from Envoy returned to the client. The default TTL is 300s
-    google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gte {seconds: 60}}];
+    google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gte {seconds: 30}}];
   }
 
   // Control how many times Envoy makes an attempt to forward a query to an external DNS server

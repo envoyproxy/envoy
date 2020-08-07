@@ -1,14 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 load("//bazel:envoy_internal.bzl", "envoy_external_dep_path")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 bool_flag(
     name = "moonjit",
@@ -44,6 +44,7 @@ envoy_cc_library(
     deps = [
         ":lua_lib",
         "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:hex_lib",
         "//source/common/protobuf",
     ],
 )

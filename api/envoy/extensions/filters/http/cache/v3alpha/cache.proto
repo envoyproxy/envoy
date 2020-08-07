@@ -61,7 +61,7 @@ message CacheConfig {
   // contents of a response, as described by
   // https://httpwg.org/specs/rfc7234.html#caching.negotiated.responses.
   //
-  // During insertion, *allowed_vary_headers* acts as a whitelist: if a
+  // During insertion, *allowed_vary_headers* acts as a allowlist: if a
   // response's *vary* header mentions any header names that aren't in
   // *allowed_vary_headers*, that response will not be cached.
   //

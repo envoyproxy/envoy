@@ -20,7 +20,8 @@ class FilesystemSubscriptionImpl : public Config::Subscription,
                                    Logger::Loggable<Logger::Id::config> {
 public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
-                             SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+                             SubscriptionCallbacks& callbacks,
+                             OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
                              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Config::Subscription
@@ -37,6 +38,7 @@ private:
   const std::string path_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   SubscriptionCallbacks& callbacks_;
+  OpaqueResourceDecoder& resource_decoder_;
   SubscriptionStats stats_;
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;

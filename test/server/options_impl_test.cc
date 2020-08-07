@@ -96,7 +96,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(0U, options->restartEpoch());
   EXPECT_EQ(spdlog::level::info, options->logLevel());
   EXPECT_EQ(2, options->componentLogLevels().size());
-  EXPECT_EQ("[[%g:%#] %v]", options->logFormat());
+  EXPECT_EQ("[%v]", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
@@ -154,10 +154,11 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setAdminAddressPath("path");
   options->setLocalAddressIpVersion(Network::Address::IpVersion::v6);
   options->setDrainTime(std::chrono::seconds(42));
+  options->setDrainStrategy(Server::DrainStrategy::Immediate);
+  options->setParentShutdownTime(std::chrono::seconds(43));
   options->setLogLevel(spdlog::level::trace);
   options->setLogFormat("%L %n %v");
   options->setLogPath("/foo/bar");
-  options->setParentShutdownTime(std::chrono::seconds(43));
   options->setRestartEpoch(44);
   options->setFileFlushIntervalMsec(std::chrono::milliseconds(45));
   options->setMode(Server::Mode::Validate);
@@ -181,6 +182,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(std::chrono::seconds(42), options->drainTime());
+  EXPECT_EQ(Server::DrainStrategy::Immediate, options->drainStrategy());
   EXPECT_EQ(spdlog::level::trace, options->logLevel());
   EXPECT_EQ("%L %n %v", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
@@ -209,11 +211,13 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(envoy::admin::v3::CommandLineOptions::v6,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
+  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::Immediate,
+            command_line_options->drain_strategy());
+  EXPECT_EQ(options->parentShutdownTime().count(),
+            command_line_options->parent_shutdown_time().seconds());
   EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()), command_line_options->log_level());
   EXPECT_EQ(options->logFormat(), command_line_options->log_format());
   EXPECT_EQ(options->logPath(), command_line_options->log_path());
-  EXPECT_EQ(options->parentShutdownTime().count(),
-            command_line_options->parent_shutdown_time().seconds());
   EXPECT_EQ(options->restartEpoch(), command_line_options->restart_epoch());
   EXPECT_EQ(options->fileFlushIntervalMsec().count() / 1000,
             command_line_options->file_flush_interval().seconds());
@@ -229,6 +233,7 @@ TEST_F(OptionsImplTest, SetAll) {
 TEST_F(OptionsImplTest, DefaultParams) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
+  EXPECT_EQ(Server::DrainStrategy::Gradual, options->drainStrategy());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
@@ -258,6 +263,7 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
+
   // Currently the following 7 options are not defined in proto, hence the count differs by 7.
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
@@ -266,7 +272,13 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
   // 6. hot restart version - print the hot restart version and exit.
   // 7. log-format-prefix-with-location - short-term override for rollout of dynamic log format.
-  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
+  const uint32_t options_not_in_proto = 7;
+
+  // There are two deprecated options: "max_stats" and "max_obj_name_len".
+  const uint32_t deprecated_options = 2;
+
+  EXPECT_EQ(options->count() - options_not_in_proto,
+            command_line_options->GetDescriptor()->field_count() - deprecated_options);
 }
 
 TEST_F(OptionsImplTest, OptionsFromArgv) {
@@ -419,19 +431,19 @@ TEST_F(OptionsImplTest, LogFormatDefault) {
 TEST_F(OptionsImplTest, LogFormatDefaultNoPrefix) {
   std::unique_ptr<OptionsImpl> options =
       createOptionsImpl({"envoy", "-c", "hello", "--log-format-prefix-with-location", "0"});
-  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] %v");
+  EXPECT_EQ(options->logFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatOverride) {
   std::unique_ptr<OptionsImpl> options =
-      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
+                         "--log-format-prefix-with-location 1"});
   EXPECT_EQ(options->logFormat(), "%%v [%g:%#] %v %t [%g:%#] %v");
 }
 
 TEST_F(OptionsImplTest, LogFormatOverrideNoPrefix) {
   std::unique_ptr<OptionsImpl> options =
-      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v",
-                         "--log-format-prefix-with-location 0"});
+      createOptionsImpl({"envoy", "-c", "hello", "--log-format", "%%v %v %t %v"});
   EXPECT_EQ(options->logFormat(), "%%v %v %t %v");
 }
 

@@ -78,7 +78,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.grpc_json_transcoder",
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )

@@ -10,6 +10,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -20,7 +21,7 @@ namespace Network {
 namespace Test {
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstSharedPtr addr_port,
-                                                    Address::SocketType type) {
+                                                    Socket::Type type) {
   if (addr_port == nullptr || addr_port->type() != Address::Type::Ip) {
     ADD_FAILURE() << "Not an internet address: "
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
@@ -34,7 +35,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
     failing_fn = "bind";
-  } else if (type == Address::SocketType::Stream) {
+  } else if (type == Socket::Type::Stream) {
     // Try listening on the port also, if the type is TCP.
     result = sock.listen(1);
     if (result.rc_ != 0) {
@@ -42,23 +43,24 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
     }
   }
   if (failing_fn != nullptr) {
-    if (result.errno_ == EADDRINUSE) {
+    if (result.errno_ == SOCKET_ERROR_ADDR_IN_USE) {
       // The port is already in use. Perfectly normal.
       return nullptr;
-    } else if (result.errno_ == EACCES) {
+    } else if (result.errno_ == SOCKET_ERROR_ACCESS) {
       // A privileged port, and we don't have privileges. Might want to log this.
       return nullptr;
     }
     // Unexpected failure.
     ADD_FAILURE() << failing_fn << " failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
+                  << "' with error: " << errorDetails(result.errno_) << " (" << result.errno_
+                  << ")";
     return nullptr;
   }
   return sock.localAddress();
 }
 
 Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port,
-                                                    Address::SocketType type) {
+                                                    Socket::Type type) {
   auto instance = Utility::parseInternetAddressAndPort(addr_port);
   if (instance != nullptr) {
     instance = findOrCheckFreePort(instance, type);
@@ -68,35 +70,35 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
   return instance;
 }
 
-const std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
+std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("[::1]");
   }
   return std::string("127.0.0.1");
 }
 
-const std::string getLoopbackAddressString(const Address::IpVersion version) {
+std::string getLoopbackAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("::1");
   }
   return std::string("127.0.0.1");
 }
 
-const std::string getAnyAddressUrlString(const Address::IpVersion version) {
+std::string getAnyAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("[::]");
   }
   return std::string("0.0.0.0");
 }
 
-const std::string getAnyAddressString(const Address::IpVersion version) {
+std::string getAnyAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
     return std::string("::");
   }
   return std::string("0.0.0.0");
 }
 
-const std::string addressVersionAsString(const Address::IpVersion version) {
+std::string addressVersionAsString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     return std::string("v4");
   }
@@ -159,14 +161,19 @@ std::string ipVersionToDnsFamily(Network::Address::IpVersion version) {
 }
 
 std::pair<Address::InstanceConstSharedPtr, Network::SocketPtr>
-bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
+bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_port) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   SocketPtr sock = std::make_unique<SocketImpl>(type, addr);
+  if (reuse_port) {
+    sock->addOptions(SocketOptionFactory::buildReusePortOptions());
+    Socket::applyOptions(sock->options(), *sock,
+                         envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  }
   Api::SysCallIntResult result = sock->bind(addr);
   if (0 != result.rc_) {
     sock->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
-                                  addr->asString(), strerror(result.errno_), result.errno_);
+                                  addr->asString(), errorDetails(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }

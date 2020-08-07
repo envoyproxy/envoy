@@ -32,8 +32,8 @@ int QuicPickServerPortForTestsOrDieImpl() {
       fmt::format("{}:{}", Envoy::Network::Test::getAnyAddressUrlString(ip_version), /*port*/ 0),
       /*v6only*/ false);
   ASSERT(addr_port != nullptr);
-  addr_port = Envoy::Network::Test::findOrCheckFreePort(
-      addr_port, Envoy::Network::Address::SocketType::Datagram);
+  addr_port =
+      Envoy::Network::Test::findOrCheckFreePort(addr_port, Envoy::Network::Socket::Type::Datagram);
   if (addr_port != nullptr && addr_port->ip() != nullptr) {
     // Find a port.
     return addr_port->ip()->port();

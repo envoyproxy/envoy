@@ -89,9 +89,9 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   membership_total, Gauge, Current cluster membership total
   retry_or_shadow_abandoned, Counter, Total number of times shadowing or retry buffering was canceled due to buffer limits
   config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
-  update_attempt, Counter, Total cluster membership update attempts
-  update_success, Counter, Total cluster membership update successes
-  update_failure, Counter, Total cluster membership update failures
+  update_attempt, Counter, Total attempted cluster membership updates by service discovery
+  update_success, Counter, Total successful cluster membership updates by service discovery
+  update_failure, Counter, Total failed cluster membership updates by service discovery
   update_empty, Counter, Total cluster membership updates ending with empty cluster load assignment and continuing with previous config
   update_no_rebuild, Counter, Total successful cluster membership updates that didn't result in any cluster load balancing structure rebuilds
   version, Gauge, Hash of the contents from the last successful API fetch
@@ -314,3 +314,20 @@ Statistics for monitoring effective host weights when using the
 
   min_entries_per_host, Gauge, Minimum number of entries for a single host
   max_entries_per_host, Gauge, Maximum number of entries for a single host
+
+.. _config_cluster_manager_cluster_stats_request_response_sizes:
+
+Request Response Size statistics
+--------------------------------
+
+If :ref:`request response size statistics <envoy_v3_api_field_config.cluster.v3.Cluster.track_cluster_stats>` are tracked,
+statistics will be added to *cluster.<name>* and contain the following:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   upstream_rq_headers_size, Histogram, Request headers size in bytes per upstream
+   upstream_rq_body_size, Histogram, Request body size in bytes per upstream
+   upstream_rs_headers_size, Histogram, Response headers size in bytes per upstream
+   upstream_rs_body_size, Histogram, Response body size in bytes per upstream

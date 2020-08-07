@@ -107,11 +107,38 @@ message EndpointHealth {
   config.core.v4alpha.HealthStatus health_status = 2;
 }
 
+// Group endpoint health by locality under each cluster.
+message LocalityEndpointsHealth {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.health.v3.LocalityEndpointsHealth";
+
+  config.core.v4alpha.Locality locality = 1;
+
+  repeated EndpointHealth endpoints_health = 2;
+}
+
+// The health status of endpoints in a cluster. The cluster name and locality
+// should match the corresponding fields in ClusterHealthCheck message.
+message ClusterEndpointsHealth {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.health.v3.ClusterEndpointsHealth";
+
+  string cluster_name = 1;
+
+  repeated LocalityEndpointsHealth locality_endpoints_health = 2;
+}
+
 message EndpointHealthResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.health.v3.EndpointHealthResponse";
 
+  // [#comment:TODO(drewsortega): add deprecate annotation once cluster_endpoints_health is implemented]
+  // Deprecated - Flat list of endpoint health information.
   repeated EndpointHealth endpoints_health = 1;
+
+  // [#not-implemented-hide:]
+  // Organize Endpoint health information by cluster.
+  repeated ClusterEndpointsHealth cluster_endpoints_health = 2;
 }
 
 message HealthCheckRequestOrEndpointHealthResponse {

@@ -1,4 +1,5 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
@@ -73,6 +74,16 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
   mutable_any->set_type_url(type_url);
 }
 
+void removeConnectMatcher(Protobuf::Message* message) {
+  envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config =
+      dynamic_cast<envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication&>(*message);
+  for (auto& rules : *config.mutable_rules()) {
+    if (rules.match().has_connect_matcher()) {
+      rules.mutable_match()->set_path("/");
+    }
+  }
+}
+
 void cleanAttachmentTemplate(Protobuf::Message* message) {
   envoy::extensions::filters::http::squash::v3::Squash& config =
       dynamic_cast<envoy::extensions::filters::http::squash::v3::Squash&>(*message);
@@ -92,6 +103,23 @@ void cleanTapConfig(Protobuf::Message* message) {
     config.mutable_common_config()->mutable_static_config()->mutable_match_config()->set_any_match(
         true);
   }
+  // TODO(samflattery): remove once StreamingGrpcSink is implemented
+  // a static config filter is required to have one sink, but since validation isn't performed on
+  // the filter until after this function runs, we have to manually check that there are sinks
+  // before checking that they are not StreamingGrpc
+  else if (config.common_config().config_type_case() ==
+               envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
+                   kStaticConfig &&
+           !config.common_config().static_config().output_config().sinks().empty() &&
+           config.common_config()
+                   .static_config()
+                   .output_config()
+                   .sinks(0)
+                   .output_sink_type_case() ==
+               envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc) {
+    // will be caught in UberFilterFuzzer::fuzz
+    throw EnvoyException("received input with not implemented output_sink_type StreamingGrpcSink");
+  }
 }
 
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
@@ -99,13 +127,18 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   const std::string name = Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(
       std::string(filter_name));
   // Map filter name to clean-up function.
-  if (name == HttpFilterNames::get().GrpcJsonTranscoder) {
+  if (filter_name == HttpFilterNames::get().GrpcJsonTranscoder) {
+    // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
   } else if (name == HttpFilterNames::get().Squash) {
     cleanAttachmentTemplate(message);
   } else if (name == HttpFilterNames::get().Tap) {
-    // TapDS oneof field not implemented.
+    // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
+  }
+  if (filter_name == HttpFilterNames::get().JwtAuthn) {
+    // Remove when connect matcher is implemented for Jwt Authentication filter.
+    removeConnectMatcher(message);
   }
 }
 

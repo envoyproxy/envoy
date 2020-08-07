@@ -14,8 +14,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/thread.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "common/http/http1/codec_stats.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -60,7 +60,7 @@ public:
     data_[key] = std::move(value);
   }
 
-  std::unordered_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
+  absl::node_hash_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
     return data_;
   }
 };
@@ -89,6 +89,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(float, prefetchRatio, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
@@ -108,6 +109,8 @@ public:
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
               lbOriginalDstConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&, upstreamConfig,
+              (), (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
@@ -117,7 +120,8 @@ public:
   MOCK_METHOD(ClusterStats&, stats, (), (const));
   MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
-  MOCK_METHOD(absl::optional<ClusterTimeoutBudgetStats>&, timeoutBudgetStats, (), (const));
+  MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
+  MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
@@ -128,7 +132,7 @@ public:
   MOCK_METHOD(bool, warmHosts, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&,
               upstreamHttpProtocolOptions, (), (const));
-  MOCK_METHOD(absl::optional<std::string>, eds_service_name, (), (const));
+  MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(Http::Protocol, upstreamHttpProtocol, (absl::optional<Http::Protocol>), (const));
 
@@ -148,8 +152,10 @@ public:
   Upstream::TransportSocketMatcherPtr transport_socket_matcher_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> request_response_size_stats_store_;
+  ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
   NiceMock<Stats::MockIsolatedStatsStore> timeout_budget_stats_store_;
-  absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
+  ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
@@ -163,6 +169,7 @@ public:
       upstream_http_protocol_options_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;

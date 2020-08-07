@@ -7,7 +7,6 @@
 #include <list>
 #include <locale>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
@@ -17,6 +16,8 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/thread_impl.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -56,7 +57,7 @@ private:
   typedef std::unique_ptr<DirectoryWatch> DirectoryWatchPtr;
 
   Api::Api& api_;
-  std::unordered_map<std::string, DirectoryWatchPtr> callback_map_;
+  absl::node_hash_map<std::string, DirectoryWatchPtr> callback_map_;
   Event::FileEventPtr directory_event_;
   os_fd_t event_write_;
   os_fd_t event_read_;

@@ -1,18 +1,28 @@
 #pragma once
 
 #include "envoy/event/file_event.h"
+#include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 
+#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+
+#include "absl/container/flat_hash_map.h"
 #include "proxy_protocol_header.h"
+
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_UNIX;
+using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
+
+using KeyValuePair =
+    envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair;
 
 /**
  * All stats for the proxy protocol. @see stats_macros.h
@@ -32,11 +42,27 @@ struct ProxyProtocolStats {
 /**
  * Global configuration for Proxy Protocol listener filter.
  */
-class Config {
+class Config : public Logger::Loggable<Logger::Id::filter> {
 public:
-  Config(Stats::Scope& scope);
+  Config(
+      Stats::Scope& scope,
+      const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config);
 
   ProxyProtocolStats stats_;
+
+  /**
+   * Return null if the type of TLV is not needed otherwise a pointer to the KeyValuePair for
+   * emitting to dynamic metadata.
+   */
+  const KeyValuePair* isTlvTypeNeeded(uint8_t type) const;
+
+  /**
+   * Number of TLV types that need to be parsed and saved to dynamic metadata.
+   */
+  size_t numberOfNeededTlvTypes() const;
+
+private:
+  absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -79,7 +105,9 @@ private:
   /**
    * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
    */
-  bool parseExtensions(os_fd_t fd);
+  bool parseExtensions(os_fd_t fd, uint8_t* buf, size_t buf_size, size_t* buf_off = nullptr);
+  void parseTlvs(const std::vector<uint8_t>& tlvs);
+  bool readExtensions(os_fd_t fd);
 
   /**
    * Given a char * & len, parse the header as per spec
@@ -101,6 +129,16 @@ private:
 
   // Stores the portion of the first line that has been read so far.
   char buf_[MAX_PROXY_PROTO_LEN_V2];
+
+  /**
+   * Store the extension TLVs if they need to be read.
+   */
+  std::vector<uint8_t> buf_tlv_;
+
+  /**
+   * The index in buf_tlv_ that has been fully read.
+   */
+  size_t buf_tlv_off_{};
 
   ConfigSharedPtr config_;
 

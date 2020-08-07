@@ -48,6 +48,8 @@ will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_v3
 defaults to 5000ms if not specified. The :ref:`dns_failure_refresh_rate <envoy_v3_api_field_config.cluster.v3.Cluster.dns_failure_refresh_rate>`
 controls the refresh frequency during failures, and, if not configured, the DNS refresh rate will be used.
 
+DNS resolving emits :ref:`cluster statistics <config_cluster_manager_cluster_stats>` fields *update_attempt*, *update_success* and *update_failure*.
+
 .. _arch_overview_service_discovery_types_logical_dns:
 
 Logical DNS
@@ -76,6 +78,8 @@ For logical DNS cluster, if the TTL of first record is 0, :ref:`dns_refresh_rate
 will be used as the cluster's DNS refresh rate. :ref:`dns_refresh_rate <envoy_v3_api_field_config.cluster.v3.Cluster.dns_refresh_rate>`
 defaults to 5000ms if not specified. The :ref:`dns_failure_refresh_rate <envoy_v3_api_field_config.cluster.v3.Cluster.dns_failure_refresh_rate>`
 controls the refresh frequency during failures, and, if not configured, the DNS refresh rate will be used.
+
+DNS resolving emits :ref:`cluster statistics <config_cluster_manager_cluster_stats>` fields *update_attempt*, *update_success* and *update_failure*.
 
 .. _arch_overview_service_discovery_types_original_destination:
 

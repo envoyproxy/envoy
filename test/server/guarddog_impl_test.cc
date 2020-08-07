@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/common/time.h"
+#include "envoy/server/watchdog.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/macros.h"
@@ -11,7 +12,7 @@
 #include "server/guarddog_impl.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/main.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -89,7 +90,8 @@ INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogTestBase,
 class GuardDogDeathTest : public GuardDogTestBase {
 protected:
   GuardDogDeathTest()
-      : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {}
+      : config_kill_(1000, 1000, 100, 1000, 0), config_multikill_(1000, 1000, 1000, 500, 0),
+        config_multikill_threshold_(1000, 1000, 1000, 500, 60) {}
 
   /**
    * This does everything but the final forceCheckForTest() that should cause
@@ -99,6 +101,7 @@ protected:
     InSequence s;
     initGuardDog(fakestats_, config_kill_);
     unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    dogs_.emplace_back(unpet_dog_);
     guard_dog_->forceCheckForTest();
     time_system_->advanceTimeWait(std::chrono::milliseconds(99)); // 1 ms shy of death.
   }
@@ -112,18 +115,47 @@ protected:
     initGuardDog(fakestats_, config_multikill_);
     auto unpet_dog_ =
         guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    dogs_.emplace_back(unpet_dog_);
     guard_dog_->forceCheckForTest();
     auto second_dog_ =
         guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+    dogs_.emplace_back(second_dog_);
     guard_dog_->forceCheckForTest();
+    time_system_->advanceTimeWait(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
+  }
+
+  /**
+   * This does everything but the final forceCheckForTest() that should cause
+   * death for the multiple kill case using threshold (100% of watchdogs over the threshold).
+   */
+  void setupForMultiDeathThreshold() {
+    InSequence s;
+    initGuardDog(fakestats_, config_multikill_threshold_);
+
+    // Creates 5 watchdogs.
+    for (int i = 0; i < 5; ++i) {
+      auto dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");
+      dogs_.emplace_back(dog);
+
+      if (i == 0) {
+        unpet_dog_ = dog;
+      } else if (i == 1) {
+        second_dog_ = dog;
+      }
+
+      guard_dog_->forceCheckForTest();
+    }
+
     time_system_->advanceTimeWait(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
   }
 
   NiceMock<Configuration::MockMain> config_kill_;
   NiceMock<Configuration::MockMain> config_multikill_;
+  NiceMock<Configuration::MockMain> config_multikill_threshold_;
   NiceMock<Stats::MockStore> fakestats_;
   WatchDogSharedPtr unpet_dog_;
   WatchDogSharedPtr second_dog_;
+  std::vector<WatchDogSharedPtr> dogs_; // Tracks all watchdogs created.
 };
 
 INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogDeathTest,
@@ -174,6 +206,34 @@ TEST_P(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
   SetupForMultiDeath();
 }
 
+TEST_P(GuardDogDeathTest, MultiKillThresholdDeathTest) {
+  auto die_function = [&]() -> void {
+    setupForMultiDeathThreshold();
+
+    // Pet the last two dogs so we're just at the threshold that causes death.
+    dogs_.at(4)->touch();
+    dogs_.at(3)->touch();
+
+    time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
+    guard_dog_->forceCheckForTest();
+  };
+  EXPECT_DEATH(die_function(), "");
+}
+
+TEST_P(GuardDogAlmostDeadTest, MultiKillUnderThreshold) {
+  // This does everything the death test does except it pets an additional watchdog
+  // that causes us to be under the threshold (60%) of multikill death.
+  setupForMultiDeathThreshold();
+
+  // Pet the last three dogs so we're just under the threshold that causes death.
+  dogs_.at(4)->touch();
+  dogs_.at(3)->touch();
+  dogs_.at(2)->touch();
+
+  time_system_->advanceTimeWait(std::chrono::milliseconds(2)); // 1 ms past multi-death.
+  guard_dog_->forceCheckForTest();
+}
+
 TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death. The positive case is covered in MultiKillDeathTest.
@@ -195,7 +255,7 @@ TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
 
 class GuardDogMissTest : public GuardDogTestBase {
 protected:
-  GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0) {}
+  GuardDogMissTest() : config_miss_(500, 1000, 0, 0, 0), config_mega_(1000, 500, 0, 0, 0) {}
 
   void checkMiss(uint64_t count, const std::string& descriptor) {
     EXPECT_EQ(count, TestUtility::findCounter(stats_store_, "server.watchdog_miss")->value())
@@ -315,27 +375,27 @@ TEST_P(GuardDogMissTest, MissCountTest) {
 
 TEST_P(GuardDogTestBase, StartStopTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(0, 0, 0, 0);
+  NiceMock<Configuration::MockMain> config(0, 0, 0, 0, 0);
   initGuardDog(stats, config);
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(40, 50, 0, 0);
+  NiceMock<Configuration::MockMain> config(40, 50, 0, 0, 0);
   initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(40));
 }
 
 TEST_P(GuardDogTestBase, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
+  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0);
   initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), std::chrono::milliseconds(90));
 }
 
 TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
-  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
+  NiceMock<Configuration::MockMain> config(100, 90, 1000, 500, 0);
   initGuardDog(stats, config);
   auto watched_dog =
       guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "test_thread");

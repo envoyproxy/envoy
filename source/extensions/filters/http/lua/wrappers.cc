@@ -11,13 +11,10 @@ namespace Lua {
 
 HeaderMapIterator::HeaderMapIterator(HeaderMapWrapper& parent) : parent_(parent) {
   entries_.reserve(parent_.headers_.size());
-  parent_.headers_.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        HeaderMapIterator* iterator = static_cast<HeaderMapIterator*>(context);
-        iterator->entries_.push_back(&header);
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      this);
+  parent_.headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    entries_.push_back(&header);
+    return Http::HeaderMap::Iterate::Continue;
+  });
 }
 
 int HeaderMapIterator::luaPairsIterator(lua_State* state) {
@@ -112,6 +109,21 @@ int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
     dynamic_metadata_wrapper_.pushStack();
   } else {
     dynamic_metadata_wrapper_.reset(DynamicMetadataMapWrapper::create(state, *this), true);
+  }
+  return 1;
+}
+
+int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
+  const auto& ssl = stream_info_.downstreamSslConnection();
+  if (ssl != nullptr) {
+    if (downstream_ssl_connection_.get() != nullptr) {
+      downstream_ssl_connection_.pushStack();
+    } else {
+      downstream_ssl_connection_.reset(
+          Filters::Common::Lua::SslConnectionWrapper::create(state, *ssl), true);
+    }
+  } else {
+    lua_pushnil(state);
   }
   return 1;
 }

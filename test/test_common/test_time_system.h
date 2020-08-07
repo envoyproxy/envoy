@@ -65,11 +65,11 @@ public:
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
   virtual void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                       const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
+                       const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
 
   template <class D>
   void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-               const D& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+               const D& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
   }
 };
@@ -98,7 +98,7 @@ public:
   TestTimeSystem& timeSystem(const MakeTimeSystemFn& make_time_system);
 
 private:
-  std::unique_ptr<TestTimeSystem> time_system_ GUARDED_BY(mutex_);
+  std::unique_ptr<TestTimeSystem> time_system_ ABSL_GUARDED_BY(mutex_);
   Thread::MutexBasicLockable mutex_;
 };
 
@@ -121,12 +121,13 @@ public:
   }
 
   void waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-               const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+               const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     timeSystem().waitFor(mutex, condvar, duration);
   }
 
-  SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
-    return timeSystem().createScheduler(base_scheduler);
+  SchedulerPtr createScheduler(Scheduler& base_scheduler,
+                               CallbackScheduler& cb_scheduler) override {
+    return timeSystem().createScheduler(base_scheduler, cb_scheduler);
   }
   SystemTime systemTime() override { return timeSystem().systemTime(); }
   MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }

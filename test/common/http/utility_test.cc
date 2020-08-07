@@ -9,11 +9,13 @@
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/url_utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -28,16 +30,65 @@ namespace Http {
 
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString("/hello"));
+
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
+  EXPECT_EQ(Utility::QueryParams(), Utility::parseAndDecodeQueryString("/hello?"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
             Utility::parseQueryString("/hello?hello=world"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
+            Utility::parseAndDecodeQueryString("/hello?hello=world"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello="));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello="));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello=&"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
             Utility::parseQueryString("/hello?hello=&hello2=world2"));
+  EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
+            Utility::parseAndDecodeQueryString("/hello?hello=&hello2=world2"));
+
   EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
             Utility::parseQueryString("/logging?name=admin&level=trace"));
+  EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
+            Utility::parseAndDecodeQueryString("/logging?name=admin&level=trace"));
+
+  EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a%26b"}}),
+            Utility::parseQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
+  EXPECT_EQ(Utility::QueryParams({{"param_value_has_encoded_ampersand", "a&b"}}),
+            Utility::parseAndDecodeQueryString("/hello?param_value_has_encoded_ampersand=a%26b"));
+
+  EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_%26", "a%26b"}, {"ok", "1"}}),
+            Utility::parseQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+  EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_&", "a&b"}, {"ok", "1"}}),
+            Utility::parseAndDecodeQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+
+  // A sample of request path with query strings by Prometheus:
+  // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
+  EXPECT_EQ(
+      Utility::QueryParams(
+          {{"filter",
+            "%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+            "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"}}),
+      Utility::parseQueryString(
+          "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
+  EXPECT_EQ(
+      Utility::QueryParams(
+          {{"filter", "(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|"
+                      "rq_complete|rq_active|cx_active))|(server.version)"}}),
+      Utility::parseAndDecodeQueryString(
+          "/stats?filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_"
+          "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
 }
 
 TEST(HttpUtility, getResponseStatus) {
@@ -259,9 +310,10 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 namespace {
 
-envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV2Yaml(const std::string& yaml) {
+envoy::config::core::v3::Http2ProtocolOptions
+parseHttp2OptionsFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
   envoy::config::core::v3::Http2ProtocolOptions http2_options;
-  TestUtility::loadFromYamlAndValidate(yaml, http2_options);
+  TestUtility::loadFromYamlAndValidate(yaml, http2_options, false, avoid_boosting);
   return ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options);
 }
 
@@ -270,7 +322,7 @@ envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV2Yaml(const 
 TEST(HttpUtility, parseHttp2Settings) {
   {
     using ::Envoy::Http2::Utility::OptionsLimits;
-    auto http2_options = parseHttp2OptionsFromV2Yaml("{}");
+    auto http2_options = parseHttp2OptionsFromV3Yaml("{}");
     EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
     EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS,
               http2_options.max_concurrent_streams().value());
@@ -297,11 +349,75 @@ max_concurrent_streams: 2
 initial_stream_window_size: 65535
 initial_connection_window_size: 65535
     )EOF";
-    auto http2_options = parseHttp2OptionsFromV2Yaml(yaml);
+    auto http2_options = parseHttp2OptionsFromV3Yaml(yaml);
     EXPECT_EQ(1U, http2_options.hpack_table_size().value());
     EXPECT_EQ(2U, http2_options.max_concurrent_streams().value());
     EXPECT_EQ(65535U, http2_options.initial_stream_window_size().value());
     EXPECT_EQ(65535U, http2_options.initial_connection_window_size().value());
+  }
+}
+
+TEST(HttpUtility, ValidateStreamErrors) {
+  // Both false, the result should be false.
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                   .override_stream_error_on_invalid_http_message()
+                   .value());
+
+  // If the new value is not present, the legacy value is respected.
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  // If the new value is present, it is used.
+  http2_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  http2_options.set_stream_error_on_invalid_http_messaging(false);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  // Invert values - the new value should still be used.
+  http2_options.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                   .override_stream_error_on_invalid_http_message()
+                   .value());
+}
+
+TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
+  envoy::config::core::v3::Http2ProtocolOptions http2_options;
+  http2_options.set_stream_error_on_invalid_http_messaging(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  // If the HCM value is present it will take precedence over the old value.
+  Protobuf::BoolValue hcm_value;
+  hcm_value.set_value(false);
+  EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                   .override_stream_error_on_invalid_http_message()
+                   .value());
+  // The HCM value will be ignored if initializeAndValidateOptions is told it is not present.
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, false, hcm_value)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  // The override_stream_error_on_invalid_http_message takes precedence over the
+  // global one.
+  http2_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                  .override_stream_error_on_invalid_http_message()
+                  .value());
+
+  {
+    // With runtime flipped, override is ignored.
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.hcm_stream_error_on_invalid_message", "false"}});
+    EXPECT_TRUE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
+                    .override_stream_error_on_invalid_http_message()
+                    .value());
   }
 }
 
@@ -665,10 +781,9 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
-  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
-  const Router::RouteSpecificFilterConfig* one = nullconfig + 1;
-  const Router::RouteSpecificFilterConfig* two = nullconfig + 2;
-  const Router::RouteSpecificFilterConfig* three = nullconfig + 3;
+  const Router::RouteSpecificFilterConfig one;
+  const Router::RouteSpecificFilterConfig two;
+  const Router::RouteSpecificFilterConfig three;
 
   // Test when there's nothing on the route
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
@@ -676,23 +791,23 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
 
   // Testing in reverse order, so that the method always returns the last object.
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(one));
-  EXPECT_EQ(one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+      .WillByDefault(Return(&one));
+  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(two));
-  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(&two));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(three));
-  EXPECT_EQ(three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                      filter_callbacks.route()));
+      .WillByDefault(Return(&three));
+  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                       filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                    filter_callbacks.route()));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
+                                                                     filter_callbacks.route()));
 }
 
 // Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
@@ -702,16 +817,16 @@ TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
 
   // Create configs to test; to ease of testing instead of using real objects
   // we will use pointers that are actually indexes.
-  const Router::RouteSpecificFilterConfig* nullconfig = nullptr;
+  const std::vector<Router::RouteSpecificFilterConfig> nullconfigs(5);
   size_t num_configs = 1;
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
   num_configs++;
   ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
   num_configs++;
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
-      .WillByDefault(Return(nullconfig + num_configs));
+      .WillByDefault(Return(&nullconfigs[num_configs]));
 
   // a vector to save which configs are visited by the traversePerFilterConfigGeneric
   std::vector<size_t> visited_configs(num_configs, 0);
@@ -720,7 +835,7 @@ TEST(HttpUtility, TraversePerFilterConfigIteratesInOrder) {
   size_t index = 0;
   Utility::traversePerFilterConfigGeneric(filter_name, filter_callbacks.route(),
                                           [&](const Router::RouteSpecificFilterConfig& cfg) {
-                                            int cfg_index = &cfg - nullconfig;
+                                            int cfg_index = &cfg - nullconfigs.data();
                                             visited_configs[index] = cfg_index - 1;
                                             index++;
                                           });
@@ -1085,87 +1200,110 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
 
 TEST(Url, ParsingFails) {
   Utility::Url url;
-  EXPECT_FALSE(url.initialize("", false));
-  EXPECT_FALSE(url.initialize("foo", false));
-  EXPECT_FALSE(url.initialize("http://", false));
-  EXPECT_FALSE(url.initialize("random_scheme://host.com/path", false));
-  EXPECT_FALSE(url.initialize("http://www.foo.com", true));
-  EXPECT_FALSE(url.initialize("foo.com", true));
+  const bool is_connect = true;
+  EXPECT_FALSE(url.initialize("", !is_connect));
+  EXPECT_FALSE(url.initialize("foo", !is_connect));
+  EXPECT_FALSE(url.initialize("http://", !is_connect));
+  EXPECT_FALSE(url.initialize("random_scheme://host.com/path", !is_connect));
+  // Only port value in valid range (1-65535) is allowed.
+  EXPECT_FALSE(url.initialize("http://host.com:65536/path", !is_connect));
+  EXPECT_FALSE(url.initialize("http://host.com:0/path", !is_connect));
+  EXPECT_FALSE(url.initialize("http://host.com:-1/path", !is_connect));
+  EXPECT_FALSE(url.initialize("http://host.com:port/path", !is_connect));
+
+  // Test parsing fails for CONNECT request URLs.
+  EXPECT_FALSE(url.initialize("http://www.foo.com", is_connect));
+  EXPECT_FALSE(url.initialize("foo.com", is_connect));
+  // Only port value in valid range (1-65535) is allowed.
+  EXPECT_FALSE(url.initialize("foo.com:65536", is_connect));
+  EXPECT_FALSE(url.initialize("foo.com:0", is_connect));
+  EXPECT_FALSE(url.initialize("foo.com:-1", is_connect));
+  EXPECT_FALSE(url.initialize("foo.com:port", is_connect));
 }
 
 void validateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
-                 absl::string_view expected_host_port, absl::string_view expected_path) {
+                 absl::string_view expected_host_port, absl::string_view expected_path,
+                 uint16_t expected_port) {
   Utility::Url url;
-  ASSERT_TRUE(url.initialize(raw_url, false)) << "Failed to initialize " << raw_url;
+  ASSERT_TRUE(url.initialize(raw_url, /*is_connect=*/false)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.hostAndPort(), expected_host_port);
   EXPECT_EQ(url.pathAndQueryParams(), expected_path);
-}
-
-void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port) {
-  Utility::Url url;
-  ASSERT_TRUE(url.initialize(raw_url, true)) << "Failed to initialize " << raw_url;
-  EXPECT_TRUE(url.scheme().empty());
-  EXPECT_TRUE(url.pathAndQueryParams().empty());
-  EXPECT_EQ(url.hostAndPort(), expected_host_port);
+  EXPECT_EQ(url.port(), expected_port);
 }
 
 TEST(Url, ParsingTest) {
-  // Test url with no explicit path (with and without port)
-  validateUrl("http://www.host.com", "http", "www.host.com", "/");
-  validateUrl("http://www.host.com:80", "http", "www.host.com:80", "/");
+  // Test url with no explicit path (with and without port).
+  validateUrl("http://www.host.com", "http", "www.host.com", "/", 80);
+  validateUrl("http://www.host.com:80", "http", "www.host.com", "/", 80);
 
   // Test url with "/" path.
-  validateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
-  validateUrl("http://www.host.com/", "http", "www.host.com", "/");
+  validateUrl("http://www.host.com:80/", "http", "www.host.com", "/", 80);
+  validateUrl("http://www.host.com/", "http", "www.host.com", "/", 80);
 
   // Test url with "?".
-  validateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/?");
-  validateUrl("http://www.host.com/?", "http", "www.host.com", "/?");
+  validateUrl("http://www.host.com:80/?", "http", "www.host.com", "/?", 80);
+  validateUrl("http://www.host.com/?", "http", "www.host.com", "/?", 80);
 
   // Test url with "?" but without slash.
-  validateUrl("http://www.host.com:80?", "http", "www.host.com:80", "?");
-  validateUrl("http://www.host.com?", "http", "www.host.com", "?");
+  validateUrl("http://www.host.com:80?", "http", "www.host.com", "/?", 80);
+  validateUrl("http://www.host.com?", "http", "www.host.com", "/?", 80);
 
-  // Test url with multi-character path
-  validateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
-  validateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
+  // Test url with multi-character path.
+  validateUrl("http://www.host.com:80/path", "http", "www.host.com", "/path", 80);
+  validateUrl("http://www.host.com/path", "http", "www.host.com", "/path", 80);
 
-  // Test url with multi-character path and ? at the end
-  validateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path?");
-  validateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?");
+  // Test url with multi-character path and ? at the end.
+  validateUrl("http://www.host.com:80/path?", "http", "www.host.com", "/path?", 80);
+  validateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?", 80);
 
-  // Test https scheme
-  validateUrl("https://www.host.com", "https", "www.host.com", "/");
+  // Test https scheme.
+  validateUrl("https://www.host.com", "https", "www.host.com", "/", 443);
 
-  // Test url with query parameter
-  validateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
-  validateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
+  // Test url with query parameter.
+  validateUrl("http://www.host.com:80/?query=param", "http", "www.host.com", "/?query=param", 80);
+  validateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param", 80);
 
-  // Test url with query parameter but without slash
-  validateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
-  validateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
+  // Test url with query parameter but without slash. It will be normalized.
+  validateUrl("http://www.host.com:80?query=param", "http", "www.host.com", "/?query=param", 80);
+  validateUrl("http://www.host.com?query=param", "http", "www.host.com", "/?query=param", 80);
 
-  // Test url with multi-character path and query parameter
-  validateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",
-              "/path?query=param");
-  validateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param");
+  // Test url with multi-character path and query parameter.
+  validateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com",
+              "/path?query=param", 80);
+  validateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param",
+              80);
 
-  // Test url with multi-character path and more than one query parameter
-  validateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com:80",
-              "/path?query=param&query2=param2");
+  // Test url with multi-character path and more than one query parameter.
+  validateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com",
+              "/path?query=param&query2=param2", 80);
   validateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
-              "/path?query=param&query2=param2");
+              "/path?query=param&query2=param2", 80);
+
   // Test url with multi-character path, more than one query parameter and fragment
   validateUrl("http://www.host.com:80/path?query=param&query2=param2#fragment", "http",
-              "www.host.com:80", "/path?query=param&query2=param2#fragment");
+              "www.host.com", "/path?query=param&query2=param2#fragment", 80);
   validateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
-              "/path?query=param&query2=param2#fragment");
+              "/path?query=param&query2=param2#fragment", 80);
+
+  // Test url with non-default ports.
+  validateUrl("https://www.host.com:8443", "https", "www.host.com:8443", "/", 8443);
+  validateUrl("http://www.host.com:8080", "http", "www.host.com:8080", "/", 8080);
+}
+
+void validateConnectUrl(absl::string_view raw_url, absl::string_view expected_host_port,
+                        uint16_t expected_port) {
+  Utility::Url url;
+  ASSERT_TRUE(url.initialize(raw_url, /*is_connect=*/true)) << "Failed to initialize " << raw_url;
+  EXPECT_TRUE(url.scheme().empty());
+  EXPECT_TRUE(url.pathAndQueryParams().empty());
+  EXPECT_EQ(url.hostAndPort(), expected_host_port);
+  EXPECT_EQ(url.port(), expected_port);
 }
 
 TEST(Url, ParsingForConnectTest) {
-  validateConnectUrl("host.com:443", "host.com:443");
-  validateConnectUrl("host.com:80", "host.com:80");
+  validateConnectUrl("host.com:443", "host.com:443", 443);
+  validateConnectUrl("host.com:80", "host.com:80", 80);
 }
 
 void validatePercentEncodingEncodeDecode(absl::string_view source,
@@ -1189,10 +1327,28 @@ TEST(PercentEncoding, EncodeDecode) {
   validatePercentEncodingEncodeDecode("_-ok-_", "_-ok-_");
 }
 
-TEST(PercentEncoding, Trailing) {
+TEST(PercentEncoding, Decoding) {
+  EXPECT_EQ(Utility::PercentEncoding::decode("a%26b"), "a&b");
+  EXPECT_EQ(Utility::PercentEncoding::decode("hello%20world"), "hello world");
+  EXPECT_EQ(Utility::PercentEncoding::decode("upstream%7Cdownstream"), "upstream|downstream");
+  EXPECT_EQ(
+      Utility::PercentEncoding::decode(
+          "filter=%28cluster.upstream_%28rq_total%7Crq_time_sum%7Crq_time_count%7Crq_time_bucket%"
+          "7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"),
+      "filter=(cluster.upstream_(rq_total|rq_time_sum|rq_time_count|rq_time_bucket|rq_xx|rq_"
+      "complete|rq_active|cx_active))|(server.version)");
+}
+
+TEST(PercentEncoding, DecodingWithTrailingInput) {
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20lar%20"), "too lar ");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20larg%e"), "too larg%e");
   EXPECT_EQ(Utility::PercentEncoding::decode("too%20large%"), "too large%");
+}
+
+TEST(PercentEncoding, Encoding) {
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
+  EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
 }
 
 } // namespace Http

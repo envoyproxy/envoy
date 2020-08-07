@@ -10,7 +10,6 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -140,11 +139,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
@@ -242,11 +237,7 @@ public:
     use_lds_ = false;
   }
 
-  void TearDown() override {
-    cleanUpXdsConnection();
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { cleanUpXdsConnection(); }
 
   std::string virtualHostYaml(const std::string& name, const std::string& domain) {
     return fmt::format(VhostTemplate, name, domain);
@@ -376,7 +367,7 @@ public:
     resource->set_version("4");
     resource->mutable_resource()->PackFrom(
         API_DOWNGRADE(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-            virtualHostYaml("vhost_1", "vhost_1, vhost.first"))));
+            virtualHostYaml("my_route/vhost_1", "vhost_1, vhost.first"))));
     resource->add_aliases("my_route/vhost.first");
     ret.set_nonce("test-nonce-0");
 
@@ -649,6 +640,39 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
 
   response->waitForHeaders();
   EXPECT_EQ("404", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Verify that an vhds update succeeds even when the client closes its connection
+TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
+  // RDS exchange with a non-empty virtual_hosts field
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  EXPECT_TRUE(codec_client_->waitForDisconnect());
+
+  // Attempt to make a request to an unknown host
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost_1"},
+                                                 {"x-lyft-user-id", "123"}};
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
+
+  envoy::api::v2::DeltaDiscoveryResponse vhds_update =
+      createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
+  vhds_stream_->sendGrpcMessage(vhds_update);
+
+  codec_client_->sendReset(encoder);
+  response->waitForReset();
+  EXPECT_TRUE(codec_client_->connected());
 
   cleanupUpstreamAndDownstream();
 }

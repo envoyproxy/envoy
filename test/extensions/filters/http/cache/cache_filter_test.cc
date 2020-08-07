@@ -1,7 +1,7 @@
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 

@@ -19,6 +19,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/common/basic_resource_impl.h"
 #include "common/common/callback_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/lock_guard.h"
@@ -60,6 +61,11 @@ public:
     Thread::LockGuard lock(lock_);
     return end_stream_;
   }
+
+  // Execute a callback using the dispatcher associated with the FakeStream's connection. This
+  // allows execution of non-interrupted sequences of operations on the fake stream which may run
+  // into trouble if client-side events are interleaved.
+  void postToConnectionThread(std::function<void()> cb);
   void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers);
   void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
@@ -75,6 +81,25 @@ public:
   bool receivedData() { return received_data_; }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
+  }
+  void
+  sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
+                 const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
+                 const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 absl::string_view /*details*/) override {
+    const bool is_head_request =
+        headers_ != nullptr && headers_->getMethodValue() == Http::Headers::get().MethodValues.Head;
+    Http::Utility::sendLocalReply(
+        false,
+        Http::Utility::EncodeFunctions(
+            {nullptr,
+             [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+               encoder_.encodeHeaders(*headers, end_stream);
+             },
+             [&](Buffer::Instance& data, bool end_stream) -> void {
+               encoder_.encodeData(data, end_stream);
+             }}),
+        Http::Utility::LocalReplyData({is_grpc_request, code, body, grpc_status, is_head_request}));
   }
 
   ABSL_MUST_USE_RESULT
@@ -177,8 +202,8 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
-  Http::MetadataMap& metadata_map() { return metadata_map_; }
-  std::unordered_map<std::string, uint64_t>& duplicated_metadata_key_count() {
+  Http::MetadataMap& metadataMap() { return metadata_map_; }
+  absl::node_hash_map<std::string, uint64_t>& duplicatedMetadataKeyCount() {
     return duplicated_metadata_key_count_;
   }
 
@@ -199,7 +224,7 @@ private:
   bool add_served_by_header_{};
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
-  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
+  absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool received_data_{false};
 };
 
@@ -442,7 +467,7 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
-  void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onGoAway(Http::GoAwayErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -643,7 +668,7 @@ private:
     FakeListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
 
     // Network::ListenSocketFactory
-    Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+    Network::Socket::Type socketType() const override { return socket_->socketType(); }
 
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
       return socket_->localAddress();
@@ -700,11 +725,18 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
+    ResourceLimit& openConnections() override { return connection_resource_; }
+
+    void setMaxConnections(const uint32_t num_connections) {
+      connection_resource_.setMax(num_connections);
+    }
+    void clearMaxConnections() { connection_resource_.resetMax(); }
 
     FakeUpstream& parent_;
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     const Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+    BasicResourceLimitImpl connection_resource_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   };
 

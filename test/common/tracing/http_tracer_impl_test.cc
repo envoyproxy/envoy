@@ -7,12 +7,12 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "common/common/base64.h"
+#include "common/common/random_generator.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/request_id_extension_impl.h"
 #include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -44,7 +44,7 @@ namespace {
 TEST(HttpTracerUtilityTest, IsTracing) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   NiceMock<Stats::MockStore> stats;
-  Runtime::RandomGeneratorImpl random;
+  Random::RandomGeneratorImpl random;
   std::string not_traceable_guid = random.uuid();
 
   auto rid_extension = Http::RequestIDExtensionFactory::defaultInstance(random);

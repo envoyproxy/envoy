@@ -2,6 +2,8 @@
 
 #include "envoy/config/tap/v3/common.pb.h"
 
+#include "common/buffer/buffer_impl.h"
+#include "common/common/matchers.h"
 #include "common/http/header_utility.h"
 
 namespace Envoy {
@@ -11,6 +13,18 @@ namespace Tap {
 
 class Matcher;
 using MatcherPtr = std::unique_ptr<Matcher>;
+
+/**
+ * Base class for context used by individual matchers.
+ * The context may be required by matchers which are called multiple times
+ * and need to carry state between the calls. For example body matchers may
+ * store information how any bytes of the body have been already processed
+ * or what what has been already found in the body and what has yet to be found.
+ */
+class MatcherCtx {
+public:
+  virtual ~MatcherCtx() = default;
+};
 
 /**
  * Base class for all tap matchers.
@@ -40,6 +54,7 @@ public:
 
     bool matches_{false};            // Does the matcher currently match?
     bool might_change_status_{true}; // Is it possible for matches_ to change in subsequent updates?
+    std::unique_ptr<MatcherCtx> ctx_{}; // Context used by matchers to save interim context.
   };
 
   using MatchStatusVector = std::vector<MatchStatus>;
@@ -104,11 +119,29 @@ public:
                                       MatchStatusVector& statuses) const PURE;
 
   /**
+   * Update match status given HTTP request body.
+   * @param data supplies the request body.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) PURE;
+
+  /**
+   * Update match status given HTTP response body.
+   * @param data supplies the response body.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) PURE;
+
+  /**
    * @return whether given currently available information, the matcher matches.
    * @param statuses supplies the per-stream-request match status vector which must be the same
    *                 size as the match tree vector (see above).
    */
-  MatchStatus matchStatus(const MatchStatusVector& statuses) const { return statuses[my_index_]; }
+  const MatchStatus& matchStatus(const MatchStatusVector& statuses) const {
+    return statuses[my_index_];
+  }
 
 protected:
   const size_t my_index_;
@@ -156,6 +189,16 @@ public:
                               MatchStatusVector& statuses) const override {
     updateLocalStatus(statuses, [&response_trailers](Matcher& m, MatchStatusVector& statuses) {
       m.onHttpResponseTrailers(response_trailers, statuses);
+    });
+  }
+  void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) override {
+    updateLocalStatus(statuses, [&data](Matcher& m, MatchStatusVector& statuses) {
+      m.onRequestBody(data, statuses);
+    });
+  }
+  void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) override {
+    updateLocalStatus(statuses, [&data](Matcher& m, MatchStatusVector& statuses) {
+      m.onResponseBody(data, statuses);
     });
   }
 
@@ -212,6 +255,8 @@ public:
   void onHttpRequestTrailers(const Http::RequestTrailerMap&, MatchStatusVector&) const override {}
   void onHttpResponseHeaders(const Http::ResponseHeaderMap&, MatchStatusVector&) const override {}
   void onHttpResponseTrailers(const Http::ResponseTrailerMap&, MatchStatusVector&) const override {}
+  void onRequestBody(const Buffer::Instance&, MatchStatusVector&) override {}
+  void onResponseBody(const Buffer::Instance&, MatchStatusVector&) override {}
 };
 
 /**
@@ -295,6 +340,113 @@ public:
   void onHttpResponseTrailers(const Http::ResponseTrailerMap& response_trailers,
                               MatchStatusVector& statuses) const override {
     matchHeaders(response_trailers, statuses);
+  }
+};
+
+/**
+ * Base class for body matchers.
+ */
+class HttpBodyMatcherBase : public SimpleMatcher {
+public:
+  HttpBodyMatcherBase(const std::vector<MatcherPtr>& matchers) : SimpleMatcher(matchers) {}
+
+protected:
+  // Limit search to specified number of bytes.
+  // Value equal to zero means no limit.
+  uint32_t limit_{};
+};
+
+/**
+ * Context is used by HttpGenericBodyMatcher to:
+ * - track how many bytes has been processed
+ * - track patterns which have been found
+ * - store last several seen bytes of the HTTP body (when pattern starts at the end of previous body
+ *   chunk and continues at the beginning of the next body chunk)
+ */
+class HttpGenericBodyMatcherCtx : public MatcherCtx {
+public:
+  HttpGenericBodyMatcherCtx(const std::shared_ptr<std::vector<std::string>>& patterns,
+                            size_t overlap_size)
+      : patterns_(patterns) {
+    // Initialize overlap_ buffer's capacity to fit the longest pattern - 1.
+    // The length of the longest pattern is known and passed here as overlap_size.
+    patterns_index_.resize(patterns_->size());
+    std::iota(patterns_index_.begin(), patterns_index_.end(), 0);
+    overlap_.reserve(overlap_size);
+    capacity_ = overlap_size;
+  }
+  ~HttpGenericBodyMatcherCtx() override = default;
+
+  // The context is initialized per each http request. The patterns_
+  // shared pointer attaches to matcher's list of patterns, so patterns
+  // can be referenced without copying data.
+  const std::shared_ptr<const std::vector<std::string>> patterns_;
+  // List stores indexes of patterns in patterns_ shared memory which
+  // still need to be located in the body. When a pattern is found
+  // its index is removed from the list.
+  // When all patterns have been found, the list is empty.
+  std::list<uint32_t> patterns_index_;
+  // Buffer to store the last bytes from previous body chunk(s).
+  // It will store only as many bytes as is the length of the longest
+  // pattern to be found minus 1.
+  // It is necessary to locate patterns which are spread across 2 or more
+  // body chunks.
+  std::vector<char> overlap_;
+  // capacity_ tells how many bytes should be buffered. overlap_'s initial
+  // capacity is set to the length of the longest pattern - 1. As patterns
+  // are found, there is a possibility that not as many bytes are required to be buffered.
+  // It must be tracked outside of vector, because vector::reserve does not
+  // change capacity when new value is lower than current capacity.
+  uint32_t capacity_{};
+  // processed_bytes_ tracks how many bytes of HTTP body have been processed.
+  uint32_t processed_bytes_{};
+};
+
+class HttpGenericBodyMatcher : public HttpBodyMatcherBase {
+public:
+  HttpGenericBodyMatcher(const envoy::config::tap::v3::HttpGenericBodyMatch& config,
+                         const std::vector<MatcherPtr>& matchers);
+
+protected:
+  void onBody(const Buffer::Instance&, MatchStatusVector&);
+  void onNewStream(MatchStatusVector& statuses) const override {
+    // Allocate a new context used for the new stream.
+    statuses[my_index_].ctx_ =
+        std::make_unique<HttpGenericBodyMatcherCtx>(patterns_, overlap_size_);
+    statuses[my_index_].matches_ = false;
+    statuses[my_index_].might_change_status_ = true;
+  }
+  bool locatePatternAcrossChunks(const std::string& pattern, const Buffer::Instance& data,
+                                 const HttpGenericBodyMatcherCtx* ctx);
+  void bufferLastBytes(const Buffer::Instance& data, HttpGenericBodyMatcherCtx* ctx);
+
+  size_t calcLongestPatternSize(const std::list<uint32_t>& indexes) const;
+  void resizeOverlapBuffer(HttpGenericBodyMatcherCtx* ctx);
+
+private:
+  // The following fields are initialized based on matcher config and are used
+  // by all HTTP tappers.
+  // List of strings which body must contain to get match.
+  std::shared_ptr<std::vector<std::string>> patterns_;
+  // Stores the length of the longest pattern.
+  size_t overlap_size_{};
+};
+
+class HttpRequestGenericBodyMatcher : public HttpGenericBodyMatcher {
+public:
+  using HttpGenericBodyMatcher::HttpGenericBodyMatcher;
+
+  void onRequestBody(const Buffer::Instance& data, MatchStatusVector& statuses) override {
+    onBody(data, statuses);
+  }
+};
+
+class HttpResponseGenericBodyMatcher : public HttpGenericBodyMatcher {
+public:
+  using HttpGenericBodyMatcher::HttpGenericBodyMatcher;
+
+  void onResponseBody(const Buffer::Instance& data, MatchStatusVector& statuses) override {
+    onBody(data, statuses);
   }
 };
 

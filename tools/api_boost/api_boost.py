@@ -44,7 +44,8 @@ def ApiBoostFile(llvm_include_path, debug_log, path):
     result = sp.run([
         './bazel-bin/external/envoy_dev/clang_tools/api_booster/api_booster',
         '--extra-arg-before=-xc++',
-        '--extra-arg=-isystem%s' % llvm_include_path, '--extra-arg=-Wno-undefined-internal', path
+        '--extra-arg=-isystem%s' % llvm_include_path, '--extra-arg=-Wno-undefined-internal',
+        '--extra-arg=-Wno-old-style-cast', path
     ],
                     capture_output=True,
                     check=True)
@@ -100,8 +101,7 @@ def ApiBoostTree(target_paths,
   # tool in place before we can start boosting.
   if generate_compilation_database:
     print('Building compilation database for %s' % dep_build_targets)
-    sp.run(['./tools/gen_compilation_database.py', '--run_bazel_build', '--include_headers'] +
-           dep_build_targets,
+    sp.run(['./tools/gen_compilation_database.py', '--include_headers'] + dep_build_targets,
            check=True)
 
   if build_api_booster:

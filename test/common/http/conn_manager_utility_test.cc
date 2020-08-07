@@ -4,6 +4,7 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/common/random_generator.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -36,7 +37,7 @@ namespace Http {
 
 class MockRequestIDExtension : public RequestIDExtension {
 public:
-  explicit MockRequestIDExtension(Runtime::RandomGenerator& random)
+  explicit MockRequestIDExtension(Random::RandomGenerator& random)
       : real_(RequestIDExtensionFactory::defaultInstance(random)) {
     ON_CALL(*this, set(_, _))
         .WillByDefault([this](Http::RequestHeaderMap& request_headers, bool force) {
@@ -134,6 +135,7 @@ public:
   MOCK_METHOD(Tracing::HttpTracerSharedPtr, tracer, ());
   MOCK_METHOD(ConnectionManagerListenerStats&, listenerStats, ());
   MOCK_METHOD(bool, proxy100Continue, (), (const));
+  MOCK_METHOD(bool, streamErrorOnInvalidHttpMessaging, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
   MOCK_METHOD(bool, shouldNormalizePath, (), (const));
   MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
@@ -195,7 +197,7 @@ public:
   }
 
   NiceMock<Network::MockConnection> connection_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   std::shared_ptr<NiceMock<MockRequestIDExtension>> request_id_extension_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
@@ -237,14 +239,16 @@ TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
     Network::MockConnection connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
-    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+    EXPECT_EQ(Utility::AlpnNames::get().Http2,
+              ConnectionManagerUtility::determineNextProtocol(connection, data));
   }
 
   {
     Network::MockConnection connection;
     EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
     Buffer::OwnedImpl data("PRI * HTTP/2");
-    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+    EXPECT_EQ(Utility::AlpnNames::get().Http2,
+              ConnectionManagerUtility::determineNextProtocol(connection, data));
   }
 
   {
@@ -606,7 +610,7 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
   }
 
   {
-    Runtime::RandomGeneratorImpl rand;
+    Random::RandomGeneratorImpl rand;
     TestRequestHeaderMapImpl headers{{"x-client-trace-id", "trace-id"}};
     const std::string uuid = rand.uuid();
     EXPECT_CALL(random_, uuid()).WillOnce(Return(uuid));

@@ -63,6 +63,15 @@ public:
   virtual ~Instance() = default;
 
   /**
+   * Register function to call when the last byte in the last slice of this
+   * buffer has fully drained. Note that slices may be transferred to
+   * downstream buffers, drain trackers are transferred along with the bytes
+   * they track so the function is called only after the last byte is drained
+   * from all buffers.
+   */
+  virtual void addDrainTracker(std::function<void()> drain_tracker) PURE;
+
+  /**
    * Copy data into the buffer (deprecated, use absl::string_view variant
    * instead).
    * TODO(htuch): Cleanup deprecated call sites.
@@ -181,9 +190,22 @@ public:
    * @param data supplies the data to search for.
    * @param size supplies the length of the data to search for.
    * @param start supplies the starting index to search from.
+   * @param length limits the search to specified number of bytes starting from start index.
+   * When length value is zero, entire length of data from starting index to the end is searched.
    * @return the index where the match starts or -1 if there is no match.
    */
-  virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
+  virtual ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const PURE;
+
+  /**
+   * Search for an occurrence of data within entire buffer.
+   * @param data supplies the data to search for.
+   * @param size supplies the length of the data to search for.
+   * @param start supplies the starting index to search from.
+   * @return the index where the match starts or -1 if there is no match.
+   */
+  ssize_t search(const void* data, uint64_t size, size_t start) const {
+    return search(data, size, start, 0);
+  }
 
   /**
    * Search for an occurrence of data at the start of a buffer.

@@ -17,10 +17,10 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class LoadStatsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {
     // We rely on some fairly specific load balancing picks in this test, so
     // determinize the schedule.
     setDeterministic();
@@ -112,6 +112,7 @@ public:
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
       loadstats_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
       loadstats_config->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("load_report");
+      loadstats_config->set_transport_api_version(apiVersion());
       auto* load_report_cluster = bootstrap.mutable_static_resources()->add_clusters();
       load_report_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       load_report_cluster->mutable_circuit_breakers()->Clear();
@@ -237,10 +238,11 @@ public:
     }
   }
 
-  void
+  ABSL_MUST_USE_RESULT AssertionResult
   waitForLoadStatsRequest(const std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats>&
                               expected_locality_stats,
                           uint64_t dropped = 0) {
+    auto end_time = timeSystem().monotonicTime() + TestUtility::DefaultTimeout;
     Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats;
     if (!expected_locality_stats.empty() || dropped != 0) {
       auto* cluster_stats = expected_cluster_stats.Add();
@@ -282,11 +284,18 @@ public:
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
       EXPECT_EQ("POST", loadstats_stream_->headers().getMethodValue());
-      EXPECT_EQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",
-                loadstats_stream_->headers().getPathValue());
+      EXPECT_EQ(
+          TestUtility::getVersionedMethodPath("envoy.service.load_stats.{}.LoadReportingService",
+                                              "StreamLoadStats", apiVersion()),
+          loadstats_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", loadstats_stream_->headers().getContentTypeValue());
+      if (timeSystem().monotonicTime() >= end_time) {
+        return TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
+                                                        loadstats_request.cluster_stats(), true);
+      }
     } while (!TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
                                                        loadstats_request.cluster_stats(), true));
+    return testing::AssertionSuccess();
   }
 
   void waitForUpstreamResponse(uint32_t endpoint_index, uint32_t response_code = 200) {
@@ -376,9 +385,8 @@ public:
   const uint32_t load_report_interval_ms_ = 500;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LoadStatsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.
@@ -386,7 +394,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   initialize();
 
   waitForLoadStatsStream();
-  waitForLoadStatsRequest({});
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
   loadstats_stream_->startGrpcStream();
 
   // Simple 50%/50% split between dragon/winter localities. Also include an
@@ -400,8 +408,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   }
 
   // Verify we do not get empty stats for non-zero priorities.
-  waitForLoadStatsRequest(
-      {localityStats("winter", 2, 0, 0, 2), localityStats("dragon", 2, 0, 0, 2)});
+  ASSERT_TRUE(waitForLoadStatsRequest(
+      {localityStats("winter", 2, 0, 0, 2), localityStats("dragon", 2, 0, 0, 2)}));
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   // On slow machines, more than one load stats response may be pushed while we are simulating load.
@@ -419,8 +427,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   // No locality for priority=1 since there's no "winter" endpoints.
   // The hosts for dragon were received because membership_total is accurate.
-  waitForLoadStatsRequest(
-      {localityStats("winter", 2, 0, 0, 2), localityStats("dragon", 4, 0, 0, 4)});
+  ASSERT_TRUE(waitForLoadStatsRequest(
+      {localityStats("winter", 2, 0, 0, 2), localityStats("dragon", 4, 0, 0, 4)}));
 
   EXPECT_EQ(2, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(3, test_server_->counter("load_reporter.responses")->value());
@@ -435,8 +443,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
     sendAndReceiveUpstream(i % 2 + 3);
   }
 
-  waitForLoadStatsRequest(
-      {localityStats("winter", 2, 0, 0, 2, 1), localityStats("dragon", 2, 0, 0, 2, 1)});
+  ASSERT_TRUE(waitForLoadStatsRequest(
+      {localityStats("winter", 2, 0, 0, 2, 1), localityStats("dragon", 2, 0, 0, 2, 1)}));
   EXPECT_EQ(3, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(4, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
@@ -450,7 +458,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
     sendAndReceiveUpstream(1);
   }
 
-  waitForLoadStatsRequest({localityStats("winter", 1, 0, 0, 1)});
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 1, 0, 0, 1)}));
   EXPECT_EQ(4, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(5, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
@@ -463,7 +471,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   sendAndReceiveUpstream(1);
   sendAndReceiveUpstream(1);
 
-  waitForLoadStatsRequest({localityStats("winter", 3, 0, 0, 3)});
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 3, 0, 0, 3)}));
 
   EXPECT_EQ(6, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(6, test_server_->counter("load_reporter.responses")->value());
@@ -477,7 +485,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   sendAndReceiveUpstream(1);
   sendAndReceiveUpstream(1);
 
-  waitForLoadStatsRequest({localityStats("winter", 2, 0, 0, 2)});
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 2, 0, 0, 2)}));
 
   EXPECT_EQ(8, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(7, test_server_->counter("load_reporter.responses")->value());
@@ -494,7 +502,7 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   initialize();
 
   waitForLoadStatsStream();
-  waitForLoadStatsRequest({});
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
 
   loadstats_stream_->startGrpcStream();
   requestLoadStatsResponse({"cluster_0"});
@@ -512,8 +520,8 @@ TEST_P(LoadStatsIntegrationTest, LocalityWeighted) {
   sendAndReceiveUpstream(0);
 
   // Verify we get the expect request distribution.
-  waitForLoadStatsRequest(
-      {localityStats("winter", 4, 0, 0, 4), localityStats("dragon", 2, 0, 0, 2)});
+  ASSERT_TRUE(waitForLoadStatsRequest(
+      {localityStats("winter", 4, 0, 0, 4), localityStats("dragon", 2, 0, 0, 2)}));
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   // On slow machines, more than one load stats response may be pushed while we are simulating load.
@@ -529,7 +537,7 @@ TEST_P(LoadStatsIntegrationTest, NoLocalLocality) {
   initialize();
 
   waitForLoadStatsStream();
-  waitForLoadStatsRequest({});
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
   loadstats_stream_->startGrpcStream();
 
   // Simple 50%/50% split between dragon/winter localities. Also include an
@@ -546,8 +554,8 @@ TEST_P(LoadStatsIntegrationTest, NoLocalLocality) {
   // order of locality stats is different to the Success case, where winter is
   // the local locality (and hence first in the list as per
   // HostsPerLocality::get()).
-  waitForLoadStatsRequest(
-      {localityStats("dragon", 2, 0, 0, 2), localityStats("winter", 2, 0, 0, 2)});
+  ASSERT_TRUE(waitForLoadStatsRequest(
+      {localityStats("dragon", 2, 0, 0, 2), localityStats("winter", 2, 0, 0, 2)}));
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   // On slow machines, more than one load stats response may be pushed while we are simulating load.
@@ -562,7 +570,7 @@ TEST_P(LoadStatsIntegrationTest, Error) {
   initialize();
 
   waitForLoadStatsStream();
-  waitForLoadStatsRequest({});
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
   loadstats_stream_->startGrpcStream();
 
   requestLoadStatsResponse({"cluster_0"});
@@ -574,7 +582,7 @@ TEST_P(LoadStatsIntegrationTest, Error) {
   // This should count as "success" since non-5xx.
   sendAndReceiveUpstream(0, 404);
 
-  waitForLoadStatsRequest({localityStats("winter", 1, 1, 0, 2)});
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 1, 1, 0, 2)}));
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
@@ -588,13 +596,13 @@ TEST_P(LoadStatsIntegrationTest, InProgress) {
   initialize();
 
   waitForLoadStatsStream();
-  waitForLoadStatsRequest({});
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
   loadstats_stream_->startGrpcStream();
   updateClusterLoadAssignment({{0}}, {}, {}, {});
 
   requestLoadStatsResponse({"cluster_0"});
   initiateClientConnection();
-  waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 1)});
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 1)}));
 
   waitForUpstreamResponse(0, 503);
   cleanupUpstreamAndDownstream();
@@ -616,7 +624,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   initialize();
 
   waitForLoadStatsStream();
-  waitForLoadStatsRequest({});
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
   loadstats_stream_->startGrpcStream();
 
   updateClusterLoadAssignment({{0}}, {}, {}, {});
@@ -628,7 +636,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   EXPECT_EQ("503", response_->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
 
-  waitForLoadStatsRequest({}, 1);
+  ASSERT_TRUE(waitForLoadStatsRequest({}, 1));
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());

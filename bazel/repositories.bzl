@@ -125,7 +125,12 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
-        _repository_impl("io_bazel_rules_go")
+        _repository_impl(
+            name = "io_bazel_rules_go",
+            # TODO(wrowe, sunjayBhatia): remove when Windows RBE supports batch file invocation
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:rules_go.patch"],
+        )
         _repository_impl("bazel_gazelle")
 
 def envoy_dependencies(skip_targets = []):
@@ -186,12 +191,17 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_zlib()
     _upb()
+    _proxy_wasm_cpp_sdk()
+    _proxy_wasm_cpp_host()
+    _emscripten_toolchain()
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
+    _repository_impl("com_github_google_flatbuffers")
     _repository_impl("bazel_toolchains")
     _repository_impl("bazel_compdb")
     _repository_impl("envoy_build_tools")
     _repository_impl("rules_cc")
+    _org_unicode_icuuc()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -230,6 +240,7 @@ def _boringssl_fips():
         sha256 = location["sha256"],
         genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
+        patches = ["@envoy//bazel/external:boringssl_fips.patch"],
     )
 
 def _com_github_circonus_labs_libcircllhist():
@@ -372,6 +383,24 @@ def _net_zlib():
 
 def _com_google_cel_cpp():
     _repository_impl("com_google_cel_cpp")
+    _repository_impl("rules_antlr")
+    location = _get_location("antlr4_runtimes")
+    http_archive(
+        name = "antlr4_runtimes",
+        build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "cpp",
+    srcs = glob(["runtime/Cpp/runtime/src/**/*.cpp"]),
+    hdrs = glob(["runtime/Cpp/runtime/src/**/*.h"]),
+    includes = ["runtime/Cpp/runtime/src"],
+)
+""",
+        patch_args = ["-p1"],
+        # Patches ASAN violation of initialization fiasco
+        patches = ["@envoy//bazel:antlr.patch"],
+        **location
+    )
 
 def _com_github_nghttp2_nghttp2():
     location = _get_location("com_github_nghttp2_nghttp2")
@@ -694,6 +723,8 @@ def _com_googlesource_quiche():
 def _com_googlesource_googleurl():
     _repository_impl(
         name = "com_googlesource_googleurl",
+        patches = ["@envoy//bazel/external:googleurl.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "googleurl",
@@ -739,6 +770,16 @@ def _com_github_grpc_grpc():
         actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
     )
 
+    native.bind(
+        name = "grpc_alts_handshaker_proto",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
+    )
+
+    native.bind(
+        name = "grpc_alts_transport_security_common_proto",
+        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
+    )
+
 def _upb():
     _repository_impl(
         name = "upb",
@@ -749,6 +790,22 @@ def _upb():
     native.bind(
         name = "upb_lib",
         actual = "@upb//:upb",
+    )
+
+def _proxy_wasm_cpp_sdk():
+    _repository_impl(name = "proxy_wasm_cpp_sdk")
+
+def _proxy_wasm_cpp_host():
+    _repository_impl(
+        name = "proxy_wasm_cpp_host",
+        build_file = "@envoy//bazel/external:proxy_wasm_cpp_host.BUILD",
+    )
+
+def _emscripten_toolchain():
+    _repository_impl(
+        name = "emscripten_toolchain",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_cmds = REPOSITORY_LOCATIONS["emscripten_toolchain"]["patch_cmds"],
     )
 
 def _com_github_google_jwt_verify():
@@ -796,7 +853,6 @@ def _com_github_gperftools_gperftools():
     http_archive(
         name = "com_github_gperftools_gperftools",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_cmds = ["./autogen.sh"],
         **location
     )
 
@@ -841,6 +897,12 @@ filegroup(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
         **_get_location("kafka_python_client")
+    )
+
+def _org_unicode_icuuc():
+    _repository_impl(
+        name = "org_unicode_icuuc",
+        build_file = "@envoy//bazel/external:icuuc.BUILD",
     )
 
 def _foreign_cc_dependencies():
