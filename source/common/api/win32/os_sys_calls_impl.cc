@@ -347,8 +347,8 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
 SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, struct sockaddr* addr,
                                            socklen_t* addrlen, int flags) {
   const os_fd_t rc = ::accept(sockfd, addr, addrlen);
-  if (rc > 0 && (flags & SOCK_NONBLOCK)) {
-    setsocketblocking(sockfd, false);
+  if (rc > 0 && (flags & ENVOY_SOCK_NONBLOCK)) {
+    setsocketblocking(rc, false);
   }
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }

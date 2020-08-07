@@ -189,14 +189,21 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
 
 SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, struct sockaddr* addr,
                                            socklen_t* addrlen, int flags) {
-  os_fd_t rc = ::accept4(sockfd, addr, addrlen, flags);
+  os_fd_t rc;
+
+#if defined(__linux__)
+  rc = ::accept4(sockfd, addr, addrlen, flags);
   // If failed with EINVAL try without flags
-  if (rc < 0 && errno == EINVAL) {
-    rc = ::accept(sockfd, addr, addrlen);
-    if (rc > 0 && (flags & SOCK_NONBLOCK)) {
-      setsocketblocking(sockfd, false);
-    }
+  if (rc >= 0 || errno != EINVAL) {
+    return {rc, rc != -1 ? 0 : errno};
   }
+#endif
+
+  rc = ::accept(sockfd, addr, addrlen);
+  if (rc >= 0 && (flags & ENVOY_SOCK_NONBLOCK)) {
+    setsocketblocking(rc, false);
+  }
+
   return {rc, rc != -1 ? 0 : errno};
 }
 

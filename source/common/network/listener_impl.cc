@@ -14,8 +14,6 @@
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 
-#include "event2/listener.h"
-
 namespace Envoy {
 namespace Network {
 
@@ -55,7 +53,7 @@ void ListenerImpl::onSocketEvent(short flags) {
     socklen_t remote_addr_len = sizeof(remote_addr);
 
     IoHandlePtr io_handle = socket_->ioHandle().accept(
-        reinterpret_cast<struct sockaddr*>(&remote_addr), &remote_addr_len, SOCK_NONBLOCK);
+        reinterpret_cast<struct sockaddr*>(&remote_addr), &remote_addr_len, ENVOY_SOCK_NONBLOCK);
     if (io_handle == nullptr) {
       break;
     }
@@ -121,7 +119,7 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr so
 
 ListenerImpl::~ListenerImpl() {
   if (file_event_.get()) {
-    disable();
+    file_event_->setEnabled(0);
     file_event_.reset();
   }
 }
