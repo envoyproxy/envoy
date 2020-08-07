@@ -99,7 +99,7 @@ run_example_cors () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test service"
-    curl http://localhost:8000
+    curl -s http://localhost:8000 | grep "Envoy CORS Webpage"
 
     run_log "$name" "Test cors server: disabled"
     curl -s -H "Origin: http://example.com" http://localhost:8002/cors/disabled | grep Success
@@ -134,13 +134,13 @@ run_example_csrf () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test services"
-    curl http://localhost:8002
-    curl http://localhost:8000
+    curl -s http://localhost:8002 | grep "Envoy CSRF Demo"
+    curl -s http://localhost:8000 | grep "Envoy CSRF Demo"
 
     run_log "$name" "Test stats server"
-    curl http://localhost:8001/stats
+    curl -s http://localhost:8001/stats | grep ":"
 
-    run_log "$name" "Test cors server: disabled"
+    run_log "$name" "Test csrf server: disabled"
     curl -s -H "Origin: http://example.com" -X POST \
 	 http://localhost:8000/csrf/disabled \
 	| grep Success
@@ -148,7 +148,7 @@ run_example_csrf () {
 	 --head http://localhost:8000/csrf/disabled \
 	| grep "access-control-allow-origin: http://example.com"
 
-    run_log "$name" "Test cors server: shadow"
+    run_log "$name" "Test csrf server: shadow"
     curl -s -H "Origin: http://example.com" -X POST \
 	 http://localhost:8000/csrf/shadow \
 	| grep Success
@@ -156,7 +156,7 @@ run_example_csrf () {
 	 --head http://localhost:8000/csrf/shadow \
 	| grep "access-control-allow-origin: http://example.com"
 
-    run_log "$name" "Test cors server: enabled"
+    run_log "$name" "Test csrf server: enabled"
     curl -s -H "Origin: http://example.com" -X POST \
 	 http://localhost:8000/csrf/enabled \
 	| grep "Invalid origin"
@@ -164,7 +164,7 @@ run_example_csrf () {
 	 --head http://localhost:8000/csrf/enabled \
 	| grep "HTTP/1.1 403 Forbidden"
 
-    run_log "$name" "Test cors server: additional_origin"
+    run_log "$name" "Test csrf server: additional_origin"
     curl -s -H "Origin: http://example.com" -X POST \
 	 http://localhost:8000/csrf/additional_origin \
 	| grep Success
@@ -183,7 +183,7 @@ run_example_ext_authz () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test services responds with 403"
-    curl -v localhost:8000/service 2> >(grep -v Expire)
+    curl -v localhost:8000/service 2> >(grep -v Expire) | grep "HTTP/1.1 403 Forbidden"
 
     run_log "$name" "Restart front-envoy with FRONT_ENVOY_YAML=config/http-service.yaml"
     docker-compose down
@@ -191,10 +191,14 @@ run_example_ext_authz () {
     sleep 10
 
     run_log "$name" "Test service responds with 403"
-    curl -v localhost:8000/service  2> >(grep -v Expire)
+    curl -v localhost:8000/service \
+	 2> >(grep -v Expire) \
+	| grep "HTTP/1.1 403 Forbidden"
 
     run_log "$name" "Test authenticated service responds with 200"
-    curl -v -H "Authorization: Bearer token1" localhost:8000/service 2> >(grep -v Expire)
+    curl -v -H "Authorization: Bearer token1" localhost:8000/service \
+	 2> >(grep -v Expire) \
+	| grep "HTTP/1.1 200 OK"
 
     run_log "$name" "Restart front-envoy with FRONT_ENVOY_YAML=config/opa-service/v2.yaml"
     docker-compose down
@@ -202,36 +206,53 @@ run_example_ext_authz () {
     sleep 10
 
     run_log "$name" "Test OPA service responds with 200"
-    curl localhost:8000/service --verbose 2> >(grep -v Expire)
+    curl -v localhost:8000/service \
+	 2> >(grep -v Expire) \
+	| grep "HTTP/1.1 200 OK"
 
     run_log "$name" "Check OPA logs"
     docker-compose logs ext_authz-opa-service | grep decision_id -A 30
 
     run_log "$name" "Check OPA service rejects POST"
-    curl -X POST localhost:8000/service --verbose 2> >(grep -v Expire)
+    curl -v -X POST localhost:8000/service \
+	 2> >(grep -v Expire) \
+	| grep "HTTP/1.1 403 Forbidden"
 
     cleanup "$name" "$paths"
 }
 
 _fault_injection_test () {
-    local action code name
+    local action code existing_200s existing_codes name
     action="$1"
     code="$2"
     name=fault_injection
+    existing_codes=0
 
+    # enable fault injection and check for http hits of type $code
+    existing_codes=$(docker-compose logs | grep -c "HTTP/1.1\" ${code}" || :)
     run_log "$name" "Enable ${action} fault injection"
     docker-compose exec envoy bash "enable_${action}_fault_injection.sh"
     run_log "$name" "Send requests for 20 seconds"
     docker-compose exec envoy bash -c "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" > /dev/null
     run_log "$name" "Check logs again"
-    docker-compose logs | grep "HTTP/1.1\" ${code}"
+    new_codes=$(docker-compose logs | grep -c "HTTP/1.1\" ${code}")
+    if [ "$new_codes" -le "$existing_codes" ]; then
+	echo "FAULT INJECTION TEST FAILED: $code $new_codes $existing_codes"
+	return 1
+    fi
 
+    # disable fault injection and check for http hits of type 200
+    existing_200s=$(docker-compose logs | grep -c "HTTP/1.1\" 200")
     run_log "$name" "Disable ${action} fault injection"
     docker-compose exec envoy bash "disable_${action}_fault_injection.sh"
     run_log "$name" "Send requests for 20 seconds"
     docker-compose exec envoy bash -c "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" > /dev/null
     run_log "$name" "Check logs again"
-    docker-compose logs | grep "HTTP/1.1\" 200"
+    new_200s=$(docker-compose logs | grep -c "HTTP/1.1\" 200")
+    if [ "$new_200s" -le "$existing_200s" ]; then
+	echo "FAULT INJECTION DISABLE TEST FAILED: $code $new_codes $existing_codes"
+	return 1
+    fi
 }
 
 run_example_fault_injection () {
@@ -242,7 +263,9 @@ run_example_fault_injection () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Send requests for 20 seconds"
-    docker-compose exec envoy bash -c "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" > /dev/null
+    docker-compose exec envoy bash -c \
+		   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
+		   > /dev/null
     run_log "$name" "Check logs"
     docker-compose logs | grep "HTTP/1.1\" 200"
 
@@ -251,6 +274,40 @@ run_example_fault_injection () {
 
     run_log "$name" "Check tree"
     docker-compose exec envoy tree /srv/runtime
+
+    cleanup "$name" "$paths"
+}
+
+run_example_front_proxy () {
+    local name paths
+    name=front_proxy
+    paths=front-proxy
+    bring_up_example "$name" "$paths"
+
+    run_log "$name" "Test service: localhost:8080/service/1"
+    curl -s localhost:8080/service/1 | grep Hello | grep "service 1"
+    run_log "$name" "Test service: localhost:8080/service/2"
+    curl -s localhost:8080/service/2 | grep Hello | grep "service 2"
+    run_log "$name" "Test service: https://localhost:8443/service/1"
+    curl -sk https://localhost:8443/service/1 | grep Hello | grep "service 1"
+
+    run_log "$name" "Scale up docker service1=3"
+    docker-compose scale service1=3
+    run_log "$name" "Snooze for 5 while docker-compose scales..."
+    sleep 5
+
+    run_log "$name" "Test round-robin localhost:8080/service/1"
+    docker-compose exec front-envoy bash -c "\
+    		   curl localhost:8080/service/1 \
+		   && curl localhost:8080/service/1 \
+		   && curl localhost:8080/service/1" \
+		   | grep Hello | grep "service 1"
+    run_log "$name" "Test service inside front-envoy: localhost:8080/service/2"
+    docker-compose exec front-envoy curl -s localhost:8080/service/2 | grep Hello | grep "service 2"
+    run_log "$name" "Test service info: localhost:8080/server_info"
+    docker-compose exec front-envoy curl localhost:8001/server_info | jq '.'
+    run_log "$name" "Test service stats: localhost:8080/stats"
+    docker-compose exec front-envoy curl localhost:8001/stats | grep ":"
 
     cleanup "$name" "$paths"
 }
@@ -289,10 +346,10 @@ run_example_jaeger_native_tracing () {
     bring_up_example "$name" "$paths" 10
 
     run_log "$name" "Test services"
-    curl -v localhost:8000/trace/1  2> >(grep -v Expire)
+    curl -s localhost:8000/trace/1 | grep Hello
 
     run_log "$name" "Test Jaeger UI"
-    curl http://localhost:16686 2> >(grep -v Expire)
+    curl -s http://localhost:16686 | grep "<!doctype html>"
 
     cleanup "$name" "$paths"
 }
@@ -305,15 +362,15 @@ run_example_jaeger_tracing () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test services"
-    curl -v localhost:8000/trace/1  2> >(grep -v Expire)
+    curl -s localhost:8000/trace/1 | grep Hello
 
     run_log "$name" "Test Jaeger UI"
-    curl http://localhost:16686 2> >(grep -v Expire)
+    curl -s http://localhost:16686 | grep "<!doctype html>"
 
     cleanup "$name" "$paths"
 }
 
-run_example_load_reporting () {
+run_example_load_reporting_service () {
     local name paths
     name=load_reporting
     paths=load-reporting-service
@@ -329,7 +386,7 @@ run_example_load_reporting () {
     docker-compose logs http_service | grep http_service_2 | grep HTTP | grep 200
 
     run_log "$name" "Check logs: lrs_server"
-    docker-compose logs lrs_server
+    docker-compose logs lrs_server | grep "up and running"
 
     cleanup load_reporting "$paths"
 }
@@ -341,7 +398,7 @@ run_example_lua () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test connection"
-    curl -v localhost:8000 2> >(grep -v Expire)
+    curl -s localhost:8000 | grep foo
 
     cleanup "$name" "$paths"
 }
@@ -363,10 +420,31 @@ run_example_mysql () {
     "${mysql_client[@]}" -e "SELECT COUNT(*) from test.test;"
 
     run_log "$name" "Check mysql egress stats"
-    curl -s http://localhost:8001/stats?filter=egress_mysql
+    curl -s http://localhost:8001/stats?filter=egress_mysql | grep egress_mysql
 
     run_log "$name" "Check mysql TCP stats"
-    curl -s http://localhost:8001/stats?filter=mysql_tcp
+    curl -s http://localhost:8001/stats?filter=mysql_tcp | grep mysql_tcp
+
+    cleanup "$name" "$paths"
+}
+
+run_example_redis () {
+    local name paths
+    name=redis
+    paths=redis
+    bring_up_example "$name" "$paths"
+
+    run_log "$name" "Test set"
+    redis-cli -h localhost -p 1999 set foo FOO | grep OK
+    redis-cli -h localhost -p 1999 set bar BAR | grep OK
+
+    run_log "$name" "Test get"
+    redis-cli -h localhost -p 1999 get foo | grep FOO
+    redis-cli -h localhost -p 1999 get bar | grep BAR
+
+    run_log "$name" "Test redis stats"
+    curl -s "http://localhost:8001/stats?usedonly&filter=redis.egress_redis.command" \
+	| grep egress_redis
 
     cleanup "$name" "$paths"
 }
@@ -378,46 +456,12 @@ run_example_zipkin_tracing () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test connection"
-    curl -v localhost:8000/trace/1  2> >(grep -v Expire)
+    curl -s http://localhost:8000/trace/1 | grep Hello | grep "service 1"
 
     run_log "$name" "Test dashboard"
-    # this could do with using a healthcheck and waiting
+    # this could do with using the healthcheck and waiting
     sleep 20
-    curl localhost:9411/zipkin/
-
-    cleanup "$name" "$paths"
-}
-
-run_example_front_proxy () {
-    local name paths
-    name=front_proxy
-    paths=front-proxy
-    bring_up_example "$name" "$paths"
-
-    run_log "$name" "Test service: localhost:8080/service/1"
-    curl -v localhost:8080/service/1 2> >(grep -v Expire)
-    run_log "$name" "Test service: localhost:8080/service/2"
-    curl -v localhost:8080/service/2 2> >(grep -v Expire)
-    run_log "$name" "Test service: https://localhost:8443/service/1 -k -v"
-    curl https://localhost:8443/service/1 -k -v 2> >(grep -v Expire)
-    run_log "$name" "Scale up docker service1=3"
-    docker-compose scale service1=3
-
-    run_log "$name" "Snooze for 5 while docker-compose scales..."
-    sleep 5
-
-    curl -v localhost:8080/service/1 2> >(grep -v Expire)
-    run_log "$name" "Test round-robin localhost:8080/service/1"
-    docker-compose exec front-envoy bash -c "\
-    		   curl localhost:8080/service/1 \
-		   && curl localhost:8080/service/1 \
-		   && curl localhost:8080/service/1"
-    run_log "$name" "Test service: localhost:8080/service/2"
-    docker-compose exec front-envoy curl localhost:8080/service/2 2> >(grep -v Expire)
-    run_log "$name" "Test service info: localhost:8080/server_info"
-    docker-compose exec front-envoy curl localhost:8001/server_info | jq '.'
-    run_log "$name" "Test service stats: localhost:8080/stats"
-    docker-compose exec front-envoy curl localhost:8001/stats
+    curl -s http://localhost:9411/zipkin/ | grep "<!doctype html>"
 
     cleanup "$name" "$paths"
 }
