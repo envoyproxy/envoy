@@ -31,8 +31,10 @@ using Seconds = std::chrono::seconds;
 class LookupRequestTest : public testing::TestWithParam<LookupRequestTestCase> {
 public:
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  Http::TestRequestHeaderMapImpl request_headers_{
-      {":path", "/"}, {"x-forwarded-proto", "https"}, {":authority", "example.com"}};
+  Http::TestRequestHeaderMapImpl request_headers_{{":path", "/"},
+                                                  {":method", "GET"},
+                                                  {"x-forwarded-proto", "https"},
+                                                  {":authority", "example.com"}};
 
   static const SystemTime& currentTime() {
     CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());
@@ -159,7 +161,8 @@ INSTANTIATE_TEST_SUITE_P(ResultMatchesExpectation, LookupRequestTest,
                          [](const auto& info) { return info.param.test_name; });
 
 TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
-  request_headers_.addCopy("cache-control", GetParam().request_cache_control);
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                   GetParam().request_cache_control);
   const SystemTime request_time = GetParam().request_time, response_time = GetParam().response_time;
   const LookupRequest lookup_request(request_headers_, request_time);
   const Http::TestResponseHeaderMapImpl response_headers(
@@ -176,7 +179,8 @@ TEST_P(LookupRequestTest, ResultWithoutBodyMatchesExpectation) {
 }
 
 TEST_P(LookupRequestTest, ResultWithBodyMatchesExpectation) {
-  request_headers_.addCopy("cache-control", GetParam().request_cache_control);
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl,
+                                   GetParam().request_cache_control);
   const SystemTime request_time = GetParam().request_time, response_time = GetParam().response_time;
   const LookupRequest lookup_request(request_headers_, request_time);
   const Http::TestResponseHeaderMapImpl response_headers(
@@ -217,7 +221,7 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
 // "Pragma:no-cache" is equivalent to "Cache-Control:no-cache".
 // https://httpwg.org/specs/rfc7234.html#header.pragma
 TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
-  request_headers_.addCopy("pragma", "no-cache");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
   const LookupRequest lookup_request(request_headers_, currentTime());
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
@@ -227,7 +231,8 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallback) {
 }
 
 TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
-  request_headers_.addCopy("pragma", "no-cache, custom-directive=custom-value");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma,
+                                   "no-cache, custom-directive=custom-value");
   const LookupRequest lookup_request(request_headers_, currentTime());
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
@@ -237,7 +242,7 @@ TEST_F(LookupRequestTest, PragmaNoCacheFallbackExtraDirectivesIgnored) {
 }
 
 TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
-  request_headers_.addCopy("pragma", "max-age=0");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "max-age=0");
   const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
@@ -247,8 +252,8 @@ TEST_F(LookupRequestTest, PragmaFallbackOtherValuesIgnored) {
 }
 
 TEST_F(LookupRequestTest, PragmaNoFallback) {
-  request_headers_.addCopy("pragma", "no-cache");
-  request_headers_.addCopy("cache-control", "max-age=10");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().Pragma, "no-cache");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-age=10");
   const LookupRequest lookup_request(request_headers_, currentTime() + std::chrono::seconds(5));
   const Http::TestResponseHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(currentTime())}, {"cache-control", "public, max-age=3600"}});
@@ -258,8 +263,7 @@ TEST_F(LookupRequestTest, PragmaNoFallback) {
 }
 
 TEST_F(LookupRequestTest, SatisfiableRange) {
-  // add method (GET) and range to headers
-  request_headers_.addReference(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get);
+  // add range to headers
   request_headers_.addReference(Http::Headers::get().Range, "bytes=1-99,3-,-2");
   const LookupRequest lookup_request(request_headers_, currentTime());
 
@@ -295,8 +299,7 @@ TEST_F(LookupRequestTest, SatisfiableRange) {
 }
 
 TEST_F(LookupRequestTest, NotSatisfiableRange) {
-  // add method (GET) and range headers
-  request_headers_.addReference(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get);
+  // add range headers
   request_headers_.addReference(Http::Headers::get().Range, "bytes=5-99,100-");
 
   const LookupRequest lookup_request(request_headers_, currentTime());

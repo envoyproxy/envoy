@@ -1,5 +1,7 @@
 #include "envoy/http/header_map.h"
 
+#include "common/http/headers.h"
+
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
@@ -69,7 +71,7 @@ TEST_F(CacheFilterTest, UncacheableResponse) {
   request_headers_.setHost("UncacheableResponse");
 
   // Responses with "Cache-Control: no-store" are uncacheable
-  response_headers_.setCopy(Http::LowerCaseString("cache-control"), "no-store");
+  response_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-store");
 
   for (int i = 0; i < 2; i++) {
     // Create filter for request i
@@ -164,7 +166,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
     // Decode request 2 header.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                true));
     // Make sure the filter did not encode any data
     EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
@@ -210,7 +212,7 @@ TEST_F(CacheFilterTest, DelayedHitNoBody) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                true));
     // Make sure the filter did not encode any data
     EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
@@ -252,7 +254,7 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                false));
     EXPECT_CALL(
         decoder_callbacks_,
@@ -304,7 +306,7 @@ TEST_F(CacheFilterTest, DelayedHitBody) {
 
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                false));
     EXPECT_CALL(
         decoder_callbacks_,
@@ -340,8 +342,9 @@ TEST_F(CacheFilterTest, ImmediateSuccessfulValidation) {
     // Encode response
 
     // Add Etag & Last-Modified headers to the response for validation
-    response_headers_.addCopy("etag", "abc123");
-    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
 
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
@@ -354,7 +357,7 @@ TEST_F(CacheFilterTest, ImmediateSuccessfulValidation) {
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Make request require validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
 
     // Decode request 2 header
     // Make sure the filter did not encode any headers or data (during decoding)
@@ -391,7 +394,7 @@ TEST_F(CacheFilterTest, ImmediateSuccessfulValidation) {
     updated_response_headers.setDate(not_modified_date);
     EXPECT_THAT(not_modified_response_headers,
                 testing::AllOf(IsSupersetOfHeaders(updated_response_headers),
-                               HeaderHasValueRef("age", "0")));
+                               HeaderHasValueRef(Http::Headers::get().Age, "0")));
 
     // The cache is immediate so everything should be done before CacheFilter::encodeData
     EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
@@ -428,8 +431,9 @@ TEST_F(CacheFilterTest, DelayedSuccessfulValidation) {
     // Encode response
 
     // Add Etag & Last-Modified headers to the response for validation
-    response_headers_.addCopy("etag", "abc123");
-    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
 
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
@@ -442,7 +446,7 @@ TEST_F(CacheFilterTest, DelayedSuccessfulValidation) {
     CacheFilter filter = makeFilter(delayed_cache_);
 
     // Make request require validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
 
     // Decode request 2 header
     // No hit will be found, so the filter should call continueDecoding
@@ -487,7 +491,7 @@ TEST_F(CacheFilterTest, DelayedSuccessfulValidation) {
     updated_response_headers.setDate(not_modified_date);
     EXPECT_THAT(not_modified_response_headers,
                 testing::AllOf(IsSupersetOfHeaders(updated_response_headers),
-                               HeaderHasValueRef("age", "0")));
+                               HeaderHasValueRef(Http::Headers::get().Age, "0")));
 
     // A 304 response should not have a body, so encodeData should not be called
     // However, if a body is present by mistake, encodeData should stop iteration until
@@ -519,8 +523,9 @@ TEST_F(CacheFilterTest, ImmediateUnsuccessfulValidation) {
     // Encode response
 
     // Add Etag & Last-Modified headers to the response for validation
-    response_headers_.addCopy("etag", "abc123");
-    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
 
     const std::string body = "abc";
     Buffer::OwnedImpl buffer(body);
@@ -534,7 +539,7 @@ TEST_F(CacheFilterTest, ImmediateUnsuccessfulValidation) {
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Make request require validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
 
     // Decode request 2 header
     // Make sure the filter did not encode any headers or data (during decoding)
@@ -560,7 +565,7 @@ TEST_F(CacheFilterTest, ImmediateUnsuccessfulValidation) {
     EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
 
     // Check for the cached response headers with updated date
-    EXPECT_THAT(response_headers_, HeaderHasValueRef(":status", "201"));
+    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "201"));
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
@@ -593,8 +598,9 @@ TEST_F(CacheFilterTest, DelayedUnuccessfulValidation) {
     // Encode response
 
     // Add Etag & Last-Modified headers to the response for validation
-    response_headers_.addCopy("etag", "abc123");
-    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, "abc123");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
 
     const std::string body = "abc";
     Buffer::OwnedImpl buffer(body);
@@ -608,7 +614,7 @@ TEST_F(CacheFilterTest, DelayedUnuccessfulValidation) {
     CacheFilter filter = makeFilter(delayed_cache_);
 
     // Make request require validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
 
     // Decode request 2 header
     // No hit will be found, so the filter should call continueDecoding
@@ -641,7 +647,7 @@ TEST_F(CacheFilterTest, DelayedUnuccessfulValidation) {
     EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
 
     // Check for the cached response headers with updated date
-    EXPECT_THAT(response_headers_, HeaderHasValueRef(":status", "201"));
+    EXPECT_THAT(response_headers_, HeaderHasValueRef(Http::Headers::get().Status, "201"));
 
     ::testing::Mock::VerifyAndClearExpectations(&encoder_callbacks_);
 
@@ -681,8 +687,9 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
     filter.decodeHeaders(request_headers_, true);
 
     // Add validation headers to the response
-    response_headers_.addCopy("etag", etag);
-    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
 
     filter.encodeHeaders(response_headers_, true);
   }
@@ -691,7 +698,7 @@ TEST_F(ValidationHeadersTest, EtagAndLastModified) {
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
     filter.decodeHeaders(request_headers_, true);
 
     // Make sure validation conditional headers are added
@@ -711,7 +718,7 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
     filter.decodeHeaders(request_headers_, true);
 
     // Add validation headers to the response
-    response_headers_.addCopy("etag", etag);
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().Etag, etag);
 
     filter.encodeHeaders(response_headers_, true);
   }
@@ -720,7 +727,7 @@ TEST_F(ValidationHeadersTest, EtagOnly) {
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
     filter.decodeHeaders(request_headers_, true);
 
     // Make sure validation conditional headers are added
@@ -740,7 +747,8 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
     filter.decodeHeaders(request_headers_, true);
 
     // Add validation headers to the response
-    response_headers_.addCopy("last-modified", formatter_.now(time_source_));
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified,
+                                      formatter_.now(time_source_));
 
     filter.encodeHeaders(response_headers_, true);
   }
@@ -749,7 +757,7 @@ TEST_F(ValidationHeadersTest, LastModifiedOnly) {
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
     filter.decodeHeaders(request_headers_, true);
 
     // Make sure validation conditional headers are added
@@ -773,7 +781,7 @@ TEST_F(ValidationHeadersTest, NoEtagOrLastModified) {
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
     filter.decodeHeaders(request_headers_, true);
 
     // Make sure validation conditional headers are added
@@ -793,7 +801,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
     filter.decodeHeaders(request_headers_, true);
 
     // Add validation headers to the response
-    response_headers_.addCopy("last-modified", "invalid-date");
+    response_headers_.setReferenceKey(Http::CustomHeaders::get().LastModified, "invalid-date");
 
     filter.encodeHeaders(response_headers_, true);
   }
@@ -802,7 +810,7 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Make sure the request requires validation
-    request_headers_.addCopy("cache-control", "no-cache");
+    request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "no-cache");
     filter.decodeHeaders(request_headers_, true);
 
     // Make sure validation conditional headers are added
