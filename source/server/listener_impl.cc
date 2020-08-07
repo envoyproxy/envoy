@@ -379,12 +379,6 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
   if (socket_type == Network::Socket::Type::Datagram) {
     auto udp_writer_config = config_.udp_writer_config();
-    if (!Api::OsSysCallsSingleton::get().supportsUdpGso() &&
-        udp_writer_config.name() == Network::UdpWriterNames::get().GsoBatchWriter) {
-      throw EnvoyException(fmt::format("Error configuring batch writer on platform without "
-                                       "support for UDP GSO. Reset udp_writer_config to {},",
-                                       Network::UdpWriterNames::get().DefaultWriter));
-    }
     if (!Api::OsSysCallsSingleton::get().supportsUdpGso() || udp_writer_config.name().empty()) {
       udp_writer_config.set_name(Network::UdpWriterNames::get().DefaultWriter);
     }

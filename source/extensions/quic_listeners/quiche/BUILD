@@ -387,6 +387,7 @@ envoy_cc_library(
         ":udp_gso_batch_writer_lib",
         "//include/envoy/network:udp_packet_writer_config_interface",
         "//include/envoy/registry",
+        "//source/common/api:os_sys_calls_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
