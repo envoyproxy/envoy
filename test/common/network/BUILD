@@ -98,7 +98,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dns_impl_test",
     srcs = ["dns_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:address_interface",
@@ -275,7 +274,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "addr_family_aware_socket_option_impl_test",
     srcs = ["addr_family_aware_socket_option_impl_test.cc"],
-    tags = ["fails_on_windows"],
     deps = [
         ":socket_option_test",
         "//source/common/network:addr_family_aware_socket_option_lib",
