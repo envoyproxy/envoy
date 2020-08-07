@@ -272,9 +272,7 @@ void FilterChainManagerImpl::addFakeFilterChain(
     if (filter_chain_impl == nullptr) {
       // If the option for this filter chain is build_on_demand, we build a fake placeholder.
       // Otherwise, we build the filter chain directly.
-      // TODO(ASOPVII): add build option to filter chain config.
-      bool build_on_demand = filter_chain->build_on_demand(); // filter_chain.build_on_demand();
-      if (build_on_demand) {
+      if (filter_chain->build_on_demand()) {
         ENVOY_LOG(debug, "FilterChainManagerImpl:: build_on_demand, first build a placeholder");
         filter_chain_impl =
             std::make_shared<FilterChainImpl>(filter_chain); // fake filter chain placeholder
