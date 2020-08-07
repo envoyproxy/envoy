@@ -220,6 +220,7 @@ void FilterChainManagerImpl::addFakeFilterChain(
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
+  ENVOY_LOG(debug, "FilterChainManagerImpl::addFakeFilterChain");
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
   absl::flat_hash_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
@@ -270,20 +271,21 @@ void FilterChainManagerImpl::addFakeFilterChain(
     auto filter_chain_impl = findExistingFilterChain(*filter_chain);
     if (filter_chain_impl == nullptr) {
       // If the option for this filter chain is build_on_demand, we build a fake placeholder.
-      // Otherwise, we request dependencies and use factory builder to build the filter chain
-      // directly.
+      // Otherwise, we build the filter chain directly.
       // TODO(ASOPVII): add build option to filter chain config.
-      bool build_on_demand = true; // filter_chain.build_option()
+      bool build_on_demand = filter_chain->build_on_demand(); // filter_chain.build_on_demand();
       if (build_on_demand) {
+        ENVOY_LOG(debug, "FilterChainManagerImpl:: build_on_demand, first build a placeholder");
         filter_chain_impl =
-            std::make_unique<FilterChainImpl>(filter_chain); // fake filter chain placeholder
+            std::make_shared<FilterChainImpl>(filter_chain); // fake filter chain placeholder
       } else {
         filter_chain_impl =
             filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
       }
       ++new_filter_chain_size;
     }
-
+    ENVOY_LOG(debug, "FilterChainManagerImpl:: filter chain is fake: {}",
+              filter_chain_impl->isFakeFilterChain());
     addFilterChainForDestinationPorts(
         destination_ports_map_,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
@@ -329,7 +331,6 @@ void FilterChainManagerImpl::addRealFilterChain(
       filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
 
   ENVOY_LOG(debug, "placeholder->storeRealFilterChain");
-
   // TODO(ASOPVII): Call Ctor/Point of this placeholder to update its context.
   auto placeholder = std::move(fc_contexts_[*filter_chain]);
   // multi-threaded shared_ptr: lock before mutate.

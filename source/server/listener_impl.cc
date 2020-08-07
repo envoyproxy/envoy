@@ -498,6 +498,7 @@ void ListenerImpl::buildFilterChains() {
 }
 
 void ListenerImpl::buildFakeFilterChains() {
+  ENVOY_LOG(debug, "ListenerImpl::buildFakeFilterChains");
   Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
@@ -511,7 +512,6 @@ void ListenerImpl::buildFakeFilterChains() {
 void ListenerImpl::buildRealFilterChains(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
     const std::string& worker_name) {
-
   ENVOY_LOG(debug, "Inside ListenerImpl::buildRealFilterChains");
   if (filter_chain_message == nullptr) {
     ENVOY_LOG(debug, "Filter chain message is empty");
@@ -534,6 +534,7 @@ void ListenerImpl::buildRealFilterChains(
 
   if (rebuilder->isCompleted()) {
     rebuilder->callbackToWorkers();
+    return;
   }
 
   // Request dependencies only on the first time.

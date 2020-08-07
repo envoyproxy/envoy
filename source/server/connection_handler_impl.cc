@@ -445,7 +445,9 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     return;
   }
 
-  // const auto filter_chain_impl = dynamic_cast<const Server::FilterChainImpl*>(filter_chain);
+  // TODO(ASOPVII): Check if 'findFilterChain' works well.
+  // refer to ListenerFilterChainFactoryBuilder::buildFilterChainInternal. from v3 to
+  // FilterChainImpl. We can not cast protobuf to FilterChainImpl.
   if (filter_chain->isFakeFilterChain()) {
     ENVOY_LOG(debug, "found a filter chain placeholder, start rebuilding request");
     const auto& worker_name = parent_.dispatcher_.name();

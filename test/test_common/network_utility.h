@@ -148,6 +148,7 @@ public:
         has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
 
   void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
+    is_fake_placeholder_ = false;
     has_rebuilt_filter_chain_ = true;
     rebuilt_filter_chain_ = rebuilt_filter_chain;
   }
