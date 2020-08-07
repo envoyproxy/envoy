@@ -38,7 +38,9 @@ as is described in the image above.
 
 **Step 1: Build the sandbox**
 
-To build this sandbox example, and start the example apps run the following commands::
+To build this sandbox example, and start the example apps run the following commands:
+
+.. code-block:: console
 
     $ pwd
     envoy/examples/jaeger-tracing
@@ -55,7 +57,9 @@ To build this sandbox example, and start the example apps run the following comm
 
 **Step 2: Generate some load**
 
-You can now send a request to service1 via the front-envoy as follows::
+You can now send a request to service1 via the front-envoy as follows:
+
+.. code-block:: console
 
     $ curl -v localhost:8000/trace/1
     *   Trying 192.168.99.100...
