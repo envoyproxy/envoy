@@ -208,7 +208,7 @@ message FilterChain {
   // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
   string name = 7;
 
-  // [#not-implemented-hide:] Whether the filter chain will be built on demand or not.
+  // Whether the filter chain will be built on demand or not.
   bool build_on_demand = 8;
 }
 
