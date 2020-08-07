@@ -25,8 +25,8 @@ public:
   // HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& request) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override;
-  void updateHeaders(LookupContextPtr&& lookup_context,
-                     Http::ResponseHeaderMapPtr&& response_headers) override;
+  void updateHeaders(const LookupContext& lookup_context,
+                     const Http::ResponseHeaderMap& response_headers) override;
   CacheInfo cacheInfo() const override;
 
   Entry lookup(const LookupRequest& request);

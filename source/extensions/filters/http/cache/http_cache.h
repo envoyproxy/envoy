@@ -151,6 +151,7 @@ struct LookupResult {
   // True if the cached response has trailers.
   bool has_trailers_ = false;
 };
+using LookupResultPtr = std::unique_ptr<LookupResult>;
 
 // Produces a hash of key that is consistent across restarts, architectures,
 // builds, and configurations. Caches that store persistent entries based on a
@@ -305,8 +306,8 @@ public:
   //
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
-  virtual void updateHeaders(LookupContextPtr&& lookup_context,
-                             Http::ResponseHeaderMapPtr&& response_headers) PURE;
+  virtual void updateHeaders(const LookupContext& lookup_context,
+                             const Http::ResponseHeaderMap& response_headers) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;

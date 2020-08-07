@@ -268,15 +268,15 @@ public:
   }
 };
 
-// TODO(#9872): More tests for httpTime
+// TODO(#9872): More tests for httpTime.
 class HttpTimeTest : public testing::TestWithParam<std::string> {
 public:
   static const std::vector<std::string>& getOkTestCases() {
     // clang-format off
     CONSTRUCT_ON_FIRST_USE(std::vector<std::string>,
-        "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate
-        "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format
-        "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format
+        "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate.
+        "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format.
+        "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format.
     );
     // clang-format on
   }
