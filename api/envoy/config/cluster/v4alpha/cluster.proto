@@ -465,6 +465,11 @@ message Cluster {
       // If set to `true`, the cluster will use hostname instead of the resolved
       // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
       bool use_hostname_for_hashing = 1;
+
+      // Configures percentage of load to bound per upstream host. For example, with a value of 150
+      // no upstream host will get a load more than 1.5 times the average load of all the hosts
+      // in the cluster. If not specified, the load is not bounded for any upstream host.
+      google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 2}];
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.

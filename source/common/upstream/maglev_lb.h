@@ -80,10 +80,17 @@ public:
 private:
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr
-  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+  createLoadBalancer(const NormalizedHostWeightVectorPtr normalized_host_weights,
                      double /* min_normalized_weight */, double max_normalized_weight) override {
-    return std::make_shared<MaglevTable>(normalized_host_weights, max_normalized_weight,
-                                         table_size_, use_hostname_for_hashing_, stats_);
+    HashingLoadBalancerSharedPtr hlb_ptr =
+        std::make_shared<MaglevTable>(*normalized_host_weights, max_normalized_weight, table_size_,
+                                      use_hostname_for_hashing_, stats_);
+
+    if (hash_balance_factor_ == 0)
+      return hlb_ptr;
+
+    return std::make_shared<BoundedLoadHashingLoadBalancer>(hlb_ptr, normalized_host_weights,
+                                                            hash_balance_factor_);
   }
 
   static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
@@ -92,6 +99,7 @@ private:
   MaglevLoadBalancerStats stats_;
   const uint64_t table_size_;
   const bool use_hostname_for_hashing_;
+  const uint32_t hash_balance_factor_;
 };
 
 } // namespace Upstream
