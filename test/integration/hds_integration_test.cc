@@ -255,13 +255,15 @@ public:
                                     Network::Address::InstanceConstSharedPtr address, int cluster,
                                     int locality, int endpoint) {
     // Get some response.
-    if (!hds_stream_->waitForGrpcMessage(*dispatcher_, response_))
+    if (!hds_stream_->waitForGrpcMessage(*dispatcher_, response_)) {
       return false;
+    }
 
     // Check endpoint health status by indices.
     while (!checkClusterEndpointHealthResponse(healthy, address, cluster, locality, endpoint)) {
-      if (!hds_stream_->waitForGrpcMessage(*dispatcher_, response_))
+      if (!hds_stream_->waitForGrpcMessage(*dispatcher_, response_)) {
         return false;
+      }
 
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
       EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
