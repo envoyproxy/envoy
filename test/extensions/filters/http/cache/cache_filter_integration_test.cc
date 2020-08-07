@@ -74,7 +74,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
+    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
 
   // Advance time, to verify the original date header is preserved.
@@ -91,7 +91,8 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     EXPECT_NE(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
     // Advance time to force a log flush.
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_EQ(waitForAccessLog(access_log_name_, 1), "RFCF cache.response_from_cache_filter\n");
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
   }
 }
 
@@ -130,7 +131,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
+    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
 
   // Advance time for the cached response to be stale (expired)
@@ -168,7 +169,8 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_EQ(waitForAccessLog(access_log_name_, 1), "RFCF cache.response_from_cache_filter\n");
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
   }
 }
 
@@ -207,7 +209,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_EQ(waitForAccessLog(access_log_name_), "- via_upstream\n");
+    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
 
   // Advance time for the cached response to be stale (expired)
@@ -248,7 +250,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_EQ(waitForAccessLog(access_log_name_, 1), "- via_upstream\n");
+    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
   }
 }
 
