@@ -42,6 +42,10 @@ private:
   void onHeaders(LookupResult&& result);
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
+  // Calculate and add the response's age to its headers.
+  void addResponseAge(Http::ResponseHeaderMapPtr& headers);
+  // Sets callback info as a response from cache, and encode the headers.
+  void sendHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream);
 
   TimeSource& time_source_;
   HttpCache& cache_;
@@ -51,7 +55,7 @@ private:
   // Tracks what body bytes still need to be read from the cache. This is
   // currently only one Range, but will expand when full range support is added. Initialized by
   // onOkHeaders.
-  std::vector<AdjustedByteRange> remaining_body_;
+  std::vector<AdjustedByteRange> remaining_ranges_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.

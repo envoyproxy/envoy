@@ -104,47 +104,57 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       state_ = GetHeadersState::GetHeadersResultUnusable;
     }
     return;
-  case CacheEntryStatus::NotSatisfiableRange:
-    result.headers_->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
-    result.headers_->setContentLength(0);
-    result.headers_->addCopy(Http::Headers::get().ContentRange,
-                             absl::StrCat("bytes */", result.content_length_));
-    result.content_length_ = 0;
-  case CacheEntryStatus::SatisfiableRange:
-    // Multi-part responses are not supported; they will be treated as usual 200 response on '::Ok'
-    // case below. A possible way to achieve that would be to move all ranges to remaining_body, and
+  case CacheEntryStatus::NotSatisfiableRange: {
+    Http::ResponseHeaderMapPtr response_headers = std::move(result.headers_);
+    response_headers->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
+    response_headers->setContentLength(0);
+    response_headers->addCopy(Http::Headers::get().ContentRange,
+                              absl::StrCat("bytes */", result.content_length_));
+    response_has_trailers_ = result.has_trailers_;
+    addResponseAge(response_headers);
+    // There is no body to send, so we decide to end the stream only based on having trailers.
+    sendHeaders(std::move(response_headers), !response_has_trailers_);
+    if (response_has_trailers_) {
+      lookup_->getTrailers(
+          [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailers(std::move(trailers)); });
+    }
+    return;
+  }
+  case CacheEntryStatus::SatisfiableRange: {
+    if (result.response_ranges_.size() == 1) {
+      Http::ResponseHeaderMapPtr response_headers = std::move(result.headers_);
+      response_headers->setStatus(static_cast<uint64_t>(Http::Code::PartialContent));
+      response_headers->setContentLength(result.response_ranges_[0].length());
+      response_headers->addCopy(Http::Headers::get().ContentRange,
+                                absl::StrCat("bytes ", result.response_ranges_[0].begin(), "-",
+                                             result.response_ranges_[0].end() - 1, "/",
+                                             result.content_length_));
+      response_has_trailers_ = result.has_trailers_;
+      addResponseAge(response_headers);
+      // There's always a body to send (i.e., the satisfiable range), so end_stream is false.
+      sendHeaders(std::move(response_headers), false);
+      remaining_ranges_ = std::move(result.response_ranges_);
+      getBody();
+      return;
+    }
+    // Multi-part responses are not supported, and they will be treated as a usual 200 response.
+    // A possible way to achieve that would be to move all ranges to remaining_body, and
     // add logic inside '::onBody' to interleave the body bytes with sub-headers and separator
     // string for each part. Would need to keep track if the current range is over or not to know
     // when to insert the separator, and calculate the length based on length of ranges + extra
     // headers and separators.
-    if (result.response_ranges_.size() == 1) {
-      remaining_body_ = std::move(result.response_ranges_);
-      result.headers_->setStatus(static_cast<uint64_t>(Http::Code::PartialContent));
-      result.headers_->setContentLength(remaining_body_[0].length());
-      result.headers_->addCopy(Http::Headers::get().ContentRange,
-                               absl::StrCat("bytes ", remaining_body_[0].begin(), "-",
-                                            remaining_body_[0].end() - 1, "/",
-                                            result.content_length_));
-      result.content_length_ = remaining_body_[0].length();
-    }
+    ABSL_FALLTHROUGH_INTENDED;
+  }
   case CacheEntryStatus::Ok:
     response_has_trailers_ = result.has_trailers_;
     const bool end_stream = (result.content_length_ == 0 && !response_has_trailers_);
-    // TODO(toddmgreer): Calculate age per https://httpwg.org/specs/rfc7234.html#age.calculations
-    result.headers_->addReferenceKey(Http::Headers::get().Age, 0);
-    decoder_callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::ResponseFromCacheFilter);
-    decoder_callbacks_->streamInfo().setResponseCodeDetails(
-        CacheResponseCodeDetails::get().ResponseFromCacheFilter);
-    decoder_callbacks_->encodeHeaders(std::move(result.headers_), end_stream);
+    addResponseAge(result.headers_);
+    sendHeaders(std::move(result.headers_), end_stream);
     if (end_stream) {
       return;
     }
     if (result.content_length_ > 0) {
-      if (remaining_body_.empty()) {
-        // no range was added to remaining_body_, will add entire body to response
-        remaining_body_.emplace_back(0, result.content_length_);
-      }
+      remaining_ranges_.emplace_back(0, result.content_length_);
       getBody();
     } else {
       lookup_->getTrailers(
@@ -154,32 +164,32 @@ void CacheFilter::onHeaders(LookupResult&& result) {
 }
 
 void CacheFilter::getBody() {
-  ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
-  lookup_->getBody(remaining_body_[0],
+  ASSERT(!remaining_ranges_.empty(), "No reason to call getBody when there's no body to get.");
+  lookup_->getBody(remaining_ranges_[0],
                    [this](Buffer::InstancePtr&& body) { onBody(std::move(body)); });
 }
 
 // TODO(toddmgreer): Handle downstream backpressure.
 void CacheFilter::onBody(Buffer::InstancePtr&& body) {
-  ASSERT(!remaining_body_.empty(),
+  ASSERT(!remaining_ranges_.empty(),
          "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
          "bogus callback.");
   ASSERT(body, "Cache said it had a body, but isn't giving it to us.");
 
   const uint64_t bytes_from_cache = body->length();
-  if (bytes_from_cache < remaining_body_[0].length()) {
-    remaining_body_[0].trimFront(bytes_from_cache);
-  } else if (bytes_from_cache == remaining_body_[0].length()) {
-    remaining_body_.erase(remaining_body_.begin());
+  if (bytes_from_cache < remaining_ranges_[0].length()) {
+    remaining_ranges_[0].trimFront(bytes_from_cache);
+  } else if (bytes_from_cache == remaining_ranges_[0].length()) {
+    remaining_ranges_.erase(remaining_ranges_.begin());
   } else {
     ASSERT(false, "Received oversized body from cache.");
     decoder_callbacks_->resetStream();
     return;
   }
 
-  const bool end_stream = remaining_body_.empty() && !response_has_trailers_;
+  const bool end_stream = remaining_ranges_.empty() && !response_has_trailers_;
   decoder_callbacks_->encodeData(*body, end_stream);
-  if (!remaining_body_.empty()) {
+  if (!remaining_ranges_.empty()) {
     getBody();
   } else if (response_has_trailers_) {
     lookup_->getTrailers(
@@ -189,6 +199,19 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 
 void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   decoder_callbacks_->encodeTrailers(std::move(trailers));
+}
+
+void CacheFilter::addResponseAge(Http::ResponseHeaderMapPtr& headers) {
+  // TODO(toddmgreer): Calculate age per https://httpwg.org/specs/rfc7234.html#age.calculations
+  headers->addReferenceKey(Http::Headers::get().Age, 0);
+}
+
+void CacheFilter::sendHeaders(Http::ResponseHeaderMapPtr&& headers, const bool end_stream) {
+  decoder_callbacks_->streamInfo().setResponseFlag(
+      StreamInfo::ResponseFlag::ResponseFromCacheFilter);
+  decoder_callbacks_->streamInfo().setResponseCodeDetails(
+      CacheResponseCodeDetails::get().ResponseFromCacheFilter);
+  decoder_callbacks_->encodeHeaders(std::move(headers), end_stream);
 }
 } // namespace Cache
 } // namespace HttpFilters
