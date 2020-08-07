@@ -36,12 +36,12 @@ void blockFormat(YAML::Node node) {
   node.SetStyle(YAML::EmitterStyle::Block);
 
   if (node.Type() == YAML::NodeType::Sequence) {
-    for (auto it : node) {
+    for (const auto& it : node) {
       blockFormat(it);
     }
   }
   if (node.Type() == YAML::NodeType::Map) {
-    for (auto it : node) {
+    for (const auto& it : node) {
       blockFormat(it.second);
     }
   }

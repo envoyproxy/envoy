@@ -42,10 +42,9 @@ USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "test", "other"]
 
 DEPENDENCY_REPOSITORIES = dict(
     bazel_compdb = dict(
-        sha256 = "943f1a57e01d030b9c649f9e41fdafd871e8b0e8a1431f93c6673c38b9c15b3b",
-        strip_prefix = "bazel-compilation-database-c37b909045eb72d29a47f77cc1e9b519dd5c10b6",
-        # 2020-07-31
-        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/c37b909045eb72d29a47f77cc1e9b519dd5c10b6.tar.gz"],
+        sha256 = "bcecfd622c4ef272fd4ba42726a52e140b961c4eac23025f18b346c968a8cfb4",
+        strip_prefix = "bazel-compilation-database-0.4.5",
+        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/0.4.5.tar.gz"],
         use_category = ["build"],
     ),
     bazel_gazelle = dict(
