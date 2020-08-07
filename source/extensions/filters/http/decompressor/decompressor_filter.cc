@@ -100,7 +100,10 @@ Http::FilterDataStatus DecompressorFilter::decodeData(Buffer::Instance& data, bo
 }
 
 Http::FilterTrailersStatus DecompressorFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
-  request_byte_tracker_.reportTotalBytes(trailers);
+  // Only report if the filter has actually decompressed.
+  if (request_decompressor_) {
+    request_byte_tracker_.reportTotalBytes(trailers);
+  }
   return Http::FilterTrailersStatus::Continue;
 }
 
@@ -129,7 +132,10 @@ Http::FilterDataStatus DecompressorFilter::encodeData(Buffer::Instance& data, bo
 }
 
 Http::FilterTrailersStatus DecompressorFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  response_byte_tracker_.reportTotalBytes(trailers);
+  // Only report if the filter has actually decompressed.
+  if (response_decompressor_) {
+    response_byte_tracker_.reportTotalBytes(trailers);
+  }
   return Http::FilterTrailersStatus::Continue;
 }
 
