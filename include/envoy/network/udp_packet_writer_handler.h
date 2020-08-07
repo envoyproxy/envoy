@@ -16,12 +16,12 @@ namespace Network {
 /**
  * Udp Default Packet Writer Name
  **/
-static const std::string DefaultWriterName{"udp_default_writer"};
+constexpr absl::string_view DefaultWriterName = "udp_default_writer";
 
 /**
  * Max v6 packet size, excluding IP and UDP headers.
  */
-static const uint64_t K_MAX_OUTGOING_PACKET_SIZE = 1452;
+constexpr uint64_t K_MAX_OUTGOING_PACKET_SIZE = 1452;
 
 /**
  * UdpPacketWriterBuffer bundles a buffer and a function that

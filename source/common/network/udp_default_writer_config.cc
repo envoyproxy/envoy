@@ -24,7 +24,7 @@ UdpDefaultWriterConfigFactory::createUdpPacketWriterFactory(const Protobuf::Mess
   return std::make_unique<UdpDefaultWriterFactory>();
 }
 
-std::string UdpDefaultWriterConfigFactory::name() const { return DefaultWriterName; }
+std::string UdpDefaultWriterConfigFactory::name() const { return std::string(DefaultWriterName); }
 
 REGISTER_FACTORY(UdpDefaultWriterConfigFactory, Network::UdpPacketWriterConfigFactory);
 
