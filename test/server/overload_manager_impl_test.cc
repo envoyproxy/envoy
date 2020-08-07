@@ -136,9 +136,9 @@ protected:
         }
         triggers {
           name: "envoy.resource_monitors.fake_resource3"
-          range {
-            min_value: 0.5
-            max_value: 0.8
+          scaled {
+            scaling_threshold: 0.5
+            saturation_threshold: 0.8
           }
         }
       }
@@ -293,7 +293,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   manager->stop();
 }
 
-TEST_F(OverloadManagerImplTest, RangeTrigger) {
+TEST_F(OverloadManagerImplTest, ScaledTrigger) {
   setDispatcherExpectation();
 
   auto manager(createOverloadManager(getConfig()));
@@ -314,7 +314,7 @@ TEST_F(OverloadManagerImplTest, RangeTrigger) {
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(0, scale_percent_gauge.value());
 
-  // The trigger for fake_resource3 is a range trigger with a min of 0.5 and a max of 0.8. Set the
+  // The trigger for fake_resource3 is a scaled trigger with a min of 0.5 and a max of 0.8. Set the
   // current pressure value to halfway in that range.
   factory3_.monitor_->setPressure(0.65);
   timer_cb_();
@@ -409,7 +409,7 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
                           "Duplicate overload action .*");
 }
 
-TEST_F(OverloadManagerImplTest, RangeTriggerMaxLessThanMin) {
+TEST_F(OverloadManagerImplTest, ScaledTriggerMaxLessThanMin) {
   const std::string config = R"EOF(
     resource_monitors {
       name: "envoy.resource_monitors.fake_resource1"
@@ -418,9 +418,9 @@ TEST_F(OverloadManagerImplTest, RangeTriggerMaxLessThanMin) {
       name: "envoy.overload_actions.dummy_action"
       triggers {
         name: "envoy.resource_monitors.fake_resource1"
-        range {
-          min_value: 0.9
-          max_value: 0.8
+        scaled {
+          scaling_threshold: 0.9
+          saturation_threshold: 0.8
         }
       }
     }
@@ -430,7 +430,7 @@ TEST_F(OverloadManagerImplTest, RangeTriggerMaxLessThanMin) {
                           "min_value must be less than max_value.*");
 }
 
-TEST_F(OverloadManagerImplTest, RangeTriggerMaxEqualsMin) {
+TEST_F(OverloadManagerImplTest, ScaledTriggerMaxEqualsMin) {
   const std::string config = R"EOF(
     resource_monitors {
       name: "envoy.resource_monitors.fake_resource1"
@@ -439,9 +439,9 @@ TEST_F(OverloadManagerImplTest, RangeTriggerMaxEqualsMin) {
       name: "envoy.overload_actions.dummy_action"
       triggers {
         name: "envoy.resource_monitors.fake_resource1"
-        range {
-          min_value: 0.9
-          max_value: 0.9
+        scaled {
+          scaling_threshold: 0.9
+          saturation_threshold: 0.9
         }
       }
     }

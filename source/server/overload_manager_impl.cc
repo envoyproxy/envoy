@@ -38,10 +38,11 @@ private:
   OverloadActionState state_;
 };
 
-class RangeTriggerImpl final : public OverloadAction::Trigger {
+class ScaledTriggerImpl final : public OverloadAction::Trigger {
 public:
-  RangeTriggerImpl(const envoy::config::overload::v3::ScaledTrigger& config)
-      : scaling_threshold_(config.scaling_threshold()), saturated_threshold_(config.saturation_threshold()),
+  ScaledTriggerImpl(const envoy::config::overload::v3::ScaledTrigger& config)
+      : scaling_threshold_(config.scaling_threshold()),
+        saturated_threshold_(config.saturation_threshold()),
         state_(OverloadActionState::inactive()) {
     if (scaling_threshold_ >= saturated_threshold_) {
       throw EnvoyException("min_value must be less than max_value");
@@ -120,7 +121,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction
       trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
       break;
     case envoy::config::overload::v3::Trigger::TriggerOneofCase::kScaled:
-      trigger = std::make_unique<RangeTriggerImpl>(trigger_config.scaled());
+      trigger = std::make_unique<ScaledTriggerImpl>(trigger_config.scaled());
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
