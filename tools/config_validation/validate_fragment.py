@@ -69,4 +69,4 @@ if __name__ == '__main__':
   message_type = parsed_args.message_type
   content = parsed_args.s if (parsed_args.fragment_path is None) else pathlib.Path(
       parsed_args.fragment_path).read_text()
-  ValidateFragment(message_type, yaml.load(content, Loader=yaml.FullLoader))
+  ValidateFragment(message_type, yaml.safe_load(content))
