@@ -378,8 +378,11 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
   if (socket_type == Network::Socket::Type::Datagram) {
     auto udp_writer_config = config_.udp_writer_config();
-    if (!Api::OsSysCallsSingleton::get().supportsUdpGso() || udp_writer_config.name().empty()) {
-      udp_writer_config.set_name(std::string(Network::DefaultWriterName));
+    if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
+        udp_writer_config.typed_config().type_url().empty()) {
+      const std::string default_type_url =
+          "type.googleapis.com/envoy.config.listener.v3.UdpDefaultWriterOptions";
+      udp_writer_config.mutable_typed_config()->set_type_url(default_type_url);
     }
     auto& config_factory =
         Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(

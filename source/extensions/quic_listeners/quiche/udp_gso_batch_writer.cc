@@ -87,8 +87,7 @@ UdpGsoBatchWriter::getNextWriteLocation(const Network::Address::Ip* local_ip,
   quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
   quic::QuicPacketBuffer quic_buf = GetNextWriteLocation(self_addr.host(), peer_addr);
   return Network::UdpPacketWriterBuffer(reinterpret_cast<uint8_t*>(quic_buf.buffer),
-                                        Network::K_MAX_OUTGOING_PACKET_SIZE,
-                                        quic_buf.release_buffer);
+                                        Network::UdpMaxOutgoingPacketSize, quic_buf.release_buffer);
 }
 
 Api::IoCallUint64Result UdpGsoBatchWriter::flush() {

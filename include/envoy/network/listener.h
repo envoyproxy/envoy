@@ -265,7 +265,6 @@ public:
   /**
    * Returns the pointer to the udp_packet_writer associated with the
    * UdpListenerCallback
-   *
    */
   virtual UdpPacketWriter& udpPacketWriter() PURE;
 };

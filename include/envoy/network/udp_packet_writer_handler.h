@@ -16,12 +16,12 @@ namespace Network {
 /**
  * Udp Default Packet Writer Name
  **/
-constexpr absl::string_view DefaultWriterName = "udp_default_writer";
+constexpr absl::string_view UdpDefaultWriterName = "udp_default_writer";
 
 /**
  * Max v6 packet size, excluding IP and UDP headers.
  */
-constexpr uint64_t K_MAX_OUTGOING_PACKET_SIZE = 1452;
+constexpr uint64_t UdpMaxOutgoingPacketSize = 1452;
 
 /**
  * UdpPacketWriterBuffer bundles a buffer and a function that
@@ -46,7 +46,8 @@ public:
    * @brief Sends a packet via given UDP socket with specific source address.
    *
    * @param buffer points to the buffer containing the packet
-   * @param local_ip is the source address to be used to send.
+   * @param local_ip is the source address to be used to send. If it is null,
+   * picks up the default network interface ip address.
    * @param peer_address is the destination address to send to.
    * @return result with number of bytes written, and write status
    */

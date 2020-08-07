@@ -22,7 +22,7 @@ public:
   bool isWriteBlocked() const override { return write_blocked_; }
   void setWritable() override { write_blocked_ = false; }
   uint64_t getMaxPacketSize(const Address::Instance& /*peer_address*/) const override {
-    return Network::K_MAX_OUTGOING_PACKET_SIZE;
+    return Network::UdpMaxOutgoingPacketSize;
   }
   bool isBatchMode() const override { return false; }
   Network::UdpPacketWriterBuffer
