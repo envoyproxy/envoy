@@ -419,16 +419,18 @@ run_example_front_proxy () {
 }
 
 run_examples () {
-    for example in $(find examples -mindepth 1 -maxdepth 1 -type d | sort); do
+    local example example_test
+    cd "${SRCDIR}/examples" || exit 1
+    for example in $(find . -mindepth 1 -maxdepth 1 -type d | sort); do
 	example_test="run_example_$(echo "$example" | cut -d/ -f2 | tr '-' '_')"
 	$example_test
     done
 }
 
 verify_build_configs () {
-    local configs missing
+    local config configs missing
     missing=()
-    cd "${SRCDIR}/examples" || exit 1
+    cd "${SRCDIR}/examples" || return 1
     configs="$(find . -name "*.yaml" -o -name "*.lua" | grep -vE "${EXCLUDED_BUILD_CONFIGS}" | cut  -d/ -f2-)"
     for config in $configs; do
 	grep "\"$config\"" BUILD || missing+=("$config")
