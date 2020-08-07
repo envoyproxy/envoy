@@ -2,14 +2,14 @@
 
 #include "server/connection_handler_impl.h"
 
-#include "extensions/quic_listeners/quiche/envoy_quic_fake_proof_source.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_proof_source_base.h"
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicProofSource : public EnvoyQuicFakeProofSource,
-                             protected Logger::Loggable<Logger::Id::quic> {
+// A ProofSource implementation which supplies a proof instance with certs from filter chain.
+class EnvoyQuicProofSource : public EnvoyQuicProofSourceBase {
 public:
   EnvoyQuicProofSource(Network::Socket& listen_socket,
                        Network::FilterChainManager& filter_chain_manager,
@@ -19,14 +19,17 @@ public:
 
   ~EnvoyQuicProofSource() override = default;
 
+  // quic::ProofSource
   quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>
   GetCertChain(const quic::QuicSocketAddress& server_address,
                const quic::QuicSocketAddress& client_address, const std::string& hostname) override;
-  void ComputeTlsSignature(const quic::QuicSocketAddress& server_address,
-                           const quic::QuicSocketAddress& client_address,
-                           const std::string& hostname, uint16_t signature_algorithm,
-                           quiche::QuicheStringPiece in,
-                           std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
+
+protected:
+  // quic::ProofSource
+  void signPayload(const quic::QuicSocketAddress& server_address,
+                   const quic::QuicSocketAddress& client_address, const std::string& hostname,
+                   uint16_t signature_algorithm, quiche::QuicheStringPiece in,
+                   std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
 
 private:
   struct CertConfigWithFilterChain {

@@ -12,14 +12,16 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include "quiche/quic/core/crypto/proof_source.h"
 #include "quiche/quic/core/quic_versions.h"
-
+#include "quiche/quic/core/crypto/crypto_protocol.h"
+#include "quiche/quic/platform/api/quic_reference_counted.h"
+#include "quiche/quic/platform/api/quic_socket_address.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 #pragma GCC diagnostic pop
 
 #include "openssl/ssl.h"
 #include "envoy/network/filter.h"
-#include "quiche/quic/platform/api/quic_reference_counted.h"
-#include "quiche/quic/platform/api/quic_socket_address.h"
-#include "quiche/common/platform/api/quiche_string_piece.h"
+#include "server/backtrace.h"
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Quic {
@@ -38,11 +40,12 @@ private:
   const Network::FilterChain& filter_chain_;
 };
 
-// A fake implementation of quic::ProofSource which uses RSA cipher suite to sign in GetProof().
-// TODO(danzh) Rename it to EnvoyQuicProofSource once it's fully implemented.
-class EnvoyQuicFakeProofSource : public quic::ProofSource {
+// A partial implementation of quic::ProofSource which chooses a cipher suite according to the leaf
+// cert to sign in GetProof().
+class EnvoyQuicProofSourceBase : public quic::ProofSource,
+                                 protected Logger::Loggable<Logger::Id::quic> {
 public:
-  ~EnvoyQuicFakeProofSource() override = default;
+  ~EnvoyQuicProofSourceBase() override = default;
 
   // quic::ProofSource
   // Returns a certs chain and its fake SCT "Fake timestamp" and TLS signature wrapped
@@ -50,18 +53,23 @@ public:
   void GetProof(const quic::QuicSocketAddress& server_address,
                 const quic::QuicSocketAddress& client_address, const std::string& hostname,
                 const std::string& server_config, quic::QuicTransportVersion /*transport_version*/,
-                quiche::QuicheStringPiece /*chlo_hash*/,
-                std::unique_ptr<quic::ProofSource::Callback> callback) override {
-    quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
-        GetCertChain(server_address, client_address, hostname);
-    quic::QuicCryptoProof proof;
-    // TODO(danzh) Get the signature algorithm from leaf cert.
-    auto signature_callback = std::make_unique<SignatureCallback>(std::move(callback), chain);
-    ComputeTlsSignature(server_address, client_address, hostname, SSL_SIGN_RSA_PSS_RSAE_SHA256,
-                        server_config, std::move(signature_callback));
-  }
+                quiche::QuicheStringPiece chlo_hash,
+                std::unique_ptr<quic::ProofSource::Callback> callback) override;
 
   TicketCrypter* GetTicketCrypter() override { return nullptr; }
+
+  void ComputeTlsSignature(const quic::QuicSocketAddress& server_address,
+                           const quic::QuicSocketAddress& client_address,
+                           const std::string& hostname, uint16_t signature_algorithm,
+                           quiche::QuicheStringPiece in,
+                           std::unique_ptr<quic::ProofSource::SignatureCallback> callback) override;
+
+protected:
+  virtual void signPayload(const quic::QuicSocketAddress& server_address,
+                           const quic::QuicSocketAddress& client_address,
+                           const std::string& hostname, uint16_t signature_algorithm,
+                           quiche::QuicheStringPiece in,
+                           std::unique_ptr<quic::ProofSource::SignatureCallback> callback) PURE;
 
 private:
   // Used by GetProof() to get signature.

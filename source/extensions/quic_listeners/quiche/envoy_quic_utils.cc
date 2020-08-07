@@ -124,5 +124,66 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
   return connection_socket;
 }
 
+bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes,
+                                          std::string* error_details) {
+  const uint8_t* data;
+  const uint8_t* orig_data;
+  orig_data = data = reinterpret_cast<const uint8_t*>(der_bytes.data());
+  bssl::UniquePtr<X509> cert(d2i_X509(nullptr, &data, der_bytes.size()));
+  if (!cert.get()) {
+    *error_details = "d2i_X509: fail to parse DER";
+    return nullptr;
+  }
+  if (data < orig_data || static_cast<size_t>(data - orig_data) != der_bytes.size()) {
+    *error_details = "There is trailing garbage in DER.";
+    return nullptr;
+  }
+  return cert;
+}
+
+int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details) {
+  int sign_alg = 0;
+  const int pkey_id = EVP_PKEY_id(public_key);
+  switch (pkey_id) {
+  case EVP_PKEY_EC: {
+    // We only support P-256 ECDSA today.
+    const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key);
+    // Since we checked the key type above, this should be valid.
+    ASSERT(ecdsa_public_key != nullptr);
+    const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
+    if (ecdsa_group == nullptr || EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+      *error_details = "Invalid leaf cert, only P-256 ECDSA certificates are supported";
+      break;
+    }
+    // QUICHE uses SHA-256 as hash function in cert signature.
+    sign_alg = SSL_SIGN_ECDSA_SECP256R1_SHA256;
+  } break;
+  case EVP_PKEY_RSA: {
+    // We require RSA certificates with 2048-bit or larger keys.
+    const RSA* rsa_public_key = EVP_PKEY_get0_RSA(public_key);
+    // Since we checked the key type above, this should be valid.
+    ASSERT(rsa_public_key != nullptr);
+    const unsigned rsa_key_length = RSA_size(rsa_public_key);
+#ifdef BORINGSSL_FIPS
+    if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8) {
+      *error_details = "Invalid leaf cert, only RSA certificates with 2048-bit or 3072-bit keys "
+                       "are supported in FIPS mode";
+      break;
+    }
+#else
+    if (rsa_key_length < 2048 / 8) {
+      *error_details =
+          "Invalid leaf cert, only RSA certificates with 2048-bit or larger keys are supported";
+      break;
+    }
+#endif
+    sign_alg = SSL_SIGN_RSA_PSS_RSAE_SHA256;
+  } break;
+  default:
+    *error_details = "Invalid leaf cert, only RSA and ECDSA certificates are supported";
+  }
+  return sign_alg;
+}
+
 } // namespace Quic
 } // namespace Envoy
