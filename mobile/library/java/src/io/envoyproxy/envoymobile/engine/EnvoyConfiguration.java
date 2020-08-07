@@ -51,8 +51,10 @@ public class EnvoyConfiguration {
    *                                 resolved.
    */
   String resolveTemplate(String templateYAML) {
+    // TODO(goaway): update when Android filter chain wiring is complete.
     String resolvedConfiguration =
         templateYAML.replace("{{ stats_domain }}", statsDomain)
+            .replace("{{ platform_filter_chain }}", "")
             .replace("{{ connect_timeout_seconds }}", String.format("%s", connectTimeoutSeconds))
             .replace("{{ dns_refresh_rate_seconds }}", String.format("%s", dnsRefreshSeconds))
             .replace("{{ dns_failure_refresh_rate_seconds_base }}",

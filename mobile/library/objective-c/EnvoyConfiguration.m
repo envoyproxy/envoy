@@ -33,7 +33,17 @@
 }
 
 - (nullable NSString *)resolveTemplate:(NSString *)templateYAML {
+  NSString *filterConfigChain = [[NSString alloc] init];
+  NSString *filterTemplate = [[NSString alloc] initWithUTF8String:platform_filter_template];
+  for (EnvoyHTTPFilterFactory *filterFactory in self.httpFilterFactories) {
+    NSString *filterConfig =
+        [filterTemplate stringByReplacingOccurrencesOfString:@"{{ platform_filter_name }}"
+                                                  withString:filterFactory.filterName];
+    filterConfigChain = [filterConfigChain stringByAppendingString:filterConfig];
+  }
+
   NSDictionary<NSString *, NSString *> *templateKeysToValues = @{
+    @"platform_filter_chain" : filterConfigChain,
     @"stats_domain" : self.statsDomain,
     @"connect_timeout_seconds" :
         [NSString stringWithFormat:@"%lu", (unsigned long)self.connectTimeoutSeconds],
