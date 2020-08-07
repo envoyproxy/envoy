@@ -251,15 +251,18 @@ public:
   }
 
   // wait until our response has desired health status for desired endpoint.
-  void waitForClusterHealthResponse(envoy::config::core::v3::HealthStatus healthy,
+  bool waitForClusterHealthResponse(envoy::config::core::v3::HealthStatus healthy,
                                     Network::Address::InstanceConstSharedPtr address, int cluster,
                                     int locality, int endpoint) {
     // Get some response.
-    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
+    if (!hds_stream_->waitForGrpcMessage(*dispatcher_, response_))
+      return false;
 
     // Check endpoint health status by indices.
     while (!checkClusterEndpointHealthResponse(healthy, address, cluster, locality, endpoint)) {
-      ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
+      if (!hds_stream_->waitForGrpcMessage(*dispatcher_, response_))
+        return false;
+
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
       EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
                                                     "StreamHealthCheck", apiVersion(),
@@ -267,6 +270,8 @@ public:
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
+
+    return true;
   }
 
   const std::string serviceNamespace() const {
@@ -545,8 +550,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   host2_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
-  waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY, host2_upstream_->localAddress(), 0,
-                               0, 1);
+  ASSERT_TRUE(waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY,
+                                           host2_upstream_->localAddress(), 0, 0, 1));
 
   // Ensure we have at least one cluster before trying to read it.
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
@@ -608,8 +613,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   host2_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
-  waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY, host2_upstream_->localAddress(), 0,
-                               1, 0);
+  ASSERT_TRUE(waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY,
+                                           host2_upstream_->localAddress(), 0, 1, 0));
 
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 1);
 
@@ -686,8 +691,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   host2_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
-  waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY, host2_upstream_->localAddress(), 1,
-                               0, 0);
+  ASSERT_TRUE(waitForClusterHealthResponse(envoy::config::core::v3::HEALTHY,
+                                           host2_upstream_->localAddress(), 1, 0, 0));
 
   ASSERT_EQ(response_.endpoint_health_response().cluster_endpoints_health_size(), 2);
 
