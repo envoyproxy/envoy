@@ -80,7 +80,6 @@ public:
    */
   TestIoSocketHandle* waitForAcceptedSocket(uint32_t index) const;
 
-private:
   // SocketInterface
   IoHandlePtr socket(os_fd_t fd) override;
 
@@ -89,6 +88,7 @@ private:
     return "envoy.extensions.network.socket_interface.test_socket_interface";
   };
 
+private:
   friend class TestIoSocketHandle;
   static TestSocketInterface& GetMutableSingleton() { return *singleton_; }
 
