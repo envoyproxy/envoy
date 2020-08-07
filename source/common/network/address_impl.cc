@@ -299,10 +299,10 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
-EnvoyInternalInstance::EnvoyInternalInstance(const std::string& name,
+EnvoyInternalInstance::EnvoyInternalInstance(const std::string& listener_name,
                                              absl::string_view sock_interface)
-    : InstanceBase(Type::EnvoyInternal, sock_interface), envoy_internal_address_(name) {
-  friendly_name_ = absl::StrCat("envoy:://", name);
+    : InstanceBase(Type::EnvoyInternal, sock_interface), internal_address_(listener_name) {
+  friendly_name_ = absl::StrCat("envoy://", listener_name);
 }
 
 bool EnvoyInternalInstance::operator==(const Instance& rhs) const {

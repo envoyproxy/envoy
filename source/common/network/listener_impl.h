@@ -15,7 +15,7 @@ namespace Network {
 class ListenerImpl : public BaseListenerImpl {
 public:
   ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
-               bool bind_to_port);
+               bool bind_to_port, const std::string& name);
 
   void disable() override;
   void enable() override;

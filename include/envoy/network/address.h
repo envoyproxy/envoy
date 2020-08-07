@@ -124,7 +124,7 @@ public:
   /**
    * @return an listener name as the peer address.
    */
-  virtual std::string listenerName() const PURE;
+  virtual const std::string& listenerName() const PURE;
 };
 
 enum class Type { Ip, Pipe, EnvoyInternal };

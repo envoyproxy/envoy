@@ -18,7 +18,6 @@ namespace Address {
  * Implementation of a resolver for IP addresses.
  */
 class IpResolver : public Resolver {
-
 public:
   InstanceConstSharedPtr
   resolve(const envoy::config::core::v3::SocketAddress& socket_address) override {
@@ -48,10 +47,10 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
-    return InstanceConstSharedPtr{new PipeInstance(address.pipe().path())};
+    return std::make_shared<PipeInstance>(address.pipe().path());
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
-    return InstanceConstSharedPtr{
-        new EnvoyInternalInstance(address.envoy_internal_address().peer_listener_name())};
+    return std::make_shared<EnvoyInternalInstance>(
+        address.envoy_internal_address().peer_listener_name());
   default:
     throw EnvoyException("Address must be a socket, pipe or envoy internal: " +
                          address.DebugString());

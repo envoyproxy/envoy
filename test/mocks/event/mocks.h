@@ -64,8 +64,9 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::ListenerCallbacks& cb, bool bind_to_port) override {
-    return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port)};
+                                      Network::ListenerCallbacks& cb, bool bind_to_port,
+                                      const std::string& name) override {
+    return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port, name)};
   }
 
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
@@ -115,7 +116,7 @@ public:
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::ListenerCallbacks& cb,
-               bool bind_to_port));
+               bool bind_to_port, const std::string& name));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr && socket, Network::UdpListenerCallbacks& cb));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));

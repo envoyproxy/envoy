@@ -251,19 +251,26 @@ public:
   /**
    * Construct from a string name.
    */
-  explicit EnvoyInternalInstance(const std::string& envoy_internal_address,
+  explicit EnvoyInternalInstance(const std::string& envoy_listener_name,
                                  absl::string_view sock_interface = "");
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
   const Ip* ip() const override { return nullptr; }
   const Pipe* pipe() const override { return nullptr; }
-  const EnvoyInternalAddress* envoyInternalAddress() const override { return nullptr; }
+  const EnvoyInternalAddress* envoyInternalAddress() const override { return &internal_address_; }
   const sockaddr* sockAddr() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   socklen_t sockAddrLen() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
-  std::string envoy_internal_address_;
+  struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
+    explicit EnvoyInternalAddressImpl(const std::string& listener_name)
+        : listener_name_(listener_name) {}
+    ~EnvoyInternalAddressImpl() = default;
+    const std::string& listenerName() const override { return listener_name_; }
+    std::string listener_name_;
+  };
+  EnvoyInternalAddressImpl internal_address_;
 };
 
 } // namespace Address

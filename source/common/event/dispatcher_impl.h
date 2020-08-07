@@ -72,7 +72,8 @@ public:
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::ListenerCallbacks& cb, bool bind_to_port) override;
+                                      Network::ListenerCallbacks& cb, bool bind_to_port,
+                                      const std::string& name) override;
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;

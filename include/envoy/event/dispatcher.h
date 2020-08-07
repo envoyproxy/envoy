@@ -161,8 +161,8 @@ public:
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                              Network::ListenerCallbacks& cb,
-                                              bool bind_to_port) PURE;
+                                              Network::ListenerCallbacks& cb, bool bind_to_port,
+                                              const std::string& name) PURE;
 
   /**
    * Creates a logical udp listener on a specific port.

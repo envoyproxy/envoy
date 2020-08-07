@@ -346,9 +346,15 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-  ENVOY_LOG_MISC(debug, "lambdai: create connection to ip {}",
-                 address->ip() ? address->ip()->addressAsString() : "invalid ip address");
-  if (address->ip() && address->ip()->addressAsString() == "127.0.0.255") {
+  ENVOY_LOG_MISC(debug, "lambdai: address", address->asString());
+  if (address->ip()) {
+    ENVOY_LOG_MISC(debug, "lambdai: create connection to address {}",
+                   address->ip()->addressAsString());
+  } else if (address->envoyInternalAddress()) {
+    ENVOY_LOG_MISC(debug, "lambdai: create connection to address {}",
+                   address->envoyInternalAddress()->listenerName());
+  }
+  if (address->envoyInternalAddress()) {
     return dispatcher.createUserspacePipe(
         address, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1));
   }

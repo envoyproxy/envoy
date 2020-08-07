@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "common/network/address_impl.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/connection.h"
@@ -15,6 +14,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
+#include "common/network/address_impl.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/stats/isolated_store_impl.h"
 

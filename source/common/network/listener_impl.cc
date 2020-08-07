@@ -84,7 +84,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 void ListenerImpl::setupPipeListener(Event::DispatcherImpl& dispatcher,
                                      const std::string& pipe_listener_id) {
   dispatcher.registerPipeFactory(
-      pipe_listener_id,
+      absl::StrCat("envoy://", pipe_listener_id),
       [this](const Address::InstanceConstSharedPtr& address, Network::ConnectionPtr server_conn) {
         Network::ConnectionSocketPtr socket = std::make_unique<Network::ConnectionSocketImpl>(
             nullptr,
@@ -115,11 +115,11 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
 }
 
 ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                           ListenerCallbacks& cb, bool bind_to_port)
+                           ListenerCallbacks& cb, bool bind_to_port, const std::string& name)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), listener_(nullptr) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
-    setupPipeListener(dispatcher, socket_->localAddress()->asString());
+    setupPipeListener(dispatcher, name);
   }
 }
 

@@ -157,6 +157,8 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   } catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
+    ENVOY_LOG_MISC(debug,
+                   "lambdai: fail to load with earlier version, try loading with latest version");
     f(message, MessageVersion::LATEST_VERSION);
   }
 }

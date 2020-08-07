@@ -27,7 +27,7 @@ public:
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                     const bool use_tcp_for_dns_lookups) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::ListenerCallbacks&,
-                                      bool bind_to_port) override;
+                                      bool bind_to_port, const std::string& name) override;
 
 protected:
   std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{
