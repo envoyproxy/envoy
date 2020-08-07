@@ -233,18 +233,20 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "c64156c24602ab7a5c66937d774cc55868911d5bbbf1650792f5877744b1c2d9",
+        sha256 = "4c80e5fe044ce5f8055b20a2f141ee32ec2614000f3e95d2aa81611a4c8f5213",
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
         # This also includes the fixes for https://github.com/libevent/libevent/issues/806
         # and https://github.com/lyft/envoy-mobile/issues/215.
-        # This also include the fixes for Phantom events with EV_ET (see
+        # This also includes the fixes for Phantom events with EV_ET (see
         # https://github.com/libevent/libevent/issues/984).
+        # This also includes the wepoll backend for Windows (see
+        # https://github.com/libevent/libevent/pull/1006)
         # TODO(adip): Update to v2.2 when it is released.
-        strip_prefix = "libevent-06a11929511bebaaf40c52aaf91de397b1782ba2",
-        # 2020-05-08
-        urls = ["https://github.com/libevent/libevent/archive/06a11929511bebaaf40c52aaf91de397b1782ba2.tar.gz"],
+        strip_prefix = "libevent-62c152d9a7cd264b993dad730c4163c6ede2e0a3",
+        # 2020-07-31
+        urls = ["https://github.com/libevent/libevent/archive/62c152d9a7cd264b993dad730c4163c6ede2e0a3.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:libevent_project:libevent:*",
     ),
