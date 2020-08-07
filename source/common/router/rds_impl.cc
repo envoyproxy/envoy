@@ -306,15 +306,14 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
   auto alias =
       VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
-  // We use weak pointers here as RdsRouteConfigProviderImpl instance could go away before the
-  // dispatcher had a chance to execute the callback.
+  // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
+  // execute the callback. We use a weak_ptr here to verify that the instance is still around.
   factory_context_.dispatcher().post(
-      [subscription = std::weak_ptr<RdsRouteConfigSubscription>(subscription_),
+      [this,
        config_cbs = std::weak_ptr<std::list<UpdateOnDemandCallback>>(config_update_callbacks_),
        alias, &thread_local_dispatcher, route_config_updated_cb]() -> void {
         if (auto callbacks = config_cbs.lock()) {
-          auto sub = subscription.lock();
-          sub->updateOnDemand(alias);
+          subscription_->updateOnDemand(alias);
           callbacks->push_back({alias, thread_local_dispatcher, route_config_updated_cb});
         }
       });
