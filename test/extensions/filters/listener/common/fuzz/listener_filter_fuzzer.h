@@ -31,6 +31,25 @@ private:
   Event::FileReadyCb file_event_callback_;
 };
 
+class FuzzedHeader {
+public:
+  FuzzedHeader(const test::extensions::filters::listener::FilterFuzzTestCase& input);
+
+  // Copies next read into buffer and returns the number of bytes written
+  Api::SysCallSizeResult next(void* buffer, size_t length);
+
+  bool done();
+
+  // Returns true if data field in proto is empty
+  bool empty();
+
+private:
+  const int nreads;            // Number of reads
+  int nread;                   // Counter of current read
+  std::string header;          // Construct header from single or multiple reads
+  std::vector<size_t> indices; // Ending indices for each read
+};
+
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy
