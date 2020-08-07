@@ -68,25 +68,25 @@ void ListenerFilterFuzzer::fuzz(
 }
 
 FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzzTestCase& input)
-    : nreads(input.data_size()), nread(0), header("") {
-  for (int i = 0; i < nreads; i++) {
-    header += input.data(i);
-    indices.push_back(header.size());
+    : nreads_(input.data_size()), nread_(0), header_("") {
+  for (int i = 0; i < nreads_; i++) {
+    header_ += input.data(i);
+    indices_.push_back(header_.size());
   }
 }
 
 Api::SysCallSizeResult FuzzedHeader::next(void* buffer, size_t length) {
   if (done()) {         // End of stream reached
-    nread = nreads - 1; // Decrement to avoid out-of-range for last recv() call
+    nread_ = nreads_ - 1; // Decrement to avoid out-of-range for last recv() call
   }
-  ASSERT(length >= indices[nread]);
-  memcpy(buffer, header.data(), indices[nread]);
-  return Api::SysCallSizeResult{static_cast<ssize_t>(indices[nread++]), 0};
+  ASSERT(length >= indices_[nread_]);
+  memcpy(buffer, header_.data(), indices_[nread_]);
+  return Api::SysCallSizeResult{static_cast<ssize_t>(indices_[nread_++]), 0};
 }
 
-bool FuzzedHeader::done() { return nread >= nreads; }
+bool FuzzedHeader::done() { return nread_ >= nreads_; }
 
-bool FuzzedHeader::empty() { return nreads == 0; }
+bool FuzzedHeader::empty() { return nreads_ == 0; }
 
 } // namespace ListenerFilters
 } // namespace Extensions

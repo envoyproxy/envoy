@@ -44,10 +44,10 @@ public:
   bool empty();
 
 private:
-  const int nreads;            // Number of reads
-  int nread;                   // Counter of current read
-  std::string header;          // Construct header from single or multiple reads
-  std::vector<size_t> indices; // Ending indices for each read
+  const int nreads_;            // Number of reads
+  int nread_;                   // Counter of current read
+  std::string header_;          // Construct header from single or multiple reads
+  std::vector<size_t> indices_; // Ending indices for each read
 };
 
 } // namespace ListenerFilters
