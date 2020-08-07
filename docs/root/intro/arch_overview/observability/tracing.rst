@@ -120,7 +120,7 @@ Baggage provides a mechanism for data to be available throughout the entirety of
 While metadata such as tags are usually communicated to collectors out-of-band, baggage data is injected into the actual
 request context and available to applications during the duration of the request. This enables metadata to transparently
 travel from the beginning of the request throughout your entire mesh without relying on application-specific modifications for
-propagation. TODO put a link here for more reading?
+propagation. See `OpenTracing's documentation <https://opentracing.io/docs/overview/tags-logs-baggage/>`_ for more information about baggage.
 
 Tracing providers have varying level of support for getting and setting baggage:
 
