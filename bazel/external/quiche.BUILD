@@ -3746,6 +3746,25 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_test_tools_session_peer_lib",
+    srcs = [
+        "quiche/quic/test_tools/quic_session_peer.cc",
+    ],
+    hdrs = [
+        "quiche/quic/test_tools/quic_session_peer.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_packets_lib",
+        ":quic_core_session_lib",
+        ":quic_core_utils_lib",
+        ":quic_platform",
+    ],
+)
+
+envoy_cc_test_library(
     name = "quic_test_tools_unacked_packet_map_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_unacked_packet_map_peer.cc"],
     hdrs = ["quiche/quic/test_tools/quic_unacked_packet_map_peer.h"],

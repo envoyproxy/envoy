@@ -994,6 +994,7 @@ sched
 schedulable
 schemas
 scopekey
+secp
 sendmsg
 sendmmsg
 sendto
