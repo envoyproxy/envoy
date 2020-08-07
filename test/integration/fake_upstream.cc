@@ -176,14 +176,29 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
   return succeeded;
 }
 
+static void wakeup(Event::Dispatcher& dispatcher, std::function<bool()> predicate) {
+  if (!predicate()) {
+    auto timer = dispatcher.createTimer([&dispatcher, predicate]() {
+      wakeup(dispatcher, predicate);
+    });
+    timer->enableTimer(5ms);
+  }
+}
+
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto cond = [this, &client_dispatcher]() {
+  /*
+  auto timer_cb = [this, &client_dispatcher]() {
+                    if (!end_stream_) {
+                      Event::TimerPtr timer = client_dispatcher.createTimer(
+  */
+  auto cond = [this, &client_dispatcher]() -> bool {
     // Run the client dispatcher since we may need to process window updates, etc.
     client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     return end_stream_;
   };
+  wakeup(client_dispatcher, cond);
   if (!time_system_.await(cond, lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for end of stream.";
   }
@@ -322,13 +337,15 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
                                                      bool /*ignore_spurious_events*/,
                                                      milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  if (!time_system_.await([this, &client_dispatcher]() -> bool {
-                            if (!new_streams_.empty()) {
-                              return true;
-                            }
-                            client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-                            return false;
-                          }, lock_, timeout)) {
+  auto cond = [this, &client_dispatcher]() -> bool {
+    // Run the client dispatcher since we may need to process window updates, etc.
+    if (new_streams_.empty()) {
+      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+    }
+    return !new_streams_.empty();
+  };
+  wakeup(client_dispatcher, cond);
+  if (!time_system_.await(cond, lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for new stream.";
   }
   stream = std::move(new_streams_.front());
