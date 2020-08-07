@@ -142,6 +142,7 @@ def envoy_cc_fuzz_test(
     fuzzing_corpus(
         name = name + "_corpus_dir",
         srcs = [corpus_name],
+        testonly = True,
     )
 
     envoy_fuzzing_launcher(
