@@ -625,7 +625,7 @@ template <class Value> struct TrieLookupTable {
  */
 class ExceptionUtil {
 public:
-  static void ThrowEnvoyException(const std::string& message);
+  static void throwEnvoyException(const std::string& message);
 };
 
 // Mix-in class for allocating classes with variable-sized inlined storage.

@@ -218,13 +218,13 @@ public:
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
-      ExceptionUtil::ThrowEnvoyException("Provided name for static registration lookup was empty.");
+      ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
     }
 
     Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
 
     if (factory == nullptr) {
-      ExceptionUtil::ThrowEnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Didn't find a registered implementation for name: '{}'", name));
     }
 
@@ -400,12 +400,12 @@ public:
                                       const char* filter_chain_type, bool is_terminal_filter,
                                       bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
-      ExceptionUtil::ThrowEnvoyException(
+      ExceptionUtil::throwEnvoyException(
           fmt::format("Error: terminal filter named {} of type {} must be the "
                       "last filter in a {} filter chain.",
                       name, filter_type, filter_chain_type));
     } else if (!is_terminal_filter && last_filter_in_current_config) {
-      ExceptionUtil::ThrowEnvoyException(fmt::format(
+      ExceptionUtil::throwEnvoyException(fmt::format(
           "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
           name, filter_type, filter_chain_type));
     }
@@ -427,7 +427,7 @@ public:
       uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config.dns_failure_refresh_rate(),
                                                             max_interval, base_interval_ms * 10);
       if (max_interval_ms < base_interval_ms) {
-        ExceptionUtil::ThrowEnvoyException(
+        ExceptionUtil::throwEnvoyException(
             "dns_failure_refresh_rate must have max_interval greater than "
             "or equal to the base_interval");
       }

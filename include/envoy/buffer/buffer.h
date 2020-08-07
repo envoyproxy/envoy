@@ -262,7 +262,7 @@ public:
     static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
 
     if (length() < start + Size) {
-      ExceptionUtil::ThrowEnvoyException("buffer underflow");
+      ExceptionUtil::throwEnvoyException("buffer underflow");
     }
 
     constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
