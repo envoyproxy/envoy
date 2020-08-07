@@ -91,7 +91,7 @@ INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, RequestConditionalHeadersTest,
 
 TEST_P(RequestConditionalHeadersTest, ConditionalHeaders) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers_));
-  request_headers_.setReferenceKey(Http::LowerCaseString{conditionalHeader()}, "test-value");
+  request_headers_.setCopy(Http::LowerCaseString{conditionalHeader()}, "test-value");
   EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers_));
 }
 
