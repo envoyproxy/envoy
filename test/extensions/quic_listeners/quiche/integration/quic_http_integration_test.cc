@@ -145,11 +145,6 @@ public:
               - name: "envoy.resource_monitors.injected_resource"
                 threshold:
                   value: 0.95
-          - name: "envoy.overload_actions.disable_http_keepalive"
-            triggers:
-              - name: "envoy.resource_monitors.injected_resource"
-                threshold:
-                  value: 0.8
           - name: "envoy.overload_actions.stop_accepting_connections"
             triggers:
               - name: "envoy.resource_monitors.injected_resource"

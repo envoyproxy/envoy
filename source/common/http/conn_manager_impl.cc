@@ -481,7 +481,7 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
   }
 }
 
-void ConnectionManagerImpl::onDrainTimeout() {
+void ConnectionManagerImpl::drainConnection() {
   ASSERT(drain_state_ != DrainState::NotDraining);
   codec_->goAway();
   drain_state_ = DrainState::Closing;
@@ -1484,13 +1484,18 @@ ConnectionManagerImpl::FilterManager::commonDecodePrefix(
   return std::next(filter->entry());
 }
 
-void ConnectionManagerImpl::startDrainSequence() {
+void ConnectionManagerImpl::startDrainSequence(bool wait_for_timeout) {
   ASSERT(drain_state_ == DrainState::NotDraining);
   drain_state_ = DrainState::Draining;
   codec_->shutdownNotice();
-  drain_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-      [this]() -> void { onDrainTimeout(); });
-  drain_timer_->enableTimer(config_.drainTimeout());
+  if (wait_for_timeout) {
+    drain_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { drainConnection(); });
+    drain_timer_->enableTimer(wait_for_timeout ? config_.drainTimeout()
+                                               : std::chrono::milliseconds::zero());
+  } else {
+    drainConnection();
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
@@ -1832,15 +1837,26 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                                                   connection_manager_.config_,
                                                   connection_manager_.config_.via());
 
+  bool drain_connection_due_to_overload = false;
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      connection_manager_.overload_disable_keepalive_ref_ == Server::OverloadActionState::Active) {
+    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
+    drain_connection_due_to_overload = true;
+    connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
+  }
+
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.drain_close_.drainClose()) {
+      (connection_manager_.drain_close_.drainClose() || drain_connection_due_to_overload)) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
-    // of time to race with incoming requests. It mainly just keeps the logic the same between
-    // HTTP/1.1 and HTTP/2.
-    connection_manager_.startDrainSequence();
+    // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to
+    // prevent any new streams.
+    connection_manager_.startDrainSequence(
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.connection_manager_drain_http2")
+            ? !drain_connection_due_to_overload
+            : true);
     connection_manager_.stats_.named_.downstream_cx_drain_close_.inc();
     ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
   }
@@ -1863,13 +1879,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     connection_manager_.drain_state_ = DrainState::Closing;
   }
 
-  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      connection_manager_.overload_disable_keepalive_ref_ == Server::OverloadActionState::Active) {
-    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
-    connection_manager_.drain_state_ = DrainState::Closing;
-    connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
-  }
-
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
@@ -1881,24 +1890,15 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     connection_manager_.stats_.named_.downstream_rq_response_before_rq_complete_.inc();
   }
 
-  if (connection_manager_.drain_state_ != DrainState::NotDraining) {
-    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-      // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
-      // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
-      // payload is no longer HTTP/1.1)
-      if (!Utility::isUpgrade(headers) &&
-          !HeaderUtility::isConnectResponse(filter_manager_.requestHeaders(),
-                                            *filter_manager_.responseHeaders())) {
-        headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
-        headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
-      }
-    } else {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.connection_manager_drain_http2")) {
-        // For H2, send a GOAWAY frame to tell the client that no further requests will be accepted
-        // on this connection.
-        connection_manager_.codec_->goAway();
-      }
+  if (connection_manager_.drain_state_ != DrainState::NotDraining &&
+      connection_manager_.codec_->protocol() < Protocol::Http2) {
+    // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
+    // Do not do this for H2 (which drains via GOAWAY) or Upgrade or CONNECT (as the
+    // payload is no longer HTTP/1.1)
+    if (!Utility::isUpgrade(headers) &&
+        !HeaderUtility::isConnectResponse(filter_manager_.requestHeaders(),
+                                          *filter_manager_.responseHeaders())) {
+      headers.setReferenceConnection(Headers::get().ConnectionValues.Close);
     }
   }
 
