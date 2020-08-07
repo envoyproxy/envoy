@@ -15,7 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Udp Gso Batch Writer Config]
 
+// [#not-implemented-hide:]
 // Configuration specific to the Udp Gso Batch Writer.
-// Next id: 1
 message UdpGsoBatchWriterOptions {
 }

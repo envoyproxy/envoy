@@ -15,8 +15,8 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // [#protodoc-title: Udp Default Writer Config]
 
+// [#not-implemented-hide:]
 // Configuration specific to the Udp Default Writer.
-// Next id: 1
 message UdpDefaultWriterOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.listener.v3.UdpDefaultWriterOptions";
