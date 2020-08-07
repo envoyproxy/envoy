@@ -60,11 +60,8 @@ using SocketInterfaceLoader = ScopedInjectableLoader<SocketInterface>;
  */
 static inline IoHandlePtr ioHandleForAddr(Socket::Type type,
                                           const Address::InstanceConstSharedPtr addr) {
-  auto sock_interface_name = addr->socketInterface();
-  if (!sock_interface_name.empty()) {
-    auto sock_interface = socketInterface(sock_interface_name);
-    RELEASE_ASSERT(sock_interface != nullptr,
-                   fmt::format("missing socket interface {}", sock_interface_name));
+  auto sock_interface = addr->socketInterface();
+  if (sock_interface) {
     return sock_interface->socket(type, addr);
   }
   return SocketInterfaceSingleton::get().socket(type, addr);

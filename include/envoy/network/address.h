@@ -16,6 +16,10 @@
 
 namespace Envoy {
 namespace Network {
+
+/* Forward declaration */
+class SocketInterface;
+
 namespace Address {
 
 /**
@@ -178,9 +182,9 @@ public:
   virtual Type type() const PURE;
 
   /**
-   * @return name of socket interface that should be used with this address
+   * @return SocketInterface if one was configured or nullptr
    */
-  virtual const std::string& socketInterface() const PURE;
+  virtual const Network::SocketInterface* socketInterface() const PURE;
 };
 
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
