@@ -46,10 +46,10 @@ void ListenerFilterFuzzer::fuzz(
 
       EXPECT_CALL(os_sys_calls_, recv(kFakeSocketFd, _, _, MSG_PEEK))
           .Times(testing::AnyNumber())
-          .WillRepeatedly(Invoke([&header](os_fd_t, void* buffer, size_t length, int)
-                                 -> Api::SysCallSizeResult {
-            return header.next(buffer, length);
-          }));
+          .WillRepeatedly(Invoke(
+              [&header](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                return header.next(buffer, length);
+              }));
     }
 
     bool got_continue = false;
@@ -81,12 +81,12 @@ Api::SysCallSizeResult FuzzedHeader::next(void* buffer, size_t length) {
   }
   ASSERT(length >= indices[nread]);
   memcpy(buffer, header.data(), indices[nread]);
-  return Api::SysCallSizeResult{ssize_t(indices[nread++]), 0};
+  return Api::SysCallSizeResult{static_cast<ssize_t>(indices[nread++]), 0};
 }
 
-bool FuzzedHeader::done() { return (nread >= nreads); }
+bool FuzzedHeader::done() { return nread >= nreads; }
 
-bool FuzzedHeader::empty() { return (nreads == 0); }
+bool FuzzedHeader::empty() { return nreads == 0; }
 
 } // namespace ListenerFilters
 } // namespace Extensions
