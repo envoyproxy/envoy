@@ -2790,12 +2790,7 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::getUpstreamSocketOptions() con
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  parent_.active_stream_.requestRouteConfigUpdate(dispatcher(), std::move(route_config_updated_cb));
-}
-
-absl::optional<Router::ConfigConstSharedPtr>
-ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
-  return parent_.active_stream_.routeConfig();
+  parent_.active_stream_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {

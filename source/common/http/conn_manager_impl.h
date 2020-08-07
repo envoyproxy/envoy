@@ -1003,12 +1003,9 @@ private:
     Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
-<<<<<<< HEAD
     absl::optional<uint64_t> scope_key_hash_;
-=======
 
     friend FilterManager;
->>>>>>> 7cf3efa4b... hcm: introduce FilterManager (#12295)
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -1070,13 +1067,8 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
-<<<<<<< HEAD
-
-}; // namespace Http
-=======
   bool remote_close_{};
 };
->>>>>>> 360e0803a... http: setting details for all HTTP/1.1 repsonse paths. (#12228)
 
 } // namespace Http
 } // namespace Envoy
