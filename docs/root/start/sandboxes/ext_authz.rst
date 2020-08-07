@@ -23,10 +23,17 @@ Ensure that you have a recent versions of ``docker`` and ``docker-compose``.
 
 A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/products/docker-desktop>`_.
 
-**Step 2: Clone the Envoy repository and start all of our containers**
+**Step 2: Clone the Envoy repo**
 
-If you have not cloned the Envoy repository, clone it with ``git clone git@github.com:envoyproxy/envoy``
-or ``git clone https://github.com/envoyproxy/envoy.git``.
+If you have not cloned the Envoy repo, clone it with:
+
+``git clone git@github.com:envoyproxy/envoy``
+
+or
+
+``git clone https://github.com/envoyproxy/envoy.git``
+
+**Step 3: Start all of our containers**
 
 To build this sandbox example and start the example services, run the following commands:
 
@@ -69,7 +76,7 @@ For example, to run Envoy with ext_authz HTTP filter with HTTP service will be:
     $ FRONT_ENVOY_YAML=config/http-service.yaml docker-compose up --build -d
     $ # Or you can update the .env file with the above FRONT_ENVOY_YAML value, so you don't have to specify it when running the "up" command.
 
-**Step 3: Access the upstream-service behind the Front Envoy**
+**Step 4: Access the upstream-service behind the Front Envoy**
 
 You can now try to send a request to upstream-service via the front-envoy as follows:
 
