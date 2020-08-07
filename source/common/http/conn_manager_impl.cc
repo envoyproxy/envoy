@@ -1160,9 +1160,9 @@ void ConnectionManagerImpl::FilterManager::decodeHeaders(ActiveStreamDecoderFilt
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     const bool new_metadata_added = processNewlyAddedMetadata();
-    // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
-    // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
-    // after the new metadata.
+    // If end_stream is set in headers, and a filter adds new metadata, we need to delay
+    // end_stream in headers by inserting an empty data frame with end_stream set. The empty data
+    // frame is sent after the new metadata.
     if ((*entry)->end_stream_ && new_metadata_added && !buffered_request_data_) {
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(trace,
@@ -2790,12 +2790,7 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::getUpstreamSocketOptions() con
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  parent_.active_stream_.requestRouteConfigUpdate(dispatcher(), std::move(route_config_updated_cb));
-}
-
-absl::optional<Router::ConfigConstSharedPtr>
-ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
-  return parent_.active_stream_.routeConfig();
+  parent_.active_stream_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
