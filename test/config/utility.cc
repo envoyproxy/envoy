@@ -617,8 +617,8 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
 }
 
-void ConfigHelper::setLegacyCodecs() {
-  addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "false");
+void ConfigHelper::setNewCodecs() {
+  addRuntimeOverride("envoy.reloadable_features.new_codec_behavior", "true");
 }
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {

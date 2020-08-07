@@ -247,6 +247,9 @@ def runChecks():
                                 "Don't use std::optional; use absl::optional instead")
   errors += checkUnfixableError("std_variant.cc",
                                 "Don't use std::variant; use absl::variant instead")
+  errors += checkUnfixableError(
+      "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
+  errors += checkFileExpectingOK("commented_throw.cc")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",

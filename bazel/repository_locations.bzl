@@ -233,18 +233,20 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "c64156c24602ab7a5c66937d774cc55868911d5bbbf1650792f5877744b1c2d9",
+        sha256 = "4c80e5fe044ce5f8055b20a2f141ee32ec2614000f3e95d2aa81611a4c8f5213",
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
         # This also includes the fixes for https://github.com/libevent/libevent/issues/806
         # and https://github.com/lyft/envoy-mobile/issues/215.
-        # This also include the fixes for Phantom events with EV_ET (see
+        # This also includes the fixes for Phantom events with EV_ET (see
         # https://github.com/libevent/libevent/issues/984).
+        # This also includes the wepoll backend for Windows (see
+        # https://github.com/libevent/libevent/pull/1006)
         # TODO(adip): Update to v2.2 when it is released.
-        strip_prefix = "libevent-06a11929511bebaaf40c52aaf91de397b1782ba2",
-        # 2020-05-08
-        urls = ["https://github.com/libevent/libevent/archive/06a11929511bebaaf40c52aaf91de397b1782ba2.tar.gz"],
+        strip_prefix = "libevent-62c152d9a7cd264b993dad730c4163c6ede2e0a3",
+        # 2020-07-31
+        urls = ["https://github.com/libevent/libevent/archive/62c152d9a7cd264b993dad730c4163c6ede2e0a3.tar.gz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:libevent_project:libevent:*",
     ),
@@ -415,9 +417,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/googleurl_6dafefa72cba2ab2ba4922d17a30618e9617c7cf.tar.gz
-        sha256 = "f1ab73ddd1a7db4e08a9e4db6c2e98e5a0a7bbaca08f5fee0d73adb02c24e44a",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_6dafefa72cba2ab2ba4922d17a30618e9617c7cf.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ef0d23689e240e6c8de4c3a5296b209128c87373.tar.gz.
+        sha256 = "d769283fed1319bca68bae8bdd47fbc3a7933999329eee850eff1f1ea61ce176",
+        # 2020-08-05
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_ef0d23689e240e6c8de4c3a5296b209128c87373.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
@@ -482,9 +485,9 @@ DEPENDENCY_REPOSITORIES = dict(
         use_category = ["test"],
     ),
     org_unicode_icuuc = dict(
-        strip_prefix = "icu-release-64-2",
-        sha256 = "524960ac99d086cdb6988d2a92fc163436fd3c6ec0a84c475c6382fbf989be05",
-        urls = ["https://github.com/unicode-org/icu/archive/release-64-2.tar.gz"],
+        strip_prefix = "icu",
+        sha256 = "94a80cd6f251a53bd2a997f6f1b5ac6653fe791dfab66e1eb0227740fb86d5dc",
+        urls = ["https://github.com/unicode-org/icu/releases/download/release-67-1/icu4c-67_1-src.tgz"],
         use_category = ["dataplane"],
         cpe = "cpe:2.3:a:icu-project:international_components_for_unicode",
     ),
