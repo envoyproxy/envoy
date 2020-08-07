@@ -38,6 +38,8 @@ public:
   // Init::TargetHandle
   bool initialize(const Watcher& watcher) const override;
 
+  absl::string_view name() const override;
+
 private:
   // Name of the handle (almost always the name of the ManagerImpl calling the target)
   const std::string handle_name_;

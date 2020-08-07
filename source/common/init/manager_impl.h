@@ -7,6 +7,8 @@
 #include "common/common/logger.h"
 #include "common/init/watcher_impl.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Init {
 
@@ -35,27 +37,39 @@ public:
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
 
+  // Expose the const reference of target_names_count_ hash map to public.
+  const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const;
+
 private:
-  void onTargetReady();
+  // Callback function with an additional target_name parameter, decrease unready targets count by
+  // 1, update target_names_count_ hash map.
+  void onTargetReady(absl::string_view target_name);
+
   void ready();
 
-  // Human-readable name for logging
+  // Human-readable name for logging.
   const std::string name_;
 
-  // Current state
+  // Current state.
   State state_;
 
-  // Current number of registered targets that have not yet initialized
+  // Current number of registered targets that have not yet initialized.
   uint32_t count_;
 
-  // Handle to the watcher passed in `initialize`, to be called when initialization completes
+  // Handle to the watcher passed in `initialize`, to be called when initialization completes.
   WatcherHandlePtr watcher_handle_;
 
-  // Watcher to receive ready notifications from each target
+  // Watcher to receive ready notifications from each target. We restrict the watcher_ inside
+  // ManagerImpl to be constructed with the 'TargetAwareReadyFn' fn so that the init manager will
+  // get target name information when the watcher_ calls 'onTargetSendName(target_name)' For any
+  // other purpose, a watcher can be constructed with either TargetAwareReadyFn or ReadyFn.
   const WatcherImpl watcher_;
 
-  // All registered targets
+  // All registered targets.
   std::list<TargetHandlePtr> target_handles_;
+
+  // Count of target_name of unready targets.
+  absl::flat_hash_map<std::string, uint32_t> target_names_count_;
 };
 
 } // namespace Init

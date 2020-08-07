@@ -22,6 +22,8 @@ bool TargetHandleImpl::initialize(const Watcher& watcher) const {
   }
 }
 
+absl::string_view TargetHandleImpl::name() const { return name_; }
+
 TargetImpl::TargetImpl(absl::string_view name, InitializeFn fn)
     : name_(fmt::format("target {}", name)),
       fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {

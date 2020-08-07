@@ -1,19 +1,23 @@
 #include "common/init/manager_impl.h"
 
+#include <functional>
+
 #include "common/common/assert.h"
+#include "common/init/watcher_impl.h"
 
 namespace Envoy {
 namespace Init {
 
 ManagerImpl::ManagerImpl(absl::string_view name)
     : name_(fmt::format("init manager {}", name)), state_(State::Uninitialized), count_(0),
-      watcher_(name_, [this]() { onTargetReady(); }) {}
+      watcher_(name_, [this](absl::string_view target_name) { onTargetReady(target_name); }) {}
 
 Manager::State ManagerImpl::state() const { return state_; }
 
 void ManagerImpl::add(const Target& target) {
   ++count_;
   TargetHandlePtr target_handle(target.createHandle(name_));
+  ++target_names_count_[target.name()];
   switch (state_) {
   case State::Uninitialized:
     // If the manager isn't initialized yet, save the target handle to be initialized later.
@@ -53,15 +57,26 @@ void ManagerImpl::initialize(const Watcher& watcher) {
     // completed immediately.
     for (const auto& target_handle : target_handles_) {
       if (!target_handle->initialize(watcher_)) {
-        onTargetReady();
+        onTargetReady(target_handle->name());
       }
     }
   }
 }
 
-void ManagerImpl::onTargetReady() {
+const absl::flat_hash_map<std::string, uint32_t>& ManagerImpl::unreadyTargets() const {
+  return target_names_count_;
+}
+
+void ManagerImpl::onTargetReady(absl::string_view target_name) {
   // If there are no remaining targets and one mysteriously calls us back, this manager is haunted.
-  ASSERT(count_ != 0, fmt::format("{} called back by target after initialization complete"));
+  ASSERT(count_ != 0,
+         fmt::format("{} called back by target after initialization complete", target_name));
+
+  // Decrease target_name count by 1.
+  ASSERT(target_names_count_.find(target_name) != target_names_count_.end());
+  if (--target_names_count_[target_name] == 0) {
+    target_names_count_.erase(target_name);
+  }
 
   // If there are no uninitialized targets remaining when called back by a target, that means it was
   // the last. Signal `ready` to the handle we saved in `initialize`.
