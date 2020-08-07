@@ -26,8 +26,8 @@ public:
 
   bool updateValue(double value) override {
     const OverloadActionState state = actionState();
-    state_.emplace(value >= threshold_ ? OverloadActionState::saturated()
-                                       : OverloadActionState::inactive());
+    state_ =
+        value >= threshold_ ? OverloadActionState::saturated() : OverloadActionState::inactive();
     return state.value() != actionState().value();
   }
 
@@ -41,7 +41,7 @@ private:
 class RangeTriggerImpl final : public OverloadAction::Trigger {
 public:
   RangeTriggerImpl(const envoy::config::overload::v3::ScaledTrigger& config)
-      : scaling_threshold_(config.min_value()), saturated_threshold_(config.max_value()),
+      : scaling_threshold_(config.scaling_threshold()), saturated_threshold_(config.saturation_threshold()),
         state_(OverloadActionState::inactive()) {
     if (scaling_threshold_ >= saturated_threshold_) {
       throw EnvoyException("min_value must be less than max_value");
@@ -58,7 +58,7 @@ public:
       state_ = OverloadActionState((value - scaling_threshold_) /
                                    (saturated_threshold_ - scaling_threshold_));
     }
-    return state_->value() != old_state.value();
+    return state_.value() != old_state.value();
   }
 
   OverloadActionState actionState() const override { return state_; }
