@@ -102,13 +102,12 @@ final class StreamClientBuilderTests: XCTestCase {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
       XCTAssertEqual(1, config.httpFilterFactories.count)
-      XCTAssertEqual("TestFilter", config.httpFilterFactories[0].filterName)
       expectation.fulfill()
     }
 
     _ = try StreamClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addFilter("TestFilter", factory: TestFilter.init)
+      .addFilter(factory: TestFilter.init)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }

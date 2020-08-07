@@ -16,8 +16,7 @@ final class ViewController: UITableViewController {
     do {
       NSLog("starting Envoy...")
       self.client = try StreamClientBuilder()
-        // TODO(goaway): Update once dynamic registration is in place.
-        .addFilter("DemoFilter", factory: DemoFilter.init)
+        .addFilter(factory: DemoFilter.init)
         .build()
     } catch let error {
       NSLog("starting Envoy failed: \(error)")

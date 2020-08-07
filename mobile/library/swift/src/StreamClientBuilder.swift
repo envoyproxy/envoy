@@ -110,13 +110,12 @@ public final class StreamClientBuilder: NSObject {
 
   /// Add an HTTP filter factory used to construct filters for streams sent by this client.
   ///
-  /// - parameter filterName: Unique name for this filter required for registration.
   /// - parameter factory: Closure returning an instantiated filter. Called once per stream.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addFilter(_ filterName: String, factory: @escaping () -> Filter)
-      -> StreamClientBuilder {
+  public func addFilter(factory: @escaping () -> Filter) -> StreamClientBuilder {
+    let filterName = UUID().uuidString
     self.filterChain.append(EnvoyHTTPFilterFactory(filterName: filterName, factory: factory))
     return self
   }
