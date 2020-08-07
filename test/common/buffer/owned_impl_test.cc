@@ -455,10 +455,13 @@ TEST_F(OwnedImplTest, ExtractUnownedSlice) {
   Buffer::OwnedImpl buffer;
   buffer.addBufferFragment(*frag);
 
+  bool drain_tracker_called{false};
+  buffer.addDrainTracker([&] { drain_tracker_called = true; });
+
   // Add an owned slice to the end of the buffer.
   EXPECT_EQ(expected_length0, buffer.length());
   std::string owned_slice_content{"another slice, but owned"};
-  buffer.appendSliceForTest(owned_slice_content);
+  buffer.add(owned_slice_content);
   const uint64_t expected_length1 = owned_slice_content.length();
 
   // Partially drain the unowned slice.
@@ -466,10 +469,12 @@ TEST_F(OwnedImplTest, ExtractUnownedSlice) {
   buffer.drain(partial_drain_size);
   EXPECT_EQ(expected_length0 - partial_drain_size + expected_length1, buffer.length());
   EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(drain_tracker_called);
 
   // Extract what remains of the unowned slice, leaving only the owned slice.
   auto slice = buffer.extractMutableFrontSlice();
   ASSERT_TRUE(slice);
+  EXPECT_TRUE(drain_tracker_called);
   auto slice_data = slice->getMutableData();
   ASSERT_NE(slice_data.data(), nullptr);
   EXPECT_EQ(slice_data.size(), expected_length0 - partial_drain_size);
