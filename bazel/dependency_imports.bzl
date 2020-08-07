@@ -8,6 +8,7 @@ load("@upb//bazel:repository_defs.bzl", upb_bazel_version_repository = "bazel_ve
 load("@config_validation_pip3//:requirements.bzl", config_validation_pip_install = "pip_install")
 load("@protodoc_pip3//:requirements.bzl", protodoc_pip_install = "pip_install")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
+load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 
 # go version for rules_go
 GO_VERSION = "1.14.4"
@@ -21,6 +22,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     apple_rules_dependencies()
     upb_bazel_version_repository(name = "upb_bazel_version")
     antlr_dependencies(471)
+    rules_fuzzing_dependencies()
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",
