@@ -55,8 +55,17 @@ public:
   FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
              Event::TestTimeSystem& time_system);
 
-  uint64_t bodyLength() { return body_.length(); }
-  Buffer::Instance& body() { return body_; }
+  uint64_t bodyLength() ABSL_LOCKS_EXCLUDED(lock_) {
+    Thread::LockGuard lock(lock_);
+    return body_.length();
+  }
+
+  uint64_t bodyLengthLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return body_.length(); }
+  Buffer::Instance& bodyLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return body_; }
+  Buffer::Instance& body() ABSL_LOCKS_EXCLUDED(lock_) {
+    Thread::LockGuard lock(lock_);
+    return body_;
+  }
   bool complete() {
     Thread::LockGuard lock(lock_);
     return end_stream_;
@@ -78,7 +87,10 @@ public:
   const Http::RequestHeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
-  bool receivedData() { return received_data_; }
+  bool receivedData() ABSL_LOCKS_EXCLUDED(lock_) {
+    Thread::LockGuard lock(lock_);
+    return received_data_;
+  }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
   }
@@ -109,12 +121,14 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
-              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout)
+      ABSL_LOCKS_EXCLUDED(lock_);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForData(Event::Dispatcher& client_dispatcher, absl::string_view body,
-              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout)
+      ABSL_LOCKS_EXCLUDED(lock_);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -160,9 +174,9 @@ public:
     }
     {
       Thread::LockGuard lock(lock_);
-      if (!grpc_decoder_.decode(body(), decoded_grpc_frames_)) {
+      if (!grpc_decoder_.decode(bodyLockHeld(), decoded_grpc_frames_)) {
         return testing::AssertionFailure()
-               << "Couldn't decode gRPC data frame: " << body().toString();
+               << "Couldn't decode gRPC data frame: " << bodyLockHeld().toString();
       }
     }
     if (decoded_grpc_frames_.empty()) {
@@ -173,9 +187,9 @@ public:
       }
       {
         Thread::LockGuard lock(lock_);
-        if (!grpc_decoder_.decode(body(), decoded_grpc_frames_)) {
+        if (!grpc_decoder_.decode(bodyLockHeld(), decoded_grpc_frames_)) {
           return testing::AssertionFailure()
-                 << "Couldn't decode gRPC data frame: " << body().toString();
+                 << "Couldn't decode gRPC data frame: " << bodyLockHeld().toString();
         }
       }
     }
@@ -198,7 +212,14 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  virtual void setEndStream(bool end) { end_stream_ = end; }
+  virtual void setEndStream(bool end) ABSL_LOCKS_EXCLUDED(lock_) {
+    Thread::LockGuard lock(lock_);
+    end_stream_ = end;
+  }
+
+  virtual void setEndStreamLockHeld(bool end) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+    end_stream_ = end;
+  }
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
@@ -214,18 +235,19 @@ private:
   FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Thread::MutexBasicLockable lock_;
-  Thread::CondVar decoder_event_;
-  Http::RequestTrailerMapPtr trailers_;
-  bool end_stream_{};
-  Buffer::OwnedImpl body_;
-  bool saw_reset_{};
+  // Thread::CondVar decoder_event_;
+  bool decoder_event_ ABSL_GUARDED_BY(lock_) = false;
+  Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
+  bool end_stream_ ABSL_GUARDED_BY(lock_){};
+  Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
+  bool saw_reset_ ABSL_GUARDED_BY(lock_){};
   Grpc::Decoder grpc_decoder_;
   std::vector<Grpc::Frame> decoded_grpc_frames_;
   bool add_served_by_header_{};
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
-  bool received_data_{false};
+  bool received_data_ ABSL_GUARDED_BY(lock_){false};
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;

@@ -49,23 +49,23 @@ FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encode
 void FakeStream::decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) {
   Thread::LockGuard lock(lock_);
   headers_ = std::move(headers);
-  setEndStream(end_stream);
-  decoder_event_.notifyOne();
+  setEndStreamLockHeld(end_stream);
+  decoder_event_ = true;
 }
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
-  received_data_ = true;
   Thread::LockGuard lock(lock_);
+  received_data_ = true;
   body_.add(data);
-  setEndStream(end_stream);
-  decoder_event_.notifyOne();
+  setEndStreamLockHeld(end_stream);
+  decoder_event_ = true;
 }
 
 void FakeStream::decodeTrailers(Http::RequestTrailerMapPtr&& trailers) {
   Thread::LockGuard lock(lock_);
-  setEndStream(true);
+  setEndStreamLockHeld(true);
   trailers_ = std::move(trailers);
-  decoder_event_.notifyOne();
+  decoder_event_ = true;
 }
 
 void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
@@ -144,14 +144,17 @@ void FakeStream::readDisable(bool disable) {
 void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;
-  decoder_event_.notifyOne();
+  decoder_event_ = true;
 }
 
 AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  if (!time_system_.await([this]() -> bool { return headers_ != nullptr; }, lock_, timeout)) {
+  if (!time_system_.await([this]() EXCLUSIVE_LOCKS_REQUIRED(
+                              lock_) -> bool { return decoder_event_ && headers_ != nullptr; },
+                          lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for headers.";
   }
+  decoder_event_ = false;
   return AssertionSuccess();
 }
 
@@ -159,14 +162,15 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
                                         milliseconds timeout) {
   Thread::LockGuard lock(lock_);
   if (!time_system_.await(
-          [this, body_length, &client_dispatcher]() -> bool {
+          [this, body_length, &client_dispatcher]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
             // Run the client dispatcher since we may need to process window updates, etc.
             client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-            return bodyLength() >= body_length;
+            return decoder_event_ && bodyLengthLockHeld() >= body_length;
           },
           lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";
   }
+  decoder_event_ = false;
   return AssertionSuccess();
 }
 
@@ -198,23 +202,27 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
                     if (!end_stream_) {
                       Event::TimerPtr timer = client_dispatcher.createTimer(
   */
-  auto cond = [this, &client_dispatcher]() -> bool {
+  auto cond = [this, &client_dispatcher]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
     // Run the client dispatcher since we may need to process window updates, etc.
     client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    return end_stream_;
+    return end_stream_ && decoder_event_;
   };
   wakeup(client_dispatcher, cond);
   if (!time_system_.await(cond, lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for end of stream.";
   }
+  decoder_event_ = false;
   return AssertionSuccess();
 }
 
 AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  if (!time_system_.await(saw_reset_, lock_, timeout)) {
+  if (!time_system_.await(
+          [this]() EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool { return saw_reset_ && decoder_event_; },
+          lock_, timeout)) {
     return AssertionFailure() << "Timed out waiting for reset.";
   }
+  decoder_event_ = false;
   return AssertionSuccess();
 }
 
@@ -340,10 +348,14 @@ AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
 }
 
 Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encoder, bool) {
-  Thread::LockGuard lock(lock_);
-  new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
-  connection_event_.notifyOne();
-  return *new_streams_.back();
+  Http::RequestDecoder* decoder;
+  {
+    Thread::LockGuard lock(lock_);
+    new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
+    connection_event_.notifyOne();
+    decoder = &(*new_streams_.back());
+  }
+  return *decoder;
 }
 
 AssertionResult FakeConnectionBase::waitForDisconnect(bool /*ignore_spurious_events*/,
@@ -480,13 +492,15 @@ void FakeUpstream::cleanUp() {
 
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
-  Thread::LockGuard lock(lock_);
-  if (read_disable_on_new_connection_) {
-    connection.readDisable(true);
+  {
+    Thread::LockGuard lock(lock_);
+    if (read_disable_on_new_connection_) {
+      connection.readDisable(true);
+    }
+    auto connection_wrapper =
+        std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
+    LinkedList::moveIntoListBack(std::move(connection_wrapper), new_connections_);
   }
-  auto connection_wrapper =
-      std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
-  LinkedList::moveIntoListBack(std::move(connection_wrapper), new_connections_);
   upstream_event_.notifyOne();
   return true;
 }
@@ -634,8 +648,10 @@ testing::AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& 
 }
 
 void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
-  Thread::LockGuard lock(lock_);
-  received_datagrams_.emplace_back(std::move(data));
+  {
+    Thread::LockGuard lock(lock_);
+    received_datagrams_.emplace_back(std::move(data));
+  }
   upstream_event_.notifyOne();
 }
 
@@ -689,12 +705,14 @@ AssertionResult FakeRawConnection::write(const std::string& data, bool end_strea
 
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
                                                             bool end_stream) {
-  Thread::LockGuard lock(parent_.lock_);
-  ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
-  parent_.data_.append(data.toString());
-  parent_.half_closed_ = end_stream;
-  data.drain(data.length());
-  parent_.connection_event_.notifyOne();
+  {
+    Thread::LockGuard lock(parent_.lock_);
+    ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
+    parent_.data_.append(data.toString());
+    parent_.half_closed_ = end_stream;
+    data.drain(data.length());
+    parent_.connection_event_.notifyOne();
+  }
   return Network::FilterStatus::StopIteration;
 }
 } // namespace Envoy
