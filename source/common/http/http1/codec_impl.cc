@@ -675,20 +675,6 @@ int ConnectionImpl::onHeadersCompleteBase() {
     handling_upgrade_ = true;
   }
 
-  // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
-  // transfer-codings it does not understand.
-  // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 a payload with a
-  // CONNECT request has no defined semantics, and may be rejected.
-  if (request_or_response_headers.TransferEncoding()) {
-    const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
-    if (!absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked) ||
-        parser_.method == HTTP_CONNECT) {
-      error_code_ = Http::Code::NotImplemented;
-      sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
-      throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
-    }
-  }
-
   // https://tools.ietf.org/html/rfc7230#section-3.3.3
   // If a message is received with both a Transfer-Encoding and a
   // Content-Length header field, the Transfer-Encoding overrides the
@@ -709,6 +695,20 @@ int ConnectionImpl::onHeadersCompleteBase() {
       sendProtocolError(Http1ResponseCodeDetails::get().ContentLengthNotAllowed);
       throw CodecProtocolException(
           "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
+    }
+  }
+
+  // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
+  // transfer-codings it does not understand.
+  // Per https://tools.ietf.org/html/rfc7231#section-4.3.6 a payload with a
+  // CONNECT request has no defined semantics, and may be rejected.
+  if (request_or_response_headers.TransferEncoding()) {
+    const absl::string_view encoding = request_or_response_headers.getTransferEncodingValue();
+    if (!absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked) ||
+        parser_.method == HTTP_CONNECT) {
+      error_code_ = Http::Code::NotImplemented;
+      sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
+      throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
     }
   }
 
