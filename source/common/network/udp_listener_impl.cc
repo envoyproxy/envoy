@@ -45,15 +45,17 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
 }
 
 UdpListenerImpl::~UdpListenerImpl() {
-  disable();
+  disableEvent();
   file_event_.reset();
 }
 
-void UdpListenerImpl::disable() { file_event_->setEnabled(0); }
+void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
   file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
+
+void UdpListenerImpl::disableEvent() { file_event_->setEnabled(0); }
 
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
