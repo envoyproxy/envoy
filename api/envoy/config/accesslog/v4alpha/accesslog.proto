@@ -306,7 +306,7 @@ message MetadataFilter {
   // Matcher to check metadata for specified value. For example, to match on the
   // access_log_hint metadata, set the filter to "envoy.common" and the path to
   // "access_log_hint", and the value to "true".
-  type.matcher.v4alpha.MetadataMatcher matcher = 1 [(validate.rules).message = {required: true}];
+  type.matcher.v4alpha.MetadataMatcher matcher = 1;
 
   // Default result if the key does not exist in dynamic metadata: if unset or
   // true, then log; if false, then don't log.
