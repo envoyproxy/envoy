@@ -1,8 +1,8 @@
 #pragma once
 
+#include <list>
 #include <memory>
 #include <string>
-#include <list>
 
 #include "envoy/common/callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"

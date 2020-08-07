@@ -24,7 +24,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
-#include "common/router/scoped_rds.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/ssl/connection.h"
@@ -42,6 +41,7 @@
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
 #include "common/local_reply/local_reply.h"
+#include "common/router/scoped_rds.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
