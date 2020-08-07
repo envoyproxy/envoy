@@ -14,11 +14,6 @@ namespace Envoy {
 namespace Network {
 
 /**
- * Udp Default Packet Writer Name
- **/
-constexpr absl::string_view UdpDefaultWriterName = "udp_default_writer";
-
-/**
  * Max v6 packet size, excluding IP and UDP headers.
  */
 constexpr uint64_t UdpMaxOutgoingPacketSize = 1452;
