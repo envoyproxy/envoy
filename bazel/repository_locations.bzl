@@ -410,9 +410,9 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/b2b8ff25f5a565324b93411ca29c3403ccbca969.tar.gz
-        sha256 = "792924bbf27203bb0d1d08c99597a30793ef8f4cfa2df99792aea7200f1b27e3",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/b2b8ff25f5a565324b93411ca29c3403ccbca969.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/96bd860bec207d4b722ab7f319fa47be129a85cd.tar.gz
+        sha256 = "d7129a2f41f2bd00a8a38b33f9b7b955d3e7de3dec20f69b70d7000d3a856360",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/96bd860bec207d4b722ab7f319fa47be129a85cd.tar.gz"],
         use_category = ["dataplane"],
         cpe = "N/A",
     ),
