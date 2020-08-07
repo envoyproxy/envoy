@@ -374,7 +374,14 @@ public:
   Network::Listener* listener() override { return udp_listener_.get(); }
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
-  void shutdownListener() override { udp_listener_.reset(); }
+  void shutdownListener() override {
+    // The read filter should be deleted before the UDP listener is deleted.
+    // The read filter refers to the UDP listener to send packets to downstream.
+    // If the UDP listener is deleted before the read filter, the read filter may try to use it
+    // after deletion.
+    read_filter_.reset();
+    udp_listener_.reset();
+  }
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;

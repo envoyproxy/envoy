@@ -16,7 +16,18 @@ void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
 } // namespace
 
 LibeventScheduler::LibeventScheduler() {
+#ifdef WIN32
+  event_config* event_config = event_config_new();
+  RELEASE_ASSERT(event_config != nullptr,
+                 "Failed to initialize libevent event_base: event_config_new");
+  // Request wepoll backend by avoiding win32 backend.
+  int error = event_config_avoid_method(event_config, "win32");
+  RELEASE_ASSERT(error == 0, "Failed to initialize libevent event_base: event_config_avoid_method");
+  event_base* event_base = event_base_new_with_config(event_config);
+  event_config_free(event_config);
+#else
   event_base* event_base = event_base_new();
+#endif
   RELEASE_ASSERT(event_base != nullptr, "Failed to initialize libevent event_base");
   libevent_ = Libevent::BasePtr(event_base);
 
@@ -43,7 +54,7 @@ void LibeventScheduler::run(Dispatcher::RunType mode) {
     // This is because libevent only supports level triggering on Windows, and so the write
     // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
     // loop will run at most once
-    flag |= EVLOOP_NONBLOCK | EVLOOP_ONCE;
+    flag |= EVLOOP_ONCE;
 #endif
     break;
   case Dispatcher::RunType::Block:

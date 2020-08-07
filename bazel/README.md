@@ -735,7 +735,7 @@ For example, you can use [You Complete Me](https://valloric.github.io/YouComplet
 For example, use following command to prepare a compilation database:
 
 ```
-TEST_TMPDIR=/tmp tools/gen_compilation_database.py --run_bazel_build
+TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
 

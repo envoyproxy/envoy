@@ -268,15 +268,15 @@ public:
   }
 };
 
-// TODO(#9872): More tests for httpTime
+// TODO(#9872): More tests for httpTime.
 class HttpTimeTest : public testing::TestWithParam<std::string> {
 public:
   static const std::vector<std::string>& getOkTestCases() {
     // clang-format off
     CONSTRUCT_ON_FIRST_USE(std::vector<std::string>,
-        "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate
-        "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format
-        "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format
+        "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate.
+        "Sunday, 06-Nov-94 08:49:37 GMT", // obsolete RFC 850 format.
+        "Sun Nov  6 08:49:37 1994"        // ANSI C's asctime() format.
     );
     // clang-format on
   }
@@ -310,6 +310,37 @@ TEST_P(HttpTimeTest, Ok) {
 }
 
 TEST(HttpTime, Null) { EXPECT_EQ(CacheHeadersUtils::httpTime(nullptr), SystemTime()); }
+
+void testReadAndRemoveLeadingDigits(absl::string_view input, int64_t expected,
+                                    absl::string_view remaining) {
+  absl::string_view test_input(input);
+  auto output = CacheHeadersUtils::readAndRemoveLeadingDigits(test_input);
+  if (output) {
+    EXPECT_EQ(output, static_cast<uint64_t>(expected)) << "input=" << input;
+    EXPECT_EQ(test_input, remaining) << "input=" << input;
+  } else {
+    EXPECT_LT(expected, 0) << "input=" << input;
+    EXPECT_EQ(test_input, remaining) << "input=" << input;
+  }
+}
+
+TEST(ReadAndRemoveLeadingDigits, ComprehensiveTest) {
+  testReadAndRemoveLeadingDigits("123", 123, "");
+  testReadAndRemoveLeadingDigits("a123", -1, "a123");
+  testReadAndRemoveLeadingDigits("9_", 9, "_");
+  testReadAndRemoveLeadingDigits("11111111111xyz", 11111111111ll, "xyz");
+
+  // Overflow case
+  testReadAndRemoveLeadingDigits("1111111111111111111111111111111xyz", -1,
+                                 "1111111111111111111111111111111xyz");
+
+  // 2^64
+  testReadAndRemoveLeadingDigits("18446744073709551616xyz", -1, "18446744073709551616xyz");
+  // 2^64-1
+  testReadAndRemoveLeadingDigits("18446744073709551615xyz", 18446744073709551615ull, "xyz");
+  // (2^64-1)*10+9
+  testReadAndRemoveLeadingDigits("184467440737095516159yz", -1, "184467440737095516159yz");
+}
 
 } // namespace
 } // namespace Cache

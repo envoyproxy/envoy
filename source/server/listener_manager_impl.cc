@@ -313,11 +313,11 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
     fillState(*dump_listener, *listener);
   }
 
-  for (const auto& state_and_name : error_state_tracker_) {
+  for (const auto& [error_name, error_state] : error_state_tracker_) {
     DynamicListener* dynamic_listener =
-        getOrCreateDynamicListener(state_and_name.first, *config_dump, listener_map);
+        getOrCreateDynamicListener(error_name, *config_dump, listener_map);
 
-    const envoy::admin::v3::UpdateFailureState& state = *state_and_name.second;
+    const envoy::admin::v3::UpdateFailureState& state = *error_state;
     dynamic_listener->mutable_error_state()->CopyFrom(state);
   }
 

@@ -991,6 +991,7 @@ sched
 schedulable
 schemas
 scopekey
+secp
 sendmsg
 sendmmsg
 sendto
@@ -1173,6 +1174,7 @@ vptr
 wakeup
 wakeups
 websocket
+wepoll
 whitespace
 whitespaces
 wildcard

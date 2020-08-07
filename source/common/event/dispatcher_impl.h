@@ -80,12 +80,12 @@ public:
   void updateApproximateMonotonicTime() override;
 
   // FatalErrorInterface
-  void onFatalError() const override {
+  void onFatalError(std::ostream& os) const override {
     // Dump the state of the tracked object if it is in the current thread. This generally results
     // in dumping the active state only for the thread which caused the fatal error.
     if (isThreadSafe()) {
       if (current_object_) {
-        current_object_->dumpState(std::cerr);
+        current_object_->dumpState(os);
       }
     }
   }
