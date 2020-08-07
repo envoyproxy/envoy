@@ -68,7 +68,14 @@ void ListenerFilterFuzzer::fuzz(
 }
 
 FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzzTestCase& input)
-    : nreads_(input.data_size()), nread_(0), header_("") {
+    : nreads_(input.data_size()), nread_(0) {
+  size_t len = 0;
+  for (int i = 0; i < nreads_; i++) {
+    len += input.data(i).size();
+  }
+
+  header_.reserve(len);
+
   for (int i = 0; i < nreads_; i++) {
     header_ += input.data(i);
     indices_.push_back(header_.size());
@@ -76,7 +83,7 @@ FuzzedHeader::FuzzedHeader(const test::extensions::filters::listener::FilterFuzz
 }
 
 Api::SysCallSizeResult FuzzedHeader::next(void* buffer, size_t length) {
-  if (done()) {         // End of stream reached
+  if (done()) {           // End of stream reached
     nread_ = nreads_ - 1; // Decrement to avoid out-of-range for last recv() call
   }
   ASSERT(length >= indices_[nread_]);
