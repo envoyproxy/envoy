@@ -37,6 +37,15 @@ jobs:
           artifactName: format
         condition: failed()
 
+  - job: examples
+    dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+      - script: ci/verify_examples.sh
+        workingDirectory: $(Build.SourcesDirectory)
+        displayName: "Verify examples run as documented"
+
   - job: release
     displayName: "Linux-x64 release"
     dependsOn: ["format"]
