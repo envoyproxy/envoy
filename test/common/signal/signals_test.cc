@@ -2,8 +2,10 @@
 
 #include <csignal>
 
+#include "common/signal/fatal_error_handler.h"
 #include "common/signal/signal_action.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -18,6 +20,12 @@ namespace Envoy {
 #if defined(__SANITIZE_ADDRESS__)
 #define ASANITIZED /* Sanitized by GCC */
 #endif
+
+// Use this test handler instead of a mock, because fatal error handlers must be
+// signal-safe and a mock might allocate memory.
+class TestFatalErrorHandler : public FatalErrorHandlerInterface {
+  void onFatalError(std::ostream& os) const override { os << "HERE!"; }
+};
 
 // Death tests that expect a particular output are disabled under address sanitizer.
 // The sanitizer does its own special signal handling and prints messages that are
@@ -35,13 +43,9 @@ TEST(SignalsDeathTest, InvalidAddressDeathTest) {
       "backtrace.*Segmentation fault");
 }
 
-class TestFatalErrorHandler : public FatalErrorHandlerInterface {
-  void onFatalError() const override { std::cerr << "HERE!"; }
-};
-
 TEST(SignalsDeathTest, RegisteredHandlerTest) {
   TestFatalErrorHandler handler;
-  SignalAction::registerFatalErrorHandler(handler);
+  FatalErrorHandler::registerFatalErrorHandler(handler);
   SignalAction actions;
   // Make sure the fatal error log "HERE" registered above is logged on fatal error.
   EXPECT_DEATH(
@@ -51,7 +55,7 @@ TEST(SignalsDeathTest, RegisteredHandlerTest) {
         *(nasty_ptr) = 0; // NOLINT(clang-analyzer-core.NullDereference)
       }(),
       "HERE");
-  SignalAction::removeFatalErrorHandler(handler);
+  FatalErrorHandler::removeFatalErrorHandler(handler);
 }
 
 TEST(SignalsDeathTest, BusDeathTest) {
@@ -143,6 +147,62 @@ TEST(Signals, HandlerTest) {
   siginfo_t fake_si;
   fake_si.si_addr = nullptr;
   SignalAction::sigHandler(SIGURG, &fake_si, nullptr);
+}
+
+TEST(FatalErrorHandler, CallHandler) {
+  // Reserve space in advance so that the handler doesn't allocate memory.
+  std::string s;
+  s.reserve(1024);
+  std::ostringstream os(std::move(s));
+
+  TestFatalErrorHandler handler;
+  FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  FatalErrorHandler::callFatalErrorHandlers(os);
+  EXPECT_EQ(os.str(), "HERE!");
+
+  // callFatalErrorHandlers() will unregister the handler, so this isn't
+  // necessary for cleanup. Call it anyway, to simulate the case when one thread
+  // tries to remove the handler while another thread crashes.
+  FatalErrorHandler::removeFatalErrorHandler(handler);
+}
+
+// Use this specialized test handler instead of a mock, because fatal error
+// handlers must be signal-safe and a mock might allocate memory.
+class MemoryCheckingFatalErrorHandler : public FatalErrorHandlerInterface {
+public:
+  MemoryCheckingFatalErrorHandler(const Stats::TestUtil::MemoryTest& memory_test,
+                                  uint64_t& allocated_after_call)
+      : memory_test_(memory_test), allocated_after_call_(allocated_after_call) {}
+  void onFatalError(std::ostream& os) const override {
+    UNREFERENCED_PARAMETER(os);
+    allocated_after_call_ = memory_test_.consumedBytes();
+  }
+
+private:
+  const Stats::TestUtil::MemoryTest& memory_test_;
+  uint64_t& allocated_after_call_;
+};
+
+// FatalErrorHandler::callFatalErrorHandlers shouldn't allocate any heap memory,
+// so that it's safe to call from a signal handler. Test by comparing the
+// allocated memory before a call with the allocated memory during a handler.
+TEST(FatalErrorHandler, DontAllocateMemory) {
+  // Reserve space in advance so that the handler doesn't allocate memory.
+  std::string s;
+  s.reserve(1024);
+  std::ostringstream os(std::move(s));
+
+  Stats::TestUtil::MemoryTest memory_test;
+
+  uint64_t allocated_after_call;
+  MemoryCheckingFatalErrorHandler handler(memory_test, allocated_after_call);
+  FatalErrorHandler::registerFatalErrorHandler(handler);
+
+  uint64_t allocated_before_call = memory_test.consumedBytes();
+  FatalErrorHandler::callFatalErrorHandlers(os);
+
+  EXPECT_MEMORY_EQ(allocated_after_call, allocated_before_call);
 }
 
 } // namespace Envoy

@@ -10,6 +10,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "fatal_error_handler_lib",
+    srcs = ["fatal_error_handler.cc"],
     hdrs = ["fatal_error_handler.h"],
 )
 
