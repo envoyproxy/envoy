@@ -17,11 +17,11 @@ Manager::State ManagerImpl::state() const { return state_; }
 void ManagerImpl::add(const Target& target) {
   ++count_;
   TargetHandlePtr target_handle(target.createHandle(name_));
+  ++target_names_count_[target.name()];
   switch (state_) {
   case State::Uninitialized:
     // If the manager isn't initialized yet, save the target handle to be initialized later.
     ENVOY_LOG(debug, "added {} to {}", target.name(), name_);
-    ++target_names_count_[target.name()];
     target_handles_.push_back(std::move(target_handle));
     return;
   case State::Initializing:
@@ -29,7 +29,6 @@ void ManagerImpl::add(const Target& target) {
     // it's important in this case that count_ was incremented above before calling the target,
     // because if the target calls the init manager back immediately, count_ will be decremented
     // here (see the definition of watcher_ above).
-    ++target_names_count_[target.name()];
     target_handle->initialize(watcher_);
     return;
   case State::Initialized:
