@@ -35,7 +35,7 @@ class Slice : public SliceData {
 public:
   using Reservation = RawSlice;
 
-  virtual ~Slice() { callAndClearDrainTrackers(); }
+  ~Slice() override { callAndClearDrainTrackers(); }
 
   // SliceData
   absl::Span<uint8_t> getMutableData() override {
