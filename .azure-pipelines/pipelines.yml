@@ -43,9 +43,9 @@ jobs:
       vmImage: "ubuntu-18.04"
     steps:
       - bash: |
-        sudo apt-get update -y
-        sudo apt-get install -y -qq --no-install-recommends redis
-      - script: ci/verify_examples.sh
+          sudo apt-get update -y
+          sudo apt-get install -y -qq --no-install-recommends redis
+          ci/verify_examples.sh
         workingDirectory: $(Build.SourcesDirectory)
         displayName: "Verify examples run as documented"
 
