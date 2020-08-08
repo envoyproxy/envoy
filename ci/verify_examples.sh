@@ -8,16 +8,16 @@ EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./jaeger-native-tracing|docke
 trap_errors () {
     local frame=0 COMMAND LINE SUB FILE
     if [ -n "$example_test" ]; then
-	COMMAND=" (${example_test})"
+        COMMAND=" (${example_test})"
     fi
     set +v
     while read -r LINE SUB FILE < <(caller "$frame"); do
-	if [ "$frame" -ne "0" ]; then
-	    FAILED+=("  > ${SUB}@ ${FILE} :${LINE}")
-	else
-	    FAILED+=("${SUB}@ ${FILE} :${LINE}${COMMAND}")
-	fi
-	((frame++))
+        if [ "$frame" -ne "0" ]; then
+            FAILED+=("  > ${SUB}@ ${FILE} :${LINE}")
+        else
+            FAILED+=("${SUB}@ ${FILE} :${LINE}${COMMAND}")
+        fi
+        ((frame++))
     done
     set -v
 }
@@ -56,8 +56,8 @@ bring_up_example_stack () {
     run_log "$name" "Bring up services"
     docker-compose up --build -d "${args[@]:3}" || return 1
     if [ "$snooze" -ne "0" ]; then
-	run_log "$name" "Snooze for ${snooze} while ${name} gets started"
-	sleep "$snooze"
+        run_log "$name" "Snooze for ${snooze} while ${name} gets started"
+        sleep "$snooze"
     fi
     docker-compose ps
     docker-compose logs
@@ -69,7 +69,7 @@ bring_up_example () {
     read -ra paths <<< "$(echo "$2" | tr ',' ' ')"
     shift 2
     for path in "${paths[@]}"; do
-	bring_up_example_stack "$name" "$(get_path "$path")" "$@"
+        bring_up_example_stack "$name" "$(get_path "$path")" "$@"
     done
 }
 
@@ -88,7 +88,7 @@ cleanup () {
     name="$1"
     read -ra paths <<< "$(echo "$2" | tr ',' ' ')"
     for path in "${paths[@]}"; do
-	cleanup_stack "$name" "$(get_path "$path")"
+        cleanup_stack "$name" "$(get_path "$path")"
     done
 }
 
@@ -102,27 +102,34 @@ run_example_cors () {
     curl -s http://localhost:8000 | grep "Envoy CORS Webpage"
 
     run_log "$name" "Test cors server: disabled"
-    curl -s -H "Origin: http://example.com" http://localhost:8002/cors/disabled | grep Success
-    curl -s -H "Origin: http://example.com" \
-	 --head http://localhost:8002/cors/disabled \
-	| grep access-control-allow-origin \
-	| [ "$(wc -l)" -eq 0 ] || return 1
+    curl -s -H "Origin: http://example.com" http://localhost:8002/cors/disabled \
+        | grep Success
+    curl -s --head -X GET \
+         -H "Origin: http://example.com" \
+         http://localhost:8002/cors/disabled \
+        | grep access-control-allow-origin \
+        | [ "$(wc -l)" -eq 0 ] || return 1
 
     run_log "$name" "Test cors server: open"
-    curl -s -H "Origin: http://example.com" http://localhost:8002/cors/open | grep Success
-    curl -s -H "Origin: http://example.com" \
-	 --head http://localhost:8002/cors/open \
-	| grep "access-control-allow-origin: http://example.com"
+    curl -s -H "Origin: http://example.com" http://localhost:8002/cors/open \
+        | grep Success
+    curl -s --head -X GET \
+         -H "Origin: http://example.com" \
+         http://localhost:8002/cors/open \
+        | grep "access-control-allow-origin: http://example.com"
 
     run_log "$name" "Test cors server: restricted"
-    curl -s -H "Origin: http://example.com" http://localhost:8002/cors/restricted | grep Success
-    curl -s -H "Origin: http://example.com" \
-	 --head http://localhost:8002/cors/restricted \
-	| grep access-control-allow-origin \
-	| [ "$(wc -l)" -eq 0 ] || return 1
-    curl -s -H "Origin: http://foo.envoyproxy.io" \
-	 --head http://localhost:8002/cors/restricted \
-	| grep "access-control-allow-origin: http://foo.envoyproxy.io"
+    curl -s -H "Origin: http://example.com" http://localhost:8002/cors/restricted \
+        | grep Success
+    curl -s --head -X GET \
+         -H "Origin: http://example.com" \
+         http://localhost:8002/cors/restricted \
+        | grep access-control-allow-origin \
+        | [ "$(wc -l)" -eq 0 ] || return 1
+    curl -s --head -X GET \
+         -H "Origin: http://foo.envoyproxy.io" \
+         http://localhost:8002/cors/restricted \
+        | grep "access-control-allow-origin: http://foo.envoyproxy.io"
     cleanup "$name" "$paths"
 }
 
@@ -141,36 +148,44 @@ run_example_csrf () {
     curl -s http://localhost:8001/stats | grep ":"
 
     run_log "$name" "Test csrf server: disabled"
-    curl -s -H "Origin: http://example.com" -X POST \
-	 http://localhost:8000/csrf/disabled \
-	| grep Success
-    curl -s -H "Origin: http://example.com" -X POST \
-	 --head http://localhost:8000/csrf/disabled \
-	| grep "access-control-allow-origin: http://example.com"
+    curl -s -X POST \
+         -H "Origin: http://example.com" \
+         http://localhost:8000/csrf/disabled \
+        | grep Success
+    curl -s --head -X POST \
+         -H "Origin: http://example.com" \
+         http://localhost:8000/csrf/disabled \
+        | grep "access-control-allow-origin: http://example.com"
 
     run_log "$name" "Test csrf server: shadow"
-    curl -s -H "Origin: http://example.com" -X POST \
-	 http://localhost:8000/csrf/shadow \
-	| grep Success
-    curl -s -H "Origin: http://example.com" -X POST \
-	 --head http://localhost:8000/csrf/shadow \
-	| grep "access-control-allow-origin: http://example.com"
+    curl -s -X POST \
+         -H "Origin: http://example.com" \
+         http://localhost:8000/csrf/shadow \
+        | grep Success
+    curl -s --head -X POST \
+         -H "Origin: http://example.com" \
+         http://localhost:8000/csrf/shadow \
+        | grep "access-control-allow-origin: http://example.com"
 
     run_log "$name" "Test csrf server: enabled"
-    curl -s -H "Origin: http://example.com" -X POST \
-	 http://localhost:8000/csrf/enabled \
-	| grep "Invalid origin"
-    curl -s -H "Origin: http://example.com" -X POST \
-	 --head http://localhost:8000/csrf/enabled \
-	| grep "HTTP/1.1 403 Forbidden"
+    curl -s -X POST \
+         -H "Origin: http://example.com" \
+         http://localhost:8000/csrf/enabled \
+        | grep "Invalid origin"
+    curl -s --head -X POST \
+         -H "Origin: http://example.com" \
+         http://localhost:8000/csrf/enabled \
+        | grep "HTTP/1.1 403 Forbidden"
 
     run_log "$name" "Test csrf server: additional_origin"
-    curl -s -H "Origin: http://example.com" -X POST \
-	 http://localhost:8000/csrf/additional_origin \
-	| grep Success
-    curl -s -H "Origin: http://example.com" -X POST \
-	 --head http://localhost:8000/csrf/additional_origin \
-	| grep "access-control-allow-origin: http://example.com"
+    curl -s -X POST \
+         -H "Origin: http://example.com" \
+         http://localhost:8000/csrf/additional_origin \
+        | grep Success
+    curl -s --head -X POST \
+         -H "Origin: http://example.com" \
+         http://localhost:8000/csrf/additional_origin \
+        | grep "access-control-allow-origin: http://example.com"
 
     cleanup "$name" "$paths"
 }
@@ -183,7 +198,9 @@ run_example_ext_authz () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test services responds with 403"
-    curl -v localhost:8000/service 2> >(grep -v Expire) | grep "HTTP/1.1 403 Forbidden"
+    curl -s --head -X GET \
+         http://localhost:8000/service \
+        | grep "HTTP/1.1 403 Forbidden"
 
     run_log "$name" "Restart front-envoy with FRONT_ENVOY_YAML=config/http-service.yaml"
     docker-compose down
@@ -191,14 +208,14 @@ run_example_ext_authz () {
     sleep 10
 
     run_log "$name" "Test service responds with 403"
-    curl -v localhost:8000/service \
-	 2> >(grep -v Expire) \
-	| grep "HTTP/1.1 403 Forbidden"
+    curl -s --head -X GET \
+         http://localhost:8000/service \
+        | grep "HTTP/1.1 403 Forbidden"
 
     run_log "$name" "Test authenticated service responds with 200"
-    curl -v -H "Authorization: Bearer token1" localhost:8000/service \
-	 2> >(grep -v Expire) \
-	| grep "HTTP/1.1 200 OK"
+    curl -s --head -X GET \
+         -H "Authorization: Bearer token1" http://localhost:8000/service \
+        | grep "HTTP/1.1 200 OK"
 
     run_log "$name" "Restart front-envoy with FRONT_ENVOY_YAML=config/opa-service/v2.yaml"
     docker-compose down
@@ -206,17 +223,17 @@ run_example_ext_authz () {
     sleep 10
 
     run_log "$name" "Test OPA service responds with 200"
-    curl -v localhost:8000/service \
-	 2> >(grep -v Expire) \
-	| grep "HTTP/1.1 200 OK"
+    curl -s --head -X GET \
+         http://localhost:8000/service \
+        | grep "HTTP/1.1 200 OK"
 
     run_log "$name" "Check OPA logs"
     docker-compose logs ext_authz-opa-service | grep decision_id -A 30
 
     run_log "$name" "Check OPA service rejects POST"
-    curl -v -X POST localhost:8000/service \
-	 2> >(grep -v Expire) \
-	| grep "HTTP/1.1 403 Forbidden"
+    curl -s --head -X POST \
+         http://localhost:8000/service \
+        | grep "HTTP/1.1 403 Forbidden"
 
     cleanup "$name" "$paths"
 }
@@ -234,12 +251,12 @@ _fault_injection_test () {
     docker-compose exec -T envoy bash "enable_${action}_fault_injection.sh"
     run_log "$name" "Send requests for 20 seconds"
     docker-compose exec -T envoy bash -c \
-		   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
-	&> /dev/null
+                   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
+        &> /dev/null
     run_log "$name" "Check logs again"
     new_codes=$(docker-compose logs | grep -c "HTTP/1.1\" ${code}")
     if [ "$new_codes" -le "$existing_codes" ]; then
-	return 1
+        return 1
     fi
 
     # disable fault injection and check for http hits of type 200
@@ -248,12 +265,12 @@ _fault_injection_test () {
     docker-compose exec -T envoy bash "disable_${action}_fault_injection.sh"
     run_log "$name" "Send requests for 20 seconds"
     docker-compose exec -T envoy bash -c \
-		   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
-	&> /dev/null
+                   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
+        &> /dev/null
     run_log "$name" "Check logs again"
     new_200s=$(docker-compose logs | grep -c "HTTP/1.1\" 200")
     if [ "$new_200s" -le "$existing_200s" ]; then
-	return 1
+        return 1
     fi
 }
 
@@ -266,8 +283,8 @@ run_example_fault_injection () {
 
     run_log "$name" "Send requests for 20 seconds"
     docker-compose exec -T envoy bash -c \
-		   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
-	&> /dev/null
+                   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
+        &> /dev/null
     run_log "$name" "Check logs"
     docker-compose logs | grep "HTTP/1.1\" 200"
 
@@ -287,9 +304,9 @@ run_example_front_proxy () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test service: localhost:8080/service/1"
-    curl -s localhost:8080/service/1 | grep Hello | grep "service 1"
+    curl -s http://localhost:8080/service/1 | grep Hello | grep "service 1"
     run_log "$name" "Test service: localhost:8080/service/2"
-    curl -s localhost:8080/service/2 | grep Hello | grep "service 2"
+    curl -s http://localhost:8080/service/2 | grep Hello | grep "service 2"
     run_log "$name" "Test service: https://localhost:8443/service/1"
     curl -sk https://localhost:8443/service/1 | grep Hello | grep "service 1"
 
@@ -300,16 +317,16 @@ run_example_front_proxy () {
 
     run_log "$name" "Test round-robin localhost:8080/service/1"
     docker-compose exec -T front-envoy bash -c "\
-    		   curl localhost:8080/service/1 \
-		   && curl localhost:8080/service/1 \
-		   && curl localhost:8080/service/1" \
-		   | grep Hello | grep "service 1"
+                   curl -s http://localhost:8080/service/1 \
+                   && curl -s http://localhost:8080/service/1 \
+                   && curl -s http://localhost:8080/service/1" \
+                   | grep Hello | grep "service 1"
     run_log "$name" "Test service inside front-envoy: localhost:8080/service/2"
-    docker-compose exec -T front-envoy curl -s localhost:8080/service/2 | grep Hello | grep "service 2"
+    docker-compose exec -T front-envoy curl -s http://localhost:8080/service/2 | grep Hello | grep "service 2"
     run_log "$name" "Test service info: localhost:8080/server_info"
-    docker-compose exec -T front-envoy curl localhost:8001/server_info | jq '.'
+    docker-compose exec -T front-envoy curl http://localhost:8001/server_info | jq '.'
     run_log "$name" "Test service stats: localhost:8080/stats"
-    docker-compose exec -T front-envoy curl localhost:8001/stats | grep ":"
+    docker-compose exec -T front-envoy curl http://localhost:8001/stats | grep ":"
 
     cleanup "$name" "$paths"
 }
@@ -348,7 +365,7 @@ run_example_jaeger_native_tracing () {
     bring_up_example "$name" "$paths" 10
 
     run_log "$name" "Test services"
-    curl -s localhost:8000/trace/1 | grep Hello
+    curl -s http://localhost:8000/trace/1 | grep Hello
 
     run_log "$name" "Test Jaeger UI"
     curl -s http://localhost:16686 | grep "<!doctype html>"
@@ -364,7 +381,7 @@ run_example_jaeger_tracing () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test services"
-    curl -s localhost:8000/trace/1 | grep Hello
+    curl -s http://localhost:8000/trace/1 | grep Hello
 
     run_log "$name" "Test Jaeger UI"
     curl -s http://localhost:16686 | grep "<!doctype html>"
@@ -400,7 +417,7 @@ run_example_lua () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Test connection"
-    curl -s localhost:8000 | grep foo
+    curl -s http://localhost:8000 | grep foo
 
     cleanup "$name" "$paths"
 }
@@ -446,7 +463,7 @@ run_example_redis () {
 
     run_log "$name" "Test redis stats"
     curl -s "http://localhost:8001/stats?usedonly&filter=redis.egress_redis.command" \
-	| grep egress_redis
+        | grep egress_redis
 
     cleanup "$name" "$paths"
 }
@@ -473,8 +490,8 @@ run_examples () {
     cd "${SRCDIR}/examples" || exit 1
     examples=$(find . -mindepth 1 -maxdepth 1 -type d | sort)
     for example in $examples; do
-	example_test="run_example_$(echo "$example" | cut -d/ -f2 | tr '-' '_')"
-	$example_test
+        example_test="run_example_$(echo "$example" | cut -d/ -f2 | tr '-' '_')"
+        $example_test
     done
 }
 
@@ -484,11 +501,11 @@ verify_build_configs () {
     cd "${SRCDIR}/examples" || return 1
     configs="$(find . -name "*.yaml" -o -name "*.lua" | grep -vE "${EXCLUDED_BUILD_CONFIGS}" | cut  -d/ -f2-)"
     for config in $configs; do
-	grep "\"$config\"" BUILD || missing+=("$config")
+        grep "\"$config\"" BUILD || missing+=("$config")
     done
     if [ -n "${missing[*]}" ]; then
        for config in "${missing[@]}"; do
-	   echo "Missing config: $config" >&2
+           echo "Missing config: $config" >&2
        done
        return 1
     fi
@@ -501,7 +518,7 @@ run_examples
 if [ "${#FAILED[@]}" -ne "0" ]; then
     echo "TESTS FAILED:"
     for failed in "${FAILED[@]}"; do
-	echo "$failed" >&2
+        echo "$failed" >&2
     done
     exit 1
 fi
