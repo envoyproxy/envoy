@@ -90,6 +90,7 @@ ENV
 EOF
 EOS
 EOY
+EPOLLOUT
 EPOLLRDHUP
 EQ
 ERANGE
@@ -146,6 +147,7 @@ IDL
 IETF
 INADDR
 INET
+INVAL
 IO
 IOS
 IP
@@ -431,6 +433,7 @@ bools
 borks
 broadcasted
 buf
+buflen
 bugprone
 builtin
 builtins
@@ -633,6 +636,7 @@ gmock
 goog
 google
 goto
+gso
 gzip
 hackery
 hacky

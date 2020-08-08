@@ -12,6 +12,7 @@
 using testing::AtLeast;
 using testing::ByMove;
 using testing::InSequence;
+using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnNew;
 using testing::SaveArg;
@@ -165,6 +166,10 @@ public:
     EXPECT_CALL(callbacks_.udp_listener_.dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge, Event::FileReadyType::Read))
         .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
+    // Internal Buffer is Empty, flush will be a no-op
+    ON_CALL(callbacks_.udp_listener_, flush())
+        .WillByDefault(
+            InvokeWithoutArgs([]() -> Api::IoCallUint64Result { return makeNoError(0); }));
   }
 
   void checkTransferStats(uint64_t rx_bytes, uint64_t rx_datagrams, uint64_t tx_bytes,

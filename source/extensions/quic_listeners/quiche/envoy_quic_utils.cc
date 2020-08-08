@@ -22,25 +22,30 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
              : nullptr;
 }
 
-quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
-    const Network::Address::InstanceConstSharedPtr& envoy_address) {
-  ASSERT(envoy_address != nullptr && envoy_address->type() == Network::Address::Type::Ip);
-  uint32_t port = envoy_address->ip()->port();
+quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip) {
+  if (envoy_ip == nullptr) {
+    // Return uninitialized socket addr
+    return quic::QuicSocketAddress();
+  }
+
+  uint32_t port = envoy_ip->port();
   sockaddr_storage ss;
-  if (envoy_address->ip()->version() == Network::Address::IpVersion::v4) {
+
+  if (envoy_ip->version() == Network::Address::IpVersion::v4) {
+    // Create and return quic ipv4 address
     auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
     memset(ipv4_addr, 0, sizeof(sockaddr_in));
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_port = htons(port);
-    ipv4_addr->sin_addr.s_addr = envoy_address->ip()->ipv4()->address();
+    ipv4_addr->sin_addr.s_addr = envoy_ip->ipv4()->address();
   } else {
+    // Create and return quic ipv6 address
     auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
     memset(ipv6_addr, 0, sizeof(sockaddr_in6));
     ipv6_addr->sin6_family = AF_INET6;
     ipv6_addr->sin6_port = htons(port);
     ASSERT(sizeof(ipv6_addr->sin6_addr.s6_addr) == 16u);
-    *reinterpret_cast<absl::uint128*>(ipv6_addr->sin6_addr.s6_addr) =
-        envoy_address->ip()->ipv6()->address();
+    *reinterpret_cast<absl::uint128*>(ipv6_addr->sin6_addr.s6_addr) = envoy_ip->ipv6()->address();
   }
   return quic::QuicSocketAddress(ss);
 }

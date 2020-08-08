@@ -206,6 +206,8 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     cluster_.cluster_stats_.sess_rx_errors_.inc();
   }
+  // Flush out buffered data at the end of IO event.
+  cluster_.filter_.read_callbacks_->udpListener().flush();
 }
 
 void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {

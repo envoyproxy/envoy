@@ -110,13 +110,19 @@ const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   ENVOY_UDP_LOG(trace, "send");
   Buffer::Instance& buffer = send_data.buffer_;
-  Api::IoCallUint64Result send_result = Utility::writeToSocket(
-      socket_->ioHandle(), buffer, send_data.local_ip_, send_data.peer_address_);
+
+  Api::IoCallUint64Result send_result =
+      cb_.udpPacketWriter().writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
 
   // The send_result normalizes the rc_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.
   buffer.drain(send_result.rc_);
   return send_result;
+}
+
+Api::IoCallUint64Result UdpListenerImpl::flush() {
+  ENVOY_UDP_LOG(trace, "flush");
+  return cb_.udpPacketWriter().flush();
 }
 
 } // namespace Network

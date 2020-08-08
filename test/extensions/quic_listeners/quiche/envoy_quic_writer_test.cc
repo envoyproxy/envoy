@@ -5,6 +5,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 
@@ -22,7 +23,8 @@ namespace Quic {
 
 class EnvoyQuicWriterTest : public ::testing::Test {
 public:
-  EnvoyQuicWriterTest() : envoy_quic_writer_(socket_) {
+  EnvoyQuicWriterTest()
+      : envoy_quic_writer_(std::make_unique<Network::UdpDefaultWriter>(socket_.ioHandle())) {
     self_address_.FromString("::");
     quic::QuicIpAddress peer_ip;
     peer_ip.FromString("::1");

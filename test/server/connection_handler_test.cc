@@ -11,6 +11,7 @@
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/udp_default_writer_config.h"
 #include "common/network/utility.h"
 
 #include "server/connection_handler_impl.h"
@@ -56,7 +57,7 @@ public:
         bool continue_on_listener_filters_timeout,
         Network::ListenSocketFactorySharedPtr socket_factory,
         std::shared_ptr<NiceMock<Network::MockFilterChainManager>> filter_chain_manager = nullptr)
-        : parent_(parent), socket_(std::make_shared<Network::MockListenSocket>()),
+        : parent_(parent), socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()),
           socket_factory_(std::move(socket_factory)), tag_(tag), bind_to_port_(bind_to_port),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name), listener_filters_timeout_(listener_filters_timeout),
@@ -69,6 +70,7 @@ public:
       udp_listener_factory_ =
           Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(listener_name)
               .createActiveUdpListenerFactory(dummy, /*concurrency=*/1);
+      udp_writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
 
@@ -96,6 +98,9 @@ public:
     Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
+    Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+      return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -111,7 +116,7 @@ public:
     void clearMaxConnections() { open_connections_.resetMax(); }
 
     ConnectionHandlerTest& parent_;
-    std::shared_ptr<Network::MockListenSocket> socket_;
+    std::shared_ptr<NiceMock<Network::MockListenSocket>> socket_;
     Network::ListenSocketFactorySharedPtr socket_factory_;
     uint64_t tag_;
     bool bind_to_port_;
@@ -120,6 +125,7 @@ public:
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
+    std::unique_ptr<Network::UdpPacketWriterFactory> udp_writer_factory_;
     Network::ConnectionBalancerPtr connection_balancer_;
     BasicResourceLimitImpl open_connections_;
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
@@ -155,6 +161,7 @@ public:
     MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
     MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));
+    MOCK_METHOD(Api::IoCallUint64Result, flush, (), (override));
 
   private:
     ConnectionHandlerTest& parent_;

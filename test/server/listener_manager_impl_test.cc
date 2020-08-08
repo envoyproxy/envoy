@@ -4699,6 +4699,28 @@ filter_chains:
   EXPECT_EQ(0UL, manager_->listeners().size());
 }
 
+// This test verifies that on default initialization the UDP Packet Writer
+// is initialized in passthrough mode. (i.e. by using UdpDefaultWriter).
+TEST_F(ListenerManagerImplTest, UdpDefaultWriterConfig) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    protocol: UDP
+    port_value: 1234
+filter_chains:
+  filters: []
+    )EOF");
+  manager_->addOrUpdateListener(listener, "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+  Network::SocketSharedPtr listen_socket =
+      manager_->listeners().front().get().listenSocketFactory().getListenSocket();
+  Network::UdpPacketWriterPtr udp_packet_writer =
+      manager_->listeners().front().get().udpPacketWriterFactory()->get().createUdpPacketWriter(
+          listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
+  EXPECT_FALSE(udp_packet_writer->isBatchMode());
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

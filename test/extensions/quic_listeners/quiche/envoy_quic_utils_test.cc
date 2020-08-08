@@ -39,7 +39,7 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
     Network::Address::InstanceConstSharedPtr envoy_addr =
         quicAddressToEnvoyAddressInstance(quic_addr);
     EXPECT_EQ(quic_addr.ToString(), envoy_addr->asStringView());
-    EXPECT_EQ(quic_addr, envoyAddressInstanceToQuicSocketAddress(envoy_addr));
+    EXPECT_EQ(quic_addr, envoyIpAddressToQuicSocketAddress(envoy_addr->ip()));
   }
 }
 

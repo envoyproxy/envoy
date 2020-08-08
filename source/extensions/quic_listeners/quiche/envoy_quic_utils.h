@@ -34,8 +34,7 @@ namespace Quic {
 Network::Address::InstanceConstSharedPtr
 quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address);
 
-quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
-    const Network::Address::InstanceConstSharedPtr& envoy_address);
+quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip);
 
 // The returned header map has all keys in lower case.
 template <class T>

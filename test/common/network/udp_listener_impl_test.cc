@@ -11,9 +11,10 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/udp_listener_impl.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 #include "common/network/utility.h"
 
-#include "test/common/network/listener_impl_test_base.h"
+#include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
@@ -28,6 +29,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Network {
@@ -45,76 +47,23 @@ public:
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
 };
 
-class UdpListenerImplTest : public ListenerImplTestBase {
+class UdpListenerImplTest : public UdpListenerImplTestBase {
 public:
-  UdpListenerImplTest()
-      : server_socket_(createServerSocket(true)), send_to_addr_(getServerLoopbackAddress()) {
-    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
-    ON_CALL(udp_gro_syscall_, supportsUdpGro()).WillByDefault(Return(false));
-  }
-
   void SetUp() override {
+    ON_CALL(udp_gro_syscall_, supportsUdpGro()).WillByDefault(Return(false));
+
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(SocketOptionFactory::buildRxQueueOverFlowOptions());
     if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
       server_socket_->addOptions(SocketOptionFactory::buildUdpGroOptions());
     }
-
     listener_ = std::make_unique<UdpListenerImpl>(
         dispatcherImpl(), server_socket_, listener_callbacks_, dispatcherImpl().timeSource());
+    udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());
+    ON_CALL(listener_callbacks_, udpPacketWriter()).WillByDefault(ReturnRef(*udp_packet_writer_));
   }
 
-protected:
-  Address::Instance* getServerLoopbackAddress() {
-    if (version_ == Address::IpVersion::v4) {
-      return new Address::Ipv4Instance(Network::Test::getLoopbackAddressString(version_),
-                                       server_socket_->localAddress()->ip()->port());
-    }
-    return new Address::Ipv6Instance(Network::Test::getLoopbackAddressString(version_),
-                                     server_socket_->localAddress()->ip()->port());
-  }
-
-  SocketSharedPtr createServerSocket(bool bind) {
-    // Set IP_FREEBIND to allow sendmsg to send with non-local IPv6 source address.
-    return std::make_shared<UdpListenSocket>(Network::Test::getAnyAddress(version_),
-#ifdef IP_FREEBIND
-                                             SocketOptionFactory::buildIpFreebindOptions(),
-#else
-                                             nullptr,
-#endif
-                                             bind);
-  }
-
-  // Validates receive data, source/destination address and received time.
-  void validateRecvCallbackParams(const UdpRecvData& data, size_t num_packet_per_recv) {
-    ASSERT_NE(data.addresses_.local_, nullptr);
-
-    ASSERT_NE(data.addresses_.peer_, nullptr);
-    ASSERT_NE(data.addresses_.peer_->ip(), nullptr);
-
-    EXPECT_EQ(data.addresses_.local_->asString(), send_to_addr_->asString());
-
-    EXPECT_EQ(data.addresses_.peer_->ip()->addressAsString(),
-              client_.localAddress()->ip()->addressAsString());
-
-    EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
-
-    EXPECT_EQ(time_system_.monotonicTime(),
-              data.receive_time_ +
-                  std::chrono::milliseconds(
-                      (num_packets_received_by_listener_ % num_packet_per_recv) * 100));
-    // Advance time so that next onData() should have different received time.
-    time_system_.advanceTimeWait(std::chrono::milliseconds(100));
-    ++num_packets_received_by_listener_;
-  }
-
-  SocketSharedPtr server_socket_;
-  Network::Test::UdpSyncPeer client_{GetParam()};
-  Address::InstanceConstSharedPtr send_to_addr_;
-  MockUdpListenerCallbacks listener_callbacks_;
-  std::unique_ptr<UdpListenerImpl> listener_;
-  size_t num_packets_received_by_listener_{0};
   NiceMock<MockSupportsUdpGro> udp_gro_syscall_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&udp_gro_syscall_};
 };
@@ -342,35 +291,12 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
  * address.
  */
 TEST_P(UdpListenerImplTest, SendData) {
+  EXPECT_FALSE(udp_packet_writer_->isBatchMode());
   const std::string payload("hello world");
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
-  // Use a self address that is unlikely to be picked by source address discovery
-  // algorithm if not specified in recvmsg/recvmmsg. Port is not taken into
-  // consideration.
-  Address::InstanceConstSharedPtr send_from_addr;
-  if (version_ == Address::IpVersion::v4) {
-    // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
-    send_from_addr = std::make_shared<Address::Ipv4Instance>(
-#ifndef __APPLE__
-        "127.1.2.3",
-#else
-        "127.0.0.1",
-#endif
-        server_socket_->localAddress()->ip()->port());
-  } else {
-    // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
-    // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
-    // customized source address is doing the work because kernel also picks ::1
-    // if it's not specified in cmsghdr.
-    send_from_addr = std::make_shared<Address::Ipv6Instance>(
-#ifdef IP_FREEBIND
-        "::9",
-#else
-        "::1",
-#endif
-        server_socket_->localAddress()->ip()->port());
-  }
+
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
 
   UdpSendData send_data{send_from_addr->ip(), *client_.localAddress(), *buffer};
 
@@ -384,6 +310,11 @@ TEST_P(UdpListenerImplTest, SendData) {
   EXPECT_EQ(bytes_to_read, data.buffer_->length());
   EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
   EXPECT_EQ(data.buffer_->toString(), payload);
+
+  // Verify External Flush is a No-op
+  auto flush_result = udp_packet_writer_->flush();
+  EXPECT_TRUE(flush_result.ok());
+  EXPECT_EQ(0, flush_result.rc_);
 }
 
 /**
@@ -399,9 +330,24 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  auto send_result = listener_->send(send_data);
+  EXPECT_FALSE(send_result.ok());
+  EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+  // Failed write shouldn't drain the data.
+  EXPECT_EQ(payload.length(), buffer->length());
+  // Verify the writer is set to blocked
+  EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
+
+  // Reset write_blocked status
+  udp_packet_writer_->setWritable();
+  EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
+
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
-  auto send_result = listener_->send(send_data);
+  send_result = listener_->send(send_data);
   EXPECT_FALSE(send_result.ok());
   EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
   // Failed write shouldn't drain the data.

@@ -302,6 +302,9 @@ public:
   Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+    return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
+  }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 
   ResourceLimit& openConnections() override { return *open_connections_; }
@@ -341,6 +344,7 @@ private:
   // Helpers for constructor.
   void buildAccessLog();
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
+  void buildUdpWriterFactory(Network::Socket::Type socket_type);
   void buildListenSocketOptions(Network::Socket::Type socket_type);
   void createListenerFilterFactories(Network::Socket::Type socket_type);
   void validateFilterChains(Network::Socket::Type socket_type);
@@ -386,6 +390,7 @@ private:
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+  Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
