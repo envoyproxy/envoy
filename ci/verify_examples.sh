@@ -231,26 +231,28 @@ _fault_injection_test () {
     # enable fault injection and check for http hits of type $code
     existing_codes=$(docker-compose logs | grep -c "HTTP/1.1\" ${code}" || :)
     run_log "$name" "Enable ${action} fault injection"
-    docker-compose exec envoy bash "enable_${action}_fault_injection.sh"
+    docker-compose exec -T envoy bash "enable_${action}_fault_injection.sh"
     run_log "$name" "Send requests for 20 seconds"
-    docker-compose exec envoy bash -c "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" > /dev/null
+    docker-compose exec -T envoy bash -c \
+		   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
+	&> /dev/null
     run_log "$name" "Check logs again"
     new_codes=$(docker-compose logs | grep -c "HTTP/1.1\" ${code}")
     if [ "$new_codes" -le "$existing_codes" ]; then
-	echo "FAULT INJECTION TEST FAILED: $code $new_codes $existing_codes"
 	return 1
     fi
 
     # disable fault injection and check for http hits of type 200
     existing_200s=$(docker-compose logs | grep -c "HTTP/1.1\" 200")
     run_log "$name" "Disable ${action} fault injection"
-    docker-compose exec envoy bash "disable_${action}_fault_injection.sh"
+    docker-compose exec -T envoy bash "disable_${action}_fault_injection.sh"
     run_log "$name" "Send requests for 20 seconds"
-    docker-compose exec envoy bash -c "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" > /dev/null
+    docker-compose exec -T envoy bash -c \
+		   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
+	&> /dev/null
     run_log "$name" "Check logs again"
     new_200s=$(docker-compose logs | grep -c "HTTP/1.1\" 200")
     if [ "$new_200s" -le "$existing_200s" ]; then
-	echo "FAULT INJECTION DISABLE TEST FAILED: $code $new_codes $existing_codes"
 	return 1
     fi
 }
@@ -263,9 +265,9 @@ run_example_fault_injection () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Send requests for 20 seconds"
-    docker-compose exec envoy bash -c \
+    docker-compose exec -T envoy bash -c \
 		   "bash send_request.sh & export pid=\$! && sleep 20 && kill \$pid" \
-		   > /dev/null
+	&> /dev/null
     run_log "$name" "Check logs"
     docker-compose logs | grep "HTTP/1.1\" 200"
 
@@ -273,7 +275,7 @@ run_example_fault_injection () {
     _fault_injection_test delay 200
 
     run_log "$name" "Check tree"
-    docker-compose exec envoy tree /srv/runtime
+    docker-compose exec -T envoy tree /srv/runtime
 
     cleanup "$name" "$paths"
 }
@@ -297,17 +299,17 @@ run_example_front_proxy () {
     sleep 5
 
     run_log "$name" "Test round-robin localhost:8080/service/1"
-    docker-compose exec front-envoy bash -c "\
+    docker-compose exec -T front-envoy bash -c "\
     		   curl localhost:8080/service/1 \
 		   && curl localhost:8080/service/1 \
 		   && curl localhost:8080/service/1" \
 		   | grep Hello | grep "service 1"
     run_log "$name" "Test service inside front-envoy: localhost:8080/service/2"
-    docker-compose exec front-envoy curl -s localhost:8080/service/2 | grep Hello | grep "service 2"
+    docker-compose exec -T front-envoy curl -s localhost:8080/service/2 | grep Hello | grep "service 2"
     run_log "$name" "Test service info: localhost:8080/server_info"
-    docker-compose exec front-envoy curl localhost:8001/server_info | jq '.'
+    docker-compose exec -T front-envoy curl localhost:8001/server_info | jq '.'
     run_log "$name" "Test service stats: localhost:8080/stats"
-    docker-compose exec front-envoy curl localhost:8001/stats | grep ":"
+    docker-compose exec -T front-envoy curl localhost:8001/stats | grep ":"
 
     cleanup "$name" "$paths"
 }
@@ -330,10 +332,10 @@ run_example_grpc_bridge () {
     bring_up_example "$name" "$paths"
 
     run_log "$name" "Set key value foo=bar"
-    docker-compose exec grpc-client /client/grpc-kv-client.py set foo bar | grep setf
+    docker-compose exec -T grpc-client /client/grpc-kv-client.py set foo bar | grep setf
 
     run_log "$name" "Get key foo"
-    docker-compose exec grpc-client /client/grpc-kv-client.py get foo | grep bar
+    docker-compose exec -T grpc-client /client/grpc-kv-client.py get foo | grep bar
 
     cleanup "$name" "$paths"
 }
