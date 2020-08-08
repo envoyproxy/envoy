@@ -3585,6 +3585,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_test_tools_mock_syscall_wrapper_lib",
+    srcs = ["quiche/quic/test_tools/quic_mock_syscall_wrapper.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_mock_syscall_wrapper.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_syscall_wrapper_lib",
+        ":quic_platform_base",
+        ":quic_platform_test",
+    ],
+)
+
+envoy_cc_test_library(
     name = "quic_test_tools_sent_packet_manager_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_sent_packet_manager_peer.cc"],
     hdrs = ["quiche/quic/test_tools/quic_sent_packet_manager_peer.h"],

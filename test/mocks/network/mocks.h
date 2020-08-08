@@ -142,6 +142,7 @@ public:
   MOCK_METHOD(void, onReadReady, ());
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
+  MOCK_METHOD(Network::UdpPacketWriter&, udpPacketWriter, ());
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -332,6 +333,14 @@ public:
   MOCK_METHOD(SocketOptRef, sharedSocket, (), (const));
 };
 
+class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {
+public:
+  MockUdpPacketWriterFactory() = default;
+
+  MOCK_METHOD(Network::UdpPacketWriterPtr, createUdpPacketWriter,
+              (Network::IoHandle&, Stats::Scope&), ());
+};
+
 class MockListenerConfig : public ListenerConfig {
 public:
   MockListenerConfig();
@@ -349,6 +358,7 @@ public:
   MOCK_METHOD(uint64_t, listenerTag, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(Network::ActiveUdpListenerFactory*, udpListenerFactory, ());
+  MOCK_METHOD(Network::UdpPacketWriterFactoryOptRef, udpPacketWriterFactory, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
 
@@ -461,6 +471,22 @@ public:
   testing::NiceMock<MockConnection> connection_;
 };
 
+class MockUdpPacketWriter : public UdpPacketWriter {
+public:
+  MockUdpPacketWriter() = default;
+
+  MOCK_METHOD(Api::IoCallUint64Result, writePacket,
+              (const Buffer::Instance& buffer, const Address::Ip* local_ip,
+               const Address::Instance& peer_address));
+  MOCK_METHOD(bool, isWriteBlocked, (), (const));
+  MOCK_METHOD(void, setWritable, ());
+  MOCK_METHOD(uint64_t, getMaxPacketSize, (const Address::Instance& peer_address), (const));
+  MOCK_METHOD(bool, isBatchMode, (), (const));
+  MOCK_METHOD(Network::UdpPacketWriterBuffer, getNextWriteLocation,
+              (const Address::Ip* local_ip, const Address::Instance& peer_address));
+  MOCK_METHOD(Api::IoCallUint64Result, flush, ());
+};
+
 class MockUdpListener : public UdpListener {
 public:
   MockUdpListener();
@@ -472,6 +498,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, send, (const UdpSendData&));
+  MOCK_METHOD(Api::IoCallUint64Result, flush, ());
 
   Event::MockDispatcher dispatcher_;
 };
