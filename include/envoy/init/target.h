@@ -25,6 +25,12 @@ struct TargetHandle {
    * @return true if the target received this call, false if the target was already destroyed.
    */
   virtual bool initialize(const Watcher& watcher) const PURE;
+
+  /**
+   * @return a human-readable target name, for logging / debugging / tracking target names.
+   * The target name has to be unique.
+   */
+  virtual absl::string_view name() const PURE;
 };
 using TargetHandlePtr = std::unique_ptr<TargetHandle>;
 

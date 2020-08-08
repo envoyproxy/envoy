@@ -7,6 +7,7 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 
 #include "quiche/quic/test_tools/quic_connection_peer.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #pragma GCC diagnostic pop
 
 #include "common/event/libevent_scheduler.h"
@@ -39,7 +40,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_draft_29, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_27, !GetParam());
           SetQuicReloadableFlag(quic_disable_version_draft_25, !GetParam());
           return quic::CurrentSupportedVersions()[0];
