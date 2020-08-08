@@ -54,6 +54,7 @@ protected:
 
 private:
   void onSocketEvent(short flags);
+  void disableEvent();
 
   TimeSource& time_source_;
   Event::FileEventPtr file_event_;
