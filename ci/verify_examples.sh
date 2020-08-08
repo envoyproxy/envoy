@@ -409,7 +409,7 @@ run_example_mysql () {
     local mysql_client name paths
     name=mysql
     paths=mysql
-    mysql_client=(docker run -ti --network envoymesh mysql:5.5 mysql -h envoy -P 1999 -u root)
+    mysql_client=(docker run --network envoymesh mysql:5.5 mysql -h envoy -P 1999 -u root)
 
     bring_up_example "$name" "$paths" 10
 
