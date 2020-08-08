@@ -44,7 +44,7 @@ jobs:
     steps:
       - bash: |
           sudo apt-get update -y
-          sudo apt-get install -y -qq --no-install-recommends redis
+          sudo apt-get install -y -qq --no-install-recommends redis-tools
           ci/verify_examples.sh
         workingDirectory: $(Build.SourcesDirectory)
         displayName: "Verify examples run as documented"
