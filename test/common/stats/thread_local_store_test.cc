@@ -1674,6 +1674,13 @@ protected:
   static constexpr uint32_t NumThreads = 10;
 
   HistogramThreadTest() : ThreadLocalRealThreadsTestBase(NumThreads) {}
+
+  void mergeHistograms() {
+    BlockingBarrier blocking_barrier(1);
+    main_dispatcher_->post([this, &blocking_barrier]() {
+      store_->mergeHistograms(blocking_barrier.decrementCountFn());
+    });
+  }
 };
 
 TEST_F(HistogramThreadTest, MakeHistogramsAndRecordValues) {
@@ -1686,12 +1693,7 @@ TEST_F(HistogramThreadTest, MakeHistogramsAndRecordValues) {
     }));
   }
 
-  {
-    BlockingBarrier blocking_barrier(1);
-    main_dispatcher_->post([this, &blocking_barrier]() {
-      store_->mergeHistograms(blocking_barrier.decrementCountFn());
-    });
-  }
+  mergeHistograms();
 
   auto histograms = store_->histograms();
   ASSERT_EQ(1, histograms.size());
