@@ -23,7 +23,7 @@ cd ../
 
 # Test grpc bridge example
 # install go
-GO_VERSION="1.14.4"
+GO_VERSION="1.14.7"
 curl -O https://storage.googleapis.com/golang/go$GO_VERSION.linux-amd64.tar.gz
 tar -xf go$GO_VERSION.linux-amd64.tar.gz
 sudo mv go /usr/local
