@@ -176,9 +176,9 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
 
   Buffer::OwnedImpl fake_data;
   CommandSplitter::MockSplitRequest* request_handle1 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks1 = nullptr;
+  CommandSplitter::SplitCallbacks* request_callbacks1{};
   CommandSplitter::MockSplitRequest* request_handle2 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks2 = nullptr;
+  CommandSplitter::SplitCallbacks* request_callbacks2{};
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
     EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
@@ -217,9 +217,9 @@ TEST_F(RedisProxyFilterTest, OutOfOrderResponseDownstreamDisconnectBeforeFlush) 
 
   Buffer::OwnedImpl fake_data;
   CommandSplitter::MockSplitRequest* request_handle1 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks1 = nullptr;
+  CommandSplitter::SplitCallbacks* request_callbacks1{};
   CommandSplitter::MockSplitRequest* request_handle2 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks2 = nullptr;
+  CommandSplitter::SplitCallbacks* request_callbacks2{};
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
     EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
@@ -248,7 +248,7 @@ TEST_F(RedisProxyFilterTest, DownstreamDisconnectWithActive) {
 
   Buffer::OwnedImpl fake_data;
   CommandSplitter::MockSplitRequest* request_handle1 = new CommandSplitter::MockSplitRequest();
-  CommandSplitter::SplitCallbacks* request_callbacks1 = nullptr;
+  CommandSplitter::SplitCallbacks* request_callbacks1{};
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr request1(new Common::Redis::RespValue());
     EXPECT_CALL(splitter_, makeRequest_(Ref(*request1), _, _))
