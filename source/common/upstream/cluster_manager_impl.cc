@@ -1118,7 +1118,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(const std::s
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());
   const auto& cluster_entry = config.thread_local_clusters_[name];
-  ENVOY_LOG(debug, "removing hosts for TLS cluster {} removed {}", name, hosts_removed.size());
+  ENVOY_LOG(debug, "removing hosts for TLS cluster {} removed {}.", name, hosts_removed.size());
 
   // We need to go through and purge any connection pools for hosts that got deleted.
   // Even if two hosts actually point to the same address this will be safe, since if a
