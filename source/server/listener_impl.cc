@@ -314,8 +314,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
-  // buildFilterChains();
-  buildFakeFilterChains();
+  buildFilterChains();
   if (socket_type == Network::Socket::Type::Datagram) {
     return;
   }
@@ -371,8 +370,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
-  // buildFilterChains();
-  buildFakeFilterChains();
+  buildFilterChains();
   // In place update is tcp only so it's safe to apply below tcp only initialization.
   buildSocketOptions();
   buildOriginalDstListenerFilter();
@@ -516,18 +514,6 @@ void ListenerImpl::buildFilterChains() {
   // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
   filter_chain_manager_.addFilterChain(config_.filter_chains(), builder, filter_chain_manager_);
-}
-
-void ListenerImpl::buildFakeFilterChains() {
-  ENVOY_LOG(debug, "ListenerImpl::buildFakeFilterChains");
-  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
-      parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
-      parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
-      parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
-  transport_factory_context.setInitManager(*dynamic_init_manager_);
-  ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
-  filter_chain_manager_.addFakeFilterChain(config_.filter_chains(), builder, filter_chain_manager_);
 }
 
 void ListenerImpl::buildRealFilterChains(

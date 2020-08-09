@@ -394,7 +394,6 @@ private:
   void createListenerFilterFactories(Network::Socket::Type socket_type);
   void validateFilterChains(Network::Socket::Type socket_type);
   void buildFilterChains();
-  void buildFakeFilterChains();
 
   absl::flat_hash_map<const envoy::config::listener::v3::FilterChain* const,
                       PerFilterChainRebuilderPtr>
