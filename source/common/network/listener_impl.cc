@@ -49,11 +49,11 @@ void ListenerImpl::onSocketEvent(short flags) {
       PANIC(fmt::format("listener accept failure: {}", errorDetails(errno)));
     }
 
-    struct sockaddr_storage remote_addr;
+    sockaddr_storage remote_addr;
     socklen_t remote_addr_len = sizeof(remote_addr);
 
-    IoHandlePtr io_handle = socket_->ioHandle().accept(
-        reinterpret_cast<struct sockaddr*>(&remote_addr), &remote_addr_len, ENVOY_SOCK_NONBLOCK);
+    IoHandlePtr io_handle = socket_->ioHandle().accept(reinterpret_cast<sockaddr*>(&remote_addr),
+                                                       &remote_addr_len, ENVOY_SOCK_NONBLOCK);
     if (io_handle == nullptr) {
       break;
     }

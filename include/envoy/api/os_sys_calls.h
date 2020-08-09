@@ -159,7 +159,7 @@ public:
   /**
    * @see man 2 accept
    */
-  virtual SysCallSocketResult accept(os_fd_t socket, struct sockaddr* addr, socklen_t* addrlen,
+  virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen,
                                      int flags) PURE;
 };
 

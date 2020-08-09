@@ -344,13 +344,16 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
-SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, struct sockaddr* addr,
-                                           socklen_t* addrlen, int flags) {
+SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen,
+                                           int flags) {
   const os_fd_t rc = ::accept(sockfd, addr, addrlen);
-  if (rc > 0 && (flags & ENVOY_SOCK_NONBLOCK)) {
+  if (SOCKET_INVALID(rc)) {
+    return {rc, ::WSAGetLastError()};
+  }
+  if (flags & ENVOY_SOCK_NONBLOCK) {
     setsocketblocking(rc, false);
   }
-  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  return {rc, 0};
 }
 
 } // namespace Api

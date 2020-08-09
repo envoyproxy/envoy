@@ -187,8 +187,8 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
   return {rc, rc != -1 ? 0 : errno};
 }
 
-SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, struct sockaddr* addr,
-                                           socklen_t* addrlen, int flags) {
+SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen,
+                                           int flags) {
   os_fd_t rc;
 
 #if defined(__linux__)
