@@ -39,6 +39,14 @@ absl::optional<Network::Address::IpVersion> FakeConnectionSocket::ipVersion() co
   return local_address_->ip()->version();
 }
 
+void FakeConnectionSocket::setDetectedTransportProtocol(absl::string_view protocol) {
+  transport_protocol_ = std::string(protocol);
+}
+
+absl::string_view FakeConnectionSocket::detectedTransportProtocol() const {
+  return transport_protocol_;
+}
+
 void FakeConnectionSocket::setRequestedApplicationProtocols(
     const std::vector<absl::string_view>& protocols) {
   application_protocols_.clear();

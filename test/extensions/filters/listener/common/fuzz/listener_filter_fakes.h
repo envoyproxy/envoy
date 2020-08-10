@@ -39,6 +39,10 @@ public:
 
   const std::vector<std::string>& requestedApplicationProtocols() const override;
 
+  void setDetectedTransportProtocol(absl::string_view protocol) override;
+
+  absl::string_view detectedTransportProtocol() const override;
+
   Api::SysCallIntResult getSocketOption(int level, int, void* optval, socklen_t*) const override;
 
 private:
@@ -47,6 +51,7 @@ private:
   Network::Address::InstanceConstSharedPtr remote_address_;
   Network::Address::Type addr_type_;
   std::vector<std::string> application_protocols_;
+  std::string transport_protocol_;
 };
 
 // TODO: Move over to Fake (name is confusing)
