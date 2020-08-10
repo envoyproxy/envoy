@@ -930,12 +930,10 @@ size_t ContextImpl::daysUntilFirstCertExpires() const {
   int daysUntilExpiration = Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
   for (auto& ctx : tls_contexts_) {
     if (ctx.cert_ == nullptr) {
-      return 0;
+      continue;
     }
     bssl::UniquePtr<X509> x509(X509_parse_from_buffer(ctx.cert_.get()));
-    if (!x509) {
-      return 0;
-    }
+    RELEASE_ASSERT(x509 != nullptr, "TLS context must have a valid certificate");
     daysUntilExpiration = std::min<int>(Utility::getDaysUntilExpiration(x509.get(), time_source_),
                                         daysUntilExpiration);
   }
@@ -959,9 +957,7 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
       continue;
     }
     bssl::UniquePtr<X509> x509(X509_parse_from_buffer(ctx.cert_.get()));
-    if (!x509) {
-      continue;
-    }
+    RELEASE_ASSERT(x509 != nullptr, "TLS context must have a valid certificate");
     cert_details.emplace_back(certificateDetails(x509.get(), ctx.getCertChainFileName()));
   }
   return cert_details;
