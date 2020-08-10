@@ -72,7 +72,7 @@ public:
               unixSocketPeerCredentials, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));
-  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
+  MOCK_METHOD(Ssl::ConnectionInfoSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
@@ -118,7 +118,7 @@ public:
               unixSocketPeerCredentials, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));
-  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
+  MOCK_METHOD(Ssl::ConnectionInfoSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
@@ -167,7 +167,7 @@ public:
               unixSocketPeerCredentials, (), (const));
   MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));
-  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
+  MOCK_METHOD(Ssl::ConnectionInfoSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));

@@ -38,16 +38,16 @@ public:
     return {PostIoAction::Close, 0, false};
   }
   void onConnected() override {}
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
+  Ssl::ConnectionInfoSharedPtr ssl() const override { return nullptr; }
 };
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), state_(SocketState::PreHandshake) {
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), state_(Ssl::SocketState::PreHandshake) {
   bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
-  info_ = std::make_shared<SslSocketInfo>(std::move(ssl), ctx_);
+  info_ = std::make_shared<SslSocketInfo>(std::move(ssl), ctx_, this);
 
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
@@ -96,9 +96,9 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
 }
 
 Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
-  if (state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent) {
+  if (state_ != Ssl::SocketState::HandshakeComplete && state_ != Ssl::SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || state_ != SocketState::HandshakeComplete) {
+    if (action == PostIoAction::Close || state_ != Ssl::SocketState::HandshakeComplete) {
       // end_stream is false because either a hard error occurred (action == Close) or
       // the handshake isn't complete, so a half-close cannot occur yet.
       return {action, 0, false};
@@ -158,7 +158,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 
 void SslSocket::onPrivateKeyMethodComplete() {
   ASSERT(isThreadSafe());
-  ASSERT(state_ == SocketState::HandshakeInProgress);
+  ASSERT(state_ == Ssl::SocketState::HandshakeInProgress);
 
   // Resume handshake.
   PostIoAction action = doHandshake();
@@ -168,38 +168,18 @@ void SslSocket::onPrivateKeyMethodComplete() {
   }
 }
 
-PostIoAction SslSocket::doHandshake() {
-  ASSERT(state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent);
-  int rc = SSL_do_handshake(rawSsl());
-  if (rc == 1) {
-    ENVOY_CONN_LOG(debug, "handshake complete", callbacks_->connection());
-    state_ = SocketState::HandshakeComplete;
-    ctx_->logHandshake(rawSsl());
-    callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
-
-    // It's possible that we closed during the handshake callback.
-    return callbacks_->connection().state() == Network::Connection::State::Open
-               ? PostIoAction::KeepOpen
-               : PostIoAction::Close;
-  } else {
-    int err = SSL_get_error(rawSsl(), rc);
-    switch (err) {
-    case SSL_ERROR_WANT_READ:
-    case SSL_ERROR_WANT_WRITE:
-      ENVOY_CONN_LOG(debug, "handshake expecting {}", callbacks_->connection(),
-                     err == SSL_ERROR_WANT_READ ? "read" : "write");
-      return PostIoAction::KeepOpen;
-    case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
-      ENVOY_CONN_LOG(debug, "handshake continued asynchronously", callbacks_->connection());
-      state_ = SocketState::HandshakeInProgress;
-      return PostIoAction::KeepOpen;
-    default:
-      ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_->connection(), err);
-      drainErrorQueue();
-      return PostIoAction::Close;
-    }
-  }
+Network::Connection::State SslSocket::connectionState() const {
+  return callbacks_->connection().state();
 }
+
+void SslSocket::onSuccess(SSL* ssl) {
+  ctx_->logHandshake(ssl);
+  callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+}
+
+void SslSocket::onFailure() { drainErrorQueue(); }
+
+PostIoAction SslSocket::doHandshake() { return info_->doHandshake(state_); }
 
 void SslSocket::drainErrorQueue() {
   bool saw_error = false;
@@ -229,10 +209,10 @@ void SslSocket::drainErrorQueue() {
 }
 
 Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_stream) {
-  ASSERT(state_ != SocketState::ShutdownSent || write_buffer.length() == 0);
-  if (state_ != SocketState::HandshakeComplete && state_ != SocketState::ShutdownSent) {
+  ASSERT(state_ != Ssl::SocketState::ShutdownSent || write_buffer.length() == 0);
+  if (state_ != Ssl::SocketState::HandshakeComplete && state_ != Ssl::SocketState::ShutdownSent) {
     PostIoAction action = doHandshake();
-    if (action == PostIoAction::Close || state_ != SocketState::HandshakeComplete) {
+    if (action == PostIoAction::Close || state_ != Ssl::SocketState::HandshakeComplete) {
       return {action, 0, false};
     }
   }
@@ -285,18 +265,18 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
   return {PostIoAction::KeepOpen, total_bytes_written, false};
 }
 
-void SslSocket::onConnected() { ASSERT(state_ == SocketState::PreHandshake); }
+void SslSocket::onConnected() { ASSERT(state_ == Ssl::SocketState::PreHandshake); }
 
-Ssl::ConnectionInfoConstSharedPtr SslSocket::ssl() const { return info_; }
+Ssl::ConnectionInfoSharedPtr SslSocket::ssl() const { return info_; }
 
 void SslSocket::shutdownSsl() {
-  ASSERT(state_ != SocketState::PreHandshake);
-  if (state_ != SocketState::ShutdownSent &&
+  ASSERT(state_ != Ssl::SocketState::PreHandshake);
+  if (state_ != Ssl::SocketState::ShutdownSent &&
       callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(rawSsl());
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
     drainErrorQueue();
-    state_ = SocketState::ShutdownSent;
+    state_ = Ssl::SocketState::ShutdownSent;
   }
 }
 
@@ -309,8 +289,9 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
   return certificate_validation_status_;
 }
 
-SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx)
-    : ssl_(std::move(ssl)) {
+SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
+                             HandshakeCallbacks* handshake_callbacks)
+    : ssl_(std::move(ssl)), handshake_callbacks_(handshake_callbacks) {
   SSL_set_ex_data(ssl_.get(), ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
 }
 
@@ -478,7 +459,8 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  if (state_ == SocketState::HandshakeInProgress || state_ == SocketState::HandshakeComplete) {
+  if (state_ == Ssl::SocketState::HandshakeInProgress ||
+      state_ == Ssl::SocketState::HandshakeComplete) {
     shutdownSsl();
   }
 }
@@ -525,6 +507,33 @@ absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view exten
     return absl::nullopt;
   }
   return Utility::getX509ExtensionValue(*cert, extension_name);
+}
+
+Network::PostIoAction SslSocketInfo::doHandshake(Ssl::SocketState& state) {
+  ASSERT(state != Ssl::SocketState::HandshakeComplete && state != Ssl::SocketState::ShutdownSent);
+  int rc = SSL_do_handshake(ssl());
+  if (rc == 1) {
+    state = Ssl::SocketState::HandshakeComplete;
+    handshake_callbacks_->onSuccess(ssl());
+
+    // It's possible that we closed during the handshake callback.
+    return handshake_callbacks_->connectionState() == Network::Connection::State::Open
+               ? PostIoAction::KeepOpen
+               : PostIoAction::Close;
+  } else {
+    int err = SSL_get_error(ssl(), rc);
+    switch (err) {
+    case SSL_ERROR_WANT_READ:
+    case SSL_ERROR_WANT_WRITE:
+      return PostIoAction::KeepOpen;
+    case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+      state = Ssl::SocketState::HandshakeInProgress;
+      return PostIoAction::KeepOpen;
+    default:
+      handshake_callbacks_->onFailure();
+      return PostIoAction::Close;
+    }
+  }
 }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }

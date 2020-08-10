@@ -13,7 +13,9 @@ envoy_cc_library(
     hdrs = ["connection.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":ssl_socket_state",
         "//include/envoy/common:time_interface",
+        "//include/envoy/network:post_io_action_interface",
     ],
 )
 
@@ -67,4 +69,10 @@ envoy_cc_library(
     hdrs = ["ssl_socket_extended_info.h"],
     deps = [
     ],
+)
+
+envoy_cc_library(
+    name = "ssl_socket_state",
+    hdrs = ["ssl_socket_state.h"],
+    deps = [],
 )

@@ -38,9 +38,7 @@ Network::IoResult PassthroughSocket::doWrite(Buffer::Instance& buffer, bool end_
 
 void PassthroughSocket::onConnected() { transport_socket_->onConnected(); }
 
-Ssl::ConnectionInfoConstSharedPtr PassthroughSocket::ssl() const {
-  return transport_socket_->ssl();
-}
+Ssl::ConnectionInfoSharedPtr PassthroughSocket::ssl() const { return transport_socket_->ssl(); }
 
 } // namespace TransportSockets
 } // namespace Extensions

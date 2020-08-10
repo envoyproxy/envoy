@@ -70,10 +70,10 @@ public:
   MOCK_METHOD(void, setDownstreamRemoteAddress, (const Network::Address::InstanceConstSharedPtr&));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, downstreamRemoteAddress, (),
               (const));
-  MOCK_METHOD(void, setDownstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
-  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, downstreamSslConnection, (), (const));
-  MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
-  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, upstreamSslConnection, (), (const));
+  MOCK_METHOD(void, setDownstreamSslConnection, (const Ssl::ConnectionInfoSharedPtr&));
+  MOCK_METHOD(Ssl::ConnectionInfoSharedPtr, downstreamSslConnection, (), (const));
+  MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoSharedPtr&));
+  MOCK_METHOD(Ssl::ConnectionInfoSharedPtr, upstreamSslConnection, (), (const));
   MOCK_METHOD(const Router::RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
@@ -122,8 +122,8 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
-  Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
+  Ssl::ConnectionInfoSharedPtr downstream_connection_info_;
+  Ssl::ConnectionInfoSharedPtr upstream_connection_info_;
   std::string requested_server_name_;
   std::string route_name_;
   std::string upstream_transport_failure_reason_;

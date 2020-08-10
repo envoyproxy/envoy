@@ -90,20 +90,19 @@ public:
     return downstream_remote_address_;
   }
 
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
+  void setDownstreamSslConnection(const Ssl::ConnectionInfoSharedPtr& connection_info) override {
     downstream_connection_info_ = connection_info;
   }
 
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
+  Ssl::ConnectionInfoSharedPtr downstreamSslConnection() const override {
     return downstream_connection_info_;
   }
 
-  void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
+  void setUpstreamSslConnection(const Ssl::ConnectionInfoSharedPtr& connection_info) override {
     upstream_connection_info_ = connection_info;
   }
 
-  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+  Ssl::ConnectionInfoSharedPtr upstreamSslConnection() const override {
     return upstream_connection_info_;
   }
   void setRouteName(absl::string_view route_name) override {
@@ -251,8 +250,8 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
-  Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
+  Ssl::ConnectionInfoSharedPtr downstream_connection_info_;
+  Ssl::ConnectionInfoSharedPtr upstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateSharedPtr filter_state_{

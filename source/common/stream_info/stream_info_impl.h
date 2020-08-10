@@ -189,22 +189,19 @@ struct StreamInfoImpl : public StreamInfo {
     return downstream_remote_address_;
   }
 
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
+  void setDownstreamSslConnection(const Ssl::ConnectionInfoSharedPtr& connection_info) override {
     downstream_ssl_info_ = connection_info;
   }
 
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
+  Ssl::ConnectionInfoSharedPtr downstreamSslConnection() const override {
     return downstream_ssl_info_;
   }
 
-  void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
+  void setUpstreamSslConnection(const Ssl::ConnectionInfoSharedPtr& connection_info) override {
     upstream_ssl_info_ = connection_info;
   }
 
-  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
-    return upstream_ssl_info_;
-  }
+  Ssl::ConnectionInfoSharedPtr upstreamSslConnection() const override { return upstream_ssl_info_; }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
@@ -303,8 +300,8 @@ private:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
-  Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
+  Ssl::ConnectionInfoSharedPtr downstream_ssl_info_;
+  Ssl::ConnectionInfoSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
   Http::RequestIDExtensionSharedPtr request_id_extension_;

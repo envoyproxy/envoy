@@ -499,7 +499,7 @@ void Filter::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 
 void Filter::onPoolReadyBase(Upstream::HostDescriptionConstSharedPtr& host,
                              const Network::Address::InstanceConstSharedPtr& local_address,
-                             Ssl::ConnectionInfoConstSharedPtr ssl_info) {
+                             Ssl::ConnectionInfoSharedPtr ssl_info) {
   upstream_handle_.reset();
   read_callbacks_->upstreamHost(host);
   getStreamInfo().onUpstreamHostSelected(host);
