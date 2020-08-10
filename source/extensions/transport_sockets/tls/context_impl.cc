@@ -932,8 +932,7 @@ size_t ContextImpl::daysUntilFirstCertExpires() const {
     if (ctx.cert_ == nullptr) {
       return 0;
     }
-    auto* start = CRYPTO_BUFFER_data(ctx.cert_.get());
-    bssl::UniquePtr<X509> x509(d2i_X509(nullptr, &start, CRYPTO_BUFFER_len(ctx.cert_.get())));
+    bssl::UniquePtr<X509> x509(X509_parse_from_buffer(ctx.cert_.get()));
     if (!x509) {
       return 0;
     }
@@ -959,8 +958,7 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
     if (ctx.cert_ == nullptr) {
       continue;
     }
-    auto* start = CRYPTO_BUFFER_data(ctx.cert_.get());
-    bssl::UniquePtr<X509> x509(d2i_X509(nullptr, &start, CRYPTO_BUFFER_len(ctx.cert_.get())));
+    bssl::UniquePtr<X509> x509(X509_parse_from_buffer(ctx.cert_.get()));
     if (!x509) {
       continue;
     }
@@ -1236,8 +1234,7 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
   // chain for resumption purposes.
   for (const auto& ctx : tls_contexts_) {
     RELEASE_ASSERT(ctx.cert_ != nullptr, "TLS context should have a certificate chain");
-    auto* start = CRYPTO_BUFFER_data(ctx.cert_.get());
-    bssl::UniquePtr<X509> cert(d2i_X509(nullptr, &start, CRYPTO_BUFFER_len(ctx.cert_.get())));
+    bssl::UniquePtr<X509> cert(X509_parse_from_buffer(ctx.cert_.get()));
     RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
     X509_NAME* cert_subject = X509_get_subject_name(cert.get());
     RELEASE_ASSERT(cert_subject != nullptr, "TLS certificate should have a subject");

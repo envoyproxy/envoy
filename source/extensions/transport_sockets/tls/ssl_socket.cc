@@ -531,8 +531,7 @@ X509* SslSocketInfo::getX509Certificate() const {
   }
   CRYPTO_BUFFER* leaf = ContextImpl::localLeafCertificate(ssl_.get());
   if (leaf) {
-    auto* start = CRYPTO_BUFFER_data(leaf);
-    cached_certificate_.reset(d2i_X509(nullptr, &start, CRYPTO_BUFFER_len(leaf)));
+    cached_certificate_.reset(X509_parse_from_buffer(leaf));
   }
   return cached_certificate_.get();
 }
@@ -544,8 +543,7 @@ X509* SslSocketInfo::getX509PeerCertificate() const {
   const STACK_OF(CRYPTO_BUFFER)* chain = SSL_get0_peer_certificates(ssl_.get());
   if (chain && sk_CRYPTO_BUFFER_num(chain) > 0) {
     CRYPTO_BUFFER* leaf = sk_CRYPTO_BUFFER_value(chain, 0);
-    auto* start = CRYPTO_BUFFER_data(leaf);
-    cached_peer_certificate_.reset(d2i_X509(nullptr, &start, CRYPTO_BUFFER_len(leaf)));
+    cached_peer_certificate_.reset(X509_parse_from_buffer(leaf));
   }
   return cached_peer_certificate_.get();
 }
