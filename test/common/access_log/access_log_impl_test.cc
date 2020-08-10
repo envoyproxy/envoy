@@ -1310,6 +1310,32 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
 }
 
+// This is a regression test for fuzz bug https://oss-fuzz.com/testcase-detail/4863844862918656
+// where a missing matcher would attempt to create a ValueMatcher and crash in debug mode. Instead,
+// the configured metadata filter does not match.
+TEST_F(AccessLogImplTest, MetadataFilterNoMatcher) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  metadata_filter:
+    match_if_key_not_found: false
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  TestStreamInfo stream_info;
+  ProtobufWkt::Struct metadata_val;
+  stream_info.setDynamicMetadata("some.namespace", metadata_val);
+
+  const InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  // If no matcher is set, then expect no logs.
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info);
+}
+
 TEST_F(AccessLogImplTest, MetadataFilterNoKey) {
   const std::string default_true_yaml = R"EOF(
 name: accesslog

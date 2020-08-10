@@ -262,15 +262,17 @@ MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilte
     : default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
       filter_(filter_config.matcher().filter()) {
 
-  auto& matcher_config = filter_config.matcher();
+  if (filter_config.has_matcher()) {
+    auto& matcher_config = filter_config.matcher();
 
-  for (const auto& seg : matcher_config.path()) {
-    path_.push_back(seg.key());
+    for (const auto& seg : matcher_config.path()) {
+      path_.push_back(seg.key());
+    }
+
+    // Matches if the value equals the configured 'MetadataMatcher' value.
+    const auto& val = matcher_config.value();
+    value_matcher_ = Matchers::ValueMatcher::create(val);
   }
-
-  // Matches if the value equals the configured 'MetadataMatcher' value.
-  const auto& val = matcher_config.value();
-  value_matcher_ = Matchers::ValueMatcher::create(val);
 
   // Matches if the value is present in dynamic metadata
   auto present_val = envoy::type::matcher::v3::ValueMatcher();
@@ -286,7 +288,7 @@ bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
   // If the key corresponds to a set value in dynamic metadata, return true if the value matches the
   // the configured 'MetadataMatcher' value and false otherwise
   if (present_matcher_->match(value)) {
-    return value_matcher_->match(value);
+    return value_matcher_ && value_matcher_->match(value);
   }
 
   // If the key does not correspond to a set value in dynamic metadata, return true if
