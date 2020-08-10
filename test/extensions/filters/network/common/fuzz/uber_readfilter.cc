@@ -6,7 +6,6 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-
 void UberFilterFuzzer::reset() {
   // Reset some changes made by current filter on some mock objects.
 
@@ -16,6 +15,10 @@ void UberFilterFuzzer::reset() {
   read_filter_callbacks_->connection_.callbacks_.clear();
   read_filter_callbacks_->connection_.bytes_sent_callbacks_.clear();
   read_filter_callbacks_->connection_.state_ = Network::Connection::State::Open;
+  // Clear the pointers inside the mock_dispatcher
+  Event::MockDispatcher& mock_dispatcher =
+      dynamic_cast<Event::MockDispatcher&>(read_filter_callbacks_->connection_.dispatcher_);
+  mock_dispatcher.clearDeferredDeleteList();
   read_filter_.reset();
 }
 
@@ -30,15 +33,18 @@ void UberFilterFuzzer::fuzzerSetup() {
         read_filter_ = read_filter;
         read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
       }));
+  ON_CALL(read_filter_callbacks_->connection_, addFilter(_))
+      .WillByDefault(Invoke([&](Network::FilterSharedPtr read_filter) -> void {
+        read_filter_ = read_filter;
+        read_filter_->initializeReadFilterCallbacks(*read_filter_callbacks_);
+      }));
   // Prepare sni for sni_cluster filter and sni_dynamic_forward_proxy filter.
   ON_CALL(read_filter_callbacks_->connection_, requestedServerName())
       .WillByDefault(testing::Return("fake_cluster"));
   // Prepare time source for filters such as local_ratelimit filter.
   factory_context_.prepareSimulatedSystemTime();
   // Prepare address for filters such as ext_authz filter.
-  addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
-  read_filter_callbacks_->connection_.remote_address_ = addr_;
-  read_filter_callbacks_->connection_.local_address_ = addr_;
+  pipe_addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
   async_request_ = std::make_unique<Grpc::MockAsyncRequest>();
 }
 

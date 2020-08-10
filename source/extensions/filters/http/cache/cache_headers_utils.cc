@@ -15,19 +15,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-// Utility functions used in RequestCacheControl & ResponseCacheControl
+// Utility functions used in RequestCacheControl & ResponseCacheControl.
 namespace {
 // A directive with an invalid duration is ignored, the RFC does not specify a behavior:
 // https://httpwg.org/specs/rfc7234.html#delta-seconds
 OptionalDuration parseDuration(absl::string_view s) {
   OptionalDuration duration;
-  // Strip quotation marks if any
+  // Strip quotation marks if any.
   if (s.size() > 1 && s.front() == '"' && s.back() == '"') {
     s = s.substr(1, s.size() - 2);
   }
   long num;
   if (absl::SimpleAtoi(s, &num) && num >= 0) {
-    // s is a valid string of digits representing a positive number
+    // s is a valid string of digits representing a positive number.
     duration = std::chrono::seconds(num);
   }
   return duration;
@@ -87,12 +87,12 @@ ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_heade
     std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
 
     if (directive == "no-cache") {
-      // If no-cache directive has arguments they are ignored - not handled
+      // If no-cache directive has arguments they are ignored - not handled.
       must_validate_ = true;
     } else if (directive == "must-revalidate" || directive == "proxy-revalidate") {
       no_stale_ = true;
     } else if (directive == "no-store" || directive == "private") {
-      // If private directive has arguments they are ignored - not handled
+      // If private directive has arguments they are ignored - not handled.
       no_store_ = true;
     } else if (directive == "no-transform") {
       no_transform_ = true;
@@ -151,12 +151,12 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   absl::Time time;
   const std::string input(header_entry->value().getStringView());
 
-  // Acceptable Date/Time Formats per
+  // Acceptable Date/Time Formats per:
   // https://tools.ietf.org/html/rfc7231#section-7.1.1.1
   //
-  // Sun, 06 Nov 1994 08:49:37 GMT    ; IMF-fixdate
-  // Sunday, 06-Nov-94 08:49:37 GMT   ; obsolete RFC 850 format
-  // Sun Nov  6 08:49:37 1994         ; ANSI C's asctime() format
+  // Sun, 06 Nov 1994 08:49:37 GMT    ; IMF-fixdate.
+  // Sunday, 06-Nov-94 08:49:37 GMT   ; obsolete RFC 850 format.
+  // Sun Nov  6 08:49:37 1994         ; ANSI C's asctime() format.
   static const char* rfc7231_date_formats[] = {"%a, %d %b %Y %H:%M:%S GMT",
                                                "%A, %d-%b-%y %H:%M:%S GMT", "%a %b %e %H:%M:%S %Y"};
 
@@ -178,7 +178,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
     }
     uint64_t new_val = (val * 10) + (cur - '0');
     if (new_val / 8 < val) {
-      // Overflow occurred
+      // Overflow occurred.
       return absl::nullopt;
     }
     val = new_val;
@@ -186,7 +186,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
   }
 
   if (bytes_consumed) {
-    // Consume some digits
+    // Consume some digits.
     str.remove_prefix(bytes_consumed);
     return val;
   }
