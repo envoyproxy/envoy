@@ -82,11 +82,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "inline_headers_handles",
-    srcs = ["inline_headers_handles.cc"],
     hdrs = ["inline_headers_handles.h"],
     deps = [
-        "//source/common/http:header_map_lib",
-        "//source/common/http:headers_lib",
+        "//include/envoy/http:header_map_interface",
     ],
 )
 

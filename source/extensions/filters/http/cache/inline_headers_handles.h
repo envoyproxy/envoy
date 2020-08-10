@@ -7,40 +7,39 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-// Request headers inline handles
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    authorization_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    authorization_handle(Http::CustomHeaders::get().Authorization);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    pragma_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    pragma_handle(Http::CustomHeaders::get().Pragma);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    request_cache_control_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    request_cache_control_handle(Http::CustomHeaders::get().CacheControl);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_match_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    if_match_handle(Http::CustomHeaders::get().IfMatch);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_none_match_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    if_none_match_handle(Http::CustomHeaders::get().IfNoneMatch);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_modified_since_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    if_modified_since_handle(Http::CustomHeaders::get().IfModifiedSince);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_unmodified_since_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    if_unmodified_since_handle(Http::CustomHeaders::get().IfUnmodifiedSince);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    if_range_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    if_range_handle(Http::CustomHeaders::get().IfRange);
 
 // Response headers inline handles
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    response_cache_control_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    response_cache_control_handle(Http::CustomHeaders::get().CacheControl);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    last_modified_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    last_modified_handle(Http::CustomHeaders::get().LastModified);
 
-extern Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    etag_handle;
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    etag_handle(Http::CustomHeaders::get().Etag);
 
 } // namespace Cache
 } // namespace HttpFilters
