@@ -300,7 +300,7 @@ public:
       return testing::AssertionSuccess();
     }
     Thread::CondVar callback_ready_event;
-    bool unexpected_disconnect = false;
+    std::atomic<bool> unexpected_disconnect = false;
     connection_.dispatcher().post(
         [this, f, &callback_ready_event, &unexpected_disconnect]() -> void {
           // The use of connected() here, vs. !disconnected_, is because we want to use the lock_

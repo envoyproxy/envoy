@@ -95,10 +95,10 @@ DEPENDENCY_REPOSITORIES = dict(
         cpe = "N/A",
     ),
     com_google_absl = dict(
-        sha256 = "ec8ef47335310cc3382bdc0d0cc1097a001e67dc83fcba807845aa5696e7e1e4",
-        strip_prefix = "abseil-cpp-302b250e1d917ede77b5ff00a6fd9f28430f1563",
-        # 2020-07-13
-        urls = ["https://github.com/abseil/abseil-cpp/archive/302b250e1d917ede77b5ff00a6fd9f28430f1563.tar.gz"],
+        sha256 = "573baccd67aa591b8c7209bfb0c77e0d15633d77ced39d1ccbb1232828f7f7d9",
+        strip_prefix = "abseil-cpp-ce4bc927755fdf0ed03d679d9c7fa041175bb3cb",
+        # 2020-08-08
+        urls = ["https://github.com/abseil/abseil-cpp/archive/ce4bc927755fdf0ed03d679d9c7fa041175bb3cb.tar.gz"],
         use_category = ["dataplane", "controlplane"],
         cpe = "N/A",
     ),

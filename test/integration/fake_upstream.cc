@@ -709,7 +709,7 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
 AssertionResult FakeRawConnection::write(const std::string& data, bool end_stream,
                                          milliseconds timeout) {
   return shared_connection_.executeOnDispatcher(
-      [&data, end_stream](Network::Connection& connection) {
+      [data, end_stream](Network::Connection& connection) {
         Buffer::OwnedImpl to_write(data);
         connection.write(to_write, end_stream);
       },
