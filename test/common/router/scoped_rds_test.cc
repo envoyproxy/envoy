@@ -198,6 +198,9 @@ scope_key_builder:
           TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
               fmt::format(route_config_tmpl, name));
       const auto decoded_resources = TestUtility::decodeResources({route_config});
+      if (rds_subscription_by_name_.find(name) == rds_subscription_by_name_.end()) {
+        continue;
+      }
       rds_subscription_by_name_[name]->onConfigUpdate(decoded_resources.refvec_, version);
     }
   }
@@ -933,6 +936,8 @@ key:
   EXPECT_EQ(getScopedRouteMap().size(), 2);
 }
 
+// Compare behavior of 2 scopes that share that same route configuration but have different
+// priority. roue config of secondary priority scope shouldn't be loaded.
 TEST_F(ScopedRdsTest, SecondaryPriorityScopeNotLoadedWithoutRequest) {
   setup();
   init_watcher_.expectReady();
@@ -969,6 +974,7 @@ key:
   // in yet(NullConfigImpl returned).
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
+  // Route config for foo key is NullConfigImpl and route config for bar key is nullptr
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -978,13 +984,18 @@ key:
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
               IsNull());
   pushRdsConfig({"foo_routes"}, "111");
+  // Scope foo now have route config but route config for scope bar is still nullptr.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+              IsNull());
 }
 
+// push
 TEST_F(ScopedRdsTest, PushRdsAfterOndemandRequest) {
   setup();
   init_watcher_.expectReady();
@@ -1109,6 +1120,57 @@ key:
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->name(),
+            "foo_routes");
+}
+
+// Change a scope from secondary to primary will enable eager loading.
+TEST_F(ScopedRdsTest, UpdateSecondaryScopeToPrimaryScope) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  // Secondary priority scope should be loaded lazily.
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+priority: Secondary
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
+
+  const auto decoded_resources1 = TestUtility::decodeResources({lazy_resource});
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources1.refvec_, "1"));
+
+  // The scope is of secondary priority and rds update won't be accepted.
+  pushRdsConfig({"foo_routes"}, "111");
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
+
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+              IsNull());
+
+  const std::string config_yaml = R"EOF(
+  name: foo_scope
+  route_configuration_name: foo_routes
+  key:
+    fragments:
+      - string_key: x-foo-key
+  )EOF";
+  const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  const auto decoded_resources2 = TestUtility::decodeResources({eager_resource});
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources2.refvec_, "2"));
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "");
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
 }

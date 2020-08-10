@@ -1589,7 +1589,7 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
                 if (scope_exist) {
                   refreshCachedRoute();
                 }
-                (*cb)(hasCachedRoute());
+                (*cb)(scope_exist && hasCachedRoute() && cached_route_.value()->routeEntry());
               }
             });
     route_config_update_requester_->requestSrdsUpdate(*scope_key_hash_, thread_local_dispatcher,

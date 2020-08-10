@@ -475,7 +475,6 @@ key:
                                      {":authority", "host"},
                                      {":scheme", "http"},
                                      {"Addr", "x-foo-key=foo"}});
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
   createRdsStream("foo_route1");
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
@@ -490,6 +489,161 @@ key:
                                      {"Addr", "x-foo-key=foo"}},
       456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
       /*cluster_0*/ 0);
+}
+
+// With on demand update filter configured, scope not match should still return 404
+TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateScopeNotMatch) {
+
+  config_helper_.addFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+
+  const std::string scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/meh" }}
+          route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [&]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+    createRdsStream("foo_route1");
+    // CreateRdsStream waits for connection which is fired by RDS subscription.
+    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  // No scope key matches "xyz-route".
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=bar"}});
+  response->waitForEndStream();
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+}
+
+// With on demand update filter configured, scope match but virtual host don't match, should still
+// return 404
+TEST_P(ScopedRdsIntegrationTest, OnDemandUpdatePrimaryVirtualHostNotMatch) {
+
+  config_helper_.addFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+
+  const std::string scope_tmpl = R"EOF(
+name: {}
+route_configuration_name: {}
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/meh" }}
+          route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [&]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
+    createRdsStream("foo_route1");
+    // CreateRdsStream waits for connection which is fired by RDS subscription.
+    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  // No scope key matches "xyz-route".
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/neh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo"}});
+  response->waitForEndStream();
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+}
+
+// With on demand update filter configured, scope match but virtual host don't match, should still
+// return 404
+TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSecondaryVirtualHostNotMatch) {
+
+  config_helper_.addFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+
+  const std::string scope_route1 = R"EOF(
+name: foo_scope
+route_configuration_name: foo_route1
+key:
+  fragments:
+    - string_key: foo
+)EOF";
+  const std::string scope_route2 = R"EOF(
+name: bar_scope
+route_configuration_name: foo_route1
+priority: Secondary
+key:
+  fragments:
+    - string_key: bar
+)EOF";
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/meh" }}
+          route: {{ cluster: {} }}
+)EOF";
+
+  on_server_init_function_ = [&]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scope_route1, scope_route2}, {scope_route1, scope_route2}, {}, "1");
+    createRdsStream("foo_route1");
+    // CreateRdsStream waits for connection which is fired by RDS subscription.
+    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  // No scope key matches "xyz-route".
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/neh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=bar"}});
+  response->waitForEndStream();
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
 }
 
 // Scopes of different priority share the same route configuration
