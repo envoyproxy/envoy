@@ -53,10 +53,8 @@ void skipResponderId(CBS& cbs) {
   // KeyHash ::= OCTET STRING -- SHA-1 hash of responder's public key
   //    (excluding the tag and length fields)
 
-  if (unwrap(Asn1Utility::getOptional(cbs,
-                                      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
-      unwrap(Asn1Utility::getOptional(cbs,
-                                      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
+  if (unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
+      unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2))) {
     return;
   }
 
@@ -70,8 +68,8 @@ void skipCertStatus(CBS& cbs) {
   //  unknown             [2] IMPLICIT UnknownInfo
   // }
   if (!(unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 0)) ||
-        unwrap(Asn1Utility::getOptional(cbs,
-                                        CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
+        unwrap(
+            Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1)) ||
         unwrap(Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 2)))) {
     throw EnvoyException(absl::StrCat("Unknown OcspCertStatus tag: ", parseTag(cbs)));
   }
@@ -107,7 +105,8 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
   }
 
   auto& this_update = response_->response_->getThisUpdate();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.check_ocsp_response_validity_start_time") &&
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.check_ocsp_response_validity_start_time") &&
       time_source_.systemTime() < this_update) {
     std::string time_format(GENERALIZED_TIME_FORMAT);
     DateFormatter formatter(time_format);
@@ -143,8 +142,8 @@ std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {
   }
 
   OcspResponseStatus status = Asn1OcspUtility::parseResponseStatus(elem);
-  auto maybe_bytes = unwrap(Asn1Utility::getOptional(elem,
-                                      CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
+  auto maybe_bytes =
+      unwrap(Asn1Utility::getOptional(elem, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
   ResponsePtr resp = nullptr;
   if (maybe_bytes) {
     resp = Asn1OcspUtility::parseResponseBytes(maybe_bytes.value());
