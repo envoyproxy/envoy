@@ -645,10 +645,11 @@ AdminImpl::dumpUnreadyTargetsConfigs(const absl::optional<std::string>& mask) co
 
 ProtobufTypes::MessagePtr AdminImpl::dumpListenerUnreadyTargetsConfigs() const {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+
   if (server_.listenerManager().isWorkerStarted()) {
-    listeners = server_.listenerManager().warmingListeners();
+    listeners = server_.listenerManager().listeners(ListenerManager::WARMING);
   } else {
-    listeners = server_.listenerManager().listeners();
+    listeners = server_.listenerManager().listeners(ListenerManager::ACTIVE);
   }
 
   auto unready_targets_config_dump_list =

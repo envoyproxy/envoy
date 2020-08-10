@@ -50,7 +50,7 @@ template <>
 TestRequestHeaderMapImpl
 fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<TestRequestHeaderMapImpl>(headers, {"transfer-encoding"},
-                                                     {":authority"});
+                                                     {":authority", ":method", ":path"});
 }
 
 // Convert from test proto Http1ServerSettings to Http1Settings.
