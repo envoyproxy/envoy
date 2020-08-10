@@ -113,7 +113,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
         proto_config,
     Api::Api& api) {
 
-  disabled_ = (proto_config.services().size() == 0);
+  disabled_ = proto_config.services().empty();
   if (disabled_) {
     return;
   }
@@ -412,7 +412,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                                                               bool end_stream) {
 
   initPerRouteConfig();
-  if (per_route_config_ == nullptr) {
+  if (per_route_config_->disabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
