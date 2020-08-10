@@ -39,7 +39,6 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
     # Legacy test use. TODO(#9953) clean up.
-    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
