@@ -75,7 +75,7 @@ INSTANTIATE_TEST_SUITE_P(CipherSuites, SslLibraryCipherSuiteSupport,
 // Tests for whether new cipher suites are added. When they are, they must be added to
 // knownCipherSuites() so that this test can detect if they are removed in the future.
 TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
-  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_with_buffers_method()));
   EXPECT_NE(0, SSL_CTX_set_strict_cipher_list(ctx.get(), "ALL"));
 
   std::vector<std::string> present_cipher_suites;
@@ -89,7 +89,7 @@ TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
 // suite is removed, it must be added to the release notes as an incompatible change, because it can
 // cause previously loadable configurations to no longer load if they reference the cipher suite.
 TEST_P(SslLibraryCipherSuiteSupport, CipherSuitesNotRemoved) {
-  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_with_buffers_method()));
   EXPECT_NE(0, SSL_CTX_set_strict_cipher_list(ctx.get(), GetParam().c_str()));
 }
 
