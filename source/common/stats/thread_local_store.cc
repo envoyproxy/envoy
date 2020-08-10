@@ -198,6 +198,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   for (ParentHistogramImpl* histogram : histogram_set_) {
     histogram->setShuttingDown(true);
   }
+  histogram_set_.clear();
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
@@ -206,7 +207,7 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
         [this]() -> void {
-          for (const auto& id_hist : tls_->getTyped<TlsCache>().histogram_cache_) {
+          for (const auto& id_hist : tls_->getTyped<TlsCache>().tls_histogram_cache_) {
             const TlsHistogramSharedPtr& tls_hist = id_hist.second;
             tls_hist->beginMerge();
           }
@@ -290,7 +291,10 @@ ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
 
 void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) { scope_cache_.erase(scope_id); }
 void ThreadLocalStoreImpl::TlsCache::eraseHistogram(uint64_t histogram_id) {
-  histogram_cache_.erase(histogram_id);
+  // This is called for every histogram in every thread, even though the
+  // histogram may not have been cached in each thread yet. So we don't
+  // want to check whether the erase() call erased anything.
+  tls_histogram_cache_.erase(histogram_id);
 }
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
@@ -701,7 +705,7 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
   TlsHistogramSharedPtr* tls_histogram = nullptr;
   if (!shutting_down_ && tls_ != nullptr) {
     TlsCache& tls_cache = tls_->getTyped<TlsCache>();
-    tls_histogram = &tls_cache.histogram_cache_[id];
+    tls_histogram = &tls_cache.tls_histogram_cache_[id];
     if (*tls_histogram != nullptr) {
       return **tls_histogram;
     }
@@ -775,8 +779,16 @@ void ParentHistogramImpl::incRefCount() { ++ref_count_; }
 bool ParentHistogramImpl::decRefCount() {
   bool ret;
   if (shutting_down_) {
+    // When shutting down, we cannot reference thread_local_store_, as
+    // histograms can outlive the store. So we decrement the ref-count without
+    // the stores' lock. We will not be removing the object from the store's
+    // histogram map in this scenario, as the set was cleared during shutdown,
+    // and will not be repopulated in histogramFromStatNameWithTags after
+    // initiating shutdown.
     ret = --ref_count_ == 0;
   } else {
+    // We delegate to the Store object to decrement the ref-count so it
+    // can hold the lock to the map, in case
     ret = thread_local_store_.decHistogramRefCount(*this, ref_count_);
   }
   return ret;

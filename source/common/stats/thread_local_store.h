@@ -284,8 +284,18 @@ private:
     StatRefMap<Gauge> gauges_;
     StatRefMap<TextReadout> text_readouts_;
 
-    // The histogram objects are not shared with the central cache, and don't
-    // require taking a lock when decrementing their ref-count.
+    // Histograms also require holding a mutex while decrementing reference
+    // counts. The only difference from other stats is that the histogram_set_
+    // lives in the ThreadLocalStore object, rather than in
+    // AllocatorImpl. Histograms are removed from that set when all scopes
+    // referencing the histogram are dropped. Each ParentHistogram has a unique
+    // index, which is not re-used during the process lifetime.
+    //
+    // There is also a tls_histogram_cache_ in the TlsCache object, which is
+    // not tied to a scope. It maps from parent histogram's unique index to
+    // a TlsHistogram. This enables continuity between same-named histograms
+    // in same-named scopes. That scenario is common when re-creating scopes in
+    // response to xDS.
     StatNameHashMap<ParentHistogramSharedPtr> parent_histograms_;
 
     // We keep a TLS cache of rejected stat names. This costs memory, but
@@ -442,7 +452,7 @@ private:
     absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
 
     // Maps from histogram ID (monotonically increasing) to a TLS histogram.
-    absl::flat_hash_map<uint64_t, TlsHistogramSharedPtr> histogram_cache_;
+    absl::flat_hash_map<uint64_t, TlsHistogramSharedPtr> tls_histogram_cache_;
   };
 
   template <class StatFn> bool iterHelper(StatFn fn) const {
