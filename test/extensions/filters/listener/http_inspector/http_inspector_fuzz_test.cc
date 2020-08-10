@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/original_dst/original_dst.h"
+#include "extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
-namespace OriginalDst {
+namespace HttpInspector {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
 
@@ -18,12 +18,15 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
     return;
   }
 
-  auto filter = std::make_unique<OriginalDstFilter>();
+  Stats::IsolatedStoreImpl store;
+  ConfigSharedPtr cfg = std::make_shared<Config>(store);
+  auto filter = std::make_unique<Filter>(cfg);
+
   ListenerFilterFuzzer fuzzer;
   fuzzer.fuzz(*filter, input);
 }
 
-} // namespace OriginalDst
+} // namespace HttpInspector
 } // namespace ListenerFilters
 } // namespace Extensions
 } // namespace Envoy
