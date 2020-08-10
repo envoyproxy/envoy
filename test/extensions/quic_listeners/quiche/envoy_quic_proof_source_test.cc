@@ -242,6 +242,42 @@ GUy+n0vQNB0cXGzgcGI=
   testGetProof(false);
 }
 
+TEST_F(EnvoyQuicProofSourceTest, UnexpectedPrivateKey) {
+  EXPECT_CALL(listen_socket_, ioHandle());
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
+  auto server_context_config = std::make_unique<Ssl::MockServerContextConfig>();
+  auto server_context_config_ptr = server_context_config.get();
+  QuicServerTransportSocketFactory transport_socket_factory(std::move(server_context_config));
+  EXPECT_CALL(filter_chain_, transportSocketFactory())
+      .WillRepeatedly(ReturnRef(transport_socket_factory));
+
+  Ssl::MockTlsCertificateConfig tls_cert_config;
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
+      std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config)};
+  EXPECT_CALL(*server_context_config_ptr, tlsCertificates())
+      .WillRepeatedly(Return(tls_cert_configs));
+  std::string rsa_pkey_1024_len(R"(-----BEGIN RSA PRIVATE KEY-----
+MIICWwIBAAKBgQC79hDq/OwN3ke3EF6Ntdi9R+VSrl9MStk992l1us8lZhq+e0zU
+OlvxbUeZ8wyVkzs1gqI1it1IwF+EpdGhHhjggZjg040GD3HWSuyCzpHh+nLwJxtQ
+D837PCg0zl+TnKv1YjY3I1F3trGhIqfd2B6pgaJ4hpr+0hdqnKP0Htd4DwIDAQAB
+AoGASNypUD59Tx70k+1fifWNMEq3heacgJmfPxsyoXWqKSg8g8yOStLYo20mTXJf
+VXg+go7CTJkpELOqE2SoL5nYMD0D/YIZCgDx85k0GWHdA6udNn4to95ZTeZPrBHx
+T0QNQHnZI3A7RwLinO60IRY0NYzhkTEBxIuvIY6u0DVbrAECQQDpshbxK3DHc7Yi
+Au7BUsxP8RbG4pP5IIVoD4YvJuwUkdrfrwejqTdkfchJJc+Gu/+h8vy7eASPHLLT
+NBk5wFoPAkEAzeaKnx0CgNs0RX4+sSF727FroD98VUM38OFEJQ6U9OAWGvaKd8ey
+yAYUjR2Sl5ZRyrwWv4IqyWgUGhZqNG0CAQJAPTjjm8DGpenhcB2WkNzxG4xMbEQV
+gfGMIYvXmmi29liTn4AKH00IbvIo00jtih2cRcATh8VUZG2fR4dhiGik7wJAWSwS
+NwzaS7IjtkERp6cHvELfiLxV/Zsp/BGjcKUbD96I1E6X834ySHyRo/f9x9bbP4Es
+HO6j1yxTIGU6w8++AQJACdFPnRidOaj5oJmcZq0s6WGTYfegjTOKgi5KQzO0FTwG
+qGm130brdD+1U1EJnEFmleLZ/W6mEi3MxcKpWOpTqQ==
+-----END RSA PRIVATE KEY-----)");
+  EXPECT_CALL(tls_cert_config, privateKey()).WillOnce(ReturnRef(rsa_pkey_1024_len));
+  proof_source_.ComputeTlsSignature(server_address_, client_address_, hostname_,
+                                    SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
+                                    std::make_unique<TestSignatureCallback>(false));
+}
+
 TEST_F(EnvoyQuicProofSourceTest, InvalidPrivateKey) {
   EXPECT_CALL(listen_socket_, ioHandle());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))

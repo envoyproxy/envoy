@@ -58,9 +58,19 @@ void EnvoyQuicProofSource::signPayload(
     callback->Run(false, "", nullptr);
     return;
   }
+  // Verify the signature algorithm is as expected.
+  std::string error_details;
+  int sign_alg = deduceSignatureAlgorithmFromPublicKey(pem_key->private_key(), &error_details);
+  if (sign_alg != signature_algorithm) {
+    ENVOY_LOG(warn,
+              fmt::format("The signature algorithm {} from the private key is not expected: {}",
+                          sign_alg, error_details));
+    callback->Run(false, "", nullptr);
+    return;
+  }
+
   // Sign.
   std::string sig = pem_key->Sign(in, signature_algorithm);
-
   bool success = !sig.empty();
   ASSERT(res.filter_chain_.has_value());
   callback->Run(success, sig,
