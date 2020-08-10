@@ -18,7 +18,7 @@ namespace Router {
 
 enum class ResetHeaderFormat { Seconds, UnixTimestamp };
 
-/*
+/**
  * A ResetHeaderParser specifies a header name and a format to match against
  * response headers that are used to signal a rate limit interval reset, such
  * as Retry-After or X-RateLimit-Reset.
