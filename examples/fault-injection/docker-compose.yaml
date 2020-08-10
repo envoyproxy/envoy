@@ -6,7 +6,6 @@ services:
       dockerfile: Dockerfile-envoy
     command: /usr/local/bin/envoy -c /etc/envoy.yaml
     volumes:
-      - ./envoy.yaml:/etc/envoy.yaml
       - ./runtime:/srv/runtime
     networks:
       - envoymesh

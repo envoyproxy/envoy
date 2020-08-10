@@ -50,7 +50,7 @@ template <>
 TestRequestHeaderMapImpl
 fromSanitizedHeaders<TestRequestHeaderMapImpl>(const test::fuzz::Headers& headers) {
   return Fuzz::fromHeaders<TestRequestHeaderMapImpl>(headers, {"transfer-encoding"},
-                                                     {":authority"});
+                                                     {":authority", ":method", ":path"});
 }
 
 // Convert from test proto Http1ServerSettings to Http1Settings.
@@ -523,7 +523,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         }
         auto stream_ptr = pending_streams.front()->removeFromList(pending_streams);
         HttpStream* const stream = stream_ptr.get();
-        stream_ptr->moveIntoListBack(std::move(stream_ptr), streams);
+        LinkedList::moveIntoListBack(std::move(stream_ptr), streams);
         stream->response_.response_encoder_ = &encoder;
         encoder.getStream().addCallbacks(stream->response_.stream_callbacks_);
         stream->stream_index_ = streams.size() - 1;
@@ -580,7 +580,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
               should_close_connection = true;
             }
           });
-      stream->moveIntoListBack(std::move(stream), pending_streams);
+      LinkedList::moveIntoListBack(std::move(stream), pending_streams);
       break;
     }
     case test::common::http::Action::kStreamAction: {

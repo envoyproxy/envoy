@@ -347,6 +347,169 @@ TEST_F(OwnedImplTest, Read) {
   EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 }
 
+TEST_F(OwnedImplTest, ExtractOwnedSlice) {
+  // Create a buffer with two owned slices.
+  Buffer::OwnedImpl buffer;
+  buffer.appendSliceForTest("abcde");
+  const uint64_t expected_length0 = 5;
+  buffer.appendSliceForTest("123");
+  const uint64_t expected_length1 = 3;
+  EXPECT_EQ(buffer.toString(), "abcde123");
+  RawSliceVector slices = buffer.getRawSlices();
+  EXPECT_EQ(2, slices.size());
+
+  // Extract first slice.
+  auto slice = buffer.extractMutableFrontSlice();
+  ASSERT_TRUE(slice);
+  auto slice_data = slice->getMutableData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length0);
+  EXPECT_EQ("abcde",
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(buffer.toString(), "123");
+
+  // Modify and re-add extracted first slice data to the end of the buffer.
+  auto slice_mutable_data = slice->getMutableData();
+  ASSERT_NE(slice_mutable_data.data(), nullptr);
+  EXPECT_EQ(slice_mutable_data.size(), expected_length0);
+  *slice_mutable_data.data() = 'A';
+  buffer.appendSliceForTest(slice_mutable_data.data(), slice_mutable_data.size());
+  EXPECT_EQ(buffer.toString(), "123Abcde");
+
+  // Extract second slice, leaving only the original first slice.
+  slice = buffer.extractMutableFrontSlice();
+  ASSERT_TRUE(slice);
+  slice_data = slice->getMutableData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length1);
+  EXPECT_EQ("123",
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(buffer.toString(), "Abcde");
+}
+
+TEST_F(OwnedImplTest, ExtractAfterSentinelDiscard) {
+  // Create a buffer with a sentinel and one owned slice.
+  Buffer::OwnedImpl buffer;
+  bool sentinel_discarded = false;
+  const Buffer::OwnedBufferFragmentImpl::Releasor sentinel_releasor{
+      [&](const Buffer::OwnedBufferFragmentImpl* sentinel) {
+        sentinel_discarded = true;
+        delete sentinel;
+      }};
+  auto sentinel =
+      Buffer::OwnedBufferFragmentImpl::create(absl::string_view("", 0), sentinel_releasor);
+  buffer.addBufferFragment(*sentinel.release());
+
+  buffer.appendSliceForTest("abcde");
+  const uint64_t expected_length = 5;
+  EXPECT_EQ(buffer.toString(), "abcde");
+  RawSliceVector slices = buffer.getRawSlices(); // only returns slices with data
+  EXPECT_EQ(1, slices.size());
+
+  // Extract owned slice after discarding sentinel.
+  EXPECT_FALSE(sentinel_discarded);
+  auto slice = buffer.extractMutableFrontSlice();
+  ASSERT_TRUE(slice);
+  EXPECT_TRUE(sentinel_discarded);
+  auto slice_data = slice->getMutableData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length);
+  EXPECT_EQ("abcde",
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
+  // Create a buffer with two owned slices.
+  Buffer::OwnedImpl buffer;
+  buffer.appendSliceForTest("abcde");
+  const uint64_t expected_length0 = 5;
+  buffer.appendSliceForTest("123");
+  EXPECT_EQ(buffer.toString(), "abcde123");
+  RawSliceVector slices = buffer.getRawSlices();
+  EXPECT_EQ(2, slices.size());
+
+  // Partially drain the first slice.
+  const uint64_t partial_drain_size = 2;
+  buffer.drain(partial_drain_size);
+  EXPECT_EQ(buffer.toString(), static_cast<const char*>("abcde123") + partial_drain_size);
+
+  // Extracted partially drained first slice, leaving the second slice.
+  auto slice = buffer.extractMutableFrontSlice();
+  ASSERT_TRUE(slice);
+  auto slice_data = slice->getMutableData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length0 - partial_drain_size);
+  EXPECT_EQ(static_cast<const char*>("abcde") + partial_drain_size,
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(buffer.toString(), "123");
+}
+
+TEST_F(OwnedImplTest, ExtractUnownedSlice) {
+  // Create a buffer with an unowned slice.
+  std::string input{"unowned test slice"};
+  const size_t expected_length0 = input.size();
+  auto frag = OwnedBufferFragmentImpl::create(
+      {input.c_str(), expected_length0},
+      [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
+  Buffer::OwnedImpl buffer;
+  buffer.addBufferFragment(*frag);
+
+  bool drain_tracker_called{false};
+  buffer.addDrainTracker([&] { drain_tracker_called = true; });
+
+  // Add an owned slice to the end of the buffer.
+  EXPECT_EQ(expected_length0, buffer.length());
+  std::string owned_slice_content{"another slice, but owned"};
+  buffer.add(owned_slice_content);
+  const uint64_t expected_length1 = owned_slice_content.length();
+
+  // Partially drain the unowned slice.
+  const uint64_t partial_drain_size = 5;
+  buffer.drain(partial_drain_size);
+  EXPECT_EQ(expected_length0 - partial_drain_size + expected_length1, buffer.length());
+  EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(drain_tracker_called);
+
+  // Extract what remains of the unowned slice, leaving only the owned slice.
+  auto slice = buffer.extractMutableFrontSlice();
+  ASSERT_TRUE(slice);
+  EXPECT_TRUE(drain_tracker_called);
+  auto slice_data = slice->getMutableData();
+  ASSERT_NE(slice_data.data(), nullptr);
+  EXPECT_EQ(slice_data.size(), expected_length0 - partial_drain_size);
+  EXPECT_EQ(input.data() + partial_drain_size,
+            absl::string_view(reinterpret_cast<const char*>(slice_data.data()), slice_data.size()));
+  EXPECT_EQ(expected_length1, buffer.length());
+
+  // The underlying immutable unowned slice was discarded during the extract
+  // operation and replaced with a mutable copy. The drain trackers were
+  // called as part of the extract, implying that the release callback was called.
+  EXPECT_TRUE(release_callback_called_);
+}
+
+TEST_F(OwnedImplTest, ExtractWithDrainTracker) {
+  testing::InSequence s;
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("a");
+
+  testing::MockFunction<void()> tracker1;
+  testing::MockFunction<void()> tracker2;
+  buffer.addDrainTracker(tracker1.AsStdFunction());
+  buffer.addDrainTracker(tracker2.AsStdFunction());
+
+  testing::MockFunction<void()> done;
+  EXPECT_CALL(tracker1, Call());
+  EXPECT_CALL(tracker2, Call());
+  EXPECT_CALL(done, Call());
+  auto slice = buffer.extractMutableFrontSlice();
+  // The test now has ownership of the slice, but the drain trackers were
+  // called as part of the extract operation
+  done.Call();
+  slice.reset();
+}
+
 TEST_F(OwnedImplTest, DrainTracking) {
   testing::InSequence s;
 
@@ -595,22 +758,22 @@ TEST_F(OwnedImplTest, LinearizeDrainTracking) {
   testing::MockFunction<void(int, int)> drain_tracker;
   testing::MockFunction<void()> done_tracker;
   EXPECT_CALL(tracker1, Call());
+  EXPECT_CALL(drain_tracker, Call(3 * LargeChunk + 108 * SmallChunk, 16384));
   EXPECT_CALL(release_callback_tracker, Call(_, _, _));
   EXPECT_CALL(tracker2, Call());
-  EXPECT_CALL(drain_tracker, Call(3 * LargeChunk + 108 * SmallChunk, 16384));
   EXPECT_CALL(release_callback_tracker2, Call(_, _, _));
   EXPECT_CALL(tracker3, Call());
-  EXPECT_CALL(tracker4, Call());
   EXPECT_CALL(drain_tracker, Call(2 * LargeChunk + 107 * SmallChunk, 16384));
   EXPECT_CALL(drain_tracker, Call(LargeChunk + 106 * SmallChunk, 16384));
+  EXPECT_CALL(tracker4, Call());
   EXPECT_CALL(drain_tracker, Call(105 * SmallChunk, 16384));
   EXPECT_CALL(tracker5, Call());
   EXPECT_CALL(drain_tracker, Call(4616, 4616));
   EXPECT_CALL(done_tracker, Call());
-  for (auto& expected_first_slice : std::vector<std::vector<int>>{{16584, 3832, 20416},
-                                                                  {32904, 3896, 36800},
-                                                                  {16520, 3896, 36800},
-                                                                  {20296, 120, 20416},
+  for (auto& expected_first_slice : std::vector<std::vector<int>>{{16384, 4032, 20416},
+                                                                  {16384, 4032, 20416},
+                                                                  {16520, 0, 32704},
+                                                                  {16384, 4032, 20416},
                                                                   {4616, 3512, 8128}}) {
     const uint32_t write_size = std::min<uint32_t>(LinearizeSize, buffer.length());
     buffer.linearize(write_size);

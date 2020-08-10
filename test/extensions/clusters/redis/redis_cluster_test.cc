@@ -90,10 +90,11 @@ protected:
     return addresses;
   }
 
-  void setupFromV3Yaml(const std::string& yaml) {
+  void setupFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
     expectRedisSessionCreated();
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
+    envoy::config::cluster::v3::Cluster cluster_config =
+        Upstream::parseClusterFromV3Yaml(yaml, avoid_boosting);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -121,7 +122,7 @@ protected:
         });
   }
 
-  void setupFactoryFromV2Yaml(const std::string& yaml) {
+  void setupFactoryFromV3Yaml(const std::string& yaml) {
     NiceMock<Upstream::MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
@@ -793,12 +794,12 @@ TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
         cluster_refresh_timeout: 0.25s
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(setupFactoryFromV2Yaml(basic_yaml_hosts), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(setupFactoryFromV3Yaml(basic_yaml_hosts), EnvoyException,
                             "Redis cluster can only created with redis cluster type.");
 }
 
 TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
-  setupFactoryFromV2Yaml(BasicConfig);
+  setupFactoryFromV3Yaml(BasicConfig);
 }
 
 TEST_F(RedisClusterTest, RedisErrorResponse) {

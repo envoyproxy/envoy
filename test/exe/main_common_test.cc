@@ -151,7 +151,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonDeathTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
-#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
+#if defined(__clang_analyzer__) || (defined(__has_feature) && (__has_feature(thread_sanitizer) ||  \
+                                                               __has_feature(address_sanitizer) || \
+                                                               __has_feature(memory_sanitizer)))
   ENVOY_LOG_MISC(critical,
                  "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
 #else
@@ -172,7 +174,6 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
              size *= 1000) {
           int* p = new int[size];
           // Use the pointer to prevent clang from optimizing the allocation away in opt mode.
-          // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
           ENVOY_LOG_MISC(debug, "p={}", reinterpret_cast<intptr_t>(p));
         }
       }(),

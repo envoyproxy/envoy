@@ -4,14 +4,18 @@
 #include "envoy/network/connection.h"
 
 #include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
-    : stat_prefix_{stat_prefix}, scope_{scope}, stats_{generateStats(stat_prefix, scope)} {}
+PostgresFilterConfig::PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
+                                           Stats::Scope& scope)
+    : stat_prefix_{stat_prefix},
+      enable_sql_parsing_(enable_sql_parsing), scope_{scope}, stats_{generateStats(stat_prefix,
+                                                                                   scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
@@ -21,7 +25,8 @@ PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{c
 
 // Network::ReadFilter
 Network::FilterStatus PostgresFilter::onData(Buffer::Instance& data, bool) {
-  ENVOY_CONN_LOG(trace, "echo: got {} bytes", read_callbacks_->connection(), data.length());
+  ENVOY_CONN_LOG(trace, "postgres_proxy: got {} bytes", read_callbacks_->connection(),
+                 data.length());
 
   // Frontend Buffer
   frontend_buffer_.add(data);
@@ -156,6 +161,29 @@ void PostgresFilter::incStatements(StatementType type) {
     break;
   case DecoderCallbacks::StatementType::Noop:
     break;
+  }
+}
+
+void PostgresFilter::processQuery(const std::string& sql) {
+  if (config_->enable_sql_parsing_) {
+    ProtobufWkt::Struct metadata;
+
+    auto result = Common::SQLUtils::SQLUtils::setMetadata(sql, decoder_->getAttributes(), metadata);
+
+    if (!result) {
+      config_->stats_.statements_parse_error_.inc();
+      ENVOY_CONN_LOG(trace, "postgres_proxy: cannot parse SQL: {}", read_callbacks_->connection(),
+                     sql.c_str());
+      return;
+    }
+
+    config_->stats_.statements_parsed_.inc();
+    ENVOY_CONN_LOG(trace, "postgres_proxy: query processed {}", read_callbacks_->connection(),
+                   sql.c_str());
+
+    // Set dynamic metadata
+    read_callbacks_->connection().streamInfo().setDynamicMetadata(
+        NetworkFilterNames::get().PostgresProxy, metadata);
   }
 }
 

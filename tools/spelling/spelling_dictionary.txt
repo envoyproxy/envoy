@@ -90,6 +90,7 @@ ENV
 EOF
 EOS
 EOY
+EPOLLOUT
 EPOLLRDHUP
 EQ
 ERANGE
@@ -146,6 +147,7 @@ IDL
 IETF
 INADDR
 INET
+INVAL
 IO
 IOS
 IP
@@ -431,6 +433,7 @@ bools
 borks
 broadcasted
 buf
+buflen
 bugprone
 builtin
 builtins
@@ -633,6 +636,7 @@ gmock
 goog
 google
 goto
+gso
 gzip
 hackery
 hacky
@@ -860,6 +864,7 @@ postfix
 postfixes
 postgres
 postgresql
+pragma
 pre
 preallocate
 preallocating
@@ -964,6 +969,7 @@ restarter
 resync
 retriable
 retriggers
+revalidation
 rmdir
 rocketmq
 rewriter
@@ -988,6 +994,7 @@ sched
 schedulable
 schemas
 scopekey
+secp
 sendmsg
 sendmmsg
 sendto
@@ -1170,6 +1177,7 @@ vptr
 wakeup
 wakeups
 websocket
+wepoll
 whitespace
 whitespaces
 wildcard

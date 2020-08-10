@@ -1958,7 +1958,30 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
 
   test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
   response->waitForReset();
+  EXPECT_TRUE(response->complete());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_response_for_timeout",
+                                    "false");
+  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  response->waitForReset();
   EXPECT_FALSE(response->complete());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("max_duration_timeout"));
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.

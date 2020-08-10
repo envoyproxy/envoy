@@ -421,24 +421,32 @@ public:
              Server::FieldValidationConfig validation_config, uint32_t concurrency,
              std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy);
 
-  void waitForCounterEq(const std::string& name, uint64_t value) override {
-    notifyingStatsAllocator().waitForCounterFromStringEq(name, value);
+  void
+  waitForCounterEq(const std::string& name, uint64_t value,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void waitForCounterGe(const std::string& name, uint64_t value) override {
-    notifyingStatsAllocator().waitForCounterFromStringGe(name, value);
+  void
+  waitForCounterGe(const std::string& name, uint64_t value,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
+  }
+
+  void
+  waitForGaugeEq(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
+  }
+
+  void
+  waitForGaugeGe(const std::string& name, uint64_t value,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
   }
 
   void waitForCounterExists(const std::string& name) override {
     notifyingStatsAllocator().waitForCounterExists(name);
-  }
-
-  void waitForGaugeGe(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeGe(statStore(), name, value, time_system_);
-  }
-
-  void waitForGaugeEq(const std::string& name, uint64_t value) override {
-    TestUtility::waitForGaugeEq(statStore(), name, value, time_system_);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

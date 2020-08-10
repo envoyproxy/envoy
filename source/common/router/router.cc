@@ -589,7 +589,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   UpstreamRequestPtr upstream_request =
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
-  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
@@ -1169,7 +1169,7 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
 
   ASSERT(final_upstream_request);
   // Now put the final request back on this list.
-  final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
@@ -1551,7 +1551,7 @@ void Filter::doRetry() {
   }
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
-  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() &&
                                             !downstream_trailers_ && downstream_end_stream_);
   // It's possible we got immediately reset which means the upstream request we just
