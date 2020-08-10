@@ -101,7 +101,7 @@ function bazel_binary_build() {
 CI_TARGET=$1
 shift
 
-if [[ $# -gt 1 ]]; then
+if [[ $# -ge 1 ]]; then
   COVERAGE_TEST_TARGETS=$*
   TEST_TARGETS="$COVERAGE_TEST_TARGETS"
 else
@@ -230,7 +230,7 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define quiche=enabled \
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
-    --define use_legacy_codecs_in_integration_tests=true \
+    --define use_new_codecs_in_integration_tests=true \
   "
   ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
   setup_clang_toolchain
