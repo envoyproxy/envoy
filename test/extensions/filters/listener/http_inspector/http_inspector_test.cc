@@ -586,9 +586,9 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
 
     size_t ctr = 1;
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-    .Times(num_loops)
-    .WillRepeatedly(Invoke(
-        [&data, &ctr, num_loops](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+        .Times(num_loops)
+        .WillRepeatedly(Invoke([&data, &ctr, num_loops](os_fd_t, void* buffer, size_t length,
+                                                        int) -> Api::SysCallSizeResult {
           size_t len = ctr;
           if (num_loops == 2) {
             len = size_t(Config::MAX_INSPECT_SIZE / (3 - ctr));
@@ -597,7 +597,7 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
           memcpy(buffer, data.data(), len);
           ctr += 1;
           return Api::SysCallSizeResult{ssize_t(len), 0};
-        }));  
+        }));
   }
 
   bool got_continue = false;
