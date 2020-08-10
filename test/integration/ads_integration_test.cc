@@ -420,7 +420,7 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
                                       {"warming_cluster_2", "warming_cluster_1"}, {}, {}));
 }
 
-// Validate that warming listeners are removed when left out of SOTW update
+// Validate that warming listeners are removed when left out of SOTW update.
 TEST_P(AdsIntegrationTest, RemoveWarmingListener) {
   initialize();
 
@@ -457,7 +457,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingListener) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
 
-  // send a listener without its route, so it will be added as warming
+  // Send a listener without its route, so it will be added as warming.
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
       Config::TypeUrl::get().Listener,
       {buildListener("listener_0", "route_config_0"),
@@ -469,7 +469,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingListener) {
                                       {"nonexistent_route"}, {}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}, {}, {}));
 
-  // send a request removing the warming listener
+  // Send a request removing the warming listener.
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {"warming_listener_1"}, "3");
@@ -477,7 +477,7 @@ TEST_P(AdsIntegrationTest, RemoveWarmingListener) {
                                       {"route_config_0"}, {}, {"nonexistent_route"}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "3", {}, {}, {}));
 
-  // the warming listener should be successfully removed
+  // The warming listener should be successfully removed.
   test_server_->waitForCounterEq("listener_manager.listener_removed", 1);
   test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
 }

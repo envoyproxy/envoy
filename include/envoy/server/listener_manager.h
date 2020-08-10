@@ -131,9 +131,9 @@ public:
     All,
   };
 
-  // the types of listeners to be returned from listeners(ListenerState)
-  // an enum instead of enum class so the underlying type is an int and bitwise operations can be
-  // used without casting
+  // The types of listeners to be returned from listeners(ListenerState).
+  // An enum instead of enum class so the underlying type is an int and bitwise operations can be
+  // used without casting.
   enum ListenerState : uint8_t {
     ACTIVE = 1 << 0,
     WARMING = 1 << 1,
