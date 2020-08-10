@@ -44,6 +44,7 @@ bool ListenerImpl::rejectCxOverGlobalLimit() {
 void ListenerImpl::onSocketEvent(short flags) {
   ASSERT(flags & (Event::FileReadyType::Read));
 
+  // TODO(fcoras): Add limit on number of accepted calls per wakeup
   while (1) {
     if (!socket_->ioHandle().isOpen()) {
       PANIC(fmt::format("listener accept failure: {}", errorDetails(errno)));
@@ -52,8 +53,8 @@ void ListenerImpl::onSocketEvent(short flags) {
     sockaddr_storage remote_addr;
     socklen_t remote_addr_len = sizeof(remote_addr);
 
-    IoHandlePtr io_handle = socket_->ioHandle().accept(reinterpret_cast<sockaddr*>(&remote_addr),
-                                                       &remote_addr_len, ENVOY_SOCK_NONBLOCK);
+    IoHandlePtr io_handle =
+        socket_->ioHandle().accept(reinterpret_cast<sockaddr*>(&remote_addr), &remote_addr_len);
     if (io_handle == nullptr) {
       break;
     }
@@ -95,6 +96,7 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
 #else
   auto trigger = Event::FileTriggerType::Edge;
 #endif
+  // TODO(fcoras): make listen backlog configurable
   socket.ioHandle().listen(128);
   file_event_ = dispatcher.createFileEvent(
       socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); }, trigger,
@@ -114,13 +116,6 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr so
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
-  }
-}
-
-ListenerImpl::~ListenerImpl() {
-  if (file_event_.get()) {
-    file_event_->setEnabled(0);
-    file_event_.reset();
   }
 }
 

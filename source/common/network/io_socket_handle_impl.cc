@@ -387,8 +387,8 @@ Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
 }
 
-IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen, int flags) {
-  auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen, flags);
+IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen) {
+  auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
   if (SOCKET_INVALID(result.rc_)) {
     return nullptr;
   }

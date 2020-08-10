@@ -16,7 +16,6 @@ class ListenerImpl : public BaseListenerImpl {
 public:
   ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
                bool bind_to_port);
-  ~ListenerImpl() override;
   void disable() override;
   void enable() override;
 

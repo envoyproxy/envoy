@@ -159,8 +159,7 @@ public:
   /**
    * @see man 2 accept
    */
-  virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen,
-                                     int flags) PURE;
+  virtual SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;
