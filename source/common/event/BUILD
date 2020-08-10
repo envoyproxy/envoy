@@ -153,8 +153,8 @@ envoy_cc_library(
     srcs = ["scaled_range_timer.cc"],
     hdrs = ["scaled_range_timer.h"],
     deps = [
-        "//include/envoy/event:timer_interface",
         "//include/envoy/event:range_timer_interface",
+        "//include/envoy/event:timer_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:scope_tracker",
     ],

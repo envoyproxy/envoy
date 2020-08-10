@@ -46,8 +46,8 @@ envoy_cc_test(
     srcs = ["scaled_range_timer_test.cc"],
     deps = [
         "//source/common/event:scaled_range_timer_lib",
-        "//test/mocks/event:event_mocks",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
