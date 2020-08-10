@@ -110,6 +110,8 @@ else
   TEST_TARGETS="${COVERAGE_TEST_TARGETS} @com_googlesource_quiche//:ci_tests"
 fi
 
+BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_cpu_resources=${NUM_CPUS}"
+
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # When testing memory consumption, we want to test against exact byte-counts
   # where possible. As these differ between platforms and compile options, we
