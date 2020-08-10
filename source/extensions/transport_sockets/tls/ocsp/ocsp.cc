@@ -145,7 +145,7 @@ std::unique_ptr<OcspResponse> Asn1OcspUtility::parseOcspResponse(CBS& cbs) {
                                       CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0));
   ResponsePtr resp = nullptr;
   if (maybe_bytes) {
-    resp = Asn1OcspUtility::parseResponseBytes(maybe_bytes.get());
+    resp = Asn1OcspUtility::parseResponseBytes(maybe_bytes.value());
   }
 
   return std::make_unique<OcspResponse>(status, std::move(resp));

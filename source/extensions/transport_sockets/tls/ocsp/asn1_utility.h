@@ -192,15 +192,15 @@ ParsingResult<std::vector<T>> Asn1Utility::parseSequenceOf(CBS& cbs,
 template <typename T>
 ParsingResult<absl::optional<T>> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
                                                             unsigned tag) {
-  CBS data;
-  auto is_present = getOptional(cbs, &data, tag);
+  auto maybe_data_res = getOptional(cbs, tag);
 
-  if (absl::holds_alternative<absl::string_view>(is_present)) {
-    return absl::get<absl::string_view>(is_present);
+  if (absl::holds_alternative<absl::string_view>(maybe_data_res)) {
+    return absl::get<absl::string_view>(maybe_data_res);
   }
 
-  if (absl::get<bool>(is_present)) {
-    auto res = parse_data(data);
+  auto maybe_data = absl::get<absl::optional<CBS>>(maybe_data_res);
+  if (maybe_data) {
+    auto res = parse_data(maybe_data.value());
     if (absl::holds_alternative<T>(res)) {
       return absl::get<0>(res);
     }

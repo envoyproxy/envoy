@@ -155,7 +155,7 @@ TEST_F(Asn1UtilityTest, GetOptionalTest) {
   EXPECT_EQ(absl::nullopt, absl::get<0>(Asn1Utility::getOptional(cbs, CBS_ASN1_INTEGER)));
   EXPECT_EQ(start, CBS_data(&cbs));
 
-  EXPECT_TRUE(absl::get<0>(Asn1Utility::getOptional(cbs, CBS_ASN1_BOOLEAN)));
+  CBS value = absl::get<0>(Asn1Utility::getOptional(cbs, CBS_ASN1_BOOLEAN)).value();
   EXPECT_EQ(0xff, *CBS_data(&value));
 }
 
