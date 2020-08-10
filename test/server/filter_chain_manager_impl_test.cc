@@ -65,6 +65,9 @@ public:
     TestUtility::loadFromYaml(
         TestEnvironment::substitute(filter_chain_yaml, Network::Address::IpVersion::v4),
         filter_chain_template_);
+    TestUtility::loadFromYaml(
+        TestEnvironment::substitute(on_demand_filter_chain_yaml, Network::Address::IpVersion::v4),
+        on_demand_filter_chain_template_);
   }
 
   const Network::FilterChain*
@@ -126,8 +129,26 @@ public:
             keys:
             - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
+  const std::string on_demand_filter_chain_yaml = R"EOF(
+      filter_chain_match:
+        destination_port: 10000
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      build_on_demand:
+        true
+  )EOF";
   Init::ManagerImpl init_manager_{"for_filter_chain_manager_test"};
   envoy::config::listener::v3::FilterChain filter_chain_template_;
+  envoy::config::listener::v3::FilterChain on_demand_filter_chain_template_;
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
   // Test target.
@@ -145,6 +166,12 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   addSingleFilterChainHelper(filter_chain_template_);
   auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, AddOnDemandFilterChain) {
+  addSingleFilterChainHelper(on_demand_filter_chain_template_);
+  auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_TRUE(filter_chain->isFakeFilterChain());
 }
 
 TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage) {
