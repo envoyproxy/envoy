@@ -595,22 +595,22 @@ TEST_F(OwnedImplTest, LinearizeDrainTracking) {
   testing::MockFunction<void(int, int)> drain_tracker;
   testing::MockFunction<void()> done_tracker;
   EXPECT_CALL(tracker1, Call());
+  EXPECT_CALL(drain_tracker, Call(3 * LargeChunk + 108 * SmallChunk, 16384));
   EXPECT_CALL(release_callback_tracker, Call(_, _, _));
   EXPECT_CALL(tracker2, Call());
-  EXPECT_CALL(drain_tracker, Call(3 * LargeChunk + 108 * SmallChunk, 16384));
   EXPECT_CALL(release_callback_tracker2, Call(_, _, _));
   EXPECT_CALL(tracker3, Call());
-  EXPECT_CALL(tracker4, Call());
   EXPECT_CALL(drain_tracker, Call(2 * LargeChunk + 107 * SmallChunk, 16384));
   EXPECT_CALL(drain_tracker, Call(LargeChunk + 106 * SmallChunk, 16384));
+  EXPECT_CALL(tracker4, Call());
   EXPECT_CALL(drain_tracker, Call(105 * SmallChunk, 16384));
   EXPECT_CALL(tracker5, Call());
   EXPECT_CALL(drain_tracker, Call(4616, 4616));
   EXPECT_CALL(done_tracker, Call());
-  for (auto& expected_first_slice : std::vector<std::vector<int>>{{16584, 3832, 20416},
-                                                                  {32904, 3896, 36800},
-                                                                  {16520, 3896, 36800},
-                                                                  {20296, 120, 20416},
+  for (auto& expected_first_slice : std::vector<std::vector<int>>{{16384, 4032, 20416},
+                                                                  {16384, 4032, 20416},
+                                                                  {16520, 0, 32704},
+                                                                  {16384, 4032, 20416},
                                                                   {4616, 3512, 8128}}) {
     const uint32_t write_size = std::min<uint32_t>(LinearizeSize, buffer.length());
     buffer.linearize(write_size);
@@ -1034,7 +1034,6 @@ TEST_F(OwnedImplTest, ReadReserveAndCommit) {
 }
 
 TEST(OverflowDetectingUInt64, Arithmetic) {
-  Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   OverflowDetectingUInt64 length;
   length += 1;
   length -= 1;

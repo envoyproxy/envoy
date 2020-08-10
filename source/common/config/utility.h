@@ -34,7 +34,7 @@ namespace Envoy {
 namespace Config {
 
 /**
- * Constant Api Type Values, used by envoy::api::v2::core::ApiConfigSource.
+ * Constant Api Type Values, used by envoy::config::core::v3::ApiConfigSource.
  */
 class ApiTypeValues {
 public:
@@ -78,14 +78,14 @@ public:
 
   /**
    * Extract refresh_delay as a std::chrono::milliseconds from
-   * envoy::api::v2::core::ApiConfigSource.
+   * envoy::config::core::v3::ApiConfigSource.
    */
   static std::chrono::milliseconds
   apiConfigSourceRefreshDelay(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Extract request_timeout as a std::chrono::milliseconds from
-   * envoy::api::v2::core::ApiConfigSource. If request_timeout isn't set in the config source, a
+   * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
    * default value of 1s will be returned.
    */
   static std::chrono::milliseconds
@@ -93,18 +93,18 @@ public:
 
   /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
-   * envoy::api::v2::core::ConfigSource. If request_timeout isn't set in the config source, a
+   * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
    * default value of 0s will be returned.
    */
   static std::chrono::milliseconds
   configSourceInitialFetchTimeout(const envoy::config::core::v3::ConfigSource& config_source);
 
   /**
-   * Populate an envoy::api::v2::core::ApiConfigSource.
+   * Populate an envoy::config::core::v3::ApiConfigSource.
    * @param cluster supplies the cluster name for the ApiConfigSource.
    * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
    * @param api_type supplies the type of subscription to use for the ApiConfigSource.
-   * @param api_config_source a reference to the envoy::api::v2::core::ApiConfigSource object to
+   * @param api_config_source a reference to the envoy::config::core::v3::ApiConfigSource object to
    * populate.
    */
   static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
@@ -179,7 +179,8 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
-   * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.
+   * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
+   * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
    * @return RateLimitSettings.
    */
@@ -353,9 +354,9 @@ public:
   createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   /**
-   * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
+   * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
-   * @param api_config_source envoy::api::v3::core::ApiConfigSource. Must have config type GRPC.
+   * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
    * @param skip_cluster_check whether to skip cluster validation.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
@@ -367,7 +368,7 @@ public:
   /**
    * Translate a set of cluster's hosts into a load assignment configuration.
    * @param hosts cluster's list of hosts.
-   * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
+   * @return envoy::config::endpoint::v3::ClusterLoadAssignment a load assignment configuration.
    */
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts);

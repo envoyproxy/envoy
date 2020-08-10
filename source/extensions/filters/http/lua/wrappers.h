@@ -7,6 +7,7 @@
 
 #include "extensions/common/crypto/crypto_impl.h"
 #include "extensions/filters/common/lua/lua.h"
+#include "extensions/filters/common/lua/wrappers.h"
 
 #include "openssl/evp.h"
 
@@ -181,7 +182,9 @@ class StreamInfoWrapper : public Filters::Common::Lua::BaseLuaObject<StreamInfoW
 public:
   StreamInfoWrapper(StreamInfo::StreamInfo& stream_info) : stream_info_{stream_info} {}
   static ExportedFunctions exportedFunctions() {
-    return {{"protocol", static_luaProtocol}, {"dynamicMetadata", static_luaDynamicMetadata}};
+    return {{"protocol", static_luaProtocol},
+            {"dynamicMetadata", static_luaDynamicMetadata},
+            {"downstreamSslConnection", static_luaDownstreamSslConnection}};
   }
 
 private:
@@ -197,11 +200,19 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicMetadata);
 
+  /**
+   * Get reference to stream info downstreamSslConnection.
+   * @return SslConnectionWrapper representation of StreamInfo downstream SSL connection.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamSslConnection);
+
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { dynamic_metadata_wrapper_.reset(); }
 
   StreamInfo::StreamInfo& stream_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::SslConnectionWrapper>
+      downstream_ssl_connection_;
 
   friend class DynamicMetadataMapWrapper;
 };

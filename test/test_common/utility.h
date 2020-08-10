@@ -87,22 +87,6 @@ namespace Envoy {
     ADD_FAILURE() << "Unexpected exception: " << std::string(e.what());                            \
   }
 
-/*
-  Macro to use instead of EXPECT_DEATH when stderr is produced by a logger.
-  It temporarily installs stderr sink and restores the original logger sink after the test
-  completes and stderr_sink object goes of of scope.
-  EXPECT_DEATH(statement, regex) test passes when statement causes crash and produces error message
-  matching regex. Test fails when statement does not crash or it crashes but message does not
-  match regex. If a message produced during crash is redirected away from strerr, the test fails.
-  By installing StderrSinkDelegate, the macro forces EXPECT_DEATH to send any output produced by
-  statement to stderr.
-*/
-#define EXPECT_DEATH_LOG_TO_STDERR(statement, message)                                             \
-  do {                                                                                             \
-    Envoy::Logger::StderrSinkDelegate stderr_sink(Envoy::Logger::Registry::getSink());             \
-    EXPECT_DEATH(statement, message);                                                              \
-  } while (false)
-
 #define VERIFY_ASSERTION(statement)                                                                \
   do {                                                                                             \
     ::testing::AssertionResult status = statement;                                                 \
@@ -211,14 +195,19 @@ public:
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
-   * Wait till Counter value is equal to the passed ion value.
+   * Wait for a counter to == a given value.
    * @param store supplies the stats store.
    * @param name supplies the name of the counter to wait for.
    * @param value supplies the value of the counter.
    * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the counter was == to the value within the timeout, else
+   * AssertionFailure().
    */
-  static void waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
-                               Event::TestTimeSystem& time_system);
+  static AssertionResult
+  waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
+                   Event::TestTimeSystem& time_system,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
    * Wait for a counter to >= a given value.
@@ -226,9 +215,14 @@ public:
    * @param name counter name.
    * @param value target value.
    * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the counter was >= to the value within the timeout, else
+   * AssertionFailure().
    */
-  static void waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
-                               Event::TestTimeSystem& time_system);
+  static AssertionResult
+  waitForCounterGe(Stats::Store& store, const std::string& name, uint64_t value,
+                   Event::TestTimeSystem& time_system,
+                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
    * Wait for a gauge to >= a given value.
@@ -236,9 +230,14 @@ public:
    * @param name gauge name.
    * @param value target value.
    * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the counter gauge >= to the value within the timeout, else
+   * AssertionFailure().
    */
-  static void waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
-                             Event::TestTimeSystem& time_system);
+  static AssertionResult
+  waitForGaugeGe(Stats::Store& store, const std::string& name, uint64_t value,
+                 Event::TestTimeSystem& time_system,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
    * Wait for a gauge to == a given value.
@@ -246,9 +245,14 @@ public:
    * @param name gauge name.
    * @param value target value.
    * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the gauge was == to the value within the timeout, else
+   * AssertionFailure().
    */
-  static void waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
-                             Event::TestTimeSystem& time_system);
+  static AssertionResult
+  waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
+                 Event::TestTimeSystem& time_system,
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
    * Find a readout in a stats store.

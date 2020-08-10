@@ -32,7 +32,7 @@ public:
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and
    * will raise an exception on failure.
-   * @param grpc_service envoy::api::v2::core::GrpcService configuration.
+   * @param grpc_service envoy::config::core::v3::GrpcService configuration.
    * @param scope stats scope.
    * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
    * configured.

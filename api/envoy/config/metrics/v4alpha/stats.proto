@@ -297,8 +297,13 @@ message HistogramBucketSettings {
   // before tag-extraction, for example `cluster.exampleclustername.upstream_cx_length_ms`.
   type.matcher.v4alpha.StringMatcher match = 1 [(validate.rules).message = {required: true}];
 
-  // Each value is the upper bound of a successive bucket.
-  repeated double buckets = 2 [(validate.rules).repeated = {min_items: 1}];
+  // Each value is the upper bound of a bucket. Each bucket must be greater than 0 and unique.
+  // The order of the buckets does not matter.
+  repeated double buckets = 2 [(validate.rules).repeated = {
+    min_items: 1
+    unique: true
+    items {double {gt: 0.0}}
+  }];
 }
 
 // Stats configuration proto schema for built-in *envoy.stat_sinks.statsd* sink. This sink does not support

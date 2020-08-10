@@ -2,14 +2,14 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # Trace driver for LightStep (https://lightstep.com/)
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "lightstep_tracer_lib",
