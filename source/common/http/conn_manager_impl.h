@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
+
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -450,6 +452,95 @@ private:
      * Called when the FilterManager creates an Upgrade filter chain.
      */
     virtual void upgradeFilterChainCreated() PURE;
+
+    /**
+     * Called when request activity indicates that the request timeout should be disarmed.
+     */
+    virtual void disarmRequestTimeout() PURE;
+
+    /**
+     * Called when stream activity indicates that the stream idle timeout should be reset.
+     */
+    virtual void resetIdleTimer() PURE;
+
+    /**
+     * Called when the stream should be re-created, e.g. for an internal redirect.
+     */
+    virtual void recreateStream(RequestHeaderMapPtr&& request_headers,
+                                StreamInfo::FilterStateSharedPtr filter_state) PURE;
+
+    /**
+     * Called when the stream should be reset.
+     */
+    virtual void resetStream() PURE;
+
+    /**
+     * Returns the upgrade map for the current route entry.
+     */
+    virtual const Router::RouteEntry::UpgradeMap* upgradeMap() PURE;
+
+    /**
+     * Returns the cluster info for the current route entry.
+     */
+    virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
+
+    /**
+     * Returns the current route.
+     */
+    virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
+
+    /**
+     * Clears the cached route.
+     */
+    virtual void clearRouteCache() PURE;
+
+    /**
+     * Returns the current route configuration.
+     */
+    virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
+
+    /**
+     * Update the current route configuration.
+     */
+    virtual void requestRouteConfigUpdate(
+        Event::Dispatcher& thread_local_dispatcher,
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+    /**
+     * Returns the current active span.
+     */
+    virtual Tracing::Span& activeSpan() PURE;
+
+    /**
+     * Called when a stream fails due to the response data being too large.
+     */
+    virtual void onResponseDataTooLarge() PURE;
+
+    /**
+     * Called when a stream fails due to the request data being too large.
+     */
+    virtual void onRequestDataTooLarge() PURE;
+
+    /**
+     * Returns the Http1StreamEncoderOptions associated with the response encoder.
+     */
+    virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+    /**
+     * Called when a local reply is made by the filter manager.
+     * @param code the response code of the local reply.
+     */
+    virtual void onLocalReply(Code code) PURE;
+
+    /**
+     * Returns the tracing configuration to use for this stream.
+     */
+    virtual Tracing::Config& tracingConfig() PURE;
+
+    /**
+     * Returns the tracked scope to use for this stream.
+     */
+    virtual const ScopeTrackedObject& scope() PURE;
   };
 
   /**
@@ -458,12 +549,15 @@ private:
    */
   class FilterManager : public ScopeTrackedObject, FilterChainFactoryCallbacks {
   public:
-    FilterManager(ActiveStream& active_stream, FilterManagerCallbacks& filter_manager_callbacks,
-                  uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
+    FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
+                  const Network::Connection& connection, uint64_t stream_id,
+                  bool proxy_100_continue, uint32_t buffer_limit,
+                  FilterChainFactory& filter_chain_factory,
                   const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
                   TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
                   StreamInfo::FilterState::LifeSpan filter_state_life_span)
-        : active_stream_(active_stream), filter_manager_callbacks_(filter_manager_callbacks),
+        : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
+          connection_(connection), stream_id_(stream_id), proxy_100_continue_(proxy_100_continue),
           buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
           local_reply_(local_reply),
           stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
@@ -481,7 +575,7 @@ private:
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_)
          << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
-         << "\n";
+         << DUMP_MEMBER(state_.encoding_headers_only_) << "\n";
 
       DUMP_DETAILS(request_headers_);
       DUMP_DETAILS(request_trailers_);
@@ -571,6 +665,10 @@ private:
      */
     void maybeEndEncode(bool end_stream);
 
+    void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+                        const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details);
     /**
      * Sends a local reply by constructing a response and passing it through all the encoder
      * filters. The resulting response will be passed out via the FilterManagerCallbacks.
@@ -603,6 +701,10 @@ private:
     void callLowWatermarkCallbacks();
 
     void setRequestHeaders(RequestHeaderMapPtr&& request_headers) {
+      if (Http::Headers::get().MethodValues.Head == request_headers->getMethodValue()) {
+        state_.is_head_request_ = true;
+      }
+
       // TODO(snowp): Ideally we don't need this function, but during decodeHeaders we might issue
       // local replies before the FilterManager::decodeData has been called. We could likely get rid
       // of this by updating the calls to sendLocalReply to pass ownership over the headers + adding
@@ -663,6 +765,10 @@ private:
     // Set up the Encoder/Decoder filter chain.
     bool createFilterChain();
 
+    const Network::Connection* connection() const { return &connection_; }
+
+    uint64_t streamId() const { return stream_id_; }
+
   private:
     // Indicates which filter to start the iteration with.
     enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
@@ -692,10 +798,6 @@ private:
     void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     ResponseTrailerMap& addEncodedTrailers();
-    void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
-                        const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                        absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
     // As with most of the encode functions, this runs encodeHeaders on various
     // filters before calling encodeHeadersInternal which does final header munging and passes the
@@ -728,9 +830,11 @@ private:
       return request_metadata_map_vector_.get();
     }
 
-    ActiveStream& active_stream_;
-
     FilterManagerCallbacks& filter_manager_callbacks_;
+    Event::Dispatcher& dispatcher_;
+    const Network::Connection& connection_;
+    const uint64_t stream_id_;
+    const bool proxy_100_continue_;
 
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
@@ -750,6 +854,8 @@ private:
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
+    Network::Socket::OptionsSharedPtr upstream_options_ =
+        std::make_shared<Network::Socket::Options>();
 
     FilterChainFactory& filter_chain_factory_;
     const LocalReply::LocalReply& local_reply_;
@@ -785,7 +891,8 @@ private:
     struct State {
       State()
           : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
-            created_filter_chain_(false) {}
+            created_filter_chain_(false), is_head_request_(false),
+            non_100_response_headers_encoded_(false) {}
 
       uint32_t filter_call_state_{0};
 
@@ -797,6 +904,9 @@ private:
       // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
       bool has_continue_headers_ : 1;
       bool created_filter_chain_ : 1;
+      bool is_head_request_ : 1;
+      // Tracks if headers other than 100-Continue have been encoded to the codec.
+      bool non_100_response_headers_encoded_ : 1;
 
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
       // are passed as arguments to functions expecting bools. Extend State using the bitfield
@@ -838,7 +948,10 @@ private:
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                        absl::string_view details) override;
+                        absl::string_view details) override {
+      return filter_manager_.sendLocalReply(is_grpc_request, code, body, modify_headers,
+                                            grpc_status, details);
+    }
     uint64_t streamId() { return stream_id_; }
 
     // This is a helper function for encodeHeaders and responseDataTooLarge which allows for
@@ -873,8 +986,7 @@ private:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
-      os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_)
-         << DUMP_MEMBER(state_.is_head_request_);
+      os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_);
 
       DUMP_DETAILS(&filter_manager_);
     }
@@ -899,6 +1011,26 @@ private:
       connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
       state_.successful_upgrade_ = true;
     }
+    void disarmRequestTimeout() override;
+    void resetIdleTimer() override;
+    void recreateStream(RequestHeaderMapPtr&& request_headers,
+                        StreamInfo::FilterStateSharedPtr filter_state) override;
+    void resetStream() override;
+    const Router::RouteEntry::UpgradeMap* upgradeMap() override;
+    Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
+    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    void clearRouteCache() override;
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
+    void requestRouteConfigUpdate(
+        Event::Dispatcher& thread_local_dispatcher,
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    Tracing::Span& activeSpan() override;
+    void onResponseDataTooLarge() override;
+    void onRequestDataTooLarge() override;
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
+    void onLocalReply(Code code) override;
+    Tracing::Config& tracingConfig() override;
+    const ScopeTrackedObject& scope() override;
 
     void traceRequest();
 
@@ -908,10 +1040,6 @@ private:
 
     void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);
-    void
-    requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
-                             Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
     void refreshCachedTracingCustomTags();
 
@@ -919,8 +1047,7 @@ private:
     struct State {
       State()
           : codec_saw_local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true),
-            is_head_request_(false), non_100_response_headers_encoded_(false) {}
+            successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true) {}
 
       bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
                                           // the way through to the codec.
@@ -932,15 +1059,10 @@ private:
       bool is_internally_created_ : 1;
 
       bool decorated_propagate_ : 1;
-      bool is_head_request_ : 1;
-      // Tracks if headers other than 100-Continue have been encoded to the codec.
-      bool non_100_response_headers_encoded_ : 1;
     };
 
     // Per-stream idle timeout callback.
     void onIdleTimeout();
-    // Reset per-stream idle timer.
-    void resetIdleTimer();
     // Per-stream request timeout callback.
     void onRequestTimeout();
     // Per-stream alive duration reached.
@@ -963,11 +1085,11 @@ private:
     }
 
     ConnectionManagerImpl& connection_manager_;
+    const uint64_t stream_id_;
     FilterManager filter_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
-    const uint64_t stream_id_;
     ResponseEncoder* response_encoder_{};
     Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
@@ -981,11 +1103,8 @@ private:
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
-    Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
-
-    friend FilterManager;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
