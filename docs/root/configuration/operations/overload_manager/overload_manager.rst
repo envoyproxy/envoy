@@ -54,9 +54,12 @@ Triggers connect resource monitors to actions. There are two types of triggers s
   * - :ref:`threshold <envoy_v3_api_msg_config.overload.v3.ThresholdTrigger>`
     - Sets the action state to 1 (= *saturated*) when the resource pressure is above a threshold, and to 0 otherwise.
   * - :ref:`scaled <envoy_v3_api_msg_config.overload.v3.ScaledTrigger>`
-    - Sets the action state to 0 when the resource pressure is below the min threshold,
-      `(pressure - min)/(max - min)` when `min < pressure < max`,
-      and to 1 (*saturated*) when the pressure is above the max."
+    - Sets the action state to 0 when the resource pressure is below the
+      :ref:`scaling_threshold <envoy_v3_api_field_config.overload.v3.ScaledTrigger.scaling_threshold>`,
+      `(pressure - scaling_threshold)/(saturation_threshold - scaling_threshold)` when
+      `scaling_threshold < pressure < saturation_threshold`, and to 1 (*saturated*) when the
+      pressure is above the
+      :ref:`saturation_threshold <envoy_v3_api_field_config.overload.v3.ScaledTrigger.saturation_threshold>`."
 
 Overload actions
 ----------------
