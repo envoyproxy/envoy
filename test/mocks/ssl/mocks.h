@@ -59,7 +59,7 @@ public:
   MOCK_METHOD(std::string, ciphersuiteString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
   MOCK_METHOD(absl::optional<std::string>, x509Extension, (absl::string_view), (const));
-  MOCK_METHOD(Network::PostIoAction, doHandshake, (SocketState & state), ());
+  MOCK_METHOD(Network::PostIoAction, doHandshake, (), ());
 };
 
 class MockClientContext : public ClientContext {

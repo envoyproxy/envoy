@@ -86,13 +86,17 @@ public:
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
   absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
-  Network::PostIoAction doHandshake(Ssl::SocketState& state) override;
+  Network::PostIoAction doHandshake() override;
+
+  Ssl::SocketState& state() { return state_; }
   SSL* ssl() const { return ssl_.get(); }
 
   bssl::UniquePtr<SSL> ssl_;
 
 private:
   HandshakeCallbacks* handshake_callbacks_;
+
+  Ssl::SocketState state_;
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_sha_1_peer_certificate_digest_;
@@ -124,7 +128,7 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
   absl::string_view failureReason() const override;
-  bool canFlushClose() override { return state_ == Ssl::SocketState::HandshakeComplete; }
+  bool canFlushClose() override { return info_->state() == Ssl::SocketState::HandshakeComplete; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
@@ -161,7 +165,6 @@ private:
   ContextImplSharedPtr ctx_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
-  Ssl::SocketState state_;
 
   SslSocketInfoSharedPtr info_;
 };

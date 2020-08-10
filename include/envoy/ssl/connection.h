@@ -6,7 +6,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/network/post_io_action.h"
-#include "envoy/ssl/ssl_socket_state.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -155,7 +154,7 @@ public:
    * Performs a TLS handshake on the SSL object and returns an action indicating
    * whether the callsite should close the connection or keep it open.
    */
-  virtual Network::PostIoAction doHandshake(SocketState& state) PURE;
+  virtual Network::PostIoAction doHandshake() PURE;
 };
 
 using ConnectionInfoSharedPtr = std::shared_ptr<ConnectionInfo>;
