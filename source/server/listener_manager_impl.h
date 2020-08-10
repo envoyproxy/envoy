@@ -186,7 +186,8 @@ public:
     ASSERT(lds_api_ == nullptr);
     lds_api_ = factory_.createLdsApi(lds_config);
   }
-  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>>
+  listeners(ListenerState state = ListenerState::ACTIVE) override;
   uint64_t numConnections() const override;
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog) override;
