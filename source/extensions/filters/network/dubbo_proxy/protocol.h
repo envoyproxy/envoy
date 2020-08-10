@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/typed_config.h"
@@ -100,7 +99,7 @@ using ProtocolPtr = std::unique_ptr<Protocol>;
  */
 class NamedProtocolConfigFactory : public Config::UntypedFactory {
 public:
-  virtual ~NamedProtocolConfigFactory() = default;
+  ~NamedProtocolConfigFactory() override = default;
 
   /**
    * Create a particular Dubbo protocol.

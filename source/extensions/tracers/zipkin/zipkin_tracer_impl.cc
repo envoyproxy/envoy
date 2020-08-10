@@ -1,6 +1,6 @@
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -11,7 +11,6 @@
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/tracers/well_known_names.h"
 #include "extensions/tracers/zipkin/span_context_extractor.h"
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 
@@ -68,13 +67,13 @@ Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
 Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-               const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator,
+               const LocalInfo::LocalInfo& local_info, Random::RandomGenerator& random_generator,
                TimeSource& time_source)
     : cm_(cluster_manager), tracer_stats_{ZIPKIN_TRACER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source) {
-  Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_,
+  Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = zipkin_config.collector_cluster();
 
@@ -113,13 +112,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     auto ret_span_context = extractor.extractSpanContext(sampled);
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
-      new_zipkin_span = tracer.startSpan(
-          config, std::string(request_headers.Host()->value().getStringView()), start_time);
+      new_zipkin_span =
+          tracer.startSpan(config, std::string(request_headers.getHostValue()), start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span =
-          tracer.startSpan(config, std::string(request_headers.Host()->value().getStringView()),
-                           start_time, ret_span_context.first);
+      new_zipkin_span = tracer.startSpan(config, std::string(request_headers.getHostValue()),
+                                         start_time, ret_span_context.first);
     }
 
   } catch (const ExtractorException& e) {

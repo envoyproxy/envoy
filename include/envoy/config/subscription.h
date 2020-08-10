@@ -25,9 +25,108 @@ enum class ConfigUpdateFailureReason {
   UpdateRejected
 };
 
+/**
+ * A wrapper for xDS resources that have been deserialized from the wire.
+ */
+class DecodedResource {
+public:
+  virtual ~DecodedResource() = default;
+
+  /**
+   * @return const std::string& resource name.
+   */
+  virtual const std::string& name() const PURE;
+
+  /**
+   * @return const std::vector<std::string& resource aliases.
+   */
+  virtual const std::vector<std::string>& aliases() const PURE;
+
+  /**
+   * @return const std::string& resource version.
+   */
+  virtual const std::string& version() const PURE;
+
+  /**
+   * @return const Protobuf::Message& resource message reference. If hasResource() is false, this
+   *         will be the empty message.
+   */
+  virtual const Protobuf::Message& resource() const PURE;
+
+  /**
+   * @return bool does the xDS discovery response have a set resource payload?
+   */
+  virtual bool hasResource() const PURE;
+};
+
+using DecodedResourcePtr = std::unique_ptr<DecodedResource>;
+using DecodedResourceRef = std::reference_wrapper<DecodedResource>;
+
+class OpaqueResourceDecoder {
+public:
+  virtual ~OpaqueResourceDecoder() = default;
+
+  /**
+   * @param resource some opaque resource (ProtobufWkt::Any).
+   * @return ProtobufTypes::MessagePtr decoded protobuf message in the opaque resource, e.g. the
+   *         RouteConfiguration for an Any containing envoy.config.route.v3.RouteConfiguration.
+   */
+  virtual ProtobufTypes::MessagePtr decodeResource(const ProtobufWkt::Any& resource) PURE;
+
+  /**
+   * @param resource some opaque resource (Protobuf::Message).
+   * @return std::String the resource name in a Protobuf::Message returned by decodeResource(), e.g.
+   *         the route config name for a envoy.config.route.v3.RouteConfiguration message.
+   */
+  virtual std::string resourceName(const Protobuf::Message& resource) PURE;
+};
+
+/**
+ * Subscription to DecodedResources.
+ */
 class SubscriptionCallbacks {
 public:
   virtual ~SubscriptionCallbacks() = default;
+
+  /**
+   * Called when a state-of-the-world configuration update is received. (State-of-the-world is
+   * everything other than delta gRPC - filesystem, HTTP, non-delta gRPC).
+   * @param resources vector of fetched resources corresponding to the configuration update.
+   * @param version_info supplies the version information as supplied by the xDS discovery response.
+   * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
+   *        is accepted. Accepted configurations have their version_info reflected in subsequent
+   *        requests.
+   */
+  virtual void onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
+                              const std::string& version_info) PURE;
+
+  /**
+   * Called when a delta configuration update is received.
+   * @param added_resources resources newly added since the previous fetch.
+   * @param removed_resources names of resources that this fetch instructed to be removed.
+   * @param system_version_info aggregate response data "version", for debugging.
+   * @throw EnvoyException with reason if the config changes are rejected. Otherwise the changes
+   *        are accepted. Accepted changes have their version_info reflected in subsequent requests.
+   */
+  virtual void onConfigUpdate(const std::vector<DecodedResourceRef>& added_resources,
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string& system_version_info) PURE;
+
+  /**
+   * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
+   * invokes an exception.
+   * @param reason supplies the update failure reason.
+   * @param e supplies any exception data on why the fetch failed. May be nullptr.
+   */
+  virtual void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) PURE;
+};
+
+/**
+ * Invoked when raw config received from xDS wire.
+ */
+class UntypedConfigUpdateCallbacks {
+public:
+  virtual ~UntypedConfigUpdateCallbacks() = default;
 
   /**
    * Called when a state-of-the-world configuration update is received. (State-of-the-world is
@@ -61,12 +160,6 @@ public:
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
   virtual void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) PURE;
-
-  /**
-   * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
-   * a RouteConfiguration, based on the underlying resource type.
-   */
-  virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
 };
 
 /**
@@ -97,20 +190,22 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
 /**
  * Per subscription stats. @see stats_macros.h
  */
-#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE)                                                     \
+#define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT)                                       \
   COUNTER(init_fetch_timeout)                                                                      \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_failure)                                                                          \
   COUNTER(update_rejected)                                                                         \
   COUNTER(update_success)                                                                          \
   GAUGE(update_time, NeverImport)                                                                  \
-  GAUGE(version, NeverImport)
+  GAUGE(version, NeverImport)                                                                      \
+  TEXT_READOUT(version_text)
 
 /**
  * Struct definition for per subscription stats. @see stats_macros.h
  */
 struct SubscriptionStats {
-  ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                         GENERATE_TEXT_READOUT_STRUCT)
 };
 
 } // namespace Config

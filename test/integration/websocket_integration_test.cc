@@ -31,23 +31,16 @@ Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = 
 }
 
 Http::TestResponseHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
-  return Http::TestResponseHeaderMapImpl{{":status", "101"},
-                                         {"connection", "upgrade"},
-                                         {"upgrade", upgrade_type},
-                                         {"content-length", "0"}};
+  return Http::TestResponseHeaderMapImpl{
+      {":status", "101"}, {"connection", "upgrade"}, {"upgrade", upgrade_type}};
 }
 
 template <class ProxiedHeaders, class OriginalHeaders>
 void commonValidate(ProxiedHeaders& proxied_headers, const OriginalHeaders& original_headers) {
-  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
-  // it back to the proxied headers.
-  if (original_headers.ContentLength() && proxied_headers.ContentLength() == nullptr) {
-    proxied_headers.setContentLength(size_t(0));
-  }
   // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
   if (original_headers.ContentLength() == nullptr &&
       proxied_headers.TransferEncoding() != nullptr) {
-    ASSERT_EQ(proxied_headers.TransferEncoding()->value().getStringView(), "chunked");
+    ASSERT_EQ(proxied_headers.getTransferEncodingValue(), "chunked");
     proxied_headers.removeTransferEncoding();
   }
   if (proxied_headers.Connection() != nullptr &&
@@ -67,7 +60,7 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     const Http::RequestHeaderMap& original_request_headers) {
   Http::TestRequestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
   if (proxied_request_headers.ForwardedProto()) {
-    ASSERT_EQ(proxied_request_headers.ForwardedProto()->value().getStringView(), "http");
+    ASSERT_EQ(proxied_request_headers.getForwardedProtoValue(), "http");
     proxied_request_headers.removeForwardedProto();
   }
 
@@ -77,9 +70,16 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
   proxied_request_headers.removeEnvoyExpectedRequestTimeoutMs();
 
   if (proxied_request_headers.Scheme()) {
-    ASSERT_EQ(proxied_request_headers.Scheme()->value().getStringView(), "http");
+    ASSERT_EQ(proxied_request_headers.getSchemeValue(), "http");
   } else {
     proxied_request_headers.setScheme("http");
+  }
+
+  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
+  // it back to the proxied headers.
+  if (original_request_headers.ContentLength() &&
+      proxied_request_headers.ContentLength() == nullptr) {
+    proxied_request_headers.setContentLength(size_t(0));
   }
 
   commonValidate(proxied_request_headers, original_request_headers);
@@ -96,9 +96,11 @@ void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
   // Check for and remove headers added by default for HTTP responses.
   ASSERT_TRUE(proxied_response_headers.Date() != nullptr);
   ASSERT_TRUE(proxied_response_headers.Server() != nullptr);
-  ASSERT_EQ(proxied_response_headers.Server()->value().getStringView(), "envoy");
+  ASSERT_EQ(proxied_response_headers.getServerValue(), "envoy");
   proxied_response_headers.removeDate();
   proxied_response_headers.removeServer();
+
+  ASSERT_TRUE(proxied_response_headers.TransferEncoding() == nullptr);
 
   commonValidate(proxied_response_headers, original_response_headers);
 
@@ -364,7 +366,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     response_->waitForEndStream();
-    EXPECT_EQ("413", response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("413", response_->headers().getStatusValue());
     waitForClientDisconnectOrReset();
     codec_client_->close();
   }
@@ -381,7 +383,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     response_->waitForEndStream();
-    EXPECT_EQ("413", response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("413", response_->headers().getStatusValue());
     waitForClientDisconnectOrReset();
     codec_client_->close();
   }
@@ -418,9 +420,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
   // transfer-encoding: chunked.
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
-  }
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    ASSERT_TRUE(response_->headers().TransferEncoding() != nullptr);
   }
 
   // Send both a chunked request body and "websocket" payload.

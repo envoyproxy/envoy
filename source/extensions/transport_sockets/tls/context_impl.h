@@ -84,7 +84,7 @@ public:
    * @param pattern the pattern to match against (*.example.com)
    * @return true if the san matches pattern
    */
-  static bool dnsNameMatch(const std::string& dns_name, const char* pattern);
+  static bool dnsNameMatch(const absl::string_view dns_name, const absl::string_view pattern);
 
   /**
    * Returns the leaf certificate used by the supplied connection.
@@ -108,6 +108,8 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
+  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);
@@ -123,6 +125,11 @@ protected:
 
   // A SSL_CTX_set_custom_verify_cb for custom cert validation.
   static ssl_verify_result_t verifyCallback(SSL* ssl, uint8_t* out_alert);
+
+  // Called by verifyCallback to do the actual cert chain verification.
+  ssl_verify_result_t doVerifyCertChain(
+      X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
+      const Network::TransportSocketOptions* transport_socket_options, uint8_t* out_alert);
 
   Envoy::Ssl::ClientValidationStatus
   verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
@@ -150,6 +157,7 @@ protected:
   static bool verifyCertificateSpkiList(X509* cert,
                                         const std::vector<std::vector<uint8_t>>& expected_hashes);
 
+  bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl);
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
   static SslStats generateStats(Stats::Scope& scope);
 

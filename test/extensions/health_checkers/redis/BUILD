@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -39,9 +39,10 @@ envoy_extension_cc_test(
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/redis:config",
         "//test/common/upstream:utility_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],

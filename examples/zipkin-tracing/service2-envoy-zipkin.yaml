@@ -3,14 +3,21 @@ static_resources:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 80
+        port_value: 8000
     traffic_direction: INBOUND
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
-          tracing: {}
+          tracing:
+            provider:
+              name: envoy.tracers.zipkin
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
+                collector_cluster: zipkin
+                collector_endpoint: "/api/v2/spans"
+                collector_endpoint_version: HTTP_JSON
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
@@ -56,14 +63,6 @@ static_resources:
               socket_address:
                 address: zipkin
                 port_value: 9411
-tracing:
-  http:
-    name: envoy.tracers.zipkin
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
-      collector_cluster: zipkin
-      collector_endpoint: "/api/v2/spans"
-      collector_endpoint_version: HTTP_JSON
 admin:
   access_log_path: "/dev/null"
   address:

@@ -15,9 +15,17 @@ option java_package = "io.envoyproxy.envoy.service.load_stats.v3";
 option java_outer_classname = "LrsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Load reporting service]
+// [#protodoc-title: Load Reporting service (LRS)]
+
+// Load Reporting Service is an Envoy API to emit load reports. Envoy will initiate a bi-directional
+// stream with a management server. Upon connecting, the management server can send a
+// :ref:`LoadStatsResponse <envoy_api_msg_service.load_stats.v3.LoadStatsResponse>` to a node it is
+// interested in getting the load reports for. Envoy in this node will start sending
+// :ref:`LoadStatsRequest <envoy_api_msg_service.load_stats.v3.LoadStatsRequest>`. This is done periodically
+// based on the :ref:`load reporting interval <envoy_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`
+// For details, take a look at the :ref:`Load Reporting Service sandbox example <install_sandboxes_load_reporting_service>`.
 
 service LoadReportingService {
   // Advanced API to allow for multi-dimensional load balancing by remote
@@ -53,7 +61,6 @@ service LoadReportingService {
 }
 
 // A load report Envoy sends to the management server.
-// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsRequest {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.load_stats.v2.LoadStatsRequest";
@@ -67,15 +74,21 @@ message LoadStatsRequest {
 
 // The management server sends envoy a LoadStatsResponse with all clusters it
 // is interested in learning load stats about.
-// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.load_stats.v2.LoadStatsResponse";
 
   // Clusters to report stats for.
-  repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  // Not populated if *send_all_clusters* is true.
+  repeated string clusters = 1;
+
+  // If true, the client should send all clusters it knows about.
+  // Only clients that advertise the "envoy.lrs.supports_send_all_clusters" capability in their
+  // :ref:`client_features<envoy_api_field_config.core.v3.Node.client_features>` field will honor this field.
+  bool send_all_clusters = 4;
 
   // The minimum interval of time to collect stats over. This is only a minimum for two reasons:
+  //
   // 1. There may be some delay from when the timer fires until stats sampling occurs.
   // 2. For clusters that were already feature in the previous *LoadStatsResponse*, any traffic
   //    that is observed in between the corresponding previous *LoadStatsRequest* and this

@@ -3,20 +3,25 @@ syntax = "proto3";
 package envoy.extensions.filters.http.compressor.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.compressor.v3";
 option java_outer_classname = "CompressorProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Compressor]
+// Compressor :ref:`configuration overview <config_http_filters_compressor>`.
+// [#extension: envoy.filters.http.compressor]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Compressor {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.compressor.v2.Compressor";
@@ -46,4 +51,10 @@ message Compressor {
   // Runtime flag that controls whether the filter is enabled or not. If set to false, the
   // filter will operate as a pass-through filter. If not specified, defaults to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
+
+  // A compressor library to use for compression. Currently only
+  // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
+  // is included in Envoy.
+  // This field is ignored if used in the context of the gzip http-filter, but is mandatory otherwise.
+  config.core.v3.TypedExtensionConfig compressor_library = 6;
 }

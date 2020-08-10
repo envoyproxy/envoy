@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -24,6 +24,8 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     shard_count = 4,
+    # TODO(wrowe): Diagnose timeout error on Windows (skipped for the moment)
+    tags = ["fails_on_windows"],
     deps = [
         ":test_private_key_method_provider_test_lib",
         "//include/envoy/network:transport_socket_interface",
@@ -44,6 +46,8 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "//test/extensions/transport_sockets/tls/test_data:cert_infos",
         "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
@@ -77,12 +81,15 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/extensions/transport_sockets/tls/test_data:cert_infos",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",

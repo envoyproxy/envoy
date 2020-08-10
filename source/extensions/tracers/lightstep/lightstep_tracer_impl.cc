@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/lightstep.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -15,8 +15,6 @@
 #include "common/grpc/common.h"
 #include "common/http/message_impl.h"
 #include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -198,7 +196,7 @@ LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig
                                       pool_.add(lightstep::CollectorServiceFullName()),
                                       pool_.add(lightstep::CollectorMethodName())} {
 
-  Config::Utility::checkCluster(TracerNames::get().Lightstep, lightstep_config.collector_cluster(),
+  Config::Utility::checkCluster("envoy.tracers.lightstep", lightstep_config.collector_cluster(),
                                 cm_, /* allow_added_via_api */ true);
   cluster_ = lightstep_config.collector_cluster();
 

@@ -28,6 +28,7 @@ public:
 
   bool connectionAllowed() override { return true; }
   void onAuth(const std::string&) override {}
+  void onAuth(const std::string&, const std::string&) override {}
   void onResponse(Common::Redis::RespValuePtr&&) override {}
 };
 

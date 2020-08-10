@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -8,6 +6,8 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -20,6 +20,8 @@ envoy_extension_cc_test(
         "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
     ],
     extension_name = "envoy.tracers.dynamic_ot",
+    # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/tracers/dynamic_ot:dynamic_opentracing_driver_lib",
@@ -37,6 +39,8 @@ envoy_extension_cc_test(
         "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
     ],
     extension_name = "envoy.tracers.dynamic_ot",
+    # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/tracers/dynamic_ot:config",
         "//test/mocks/server:server_mocks",

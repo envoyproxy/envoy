@@ -1,14 +1,13 @@
 #include "extensions/tracers/lightstep/config.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/lightstep.pb.h"
+#include "envoy/config/trace/v3/lightstep.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
-#include "extensions/tracers/well_known_names.h"
 
 #include "lightstep/tracer.h"
 
@@ -17,7 +16,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
 
-LightstepTracerFactory::LightstepTracerFactory() : FactoryBase(TracerNames::get().Lightstep) {}
+LightstepTracerFactory::LightstepTracerFactory() : FactoryBase("envoy.tracers.lightstep") {}
 
 Tracing::HttpTracerSharedPtr LightstepTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::LightstepConfig& proto_config,

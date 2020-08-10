@@ -10,6 +10,7 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
@@ -59,10 +60,6 @@ public:
   }
 };
 
-// perform static registration
-REGISTER_FACTORY(HeaderToFilterStateFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
-
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config_str, proto_config);
@@ -84,7 +81,13 @@ std::string getFilterConfig(bool use_local_jwks) {
   return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
-using LocalJwksIntegrationTest = HttpProtocolIntegrationTest;
+class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  LocalJwksIntegrationTest() : registration_(factory_) {}
+
+  HeaderToFilterStateFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_;
+};
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalJwksIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
@@ -111,11 +114,11 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   EXPECT_TRUE(payload_entry != nullptr);
   EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_FALSE(upstream_request_->headers().Authorization());
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::CustomHeaders::get().Authorization));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // With local Jwks, this test verifies a request is rejected with an expired Jwt token.
@@ -135,7 +138,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
 }
 
 TEST_P(LocalJwksIntegrationTest, MissingToken) {
@@ -153,7 +156,7 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
 }
 
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
@@ -172,8 +175,8 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
-  EXPECT_NE("0", response->headers().ContentLength()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_NE("0", response->headers().getContentLengthValue());
   EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
 
@@ -196,7 +199,7 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // This test verifies a CORS preflight request without JWT token is allowed.
@@ -219,7 +222,7 @@ TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // This test verifies JwtRequirement specified from filer state rules
@@ -296,7 +299,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
-    EXPECT_EQ(test.expected_status, response->headers().Status()->value().getStringView());
+    EXPECT_EQ(test.expected_status, response->headers().getStatusValue());
   }
 }
 
@@ -389,13 +392,13 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
   EXPECT_TRUE(payload_entry != nullptr);
   EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_FALSE(upstream_request_->headers().Authorization());
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::CustomHeaders::get().Authorization));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanup();
 }
@@ -420,7 +423,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
 
   cleanup();
 }
@@ -440,7 +443,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("401", response->headers().getStatusValue());
 
   cleanup();
 }

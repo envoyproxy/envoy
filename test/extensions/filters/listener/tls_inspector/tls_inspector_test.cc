@@ -1,3 +1,4 @@
+#include "common/http/utility.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -94,7 +95,7 @@ TEST_P(TlsInspectorTest, ConnectionClosed) {
 TEST_P(TlsInspectorTest, ReadError) {
   init();
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-    return Api::SysCallSizeResult{ssize_t(-1), ENOTSUP};
+    return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_NOT_SUP};
   }));
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
@@ -127,8 +128,8 @@ TEST_P(TlsInspectorTest, SniRegistered) {
 // Test that a ClientHello with an ALPN value causes the correct name notification.
 TEST_P(TlsInspectorTest, AlpnRegistered) {
   init();
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2"),
-                                                      absl::string_view("http/1.1")};
+  const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2,
+                                                          Http::Utility::AlpnNames::get().Http11};
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), "", "\x02h2\x08http/1.1");
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
@@ -151,7 +152,7 @@ TEST_P(TlsInspectorTest, AlpnRegistered) {
 // Test with the ClientHello spread over multiple socket reads.
 TEST_P(TlsInspectorTest, MultipleReads) {
   init();
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
+  const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2};
   const std::string servername("example.com");
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "\x02h2");
@@ -159,16 +160,16 @@ TEST_P(TlsInspectorTest, MultipleReads) {
     InSequence s;
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(InvokeWithoutArgs([]() -> Api::SysCallSizeResult {
-          return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+          return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
         }));
     for (size_t i = 1; i <= client_hello.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&client_hello, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= client_hello.size());
-                memcpy(buffer, client_hello.data(), client_hello.size());
-                return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
+          .WillOnce(Invoke([&client_hello, i](os_fd_t, void* buffer, size_t length,
+                                              int) -> Api::SysCallSizeResult {
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(i), 0};
+          }));
     }
   }
 
@@ -256,7 +257,7 @@ TEST_P(TlsInspectorTest, InlineReadSucceed) {
   EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
   EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
   EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
-  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
+  const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2};
   const std::string servername("example.com");
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "\x02h2");

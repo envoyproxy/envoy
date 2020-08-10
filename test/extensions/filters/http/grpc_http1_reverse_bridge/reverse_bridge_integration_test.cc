@@ -1,5 +1,7 @@
 #include <string>
 
+#include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
+
 #include "common/http/message_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -13,6 +15,9 @@
 
 using Envoy::Http::HeaderValueOf;
 
+// for ::operator""s (which Windows compiler does not support):
+using namespace std::string_literals;
+
 namespace Envoy {
 namespace {
 
@@ -24,27 +29,35 @@ public:
   ReverseBridgeIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
-  void SetUp() override {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+  void initialize() override {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
     const std::string filter =
         R"EOF(
 name: grpc_http1_reverse_bridge
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig
   content_type: application/x-protobuf
   withhold_grpc_frames: true
             )EOF";
     config_helper_.addFilter(filter);
 
+    auto vhost = config_helper_.createVirtualHost("disabled");
+    envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute
+        route_config;
+    route_config.set_disabled(true);
+    (*vhost.mutable_routes(0)
+          ->mutable_typed_per_filter_config())["envoy.filters.http.grpc_http1_reverse_bridge"]
+        .PackFrom(route_config);
+    config_helper_.addVirtualHost(vhost);
+
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstream_connection_.reset();
-    fake_upstreams_.clear();
-  }
+  void TearDown() override { fake_upstream_connection_.reset(); }
+
+protected:
+  FakeHttpConnection::Type upstream_protocol_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
@@ -53,38 +66,34 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
 
 // Verifies that we don't do anything with the request when it's hitting a route that
 // doesn't enable the bridge.
-TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
+// Regression test of https://github.com/envoyproxy/envoy/issues/9922
+TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
+  upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+  initialize();
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
                                                   {":method", "POST"},
-                                                  {":authority", "foo"},
+                                                  {":authority", "disabled"},
                                                   {":path", "/testing.ExampleService/Print"},
                                                   {"content-type", "application/grpc"}});
-  auto encoder_decoder = codec_client_->startRequest(request_headers);
-  request_encoder_ = &encoder_decoder.first;
-  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
-
-  Buffer::OwnedImpl request_data{"abcdef"};
-  codec_client_->sendData(*request_encoder_, request_data, true);
+  auto response = codec_client_->makeRequestWithBody(request_headers, "abcdef");
 
   // Wait for upstream to finish the request.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  // Ensure that we stripped the length prefix and set the appropriate headers.
-  EXPECT_EQ("f", upstream_request_->body().toString());
-
+  // Ensure that we don't do anything
+  EXPECT_EQ("abcdef", upstream_request_->body().toString());
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-  EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
+              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
 
   // Respond to the request.
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(200);
-  response_headers.setContentType("application/x-protobuf");
+  response_headers.setContentType("application/grpc");
   upstream_request_->encodeHeaders(response_headers, false);
 
   Buffer::OwnedImpl response_data{"defgh"};
@@ -97,14 +106,61 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
 
+  EXPECT_EQ(response->body(), response_data.toString());
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
+  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, "abcdef");
+
+  // Wait for upstream to finish the request.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Ensure that we stripped the length prefix and set the appropriate headers.
+  EXPECT_EQ("f", upstream_request_->body().toString());
+
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+  EXPECT_THAT(upstream_request_->headers(),
+              HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
+
+  // Respond to the request.
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-protobuf");
+  upstream_request_->encodeHeaders(response_headers, false);
+
+  Buffer::OwnedImpl response_data{"defgh"};
+  upstream_request_->encodeData(response_data, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+
   // Ensure that we restored the content-type and that we added the length prefix.
   EXPECT_EQ(response_data.length() + 5, response->body().size());
   EXPECT_TRUE(absl::EndsWith(response->body(), response_data.toString()));
 
   // Comparing strings embedded zero literals is hard. Use string literal and std::equal to avoid
   // truncating the string when it's converted to const char *.
-  using namespace std::string_literals;
-
   const auto expected_prefix = "\0\0\0\0\4"s;
   EXPECT_TRUE(
       std::equal(response->body().begin(), response->body().begin() + 4, expected_prefix.begin()));

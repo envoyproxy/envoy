@@ -1,10 +1,6 @@
-/docs/root/intro/version_history.rst merge=union
-*.generated.pb_text linguist-generated=true
-*.generated.pb_text -diff -merge
+/docs/root/version_history/current.rst merge=union
+/api/envoy/**/v4alpha/* linguist-generated=true
 /generated_api_shadow/envoy/** linguist-generated=true
-/generated_api_shadow/envoy/** -diff -merge
 /generated_api_shadow/bazel/** linguist-generated=true
-/generated_api_shadow/bazel/** -diff -merge
 *.svg binary
 /test/**/*_corpus/* linguist-generated=true
-/test/**/*_corpus/* -diff -merge

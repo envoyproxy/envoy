@@ -5,7 +5,6 @@
 #include <set>
 #include <sstream>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/interval_set.h"
@@ -18,6 +17,14 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+/**
+ * Retrieve string description of error code
+ * @param int error code
+ * @return const std::string error detail description
+ */
+const std::string errorDetails(int error_code);
+
 /**
  * Utility class for formatting dates given an absl::FormatTime style format string.
  */
@@ -699,16 +706,6 @@ public:
    * @return a string_view into the InlineString.
    */
   absl::string_view toStringView() const { return {data_, size_}; }
-
-  /**
-   * @return the number of bytes in the string
-   */
-  size_t size() const { return size_; }
-
-  /**
-   * @return a pointer to the first byte of the string.
-   */
-  const char* data() const { return data_; }
 
 private:
   // Constructor is declared private so that no one constructs one without the

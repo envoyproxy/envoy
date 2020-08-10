@@ -3,6 +3,9 @@ syntax = "proto3";
 package envoy.v2;
 
 import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 enum SomeEnum {
   DEFAULT = 0 [deprecated = true];
@@ -15,6 +18,11 @@ message Sample {
   message Entry {
     string key = 1;
     string value = 2;
+  }
+  enum DeprecateEnum {
+    option deprecated = true;
+    FIRST = 0;
+    SECOND = 1;
   }
   repeated Entry entries = 1;
   string will_deprecated = 2 [deprecated = true];

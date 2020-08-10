@@ -61,12 +61,12 @@ def fixFileExpectingSuccess(file, extra_input_files=None):
   command, infile, outfile, status, stdout = fixFileHelper(file,
                                                            extra_input_files=extra_input_files)
   if status != 0:
-    print("FAILED:")
+    print("FAILED: " + infile)
     emitStdoutAsError(stdout)
     return 1
   status, stdout, stderr = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
-    print("FAILED:")
+    print("FAILED: " + infile)
     emitStdoutAsError(stdout + stderr)
     return 1
   return 0
@@ -166,6 +166,10 @@ def runChecks():
       "Don't reference real-world time sources from production code; use injection")
   errors += checkUnfixableError("real_time_source.cc", real_time_inject_error)
   errors += checkUnfixableError("real_time_system.cc", real_time_inject_error)
+  errors += checkUnfixableError(
+      "duration_value.cc",
+      "Don't use ambiguous duration(value), use an explicit duration type, e.g. Event::TimeSystem::Milliseconds(value)"
+  )
   errors += checkUnfixableError("system_clock.cc", real_time_inject_error)
   errors += checkUnfixableError("steady_clock.cc", real_time_inject_error)
   errors += checkUnfixableError(
@@ -188,7 +192,13 @@ def runChecks():
       "serialize_as_string.cc",
       "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
   errors += checkUnfixableError(
-      "version_history.rst",
+      "version_history/current.rst",
+      "Version history not in alphabetical order (zzzzz vs aaaaa): please check placement of line")
+  errors += checkUnfixableError(
+      "version_history/current.rst",
+      "Version history not in alphabetical order (this vs aaaa): please check placement of line")
+  errors += checkUnfixableError(
+      "version_history/current.rst",
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
       "check_format.py")
   errors += checkUnfixableError(
@@ -220,6 +230,26 @@ def runChecks():
                                 "Don't use mangled Protobuf names for enum constants")
   errors += checkUnfixableError("test_naming.cc",
                                 "Test names should be CamelCase, starting with a capital letter")
+  errors += checkUnfixableError(
+      "test/register_factory.cc",
+      "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, use "
+      "Registry::InjectFactory instead.")
+  errors += checkUnfixableError("strerror.cc",
+                                "Don't use strerror; use Envoy::errorDetails instead")
+  errors += checkUnfixableError(
+      "std_unordered_map.cc", "Don't use std::unordered_map; use absl::flat_hash_map instead " +
+      "or absl::node_hash_map if pointer stability of keys/values is required")
+  errors += checkUnfixableError(
+      "std_unordered_set.cc", "Don't use std::unordered_set; use absl::flat_hash_set instead " +
+      "or absl::node_hash_set if pointer stability of keys/values is required")
+  errors += checkUnfixableError("std_any.cc", "Don't use std::any; use absl::any instead")
+  errors += checkUnfixableError("std_optional.cc",
+                                "Don't use std::optional; use absl::optional instead")
+  errors += checkUnfixableError("std_variant.cc",
+                                "Don't use std::variant; use absl::variant instead")
+  errors += checkUnfixableError(
+      "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
+  errors += checkFileExpectingOK("commented_throw.cc")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
@@ -239,7 +269,7 @@ def runChecks():
   errors += checkAndFixError("update_license.BUILD", "envoy_build_fixer check failed")
   # Validate that envoy_package() is added where there is an envoy_* rule occurring.
   errors += checkAndFixError("add_envoy_package.BUILD", "envoy_build_fixer check failed")
-  # Validate that we don't add envoy_packag() when no envoy_* rule.
+  # Validate that we don't add envoy_package() when no envoy_* rule.
   errors += checkFileExpectingOK("skip_envoy_package.BUILD")
   # Validate that we clean up gratuitous blank lines.
   errors += checkAndFixError("canonical_spacing.BUILD", "envoy_build_fixer check failed")
@@ -259,6 +289,7 @@ def runChecks():
       "term absl::make_unique< should be replaced with standard library term std::make_unique<")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
+  errors += checkFileExpectingOK("duration_value_zero.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
   errors += checkFileExpectingOK("clang_format_off.cc")
   return errors

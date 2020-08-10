@@ -1,13 +1,9 @@
-#include <arpa/inet.h>
-#include <arpa/nameser.h>
-#include <arpa/nameser_compat.h>
-
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
@@ -30,9 +26,17 @@
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/container/node_hash_map.h"
 #include "ares.h"
 #include "ares_dns.h"
 #include "gtest/gtest.h"
+
+#if !defined(WIN32)
+#include <arpa/nameser.h>
+#include <arpa/nameser_compat.h>
+#else
+#include "nameser.h"
+#endif
 
 using testing::_;
 using testing::Contains;
@@ -49,9 +53,9 @@ namespace {
 // List of IP address (in human readable format).
 using IpList = std::list<std::string>;
 // Map from hostname to IpList.
-using HostMap = std::unordered_map<std::string, IpList>;
+using HostMap = absl::node_hash_map<std::string, IpList>;
 // Map from hostname to CNAME
-using CNameMap = std::unordered_map<std::string, std::string>;
+using CNameMap = absl::node_hash_map<std::string, std::string>;
 // Represents a single TestDnsServer query state and lifecycle. This implements
 // just enough of RFC 1035 to handle queries we generate in the tests below.
 enum class RecordType { A, AAAA };
@@ -277,6 +281,8 @@ public:
     queries_.emplace_back(query);
   }
 
+  void onReject() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
   void addHosts(const std::string& hostname, const IpList& ip, const RecordType& type) {
     if (type == RecordType::A) {
       hosts_a_[hostname] = ip;
@@ -314,7 +320,7 @@ public:
 
   ares_channel channel() const { return resolver_->channel_; }
   bool isChannelDirty() const { return resolver_->dirty_channel_; }
-  const std::unordered_map<int, Event::FileEventPtr>& events() { return resolver_->events_; }
+  const absl::node_hash_map<int, Event::FileEventPtr>& events() { return resolver_->events_; }
   // Reset the channel state for a DnsResolverImpl such that it will only use
   // TCP and optionally has a zero timeout (for validating timeout behavior).
   void resetChannelTcpOnly(bool zero_timeout) {
@@ -337,7 +343,8 @@ private:
 
 class DnsImplConstructor : public testing::Test {
 protected:
-  DnsImplConstructor() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+  DnsImplConstructor()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -381,15 +388,17 @@ public:
   const std::string& asString() const override { return antagonistic_name_; }
   absl::string_view asStringView() const override { return antagonistic_name_; }
   const std::string& logicalName() const override { return antagonistic_name_; }
-  Api::SysCallIntResult bind(os_fd_t fd) const override { return instance_.bind(fd); }
-  Api::SysCallIntResult connect(os_fd_t fd) const override { return instance_.connect(fd); }
   const Address::Ip* ip() const override { return instance_.ip(); }
-  IoHandlePtr socket(Address::SocketType type) const override { return instance_.socket(type); }
+  const Address::Pipe* pipe() const override { return instance_.pipe(); }
+  const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
+  socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   Address::Type type() const override { return instance_.type(); }
+  const std::string& socketInterface() const override { return socket_interface_; }
 
 private:
   std::string antagonistic_name_;
   Address::Ipv4Instance instance_;
+  std::string socket_interface_{""};
 };
 
 TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
@@ -417,7 +426,8 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
-  DnsImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
+  DnsImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
     resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
@@ -482,13 +492,13 @@ public:
             EXPECT_EQ(expected_results, address_as_string_list);
           }
 
-          for (auto expected_absent_result : expected_absent_results) {
+          for (const auto& expected_absent_result : expected_absent_results) {
             EXPECT_THAT(address_as_string_list, Not(Contains(expected_absent_result)));
           }
 
           if (expected_ttl) {
             std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
-            for (auto address : results) {
+            for (const auto& address : results) {
               EXPECT_EQ(address.ttl_, expected_ttl.value());
             }
           }

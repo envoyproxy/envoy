@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package envoy.v2;
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.v2";
+option java_outer_classname = "SampleProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+enum SomeEnum {
+  DEFAULT = 0 [deprecated = true];
+  FOO = 1;
+  BAR = 2 [deprecated = true];
+  BAZ = 3 [(udpa.annotations.enum_value_migrate).rename = "WOW"];
+}
+
+message Sample {
+  enum DeprecateEnum {
+    option deprecated = true;
+
+    FIRST = 0;
+    SECOND = 1;
+  }
+
+  message Entry {
+    string key = 1;
+
+    string value = 2;
+  }
+
+  repeated Entry entries = 1;
+
+  string will_deprecated = 2 [deprecated = true];
+
+  string will_rename_compoent = 3 [(udpa.annotations.field_migrate).rename = "renamed_component"];
+}

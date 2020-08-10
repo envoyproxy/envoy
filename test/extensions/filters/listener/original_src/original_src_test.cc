@@ -119,7 +119,7 @@ TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressBleachesPort) {
 }
 
 TEST_F(OriginalSrcTest, FilterAddsTransparentOption) {
-  if (!ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
+  if (!ENVOY_SOCKET_IP_TRANSPARENT.hasValue()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
   }
@@ -138,7 +138,7 @@ TEST_F(OriginalSrcTest, FilterAddsTransparentOption) {
 }
 
 TEST_F(OriginalSrcTest, FilterAddsMarkOption) {
-  if (!ENVOY_SOCKET_SO_MARK.has_value()) {
+  if (!ENVOY_SOCKET_SO_MARK.hasValue()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
   }
@@ -160,7 +160,7 @@ TEST_F(OriginalSrcTest, FilterAddsMarkOption) {
 }
 
 TEST_F(OriginalSrcTest, Mark0NotAdded) {
-  if (!ENVOY_SOCKET_SO_MARK.has_value()) {
+  if (!ENVOY_SOCKET_SO_MARK.hasValue()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
   }

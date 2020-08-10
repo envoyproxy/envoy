@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -7,6 +5,8 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -23,6 +23,16 @@ envoy_cc_test(
         "//source/common/config:api_type_oracle_lib",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "decoded_resource_impl_test",
+    srcs = ["decoded_resource_impl_test.cc"],
+    deps = [
+        "//source/common/config:decoded_resource_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -72,6 +82,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":filesystem_subscription_test_harness",
         "//test/mocks/event:event_mocks",
@@ -106,7 +117,6 @@ envoy_cc_test(
         "//source/common/config:api_version_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
-        "//source/common/config:resources_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
@@ -118,6 +128,7 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:resources_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
@@ -132,7 +143,6 @@ envoy_cc_test(
     deps = [
         "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
-        "//source/common/config:resources_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf",
         "//test/common/stats:stat_test_utility_lib",
@@ -143,6 +153,7 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:resources_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -182,13 +193,13 @@ envoy_cc_test_library(
         "//source/common/config:api_version_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:grpc_subscription_lib",
-        "//source/common/config:resources_lib",
         "//source/common/config:version_converter_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -248,6 +259,17 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "opaque_resource_decoder_impl_test",
+    srcs = ["opaque_resource_decoder_impl_test.cc"],
+    deps = [
+        "//source/common/config:opaque_resource_decoder_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "subscription_factory_impl_test",
     srcs = ["subscription_factory_impl_test.cc"],
     deps = [
@@ -261,6 +283,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -271,6 +294,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         ":delta_subscription_test_harness",
         ":filesystem_subscription_test_harness",
@@ -390,7 +414,7 @@ envoy_cc_test(
         ":dummy_config_proto_cc_proto",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -406,10 +430,20 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/common/crypto:utility_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "udpa_resource_test",
+    srcs = ["udpa_resource_test.cc"],
+    deps = [
+        "//source/common/config:udpa_resource_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

@@ -148,23 +148,24 @@ void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, abs
   }
 }
 
-IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
-                                           MockBufferFactory& factory, uint32_t port,
-                                           Network::Address::IpVersion version,
-                                           bool enable_half_close)
-    : payload_reader_(new WaitForPayloadReader(dispatcher)),
+IntegrationTcpClient::IntegrationTcpClient(
+    Event::Dispatcher& dispatcher, Event::TestTimeSystem& time_system, MockBufferFactory& factory,
+    uint32_t port, Network::Address::IpVersion version, bool enable_half_close,
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    : time_system_(time_system), payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
-  EXPECT_CALL(factory, create_(_, _))
-      .WillOnce(Invoke([&](std::function<void()> below_low,
-                           std::function<void()> above_high) -> Buffer::Instance* {
-        client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
+  EXPECT_CALL(factory, create_(_, _, _))
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                           std::function<void()> above_overflow) -> Buffer::Instance* {
+        client_write_buffer_ =
+            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
         return client_write_buffer_;
       }));
 
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options);
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
@@ -188,24 +189,28 @@ void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
-void IntegrationTcpClient::waitForData(size_t length) {
+AssertionResult IntegrationTcpClient::waitForData(size_t length,
+                                                  std::chrono::milliseconds timeout) {
   if (payload_reader_->data().size() >= length) {
-    return;
+    return AssertionSuccess();
   }
 
-  payload_reader_->setLengthToWaitFor(length);
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  return payload_reader_->waitForLength(length, timeout);
 }
 
 void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
   if (ignore_spurious_events) {
-    while (!disconnected_) {
+    while (!disconnected_ && timeout_timer->enabled()) {
       connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
     }
   } else {
     connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-    EXPECT_TRUE(disconnected_);
   }
+  EXPECT_TRUE(disconnected_);
 }
 
 void IntegrationTcpClient::waitForHalfClose() {
@@ -218,7 +223,9 @@ void IntegrationTcpClient::waitForHalfClose() {
 
 void IntegrationTcpClient::readDisable(bool disabled) { connection_->readDisable(disabled); }
 
-void IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify) {
+AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_stream, bool verify,
+                                            std::chrono::milliseconds timeout) {
+  auto end_time = time_system_.monotonicTime() + timeout;
   Buffer::OwnedImpl buffer(data);
   if (verify) {
     EXPECT_CALL(*client_write_buffer_, move(_));
@@ -232,12 +239,21 @@ void IntegrationTcpClient::write(const std::string& data, bool end_stream, bool 
   connection_->write(buffer, end_stream);
   do {
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  } while (client_write_buffer_->bytes_written() != bytes_expected && !disconnected_);
-  if (verify) {
-    // If we disconnect part way through the write, then we should fail, since write() is always
-    // expected to succeed.
-    EXPECT_TRUE(!disconnected_ || client_write_buffer_->bytes_written() == bytes_expected);
+    if (client_write_buffer_->bytes_written() == bytes_expected || disconnected_) {
+      break;
+    }
+  } while (time_system_.monotonicTime() < end_time);
+
+  if (time_system_.monotonicTime() >= end_time) {
+    return AssertionFailure() << "Timed out completing write";
+  } else if (verify && (disconnected_ || client_write_buffer_->bytes_written() != bytes_expected)) {
+    return AssertionFailure()
+           << "Failed to complete write or unexpected disconnect. disconnected_: " << disconnected_
+           << " bytes_written: " << client_write_buffer_->bytes_written()
+           << " bytes_expected: " << bytes_expected;
   }
+
+  return AssertionSuccess();
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -252,7 +268,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                          const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      dispatcher_(api_->allocateDispatcher(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      dispatcher_(api_->allocateDispatcher("test_thread",
+                                           Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
@@ -262,13 +279,18 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  timeSystem().sleep(std::chrono::milliseconds(10));
-  ON_CALL(*mock_buffer_factory_, create_(_, _))
-      .WillByDefault(Invoke([](std::function<void()> below_low,
-                               std::function<void()> above_high) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+  ON_CALL(*mock_buffer_factory_, create_(_, _, _))
+      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
+                               std::function<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  // In ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS mode, set runtime config to use legacy codecs.
+#ifdef ENVOY_USE_NEW_CODECS_IN_INTEGRATION_TESTS
+  ENVOY_LOG_MISC(debug, "Using new codecs");
+  setNewCodecs();
+#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -362,7 +384,7 @@ void BaseIntegrationTest::createEnvoy() {
                  MessageUtil::getYamlStringFromMessage(bootstrap));
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
-      "bootstrap.json", MessageUtil::getJsonStringFromMessage(bootstrap));
+      "bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(bootstrap));
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
@@ -370,7 +392,7 @@ void BaseIntegrationTest::createEnvoy() {
   for (int i = 0; i < static_resources.listeners_size(); ++i) {
     named_ports.push_back(static_resources.listeners(i).name());
   }
-  createGeneratedApiTestServer(bootstrap_path, named_ports, false, true, false);
+  createGeneratedApiTestServer(bootstrap_path, named_ports, {false, true, false}, false);
 }
 
 void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
@@ -387,9 +409,11 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   }
 }
 
-IntegrationTcpClientPtr BaseIntegrationTest::makeTcpConnection(uint32_t port) {
-  return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enable_half_close_);
+IntegrationTcpClientPtr
+BaseIntegrationTest::makeTcpConnection(uint32_t port,
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  return std::make_unique<IntegrationTcpClient>(*dispatcher_, time_system_, *mock_buffer_factory_,
+                                                port, version_, enable_half_close_, options);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -449,15 +473,13 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 }
 
-void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
-                                                       const std::vector<std::string>& port_names,
-                                                       bool allow_unknown_static_fields,
-                                                       bool reject_unknown_dynamic_fields,
-                                                       bool allow_lds_rejection) {
+void BaseIntegrationTest::createGeneratedApiTestServer(
+    const std::string& bootstrap_path, const std::vector<std::string>& port_names,
+    Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
   test_server_ = IntegrationTestServer::create(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
-      timeSystem(), *api_, defer_listener_finalization_, process_object_,
-      allow_unknown_static_fields, reject_unknown_dynamic_fields, concurrency_);
+      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
+      concurrency_, drain_time_, drain_strategy_, use_real_stats_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -466,20 +488,23 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     auto end_time = time_system_.monotonicTime() + TestUtility::DefaultTimeout;
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
-    while ((test_server_->counter(success) == nullptr ||
-            test_server_->counter(success)->value() < concurrency_) &&
-           (!allow_lds_rejection || test_server_->counter(rejected) == nullptr ||
-            test_server_->counter(rejected)->value() == 0)) {
+    for (Stats::CounterSharedPtr success_counter = test_server_->counter(success),
+                                 rejected_counter = test_server_->counter(rejected);
+         (success_counter == nullptr ||
+          success_counter->value() <
+              concurrency_ * config_helper_.bootstrap().static_resources().listeners_size()) &&
+         (!allow_lds_rejection || rejected_counter == nullptr || rejected_counter->value() == 0);
+         success_counter = test_server_->counter(success),
+                                 rejected_counter = test_server_->counter(rejected)) {
       if (time_system_.monotonicTime() >= end_time) {
         RELEASE_ASSERT(0, "Timed out waiting for listeners.");
       }
       if (!allow_lds_rejection) {
-        RELEASE_ASSERT(test_server_->counter(rejected) == nullptr ||
-                           test_server_->counter(rejected)->value() == 0,
+        RELEASE_ASSERT(rejected_counter == nullptr || rejected_counter->value() == 0,
                        absl::StrCat("Lds update failed. Details\n",
                                     getListenerDetails(test_server_->server())));
       }
-      time_system_.sleep(std::chrono::milliseconds(10));
+      time_system_.advanceTimeWait(std::chrono::milliseconds(10));
     }
 
     registerTestServerPorts(port_names);
@@ -488,8 +513,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
 
 void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                                               const std::vector<std::string>& port_names,
-                                              bool allow_unknown_static_fields,
-                                              bool reject_unknown_dynamic_fields,
+                                              Server::FieldValidationConfig validator_config,
                                               bool allow_lds_rejection) {
   const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.eds_path_, port_map_, version_);
@@ -499,45 +523,27 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
       api_filesystem_config.rds_path_, port_map_, version_);
   const std::string lds_path = TestEnvironment::temporaryFileSubstitute(
       api_filesystem_config.lds_path_, {{"rds_json_path", rds_path}}, port_map_, version_);
-  createGeneratedApiTestServer(
-      TestEnvironment::temporaryFileSubstitute(
-          api_filesystem_config.bootstrap_path_,
-          {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}}, port_map_, version_),
-      port_names, allow_unknown_static_fields, reject_unknown_dynamic_fields, allow_lds_rejection);
-}
-
-void BaseIntegrationTest::createTestServer(const std::string& json_path,
-                                           const std::vector<std::string>& port_names) {
-  test_server_ = createIntegrationTestServer(
-      TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr, nullptr,
-      timeSystem());
-  registerTestServerPorts(port_names);
+  createGeneratedApiTestServer(TestEnvironment::temporaryFileSubstitute(
+                                   api_filesystem_config.bootstrap_path_,
+                                   {{"cds_json_path", cds_path}, {"lds_json_path", lds_path}},
+                                   port_map_, version_),
+                               port_names, validator_config, allow_lds_rejection);
 }
 
 void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
                                                         std::string* response,
                                                         bool disconnect_after_headers_complete) {
-  Buffer::OwnedImpl buffer(raw_http);
-  RawConnectionDriver connection(
-      port, buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      port, raw_http,
+      [response, disconnect_after_headers_complete](Network::ClientConnection& client,
+                                                    const Buffer::Instance& data) -> void {
         response->append(data.toString());
         if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
           client.close(Network::ConnectionCloseType::NoFlush);
         }
-      },
-      version_);
+      });
 
-  connection.run();
-}
-
-IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
-    const std::string& bootstrap_path,
-    std::function<void(IntegrationTestServer&)> on_server_ready_function,
-    std::function<void()> on_server_init_function, Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_, on_server_ready_function,
-                                       on_server_init_function, deterministic_, time_system, *api_,
-                                       defer_listener_finalization_);
+  connection->run();
 }
 
 void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
@@ -545,12 +551,28 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
 
-std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename) {
+// Assuming logs are newline delineated, return the start index of the nth entry.
+// If there are not n entries, it will return file.length() (end of the string
+// index)
+size_t entryIndex(const std::string& file, uint32_t entry) {
+  size_t index = 0;
+  for (uint32_t i = 0; i < entry; ++i) {
+    index = file.find('\n', index);
+    if (index == std::string::npos || index == file.length()) {
+      return file.length();
+    }
+    ++index;
+  }
+  return index;
+}
+
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
   for (int i = 0; i < 1000; ++i) {
     std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
-    if (contents.length() > 0) {
-      return contents;
+    size_t index = entryIndex(contents, entry);
+    if (contents.length() > index) {
+      return contents.substr(index);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
@@ -568,7 +590,7 @@ void BaseIntegrationTest::createXdsUpstream() {
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
-    common_tls_context->add_alpn_protocols("h2");
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
     auto* tls_cert = common_tls_context->add_tls_certificates();
     tls_cert->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
@@ -672,6 +694,23 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
     failure << x << ", ";
   }
   return failure << "}";
+}
+
+AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
+                                                          std::chrono::milliseconds timeout) {
+  const auto end_time = time_system_.monotonicTime() + timeout;
+  while (time_system_.monotonicTime() < end_time) {
+    try {
+      Network::TcpListenSocket(Network::Utility::getAddressWithPort(
+                                   *Network::Test::getCanonicalLoopbackAddress(version_), port),
+                               nullptr, true);
+      return AssertionSuccess();
+    } catch (const EnvoyException&) {
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+    }
+  }
+
+  return AssertionFailure() << "Timeout waiting for port availability";
 }
 
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(

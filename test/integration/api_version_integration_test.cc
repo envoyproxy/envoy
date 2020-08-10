@@ -75,7 +75,7 @@ public:
       RELEASE_ASSERT(result, result.message());
       result = xds_stream_->waitForHeadersComplete();
       RELEASE_ASSERT(result, result.message());
-      endpoint_ = std::string(xds_stream_->headers().Path()->value().getStringView());
+      endpoint_ = std::string(xds_stream_->headers().getPathValue());
       ENVOY_LOG_MISC(debug, "xDS endpoint {}", endpoint_);
     }
   }
@@ -112,8 +112,12 @@ public:
     std::string actual_type_url;
     const char ads_v2_sotw_endpoint[] =
         "/envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources";
-    const char ads_v3_delta_endpoint[] =
+    const char ads_v3_sotw_endpoint[] =
         "/envoy.service.discovery.v3.AggregatedDiscoveryService/StreamAggregatedResources";
+    const char ads_v2_delta_endpoint[] =
+        "/envoy.service.discovery.v2.AggregatedDiscoveryService/DeltaAggregatedResources";
+    const char ads_v3_delta_endpoint[] =
+        "/envoy.service.discovery.v3.AggregatedDiscoveryService/DeltaAggregatedResources";
     switch (transportApiVersion()) {
     case envoy::config::core::v3::ApiVersion::AUTO:
     case envoy::config::core::v3::ApiVersion::V2: {
@@ -133,7 +137,7 @@ public:
         EXPECT_TRUE(!hasHiddenEnvoyDeprecated(delta_discovery_request));
         xds_stream_->startGrpcStream();
         actual_type_url = delta_discovery_request.type_url();
-        expected_endpoint = expected_v2_delta_endpoint;
+        expected_endpoint = ads() ? ads_v2_delta_endpoint : expected_v2_delta_endpoint;
         break;
       }
       case envoy::config::core::v3::ApiConfigSource::REST: {
@@ -158,7 +162,7 @@ public:
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
         EXPECT_TRUE(!hasHiddenEnvoyDeprecated(discovery_request));
         actual_type_url = discovery_request.type_url();
-        expected_endpoint = ads() ? ads_v3_delta_endpoint : expected_v3_sotw_endpoint;
+        expected_endpoint = ads() ? ads_v3_sotw_endpoint : expected_v3_sotw_endpoint;
         break;
       }
       case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
@@ -167,7 +171,7 @@ public:
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
         EXPECT_TRUE(!hasHiddenEnvoyDeprecated(delta_discovery_request));
         actual_type_url = delta_discovery_request.type_url();
-        expected_endpoint = expected_v3_delta_endpoint;
+        expected_endpoint = ads() ? ads_v3_delta_endpoint : expected_v3_delta_endpoint;
         break;
       }
       case envoy::config::core::v3::ApiConfigSource::REST: {
@@ -214,8 +218,6 @@ public:
     if (xds_stream_ != nullptr) {
       cleanUpXdsConnection();
     }
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   std::string endpoint_;
@@ -258,7 +260,8 @@ INSTANTIATE_TEST_SUITE_P(
     AdsApiConfigSourcesExplicitApiVersions, ApiVersionIntegrationTest,
     testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
                      testing::Values(true),
-                     testing::Values(envoy::config::core::v3::ApiConfigSource::GRPC),
+                     testing::Values(envoy::config::core::v3::ApiConfigSource::GRPC,
+                                     envoy::config::core::v3::ApiConfigSource::DELTA_GRPC),
                      testing::Values(envoy::config::core::v3::ApiVersion::V2,
                                      envoy::config::core::v3::ApiVersion::V3),
                      testing::Values(envoy::config::core::v3::ApiVersion::V2,
@@ -313,9 +316,11 @@ TEST_P(ApiVersionIntegrationTest, Eds) {
 
 TEST_P(ApiVersionIntegrationTest, Rtds) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* admin_layer = bootstrap.mutable_layered_runtime()->add_layers();
-    admin_layer->set_name("admin layer");
-    admin_layer->mutable_admin_layer();
+    if (bootstrap.mutable_layered_runtime()->layers_size() == 0) {
+      auto* admin_layer = bootstrap.mutable_layered_runtime()->add_layers();
+      admin_layer->set_name("admin layer");
+      admin_layer->mutable_admin_layer();
+    }
     auto* rtds_layer = bootstrap.mutable_layered_runtime()->add_layers();
     rtds_layer->set_name("rtds_layer");
     setupConfigSource(*rtds_layer->mutable_rtds_layer()->mutable_rtds_config());

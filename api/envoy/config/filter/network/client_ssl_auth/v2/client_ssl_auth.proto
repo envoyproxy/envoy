@@ -15,7 +15,7 @@ option java_outer_classname = "ClientSslAuthProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.client_ssl_auth.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Client TLS authentication]
 // Client TLS authentication
@@ -41,6 +41,6 @@ message ClientSSLAuth {
 
   // An optional list of IP address and subnet masks that should be white
   // listed for access by the filter. If no list is provided, there is no
-  // IP white list.
+  // IP allowlist.
   repeated api.v2.core.CidrRange ip_white_list = 4;
 }

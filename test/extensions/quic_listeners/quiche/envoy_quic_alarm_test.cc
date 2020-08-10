@@ -31,11 +31,12 @@ private:
 class EnvoyQuicAlarmTest : public ::testing::Test {
 public:
   EnvoyQuicAlarmTest()
-      : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
-        clock_(*dispatcher_), alarm_factory_(*dispatcher_, clock_) {}
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
+        alarm_factory_(*dispatcher_, clock_) {}
 
   void advanceMsAndLoop(int64_t delay_ms) {
-    time_system_.sleep(std::chrono::milliseconds(delay_ms));
+    time_system_.advanceTimeAsync(std::chrono::milliseconds(delay_ms));
     dispatcher_->run(Dispatcher::RunType::NonBlock);
   }
 
@@ -153,10 +154,11 @@ TEST_F(EnvoyQuicAlarmTest, SetAlarmToPastTime) {
   EXPECT_EQ(100, (clock_.Now() - quic::QuicTime::Zero()).ToMilliseconds());
   auto unowned_delegate = new TestDelegate();
   quic::QuicArenaScopedPtr<quic::QuicAlarm> alarm(alarm_factory_.CreateAlarm(unowned_delegate));
-  // alarm becomes active upon Set().
+  // Alarm will be active 1ms after Update() for the purpose of avoiding firing
+  // in the same event loop.
   alarm->Set(clock_.Now() - QuicTime::Delta::FromMilliseconds(10));
   EXPECT_FALSE(unowned_delegate->fired());
-  dispatcher_->run(Dispatcher::RunType::NonBlock);
+  advanceMsAndLoop(1);
   EXPECT_TRUE(unowned_delegate->fired());
 }
 
@@ -167,9 +169,10 @@ TEST_F(EnvoyQuicAlarmTest, UpdateAlarmWithPastDeadline) {
   advanceMsAndLoop(9);
   EXPECT_EQ(9, (clock_.Now() - quic::QuicTime::Zero()).ToMilliseconds());
   EXPECT_FALSE(unowned_delegate->fired());
-  // alarm becomes active upon Update().
+  // Alarm will be active 1ms after Update() for the purpose of avoiding firing
+  // in the same event loop.
   alarm->Update(clock_.Now() - QuicTime::Delta::FromMilliseconds(1), quic::QuicTime::Delta::Zero());
-  dispatcher_->run(Dispatcher::RunType::NonBlock);
+  advanceMsAndLoop(1);
   EXPECT_TRUE(unowned_delegate->fired());
   unowned_delegate->set_fired(false);
   advanceMsAndLoop(1);

@@ -25,7 +25,6 @@ using testing::Invoke;
 using testing::Property;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -117,7 +116,7 @@ public:
     Common::Redis::RespValue readonly_request = Utility::ReadOnlyRequest::instance();
     EXPECT_CALL(*encoder_, encode(Eq(readonly_request), _));
     EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-    client_->initialize(auth_password_);
+    client_->initialize(auth_username_, auth_password_);
 
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
@@ -144,6 +143,7 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
   Stats::ScopePtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
+  std::string auth_username_;
   std::string auth_password_;
 };
 
@@ -190,7 +190,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
-  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -291,7 +291,7 @@ TEST_F(RedisClientImplTest, Basic) {
 
   setup();
 
-  client_->initialize(auth_password_);
+  client_->initialize(auth_username_, auth_password_);
 
   Common::Redis::RespValue request1;
   MockClientCallbacks callbacks1;
@@ -347,7 +347,7 @@ class ConfigEnableCommandStats : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(0);
   }
-  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return true; }
 };
@@ -371,7 +371,7 @@ TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
 
   setup();
 
-  client_->initialize(auth_password_);
+  client_->initialize(auth_username_, auth_password_);
 
   std::string get_command = "get";
 
@@ -427,7 +427,7 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
 
   setup(std::make_unique<ConfigEnableCommandStats>());
 
-  client_->initialize(auth_password_);
+  client_->initialize(auth_username_, auth_password_);
 
   std::string get_command = "get";
 
@@ -512,7 +512,7 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
   Utility::AuthRequest auth_request(auth_password_);
   EXPECT_CALL(*encoder_, encode(Eq(auth_request), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  client_->initialize(auth_password_);
+  client_->initialize(auth_username_, auth_password_);
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
@@ -524,7 +524,29 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
   client_->close();
 }
 
-TEST_F(RedisClientImplTest, InitializedWithPreferMasterReadPolicy) {
+TEST_F(RedisClientImplTest, InitializedWithAuthAcl) {
+  InSequence s;
+
+  setup();
+
+  auth_username_ = "testing username";
+  auth_password_ = "testing password";
+  Utility::AuthRequest auth_request(auth_username_, auth_password_);
+  EXPECT_CALL(*encoder_, encode(Eq(auth_request), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->initialize(auth_username_, auth_password_);
+
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+TEST_F(RedisClientImplTest, InitializedWithPreferPrimaryReadPolicy) {
   testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
                                ConnPoolSettings::PREFER_MASTER);
 }
@@ -710,7 +732,7 @@ class ConfigOutlierDisabled : public Config {
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(0);
   }
-  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
 };
@@ -1189,9 +1211,10 @@ TEST(RedisClientFactoryImplTest, Basic) {
   Stats::IsolatedStoreImpl stats_;
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
+  const std::string auth_username;
   const std::string auth_password;
-  ClientPtr client =
-      factory.create(host, dispatcher, config, redis_command_stats, stats_, auth_password);
+  ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats, stats_,
+                                    auth_username, auth_password);
   client->close();
 }
 } // namespace Client

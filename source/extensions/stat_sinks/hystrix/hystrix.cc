@@ -22,6 +22,13 @@ namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    access_control_allow_origin_handle(Http::CustomHeaders::get().AccessControlAllowOrigin);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    access_control_allow_headers_handle(Http::CustomHeaders::get().AccessControlAllowHeaders);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    cache_control_handle(Http::CustomHeaders::get().CacheControl);
+
 const uint64_t HystrixSink::DEFAULT_NUM_BUCKETS;
 ClusterStatsCache::ClusterStatsCache(const std::string& cluster_name)
     : cluster_name_(cluster_name) {}
@@ -50,7 +57,7 @@ void HystrixSink::addHistogramToStream(const QuantileLatencyMap& latency_map, ab
   // TODO: Consider if we better use join here
   ss << ", \"" << key << "\": {";
   bool is_first = true;
-  for (const std::pair<double, double>& element : latency_map) {
+  for (const auto& element : latency_map) {
     const std::string quantile = fmt::sprintf("%g", element.first * 100);
     HystrixSink::addDoubleToStream(quantile, element.second, ss, is_first);
     is_first = false;
@@ -264,9 +271,10 @@ const std::string HystrixSink::printRollingWindows() {
   return out_str.str();
 }
 
-HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
+HystrixSink::HystrixSink(Server::Configuration::ServerFactoryContext& server,
+                         const uint64_t num_buckets)
     : server_(server), current_index_(num_buckets > 0 ? num_buckets : DEFAULT_NUM_BUCKETS),
-      window_size_(current_index_ + 1), stat_name_pool_(server.stats().symbolTable()),
+      window_size_(current_index_ + 1), stat_name_pool_(server.scope().symbolTable()),
       cluster_name_(stat_name_pool_.add(Config::TagNames::get().CLUSTER_NAME)),
       cluster_upstream_rq_time_(stat_name_pool_.add("cluster.upstream_rq_time")),
       membership_total_(stat_name_pool_.add("membership_total")),
@@ -288,12 +296,13 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Server::AdminStream& admin_stream) {
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
-  response_headers.setReferenceCacheControl(Http::Headers::get().CacheControlValues.NoCache);
+  response_headers.setReferenceInline(cache_control_handle.handle(),
+                                      Http::CustomHeaders::get().CacheControlValues.NoCache);
   response_headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Close);
-  response_headers.setReferenceAccessControlAllowHeaders(
-      AccessControlAllowHeadersValue.AllowHeadersHystrix);
-  response_headers.setReferenceAccessControlAllowOrigin(
-      Http::Headers::get().AccessControlAllowOriginValue.All);
+  response_headers.setReferenceInline(access_control_allow_headers_handle.handle(),
+                                      AccessControlAllowHeadersValue.AllowHeadersHystrix);
+  response_headers.setReferenceInline(access_control_allow_origin_handle.handle(),
+                                      Http::CustomHeaders::get().AccessControlAllowOriginValue.All);
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();
@@ -333,14 +342,14 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
 
   // Save a map of the relevant histograms per cluster in a convenient format.
-  std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
+  absl::node_hash_map<std::string, QuantileLatencyMap> time_histograms;
   for (const auto& histogram : snapshot.histograms()) {
     if (histogram.get().tagExtractedStatName() == cluster_upstream_rq_time_) {
       absl::optional<Stats::StatName> value =
           Stats::Utility::findTag(histogram.get(), cluster_name_);
       // Make sure we found the cluster name tag
       ASSERT(value);
-      std::string value_str = server_.stats().symbolTable().toString(*value);
+      std::string value_str = server_.scope().symbolTable().toString(*value);
       auto it_bool_pair = time_histograms.emplace(std::make_pair(value_str, QuantileLatencyMap()));
       // Make sure histogram with this name was not already added
       ASSERT(it_bool_pair.second);
@@ -401,7 +410,9 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
   if (clusters.size() < cluster_stats_cache_map_.size()) {
     for (auto it = cluster_stats_cache_map_.begin(); it != cluster_stats_cache_map_.end();) {
       if (clusters.find(it->first) == clusters.end()) {
-        it = cluster_stats_cache_map_.erase(it);
+        auto next_it = std::next(it);
+        cluster_stats_cache_map_.erase(it);
+        it = next_it;
       } else {
         ++it;
       }

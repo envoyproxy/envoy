@@ -23,7 +23,7 @@ public:
 
   explicit ValidationClusterManagerFactory(
       Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
+      ThreadLocal::Instance& tls, Random::RandomGenerator& random,
       Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
       Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
@@ -57,7 +57,7 @@ public:
   ValidationClusterManager(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                            ClusterManagerFactory& factory, Stats::Store& stats,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                           Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                            AccessLog::AccessLogManager& log_manager, Event::Dispatcher& dispatcher,
                            Server::Admin& admin,
                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
@@ -65,7 +65,7 @@ public:
                            Event::TimeSystem& time_system);
 
   Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string&, ResourcePriority,
-                                                         Http::Protocol,
+                                                         absl::optional<Http::Protocol>,
                                                          LoadBalancerContext*) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string&, LoadBalancerContext*) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string&) override;

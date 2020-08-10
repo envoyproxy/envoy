@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/network/transport_socket.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"

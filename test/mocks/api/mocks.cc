@@ -19,11 +19,13 @@ MockApi::MockApi() {
 
 MockApi::~MockApi() = default;
 
-Event::DispatcherPtr MockApi::allocateDispatcher() {
-  return Event::DispatcherPtr{allocateDispatcher_(time_system_)};
+Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name) {
+  return Event::DispatcherPtr{allocateDispatcher_(name, time_system_)};
 }
-Event::DispatcherPtr MockApi::allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) {
-  return Event::DispatcherPtr{allocateDispatcher_(std::move(watermark_factory), time_system_)};
+Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name,
+                                                 Buffer::WatermarkFactoryPtr&& watermark_factory) {
+  return Event::DispatcherPtr{
+      allocateDispatcher_(name, std::move(watermark_factory), time_system_)};
 }
 
 MockOsSysCalls::MockOsSysCalls() {
@@ -50,7 +52,7 @@ SysCallIntResult MockOsSysCalls::setsockopt(os_fd_t sockfd, int level, int optna
 
 SysCallIntResult MockOsSysCalls::getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                                             socklen_t* optlen) {
-  ASSERT(*optlen == sizeof(int));
+  ASSERT(*optlen == sizeof(int) || *optlen == sizeof(sockaddr_storage));
   int val = 0;
   const auto& it = boolsockopts_.find(SockOptKey(sockfd, level, optname));
   if (it != boolsockopts_.end()) {

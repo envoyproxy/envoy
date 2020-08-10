@@ -5,14 +5,63 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/resource.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/common/basic_resource_impl.h"
 
 namespace Envoy {
 namespace Upstream {
+
+struct ManagedResourceImpl : public BasicResourceLimitImpl {
+  ManagedResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
+                      Stats::Gauge& open_gauge, Stats::Gauge& remaining)
+      : BasicResourceLimitImpl(max, runtime, runtime_key), open_gauge_(open_gauge),
+        remaining_(remaining) {
+    remaining_.set(max);
+  }
+
+  // Upstream::Resource
+  bool canCreate() override { return current_ < max(); }
+  void inc() override {
+    BasicResourceLimitImpl::inc();
+    updateRemaining();
+    open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
+  }
+  void decBy(uint64_t amount) override {
+    BasicResourceLimitImpl::decBy(amount);
+    updateRemaining();
+    open_gauge_.set(BasicResourceLimitImpl::canCreate() ? 0 : 1);
+  }
+
+  /**
+   * We set the gauge instead of incrementing and decrementing because,
+   * though atomics are used, it is possible for the current resource count
+   * to be greater than the supplied max.
+   */
+  void updateRemaining() {
+    /**
+     * We cannot use std::max here because max() and current_ are
+     * unsigned and subtracting them may overflow.
+     */
+    const uint64_t current_copy = current_;
+    remaining_.set(max() > current_copy ? max() - current_copy : 0);
+  }
+
+  /**
+   * A gauge to notify the live circuit breaker state. The gauge is set to 0
+   * to notify that the circuit breaker is not yet triggered.
+   */
+  Stats::Gauge& open_gauge_;
+
+  /**
+   * The number of resources remaining before the circuit breaker opens.
+   */
+  Stats::Gauge& remaining_;
+};
 
 /**
  * Implementation of ResourceManager.
@@ -44,78 +93,21 @@ public:
                  pending_requests_) {}
 
   // Upstream::ResourceManager
-  Resource& connections() override { return connections_; }
-  Resource& pendingRequests() override { return pending_requests_; }
-  Resource& requests() override { return requests_; }
-  Resource& retries() override { return retries_; }
-  Resource& connectionPools() override { return connection_pools_; }
+  ResourceLimit& connections() override { return connections_; }
+  ResourceLimit& pendingRequests() override { return pending_requests_; }
+  ResourceLimit& requests() override { return requests_; }
+  ResourceLimit& retries() override { return retries_; }
+  ResourceLimit& connectionPools() override { return connection_pools_; }
 
 private:
-  struct ResourceImpl : public Resource {
-    ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
-                 Stats::Gauge& open_gauge, Stats::Gauge& remaining)
-        : max_(max), runtime_(runtime), runtime_key_(runtime_key), open_gauge_(open_gauge),
-          remaining_(remaining) {
-      remaining_.set(max);
-    }
-    ~ResourceImpl() override { ASSERT(current_ == 0); }
-
-    // Upstream::Resource
-    bool canCreate() override { return current_ < max(); }
-    void inc() override {
-      current_++;
-      updateRemaining();
-      open_gauge_.set(canCreate() ? 0 : 1);
-    }
-    void dec() override { decBy(1); }
-    void decBy(uint64_t amount) override {
-      ASSERT(current_ >= amount);
-      current_ -= amount;
-      updateRemaining();
-      open_gauge_.set(canCreate() ? 0 : 1);
-    }
-    uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
-    uint64_t count() const override { return current_.load(); }
-
-    /**
-     * We set the gauge instead of incrementing and decrementing because,
-     * though atomics are used, it is possible for the current resource count
-     * to be greater than the supplied max.
-     */
-    void updateRemaining() {
-      /**
-       * We cannot use std::max here because max() and current_ are
-       * unsigned and subtracting them may overflow.
-       */
-      const uint64_t current_copy = current_;
-      remaining_.set(max() > current_copy ? max() - current_copy : 0);
-    }
-
-    const uint64_t max_;
-    std::atomic<uint64_t> current_{};
-    Runtime::Loader& runtime_;
-    const std::string runtime_key_;
-
-    /**
-     * A gauge to notify the live circuit breaker state. The gauge is set to 0
-     * to notify that the circuit breaker is not yet triggered.
-     */
-    Stats::Gauge& open_gauge_;
-
-    /**
-     * The number of resources remaining before the circuit breaker opens.
-     */
-    Stats::Gauge& remaining_;
-  };
-
-  class RetryBudgetImpl : public Resource {
+  class RetryBudgetImpl : public ResourceLimit {
   public:
     RetryBudgetImpl(absl::optional<double> budget_percent,
                     absl::optional<uint32_t> min_retry_concurrency, uint64_t max_retries,
                     Runtime::Loader& runtime, const std::string& retry_budget_runtime_key,
                     const std::string& max_retries_runtime_key, Stats::Gauge& open_gauge,
-                    Stats::Gauge& remaining, const Resource& requests,
-                    const Resource& pending_requests)
+                    Stats::Gauge& remaining, const ResourceLimit& requests,
+                    const ResourceLimit& pending_requests)
         : runtime_(runtime),
           max_retry_resource_(max_retries, runtime, max_retries_runtime_key, open_gauge, remaining),
           budget_percent_(budget_percent), min_retry_concurrency_(min_retry_concurrency),
@@ -123,7 +115,7 @@ private:
           min_retry_concurrency_key_(retry_budget_runtime_key + "min_retry_concurrency"),
           requests_(requests), pending_requests_(pending_requests), remaining_(remaining) {}
 
-    // Upstream::Resource
+    // Envoy::ResourceLimit
     bool canCreate() override {
       if (!useRetryBudget()) {
         return max_retry_resource_.canCreate();
@@ -182,20 +174,20 @@ private:
     Runtime::Loader& runtime_;
     // The max_retry resource is nested within the budget to maintain state if the retry budget is
     // toggled.
-    ResourceImpl max_retry_resource_;
+    ManagedResourceImpl max_retry_resource_;
     const absl::optional<double> budget_percent_;
     const absl::optional<uint32_t> min_retry_concurrency_;
     const std::string budget_percent_key_;
     const std::string min_retry_concurrency_key_;
-    const Resource& requests_;
-    const Resource& pending_requests_;
+    const ResourceLimit& requests_;
+    const ResourceLimit& pending_requests_;
     Stats::Gauge& remaining_;
   };
 
-  ResourceImpl connections_;
-  ResourceImpl pending_requests_;
-  ResourceImpl requests_;
-  ResourceImpl connection_pools_;
+  ManagedResourceImpl connections_;
+  ManagedResourceImpl pending_requests_;
+  ManagedResourceImpl requests_;
+  ManagedResourceImpl connection_pools_;
   RetryBudgetImpl retries_;
 };
 

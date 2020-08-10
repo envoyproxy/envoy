@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 
-# Diff or copy protoxform artifacts from Bazel cache back to the source tree.
+# 1. Take protoxform artifacts from Bazel cache and pretty-print with protoprint.py.
+# 2. In the case where we are generating an Envoy internal shadow, it may be
+#    necessary to combine the current active proto, subject to hand editing, with
+#    shadow artifacts from the previous verion; this is done via
+#    merge_active_shadow.py.
+# 3. Diff or copy resulting artifacts to the source tree.
 
 import argparse
+from collections import defaultdict
 import functools
 import multiprocessing as mp
 import os
@@ -89,7 +95,7 @@ def GetDestinationPath(src):
       matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
 
-def GetAbsDestinationPath(dst_root, src):
+def GetAbsRelDestinationPath(dst_root, src):
   """Obtain absolute path from a proto file path combined with destination root.
 
   Creates the parent directory if necessary.
@@ -101,7 +107,7 @@ def GetAbsDestinationPath(dst_root, src):
   rel_dst_path = GetDestinationPath(src)
   dst = dst_root.joinpath(rel_dst_path)
   dst.parent.mkdir(0o755, parents=True, exist_ok=True)
-  return dst
+  return dst, rel_dst_path
 
 
 def ProtoPrint(src, dst):
@@ -119,14 +125,59 @@ def ProtoPrint(src, dst):
   ])
 
 
-def SyncProtoFile(src_dst_pair):
-  """Diff or in-place update a single proto file from protoxform.py Bazel cache artifacts."
+def MergeActiveShadow(active_src, shadow_src, dst):
+  """Merge active/shadow FileDescriptorProto to a destination file.
 
   Args:
-    src_dst_pair: source/destination path tuple.
+    active_src: source path for active FileDescriptorProto.
+    shadow_src: source path for active FileDescriptorProto.
+    dst: destination path for FileDescriptorProto.
   """
-  rel_dst_path = GetDestinationPath(src_dst_pair[0])
-  ProtoPrint(*src_dst_pair)
+  print('MergeActiveShadow %s' % dst)
+  subprocess.check_output([
+      'bazel-bin/tools/protoxform/merge_active_shadow',
+      active_src,
+      shadow_src,
+      dst,
+  ])
+
+
+def SyncProtoFile(dst_srcs):
+  """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
+
+  In the case where we are generating an Envoy internal shadow, it may be
+  necessary to combine the current active proto, subject to hand editing, with
+  shadow artifacts from the previous verion; this is done via
+  MergeActiveShadow().
+
+  Args:
+    dst_srcs: destination/sources path tuple.
+  """
+  dst, srcs = dst_srcs
+  assert (len(srcs) > 0)
+  # If we only have one candidate source for a destination, just pretty-print.
+  if len(srcs) == 1:
+    src = srcs[0]
+    ProtoPrint(src, dst)
+  else:
+    # We should only see an active and next major version candidate from
+    # previous version today.
+    assert (len(srcs) == 2)
+    shadow_srcs = [
+        s for s in srcs if s.endswith('.next_major_version_candidate.envoy_internal.proto')
+    ]
+    active_src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
+    # If we're building the shadow, we need to combine the next major version
+    # candidate shadow with the potentially hand edited active version.
+    if len(shadow_srcs) > 0:
+      assert (len(shadow_srcs) == 1)
+      with tempfile.NamedTemporaryFile() as f:
+        MergeActiveShadow(active_src, shadow_srcs[0], f.name)
+        ProtoPrint(f.name, dst)
+    else:
+      ProtoPrint(active_src, dst)
+    src = active_src
+  rel_dst_path = GetDestinationPath(src)
   return ['//%s:pkg' % str(rel_dst_path.parent)]
 
 
@@ -151,6 +202,10 @@ def GetImportDeps(proto_path):
         # Special case handling for UDPA annotations.
         if import_path.startswith('udpa/annotations/'):
           imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
+          continue
+        # Special case handling for UDPA core.
+        if import_path.startswith('udpa/core/v1/'):
+          imports.append('@com_github_cncf_udpa//udpa/core/v1:pkg')
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
@@ -275,21 +330,71 @@ def GitStatus(path):
   return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
 
 
+def GitModifiedFiles(path, suffix):
+  """Obtain a list of modified files since the last commit merged by GitHub.
+
+  Args:
+    path: path to examine.
+    suffix: path suffix to filter with.
+  Return:
+    A list of strings providing the paths of modified files in the repo.
+  """
+  try:
+    modified_files = subprocess.check_output(
+        ['tools/git/modified_since_last_github_commit.sh', 'api', 'proto']).decode().split()
+    return modified_files
+  except subprocess.CalledProcessError as e:
+    if e.returncode == 1:
+      return []
+    raise
+
+
+# If we're not forcing format, i.e. FORCE_PROTO_FORMAT=yes, in the environment,
+# then try and see if we can skip reformatting based on some simple path
+# heuristics. This saves a ton of time, since proto format and sync is not
+# running under Bazel and can't do change detection.
+def ShouldSync(path, api_proto_modified_files, py_tools_modified_files):
+  if os.getenv('FORCE_PROTO_FORMAT') == 'yes':
+    return True
+  # If tools change, safest thing to do is rebuild everything.
+  if len(py_tools_modified_files) > 0:
+    return True
+  # Check to see if the basename of the file has been modified since the last
+  # GitHub commit. If so, rebuild. This is safe and conservative across package
+  # migrations in v3 and v4alpha; we could achieve a lower rate of false
+  # positives if we examined package migration annotations, at the expense of
+  # complexity.
+  for p in api_proto_modified_files:
+    if os.path.basename(p) in path:
+      return True
+  # Otherwise we can safely skip syncing.
+  return False
+
+
 def Sync(api_root, mode, labels, shadow):
+  api_proto_modified_files = GitModifiedFiles('api', 'proto')
+  py_tools_modified_files = GitModifiedFiles('tools', 'py')
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
     paths = []
     for label in labels:
-      paths.append(utils.BazelBinPathForOutputArtifact(label, '.active.proto'))
+      paths.append(utils.BazelBinPathForOutputArtifact(label, '.active_or_frozen.proto'))
       paths.append(
           utils.BazelBinPathForOutputArtifact(
               label, '.next_major_version_candidate.envoy_internal.proto'
               if shadow else '.next_major_version_candidate.proto'))
-    src_dst_paths = [
-        (path, GetAbsDestinationPath(dst_dir, path)) for path in paths if os.stat(path).st_size > 0
-    ]
+    dst_src_paths = defaultdict(list)
+    for path in paths:
+      if os.stat(path).st_size > 0:
+        abs_dst_path, rel_dst_path = GetAbsRelDestinationPath(dst_dir, path)
+        if ShouldSync(path, api_proto_modified_files, py_tools_modified_files):
+          dst_src_paths[abs_dst_path].append(path)
+        else:
+          print('Skipping sync of %s' % path)
+          src_path = str(pathlib.Path(api_root, rel_dst_path))
+          shutil.copy(src_path, abs_dst_path)
     with mp.Pool() as p:
-      pkg_deps = p.map(SyncProtoFile, src_dst_paths)
+      pkg_deps = p.map(SyncProtoFile, dst_src_paths.items())
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")

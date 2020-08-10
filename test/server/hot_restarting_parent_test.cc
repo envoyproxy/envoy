@@ -4,7 +4,8 @@
 #include "server/hot_restarting_parent.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_manager.h"
 
 #include "gtest/gtest.h"
 

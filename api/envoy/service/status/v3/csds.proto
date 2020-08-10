@@ -16,7 +16,7 @@ option java_package = "io.envoyproxy.envoy.service.status.v3";
 option java_outer_classname = "CsdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Client Status Discovery Service (CSDS)]
 
@@ -64,7 +64,7 @@ message ClientStatusRequest {
 }
 
 // Detailed config (per xDS) with status.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message PerXdsConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.status.v2.PerXdsConfig";
@@ -79,6 +79,9 @@ message PerXdsConfig {
     admin.v3.RoutesConfigDump route_config = 4;
 
     admin.v3.ScopedRoutesConfigDump scoped_route_config = 5;
+
+    // [#not-implemented-hide:]
+    admin.v3.EndpointsConfigDump endpoint_config = 6;
   }
 }
 

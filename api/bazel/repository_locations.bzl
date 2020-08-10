@@ -4,8 +4,8 @@ BAZEL_SKYLIB_SHA256 = "1dde365491125a3db70731e25658dfdd3bc5dbdfd11b840b3e987ecf0
 OPENCENSUS_PROTO_GIT_SHA = "be218fb6bd674af7519b1850cdf8410d8cbd48e8"  # Dec 20, 2019
 OPENCENSUS_PROTO_SHA256 = "e3bbdc94375e86c0edfb2fc5851507e08a3f26ee725ffff7c5c0e73264bdfcde"
 
-PGV_GIT_SHA = "ab56c3dd1cf9b516b62c5087e1ec1471bd63631e"  # Mar 11, 2020
-PGV_SHA256 = "3be12077affd1ebf8787001f5fba545cc5f1b914964dab4e0cc77c43fba03b41"
+PGV_GIT_SHA = "278964a8052f96a2f514add0298098f63fb7f47f"  # June 9, 2020
+PGV_SHA256 = "e368733c9fb7f8489591ffaf269170d7658cc0cd1ee322b601512b769446d3c8"
 
 GOOGLEAPIS_GIT_SHA = "82944da21578a53b74e547774cf62ed31a05b841"  # Dec 2, 2019
 GOOGLEAPIS_SHA = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405"
@@ -13,8 +13,8 @@ GOOGLEAPIS_SHA = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d14
 PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
 
-UDPA_GIT_SHA = "bae28a880fdbbb687d78823435febdba5fee651a"  # Mar 24, 2020
-UDPA_SHA256 = "ce73a39be04e6ecdf8150580b9989bd6e16765887a96f3810b9105f18902fc6a"
+UDPA_GIT_SHA = "efcf912fb35470672231c7b7bef620f3d17f655a"  # June 29, 2020
+UDPA_SHA256 = "0f8179fbe3d27b89a4c34b2fbd55832f3b27b6810ea9b03b36d18da2629cc871"
 
 ZIPKINAPI_RELEASE = "0.2.2"  # Aug 23, 2019
 ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc816b"
@@ -33,7 +33,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/" + PGV_GIT_SHA + ".tar.gz"],
     ),
     com_google_googleapis = dict(
-        # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
+        # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
         sha256 = GOOGLEAPIS_SHA,
         strip_prefix = "googleapis-" + GOOGLEAPIS_GIT_SHA,
         urls = ["https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_GIT_SHA + ".tar.gz"],

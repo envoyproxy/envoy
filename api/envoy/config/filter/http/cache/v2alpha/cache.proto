@@ -17,7 +17,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.cache.v3alpha";
 option (udpa.annotations.file_status).work_in_progress = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: HTTP Cache Filter]
 // [#extension: envoy.filters.http.cache]
@@ -57,7 +57,7 @@ message CacheConfig {
   // contents of a response, as described by
   // https://httpwg.org/specs/rfc7234.html#caching.negotiated.responses.
   //
-  // During insertion, *allowed_vary_headers* acts as a whitelist: if a
+  // During insertion, *allowed_vary_headers* acts as a allowlist: if a
   // response's *vary* header mentions any header names that aren't in
   // *allowed_vary_headers*, that response will not be cached.
   //

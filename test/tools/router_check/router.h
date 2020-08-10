@@ -14,7 +14,7 @@
 #include "common/router/config_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"

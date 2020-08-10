@@ -3,20 +3,15 @@ services:
 
   front-envoy:
     build:
-      context: ../
-      dockerfile: front-proxy/Dockerfile-frontenvoy
-    volumes:
-      - ./front-envoy-jaeger.yaml:/etc/front-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-front.sh:/start-front.sh
-    entrypoint: /start-front.sh
+      context: .
+      dockerfile: Dockerfile-frontenvoy
     networks:
       - envoymesh
     expose:
-      - "80"
+      - "8000"
       - "8001"
     ports:
-      - "8000:80"
+      - "8000:8000"
       - "8001:8001"
     dns:
       - 8.8.8.8
@@ -28,9 +23,7 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-service.sh:/start-service.sh
-    entrypoint: /start-service.sh
+      - ./libjaegertracing.so.0.4.2:/usr/local/lib/libjaegertracing_plugin.so
     networks:
       envoymesh:
         aliases:
@@ -38,7 +31,7 @@ services:
     environment:
       - SERVICE_NAME=1
     expose:
-      - "80"
+      - "8000"
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -49,9 +42,7 @@ services:
       dockerfile: Dockerfile-service
     volumes:
       - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
-      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
-      - ./start-service.sh:/start-service.sh
-    entrypoint: /start-service.sh
+      - ./libjaegertracing.so.0.4.2:/usr/local/lib/libjaegertracing_plugin.so
     networks:
       envoymesh:
         aliases:
@@ -59,7 +50,7 @@ services:
     environment:
       - SERVICE_NAME=2
     expose:
-      - "80"
+      - "8000"
     dns:
       - 8.8.8.8
       - 8.8.4.4

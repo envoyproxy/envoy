@@ -3,7 +3,7 @@
 #include <sstream>
 #include <string>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
 
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
@@ -84,7 +84,7 @@ public:
   NiceMock<Event::MockTimer>* timer_;
   Stats::TestUtil::TestStore stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 
@@ -154,9 +154,8 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
-            EXPECT_EQ("application/msgpack",
-                      message->headers().ContentType()->value().getStringView());
+            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+            EXPECT_EQ("application/msgpack", message->headers().getContentTypeValue());
 
             return &request;
           }));

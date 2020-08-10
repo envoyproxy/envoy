@@ -1,11 +1,11 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -205,7 +205,7 @@ envoy_cc_test_library(
     hdrs = ["quic_test_output_impl.h"],
     tags = ["nofips"],
     deps = [
-        "//source/common/filesystem:filesystem_lib",
+        "//test/test_common:file_system_for_test_lib",
         "@com_googlesource_quiche//:quic_platform_base",
         "@com_googlesource_quiche//:quiche_common_platform",
     ],
@@ -222,11 +222,6 @@ envoy_cc_test_library(
     deps = [
         ":quic_platform_expect_bug_impl_lib",
     ],
-)
-
-envoy_cc_test_library(
-    name = "spdy_platform_test_impl_lib",
-    hdrs = ["spdy_test_impl.h"],
 )
 
 envoy_cc_test(

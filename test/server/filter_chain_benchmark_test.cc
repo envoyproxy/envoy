@@ -1,5 +1,4 @@
 #include <iostream>
-#include <unordered_map>
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -11,8 +10,9 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "test/benchmark/main.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -28,7 +28,7 @@ namespace Server {
 
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  std::shared_ptr<Network::DrainableFilterChain>
+  Network::DrainableFilterChainSharedPtr
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
@@ -89,8 +89,10 @@ public:
   // Dummy method
   void close() override {}
   bool isOpen() const override { return false; }
-  Network::Address::SocketType socketType() const override {
-    return Network::Address::SocketType::Stream;
+  Network::Socket::Type socketType() const override { return Network::Socket::Type::Stream; }
+  Network::Address::Type addressType() const override { return local_address_->type(); }
+  absl::optional<Network::Address::IpVersion> ipVersion() const override {
+    return Network::Address::IpVersion::v4;
   }
   void setLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
   void restoreLocalAddress(const Network::Address::InstanceConstSharedPtr&) override {}
@@ -102,6 +104,18 @@ public:
   void addOptions(const OptionsSharedPtr&) override {}
   const OptionsSharedPtr& options() const override { return options_; }
   void setRequestedServerName(absl::string_view) override {}
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override { return {0, 0}; }
+  Api::SysCallIntResult listen(int) override { return {0, 0}; }
+  Api::SysCallIntResult connect(const Network::Address::InstanceConstSharedPtr) override {
+    return {0, 0};
+  }
+  Api::SysCallIntResult setSocketOption(int, int, const void*, socklen_t) override {
+    return {0, 0};
+  }
+  Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) const override {
+    return {0, 0};
+  }
+  Api::SysCallIntResult setBlockingForTest(bool) override { return {0, 0}; }
 
 private:
   Network::IoHandlePtr io_handle_;
@@ -164,9 +178,9 @@ const char YamlSingleDstPortBottom[] = R"EOF(
             - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
 } // namespace
 
-class FilterChainBenchmarkFixture : public benchmark::Fixture {
+class FilterChainBenchmarkFixture : public ::benchmark::Fixture {
 public:
-  void SetUp(const ::benchmark::State& state) override {
+  void initialize(::benchmark::State& state) {
     int64_t input_size = state.range(0);
     std::vector<std::string> port_chains;
     port_chains.reserve(input_size);
@@ -179,6 +193,10 @@ public:
     TestUtility::loadFromYaml(listener_yaml_config_, listener_config_);
     filter_chains_ = listener_config_.filter_chains();
   }
+
+  Envoy::Thread::MutexBasicLockable lock_;
+  Logger::Context logging_state_{spdlog::level::warn, Logger::Logger::DEFAULT_LOG_FORMAT, lock_,
+                                 false};
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
   absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
@@ -189,6 +207,12 @@ public:
 // NOLINTNEXTLINE(readability-redundant-member-init)
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 (::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
+  initialize(state);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
@@ -200,6 +224,12 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
 (::benchmark::State& state) {
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 64) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
+  initialize(state);
   std::vector<MockConnectionSocket> sockets;
   sockets.reserve(state.range(0));
   for (int i = 0; i < state.range(0); i++) {
@@ -222,12 +252,14 @@ BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
     ->Ranges({
         // scale of the chains
         {1, 4096},
-    });
+    })
+    ->Unit(::benchmark::kMillisecond);
 BENCHMARK_REGISTER_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     ->Ranges({
         // scale of the chains
         {1, 4096},
-    });
+    })
+    ->Unit(::benchmark::kMillisecond);
 
 /*
 clang-format off

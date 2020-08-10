@@ -30,8 +30,8 @@ class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public Dispatcher,
                        public FatalErrorHandlerInterface {
 public:
-  DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system);
-  DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system);
+  DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                  Event::TimeSystem& time_system);
   ~DispatcherImpl() override;
 
@@ -41,8 +41,9 @@ public:
   event_base& base() { return base_scheduler_.base(); }
 
   // Event::Dispatcher
+  const std::string& name() override { return name_; }
   TimeSource& timeSource() override { return api_.timeSource(); }
-  void initializeStats(Stats::Scope& scope, const std::string& prefix) override;
+  void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override;
   void clearDeferredDeleteList() override;
   Network::ConnectionPtr createServerConnection(Network::ConnectionSocketPtr&& socket,
                                                 Network::TransportSocketPtr&& transport_socket,
@@ -63,6 +64,7 @@ public:
   Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
                                             Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
+  Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
   SignalEventPtr listenForSignal(int signal_num, SignalCb cb) override;
@@ -78,18 +80,19 @@ public:
   void updateApproximateMonotonicTime() override;
 
   // FatalErrorInterface
-  void onFatalError() const override {
+  void onFatalError(std::ostream& os) const override {
     // Dump the state of the tracked object if it is in the current thread. This generally results
     // in dumping the active state only for the thread which caused the fatal error.
     if (isThreadSafe()) {
       if (current_object_) {
-        current_object_->dumpState(std::cerr);
+        current_object_->dumpState(os);
       }
     }
   }
 
 private:
   TimerPtr createTimerInternal(TimerCb cb);
+  void updateApproximateMonotonicTimeInternal();
   void runPostCallbacks();
 
   // Validate that an operation is thread safe, i.e. it's invoked on the same thread that the
@@ -99,15 +102,16 @@ private:
     return run_tid_.isEmpty() || run_tid_ == api_.threadFactory().currentThreadId();
   }
 
+  const std::string name_;
   Api::Api& api_;
   std::string stats_prefix_;
-  std::unique_ptr<DispatcherStats> stats_;
+  DispatcherStatsPtr stats_;
   Thread::ThreadId run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
-  TimerPtr deferred_delete_timer_;
-  TimerPtr post_timer_;
+  SchedulableCallbackPtr deferred_delete_cb_;
+  SchedulableCallbackPtr post_cb_;
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;

@@ -13,6 +13,7 @@
 #include "common/common/macros.h"
 #include "common/common/non_copyable.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 #include "fmt/ostream.h"
@@ -34,6 +35,9 @@ namespace Logger {
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(decompression)                                                                          \
   FUNCTION(dubbo)                                                                                  \
+  FUNCTION(envoy_bug)                                                                              \
+  FUNCTION(ext_authz)                                                                              \
+  FUNCTION(rocketmq)                                                                               \
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
@@ -101,10 +105,21 @@ public:
   virtual void flush() PURE;
 
 protected:
-  SinkDelegate* previous_delegate() { return previous_delegate_; }
+  // Swap the current log sink delegate for this one. This should be called by the derived class
+  // constructor immediately before returning. This is required to match restoreDelegate(),
+  // otherwise it's possible for the previous delegate to get set in the base class constructor,
+  // the derived class constructor throws, and cleanup becomes broken.
+  void setDelegate();
+
+  // Swap the current log sink (this) for the previous one. This should be called by the derived
+  // class destructor in the body. This is critical as otherwise it's possible for a log message
+  // to get routed to a partially destructed sink.
+  void restoreDelegate();
+
+  SinkDelegate* previousDelegate() { return previous_delegate_; }
 
 private:
-  SinkDelegate* previous_delegate_;
+  SinkDelegate* previous_delegate_{nullptr};
   DelegatingLogSinkSharedPtr log_sink_;
 };
 
@@ -114,6 +129,7 @@ private:
 class StderrSinkDelegate : public SinkDelegate {
 public:
   explicit StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink);
+  ~StderrSinkDelegate() override;
 
   // SinkDelegate
   void log(absl::string_view msg) override;
@@ -122,7 +138,6 @@ public:
   bool hasLock() const { return lock_ != nullptr; }
   void setLock(Thread::BasicLockable& lock) { lock_ = &lock; }
   void clearLock() { lock_ = nullptr; }
-  Thread::BasicLockable* lock() { return lock_; }
 
 private:
   Thread::BasicLockable* lock_{};
@@ -139,12 +154,15 @@ public:
 
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
-  void flush() override { sink_->flush(); }
+  void flush() override {
+    absl::ReaderMutexLock lock(&sink_mutex_);
+    sink_->flush();
+  }
   void set_pattern(const std::string& pattern) override {
     set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
   }
   void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override;
-  void set_should_escape(bool should_escape) { should_escape_ = should_escape; }
+  void setShouldEscape(bool should_escape) { should_escape_ = should_escape; }
 
   /**
    * @return bool whether a lock has been established.
@@ -178,15 +196,24 @@ private:
 
   DelegatingLogSink() = default;
 
-  void setDelegate(SinkDelegate* sink) { sink_ = sink; }
-  SinkDelegate* delegate() { return sink_; }
+  void setDelegate(SinkDelegate* sink) {
+    absl::WriterMutexLock lock(&sink_mutex_);
+    sink_ = sink;
+  }
+  SinkDelegate* delegate() {
+    absl::ReaderMutexLock lock(&sink_mutex_);
+    return sink_;
+  }
 
-  SinkDelegate* sink_{nullptr};
+  SinkDelegate* sink_ ABSL_GUARDED_BY(sink_mutex_){nullptr};
+  absl::Mutex sink_mutex_;
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
   std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);
-  absl::Mutex format_mutex_; // direct absl reference to break build cycle.
+  absl::Mutex format_mutex_;
   bool should_escape_{false};
 };
+
+enum class LoggerMode { Envoy, Fancy };
 
 /**
  * Defines a scope for the logging system with the specified lock and log level.
@@ -205,14 +232,20 @@ public:
           Thread::BasicLockable& lock, bool should_escape);
   ~Context();
 
+  static std::string getFancyLogFormat();
+  static spdlog::level::level_enum getFancyDefaultLevel();
+
 private:
-  void activate();
+  void activate(LoggerMode mode = LoggerMode::Envoy);
 
   const spdlog::level::level_enum log_level_;
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
   Context* const save_context_;
+
+  std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+  spdlog::level::level_enum fancy_default_level_ = spdlog::level::info;
 };
 
 /**
@@ -282,19 +315,15 @@ protected:
 
 } // namespace Logger
 
-// Convert the line macro to a string literal for concatenation in log macros.
-#define DO_STRINGIZE(x) STRINGIZE(x)
-#define STRINGIZE(x) #x
-#define LINE_STRING DO_STRINGIZE(__LINE__)
-#define LOG_PREFIX "[" __FILE__ ":" LINE_STRING "] "
-
 /**
  * Base logging macros. It is expected that users will use the convenience macros below rather than
  * invoke these directly.
  */
 
-#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)                                                        \
-  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level())
+#define ENVOY_SPDLOG_LEVEL(LEVEL)                                                                  \
+  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL))
+
+#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= LOGGER.level())
 
 // Compare levels before invoking logger. This is an optimization to avoid
 // executing expressions computing log contents when they would be suppressed.
@@ -302,7 +331,8 @@ protected:
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
-      LOGGER.LEVEL(LOG_PREFIX __VA_ARGS__);                                                        \
+      LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),    \
+                 __VA_ARGS__);                                                                     \
     }                                                                                              \
   } while (0)
 

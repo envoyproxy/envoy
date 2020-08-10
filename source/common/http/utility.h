@@ -13,6 +13,8 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
+#include "common/http/exception.h"
+#include "common/http/status.h"
 #include "common/json/json_loader.h"
 
 #include "absl/strings/string_view.h"
@@ -20,6 +22,31 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
+namespace Http {
+namespace Utility {
+
+// This is a wrapper around dispatch calls that may throw an exception or may return an error status
+// while exception removal is in migration.
+// TODO(#10878): Remove this.
+Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
+                               Buffer::Instance& data);
+
+/**
+ * Well-known HTTP ALPN values.
+ */
+class AlpnNameValues {
+public:
+  const std::string Http10 = "http/1.0";
+  const std::string Http11 = "http/1.1";
+  const std::string Http2 = "h2";
+  const std::string Http2c = "h2c";
+};
+
+using AlpnNames = ConstSingleton<AlpnNameValues>;
+
+} // namespace Utility
+} // namespace Http
+
 namespace Http2 {
 namespace Utility {
 
@@ -89,38 +116,28 @@ struct OptionsLimits {
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options);
 
+envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
 
 namespace Http {
 namespace Utility {
 
-/**
- * Given a fully qualified URL, splits the string_view provided into scheme,
- * host and path with query parameters components.
- */
-class Url {
-public:
-  bool initialize(absl::string_view absolute_url);
-  absl::string_view scheme() { return scheme_; }
-  absl::string_view host_and_port() { return host_and_port_; }
-  absl::string_view path_and_query_params() { return path_and_query_params_; }
-
-private:
-  absl::string_view scheme_;
-  absl::string_view host_and_port_;
-  absl::string_view path_and_query_params_;
-};
-
 class PercentEncoding {
 public:
   /**
-   * Encodes string view to its percent encoded representation.
+   * Encodes string view to its percent encoded representation. Non-visible ASCII is always escaped,
+   * in addition to a given list of reserved chars.
+   *
    * @param value supplies string to be encoded.
-   * @return std::string percent-encoded string based on
-   * https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
+   * @param reserved_chars list of reserved chars to escape. By default the escaped chars in
+   *        https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses are used.
+   * @return std::string percent-encoded string.
    */
-  static std::string encode(absl::string_view value);
+  static std::string encode(absl::string_view value, absl::string_view reserved_chars = "%");
 
   /**
    * Decodes string view from its percent encoded representation.
@@ -131,7 +148,8 @@ public:
 
 private:
   // Encodes string view to its percent encoded representation, with start index.
-  static std::string encode(absl::string_view value, const size_t index);
+  static std::string encode(absl::string_view value, const size_t index,
+                            const absl::flat_hash_set<char>& reserved_char_set);
 };
 
 /**
@@ -163,6 +181,13 @@ std::string createSslRedirectPath(const RequestHeaderMap& headers);
 QueryParams parseQueryString(absl::string_view url);
 
 /**
+ * Parse a URL into query parameters.
+ * @param url supplies the url to parse.
+ * @return QueryParams the parsed and percent-decoded parameters, if any.
+ */
+QueryParams parseAndDecodeQueryString(absl::string_view url);
+
+/**
  * Parse a a request body into query parameters.
  * @param body supplies the body to parse.
  * @return QueryParams the parsed parameters, if any.
@@ -173,9 +198,11 @@ QueryParams parseFromBody(absl::string_view body);
  * Parse query parameters from a URL or body.
  * @param data supplies the data to parse.
  * @param start supplies the offset within the data.
+ * @param decode_params supplies the flag whether to percent-decode the parsed parameters (both name
+ *        and value). Set to false to keep the parameters encoded.
  * @return QueryParams the parsed parameters, if any.
  */
-QueryParams parseParameters(absl::string_view data, size_t start);
+QueryParams parseParameters(absl::string_view data, size_t start, bool decode_params);
 
 /**
  * Finds the start of the query string in a path
@@ -238,47 +265,56 @@ bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * @return Http1Settings An Http1Settings populated from the
- * envoy::api::v2::core::Http1ProtocolOptions config.
+ * envoy::config::core::v3::Http1ProtocolOptions config.
  */
 Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
+struct EncodeFunctions {
+  // Function to rewrite locally generated response.
+  std::function<void(ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                     absl::string_view& content_type)>
+      rewrite_;
+  // Function to encode response headers.
+  std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
+  // Function to encode the response body.
+  std::function<void(Buffer::Instance& data, bool end_stream)> encode_data_;
+};
+
+struct LocalReplyData {
+  // Tells if this is a response to a gRPC request.
+  bool is_grpc_;
+  // Supplies the HTTP response code.
+  Code response_code_;
+  // Supplies the optional body text which is returned.
+  absl::string_view body_text_;
+  // gRPC status code to override the httpToGrpcStatus mapping with.
+  const absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
+  // Tells if this is a response to a HEAD request.
+  bool is_head_request_ = false;
+};
+
 /**
  * Create a locally generated response using filter callbacks.
- * @param is_grpc tells if this is a response to a gRPC request.
- * @param callbacks supplies the filter callbacks to use.
  * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
- *                 responsibility of the caller to ensure that this is set to false if onDestroy()
- *                 is invoked in the context of sendLocalReply().
- * @param response_code supplies the HTTP response code.
- * @param body_text supplies the optional body text which is sent using the text/plain content
- *                  type.
- * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
- * @param is_head_request tells if this is a response to a HEAD request
+ *        responsibility of the caller to ensure that this is set to false if onDestroy()
+ *        is invoked in the context of sendLocalReply().
+ * @param callbacks supplies the filter callbacks to use.
+ * @param local_reply_data struct which keeps data related to generate reply.
  */
-void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, absl::string_view body_text,
-                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    bool is_head_request);
+void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
+                    const LocalReplyData& local_reply_data);
 
 /**
  * Create a locally generated response using the provided lambdas.
- * @param is_grpc tells if this is a response to a gRPC request.
- * @param encode_headers supplies the function to encode response headers.
- * @param encode_data supplies the function to encode the response body.
+
  * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
  *                 responsibility of the caller to ensure that this is set to false if onDestroy()
  *                 is invoked in the context of sendLocalReply().
- * @param response_code supplies the HTTP response code.
- * @param body_text supplies the optional body text which is sent using the text/plain content
- *                  type.
- * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+ * @param encode_functions supplies the functions to encode response body and headers.
+ * @param local_reply_data struct which keeps data related to generate reply.
  */
-void sendLocalReply(
-    bool is_grpc,
-    std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers,
-    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, absl::string_view body_text,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request = false);
+void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
+                    const LocalReplyData& local_reply_data);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.

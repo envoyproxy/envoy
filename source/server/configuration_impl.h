@@ -6,11 +6,10 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <utility>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
@@ -33,7 +32,7 @@ namespace Configuration {
  */
 class StatsSinkFactory : public Config::TypedFactory {
 public:
-  virtual ~StatsSinkFactory() = default;
+  ~StatsSinkFactory() override = default;
 
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
@@ -42,7 +41,8 @@ public:
    * @param config supplies the custom proto configuration for the Stats::Sink
    * @param server supplies the server instance
    */
-  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
+  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
+                                         Server::Configuration::ServerFactoryContext& server) PURE;
 
   std::string category() const override { return "envoy.stats_sinks"; }
 };
@@ -110,6 +110,8 @@ public:
     return watchdog_multikill_timeout_;
   }
 
+  double wdMultiKillThreshold() const override { return watchdog_multikill_threshold_; }
+
 private:
   /**
    * Initialize tracers and corresponding sinks.
@@ -126,6 +128,7 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
+  double watchdog_multikill_threshold_;
 };
 
 /**

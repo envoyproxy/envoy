@@ -1,9 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/filter.h"
-#include "envoy/registry/registry.h"
 
 #include "test/config/utility.h"
 #include "test/integration/integration.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -73,15 +73,11 @@ public:
   std::string name() const override { return "envoy.upstream.polite"; }
 };
 
-// perform static registration
-REGISTER_FACTORY(PoliteFilterConfigFactory,
-                 Server::Configuration::NamedUpstreamNetworkFilterConfigFactory);
-
 class ClusterFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public BaseIntegrationTest {
 public:
   ClusterFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()), registration_(factory_) {}
 
   void initialize() override {
     enable_half_close_ = true;
@@ -95,6 +91,10 @@ public:
     });
     BaseIntegrationTest::initialize();
   }
+
+  PoliteFilterConfigFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>
+      registration_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterFilterIntegrationTest,
@@ -109,19 +109,19 @@ TEST_P(ClusterFilterIntegrationTest, TestClusterFilter) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   std::string observed_data;
-  tcp_client->write("test");
+  ASSERT_TRUE(tcp_client->write("test"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(11, &observed_data));
   EXPECT_EQ("please test", observed_data);
 
   observed_data.clear();
-  tcp_client->write(" everything");
+  ASSERT_TRUE(tcp_client->write(" everything"));
   ASSERT_TRUE(fake_upstream_connection->waitForData(22, &observed_data));
   EXPECT_EQ("please test everything", observed_data);
 
   ASSERT_TRUE(fake_upstream_connection->write("yes"));
   tcp_client->waitForData("surely yes");
 
-  tcp_client->write("", true);
+  ASSERT_TRUE(tcp_client->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->write("", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));

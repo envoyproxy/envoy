@@ -7,13 +7,14 @@
 
 #include "test/common/buffer/utility.h"
 #include "test/common/stream_info/test_util.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Property;
 using testing::Return;
 
 namespace Envoy {
@@ -34,6 +35,10 @@ protected:
     cb(filter_callback);
 
     ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault(testing::ReturnRef(stream_info_));
+
+    ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
+        .WillByDefault(testing::ReturnRef(stats_store_));
+
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -59,9 +64,10 @@ protected:
 
   envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  std::shared_ptr<Http::StreamFilter> filter_;
+  Http::StreamFilterSharedPtr filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  TestStreamInfo stream_info_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
 };
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
@@ -352,11 +358,18 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                     .counterFromString(
                         "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
                     .value());
-  EXPECT_EQ(0U, decoder_callbacks_.clusterInfo()
-                    ->statsScope()
-                    .counterFromString(
-                        "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
-                    .value());
+
+  // Check that there is response_message_count stat yet. We use
+  // stats_store_.findCounterByString rather than looking on
+  // clusterInfo()->statsScope() because findCounterByString is not an API on
+  // Stats::Store, and there is no prefix so the names will match. We verify
+  // that by double-checking we can find the request_message_count using the
+  // same API.
+  EXPECT_FALSE(stats_store_.findCounterByString(
+      "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count"));
+  EXPECT_TRUE(stats_store_.findCounterByString(
+      "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count"));
+
   const auto& data = stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>(
       HttpFilterNames::get().GrpcStats);
   EXPECT_EQ(2U, data.request_message_count);
@@ -402,6 +415,59 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
           data.serializeAsProto().get());
   EXPECT_EQ(2U, filter_object.request_message_count());
   EXPECT_EQ(3U, filter_object.response_message_count());
+}
+
+TEST_F(GrpcStatsFilterConfigTest, UpstreamStats) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_emit_filter_state(true);
+  config_.set_enable_upstream_stats(true);
+  initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc+proto"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  ON_CALL(stream_info_, lastUpstreamRxByteReceived())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
+  ON_CALL(stream_info_, lastUpstreamTxByteSent())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
+
+  EXPECT_CALL(stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "grpc.lyft.users.BadCompanions.GetBadCompanions.upstream_rq_time"),
+                  10ul));
+
+  doRequestResponse(request_headers);
+}
+
+TEST_F(GrpcStatsFilterConfigTest, UpstreamStatsWithTrailersOnly) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_emit_filter_state(true);
+  config_.set_enable_upstream_stats(true);
+  initialize();
+
+  ON_CALL(stream_info_, lastUpstreamRxByteReceived())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
+  ON_CALL(stream_info_, lastUpstreamTxByteSent())
+      .WillByDefault(testing::Return(
+          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
+
+  EXPECT_CALL(stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "grpc.lyft.users.BadCompanions.GetBadCompanions.upstream_rq_time"),
+                  10ul));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc+proto"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 }
 
 } // namespace

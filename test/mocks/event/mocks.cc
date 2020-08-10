@@ -5,6 +5,7 @@
 
 using testing::_;
 using testing::Assign;
+using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -15,7 +16,9 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Event {
 
-MockDispatcher::MockDispatcher() {
+MockDispatcher::MockDispatcher() : MockDispatcher("test_thread") {}
+
+MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   ON_CALL(*this, initializeStats(_, _)).WillByDefault(Return());
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();
@@ -47,6 +50,19 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
 }
 
 MockTimer::~MockTimer() = default;
+
+MockSchedulableCallback::~MockSchedulableCallback() = default;
+
+MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher)
+    : dispatcher_(dispatcher) {
+  EXPECT_CALL(*dispatcher, createSchedulableCallback_(_))
+      .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
+      .RetiresOnSaturation();
+  ON_CALL(*this, scheduleCallbackCurrentIteration()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, scheduleCallbackNextIteration()).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, cancel()).WillByDefault(Assign(&enabled_, false));
+  ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
+}
 
 MockSignalEvent::MockSignalEvent(MockDispatcher* dispatcher) {
   EXPECT_CALL(*dispatcher, listenForSignal_(_, _))

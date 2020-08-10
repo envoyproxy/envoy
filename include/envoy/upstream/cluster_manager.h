@@ -4,10 +4,10 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -30,6 +30,9 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -73,9 +76,22 @@ class ClusterManagerFactory;
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
+ * Cluster manager is initialized in two phases. In the first phase which begins at the construction
+ * all primary clusters (i.e. with endpoint assignments provisioned statically in bootstrap,
+ * discovered through DNS or file based CDS) are initialized. This phase may complete synchronously
+ * with cluster manager construction iff all clusters are STATIC and without health checks
+ * configured. At the completion of the first phase cluster manager invokes callback set through the
+ * `setPrimaryClustersInitializedCb` method.
+ * After the first phase has completed the server instance initializes services (i.e. RTDS) needed
+ * to successfully deploy the rest of dynamic configuration.
+ * In the second phase all secondary clusters (with endpoint assignments provisioned by xDS servers)
+ * are initialized and then the rest of the configuration provisioned through xDS.
  */
 class ClusterManager {
 public:
+  using PrimaryClustersReadyCallback = std::function<void()>;
+  using InitializationCompleteCallback = std::function<void()>;
+
   virtual ~ClusterManager() = default;
 
   /**
@@ -92,17 +108,39 @@ public:
                                   const std::string& version_info) PURE;
 
   /**
+   * Set a callback that will be invoked when all primary clusters have been initialized.
+   */
+  virtual void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) PURE;
+
+  /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
    */
-  virtual void setInitializedCb(std::function<void()> callback) PURE;
+  virtual void setInitializedCb(InitializationCompleteCallback callback) PURE;
 
-  using ClusterInfoMap = std::unordered_map<std::string, std::reference_wrapper<const Cluster>>;
+  /**
+   * Start initialization of secondary clusters and then dynamically configured clusters.
+   * The "initialized callback" set in the method above is invoked when secondary and
+   * dynamically provisioned clusters have finished initializing.
+   */
+  virtual void
+  initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
+
+  using ClusterInfoMap = absl::node_hash_map<std::string, std::reference_wrapper<const Cluster>>;
 
   /**
    * @return ClusterInfoMap all current clusters. These are the primary (not thread local)
    * clusters which should only be used for stats/admin.
    */
   virtual ClusterInfoMap clusters() PURE;
+
+  using ClusterSet = absl::flat_hash_set<std::string>;
+
+  /**
+   * @return const ClusterSet& providing the cluster names that are eligible as
+   *         xDS API config sources. These must be static (i.e. in the
+   *         bootstrap) and non-EDS.
+   */
+  virtual const ClusterSet& primaryClusters() PURE;
 
   /**
    * @return ThreadLocalCluster* the thread local cluster with the given name or nullptr if it
@@ -123,11 +161,13 @@ public:
    *
    * Can return nullptr if there is no host available in the cluster or if the cluster does not
    * exist.
+   *
+   * To resolve the protocol to use, we provide the downstream protocol (if one exists).
    */
-  virtual Http::ConnectionPool::Instance* httpConnPoolForCluster(const std::string& cluster,
-                                                                 ResourcePriority priority,
-                                                                 Http::Protocol protocol,
-                                                                 LoadBalancerContext* context) PURE;
+  virtual Http::ConnectionPool::Instance*
+  httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
+                         absl::optional<Http::Protocol> downstream_protocol,
+                         LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that
@@ -174,8 +214,8 @@ public:
   virtual void shutdown() PURE;
 
   /**
-   * @return const envoy::api::v2::core::BindConfig& cluster manager wide bind configuration for new
-   *         upstream connections.
+   * @return const envoy::config::core::v3::BindConfig& cluster manager wide bind configuration for
+   * new upstream connections.
    */
   virtual const envoy::config::core::v3::BindConfig& bindConfig() const PURE;
 
@@ -330,7 +370,7 @@ public:
     ClusterManager& cm_;
     const LocalInfo::LocalInfo& local_info_;
     Event::Dispatcher& dispatcher_;
-    Runtime::RandomGenerator& random_;
+    Random::RandomGenerator& random_;
     Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
     ProtobufMessage::ValidationVisitor& validation_visitor_;

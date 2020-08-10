@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -9,6 +7,8 @@ load(
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -40,6 +40,7 @@ envoy_extension_cc_test(
         "mysql_filter_test.cc",
     ],
     extension_name = "envoy.filters.network.mysql_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         ":mysql_test_utils_lib",
         "//source/extensions/filters/network/mysql_proxy:config",
@@ -56,6 +57,7 @@ envoy_extension_cc_test(
         "mysql_test_config.yaml",
     ],
     extension_name = "envoy.filters.network.mysql_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         ":mysql_test_utils_lib",
         "//source/common/tcp_proxy",

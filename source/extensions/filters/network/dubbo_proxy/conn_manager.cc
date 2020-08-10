@@ -18,7 +18,7 @@ namespace DubboProxy {
 
 constexpr uint32_t BufferLimit = UINT32_MAX;
 
-ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+ConnectionManager::ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                                      TimeSource& time_system)
     : config_(config), time_system_(time_system), stats_(config_.stats()),
       random_generator_(random_generator), protocol_(config.createProtocol()),
@@ -38,7 +38,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
     if (stopped_) {
       ASSERT(!active_message_list_.empty());
       auto metadata = (*active_message_list_.begin())->metadata();
-      if (metadata && metadata->message_type() == MessageType::Oneway) {
+      if (metadata && metadata->messageType() == MessageType::Oneway) {
         ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
         half_closed_ = true;
         return Network::FilterStatus::StopIteration;
@@ -83,7 +83,7 @@ StreamHandler& ConnectionManager::newStream() {
 
   ActiveMessagePtr new_message(std::make_unique<ActiveMessage>(*this));
   new_message->createFilterChain();
-  new_message->moveIntoList(std::move(new_message), active_message_list_);
+  LinkedList::moveIntoList(std::move(new_message), active_message_list_);
   return **active_message_list_.begin();
 }
 

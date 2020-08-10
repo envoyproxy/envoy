@@ -3,7 +3,8 @@
 namespace Envoy {
 namespace {
 
-void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeaderMapImpl& headers) {
+void HeaderToInt(const char header_name[], int32_t& return_int,
+                 Http::TestResponseHeaderMapImpl& headers) {
   const std::string header_value(headers.get_(header_name));
   if (!header_value.empty()) {
     uint64_t parsed_value;
@@ -41,7 +42,7 @@ void AutonomousStream::setEndStream(bool end_stream) {
 
 // Check all the special headers and send a customized response based on them.
 void AutonomousStream::sendResponse() {
-  Http::TestHeaderMapImpl headers(*headers_);
+  Http::TestResponseHeaderMapImpl headers(*headers_);
   upstream_.setLastRequestHeaders(*headers_);
 
   int32_t request_body_length = -1;
@@ -59,14 +60,16 @@ void AutonomousStream::sendResponse() {
   HeaderToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
 
   encodeHeaders(upstream_.responseHeaders(), false);
-  encodeData(response_body_length, true);
+  encodeData(response_body_length, false);
+  encodeTrailers(upstream_.responseTrailers());
 }
 
-AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shared_connection,
-                                                   Stats::Store& store, Type type,
-                                                   AutonomousUpstream& upstream)
-    : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem(),
-                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT),
+AutonomousHttpConnection::AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,
+                                                   SharedConnectionWrapper& shared_connection,
+                                                   Type type, AutonomousUpstream& upstream)
+    : FakeHttpConnection(autonomous_upstream, shared_connection, type, upstream.timeSystem(),
+                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
+                         envoy::config::core::v3::HttpProtocolOptions::ALLOW),
       upstream_(upstream) {}
 
 Http::RequestDecoder& AutonomousHttpConnection::newStream(Http::ResponseEncoder& response_encoder,
@@ -87,7 +90,7 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
                                                   const std::vector<Network::FilterFactoryCb>&) {
   shared_connections_.emplace_back(new SharedConnectionWrapper(connection, true));
   AutonomousHttpConnectionPtr http_connection(
-      new AutonomousHttpConnection(*shared_connections_.back(), stats_store_, http_type_, *this));
+      new AutonomousHttpConnection(*this, *shared_connections_.back(), http_type_, *this));
   testing::AssertionResult result = http_connection->initialize();
   RELEASE_ASSERT(result, result.message());
   http_connections_.push_back(std::move(http_connection));
@@ -109,15 +112,27 @@ std::unique_ptr<Http::TestRequestHeaderMapImpl> AutonomousUpstream::lastRequestH
   return std::move(last_request_headers_);
 }
 
+void AutonomousUpstream::setResponseTrailers(
+    std::unique_ptr<Http::TestResponseTrailerMapImpl>&& response_trailers) {
+  Thread::LockGuard lock(headers_lock_);
+  response_trailers_ = std::move(response_trailers);
+}
+
 void AutonomousUpstream::setResponseHeaders(
     std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers) {
   Thread::LockGuard lock(headers_lock_);
   response_headers_ = std::move(response_headers);
 }
 
-Http::TestHeaderMapImpl AutonomousUpstream::responseHeaders() {
+Http::TestResponseTrailerMapImpl AutonomousUpstream::responseTrailers() {
   Thread::LockGuard lock(headers_lock_);
-  Http::TestHeaderMapImpl return_headers = *response_headers_;
+  Http::TestResponseTrailerMapImpl return_trailers = *response_trailers_;
+  return return_trailers;
+}
+
+Http::TestResponseHeaderMapImpl AutonomousUpstream::responseHeaders() {
+  Thread::LockGuard lock(headers_lock_);
+  Http::TestResponseHeaderMapImpl return_headers = *response_headers_;
   return return_headers;
 }
 

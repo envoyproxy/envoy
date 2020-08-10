@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "test/integration/integration.h"
@@ -16,7 +18,7 @@ public:
     listener_filters:
       name: udp_proxy
       typed_config:
-        '@type': type.googleapis.com/envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
         stat_prefix: foo
         cluster: cluster_0
       )EOF");
@@ -42,14 +44,6 @@ public:
           });
     }
     BaseIntegrationTest::initialize();
-  }
-
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address) {
@@ -90,6 +84,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Make sure that we gracefully fail if the user does not configure reuse port and concurrency is
+// > 1.
+TEST_P(UdpProxyIntegrationTest, NoReusePort) {
+  concurrency_ = 2;
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+  setup(1);
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
 // Basic loopback test.
 TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   setup(1);
@@ -107,20 +111,20 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnNonLocalAddress) {
   Network::Address::InstanceConstSharedPtr listener_address;
   if (version_ == Network::Address::IpVersion::v4) {
     // Kernel regards any 127.x.x.x as local address.
-    listener_address.reset(new Network::Address::Ipv4Instance(
+    listener_address = std::make_shared<Network::Address::Ipv4Instance>(
 #ifndef __APPLE__
         "127.0.0.3",
 #else
         "127.0.0.1",
 #endif
-        port));
+        port);
   } else {
     // IPv6 doesn't allow any non-local source address for sendmsg. And the only
     // local address guaranteed in tests in loopback. Unfortunately, even if it's not
     // specified, kernel will pick this address as source address. So this test
     // only checks if IoSocketHandle::sendmsg() sets up CMSG_DATA correctly,
     // i.e. cmsg_len is big enough when that code path is executed.
-    listener_address.reset(new Network::Address::Ipv6Instance("::1", port));
+    listener_address = std::make_shared<Network::Address::Ipv6Instance>("::1", port);
   }
 
   requestResponseWithListenerAddress(*listener_address);

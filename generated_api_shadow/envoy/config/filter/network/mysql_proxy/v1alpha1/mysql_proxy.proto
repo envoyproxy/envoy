@@ -11,7 +11,7 @@ option java_outer_classname = "MysqlProxyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.mysql_proxy.v3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: MySQL proxy]
 // MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.

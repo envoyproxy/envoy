@@ -110,12 +110,25 @@ public:
 
   void setTags(const TagVector& tags) {
     tag_pool_.clear();
+    tag_names_and_values_.clear();
     tags_ = tags;
     for (const Tag& tag : tags) {
       tag_names_and_values_.push_back(tag_pool_.add(tag.name_));
       tag_names_and_values_.push_back(tag_pool_.add(tag.value_));
     }
   }
+
+  void setTags(const Stats::StatNameTagVector& tags) {
+    tag_pool_.clear();
+    tag_names_and_values_.clear();
+    tags_.clear();
+    for (const StatNameTag& tag : tags) {
+      tag_names_and_values_.push_back(tag.first);
+      tag_names_and_values_.push_back(tag.second);
+      tags_.push_back(Tag{symbol_table_->toString(tag.first), symbol_table_->toString(tag.second)});
+    }
+  }
+
   void addTag(const Tag& tag) {
     tags_.emplace_back(tag);
     tag_names_and_values_.push_back(tag_pool_.add(tag.name_));
@@ -124,7 +137,7 @@ public:
 
 private:
   TagVector tags_;
-  std::vector<StatName> tag_names_and_values_;
+  StatNameVec tag_names_and_values_;
   std::string tag_extracted_name_;
   StatNamePool tag_pool_;
   std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
@@ -174,6 +187,7 @@ public:
   MOCK_METHOD(void, dec, ());
   MOCK_METHOD(void, inc, ());
   MOCK_METHOD(void, set, (uint64_t value));
+  MOCK_METHOD(void, setParentValue, (uint64_t parent_value));
   MOCK_METHOD(void, sub, (uint64_t amount));
   MOCK_METHOD(void, mergeImportMode, (ImportMode));
   MOCK_METHOD(bool, used, (), (const));
@@ -245,6 +259,19 @@ private:
   RefcountHelper refcount_helper_;
 };
 
+class MockTextReadout : public MockMetric<TextReadout> {
+public:
+  MockTextReadout();
+  ~MockTextReadout() override;
+
+  MOCK_METHOD1(set, void(absl::string_view value));
+  MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(value, std::string());
+
+  bool used_;
+  std::string value_;
+};
+
 class MockMetricSnapshot : public MetricSnapshot {
 public:
   MockMetricSnapshot();
@@ -253,10 +280,12 @@ public:
   MOCK_METHOD(const std::vector<CounterSnapshot>&, counters, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, ());
   MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
+  MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;
   std::vector<std::reference_wrapper<const ParentHistogram>> histograms_;
+  std::vector<std::reference_wrapper<const TextReadout>> text_readouts_;
 };
 
 class MockSink : public Sink {
@@ -289,10 +318,14 @@ public:
   MOCK_METHOD(std::vector<GaugeSharedPtr>, gauges, (), (const));
   MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
   MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
+  MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
+  MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
+  MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
   MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
+  MOCK_METHOD(TextReadoutOptConstRef, findTextReadout, (StatName), (const));
 
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef) override {
@@ -307,6 +340,11 @@ public:
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
                                            Histogram::Unit unit) override {
     return histogram(symbol_table_->toString(name), unit);
+  }
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef) override {
+    // We always just respond with the mocked counter, so the tags don't matter.
+    return textReadout(symbol_table_->toString(name));
   }
 
   TestSymbolTable symbol_table_;

@@ -11,14 +11,14 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.cluster.redis";
 option java_outer_classname = "RedisClusterProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Redis Cluster Configuration]
 // This cluster adds support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_, as part
 // of :ref:`Envoy's support for Redis Cluster <arch_overview_redis>`.
 //
 // Redis Cluster is an extension of Redis which supports sharding and high availability (where a
-// shard that loses its master fails over to a replica, and designates it as the new master).
+// shard that loses its primary fails over to a replica, and designates it as the new primary).
 // However, as there is no unified frontend or proxy service in front of Redis Cluster, the client
 // (in this case Envoy) must locally maintain the state of the Redis Cluster, specifically the
 // topology. A random node in the cluster is queried for the topology using the `CLUSTER SLOTS

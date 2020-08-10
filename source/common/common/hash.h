@@ -1,8 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -55,17 +53,17 @@ public:
    * @param seed the seed to use for the hash
    * @return 64-bit hash representation of the supplied string view
    */
-  static uint64_t murmurHash2_64(absl::string_view key, uint64_t seed = STD_HASH_SEED);
+  static uint64_t murmurHash2(absl::string_view key, uint64_t seed = STD_HASH_SEED);
 
 private:
-  static inline uint64_t unaligned_load(const char* p) {
+  static inline uint64_t unalignedLoad(const char* p) {
     uint64_t result;
     memcpy(&result, p, sizeof(result));
     return result;
   }
 
   // Loads n bytes, where 1 <= n < 8.
-  static inline uint64_t load_bytes(const char* p, int n) {
+  static inline uint64_t loadBytes(const char* p, int n) {
     uint64_t result = 0;
     --n;
     do {
@@ -74,22 +72,8 @@ private:
     return result;
   }
 
-  static inline uint64_t shift_mix(uint64_t v) { return v ^ (v >> 47); }
+  static inline uint64_t shiftMix(uint64_t v) { return v ^ (v >> 47); }
 };
-
-struct ConstCharStarHash {
-  size_t operator()(const char* a) const { return HashUtil::xxHash64(a); }
-};
-
-struct ConstCharStarEqual {
-  size_t operator()(const char* a, const char* b) const { return strcmp(a, b) == 0; }
-};
-
-template <class Value>
-using ConstCharStarHashMap =
-    absl::flat_hash_map<const char*, Value, ConstCharStarHash, ConstCharStarEqual>;
-using ConstCharStarHashSet =
-    absl::flat_hash_set<const char*, ConstCharStarHash, ConstCharStarEqual>;
 
 using SharedString = std::shared_ptr<std::string>;
 

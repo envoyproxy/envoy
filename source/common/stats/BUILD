@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -35,7 +35,9 @@ envoy_cc_library(
         ":metric_impl_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -48,6 +50,7 @@ envoy_cc_library(
         ":histogram_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
+        ":null_text_readout_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
         ":store_impl_lib",
@@ -93,6 +96,16 @@ envoy_cc_library(
 envoy_cc_library(
     name = "null_gauge_lib",
     hdrs = ["null_gauge.h"],
+    deps = [
+        ":metric_impl_lib",
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "null_text_readout_lib",
+    hdrs = ["null_text_readout.h"],
     deps = [
         ":metric_impl_lib",
         ":symbol_table_lib",
@@ -210,6 +223,7 @@ envoy_cc_library(
     name = "tag_producer_lib",
     srcs = ["tag_producer_impl.cc"],
     hdrs = ["tag_producer_impl.h"],
+    external_deps = ["abseil_node_hash_set"],
     deps = [
         ":tag_extractor_lib",
         "//include/envoy/stats:stats_interface",
@@ -238,8 +252,10 @@ envoy_cc_library(
     hdrs = ["thread_local_store.h"],
     deps = [
         ":allocator_lib",
+        ":histogram_lib",
         ":null_counter_lib",
         ":null_gauge_lib",
+        ":null_text_readout_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",

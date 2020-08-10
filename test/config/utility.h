@@ -16,6 +16,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/http/codes.h"
 
+#include "common/config/api_version.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
 
@@ -27,6 +28,8 @@ namespace Envoy {
 
 class ConfigHelper {
 public:
+  using HttpConnectionManager =
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
   struct ServerSslOptions {
     ServerSslOptions& setRsaCert(bool rsa_cert) {
       rsa_cert_ = rsa_cert;
@@ -67,8 +70,7 @@ public:
                 envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
 
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
-  using HttpModifierFunction = std::function<void(
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&)>;
+  using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
   static std::string baseConfig();
@@ -97,10 +99,37 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
-  static std::string adsBootstrap(const std::string& api_type);
+  static std::string adsBootstrap(const std::string& api_type,
+                                  envoy::config::core::v3::ApiVersion api_version);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
-  static envoy::config::cluster::v3::Cluster buildCluster(const std::string& name, int port,
-                                                          const std::string& address);
+  static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
+                                                                const std::string& address);
+
+  // ADS configurations
+  static envoy::config::cluster::v3::Cluster buildCluster(
+      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::cluster::v3::Cluster buildTlsCluster(
+      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::endpoint::v3::ClusterLoadAssignment buildClusterLoadAssignment(
+      const std::string& name, const std::string& ip_version, uint32_t port,
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::listener::v3::Listener buildBaseListener(
+      const std::string& name, const std::string& address, const std::string& filter_chains = "",
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::listener::v3::Listener buildListener(
+      const std::string& name, const std::string& route_config, const std::string& address,
+      const std::string& stat_prefix,
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+
+  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(
+      const std::string& name, const std::string& cluster,
+      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
@@ -155,7 +184,7 @@ public:
   void addSslConfig() { addSslConfig({}); }
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
-  // /dev/null.
+  // the platform's null device.
   bool setAccessLog(const std::string& filename, absl::string_view format = "");
 
   // Set the listener access log for the first listener to a given file.
@@ -196,15 +225,31 @@ public:
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
                                 absl::string_view cluster_name = "cluster_0");
 
+  // Given an HCM with the default config, set the matcher to be a connect matcher and enable
+  // CONNECT requests.
+  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect);
+
+  void setLocalReply(
+      const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
+          config);
+
+  // Set new codecs to use for upstream and downstream codecs.
+  void setNewCodecs();
+
 private:
+  static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
+    return api_version == envoy::config::core::v3::ApiVersion::V2;
+  }
+
+  static std::string apiVersionStr(envoy::config::core::v3::ApiVersion api_version) {
+    return api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3";
+  }
+
   // Load the first HCM struct from the first listener into a parsed proto.
-  bool loadHttpConnectionManager(
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm);
+  bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
-  void storeHttpConnectionManager(
-      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-          hcm);
+  void storeHttpConnectionManager(const HttpConnectionManager& hcm);
 
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::config::listener::v3::Filter* getFilterFromListener(const std::string& name);

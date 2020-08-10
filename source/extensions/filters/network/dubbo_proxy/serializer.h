@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/typed_config.h"
@@ -81,7 +80,7 @@ using SerializerPtr = std::unique_ptr<Serializer>;
  */
 class NamedSerializerConfigFactory : public Config::UntypedFactory {
 public:
-  virtual ~NamedSerializerConfigFactory() = default;
+  ~NamedSerializerConfigFactory() override = default;
 
   /**
    * Create a particular Dubbo serializer.

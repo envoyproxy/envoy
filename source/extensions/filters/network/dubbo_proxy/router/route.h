@@ -37,7 +37,7 @@ public:
   };
 
   using RouteMatcherNameMap =
-      std::unordered_map<RouteMatcherType, std::string, RouteMatcherTypeHash>;
+      absl::node_hash_map<RouteMatcherType, std::string, RouteMatcherTypeHash>;
 
   const RouteMatcherNameMap routeMatcherNameMap = {
       {RouteMatcherType::Default, "default"},
@@ -69,7 +69,7 @@ using RouteMatcherConstSharedPtr = std::shared_ptr<const RouteMatcher>;
  */
 class NamedRouteMatcherConfigFactory : public Envoy::Config::UntypedFactory {
 public:
-  virtual ~NamedRouteMatcherConfigFactory() = default;
+  ~NamedRouteMatcherConfigFactory() override = default;
 
   /**
    * Create a particular Dubbo protocol.

@@ -41,10 +41,17 @@ public:
   virtual bool connectionAllowed() PURE;
 
   /**
-   * Called when an authentication command has been received.
+   * Called when an authentication command has been received with a password.
    * @param password supplies the AUTH password provided by the downstream client.
    */
   virtual void onAuth(const std::string& password) PURE;
+
+  /**
+   * Called when an authentication command has been received with a username and password.
+   * @param username supplies the AUTH username provided by the downstream client.
+   * @param password supplies the AUTH password provided by the downstream client.
+   */
+  virtual void onAuth(const std::string& username, const std::string& password) PURE;
 
   /**
    * Called when the response is ready.

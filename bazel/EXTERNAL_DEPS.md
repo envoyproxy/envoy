@@ -6,7 +6,9 @@ values can change when Github change their tar/gzip libraries breaking
 builds. Maintainer provided tarballs are more stable and the maintainer
 can provide the SHA256.
 
-# Adding external dependencies to Envoy (native Bazel)
+# Adding external dependencies to Envoy (C++)
+
+## Native Bazel
 
 This is the preferred style of adding dependencies that use Bazel for their
 build process.
@@ -17,19 +19,20 @@ build process.
    `external_deps` attribute.
 3. `bazel test //test/...`
 
-# Adding external dependencies to Envoy (external CMake)
+## External CMake (preferred)
 
 This is the preferred style of adding dependencies that use CMake for their build system.
 
 1. Define a the source Bazel repository in [`bazel/repositories.bzl`](repositories.bzl), in the
    `envoy_dependencies()` function.
-2. Add a `cmake_external` rule to [`bazel/foreign_cc/BUILD`](bazel/foreign_cc/BUILD). This will
-   reference the source repository in step 1.
+2. Add a `cmake_external` rule to [`bazel/foreign_cc/BUILD`](foreign_cc/BUILD). This will reference
+   the source repository in step 1.
 3. Reference your new external dependency in some `envoy_cc_library` via the name bound in step 1
    `external_deps` attribute.
 4. `bazel test //test/...`
 
-# Adding external dependencies to Envoy (genrule repository)
+
+## genrule repository
 
 This is the newer style of adding dependencies with no upstream Bazel configs.
 It wraps the dependency's native build tooling in a Bazel-aware shell script,
@@ -53,6 +56,24 @@ for details on Bazel's shell extensions.
 Dependencies between external libraries can use the standard Bazel dependency
 resolution logic, using the `$(location)` shell extension to resolve paths
 to binaries, libraries, headers, etc.
+
+# Adding external dependencies to Envoy (Python)
+
+Python dependencies should be added via `pip3` and `rules_python`. The process
+is:
+
+1. Define a `pip3_import()` pointing at your target `requirements.txt` in
+   [`bazel/repositories_extra.bzl`](repositories_extra.bzl)
+
+2. Add a `pip_install()` invocation in
+   [`bazel/dependency_imports.bzl`](dependency_imports.bzl).
+
+3. Add a `requirements("<package name")` in the `BUILD` file that depends on
+   this package.
+
+You can use [`tools/config_validation/BUILD`](../tools/config_validation/BUILD) as an example
+for this flow. See also the [`rules_python`](https://github.com/bazelbuild/rules_python)
+documentation for further references.
 
 # Updating an external dependency version
 
@@ -88,6 +109,8 @@ dependencies:
 * `libevent`: add `"EVENT__ENABLE_VERBOSE_DEBUG": "on",` to `cache_entries`
   in the `event` target in `bazel/foreign_cc/BUILD` for verbose tracing of
   libevent processing.
+
+* `nghttp2`: set `ENVOY_NGHTTP2_TRACE` in the environment and run at `-l trace`.
 
 # Distdir - prefetching dependencies
 

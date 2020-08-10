@@ -8,8 +8,10 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/path.proto";
 import "envoy/type/matcher/v3/string.proto";
 
+import "google/api/expr/v1alpha1/checked.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -17,7 +19,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.rbac.v3";
 option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
@@ -104,7 +106,15 @@ message Policy {
   // An optional symbolic expression specifying an access control
   // :ref:`condition <arch_overview_condition>`. The condition is combined
   // with the permissions and the principals as a clause with AND semantics.
-  google.api.expr.v1alpha1.Expr condition = 3;
+  // Only be used when checked_condition is not used.
+  google.api.expr.v1alpha1.Expr condition = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "expression_specifier"];
+
+  // [#not-implemented-hide:]
+  // An optional symbolic expression that has been successfully type checked.
+  // Only be used when condition is not used.
+  google.api.expr.v1alpha1.CheckedExpr checked_condition = 4
+      [(udpa.annotations.field_migrate).oneof_promotion = "expression_specifier"];
 }
 
 // Permission defines an action (or actions) that a principal can take.
@@ -180,7 +190,7 @@ message Permission {
 }
 
 // Principal defines an identity or a group of identities for a downstream subject.
-// [#next-free-field: 10]
+// [#next-free-field: 12]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -222,7 +232,21 @@ message Principal {
     Authenticated authenticated = 4;
 
     // A CIDR block that describes the downstream IP.
-    core.v3.CidrRange source_ip = 5;
+    // This address will honor proxy protocol, but will not honor XFF.
+    core.v3.CidrRange source_ip = 5 [deprecated = true];
+
+    // A CIDR block that describes the downstream remote/origin address.
+    // Note: This is always the physical peer even if the
+    // :ref:`remote_ip <envoy_api_field_config.rbac.v3.Principal.remote_ip>` is inferred
+    // from for example the x-forwarder-for header, proxy protocol, etc.
+    core.v3.CidrRange direct_remote_ip = 10;
+
+    // A CIDR block that describes the downstream remote/origin address.
+    // Note: This may not be the physical peer and could be different from the
+    // :ref:`direct_remote_ip <envoy_api_field_config.rbac.v3.Principal.direct_remote_ip>`.
+    // E.g, if the remote ip is inferred from for example the x-forwarder-for header,
+    // proxy protocol, etc.
+    core.v3.CidrRange remote_ip = 11;
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.

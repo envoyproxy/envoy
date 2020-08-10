@@ -13,13 +13,13 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.gzip.v3";
 option java_outer_classname = "GzipProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Gzip]
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
 // [#extension: envoy.filters.http.gzip]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message Gzip {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.gzip.v2.Gzip";
@@ -76,4 +76,9 @@ message Gzip {
   // the fields `content_length`, `content_type`, `disable_on_etag_header` and
   // `remove_accept_encoding_header` are ignored.
   compressor.v3.Compressor compressor = 10;
+
+  // Value for Zlib's next output buffer. If not set, defaults to 4096.
+  // See https://www.zlib.net/manual.html for more details. Also see
+  // https://github.com/envoyproxy/envoy/issues/8448 for context on this filter's performance.
+  google.protobuf.UInt32Value chunk_size = 11 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
 }

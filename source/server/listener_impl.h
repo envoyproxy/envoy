@@ -13,6 +13,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/basic_resource_impl.h"
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
@@ -24,6 +25,15 @@
 namespace Envoy {
 namespace Server {
 
+class ListenerMessageUtil {
+public:
+  /**
+   * @return true if listener message lhs and rhs are the same if ignoring filter_chains field.
+   */
+  static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                    const envoy::config::listener::v3::Listener& rhs);
+};
+
 class ListenerManagerImpl;
 
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
@@ -31,12 +41,12 @@ class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
 public:
   ListenSocketFactoryImpl(ListenerComponentFactory& factory,
                           Network::Address::InstanceConstSharedPtr address,
-                          Network::Address::SocketType socket_type,
+                          Network::Socket::Type socket_type,
                           const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
                           const std::string& listener_name, bool reuse_port);
 
   // Network::ListenSocketFactory
-  Network::Address::SocketType socketType() const override { return socket_type_; }
+  Network::Socket::Type socketType() const override { return socket_type_; }
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
@@ -64,7 +74,7 @@ private:
   // Initially, its port number might be 0. Once a socket is created, its port
   // will be set to the binding port.
   Network::Address::InstanceConstSharedPtr local_address_;
-  Network::Address::SocketType socket_type_;
+  Network::Socket::Type socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
   const std::string& listener_name_;
@@ -96,7 +106,7 @@ public:
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Random::RandomGenerator& random() override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
@@ -162,7 +172,7 @@ public:
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Random::RandomGenerator& random() override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
@@ -211,12 +221,34 @@ public:
    * @param workers_started supplies whether the listener is being added before or after workers
    *        have been started. This controls various behavior related to init management.
    * @param hash supplies the hash to use for duplicate checking.
-   * @param validation_visitor message validation visitor instance.
+   * @param concurrency is the number of listeners instances to be created.
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash, uint32_t concurrency);
   ~ListenerImpl() override;
+
+  // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
+  // update.
+  /**
+   * Execute in place filter chain update. The filter chain update is less expensive than full
+   * listener update because connections may not need to be drained.
+   */
+  std::unique_ptr<ListenerImpl>
+  newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
+                             bool workers_started, uint64_t hash);
+  /**
+   * Determine if in place filter chain update could be executed at this moment.
+   */
+  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
+                                bool worker_started);
+
+  /**
+   * Run the callback on each filter chain that exists in this listener but not in the passed
+   * listener config.
+   */
+  void diffFilterChain(const ListenerImpl& another_listener,
+                       std::function<void(Network::DrainableFilterChain&)> callback);
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -270,7 +302,12 @@ public:
   Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
+    return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
+  }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+
+  ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
   }
@@ -296,10 +333,27 @@ public:
   SystemTime last_updated_;
 
 private:
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) {
-    ensureSocketOptions();
-    listen_socket_options_->emplace_back(std::move(option));
-  }
+  /**
+   * Create a new listener from an existing listener and the new config message if the in place
+   * filter chain update is decided. Should be called only by newListenerWithFilterChain().
+   */
+  ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
+               const std::string& version_info, ListenerManagerImpl& parent,
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               uint32_t concurrency);
+  // Helpers for constructor.
+  void buildAccessLog();
+  void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
+  void buildUdpWriterFactory(Network::Socket::Type socket_type);
+  void buildListenSocketOptions(Network::Socket::Type socket_type);
+  void createListenerFilterFactories(Network::Socket::Type socket_type);
+  void validateFilterChains(Network::Socket::Type socket_type);
+  void buildFilterChains();
+  void buildSocketOptions();
+  void buildOriginalDstListenerFilter();
+  void buildProxyProtocolListenerFilter();
+  void buildTlsInspectorListenerFilter();
+
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
     Network::Socket::appendOptions(listen_socket_options_, options);
@@ -336,9 +390,16 @@ private:
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
+  Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
+
+  // Per-listener connection limits are only specified via runtime.
+  //
+  // TODO (tonya11en): Move this functionality into the overload manager.
+  const std::string cx_limit_runtime_key_;
+  std::shared_ptr<BasicResourceLimitImpl> open_connections_;
 
   // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
   // listener initialization is complete.

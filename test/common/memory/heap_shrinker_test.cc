@@ -4,7 +4,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
@@ -21,10 +21,11 @@ namespace {
 class HeapShrinkerTest : public testing::Test {
 protected:
   HeapShrinkerTest()
-      : api_(Api::createApiForTest(stats_, time_system_)), dispatcher_(*api_, time_system_) {}
+      : api_(Api::createApiForTest(stats_, time_system_)),
+        dispatcher_("test_thread", *api_, time_system_) {}
 
   void step() {
-    time_system_.sleep(std::chrono::milliseconds(10000));
+    time_system_.advanceTimeAsync(std::chrono::milliseconds(10000));
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 

@@ -1,7 +1,7 @@
 #include "extensions/filters/http/cache/cache_filter.h"
 #include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -79,21 +79,21 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
   {
-    // Create filter for request 1
+    // Create filter for request 1.
     CacheFilter filter = makeFilter(simple_cache_);
 
-    // Decode request 1 header
+    // Decode request 1 header.
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
 
-    // Encode response header
+    // Encode response header.
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter.onDestroy();
   }
   {
-    // Create filter for request 2
+    // Create filter for request 2.
     CacheFilter filter = makeFilter(simple_cache_);
 
-    // Decode request 2 header
+    // Decode request 2 header.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
                                               HeaderHasValueRef("age", "0")),
@@ -111,25 +111,25 @@ TEST_F(CacheFilterTest, DelayedHitNoBody) {
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
   {
-    // Create filter for request 1
+    // Create filter for request 1.
     CacheFilter filter = makeFilter(delayed_cache_);
 
-    // Decode request 1 header
+    // Decode request 1 header.
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     EXPECT_CALL(decoder_callbacks_, continueDecoding);
     delayed_cache_.delayed_cb_();
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
-    // Encode response header
+    // Encode response header.
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter.onDestroy();
   }
   {
-    // Create filter for request 2
+    // Create filter for request 2.
     CacheFilter filter = makeFilter(delayed_cache_);
 
-    // Decode request 2 header
+    // Decode request 2 header.
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     EXPECT_CALL(decoder_callbacks_,
@@ -149,13 +149,13 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
   const std::string body = "abc";
 
   {
-    // Create filter for request 1
+    // Create filter for request 1.
     CacheFilter filter = makeFilter(simple_cache_);
 
-    // Decode request 1 header
+    // Decode request 1 header.
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
 
-    // Encode response header
+    // Encode response header.
     Buffer::OwnedImpl buffer(body);
     response_headers_.setContentLength(body.size());
     EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
@@ -163,7 +163,7 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
     filter.onDestroy();
   }
   {
-    // Create filter for request 2
+    // Create filter for request 2.
     CacheFilter filter = makeFilter(simple_cache_);
 
     // Decode request 2 header

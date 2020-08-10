@@ -1,5 +1,5 @@
-#include "envoy/config/filter/udp/udp_proxy/v2alpha/udp_proxy.pb.h"
-#include "envoy/config/filter/udp/udp_proxy/v2alpha/udp_proxy.pb.validate.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
@@ -12,6 +12,7 @@
 using testing::AtLeast;
 using testing::ByMove;
 using testing::InSequence;
+using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnNew;
 using testing::SaveArg;
@@ -66,6 +67,7 @@ public:
                               int send_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
 
+      EXPECT_CALL(*io_handle_, supportsUdpGro());
       EXPECT_CALL(*io_handle_, supportsMmsg());
       // Return the datagram.
       EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
@@ -97,6 +99,7 @@ public:
               }
             }));
         // Return an EAGAIN result.
+        EXPECT_CALL(*io_handle_, supportsUdpGro());
         EXPECT_CALL(*io_handle_, supportsMmsg());
         EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(
@@ -125,10 +128,10 @@ public:
         .WillRepeatedly(Return(Upstream::Host::Health::Healthy));
   }
 
-  ~UdpProxyFilterTest() { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
+  ~UdpProxyFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
   void setup(const std::string& yaml, bool has_cluster = true) {
-    envoy::config::filter::udp::udp_proxy::v2alpha::UdpProxyConfig config;
+    envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
                                                      config);
@@ -163,6 +166,10 @@ public:
     EXPECT_CALL(callbacks_.udp_listener_.dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge, Event::FileReadyType::Read))
         .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
+    // Internal Buffer is Empty, flush will be a no-op
+    ON_CALL(callbacks_.udp_listener_, flush())
+        .WillByDefault(
+            InvokeWithoutArgs([]() -> Api::IoCallUint64Result { return makeNoError(0); }));
   }
 
   void checkTransferStats(uint64_t rx_bytes, uint64_t rx_datagrams, uint64_t tx_bytes,
@@ -260,13 +267,13 @@ cluster: fake_cluster
   EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_tx_bytes_total_.value());
 
-  test_sessions_[0].recvDataFromUpstream("world2", 0, EMSGSIZE);
+  test_sessions_[0].recvDataFromUpstream("world2", 0, SOCKET_ERROR_MSG_SIZE);
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(6, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_rx_bytes_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_tx_errors_.value());
 
-  test_sessions_[0].recvDataFromUpstream("world2", EMSGSIZE, 0);
+  test_sessions_[0].recvDataFromUpstream("world2", SOCKET_ERROR_MSG_SIZE, 0);
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(6, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
                    .upstream_cx_rx_bytes_total_.value());
@@ -275,7 +282,7 @@ cluster: fake_cluster
                    "udp.sess_rx_errors")
                    ->value());
 
-  test_sessions_[0].expectUpstreamWrite("hello", EMSGSIZE);
+  test_sessions_[0].expectUpstreamWrite("hello", SOCKET_ERROR_MSG_SIZE);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(10 /*rx_bytes*/, 2 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(5, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_

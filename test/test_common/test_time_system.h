@@ -10,8 +10,6 @@
 namespace Envoy {
 namespace Event {
 
-class TestTimeSystem;
-
 // Adds sleep() and waitFor() interfaces to Event::TimeSystem.
 class TestTimeSystem : public Event::TimeSystem {
 public:
@@ -19,13 +17,34 @@ public:
 
   /**
    * Advances time forward by the specified duration, running any timers
-   * along the way that have been scheduled to fire.
+   * scheduled to fire, and blocking until the timer callbacks are complete.
+   * See also advanceTimeAsync(), which does not block.
+   *
+   * This function should be used in multi-threaded tests, where other
+   * threads are running dispatcher loops. Integration tests should usually
+   * use this variant.
    *
    * @param duration The amount of time to sleep.
    */
-  virtual void sleep(const Duration& duration) PURE;
-  template <class D> void sleep(const D& duration) {
-    sleep(std::chrono::duration_cast<Duration>(duration));
+  virtual void advanceTimeWait(const Duration& duration) PURE;
+  template <class D> void advanceTimeWait(const D& duration) {
+    advanceTimeWait(std::chrono::duration_cast<Duration>(duration));
+  }
+
+  /**
+   * Advances time forward by the specified duration. Timers may be triggered on
+   * their threads, but unlike advanceTimeWait(), this method does not block
+   * waiting for them to complete.
+   *
+   * This function should be used in single-threaded tests, in scenarios where
+   * after time is advanced, the main test thread will run a dispatcher
+   * loop. Unit tests will often use this variant.
+   *
+   * @param duration The amount of time to sleep.
+   */
+  virtual void advanceTimeAsync(const Duration& duration) PURE;
+  template <class D> void advanceTimeAsync(const D& duration) {
+    advanceTimeAsync(std::chrono::duration_cast<Duration>(duration));
   }
 
   /**
@@ -37,13 +56,15 @@ public:
    * @param duration The maximum amount of time to wait.
    * @return Thread::CondVar::WaitStatus whether the condition timed out or not.
    */
-  virtual Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
+  virtual Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex,
+                                              Thread::CondVar& condvar,
+                                              const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
 
   template <class D>
   Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-                                      const D& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+                                      const D& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     return waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
   }
 };
@@ -72,7 +93,7 @@ public:
   TestTimeSystem& timeSystem(const MakeTimeSystemFn& make_time_system);
 
 private:
-  std::unique_ptr<TestTimeSystem> time_system_ GUARDED_BY(mutex_);
+  std::unique_ptr<TestTimeSystem> time_system_ ABSL_GUARDED_BY(mutex_);
   Thread::MutexBasicLockable mutex_;
 };
 
@@ -81,16 +102,22 @@ private:
 // subclass.
 template <class TimeSystemVariant> class DelegatingTestTimeSystemBase : public TestTimeSystem {
 public:
-  void sleep(const Duration& duration) override { timeSystem().sleep(duration); }
+  void advanceTimeAsync(const Duration& duration) override {
+    timeSystem().advanceTimeAsync(duration);
+  }
+  void advanceTimeWait(const Duration& duration) override {
+    timeSystem().advanceTimeWait(duration);
+  }
 
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                      const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     return timeSystem().waitFor(mutex, condvar, duration);
   }
 
-  SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
-    return timeSystem().createScheduler(base_scheduler);
+  SchedulerPtr createScheduler(Scheduler& base_scheduler,
+                               CallbackScheduler& cb_scheduler) override {
+    return timeSystem().createScheduler(base_scheduler, cb_scheduler);
   }
   SystemTime systemTime() override { return timeSystem().systemTime(); }
   MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }

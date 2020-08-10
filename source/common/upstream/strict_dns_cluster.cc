@@ -55,6 +55,11 @@ void StrictDnsClusterImpl::startPreInit() {
   for (const ResolveTargetPtr& target : resolve_targets_) {
     target->startResolve();
   }
+  // If the config provides no endpoints, the cluster is initialized immediately as if all hosts are
+  // resolved in failure.
+  if (resolve_targets_.empty()) {
+    onPreInitComplete();
+  }
 }
 
 void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
@@ -113,7 +118,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         if (status == Network::DnsResolver::ResolutionStatus::Success) {
           parent_.info_->stats().update_success_.inc();
 
-          std::unordered_map<std::string, HostSharedPtr> updated_hosts;
+          absl::node_hash_map<std::string, HostSharedPtr> updated_hosts;
           HostVector new_hosts;
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
           for (const auto& resp : response) {

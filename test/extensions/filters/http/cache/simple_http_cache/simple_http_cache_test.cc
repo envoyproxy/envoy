@@ -3,6 +3,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/http/cache/cache_headers_utils.h"
 #include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -24,7 +25,7 @@ protected:
     request_headers_.setMethod("GET");
     request_headers_.setHost("example.com");
     request_headers_.setForwardedProto("https");
-    request_headers_.setCacheControl("max-age=3600");
+    request_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "max-age=3600");
   }
 
   // Performs a cache lookup.
@@ -144,7 +145,7 @@ TEST_F(SimpleHttpCacheTest, Fresh) {
       {"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   insert("/", response_headers, "");
-  time_source_.sleep(std::chrono::seconds(3600));
+  time_source_.advanceTimeWait(std::chrono::seconds(3600));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
@@ -154,13 +155,13 @@ TEST_F(SimpleHttpCacheTest, Stale) {
       {"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   insert("/", response_headers, "");
-  time_source_.sleep(std::chrono::seconds(3601));
+  time_source_.advanceTimeWait(std::chrono::seconds(3601));
   lookup("/");
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
 
 TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
-  request_headers_.setReferenceKey(Http::Headers::get().CacheControl, "min-fresh=1000");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "min-fresh=1000");
   const std::string request_path("Name");
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
@@ -174,7 +175,7 @@ TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
 }
 
 TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
-  request_headers_.setReferenceKey(Http::Headers::get().CacheControl, "max-stale=9000");
+  request_headers_.setReferenceKey(Http::CustomHeaders::get().CacheControl, "max-stale=9000");
 
   const std::string request_path("Name");
   LookupContextPtr name_lookup_context = lookup(request_path);

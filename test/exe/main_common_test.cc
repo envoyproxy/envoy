@@ -2,6 +2,7 @@
 
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
+#include "common/common/random_generator.h"
 #include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -9,10 +10,12 @@
 
 #include "server/options_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -23,12 +26,13 @@
 
 using testing::HasSubstr;
 using testing::IsEmpty;
+using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 
 /**
- * Captures common functions needed for invoking MainCommon. Generates a
- * unique --base-id setting based on the pid and a random number. Maintains
+ * Captures common functions needed for invoking MainCommon.Maintains
  * an argv array that is terminated with nullptr. Identifies the config
  * file relative to runfiles directory.
  */
@@ -38,29 +42,7 @@ protected:
       : config_file_(TestEnvironment::temporaryFileSubstitute(
             "test/config/integration/google_com_proxy_port_0.v2.yaml", TestEnvironment::ParamMap(),
             TestEnvironment::PortMap(), GetParam())),
-        random_string_(fmt::format("{}", computeBaseId())),
-        argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}) {}
-
-  /**
-   * Computes a numeric ID to incorporate into the names of
-   * shared-memory segments and domain sockets, to help keep them
-   * distinct from other tests that might be running concurrently.
-   *
-   * The PID is needed to isolate namespaces between concurrent
-   * processes in CI. The random number generator is needed
-   * sequentially executed test methods fail with an error in
-   * bindDomainSocket if the same base-id is re-used.
-   *
-   * @return uint32_t a unique numeric ID based on the PID and a random number.
-   */
-  static uint32_t computeBaseId() {
-    Runtime::RandomGeneratorImpl random_generator_;
-    // Pick a prime number to give more of the 32-bits of entropy to the PID, and the
-    // remainder to the random number.
-    const uint32_t four_digit_prime = 7919;
-    return getpid() * four_digit_prime + random_generator_.random() % four_digit_prime;
-  }
+        argv_({"envoy-static", "--use-dynamic-base-id", "-c", config_file_.c_str(), nullptr}) {}
 
   const char* const* argv() { return &argv_[0]; }
   int argc() { return argv_.size() - 1; }
@@ -81,9 +63,11 @@ protected:
   }
 
   std::string config_file_;
-  std::string random_string_;
   std::vector<const char*> argv_;
 };
+INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
 TEST_P(MainCommonTest, ConstructDestructHotRestartEnabled) {
@@ -104,6 +88,54 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
+// Exercise base-id-path option.
+TEST_P(MainCommonTest, ConstructWritesBasePathId) {
+#ifdef ENVOY_HOT_RESTART
+  const std::string base_id_path = TestEnvironment::temporaryPath("base-id-file");
+  addArg("--base-id-path");
+  addArg(base_id_path.c_str());
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+
+  EXPECT_NE("", TestEnvironment::readFileToStringForTest(base_id_path));
+#endif
+}
+
+// Test that an in-use base id triggers a retry and that we eventually give up.
+TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
+#ifdef ENVOY_HOT_RESTART
+  PlatformImpl platform;
+  Event::TestRealTimeSystem real_time_system;
+  DefaultListenerHooks default_listener_hooks;
+  ProdComponentFactory prod_component_factory;
+
+  const std::string base_id_path = TestEnvironment::temporaryPath("base-id-file");
+
+  const auto first_args = std::vector<std::string>({"envoy-static", "--use-dynamic-base-id", "-c",
+                                                    config_file_, "--base-id-path", base_id_path});
+  OptionsImpl first_options(first_args, &MainCommon::hotRestartVersion, spdlog::level::info);
+  MainCommonBase first(first_options, real_time_system, default_listener_hooks,
+                       prod_component_factory, std::make_unique<Random::RandomGeneratorImpl>(),
+                       platform.threadFactory(), platform.fileSystem(), nullptr);
+
+  const std::string base_id_str = TestEnvironment::readFileToStringForTest(base_id_path);
+  uint32_t base_id;
+  ASSERT_TRUE(absl::SimpleAtoi(base_id_str, &base_id));
+
+  auto* mock_rng = new NiceMock<Random::MockRandomGenerator>();
+  EXPECT_CALL(*mock_rng, random()).WillRepeatedly(Return(base_id));
+
+  const auto second_args =
+      std::vector<std::string>({"envoy-static", "--use-dynamic-base-id", "-c", config_file_});
+  OptionsImpl second_options(second_args, &MainCommon::hotRestartVersion, spdlog::level::info);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      MainCommonBase(second_options, real_time_system, default_listener_hooks,
+                     prod_component_factory, std::unique_ptr<Random::RandomGenerator>{mock_rng},
+                     platform.threadFactory(), platform.fileSystem(), nullptr),
+      EnvoyException, "unable to select a dynamic base id");
+#endif
+}
+
 // Test that std::set_new_handler() was called and the callback functions as expected.
 // This test fails under TSAN and ASAN, so don't run it in that build:
 //   [  DEATH   ] ==845==ERROR: ThreadSanitizer: requested allocation size 0x3e800000000
@@ -114,19 +146,25 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 //   of 0x10000000000 (thread T0)
 
 class MainCommonDeathTest : public MainCommonTest {};
+INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonDeathTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
-#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
+#if defined(__clang_analyzer__) || (defined(__has_feature) && (__has_feature(thread_sanitizer) ||  \
+                                                               __has_feature(address_sanitizer) || \
+                                                               __has_feature(memory_sanitizer)))
   ENVOY_LOG_MISC(critical,
                  "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
 #else
   MainCommon main_common(argc(), argv());
-  EXPECT_DEATH_LOG_TO_STDERR(
+#if !defined(WIN32)
+  // Resolving symbols for a backtrace takes longer than the timeout in coverage builds,
+  // so disable handling that signal.
+  signal(SIGABRT, SIG_DFL);
+#endif
+  EXPECT_DEATH(
       []() {
-        // Resolving symbols for a backtrace takes longer than the timeout in coverage builds,
-        // so disable handling that signal.
-        signal(SIGABRT, SIG_DFL);
-
         // Allocating a fixed-size large array that results in OOM on gcc
         // results in a compile-time error on clang of "array size too big",
         // so dynamically find a size that is too large.
@@ -134,16 +172,14 @@ TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
         for (uint64_t size = initial;
              size >= initial; // Disallow wraparound to avoid infinite loops on failure.
              size *= 1000) {
-          new int[size];
+          int* p = new int[size];
+          // Use the pointer to prevent clang from optimizing the allocation away in opt mode.
+          ENVOY_LOG_MISC(debug, "p={}", reinterpret_cast<intptr_t>(p));
         }
       }(),
       ".*panic: out of memory.*");
 #endif
 }
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 class AdminRequestTest : public MainCommonTest {
 protected:
@@ -236,6 +272,9 @@ protected:
   bool pause_before_run_{false};
   bool pause_after_run_{false};
 };
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
@@ -245,6 +284,8 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
+// no signals on Windows -- could probably make this work with GenerateConsoleCtrlEvent
+#ifndef WIN32
 // This test is identical to the above one, except that instead of using an admin /quitquitquit,
 // we send ourselves a SIGTERM, which should have the same effect.
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
@@ -302,6 +343,7 @@ TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
+#endif
 
 TEST_P(AdminRequestTest, AdminRequestBeforeRun) {
   // Induce the situation where the Envoy thread is active, and main_common_ is constructed,
@@ -395,9 +437,5 @@ TEST_P(MainCommonTest, ConstructDestructLogger) {
   spdlog::details::log_msg log_msg(logger_name, spdlog::level::level_enum::err, "error");
   Logger::Registry::getSink()->log(log_msg);
 }
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/lightstep.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -95,6 +95,7 @@ private:
     void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
     void onFailure(const Http::AsyncClient::Request&,
                    Http::AsyncClient::FailureReason failure_reason) override;
+    void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   private:
     std::unique_ptr<lightstep::BufferChain> active_report_;

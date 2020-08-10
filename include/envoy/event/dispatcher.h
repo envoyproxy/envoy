@@ -9,6 +9,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/file_event.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/watcher.h"
@@ -40,10 +41,14 @@ struct DispatcherStats {
   ALL_DISPATCHER_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
+using DispatcherStatsPtr = std::unique_ptr<DispatcherStats>;
+
 /**
  * Callback invoked when a dispatcher post() runs.
  */
 using PostCb = std::function<void()>;
+
+using PostCbSharedPtr = std::shared_ptr<PostCb>;
 
 /**
  * Abstract event dispatching loop.
@@ -51,6 +56,12 @@ using PostCb = std::function<void()>;
 class Dispatcher {
 public:
   virtual ~Dispatcher() = default;
+
+  /**
+   * Returns the name that identifies this dispatcher, such as "worker_2" or "main_thread".
+   * @return const std::string& the name that identifies this dispatcher.
+   */
+  virtual const std::string& name() PURE;
 
   /**
    * Returns a time-source to use with this dispatcher.
@@ -62,9 +73,11 @@ public:
    * time, since the main and worker thread dispatchers are constructed before
    * ThreadLocalStoreImpl::initializeThreading.
    * @param scope the scope to contain the new per-dispatcher stats created here.
-   * @param prefix the stats prefix to identify this dispatcher.
+   * @param prefix the stats prefix to identify this dispatcher. If empty, the dispatcher will be
+   *               identified by its name.
    */
-  virtual void initializeStats(Stats::Scope& scope, const std::string& prefix) PURE;
+  virtual void initializeStats(Stats::Scope& scope,
+                               const absl::optional<std::string>& prefix = absl::nullopt) PURE;
 
   /**
    * Clears any items in the deferred deletion queue.
@@ -154,6 +167,14 @@ public:
    * @param cb supplies the callback to invoke when the timer fires.
    */
   virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
+
+  /**
+   * Allocates a schedulable callback. @see SchedulableCallback for docs on how to use the wrapped
+   * callback.
+   * @param cb supplies the callback to invoke when the SchedulableCallback is triggered on the
+   * event loop.
+   */
+  virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
 
   /**
    * Submits an item for deferred delete. @see DeferredDeletable.

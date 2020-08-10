@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.ext_authz.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -16,13 +17,13 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_authz.v3";
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 11]
+// [#next-free-field: 13]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -35,6 +36,11 @@ message ExtAuthz {
     // HTTP service configuration (default timeout: 200ms).
     HttpService http_service = 3;
   }
+
+  // API version for ext_authz transport protocol. This describes the ext_authz gRPC endpoint and
+  // version of messages used on the wire.
+  config.core.v3.ApiVersion transport_api_version = 12
+      [(validate.rules).enum = {defined_only: true}];
 
   //  Changes filter's behaviour on errors:
   //
@@ -49,13 +55,6 @@ message ExtAuthz {
   // Note that errors can be *always* tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
-
-  // Sets the package version the gRPC service should use. This is particularly
-  // useful when transitioning from alpha to release versions assuming that both definitions are
-  // semantically compatible. Deprecation note: This field is deprecated and should only be used for
-  // version upgrade. See release notes for more details.
-  bool hidden_envoy_deprecated_use_alpha = 4
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
@@ -100,11 +99,23 @@ message ExtAuthz {
   // If this field is not specified, the filter will be enabled for all requests.
   config.core.v3.RuntimeFractionalPercent filter_enabled = 9;
 
+  // Specifies whether to deny the requests, when the filter is disabled.
+  // If :ref:`runtime_key <envoy_api_field_config.core.v3.RuntimeFeatureFlag.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to determine whether to deny request for
+  // filter protected path at filter disabling. If filter is disabled in
+  // typed_per_filter_config for the path, requests will not be denied.
+  //
+  // If this field is not specified, all requests will be allowed when disabled.
+  config.core.v3.RuntimeFeatureFlag deny_at_disable = 11;
+
   // Specifies if the peer certificate is sent to the external service.
   //
   // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
   // :ref:`certificate<envoy_api_field_service.auth.v3.AttributeContext.Peer.certificate>`.
   bool include_peer_certificate = 10;
+
+  bool hidden_envoy_deprecated_use_alpha = 4
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // Configuration for buffering the request data.
@@ -200,6 +211,11 @@ message AuthorizationResponse {
   // response headers that have a correspondent match will be added to the original client request.
   // Note that coexistent headers will be overridden.
   type.matcher.v3.ListStringMatcher allowed_upstream_headers = 1;
+
+  // When this :ref:`list <envoy_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
+  // response headers that have a correspondent match will be added to the client's response. Note
+  // that coexistent headers will be appended.
+  type.matcher.v3.ListStringMatcher allowed_upstream_headers_to_append = 3;
 
   // When this :ref:`list <envoy_api_msg_type.matcher.v3.ListStringMatcher>`. is set, authorization
   // response headers that have a correspondent match will be added to the client's response. Note

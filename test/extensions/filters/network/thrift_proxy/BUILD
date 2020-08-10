@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
@@ -10,6 +8,8 @@ load(
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -209,7 +209,7 @@ envoy_extension_cc_test(
         ":mocks",
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy/router:config",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
@@ -228,7 +228,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
@@ -271,7 +271,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:registry_lib",
@@ -291,7 +291,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//source/extensions/filters/network/thrift_proxy/router:router_ratelimit_lib",
         "//test/mocks/ratelimit:ratelimit_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:printers_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
@@ -333,6 +333,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_name = "envoy.filters.network.thrift_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         ":utility_lib",
@@ -349,6 +350,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_name = "envoy.filters.network.thrift_proxy",
+    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         ":utility_lib",

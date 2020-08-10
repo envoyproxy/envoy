@@ -6,11 +6,10 @@
 #include "common/network/address_impl.h"
 
 #include "server/config_validation/server.h"
-#include "server/proto_descriptors.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 
 namespace Envoy {

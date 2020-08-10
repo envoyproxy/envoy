@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -14,6 +14,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "//test/mocks/network:connection_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -21,6 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "proxy_protocol_regression_test",
     srcs = ["proxy_protocol_regression_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
@@ -32,7 +34,6 @@ envoy_cc_test(
         "//source/server:connection_handler_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",

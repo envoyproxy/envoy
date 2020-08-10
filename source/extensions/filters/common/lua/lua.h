@@ -386,8 +386,11 @@ public:
    * all threaded workers.
    */
   template <class T> void registerType() {
-    tls_slot_->runOnAllThreads(
-        [this]() { T::registerType(tls_slot_->getTyped<LuaThreadLocal>().state_.get()); });
+    tls_slot_->runOnAllThreads([](ThreadLocal::ThreadLocalObjectSharedPtr previous) {
+      LuaThreadLocal& tls = *std::dynamic_pointer_cast<LuaThreadLocal>(previous);
+      T::registerType(tls.state_.get());
+      return previous;
+    });
   }
 
   /**
@@ -416,6 +419,8 @@ private:
   ThreadLocal::SlotPtr tls_slot_;
   uint64_t current_global_slot_{};
 };
+
+using ThreadLocalStatePtr = std::unique_ptr<ThreadLocalState>;
 
 /**
  * An exception specific to Lua errors.

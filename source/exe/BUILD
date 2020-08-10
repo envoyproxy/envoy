@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
@@ -9,12 +7,10 @@ load(
     "envoy_cc_win32_library",
     "envoy_package",
 )
-load(
-    "//source/extensions:all_extensions.bzl",
-    "envoy_all_extensions",
-    "envoy_windows_extensions",
-)
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
+load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
+load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -26,7 +22,7 @@ alias(
 envoy_cc_binary(
     name = "envoy-static",
     stamped = True,
-    deps = ["envoy_main_entry_lib"],
+    deps = [":envoy_main_entry_lib"],
 )
 
 envoy_cc_library(
@@ -41,7 +37,7 @@ envoy_cc_library(
         "//source/server:server_lib",
         "//source/server:listener_hooks_lib",
     ] + select({
-        "//bazel:windows_x86_64": envoy_windows_extensions(),
+        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
@@ -60,11 +56,57 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_main_common_lib",
+    name = "main_common_lib",
     srcs = ["main_common.cc"],
     hdrs = ["main_common.h"],
     deps = [
         ":envoy_common_lib",
+        ":platform_impl_lib",
+        ":process_wide_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/grpc:google_grpc_context_lib",
+        "//source/common/stats:symbol_table_creator_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
+        "//source/server/config_validation:server_lib",
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [
+            "//source/common/signal:sigaction_lib",
+            ":terminate_handler_lib",
+        ],
+    }),
+)
+
+envoy_cc_library(
+    name = "envoy_main_common_lib",
+    deps = [
+        ":main_common_lib",
+        "//source/common/version:version_linkstamp",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_common_with_core_extensions_lib",
+    deps = [
+        "//source/common/event:libevent_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/server:drain_manager_lib",
+        "//source/server:options_lib",
+        "//source/server:server_lib",
+        "//source/server:listener_hooks_lib",
+    ] + envoy_all_core_extensions(),
+)
+
+envoy_cc_library(
+    name = "envoy_main_common_with_core_extensions_lib",
+    deps = [
+        ":envoy_common_with_core_extensions_lib",
+        ":main_common_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
         "//source/common/api:os_sys_calls_lib",

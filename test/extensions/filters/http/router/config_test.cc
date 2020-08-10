@@ -6,7 +6,7 @@
 
 #include "extensions/filters/http/router/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -27,7 +27,7 @@ TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
   )EOF";
 
   envoy::extensions::filters::http::router::v3::Router proto_config;
-  TestUtility::loadFromYaml(yaml_string, proto_config);
+  TestUtility::loadFromYaml(yaml_string, proto_config, false, true);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats.", context);
@@ -43,8 +43,8 @@ TEST(RouterFilterConfigTest, BadRouterFilterConfig) {
   )EOF";
 
   envoy::extensions::filters::http::router::v3::Router proto_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
-                          "route: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config, false, true),
+                          EnvoyException, "route: Cannot find field");
 }
 
 TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
@@ -54,7 +54,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
   )EOF";
 
   envoy::extensions::filters::http::router::v3::Router router_config;
-  TestUtility::loadFromYaml(yaml, router_config);
+  TestUtility::loadFromYaml(yaml, router_config, false, true);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
@@ -91,14 +91,6 @@ TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_)).Times(1);
   cb(filter_callback);
-}
-
-TEST(RouterFilterConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<RouterFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>()),
-      EnvoyException,
-      fmt::format("Double registration for name: '{}'", HttpFilterNames::get().Router));
 }
 
 // Test that the deprecated extension name still functions.

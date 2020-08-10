@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -12,6 +13,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
@@ -32,7 +34,7 @@ namespace Envoy {
 namespace Config {
 
 /**
- * Constant Api Type Values, used by envoy::api::v2::core::ApiConfigSource.
+ * Constant Api Type Values, used by envoy::config::core::v3::ApiConfigSource.
  */
 class ApiTypeValues {
 public:
@@ -76,14 +78,14 @@ public:
 
   /**
    * Extract refresh_delay as a std::chrono::milliseconds from
-   * envoy::api::v2::core::ApiConfigSource.
+   * envoy::config::core::v3::ApiConfigSource.
    */
   static std::chrono::milliseconds
   apiConfigSourceRefreshDelay(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Extract request_timeout as a std::chrono::milliseconds from
-   * envoy::api::v2::core::ApiConfigSource. If request_timeout isn't set in the config source, a
+   * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
    * default value of 1s will be returned.
    */
   static std::chrono::milliseconds
@@ -91,18 +93,18 @@ public:
 
   /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
-   * envoy::api::v2::core::ConfigSource. If request_timeout isn't set in the config source, a
+   * envoy::config::core::v3::ApiConfigSource. If request_timeout isn't set in the config source, a
    * default value of 0s will be returned.
    */
   static std::chrono::milliseconds
   configSourceInitialFetchTimeout(const envoy::config::core::v3::ConfigSource& config_source);
 
   /**
-   * Populate an envoy::api::v2::core::ApiConfigSource.
+   * Populate an envoy::config::core::v3::ApiConfigSource.
    * @param cluster supplies the cluster name for the ApiConfigSource.
    * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
    * @param api_type supplies the type of subscription to use for the ApiConfigSource.
-   * @param api_config_source a reference to the envoy::api::v2::core::ApiConfigSource object to
+   * @param api_config_source a reference to the envoy::config::core::v3::ApiConfigSource object to
    * populate.
    */
   static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
@@ -157,25 +159,28 @@ public:
 
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.
-   * @param clusters the clusters currently loaded in the cluster manager.
-   * @param api_config_source the config source to validate.
+   * @param primary_clusters the API config source eligible clusters.
+   * @param cluster_name the cluster name to validate.
+   * @param config_source the config source typed name.
    * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
    */
-  static void validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
-                                  const std::string& cluster_name);
+  static void validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
+                                  const std::string& cluster_name,
+                                  const std::string& config_source);
 
   /**
    * Potentially calls Utility::validateClusterName, if a cluster name can be found.
-   * @param clusters the clusters currently loaded in the cluster manager.
+   * @param primary_clusters the API config source eligible clusters.
    * @param api_config_source the config source to validate.
    * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
    */
   static void checkApiConfigSourceSubscriptionBackingCluster(
-      const Upstream::ClusterManager::ClusterInfoMap& clusters,
+      const Upstream::ClusterManager::ClusterSet& primary_clusters,
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
-   * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.
+   * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
+   * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
    * @return RateLimitSettings.
    */
@@ -183,12 +188,25 @@ public:
   parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
+   * Generate a ControlPlaneStats object from stats scope.
+   * @param scope for stats.
+   * @return ControlPlaneStats for scope.
+   */
+  static ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
+    const std::string control_plane_prefix = "control_plane.";
+    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
+                                    POOL_GAUGE_PREFIX(scope, control_plane_prefix),
+                                    POOL_TEXT_READOUT_PREFIX(scope, control_plane_prefix))};
+  }
+
+  /**
    * Generate a SubscriptionStats object from stats scope.
    * @param scope for stats.
    * @return SubscriptionStats for scope.
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
-    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+    return {
+        ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TEXT_READOUT(scope))};
   }
 
   /**
@@ -219,27 +237,42 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
-    const ProtobufWkt::Any& typed_config = message.typed_config();
-    static const std::string& typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
-
-    if (!typed_config.type_url().empty()) {
-      // Unpack methods will only use the fully qualified type name after the last '/'.
-      // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-      auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
-      if (type == typed_struct_type) {
-        udpa::type::v1::TypedStruct typed_struct;
-        MessageUtil::unpackTo(typed_config, typed_struct);
-        // Not handling nested structs or typed structs in typed structs
-        type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
-      }
-      Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
-      if (factory != nullptr) {
-        return *factory;
-      }
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return *factory;
     }
 
     return Utility::getAndCheckFactoryByName<Factory>(message.name());
+  }
+
+  /**
+   * Get type URL from a typed config.
+   * @param typed_config for the extension config.
+   */
+  static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
+    static const std::string& typed_struct_type =
+        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+    // Unpack methods will only use the fully qualified type name after the last '/'.
+    // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
+    auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
+    if (type == typed_struct_type) {
+      udpa::type::v1::TypedStruct typed_struct;
+      MessageUtil::unpackTo(typed_config, typed_struct);
+      // Not handling nested structs or typed structs in typed structs
+      return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
+    }
+    return type;
+  }
+
+  /**
+   * Get a Factory from the registry by type URL.
+   * @param typed_config for the extension config.
+   */
+  template <class Factory> static Factory* getFactoryByType(const ProtobufWkt::Any& typed_config) {
+    if (typed_config.type_url().empty()) {
+      return nullptr;
+    }
+    return Registry::FactoryRegistry<Factory>::getFactoryByType(getFactoryType(typed_config));
   }
 
   /**
@@ -315,20 +348,27 @@ public:
   createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   /**
-   * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
+   * Create HistogramSettings instance.
+   */
+  static Stats::HistogramSettingsConstPtr
+  createHistogramSettings(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+
+  /**
+   * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
-   * @param api_config_source envoy::api::v2::core::ApiConfigSource. Must have config type GRPC.
+   * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
+   * @param skip_cluster_check whether to skip cluster validation.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope);
+                                Stats::Scope& scope, bool skip_cluster_check);
 
   /**
    * Translate a set of cluster's hosts into a load assignment configuration.
    * @param hosts cluster's list of hosts.
-   * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
+   * @return envoy::config::endpoint::v3::ClusterLoadAssignment a load assignment configuration.
    */
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts);
@@ -378,7 +418,7 @@ public:
    */
   template <typename T>
   static BackOffStrategyPtr prepareDnsRefreshStrategy(const T& config, uint64_t dns_refresh_rate_ms,
-                                                      Runtime::RandomGenerator& random) {
+                                                      Random::RandomGenerator& random) {
     if (config.has_dns_failure_refresh_rate()) {
       uint64_t base_interval_ms =
           PROTOBUF_GET_MS_REQUIRED(config.dns_failure_refresh_rate(), base_interval);

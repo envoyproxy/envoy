@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
@@ -27,7 +28,7 @@ public:
   static RetryStatePtr create(const RetryPolicy& route_policy,
                               Http::RequestHeaderMap& request_headers,
                               const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                              Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                              Runtime::Loader& runtime, Random::RandomGenerator& random,
                               Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority);
   ~RetryStateImpl() override;
 
@@ -74,13 +75,15 @@ public:
         [&host](auto predicate) { return predicate->shouldSelectAnotherHost(host); });
   }
 
-  const Upstream::HealthyAndDegradedLoad&
-  priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
-                       const Upstream::HealthyAndDegradedLoad& original_priority_load) override {
+  const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
+      const Upstream::PrioritySet& priority_set,
+      const Upstream::HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) override {
     if (!retry_priority_) {
       return original_priority_load;
     }
-    return retry_priority_->determinePriorityLoad(priority_set, original_priority_load);
+    return retry_priority_->determinePriorityLoad(priority_set, original_priority_load,
+                                                  priority_mapping_func);
   }
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
@@ -88,7 +91,7 @@ public:
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, const VirtualCluster* vcluster,
-                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                 Runtime::Loader& runtime, Random::RandomGenerator& random,
                  Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority);
 
   void enableBackoffTimer();
@@ -99,7 +102,7 @@ private:
   const Upstream::ClusterInfo& cluster_;
   const VirtualCluster* vcluster_;
   Runtime::Loader& runtime_;
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   uint32_t retry_on_{};
   uint32_t retries_remaining_{};

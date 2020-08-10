@@ -5,6 +5,9 @@ package envoy.extensions.common.tap.v3;
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/tap/v3/common.proto";
 
+import "udpa/core/v1/resource_locator.proto";
+
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -12,7 +15,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.common.tap.v3";
 option java_outer_classname = "CommonProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common tap extension configuration]
 
@@ -30,7 +33,12 @@ message CommonExtensionConfig {
     config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
     // Tap config to request from XDS server.
-    string name = 2 [(validate.rules).string = {min_bytes: 1}];
+    string name = 2 [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
+
+    // Resource locator for TAP. This is mutually exclusive to *name*.
+    // [#not-implemented-hide:]
+    udpa.core.v1.ResourceLocator tap_resource_locator = 3
+        [(udpa.annotations.field_migrate).oneof_promotion = "name_specifier"];
   }
 
   oneof config_type {

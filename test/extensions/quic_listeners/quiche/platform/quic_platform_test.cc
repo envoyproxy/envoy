@@ -7,9 +7,9 @@
 #include <netinet/in.h>
 
 #include <fstream>
-#include <unordered_set>
 
 #include "common/memory/stats.h"
+#include "common/network/socket_impl.h"
 #include "common/network/utility.h"
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
@@ -239,7 +239,12 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
 }
 
 TEST_F(QuicPlatformTest, QuicStackTraceTest) {
+#if !defined(ENVOY_CONFIG_COVERAGE) && !defined(GCC_COMPILER)
+  // This doesn't work in coverage build because part of the stacktrace will be overwritten by
+  // __llvm_coverage_mapping
+  // Stack trace under gcc with optimizations on (-c opt) doesn't include the test name
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
+#endif
 }
 
 TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
@@ -275,8 +280,8 @@ TEST_F(QuicPlatformTest, QuicThread) {
   EXPECT_EQ(1, value);
 
   // QuicThread will panic if it's started but not joined.
-  EXPECT_DEATH_LOG_TO_STDERR({ AdderThread(&value, 2).Start(); },
-                             "QuicThread should be joined before destruction");
+  EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
+               "QuicThread should be joined before destruction");
 }
 
 TEST_F(QuicPlatformTest, QuicUint128) {
@@ -323,7 +328,7 @@ TEST_F(QuicPlatformTest, QuicLog) {
   EXPECT_LOG_CONTAINS("info", "i=1", QUIC_VLOG(1) << "i=" << (i = 1));
   EXPECT_EQ(1, i);
 
-  errno = EINVAL;
+  errno = SOCKET_ERROR_INVAL;
   EXPECT_LOG_CONTAINS("info", "i=3:", QUIC_PLOG(INFO) << "i=" << (i = 3));
   EXPECT_EQ(3, i);
 }
@@ -392,9 +397,9 @@ TEST_F(QuicPlatformTest, QuicCHECK) {
                      "CHECK failed:.* Supposed to fail in debug mode.");
   EXPECT_DEBUG_DEATH({ DCHECK(false); }, "CHECK failed");
 
-  EXPECT_DEATH_LOG_TO_STDERR({ CHECK(false) << " Supposed to fail in all modes."; },
-                             "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH_LOG_TO_STDERR({ CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH({ CHECK(false) << " Supposed to fail in all modes."; },
+               "CHECK failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH({ CHECK(false); }, "CHECK failed");
 }
 
 // Test the behaviors of the cross products of
@@ -403,16 +408,16 @@ TEST_F(QuicPlatformTest, QuicCHECK) {
 TEST_F(QuicPlatformTest, QuicFatalLog) {
 #ifdef NDEBUG
   // Release build
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(FATAL) << "Should abort 0", "Should abort 0");
+  EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 0", "Should abort 0");
   QUIC_LOG(DFATAL) << "Should not abort";
   QUIC_DLOG(FATAL) << "Should compile out";
   QUIC_DLOG(DFATAL) << "Should compile out";
 #else
   // Debug build
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(FATAL) << "Should abort 1", "Should abort 1");
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(DFATAL) << "Should abort 2", "Should abort 2");
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_DLOG(FATAL) << "Should abort 3", "Should abort 3");
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_DLOG(DFATAL) << "Should abort 4", "Should abort 4");
+  EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 1", "Should abort 1");
+  EXPECT_DEATH(QUIC_LOG(DFATAL) << "Should abort 2", "Should abort 2");
+  EXPECT_DEATH(QUIC_DLOG(FATAL) << "Should abort 3", "Should abort 3");
+  EXPECT_DEATH(QUIC_DLOG(DFATAL) << "Should abort 4", "Should abort 4");
 #endif
 }
 
@@ -430,7 +435,7 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
   QUIC_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH_LOG_TO_STDERR(QUIC_NOTREACHED(), "not reached");
+  EXPECT_DEATH(QUIC_NOTREACHED(), "not reached");
 #endif
 }
 
@@ -592,12 +597,12 @@ TEST_F(QuicPlatformTest, QuicFlags) {
 }
 
 TEST_F(QuicPlatformTest, QuicPccSender) {
-  EXPECT_DEATH_LOG_TO_STDERR(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
-                                                   /*unacked_packets=*/nullptr, /*random=*/nullptr,
-                                                   /*stats=*/nullptr,
-                                                   /*initial_congestion_window=*/0,
-                                                   /*max_congestion_window=*/0),
-                             "PccSender is not supported.");
+  EXPECT_DEATH(quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
+                                     /*unacked_packets=*/nullptr, /*random=*/nullptr,
+                                     /*stats=*/nullptr,
+                                     /*initial_congestion_window=*/0,
+                                     /*max_congestion_window=*/0),
+               "PccSender is not supported.");
 }
 
 class FileUtilsTest : public testing::Test {
@@ -665,10 +670,9 @@ TEST_F(QuicPlatformTest, PickUnsedPort) {
         Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
     Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
         Envoy::Network::Utility::getAddressWithPort(*addr, port);
-    Envoy::Network::IoHandlePtr io_handle =
-        addr_with_port->socket(Envoy::Network::Address::SocketType::Datagram);
+    Envoy::Network::SocketImpl sock(Envoy::Network::Socket::Type::Datagram, addr_with_port);
     // binding of given port should success.
-    EXPECT_EQ(0, addr_with_port->bind(io_handle->fd()).rc_);
+    EXPECT_EQ(0, sock.bind(addr_with_port).rc_);
   }
 }
 
@@ -682,8 +686,8 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   });
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
-      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
-  EXPECT_DEATH_LOG_TO_STDERR(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
+      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
+  EXPECT_DEATH(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {

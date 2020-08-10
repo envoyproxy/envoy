@@ -28,7 +28,7 @@ public:
       destroy_cb_(this);
     }
   }
-  void raiseGoAway() { onGoAway(); }
+  void raiseGoAway(Http::GoAwayErrorCode error_code) { onGoAway(error_code); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
 
   DestroyCb destroy_cb_;
@@ -45,12 +45,14 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
     pool_ready_.ready();
   }
 
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason, absl::string_view,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
+    reason_ = reason;
     pool_failure_.ready();
   }
 
+  ConnectionPool::PoolFailureReason reason_;
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
   Http::RequestEncoder* outer_encoder_{};

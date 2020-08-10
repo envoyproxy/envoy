@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
       - "master"
+      - "release/v*"
   tags:
     include:
       - "v*"
@@ -13,12 +14,13 @@ jobs:
   - job: format
     dependsOn: [] # this removes the implicit dependency on previous stage and causes this to run in parallel.
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
-      - task: CacheBeta@1
+      - task: Cache@2
         inputs:
           key: "format | ./WORKSPACE | **/*.bzl"
           path: $(Build.StagingDirectory)/repository_cache
+        continueOnError: true
 
       - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
         workingDirectory: $(Build.SourcesDirectory)
@@ -42,11 +44,27 @@ jobs:
     condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
     timeoutInMinutes: 360
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - template: bazel.yml
         parameters:
           ciTarget: bazel.release
+
+  - job: release_arm64
+    displayName: "Linux-arm64 release"
+    dependsOn: ["format"]
+    # For master builds, continue even if format fails
+    condition: and(not(canceled()), or(succeeded(), ne(variables['Build.Reason'], 'PullRequest')))
+    timeoutInMinutes: 360
+    pool: "arm-large"
+    steps:
+      - template: bazel.yml
+        parameters:
+          managedAgent: false
+          ciTarget: bazel.release
+          rbe: false
+          artifactSuffix: ".arm64"
+          bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
   - job: bazel
     displayName: "Linux-x64"
@@ -68,18 +86,47 @@ jobs:
           CI_TARGET: "bazel.compile_time_options"
     timeoutInMinutes: 360
     pool:
-      vmImage: "Ubuntu 16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - template: bazel.yml
         parameters:
           ciTarget: $(CI_TARGET)
 
-  - job: docker
-    displayName: "Linux-x64 docker"
+  - job: coverage
+    displayName: "Linux-x64"
     dependsOn: ["release"]
+    timeoutInMinutes: 360
+    pool: "x64-large"
+    strategy:
+      maxParallel: 2
+      matrix:
+        coverage:
+          CI_TARGET: "coverage"
+        fuzz_coverage:
+          CI_TARGET: "fuzz_coverage"
+    steps:
+      - template: bazel.yml
+        parameters:
+          managedAgent: false
+          ciTarget: bazel.$(CI_TARGET)
+          rbe: false
+          # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
+          bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
+
+      - script: ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/$(CI_TARGET) $(CI_TARGET)'
+        displayName: "Upload $(CI_TARGET) Report to GCS"
+        env:
+          ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+        condition: always()
+
+  - job: docker
+    displayName: "Linux multi-arch docker"
+    dependsOn: ["release","release_arm64"]
     condition: and(succeeded(), eq(variables['PostSubmit'], 'true'), ne(variables['Build.Reason'], 'PullRequest'))
     pool:
-      vmImage: "ubuntu-16.04"
+      vmImage: "ubuntu-18.04"
     steps:
       - task: DownloadBuildArtifacts@0
         inputs:
@@ -88,17 +135,22 @@ jobs:
           itemPattern: "bazel.release/envoy_binary.tar.gz"
           downloadType: single
           targetPath: $(Build.StagingDirectory)
-
+      - task: DownloadBuildArtifacts@0
+        inputs:
+          buildType: current
+          artifactName: "bazel.release.arm64"
+          itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
+          downloadType: single
+          targetPath: $(Build.StagingDirectory)
       - bash: |
           set -e
-          tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz
-          ci/docker_build.sh
-          ci/docker_push.sh
-          ci/docker_tag.sh
+          mkdir -p linux/amd64 && tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+          mkdir -p linux/arm64 && tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+          ci/docker_ci.sh
         workingDirectory: $(Build.SourcesDirectory)
         env:
           AZP_BRANCH: $(Build.SourceBranch)
-          CIRCLE_SHA1: $(Build.SourceVersion)
+          AZP_SHA1: $(Build.SourceVersion)
           DOCKERHUB_USERNAME: $(DockerUsername)
           DOCKERHUB_PASSWORD: $(DockerPassword)
 
@@ -114,6 +166,7 @@ jobs:
       - script: ./ci/mac_ci_steps.sh
         displayName: "Run Mac CI"
         env:
+          BAZEL_BUILD_EXTRA_OPTIONS: --remote_download_toplevel
           BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
           BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
           GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
@@ -130,16 +183,11 @@ jobs:
     pool:
       vmImage: "windows-latest"
     steps:
-      - powershell: |
-          .\ci\windows_ci_setup.ps1
-          Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR"
-        displayName: "Install dependencies"
-        env:
-          TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
-
-      - bash: ci/windows_ci_steps.sh
+      - bash: ci/run_envoy_docker_windows.sh ci/windows_ci_steps.sh
         displayName: "Run Windows CI"
         env:
-          TMPDIR: $(Agent.TempDirectory)
-          BAZEL_VC: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\VC"
-          BAZEL_SH: "C:\\Program Files\\Git\\bin\\bash.exe"
+          ENVOY_RBE: "true"
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --config=remote-msvc-cl --jobs=$(RbeJobs)"
+          BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+          BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+          GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)

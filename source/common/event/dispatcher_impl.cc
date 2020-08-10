@@ -32,34 +32,33 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
-    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
-
-DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system)
-    : api_(api), buffer_factory_(std::move(factory)),
-      scheduler_(time_system.createScheduler(base_scheduler_)),
-      deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
-      post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
+    : DispatcherImpl(name, std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
+
+DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
+                               Api::Api& api, Event::TimeSystem& time_system)
+    : name_(name), api_(api), buffer_factory_(std::move(factory)),
+      scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
+      deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
+          [this]() -> void { clearDeferredDeleteList(); })),
+      post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
-#ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::registerFatalErrorHandler(*this);
-#endif
-  updateApproximateMonotonicTime();
+  ASSERT(!name_.empty());
+  FatalErrorHandler::registerFatalErrorHandler(*this);
+  updateApproximateMonotonicTimeInternal();
   base_scheduler_.registerOnPrepareCallback(
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() {
-#ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::removeFatalErrorHandler(*this);
-#endif
-}
+DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
 
-void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
+void DispatcherImpl::initializeStats(Stats::Scope& scope,
+                                     const absl::optional<std::string>& prefix) {
+  const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
-  post([this, &scope, prefix] {
-    stats_prefix_ = prefix + "dispatcher";
+  post([this, &scope, effective_prefix] {
+    stats_prefix_ = effective_prefix + "dispatcher";
     stats_ = std::make_unique<DispatcherStats>(
         DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
     base_scheduler_.initializeStats(stats_.get());
@@ -150,10 +149,17 @@ Network::UdpListenerPtr DispatcherImpl::createUdpListener(Network::SocketSharedP
   return std::make_unique<Network::UdpListenerImpl>(*this, std::move(socket), cb, timeSource());
 }
 
-TimerPtr DispatcherImpl::createTimer(TimerCb cb) { return createTimerInternal(cb); }
+TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
+  ASSERT(isThreadSafe());
+  return createTimerInternal(cb);
+}
+
+Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
+  ASSERT(isThreadSafe());
+  return base_scheduler_.createSchedulableCallback(cb);
+}
 
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
-  ASSERT(isThreadSafe());
   return scheduler_->createTimer(cb, *this);
 }
 
@@ -162,7 +168,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   current_to_delete_->emplace_back(std::move(to_delete));
   ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
   if (1 == current_to_delete_->size()) {
-    deferred_delete_timer_->enableTimer(std::chrono::milliseconds(0));
+    deferred_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
@@ -182,7 +188,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 
   if (do_post) {
-    post_timer_->enableTimer(std::chrono::milliseconds(0));
+    post_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
@@ -201,8 +207,10 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
   return approximate_monotonic_time_;
 }
 
-void DispatcherImpl::updateApproximateMonotonicTime() {
-  approximate_monotonic_time_ = timeSource().monotonicTime();
+void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
+
+void DispatcherImpl::updateApproximateMonotonicTimeInternal() {
+  approximate_monotonic_time_ = api_.timeSource().monotonicTime();
 }
 
 void DispatcherImpl::runPostCallbacks() {

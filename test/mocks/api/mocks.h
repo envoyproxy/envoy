@@ -29,13 +29,15 @@ public:
   ~MockApi() override;
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher() override;
-  Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+                                          Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   TimeSource& timeSource() override { return time_system_; }
 
-  MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_, (Event::TimeSystem&));
+  MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_, (const std::string&, Event::TimeSystem&));
   MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_,
-              (Buffer::WatermarkFactoryPtr && watermark_factory, Event::TimeSystem&));
+              (const std::string&, Buffer::WatermarkFactoryPtr&& watermark_factory,
+               Event::TimeSystem&));
   MOCK_METHOD(Filesystem::Instance&, fileSystem, ());
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
   MOCK_METHOD(const Stats::Scope&, rootScope, ());
@@ -88,6 +90,7 @@ public:
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));
   MOCK_METHOD(SysCallSizeResult, write, (os_fd_t sockfd, const void* buffer, size_t length));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
+  MOCK_METHOD(bool, supportsUdpGro, (), (const));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;

@@ -4,7 +4,7 @@
 #include "extensions/filters/network/sni_cluster/sni_cluster.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 
 #include "gmock/gmock.h"

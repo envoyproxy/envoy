@@ -13,6 +13,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -20,7 +21,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "BaseProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common types]
 
@@ -94,7 +95,7 @@ message BuildVersion {
   type.v3.SemanticVersion version = 1;
 
   // Free-form build information.
-  // Envoy defines several well known keys in the source/common/common/version.h file
+  // Envoy defines several well known keys in the source/common/version/version.h file
   google.protobuf.Struct metadata = 2;
 }
 
@@ -239,6 +240,17 @@ message RuntimeUInt32 {
   string runtime_key = 3 [(validate.rules).string = {min_bytes: 1}];
 }
 
+// Runtime derived double with a default when not specified.
+message RuntimeDouble {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RuntimeDouble";
+
+  // Default value if runtime value is not available.
+  double default_value = 1;
+
+  // Runtime key to get value for comparison. This value is used if defined.
+  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
+}
+
 // Runtime derived bool with a default when not specified.
 message RuntimeFeatureFlag {
   option (udpa.annotations.versioning).previous_message_type =
@@ -321,7 +333,8 @@ message RetryPolicy {
 
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1.
-  google.protobuf.UInt32Value num_retries = 2;
+  google.protobuf.UInt32Value num_retries = 2
+      [(udpa.annotations.field_migrate).rename = "max_retries"];
 }
 
 // The message specifies how to fetch data from remote and how to verify it.

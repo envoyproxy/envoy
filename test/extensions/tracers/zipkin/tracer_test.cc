@@ -45,7 +45,7 @@ protected:
 TEST_F(ZipkinTracerTest, SpanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, false, true, time_system_);
   SystemTime timestamp = time_system_.systemTime();
 
@@ -56,7 +56,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   // Test the creation of a root span --> CS
   // ==============
   ON_CALL(random_generator, random()).WillByDefault(Return(1000));
-  time_system_.sleep(std::chrono::milliseconds(1));
+  time_system_.advanceTimeWait(std::chrono::milliseconds(1));
   SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp);
 
   EXPECT_EQ("my_span", root_span->name());
@@ -184,9 +184,9 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   TestRandomGenerator generator;
-  const uint generated_parent_id = generator.random();
-  SpanContext modified_root_span_context(root_span_context.trace_id_high(),
-                                         root_span_context.trace_id(), root_span_context.id(),
+  const uint64_t generated_parent_id = generator.random();
+  SpanContext modified_root_span_context(root_span_context.traceIdHigh(),
+                                         root_span_context.traceId(), root_span_context.id(),
                                          generated_parent_id, root_span_context.sampled());
   SpanPtr new_shared_context_span =
       tracer.startSpan(config, "new_shared_context_span", timestamp, modified_root_span_context);
@@ -202,7 +202,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 
   // The parent should be the same as in the CS side
   EXPECT_TRUE(new_shared_context_span->isSetParentId());
-  EXPECT_EQ(modified_root_span_context.parent_id(), new_shared_context_span->parentId());
+  EXPECT_EQ(modified_root_span_context.parentId(), new_shared_context_span->parentId());
 
   // span timestamp should not be set (it was set in the CS side)
   EXPECT_FALSE(new_shared_context_span->isSetTimestamp());
@@ -229,7 +229,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 TEST_F(ZipkinTracerTest, FinishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, false, true, time_system_);
   SystemTime timestamp = time_system_.systemTime();
 
@@ -312,7 +312,7 @@ TEST_F(ZipkinTracerTest, FinishSpan) {
 TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, false, true, time_system_);
   SystemTime timestamp = time_system_.systemTime();
 
@@ -340,7 +340,7 @@ TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
 TEST_F(ZipkinTracerTest, SpanSampledPropagatedToChild) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, false, true, time_system_);
   SystemTime timestamp = time_system_.systemTime();
 
@@ -368,7 +368,7 @@ TEST_F(ZipkinTracerTest, SpanSampledPropagatedToChild) {
 TEST_F(ZipkinTracerTest, RootSpan128bitTraceId) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, true, true, time_system_);
   SystemTime timestamp = time_system_.systemTime();
 
@@ -387,7 +387,7 @@ TEST_F(ZipkinTracerTest, RootSpan128bitTraceId) {
 TEST_F(ZipkinTracerTest, SharedSpanContext) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
 
   const bool shared_span_context = true;
   Tracer tracer("my_service_name", addr, random_generator, false, shared_span_context,
@@ -411,7 +411,7 @@ TEST_F(ZipkinTracerTest, SharedSpanContext) {
 TEST_F(ZipkinTracerTest, NotSharedSpanContext) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
-  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  NiceMock<Random::MockRandomGenerator> random_generator;
 
   const bool shared_span_context = false;
   Tracer tracer("my_service_name", addr, random_generator, false, shared_span_context,

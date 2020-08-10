@@ -43,7 +43,7 @@ public:
 class MockMirrorPolicy : public MirrorPolicy {
 public:
   MockMirrorPolicy(ConnPool::InstanceSharedPtr);
-  ~MockMirrorPolicy() = default;
+  ~MockMirrorPolicy() override = default;
 
   MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
   MOCK_METHOD(bool, shouldMirror, (const std::string&), (const));
@@ -101,6 +101,7 @@ public:
 
   MOCK_METHOD(bool, connectionAllowed, ());
   MOCK_METHOD(void, onAuth, (const std::string& password));
+  MOCK_METHOD(void, onAuth, (const std::string& username, const std::string& password));
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
 };
 

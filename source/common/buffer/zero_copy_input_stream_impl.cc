@@ -19,15 +19,19 @@ void ZeroCopyInputStreamImpl::move(Buffer::Instance& instance) {
   buffer_->move(instance);
 }
 
-bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
+void ZeroCopyInputStreamImpl::drainLastSlice() {
   if (position_ != 0) {
     buffer_->drain(position_);
     position_ = 0;
   }
+}
+
+bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
+  drainLastSlice();
 
   Buffer::RawSliceVector slices = buffer_->getRawSlices(1);
 
-  if (slices.size() > 0 && slices[0].len_ > 0) {
+  if (!slices.empty() && slices[0].len_ > 0) {
     auto& slice = slices[0];
     *data = slice.mem_;
     *size = slice.len_;
@@ -44,7 +48,19 @@ bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
   return false;
 }
 
-bool ZeroCopyInputStreamImpl::Skip(int) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+bool ZeroCopyInputStreamImpl::Skip(int count) {
+  ASSERT(count >= 0);
+  drainLastSlice();
+
+  // Could not skip more than buffer length.
+  if (static_cast<uint64_t>(count) > buffer_->length()) {
+    return false;
+  }
+
+  buffer_->drain(count);
+  byte_count_ += count;
+  return true;
+}
 
 void ZeroCopyInputStreamImpl::BackUp(int count) {
   ASSERT(count >= 0);

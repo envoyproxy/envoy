@@ -1,9 +1,11 @@
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.h"
+#include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
+#include "envoy/config/trace/v3/http_tracer.pb.h"
 
 #include "extensions/tracers/dynamic_ot/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/tracer_factory.h"
+#include "test/mocks/server/tracer_factory_context.h"
 #include "test/test_common/environment.h"
 
 #include "fmt/printf.h"

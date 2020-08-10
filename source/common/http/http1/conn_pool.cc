@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
@@ -12,9 +13,9 @@
 
 #include "common/http/codec_client.h"
 #include "common/http/codes.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
-#include "common/http/http1/conn_pool_legacy.h"
-#include "common/runtime/runtime_impl.h"
+#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
@@ -26,16 +27,16 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-    : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                       transport_socket_options),
-      upstream_ready_timer_(dispatcher_.createTimer([this]() {
+    : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
+                           transport_socket_options, Protocol::Http11),
+      upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
       })) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
-ConnPoolImplBase::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
+Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
 
@@ -56,9 +57,9 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   } else {
     client.stream_wrapper_.reset();
 
-    if (!pending_requests_.empty() && !upstream_ready_enabled_) {
+    if (!pending_streams_.empty() && !upstream_ready_enabled_) {
       upstream_ready_enabled_ = true;
-      upstream_ready_timer_->enableTimer(std::chrono::milliseconds(0));
+      upstream_ready_cb_->scheduleCallbackCurrentIteration();
     }
 
     checkForDrained();
@@ -82,23 +83,27 @@ ConnPoolImpl::StreamWrapper::~StreamWrapper() {
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
 void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
-  // If Connection: close OR
-  //    Http/1.0 and not Connection: keep-alive OR
-  //    Proxy-Connection: close
-  if ((headers->Connection() &&
-       (absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
-                               Headers::get().ConnectionValues.Close))) ||
-      (parent_.codec_client_->protocol() == Protocol::Http10 &&
-       (!headers->Connection() ||
-        !absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
-                                Headers::get().ConnectionValues.KeepAlive))) ||
-      (headers->ProxyConnection() &&
-       (absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
-                               Headers::get().ConnectionValues.Close)))) {
-    parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
-    close_connection_ = true;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fixed_connection_close")) {
+    close_connection_ =
+        HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
+    if (close_connection_) {
+      parent_.parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
+    }
+  } else {
+    // If Connection: close OR
+    //    Http/1.0 and not Connection: keep-alive OR
+    //    Proxy-Connection: close
+    if ((absl::EqualsIgnoreCase(headers->getConnectionValue(),
+                                Headers::get().ConnectionValues.Close)) ||
+        (parent_.codec_client_->protocol() == Protocol::Http10 &&
+         !absl::EqualsIgnoreCase(headers->getConnectionValue(),
+                                 Headers::get().ConnectionValues.KeepAlive)) ||
+        (absl::EqualsIgnoreCase(headers->getProxyConnectionValue(),
+                                Headers::get().ConnectionValues.Close))) {
+      parent_.parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
+      close_connection_ = true;
+    }
   }
-
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
@@ -108,14 +113,12 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
-    : ConnPoolImplBase::ActiveClient(
+    : Envoy::Http::ActiveClient(
           parent, parent.host_->cluster().maxRequestsPerConnection(),
           1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
       ) {
   parent.host_->cluster().stats().upstream_cx_http1_total_.inc();
 }
-
-bool ConnPoolImpl::ActiveClient::hasActiveRequests() const { return stream_wrapper_ != nullptr; }
 
 bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
@@ -138,14 +141,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr hos
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.new_http1_connection_pool_behavior")) {
-    return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                           transport_socket_options);
-  } else {
-    return std::make_unique<Http::Legacy::Http1::ProdConnPoolImpl>(
-        dispatcher, host, priority, options, transport_socket_options);
-  }
+  return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                         transport_socket_options);
 }
 
 } // namespace Http1

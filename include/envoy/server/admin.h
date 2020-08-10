@@ -60,7 +60,7 @@ public:
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds
  * a callback that executes X when the specified admin handler is hit. This macro can be
- * used to add static handlers as in source/server/http/admin.cc and also dynamic handlers as
+ * used to add static handlers as in source/server/admin/admin.cc and also dynamic handlers as
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
@@ -153,6 +153,11 @@ public:
    * @param handler the handler that will receive this Admin's listener.
    */
   virtual void addListenerToHandler(Network::ConnectionHandler* handler) PURE;
+
+  /**
+   * @return the number of worker threads to run in the server.
+   */
+  virtual uint32_t concurrency() const PURE;
 };
 
 } // namespace Server

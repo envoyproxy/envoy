@@ -5,6 +5,8 @@ package envoy.service.ratelimit.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -13,7 +15,7 @@ option java_package = "io.envoyproxy.envoy.service.ratelimit.v3";
 option java_outer_classname = "RlsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Rate Limit Service (RLS)]
 
@@ -69,6 +71,8 @@ message RateLimitResponse {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.ratelimit.v2.RateLimitResponse.RateLimit";
 
+    // Identifies the unit of of time for rate limit.
+    // [#comment: replace by envoy/type/v3/ratelimit_unit.proto in v4]
     enum Unit {
       // The time unit is not known.
       UNKNOWN = 0;
@@ -85,6 +89,9 @@ message RateLimitResponse {
       // The time unit representing a day.
       DAY = 4;
     }
+
+    // A name or description of this limit.
+    string name = 3;
 
     // The number of requests per unit of time.
     uint32 requests_per_unit = 1;
@@ -105,6 +112,9 @@ message RateLimitResponse {
 
     // The limit remaining in the current time unit.
     uint32 limit_remaining = 3;
+
+    // Duration until reset of the current limit window.
+    google.protobuf.Duration duration_until_reset = 4;
   }
 
   // The overall response code which takes into account all of the descriptors that were passed

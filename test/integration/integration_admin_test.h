@@ -16,6 +16,17 @@ class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
     config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+    config_helper_.addConfigModifier(
+        [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto& hist_settings =
+              *bootstrap.mutable_stats_config()->mutable_histogram_bucket_settings();
+          envoy::config::metrics::v3::HistogramBucketSettings* setting = hist_settings.Add();
+          setting->mutable_match()->set_suffix("upstream_cx_connect_ms");
+          setting->mutable_buckets()->Add(1);
+          setting->mutable_buckets()->Add(2);
+          setting->mutable_buckets()->Add(3);
+          setting->mutable_buckets()->Add(4);
+        });
     HttpIntegrationTest::initialize();
   }
 
@@ -32,15 +43,7 @@ public:
     response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
                                                   downstreamProtocol(), version_);
     EXPECT_TRUE(response->complete());
-    return response->headers().Status()->value().getStringView();
-  }
-
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
+    return response->headers().getStatusValue();
   }
 
   /**

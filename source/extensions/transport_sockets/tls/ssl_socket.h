@@ -60,6 +60,7 @@ public:
   bool peerCertificateValidated() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
+  const std::string& sha1PeerCertificateDigest() const override;
   const std::string& serialNumberPeerCertificate() const override;
   const std::string& issuerPeerCertificate() const override;
   const std::string& subjectPeerCertificate() const override;
@@ -76,8 +77,7 @@ public:
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
   absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
-
-  SSL* rawSslForTest() const { return ssl_.get(); }
+  SSL* ssl() const { return ssl_.get(); }
 
   bssl::UniquePtr<SSL> ssl_;
 
@@ -92,6 +92,7 @@ private:
   mutable bssl::UniquePtr<X509> cached_peer_certificate_;
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
+  mutable std::string cached_sha_1_peer_certificate_digest_;
   mutable std::string cached_serial_number_peer_certificate_;
   mutable std::string cached_issuer_peer_certificate_;
   mutable std::string cached_subject_peer_certificate_;
@@ -105,6 +106,8 @@ private:
   mutable std::string cached_tls_version_;
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
 };
+
+using SslSocketInfoConstSharedPtr = std::shared_ptr<const SslSocketInfo>;
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::PrivateKeyConnectionCallbacks,
@@ -126,7 +129,10 @@ public:
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
 
-  SSL* rawSslForTest() const { return ssl_; }
+  SSL* rawSslForTest() const { return rawSsl(); }
+
+protected:
+  SSL* rawSsl() const { return info_->ssl_.get(); }
 
 private:
   struct ReadResult {
@@ -149,8 +155,7 @@ private:
   std::string failure_reason_;
   SocketState state_;
 
-  SSL* ssl_;
-  Ssl::ConnectionInfoConstSharedPtr info_;
+  SslSocketInfoConstSharedPtr info_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

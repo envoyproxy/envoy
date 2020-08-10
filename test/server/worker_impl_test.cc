@@ -1,10 +1,14 @@
+#include "envoy/network/exception.h"
+
 #include "common/api/api_impl.h"
 #include "common/event/dispatcher_impl.h"
 
 #include "server/worker_impl.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/guard_dog.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -25,10 +29,10 @@ namespace {
 class WorkerImplTest : public testing::Test {
 public:
   WorkerImplTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("worker_test")),
         no_exit_timer_(dispatcher_->createTimer([]() -> void {})),
         worker_(tls_, hooks_, std::move(dispatcher_), Network::ConnectionHandlerPtr{handler_},
-                overload_manager_, *api_, "worker_test") {
+                overload_manager_, *api_) {
     // In the real worker the watchdog has timers that prevent exit. Here we need to prevent event
     // loop exit since we use mock timers.
     no_exit_timer_->enableTimer(std::chrono::hours(1));
@@ -61,30 +65,32 @@ TEST_F(WorkerImplTest, BasicFlow) {
   // thread starts running.
   NiceMock<Network::MockListenerConfig> listener;
   ON_CALL(listener, listenerTag()).WillByDefault(Return(1UL));
-  EXPECT_CALL(*handler_, addListener(_))
-      .WillOnce(Invoke([current_thread_id](Network::ListenerConfig& config) -> void {
-        EXPECT_EQ(config.listenerTag(), 1UL);
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
-  worker_.addListener(listener, [&ci](bool success) -> void {
+  EXPECT_CALL(*handler_, addListener(_, _))
+      .WillOnce(Invoke(
+          [current_thread_id](absl::optional<uint64_t>, Network::ListenerConfig& config) -> void {
+            EXPECT_EQ(config.listenerTag(), 1UL);
+            EXPECT_NE(current_thread_id, std::this_thread::get_id());
+          }));
+  worker_.addListener(absl::nullopt, listener, [&ci](bool success) -> void {
     EXPECT_TRUE(success);
     ci.setReady();
   });
 
   NiceMock<Stats::MockStore> store;
   worker_.start(guard_dog_);
-  worker_.initializeStats(store, "test");
+  worker_.initializeStats(store);
   ci.waitReady();
 
   // After a worker is started adding/stopping/removing a listener happens on the worker thread.
   NiceMock<Network::MockListenerConfig> listener2;
   ON_CALL(listener2, listenerTag()).WillByDefault(Return(2UL));
-  EXPECT_CALL(*handler_, addListener(_))
-      .WillOnce(Invoke([current_thread_id](Network::ListenerConfig& config) -> void {
-        EXPECT_EQ(config.listenerTag(), 2UL);
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
-  worker_.addListener(listener2, [&ci](bool success) -> void {
+  EXPECT_CALL(*handler_, addListener(_, _))
+      .WillOnce(Invoke(
+          [current_thread_id](absl::optional<uint64_t>, Network::ListenerConfig& config) -> void {
+            EXPECT_EQ(config.listenerTag(), 2UL);
+            EXPECT_NE(current_thread_id, std::this_thread::get_id());
+          }));
+  worker_.addListener(absl::nullopt, listener2, [&ci](bool success) -> void {
     EXPECT_TRUE(success);
     ci.setReady();
   });
@@ -118,12 +124,13 @@ TEST_F(WorkerImplTest, BasicFlow) {
   // Now test adding and removing a listener without stopping it first.
   NiceMock<Network::MockListenerConfig> listener3;
   ON_CALL(listener3, listenerTag()).WillByDefault(Return(3UL));
-  EXPECT_CALL(*handler_, addListener(_))
-      .WillOnce(Invoke([current_thread_id](Network::ListenerConfig& config) -> void {
-        EXPECT_EQ(config.listenerTag(), 3UL);
-        EXPECT_NE(current_thread_id, std::this_thread::get_id());
-      }));
-  worker_.addListener(listener3, [&ci](bool success) -> void {
+  EXPECT_CALL(*handler_, addListener(_, _))
+      .WillOnce(Invoke(
+          [current_thread_id](absl::optional<uint64_t>, Network::ListenerConfig& config) -> void {
+            EXPECT_EQ(config.listenerTag(), 3UL);
+            EXPECT_NE(current_thread_id, std::this_thread::get_id());
+          }));
+  worker_.addListener(absl::nullopt, listener3, [&ci](bool success) -> void {
     EXPECT_TRUE(success);
     ci.setReady();
   });
@@ -145,9 +152,9 @@ TEST_F(WorkerImplTest, ListenerException) {
 
   NiceMock<Network::MockListenerConfig> listener;
   ON_CALL(listener, listenerTag()).WillByDefault(Return(1UL));
-  EXPECT_CALL(*handler_, addListener(_))
+  EXPECT_CALL(*handler_, addListener(_, _))
       .WillOnce(Throw(Network::CreateListenerException("failed")));
-  worker_.addListener(listener, [](bool success) -> void { EXPECT_FALSE(success); });
+  worker_.addListener(absl::nullopt, listener, [](bool success) -> void { EXPECT_FALSE(success); });
 
   worker_.start(guard_dog_);
   worker_.stop();

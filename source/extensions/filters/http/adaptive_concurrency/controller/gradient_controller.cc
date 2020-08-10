@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/runtime/runtime.h"
@@ -46,9 +47,10 @@ GradientControllerConfig::GradientControllerConfig(
 GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
                                        const std::string& stats_prefix, Stats::Scope& scope,
-                                       Runtime::RandomGenerator& random)
+                                       Random::RandomGenerator& random, TimeSource& time_source)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
-      stats_(generateStats(scope_, stats_prefix)), random_(random), num_rq_outstanding_(0),
+      stats_(generateStats(scope_, stats_prefix)), random_(random), time_source_(time_source),
+      deferred_limit_value_(0), num_rq_outstanding_(0),
       concurrency_limit_(config_.minConcurrency()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
@@ -81,6 +83,14 @@ GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
 }
 
 void GradientController::enterMinRTTSamplingWindow() {
+  // There a potential race condition where setting the minimum concurrency multiple times in a row
+  // resets the minRTT sampling timer and triggers the calculation immediately. This could occur
+  // after the minRTT sampling window has already been entered, so we can simply return here knowing
+  // the desired action is already being performed.
+  if (inMinRTTSamplingWindow()) {
+    return;
+  }
+
   absl::MutexLock ml(&sample_mutation_mtx_);
 
   stats_.min_rtt_calculation_active_.set(1);
@@ -88,12 +98,14 @@ void GradientController::enterMinRTTSamplingWindow() {
   // Set the minRTT flag to indicate we're gathering samples to update the value. This will
   // prevent the sample window from resetting until enough requests are gathered to complete the
   // recalculation.
-  deferred_limit_value_.store(concurrencyLimit());
+  deferred_limit_value_.store(GradientController::concurrencyLimit());
   updateConcurrencyLimit(config_.minConcurrency());
 
   // Throw away any latency samples from before the recalculation window as it may not represent
   // the minRTT.
   hist_clear(latency_sample_hist_.get());
+
+  min_rtt_epoch_ = time_source_.monotonicTime();
 }
 
 void GradientController::updateMinRTT() {
@@ -184,16 +196,22 @@ RequestForwardingAction GradientController::forwardingDecision() {
   return RequestForwardingAction::Block;
 }
 
-void GradientController::recordLatencySample(std::chrono::nanoseconds rq_latency) {
-  const uint32_t latency_usec =
-      std::chrono::duration_cast<std::chrono::microseconds>(rq_latency).count();
+void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   ASSERT(num_rq_outstanding_.load() > 0);
   --num_rq_outstanding_;
 
+  if (rq_send_time < min_rtt_epoch_) {
+    // Disregard samples from requests started in the previous minRTT window.
+    return;
+  }
+
+  const std::chrono::microseconds rq_latency =
+      std::chrono::duration_cast<std::chrono::microseconds>(time_source_.monotonicTime() -
+                                                            rq_send_time);
   uint32_t sample_count;
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
-    hist_insert(latency_sample_hist_.get(), latency_usec, 1);
+    hist_insert(latency_sample_hist_.get(), rq_latency.count(), 1);
     sample_count = hist_sample_count(latency_sample_hist_.get());
   }
 
@@ -207,6 +225,32 @@ void GradientController::recordLatencySample(std::chrono::nanoseconds rq_latency
 void GradientController::cancelLatencySample() {
   ASSERT(num_rq_outstanding_.load() > 0);
   --num_rq_outstanding_;
+}
+
+void GradientController::updateConcurrencyLimit(const uint32_t new_limit) {
+  const auto old_limit = concurrency_limit_.load();
+  concurrency_limit_.store(new_limit);
+  stats_.concurrency_limit_.set(concurrency_limit_.load());
+
+  if (!inMinRTTSamplingWindow() && old_limit == config_.minConcurrency() &&
+      new_limit == config_.minConcurrency()) {
+    ++consecutive_min_concurrency_set_;
+  } else {
+    consecutive_min_concurrency_set_ = 0;
+  }
+
+  // If the concurrency limit is being set to the minimum value for the 5th consecutive sample
+  // window while not in the middle of a minRTT measurement, this might be indicative of an
+  // inaccurate minRTT measurement. Since the limit is already where it needs to be for a minRTT
+  // measurement, we should measure it again.
+  //
+  // There is a possibility that the minRTT measurement begins before we are able to
+  // cancel/re-enable the timer below and triggers overlapping minRTT windows. To protect against
+  // this, there is an explicit check when entering the minRTT measurement that ensures there is
+  // only a single minRTT measurement active at a time.
+  if (consecutive_min_concurrency_set_ >= 5) {
+    min_rtt_calc_timer_->enableTimer(std::chrono::milliseconds(0));
+  }
 }
 
 } // namespace Controller

@@ -1,16 +1,17 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
 licenses(["notice"])  # Apache 2
 
 # Kafka network filter.
 # Broker filter public docs: docs/root/configuration/network_filters/kafka_broker_filter.rst
 
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
-    "envoy_cc_library",
-    "envoy_package",
-)
-
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "kafka_broker_config_lib",
@@ -96,6 +97,7 @@ envoy_cc_library(
     ],
     deps = [
         ":serialization_lib",
+        ":tagged_fields_lib",
     ],
 )
 
@@ -159,6 +161,7 @@ envoy_cc_library(
     ],
     deps = [
         ":serialization_lib",
+        ":tagged_fields_lib",
     ],
 )
 

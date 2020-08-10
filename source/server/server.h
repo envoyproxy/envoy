@@ -10,6 +10,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
@@ -35,8 +36,8 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
+#include "server/admin/admin.h"
 #include "server/configuration_impl.h"
-#include "server/http/admin.h"
 #include "server/listener_hooks.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
@@ -53,6 +54,7 @@ namespace Server {
  */
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
   COUNTER(debug_assertion_failures)                                                                \
+  COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
   GAUGE(concurrency, NeverImport)                                                                  \
@@ -116,8 +118,8 @@ public:
    * Load a bootstrap config and perform validation.
    * @param bootstrap supplies the bootstrap to fill.
    * @param options supplies the server options.
-   * @param api reference to the Api object
    * @param validation_visitor message validation visitor instance.
+   * @param api reference to the Api object
    */
   static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                   const Options& options,
@@ -160,7 +162,7 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
-  Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
+  Envoy::Random::RandomGenerator& random() override { return server_.random(); }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
@@ -170,19 +172,23 @@ public:
   Api::Api& api() override { return server_.api(); }
   Grpc::Context& grpcContext() override { return server_.grpcContext(); }
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
+  ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
+  std::chrono::milliseconds statsFlushInterval() const override {
+    return server_.statsFlushInterval();
+  }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
-  Init::Manager* initManager() override { return &server_.initManager(); }
+  Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and
     // other for dynamic configuration. Choose the dynamic validation
     // visitor if server's init manager indicates that the server is
     // in the Initialized state, as this state is engaged right after
     // the static configuration (e.g., bootstrap) has been completed.
-    return initManager()->state() == Init::Manager::State::Initialized
+    return initManager().state() == Init::Manager::State::Initialized
                ? server_.messageValidationContext().dynamicValidationVisitor()
                : server_.messageValidationContext().staticValidationVisitor();
   }
@@ -206,7 +212,7 @@ public:
                Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
+               Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
                Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                std::unique_ptr<ProcessContext> process_context);
 
@@ -232,7 +238,7 @@ public:
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
-  Runtime::RandomGenerator& random() override { return *random_generator_; }
+  Random::RandomGenerator& random() override { return *random_generator_; }
   Runtime::Loader& runtime() override;
   void shutdown() override;
   bool isShutdown() final { return shutdown_; }
@@ -285,6 +291,8 @@ private:
   void terminate();
   void notifyCallbacksForStage(
       Stage stage, Event::PostCb completion_cb = [] {});
+  void onRuntimeReady();
+  void onClusterManagerPrimaryInitializationComplete();
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
@@ -305,19 +313,23 @@ private:
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
+  // Delete local_info_ as late as possible as some members below may reference it during their
+  // destruction.
+  LocalInfo::LocalInfoPtr local_info_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
+  Assert::ActionRegistrationPtr envoy_bug_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  Runtime::RandomGeneratorPtr random_generator_;
+  Random::RandomGeneratorPtr random_generator_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
@@ -328,7 +340,6 @@ private:
   Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
-  LocalInfo::LocalInfoPtr local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
@@ -342,6 +353,7 @@ private:
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
@@ -381,6 +393,9 @@ public:
   const std::vector<std::reference_wrapper<const Stats::ParentHistogram>>& histograms() override {
     return histograms_;
   }
+  const std::vector<std::reference_wrapper<const Stats::TextReadout>>& textReadouts() override {
+    return text_readouts_;
+  }
 
 private:
   std::vector<Stats::CounterSharedPtr> snapped_counters_;
@@ -389,6 +404,8 @@ private:
   std::vector<std::reference_wrapper<const Stats::Gauge>> gauges_;
   std::vector<Stats::ParentHistogramSharedPtr> snapped_histograms_;
   std::vector<std::reference_wrapper<const Stats::ParentHistogram>> histograms_;
+  std::vector<Stats::TextReadoutSharedPtr> snapped_text_readouts_;
+  std::vector<std::reference_wrapper<const Stats::TextReadout>> text_readouts_;
 };
 
 } // namespace Server

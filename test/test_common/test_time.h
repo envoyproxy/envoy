@@ -12,14 +12,16 @@ namespace Event {
 class TestRealTimeSystem : public TestTimeSystem {
 public:
   // TestTimeSystem
-  void sleep(const Duration& duration) override;
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+  void advanceTimeAsync(const Duration& duration) override;
+  void advanceTimeWait(const Duration& duration) override;
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                      const Duration& duration) noexcept
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // Event::TimeSystem
-  Event::SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
-    return real_time_system_.createScheduler(base_scheduler);
+  Event::SchedulerPtr createScheduler(Scheduler& base_scheduler,
+                                      CallbackScheduler& cb_scheduler) override {
+    return real_time_system_.createScheduler(base_scheduler, cb_scheduler);
   }
 
   // TimeSource

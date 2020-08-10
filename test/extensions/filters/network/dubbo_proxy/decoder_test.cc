@@ -38,8 +38,8 @@ public:
             Invoke([=](Buffer::Instance&,
                        MessageMetadataSharedPtr metadata) -> std::pair<ContextSharedPtr, bool> {
               auto context = std::make_shared<ContextImpl>();
-              context->set_header_size(16);
-              context->set_body_size(body_size);
+              context->setHeaderSize(16);
+              context->setBodySize(body_size);
               metadata->setMessageType(type);
 
               return std::pair<ContextSharedPtr, bool>(context, true);
@@ -99,7 +99,7 @@ TEST_F(DubboDecoderStateMachineTest, RequestMessageCallbacks) {
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
 
-  EXPECT_EQ(active_stream_->metadata_->message_type(), MessageType::Request);
+  EXPECT_EQ(active_stream_->metadata_->messageType(), MessageType::Request);
 }
 
 TEST_F(DubboDecoderStateMachineTest, ResponseMessageCallbacks) {
@@ -114,7 +114,7 @@ TEST_F(DubboDecoderStateMachineTest, ResponseMessageCallbacks) {
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
 
-  EXPECT_EQ(active_stream_->metadata_->message_type(), MessageType::Response);
+  EXPECT_EQ(active_stream_->metadata_->messageType(), MessageType::Response);
 }
 
 TEST_F(DubboDecoderStateMachineTest, SerializeRpcInvocationException) {
@@ -194,8 +194,8 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
                           MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
-        context->set_header_size(16);
-        context->set_body_size(10);
+        context->setHeaderSize(16);
+        context->setBodySize(10);
         return std::pair<ContextSharedPtr, bool>(context, true);
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _))
@@ -228,8 +228,8 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
                           MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
-        context->set_header_size(16);
-        context->set_body_size(10);
+        context->setHeaderSize(16);
+        context->setBodySize(10);
         return std::pair<ContextSharedPtr, bool>(context, true);
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
@@ -251,8 +251,8 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
                           MessageMetadataSharedPtr metadate) -> std::pair<ContextSharedPtr, bool> {
         metadate->setMessageType(MessageType::Response);
         auto context = std::make_shared<ContextImpl>();
-        context->set_header_size(16);
-        context->set_body_size(10);
+        context->setHeaderSize(16);
+        context->setBodySize(10);
         return std::pair<ContextSharedPtr, bool>(context, true);
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));

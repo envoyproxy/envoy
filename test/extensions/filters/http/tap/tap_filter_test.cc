@@ -1,7 +1,9 @@
+#include "extensions/filters/http/tap/config.h"
 #include "extensions/filters/http/tap/tap_filter.h"
 
 #include "test/extensions/filters/http/tap/common.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -99,7 +101,7 @@ TEST_F(TapFilterTest, Config) {
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(*http_per_request_tapper_, onRequestHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  Buffer::OwnedImpl request_body;
+  Buffer::OwnedImpl request_body("hello");
   EXPECT_CALL(*http_per_request_tapper_, onRequestBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
   Http::TestRequestTrailerMapImpl request_trailers;
@@ -111,7 +113,7 @@ TEST_F(TapFilterTest, Config) {
             filter_->encode100ContinueHeaders(response_headers));
   EXPECT_CALL(*http_per_request_tapper_, onResponseHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl response_body;
+  Buffer::OwnedImpl response_body("hello");
   EXPECT_CALL(*http_per_request_tapper_, onResponseBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
   Http::TestResponseTrailerMapImpl response_trailers;
@@ -124,6 +126,28 @@ TEST_F(TapFilterTest, Config) {
 
   // Workaround InSequence/shared_ptr mock leak.
   EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(http_tap_config_.get()));
+}
+
+TEST(TapFilterConfigTest, InvalidProto) {
+  const std::string filter_config =
+      R"EOF(
+  common_config:
+    static_config:
+      match_config:
+        any_match: true
+      output_config:
+        sinks:
+          - format: JSON_BODY_AS_STRING
+            streaming_admin: {}
+)EOF";
+
+  envoy::extensions::filters::http::tap::v3::Tap config;
+  TestUtility::loadFromYaml(filter_config, config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TapFilterFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(config, "stats", context),
+                            EnvoyException,
+                            "Error: Specifying admin streaming output without configuring admin.");
 }
 
 } // namespace

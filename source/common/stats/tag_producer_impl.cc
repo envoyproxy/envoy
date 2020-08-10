@@ -14,7 +14,7 @@ namespace Stats {
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config) {
   // To check name conflict.
   reserveResources(config);
-  std::unordered_set<std::string> names = addDefaultExtractors(config);
+  absl::node_hash_set<std::string> names = addDefaultExtractors(config);
 
   for (const auto& tag_specifier : config.stats_tags()) {
     const std::string& name = tag_specifier.tag_name();
@@ -97,9 +97,9 @@ void TagProducerImpl::reserveResources(const envoy::config::metrics::v3::StatsCo
   default_tags_.reserve(config.stats_tags().size());
 }
 
-std::unordered_set<std::string>
+absl::node_hash_set<std::string>
 TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config) {
-  std::unordered_set<std::string> names;
+  absl::node_hash_set<std::string> names;
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
       names.emplace(desc.name_);

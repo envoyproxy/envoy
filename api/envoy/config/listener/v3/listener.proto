@@ -5,6 +5,7 @@ package envoy.config.listener.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
@@ -14,6 +15,9 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/core/v1/collection_entry.proto";
+
+import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -21,12 +25,18 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#next-free-field: 23]
+// Listener list collections. Entries are *Listener* resources or references.
+// [#not-implemented-hide:]
+message ListenerCollection {
+  udpa.core.v1.CollectionEntry entries = 1;
+}
+
+// [#next-free-field: 24]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -108,7 +118,8 @@ message Listener {
 
   // Soft limit on size of the listener’s new connection read and write buffers.
   // If unspecified, an implementation defined default is applied (1MiB).
-  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5;
+  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5
+      [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Listener metadata.
   core.v3.Metadata metadata = 6;
@@ -238,4 +249,14 @@ message Listener {
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
   // emitted by this listener.
   repeated accesslog.v3.AccessLog access_log = 22;
+
+  // If the protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`, this field specifies the actual udp
+  // writer to create, i.e. :ref:`name <envoy_api_field_config.core.v3.TypedExtensionConfig.name>`
+  //    = "udp_default_writer" for creating a udp writer with writing in passthrough mode,
+  //    = "udp_gso_batch_writer" for creating a udp writer with writing in batch mode.
+  // If not present, treat it as "udp_default_writer".
+  // [#not-implemented-hide:]
+  core.v3.TypedExtensionConfig udp_writer_config = 23;
 }

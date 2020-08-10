@@ -39,22 +39,20 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
     Network::Address::InstanceConstSharedPtr envoy_addr =
         quicAddressToEnvoyAddressInstance(quic_addr);
     EXPECT_EQ(quic_addr.ToString(), envoy_addr->asStringView());
-    EXPECT_EQ(quic_addr, envoyAddressInstanceToQuicSocketAddress(envoy_addr));
+    EXPECT_EQ(quic_addr, envoyIpAddressToQuicSocketAddress(envoy_addr->ip()));
   }
 }
 
 TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   spdy::SpdyHeaderBlock headers_block;
-  headers_block[":host"] = "www.google.com";
+  headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
   auto envoy_headers = spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block);
   EXPECT_EQ(headers_block.size(), envoy_headers->size());
-  EXPECT_EQ("www.google.com",
-            envoy_headers->get(Http::LowerCaseString(":host"))->value().getStringView());
-  EXPECT_EQ("/index.hml",
-            envoy_headers->get(Http::LowerCaseString(":path"))->value().getStringView());
-  EXPECT_EQ("https", envoy_headers->get(Http::LowerCaseString(":scheme"))->value().getStringView());
+  EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
+  EXPECT_EQ("/index.hml", envoy_headers->getPathValue());
+  EXPECT_EQ("https", envoy_headers->getSchemeValue());
 
   quic::QuicHeaderList quic_headers = quic::test::AsHeaderList(headers_block);
   auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers);

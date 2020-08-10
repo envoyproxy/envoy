@@ -18,7 +18,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -102,7 +102,7 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -122,14 +122,24 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
           "connect_timeout": "0.01s",
           "per_connection_buffer_limit_bytes": 8192,
           "lb_policy": "round_robin",
-          "hosts": [
-            {
-              "socket_address" : {
-                "address": "127.0.0.1",
-                "port_value": 9999
+          "load_assignment": {
+    "endpoints": [
+      {
+        "lb_endpoints": [
+          {
+            "endpoint": {
+              "address": {
+                "socket_address": {
+                  "address": "127.0.0.1",
+                  "port_value": 9999
+                }
               }
             }
-          ]
+          }
+        ]
+      }
+    ]
+  }
         }
       ]
     },
@@ -145,7 +155,7 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -189,7 +199,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -229,7 +239,7 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
@@ -281,7 +291,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
@@ -307,7 +317,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
@@ -338,7 +348,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   envoy::config::metrics::v3::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
@@ -368,7 +378,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   bootstrap.mutable_stats_sinks()->Add();
 
@@ -397,7 +407,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   udpa::type::v1::TypedStruct typed_struct;
@@ -530,7 +540,7 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   }
   )EOF";
 
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   InitialImpl config(bootstrap);
   Network::MockListenSocket socket_mock;
 
@@ -543,6 +553,244 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
       socket_mock, envoy::config::core::v3::SocketOption::STATE_BOUND);
   ASSERT_NE(detail, absl::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
+}
+
+TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
+  const std::string json = R"EOF(
+  {
+    "static_resources": {
+      "listeners" : [],
+      "clusters": [
+        {
+          "name": "test_cluster",
+          "type": "static",
+          "connect_timeout": "0.01s",
+          "per_connection_buffer_limit_bytes": 8192,
+          "lb_policy": "RING_HASH",
+          "load_assignment": {
+            "cluster_name": "load_test_cluster",
+            "endpoints": [
+              {
+                "priority": 93
+              },
+              {
+                "locality": {
+                  "zone": "zone1"
+                },
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "pipe": {
+                          "path": "path/to/pipe"
+                        }
+                      }
+                    },
+                    "health_status": "TIMEOUT",
+                    "load_balancing_weight": {
+                      "value": 4294967295
+                    }
+                  },
+                  {
+                    "endpoint": {
+                      "address": {
+                        "pipe": {
+                          "path": "path/to/pipe2"
+                        }
+                      }
+                    },
+                    "health_status": "TIMEOUT",
+                    "load_balancing_weight": {
+                      "value": 1
+                    }
+                  }
+                ],
+                "load_balancing_weight": {
+                  "value": 122
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "The sum of weights of all upstream hosts in a locality exceeds 4294967295");
+}
+
+TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
+  const std::string json = R"EOF(
+  {
+    "static_resources": {
+      "listeners" : [],
+      "clusters": [
+        {
+          "name": "test_cluster",
+          "type": "static",
+          "connect_timeout": "0.01s",
+          "per_connection_buffer_limit_bytes": 8192,
+          "lb_policy": "RING_HASH",
+          "load_assignment": {
+            "cluster_name": "load_test_cluster",
+            "endpoints": [
+              {
+                "priority": 93
+              },
+              {
+                "locality": {
+                  "zone": "zone1"
+                },
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "pipe": {
+                          "path": "path/to/pipe"
+                        }
+                      }
+                    },
+                    "health_status": "TIMEOUT",
+                    "load_balancing_weight": {
+                      "value": 7
+                    }
+                  }
+                ],
+                "load_balancing_weight": {
+                  "value": 4294967295
+                }
+              },
+              {
+                "locality": {
+                  "region": "domains",
+                  "sub_zone": "sub_zone1"
+                },
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "pipe": {
+                          "path": "path/to/pipe"
+                        }
+                      }
+                    },
+                    "health_status": "TIMEOUT",
+                    "load_balancing_weight": {
+                      "value": 8
+                    }
+                  }
+                ],
+                "load_balancing_weight": {
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "lb_subset_config": {
+            "fallback_policy": "ANY_ENDPOINT",
+            "subset_selectors": {
+              "keys": [
+                "x"
+              ]
+            },
+            "locality_weight_aware": "true"
+          },
+          "common_lb_config": {
+            "healthy_panic_threshold": {
+              "value": 0.8
+            },
+            "locality_weighted_lb_config": {
+            }
+          }
+        }
+      ]
+    },
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "The sum of weights of all localities at the same priority exceeds 4294967295");
+}
+
+TEST_F(ConfigurationImplTest, KillTimeoutWithoutSkew) {
+  const std::string json = R"EOF(
+  {
+    "watchdog": {
+      "kill_timeout": "1.0s",
+    },
+  })EOF";
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json, bootstrap);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_EQ(std::chrono::milliseconds(1000), config.wdKillTimeout());
+}
+
+TEST_F(ConfigurationImplTest, CanSkewsKillTimeout) {
+  const std::string json = R"EOF(
+  {
+    "watchdog": {
+      "kill_timeout": "1.0s",
+      "max_kill_timeout_jitter": "0.5s"
+    },
+  })EOF";
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json, bootstrap);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_LT(std::chrono::milliseconds(1000), config.wdKillTimeout());
+  EXPECT_GE(std::chrono::milliseconds(1500), config.wdKillTimeout());
+}
+
+TEST_F(ConfigurationImplTest, DoesNotSkewIfKillTimeoutDisabled) {
+  const std::string json = R"EOF(
+  {
+    "watchdog": {
+      "max_kill_timeout_jitter": "0.5s"
+    },
+  })EOF";
+
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromJson(json, bootstrap);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_EQ(std::chrono::milliseconds(0), config.wdKillTimeout());
 }
 
 } // namespace

@@ -62,7 +62,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
     throw CelException(
         absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
   }
-  return std::move(cel_expression_status.ValueOrDie());
+  return std::move(cel_expression_status.value());
 }
 
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
@@ -71,12 +71,12 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers) {
   auto activation = createActivation(info, request_headers, response_headers, response_trailers);
-  auto eval_status = expr.Evaluate(*activation.get(), arena);
+  auto eval_status = expr.Evaluate(*activation, arena);
   if (!eval_status.ok()) {
     return {};
   }
 
-  return eval_status.ValueOrDie();
+  return eval_status.value();
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,

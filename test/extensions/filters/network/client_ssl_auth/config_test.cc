@@ -7,7 +7,7 @@
 #include "extensions/filters/network/client_ssl_auth/config.h"
 #include "extensions/filters/network/well_known_names.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -94,14 +94,6 @@ TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
       ClientSslAuthConfigFactory().createFilterFactoryFromProto(
           envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth(), context),
       ProtoValidationException);
-}
-
-TEST(ClientSslAuthConfigFactoryTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<ClientSslAuthConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>()),
-      EnvoyException,
-      fmt::format("Double registration for name: '{}'", NetworkFilterNames::get().ClientSslAuth));
 }
 
 // Test that the deprecated extension name still functions.

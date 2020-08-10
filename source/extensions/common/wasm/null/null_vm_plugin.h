@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/typed_config.h"
 
 #include "extensions/common/wasm/wasm_vm.h"
@@ -24,20 +26,22 @@ public:
 #undef _DEFIN_GET_FUNCTIONE
 };
 
+using NullVmPluginPtr = std::unique_ptr<NullVmPlugin>;
+
 /**
  * Pseudo-WASM plugins using the NullVM should implement this factory and register via
  * Registry::registerFactory or the convenience class RegisterFactory.
  */
 class NullVmPluginFactory : public Config::UntypedFactory {
 public:
-  virtual ~NullVmPluginFactory() = default;
+  ~NullVmPluginFactory() override = default;
 
   std::string category() const override { return "envoy.wasm.null_vms"; }
 
   /**
    * Create an instance of the plugin.
    */
-  virtual std::unique_ptr<NullVmPlugin> create() const PURE;
+  virtual NullVmPluginPtr create() const PURE;
 };
 
 } // namespace Null

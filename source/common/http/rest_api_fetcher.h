@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
@@ -18,7 +19,7 @@ namespace Http {
 class RestApiFetcher : public Http::AsyncClient::Callbacks {
 protected:
   RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
-                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                 Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                  std::chrono::milliseconds refresh_interval,
                  std::chrono::milliseconds request_timeout);
   ~RestApiFetcher() override;
@@ -65,8 +66,10 @@ private:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override;
+  void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                    const Http::ResponseHeaderMap*) override {}
 
-  Runtime::RandomGenerator& random_;
+  Random::RandomGenerator& random_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds request_timeout_;
   Event::TimerPtr refresh_timer_;

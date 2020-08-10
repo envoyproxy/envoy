@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/opencensus.pb.h"
 
 #include "common/common/base64.h"
 
@@ -76,7 +76,7 @@ public:
 
 private:
   mutable absl::Mutex mu_;
-  std::vector<SpanData> spans_ GUARDED_BY(mu_);
+  std::vector<SpanData> spans_ ABSL_GUARDED_BY(mu_);
 };
 
 // Use a Singleton SpanCatcher.

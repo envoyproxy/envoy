@@ -14,15 +14,10 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
 #include "common/common/assert.h"
-#include "common/common/base64.h"
 
 namespace quiche {
 
-void Base64Encode(const uint8_t* data, size_t data_len, std::string* output) {
-  *output =
-      Envoy::Base64::encode(reinterpret_cast<const char*>(data), data_len, /*add_padding=*/false);
-}
-
+// NOLINTNEXTLINE(readability-identifier-naming)
 std::string HexDump(absl::string_view data) {
   const int kBytesPerLine = 16;
   const char* buf = data.data();
@@ -56,6 +51,7 @@ std::string HexDump(absl::string_view data) {
   return out;
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 char HexDigitToInt(char c) {
   ASSERT(std::isxdigit(c));
 
@@ -71,6 +67,7 @@ char HexDigitToInt(char c) {
   return 0;
 }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 bool HexDecodeToUInt32(absl::string_view data, uint32_t* out) {
   if (data.empty() || data.size() > 8u) {
     return false;
@@ -88,7 +85,7 @@ bool HexDecodeToUInt32(absl::string_view data, uint32_t* out) {
 
   std::string byte_string = absl::HexStringToBytes(data_padded);
 
-  RELEASE_ASSERT(byte_string.size() == 4u, "padded dtat is not 4 byte long.");
+  RELEASE_ASSERT(byte_string.size() == 4u, "padded data is not 4 byte long.");
   uint32_t bytes;
   memcpy(&bytes, byte_string.data(), byte_string.length());
   *out = ntohl(bytes);

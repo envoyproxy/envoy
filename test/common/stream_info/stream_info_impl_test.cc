@@ -232,9 +232,27 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
   EXPECT_FALSE(stream_info.getRequestHeaders());
 
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   stream_info.setRequestHeaders(headers);
   EXPECT_EQ(&headers, stream_info.getRequestHeaders());
+}
+
+TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
+  StreamInfoImpl stream_info(test_time_.timeSystem());
+  EXPECT_TRUE(stream_info.getRequestIDExtension());
+
+  auto rid_extension = stream_info.getRequestIDExtension();
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  rid_extension->set(request_headers, false);
+  rid_extension->set(request_headers, true);
+  rid_extension->setInResponse(response_headers, request_headers);
+  uint64_t out = 123;
+  EXPECT_FALSE(rid_extension->modBy(request_headers, out, 10000));
+  EXPECT_EQ(out, 123);
+  rid_extension->setTraceStatus(request_headers, Http::TraceStatus::Forced);
+  EXPECT_EQ(rid_extension->getTraceStatus(request_headers), Http::TraceStatus::NoTrace);
 }
 
 } // namespace

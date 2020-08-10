@@ -29,11 +29,13 @@ public:
   using CounterAllocator = std::function<RefcountPtr<Base>(StatName name)>;
   using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
   using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
+  using TextReadoutAllocator = std::function<RefcountPtr<Base>(StatName name, TextReadout::Type)>;
   using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
   IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
   IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
   IsolatedStatsCache(HistogramAllocator alloc) : histogram_alloc_(alloc) {}
+  IsolatedStatsCache(TextReadoutAllocator alloc) : text_readout_alloc_(alloc) {}
 
   Base& get(StatName name) {
     auto stat = stats_.find(name);
@@ -68,6 +70,17 @@ public:
     return *new_stat;
   }
 
+  Base& get(StatName name, TextReadout::Type type) {
+    auto stat = stats_.find(name);
+    if (stat != stats_.end()) {
+      return *stat->second;
+    }
+
+    RefcountPtr<Base> new_stat = text_readout_alloc_(name, type);
+    stats_.emplace(new_stat->statName(), new_stat);
+    return *new_stat;
+  }
+
   std::vector<RefcountPtr<Base>> toVector() const {
     std::vector<RefcountPtr<Base>> vec;
     vec.reserve(stats_.size());
@@ -76,6 +89,15 @@ public:
     }
 
     return vec;
+  }
+
+  bool iterate(const IterateFn<Base>& fn) const {
+    for (auto& stat : stats_) {
+      if (!fn(stat.second)) {
+        return false;
+      }
+    }
+    return true;
   }
 
 private:
@@ -93,6 +115,7 @@ private:
   CounterAllocator counter_alloc_;
   GaugeAllocator gauge_alloc_;
   HistogramAllocator histogram_alloc_;
+  TextReadoutAllocator text_readout_alloc_;
 };
 
 class IsolatedStoreImpl : public StoreImpl {
@@ -124,10 +147,27 @@ public:
     Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit);
     return histogram;
   }
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    TextReadout& text_readout =
+        text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
+    return text_readout;
+  }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
   GaugeOptConstRef findGauge(StatName name) const override { return gauges_.find(name); }
   HistogramOptConstRef findHistogram(StatName name) const override {
     return histograms_.find(name);
+  }
+  TextReadoutOptConstRef findTextReadout(StatName name) const override {
+    return text_readouts_.find(name);
+  }
+
+  bool iterate(const IterateFn<Counter>& fn) const override { return counters_.iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return gauges_.iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return histograms_.iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return text_readouts_.iterate(fn);
   }
 
   // Stats::Store
@@ -143,6 +183,9 @@ public:
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     return std::vector<ParentHistogramSharedPtr>{};
   }
+  std::vector<TextReadoutSharedPtr> textReadouts() const override {
+    return text_readouts_.toVector();
+  }
 
   Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
@@ -156,6 +199,10 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName(), unit);
   }
+  TextReadout& textReadoutFromString(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return textReadoutFromStatName(storage.statName());
+  }
 
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
@@ -165,6 +212,7 @@ private:
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
+  IsolatedStatsCache<TextReadout> text_readouts_;
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
 };

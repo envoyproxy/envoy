@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Eq;
 using testing::NiceMock;
 using testing::Throw;
 using testing::UnorderedElementsAre;
@@ -62,7 +61,7 @@ protected:
     return state_.handleResponse(message);
   }
 
-  NiceMock<MockSubscriptionCallbacks> callbacks_;
+  NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   // We start out interested in three resources: name1, name2, and name3.

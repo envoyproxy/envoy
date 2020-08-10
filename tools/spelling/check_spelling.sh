@@ -67,16 +67,16 @@ if [[ ! ${ACTUAL_SHA} == ${EXPECT_SHA} ]]; then
 fi
 
 chmod +x "${TMP_DIR}/misspell"
- 
+
 # Spell checking
 # All the skipping files are defined in tools/spelling/spelling_skip_files.txt
 SPELLING_SKIP_FILES="${ROOTDIR}/tools/spelling/spelling_skip_files.txt"
 
-# All the ignore words are defined in tools/spelling/spelling_whitelist_words.txt
-SPELLING_WHITELIST_WORDS_FILE="${ROOTDIR}/tools/spelling/spelling_whitelist_words.txt"
+# All the ignore words are defined in tools/spelling/spelling_allowlist_words.txt
+SPELLING_ALLOWLIST_WORDS_FILE="${ROOTDIR}/tools/spelling/spelling_allowlist_words.txt"
 
-WHITELIST_WORDS=$(echo -n $(cat "${SPELLING_WHITELIST_WORDS_FILE}" | \
+ALLOWLIST_WORDS=$(echo -n $(cat "${SPELLING_ALLOWLIST_WORDS_FILE}" | \
                   grep -v "^#"|grep -v "^$") | tr ' ' ',')
 SKIP_FILES=$(echo $(cat "${SPELLING_SKIP_FILES}") | sed "s| | -e |g")
 git ls-files | grep -v -e ${SKIP_FILES} | xargs "${TMP_DIR}/misspell" -i \
-  "${WHITELIST_WORDS}" ${MISSPELL_ARGS}
+  "${ALLOWLIST_WORDS}" ${MISSPELL_ARGS}

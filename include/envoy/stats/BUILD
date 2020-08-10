@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -29,6 +29,7 @@ envoy_cc_library(
         "tag_extractor.h",
         "tag_producer.h",
     ],
+    external_deps = ["abseil_inlined_vector"],
     deps = [
         ":refcount_ptr_interface",
         ":symbol_table_interface",
@@ -50,6 +51,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "symbol_table_interface",
     hdrs = ["symbol_table.h"],
+    external_deps = ["abseil_inlined_vector"],
     deps = [
         "//source/common/common:hash_lib",
     ],

@@ -44,7 +44,7 @@ public:
   StreamHandler& newStream() override { return *this; }
   void onHeartbeat(MessageMetadataSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-  uint64_t requestId() const { return metadata_ ? metadata_->request_id() : 0; }
+  uint64_t requestId() const { return metadata_ ? metadata_->requestId() : 0; }
 
 private:
   FilterStatus applyMessageEncodedFilters(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx);
@@ -185,7 +185,7 @@ public:
   void onError(const std::string& what);
   MessageMetadataSharedPtr metadata() const { return metadata_; }
   ContextSharedPtr context() const { return context_; }
-  bool pending_stream_decoded() const { return pending_stream_decoded_; }
+  bool pendingStreamDecoded() const { return pending_stream_decoded_; }
 
 private:
   void addDecoderFilterWorker(DubboFilters::DecoderFilterSharedPtr filter, bool dual_filter);

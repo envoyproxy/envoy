@@ -6,6 +6,7 @@
 #include "extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -37,7 +38,6 @@ public:
 };
 
 TestNullVmPlugin* test_null_vm_plugin_ = nullptr;
-Envoy::Registry::RegisterFactory<PluginFactory, Null::NullVmPluginFactory> register_;
 
 std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   auto result = std::make_unique<TestNullVmPlugin>();
@@ -47,9 +47,12 @@ std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
 
 class BaseVmTest : public testing::Test {
 public:
-  BaseVmTest() : scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
+  BaseVmTest()
+      : registration_(factory_), scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
 
 protected:
+  PluginFactory factory_;
+  Envoy::Registry::InjectFactory<Null::NullVmPluginFactory> registration_;
   Stats::IsolatedStoreImpl stats_store;
   Stats::ScopeSharedPtr scope_;
 };
@@ -114,10 +117,10 @@ MockHostFunctions* g_host_functions;
 
 void pong(void*, Word value) { g_host_functions->pong(convertWordToUint32(value)); }
 
-Word random(void*) { return Word(g_host_functions->random()); }
+Word random(void*) { return {g_host_functions->random()}; }
 
 // pong() with wrong number of arguments.
-void bad_pong1(void*) { return; }
+void bad_pong1(void*) {}
 
 // pong() with wrong return type.
 Word bad_pong2(void*, Word) { return 2; }
@@ -147,6 +150,13 @@ TEST_P(WasmVmTest, V8BadCode) {
 }
 
 TEST_P(WasmVmTest, V8Code) {
+#ifndef NDEBUG
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
+  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
+  if (GetParam() == 1) {
+    return;
+  }
+#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->runtime() == "envoy.wasm.runtime.v8");
@@ -167,6 +177,13 @@ TEST_P(WasmVmTest, V8Code) {
 }
 
 TEST_P(WasmVmTest, V8BadHostFunctions) {
+#ifndef NDEBUG
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
+  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
+  if (GetParam() == 1) {
+    return;
+  }
+#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
@@ -195,6 +212,13 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
 }
 
 TEST_P(WasmVmTest, V8BadModuleFunctions) {
+#ifndef NDEBUG
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
+  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
+  if (GetParam() == 1) {
+    return;
+  }
+#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
@@ -223,6 +247,13 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
 }
 
 TEST_P(WasmVmTest, V8FunctionCalls) {
+#ifndef NDEBUG
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
+  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
+  if (GetParam() == 1) {
+    return;
+  }
+#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
@@ -261,6 +292,13 @@ TEST_P(WasmVmTest, V8FunctionCalls) {
 }
 
 TEST_P(WasmVmTest, V8Memory) {
+#ifndef NDEBUG
+  // Do not execute pre-compilation tests in debug mode because V8 will fail to load because the
+  // flags do not match. TODO: restore this test when the rust toolchain is integrated.
+  if (GetParam() == 1) {
+    return;
+  }
+#endif
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 

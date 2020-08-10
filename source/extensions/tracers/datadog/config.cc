@@ -1,14 +1,13 @@
 #include "extensions/tracers/datadog/config.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/datadog/datadog_tracer_impl.h"
-#include "extensions/tracers/well_known_names.h"
 
 #include "datadog/opentracing.h"
 
@@ -17,7 +16,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-DatadogTracerFactory::DatadogTracerFactory() : FactoryBase(TracerNames::get().Datadog) {}
+DatadogTracerFactory::DatadogTracerFactory() : FactoryBase("envoy.tracers.datadog") {}
 
 Tracing::HttpTracerSharedPtr DatadogTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::DatadogConfig& proto_config,

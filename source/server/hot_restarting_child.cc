@@ -80,12 +80,17 @@ void HotRestartingChild::sendParentTerminateRequest() {
   wrapped_request.mutable_request()->mutable_terminate();
   sendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
-  // Once setting parent_terminated_ == true, we can send no more hot restart RPCs, and therefore
-  // receive no more responses, including stats. So, now safe to forget our stat transferral state.
+
+  // Note that the 'generation' counter needs to retain the contribution from
+  // the parent.
+  stat_merger_->retainParentGaugeValue(hot_restart_generation_stat_name_);
+
+  // Now it is safe to forget our stat transferral state.
   //
-  // This destruction is actually important far beyond memory efficiency. The scope-based temporary
-  // counter logic relies on the StatMerger getting destroyed once hot restart's stat merging is
-  // all done. (See stat_merger.h for details).
+  // This destruction is actually important far beyond memory efficiency. The
+  // scope-based temporary counter logic relies on the StatMerger getting
+  // destroyed once hot restart's stat merging is all done. (See stat_merger.h
+  // for details).
   stat_merger_.reset();
 }
 
@@ -93,12 +98,13 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
   if (!stat_merger_) {
     stat_merger_ = std::make_unique<Stats::StatMerger>(stats_store);
+    hot_restart_generation_stat_name_ = hotRestartGeneration(stats_store).statName();
   }
 
   // Convert the protobuf for serialized dynamic spans into the structure
   // required by StatMerger.
   Stats::StatMerger::DynamicsMap dynamics;
-  for (auto iter : stats_proto.dynamics()) {
+  for (const auto& iter : stats_proto.dynamics()) {
     Stats::DynamicSpans& spans = dynamics[iter.first];
     for (int i = 0; i < iter.second.spans_size(); ++i) {
       const HotRestartMessage::Reply::Span& span_proto = iter.second.spans(i);

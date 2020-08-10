@@ -189,7 +189,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
   request_ptr->pending_response_->asArray().swap(responses);
 
   Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
-  for (uint64_t i = 1; i < base_request->asArray().size(); i++) {
+  for (uint32_t i = 1; i < base_request->asArray().size(); i++) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
@@ -265,8 +265,8 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
   request_ptr->pending_response_->type(Common::Redis::RespType::SimpleString);
 
   Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
-  unsigned fragment_index = 0;
-  for (unsigned i = 1; i < base_request->asArray().size(); i += 2) {
+  uint32_t fragment_index = 0;
+  for (uint32_t i = 1; i < base_request->asArray().size(); i += 2) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, fragment_index++);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
@@ -336,7 +336,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
   request_ptr->pending_response_->type(Common::Redis::RespType::Integer);
 
   Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
-  for (unsigned i = 1; i < base_request->asArray().size(); i++) {
+  for (uint32_t i = 1; i < base_request->asArray().size(); i++) {
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
@@ -439,7 +439,12 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
       onInvalidRequest(callbacks);
       return nullptr;
     }
-    callbacks.onAuth(request->asArray()[1].asString());
+    if (request->asArray().size() == 3) {
+      callbacks.onAuth(request->asArray()[1].asString(), request->asArray()[2].asString());
+    } else {
+      callbacks.onAuth(request->asArray()[1].asString());
+    }
+
     return nullptr;
   }
 

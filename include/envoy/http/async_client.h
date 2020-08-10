@@ -70,6 +70,14 @@ public:
      * @param reason  failure reason
      */
     virtual void onFailure(const Request& request, FailureReason reason) PURE;
+
+    /**
+     * Called before finalizing upstream span when the request is complete or reset.
+     * @param span a tracing span to fill with extra tags.
+     * @param response_headers the response headers.
+     */
+    virtual void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span& span,
+                                              const Http::ResponseHeaderMap* response_headers) PURE;
   };
 
   /**
@@ -150,6 +158,12 @@ public:
      * Reset the stream.
      */
     virtual void reset() PURE;
+
+    /***
+     * @returns if the stream has enough buffered outbound data to be over the configured buffer
+     * limits
+     */
+    virtual bool isAboveWriteBufferHighWatermark() const PURE;
   };
 
   virtual ~AsyncClient() = default;

@@ -13,7 +13,7 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.admin.v3";
 option java_outer_classname = "ConfigDumpProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: ConfigDump]
 
@@ -30,8 +30,11 @@ message ConfigDump {
   //
   // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_api_msg_admin.v3.BootstrapConfigDump>`
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v3.ClustersConfigDump>`
+  // * *endpoints*:  :ref:`EndpointsConfigDump <envoy_api_msg_admin.v3.EndpointsConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v3.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v3.RoutesConfigDump>`
+  //
+  // EDS Configuration will only be dumped by using parameter `?include_eds`
   //
   // You can filter output with the resource and mask query parameters.
   // See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
@@ -345,4 +348,36 @@ message SecretsConfigDump {
   // The dynamically loaded warming secrets. These are secrets that are currently undergoing
   // warming in preparation to service clusters or listeners.
   repeated DynamicSecret dynamic_warming_secrets = 3;
+}
+
+// Envoy's admin fill this message with all currently known endpoints. Endpoint
+// configuration information can be used to recreate an Envoy configuration by populating all
+// endpoints as static endpoints or by returning them in an EDS response.
+message EndpointsConfigDump {
+  message StaticEndpointConfig {
+    // The endpoint config.
+    google.protobuf.Any endpoint_config = 1;
+
+    // [#not-implemented-hide:] The timestamp when the Endpoint was last updated.
+    google.protobuf.Timestamp last_updated = 2;
+  }
+
+  message DynamicEndpointConfig {
+    // [#not-implemented-hide:] This is the per-resource version information. This version is currently taken from the
+    // :ref:`version_info <envoy_api_field_service.discovery.v3.DiscoveryResponse.version_info>` field at the time that
+    // the endpoint configuration was loaded.
+    string version_info = 1;
+
+    // The endpoint config.
+    google.protobuf.Any endpoint_config = 2;
+
+    // [#not-implemented-hide:] The timestamp when the Endpoint was last updated.
+    google.protobuf.Timestamp last_updated = 3;
+  }
+
+  // The statically loaded endpoint configs.
+  repeated StaticEndpointConfig static_endpoint_configs = 2;
+
+  // The dynamically loaded endpoint configs.
+  repeated DynamicEndpointConfig dynamic_endpoint_configs = 3;
 }

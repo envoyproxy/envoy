@@ -88,7 +88,7 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Finish the response.
-  upstream_request_->encodeTrailers(Http::TestHeaderMapImpl{{"trailer", "bar"}});
+  upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"trailer", "bar"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
 }
@@ -180,7 +180,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   EXPECT_TRUE(upstream_request2->complete());
   EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
   EXPECT_TRUE(response2->complete());
-  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
   EXPECT_EQ(response2_bytes, response2->body().size());
 
   // Respond to request 1
@@ -190,7 +190,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   EXPECT_TRUE(upstream_request1->complete());
   EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
-  EXPECT_EQ("200", response1->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
   EXPECT_EQ(response1_bytes, response1->body().size());
 }
 
@@ -235,13 +235,16 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
     responses[i]->waitForEndStream();
     if (i % 2 != 0) {
       EXPECT_TRUE(responses[i]->complete());
-      EXPECT_EQ("200", responses[i]->headers().Status()->value().getStringView());
+      EXPECT_EQ("200", responses[i]->headers().getStatusValue());
       EXPECT_EQ(response_bytes[i], responses[i]->body().length());
     } else {
       // Upstream stream reset.
-      EXPECT_EQ("503", responses[i]->headers().Status()->value().getStringView());
+      EXPECT_EQ("503", responses[i]->headers().getStatusValue());
     }
   }
+
+  EXPECT_EQ(0, test_server_->gauge("http2.streams_active")->value());
+  EXPECT_EQ(0, test_server_->gauge("http2.pending_send_bytes")->value());
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
@@ -345,7 +348,7 @@ typed_config:
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter
   // which buffers response data but in this case, make sure the sendLocalReply
   // is gRPC.
-  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
@@ -360,7 +363,7 @@ typed_config:
                                                                  {"te", "trailers"}});
   auto downstream_request = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  Buffer::OwnedImpl data(R"({"TableName":"locations"})");
+  Buffer::OwnedImpl data("HTTP body content goes here");
   codec_client_->sendData(*downstream_request, data, true);
   waitForNextUpstreamRequest();
 
@@ -386,7 +389,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl many_headers(default_response_headers_);
+  Http::TestResponseHeaderMapImpl many_headers(default_response_headers_);
   for (int i = 0; i < 100; i++) {
     many_headers.addCopy("many", std::string(1, 'a'));
   }
@@ -396,7 +399,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
   upstream_request_->encodeHeaders(many_headers, true);
   response->waitForEndStream();
   // Upstream stream reset triggered.
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Tests bootstrap configuration of max response headers.
@@ -431,7 +434,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl large_headers(default_response_headers_);
+  Http::TestResponseHeaderMapImpl large_headers(default_response_headers_);
   large_headers.addCopy("large", std::string(60 * 1024, 'a'));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -439,7 +442,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
   upstream_request_->encodeHeaders(large_headers, true);
   response->waitForEndStream();
   // Upstream stream reset.
-  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
@@ -483,7 +486,7 @@ typed_config:
   // Send the response headers.
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace Envoy

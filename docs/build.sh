@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# set SPHINX_SKIP_CONFIG_VALIDATION environment variable to true to skip 
+# validation of configuration examples
+
 . tools/shell_utils.sh
 
 set -e
@@ -16,10 +19,10 @@ then
     exit 1
   fi
   # Check the version_history.rst contains current release version.
-  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst \
-    || (echo "Git tag not found in version_history.rst" && exit 1)
+  grep --fixed-strings "$VERSION_NUMBER" docs/root/version_history/current.rst \
+    || (echo "Git tag not found in version_history/current.rst" && exit 1)
 
-  # Now that we now there is a match, we can use the tag.
+  # Now that we know there is a match, we can use the tag.
   export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
   export ENVOY_DOCS_RELEASE_LEVEL=tagged
   export ENVOY_BLOB_SHA="$CIRCLE_TAG"
@@ -31,8 +34,10 @@ else
   export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
 
-SCRIPT_DIR=$(dirname "$0")
-API_DIR=$(dirname "$dir")/api
+SCRIPT_DIR="$(dirname "$0")"
+SRC_DIR="$(dirname "$dir")"
+API_DIR="${SRC_DIR}"/api
+CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -115,12 +120,18 @@ generate_api_rst v3
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#envoy_api_#envoy_v3_api_#g"
 find "${GENERATED_RST_DIR}"/api-v3 -name "*.rst" -print0 | xargs -0 sed -i -e "s#config_resource_monitors#v3_config_resource_monitors#g"
 
+# xDS protocol spec.
 mkdir -p ${GENERATED_RST_DIR}/api-docs
-
-cp -f $API_DIR/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+cp -f "${API_DIR}"/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+# Edge hardening example YAML.
+mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
+cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
 
 rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 
-rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${GENERATED_RST_DIR}"
+rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${SCRIPT_DIR}"/_ext "${GENERATED_RST_DIR}"
+
+# To speed up validate_fragment invocations in validating_code_block 
+bazel build ${BAZEL_BUILD_OPTIONS} //tools/config_validation:validate_fragment
 
 sphinx-build -W --keep-going -b html "${GENERATED_RST_DIR}" "${DOCS_OUTPUT_DIR}"

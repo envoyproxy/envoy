@@ -6,7 +6,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/http2/codec_impl.h"
-#include "common/http/http2/conn_pool_legacy.h"
+#include "common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -16,15 +16,15 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-    : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
-                       transport_socket_options) {}
+    : HttpConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
+                           transport_socket_options, Protocol::Http2) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 
-ConnPoolImplBase::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
+Envoy::ConnectionPool::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }
-void ConnPoolImpl::onGoAway(ActiveClient& client) {
+void ConnPoolImpl::onGoAway(ActiveClient& client, Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *client.codec_client_);
   host_->cluster().stats().upstream_cx_close_notify_.inc();
   if (client.state_ != ActiveClient::State::DRAINING) {
@@ -65,17 +65,13 @@ uint64_t ConnPoolImpl::maxRequestsPerConnection() {
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
-    : ConnPoolImplBase::ActiveClient(
+    : Envoy::Http::ActiveClient(
           parent, parent.maxRequestsPerConnection(),
           parent.host_->cluster().http2Options().max_concurrent_streams().value()) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
 
   parent.host_->cluster().stats().upstream_cx_http2_total_.inc();
-}
-
-bool ConnPoolImpl::ActiveClient::hasActiveRequests() const {
-  return codec_client_->numActiveRequests() > 0;
 }
 
 bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {
@@ -97,14 +93,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr hos
                  Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
                  const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.new_http2_connection_pool_behavior")) {
-    return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                           transport_socket_options);
-  } else {
-    return std::make_unique<Http::Legacy::Http2::ProdConnPoolImpl>(
-        dispatcher, host, priority, options, transport_socket_options);
-  }
+  return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                         transport_socket_options);
 }
 
 } // namespace Http2

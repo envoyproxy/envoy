@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "envoy/common/time.h"
-#include "envoy/runtime/runtime.h"
 
 #include "common/common/logger.h"
+#include "common/common/random_generator.h"
 
 #include "extensions/tracers/xray/reservoir.h"
 #include "extensions/tracers/xray/sampling_strategy.h"
@@ -74,13 +74,7 @@ public:
    * Set the percentage of requests to sample _after_ sampling |fixed_target| requests per second.
    */
   void setRate(double rate) { rate_ = rate; }
-
-  const std::string& host() const { return host_; }
-  const std::string& httpMethod() const { return http_method_; }
-  const std::string& urlPath() const { return url_path_; }
-  uint32_t fixedTarget() const { return fixed_target_; }
   double rate() const { return rate_; }
-  const Reservoir& reservoir() const { return reservoir_; }
   Reservoir& reservoir() { return reservoir_; }
 
 private:
@@ -143,7 +137,7 @@ private:
 
 class LocalizedSamplingStrategy : public SamplingStrategy {
 public:
-  LocalizedSamplingStrategy(const std::string& sampling_rules_json, Runtime::RandomGenerator& rng,
+  LocalizedSamplingStrategy(const std::string& sampling_rules_json, Random::RandomGenerator& rng,
                             TimeSource& time_source)
       : SamplingStrategy(rng), default_manifest_(LocalizedSamplingManifest::createDefault()),
         custom_manifest_(sampling_rules_json), time_source_(time_source),

@@ -2,7 +2,7 @@
 
 #include <datadog/opentracing.h>
 
-#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -52,9 +52,7 @@ public:
   // Getters to return the DatadogDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
   const std::string& cluster() { return cluster_; }
-  Runtime::Loader& runtime() { return runtime_; }
   DatadogTracerStats& tracerStats() { return tracer_stats_; }
-  const datadog::opentracing::TracerOptions& tracerOptions() { return tracer_options_; }
 
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
@@ -80,7 +78,6 @@ private:
   DatadogTracerStats tracer_stats_;
   datadog::opentracing::TracerOptions tracer_options_;
   ThreadLocal::SlotPtr tls_;
-  Runtime::Loader& runtime_;
 };
 
 /**
@@ -112,6 +109,7 @@ public:
   // Http::AsyncClient::Callbacks.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
 private:
   /**

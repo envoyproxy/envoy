@@ -8,6 +8,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -16,13 +17,13 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.redis_proxy.v3";
 option java_outer_classname = "RedisProxyProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Redis Proxy]
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -38,22 +39,22 @@ message RedisProxy {
     // because replication is asynchronous and requires some delay. You need to ensure that your
     // application can tolerate stale data.
     enum ReadPolicy {
-      // Default mode. Read from the current master node.
-      MASTER = 0;
+      // Default mode. Read from the current primary node.
+      MASTER = 0 [(udpa.annotations.enum_value_migrate).rename = "PRIMARY"];
 
-      // Read from the master, but if it is unavailable, read from replica nodes.
-      PREFER_MASTER = 1;
+      // Read from the primary, but if it is unavailable, read from replica nodes.
+      PREFER_MASTER = 1 [(udpa.annotations.enum_value_migrate).rename = "PREFER_PRIMARY"];
 
       // Read from replica nodes. If multiple replica nodes are present within a shard, a random
       // node is selected. Healthy nodes have precedent over unhealthy nodes.
       REPLICA = 2;
 
       // Read from the replica nodes (similar to REPLICA), but if all replicas are unavailable (not
-      // present or unhealthy), read from the master.
+      // present or unhealthy), read from the primary.
       PREFER_REPLICA = 3;
 
-      // Read from any node of the cluster. A random node is selected among the master and replicas,
-      // healthy nodes have precedent over unhealthy nodes.
+      // Read from any node of the cluster. A random node is selected among the primary and
+      // replicas, healthy nodes have precedent over unhealthy nodes.
       ANY = 4;
     }
 
@@ -113,10 +114,10 @@ message RedisProxy {
     google.protobuf.UInt32Value max_upstream_unknown_connections = 6;
 
     // Enable per-command statistics per upstream cluster, in addition to the filter level aggregate
-    // count.
+    // count. These commands are measured in microseconds.
     bool enable_command_stats = 8;
 
-    // Read policy. The default is to read from the master.
+    // Read policy. The default is to read from the primary.
     ReadPolicy read_policy = 7 [(validate.rules).enum = {defined_only: true}];
   }
 
@@ -193,7 +194,7 @@ message RedisProxy {
   ConnPoolSettings settings = 3 [(validate.rules).message = {required: true}];
 
   // Indicates that latency stat should be computed in microseconds. By default it is computed in
-  // milliseconds.
+  // milliseconds. This does not apply to upstream command stats currently.
   bool latency_in_micros = 4;
 
   // List of **unique** prefixes used to separate keys from different workloads to different
@@ -234,6 +235,18 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no password is set" error will be returned.
   config.core.v3.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
+
+  // If a username is provided an ACL style AUTH command will be required with a username and password.
+  // Authenticate Redis client connections locally by forcing downstream clients to issue a `Redis
+  // AUTH command <https://redis.io/commands/auth>`_ with this username and the *downstream_auth_password*
+  // before enabling any other command. If an AUTH command's username and password matches this username
+  // and the *downstream_auth_password* , an "OK" response will be returned to the client. If the AUTH
+  // command username or password does not match this username or the *downstream_auth_password*, then an
+  // "WRONGPASS invalid username-password pair" error will be returned. If any other command is received before AUTH when this
+  // password is set, then a "NOAUTH Authentication required." error response will be sent to the
+  // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
+  // AUTH, but no ACL is set" error will be returned.
+  config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
@@ -246,4 +259,8 @@ message RedisProtocolOptions {
   // Upstream server password as defined by the `requirepass` directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.
   config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
+
+  // Upstream server username as defined by the `user` directive
+  // <https://redis.io/topics/acl>`_ in the server's configuration file.
+  config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 }

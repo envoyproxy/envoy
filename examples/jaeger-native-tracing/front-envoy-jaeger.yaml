@@ -3,7 +3,7 @@ static_resources:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 80
+        port_value: 8000
     traffic_direction: OUTBOUND
     filter_chains:
     - filters:
@@ -11,6 +11,26 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           generate_request_id: true
+          tracing:
+            provider:
+              name: envoy.tracers.dynamic_ot
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
+                library: /usr/local/lib/libjaegertracing_plugin.so
+                config:
+                  service_name: front-proxy
+                  sampler:
+                    type: const
+                    param: 1
+                  reporter:
+                    localAgentHostPort: jaeger:6831
+                  headers:
+                    jaegerDebugHeader: jaeger-debug-id
+                    jaegerBaggageHeader: jaeger-baggage
+                    traceBaggageHeaderPrefix: uberctx-
+                  baggage_restrictions:
+                    denyBaggageOnInitializationFailure: false
+                    hostPort: ""
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
@@ -44,27 +64,7 @@ static_resources:
             address:
               socket_address:
                 address: service1
-                port_value: 80
-tracing:
-  http:
-    name: envoy.tracers.dynamic_ot
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
-      library: /usr/local/lib/libjaegertracing_plugin.so
-      config:
-        service_name: front-proxy
-        sampler:
-          type: const
-          param: 1
-        reporter:
-          localAgentHostPort: jaeger:6831
-        headers:
-          jaegerDebugHeader: jaeger-debug-id
-          jaegerBaggageHeader: jaeger-baggage
-          traceBaggageHeaderPrefix: uberctx-
-        baggage_restrictions:
-          denyBaggageOnInitializationFailure: false
-          hostPort: ""
+                port_value: 8000
 admin:
   access_log_path: "/dev/null"
   address:

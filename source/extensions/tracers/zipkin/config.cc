@@ -1,13 +1,12 @@
 #include "extensions/tracers/zipkin/config.h"
 
-#include "envoy/config/trace/v3/trace.pb.h"
-#include "envoy/config/trace/v3/trace.pb.validate.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
+#include "envoy/config/trace/v3/zipkin.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/tracers/well_known_names.h"
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 namespace Envoy {
@@ -15,7 +14,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase(TracerNames::get().Zipkin) {}
+ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase("envoy.tracers.zipkin") {}
 
 Tracing::HttpTracerSharedPtr ZipkinTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v3::ZipkinConfig& proto_config,

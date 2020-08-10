@@ -5,15 +5,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
-    volumes:
-      - ./front-envoy.yaml:/etc/front-envoy.yaml
     networks:
       - envoymesh
     expose:
-      - "80"
+      - "8000"
       - "8001"
     ports:
-      - "8000:80"
+      - "8000:8000"
       - "8001:8001"
 
   frontend-service:
@@ -27,7 +25,7 @@ services:
         aliases:
           - frontendservice
     expose:
-      - "80"
+      - "8000"
 
 networks:
   envoymesh: {}

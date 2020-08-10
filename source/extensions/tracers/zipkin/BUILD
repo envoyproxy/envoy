@@ -1,15 +1,15 @@
-licenses(["notice"])  # Apache 2
-
-# Trace driver for Zipkin (https://zipkin.io/).
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+# Trace driver for Zipkin (https://zipkin.io/).
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "zipkin_lib",
@@ -58,7 +58,6 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
-        "//source/extensions/tracers:well_known_names",
         "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
@@ -69,9 +68,13 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
+    # Legacy test use. TODO(#9953) clean up.
+    visibility = [
+        "//:extension_config",
+        "//test/server:__subpackages__",
+    ],
     deps = [
         ":zipkin_lib",
-        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],

@@ -12,7 +12,7 @@ namespace TcpProxy {
 // or an HttpConnectionHandle
 class ConnectionHandle {
 public:
-  virtual ~ConnectionHandle() {}
+  virtual ~ConnectionHandle() = default;
   // Cancel the conn pool request and close any excess pending requests.
   virtual void cancel() PURE;
 };
@@ -33,7 +33,9 @@ private:
 class HttpConnectionHandle : public ConnectionHandle {
 public:
   HttpConnectionHandle(Http::ConnectionPool::Cancellable* handle) : upstream_http_handle_(handle) {}
-  void cancel() override { upstream_http_handle_->cancel(); }
+  void cancel() override {
+    upstream_http_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+  }
 
 private:
   Http::ConnectionPool::Cancellable* upstream_http_handle_{};
@@ -43,7 +45,7 @@ private:
 // upstream.
 class GenericUpstream {
 public:
-  virtual ~GenericUpstream() {}
+  virtual ~GenericUpstream() = default;
   // Calls readDisable on the upstream connection. Returns false if readDisable could not be
   // performed (e.g. if the connection is closed)
   virtual bool readDisable(bool disable) PURE;
@@ -75,7 +77,7 @@ private:
 class HttpUpstream : public GenericUpstream, Http::StreamCallbacks {
 public:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
-  ~HttpUpstream();
+  ~HttpUpstream() override;
 
   static bool isValidBytestreamResponse(const Http::ResponseHeaderMap& headers);
 

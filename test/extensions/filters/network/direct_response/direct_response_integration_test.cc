@@ -21,20 +21,9 @@ public:
       )EOF");
   }
 
-  /**
-   * Initializer for an individual test.
-   */
   void SetUp() override {
     useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
     BaseIntegrationTest::initialize();
-  }
-
-  /**
-   *  Destructor for an individual test.
-   */
-  void TearDown() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 };
 
@@ -43,17 +32,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DirectResponseIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(DirectResponseIntegrationTest, Hello) {
-  Buffer::OwnedImpl buffer("hello");
   std::string response;
-  RawConnectionDriver connection(
-      lookupPort("listener_0"), buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+  auto connection = createConnectionDriver(
+      lookupPort("listener_0"), "hello",
+      [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
         response.append(data.toString());
-        connection.close();
-      },
-      version_);
-
-  connection.run();
+        conn.close(Network::ConnectionCloseType::FlushWrite);
+      });
+  connection->run();
   EXPECT_EQ("hello, world!\n", response);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::HasSubstr(StreamInfo::ResponseCodeDetails::get().DirectResponse));

@@ -165,12 +165,22 @@ void Cluster::onDnsHostRemove(const std::string& host) {
 
 Upstream::HostConstSharedPtr
 Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
-  if (!context || !context->downstreamHeaders()) {
+  if (!context) {
     return nullptr;
   }
 
-  const auto host_it =
-      host_map_->find(context->downstreamHeaders()->Host()->value().getStringView());
+  absl::string_view host;
+  if (context->downstreamHeaders()) {
+    host = context->downstreamHeaders()->getHostValue();
+  } else if (context->downstreamConnection()) {
+    host = context->downstreamConnection()->requestedServerName();
+  }
+
+  if (host.empty()) {
+    return nullptr;
+  }
+
+  const auto host_it = host_map_->find(host);
   if (host_it == host_map_->end()) {
     return nullptr;
   } else {
@@ -188,11 +198,12 @@ ClusterFactory::createClusterWithConfig(
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context.singletonManager(), context.dispatcher(), context.tls(), context.random(),
-      context.stats());
+      context.runtime(), context.stats());
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (cluster_config.has_upstream_http_protocol_options()) {
-    if (!cluster_config.upstream_http_protocol_options().auto_sni() ||
-        !cluster_config.upstream_http_protocol_options().auto_san_validation()) {
+    if (!proto_config.allow_insecure_cluster_options() &&
+        (!cluster_config.upstream_http_protocol_options().auto_sni() ||
+         !cluster_config.upstream_http_protocol_options().auto_san_validation())) {
       throw EnvoyException(
           "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true when "
           "configured with upstream_http_protocol_options");

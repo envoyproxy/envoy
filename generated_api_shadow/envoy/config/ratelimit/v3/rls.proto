@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.ratelimit.v3;
 
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 
 import "udpa/annotations/status.proto";
@@ -11,7 +12,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.ratelimit.v3";
 option java_outer_classname = "RlsProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Rate limit service]
 
@@ -26,4 +27,8 @@ message RateLimitServiceConfig {
   // will connect to this cluster when it needs to make rate limit service
   // requests.
   core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+
+  // API version for rate limit transport protocol. This describes the rate limit gRPC endpoint and
+  // version of messages used on the wire.
+  core.v3.ApiVersion transport_api_version = 4 [(validate.rules).enum = {defined_only: true}];
 }

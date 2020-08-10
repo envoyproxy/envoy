@@ -7,21 +7,24 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/common/statusor.h"
+#include "common/common/thread.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http2/codec_stats.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
+#include "common/http/status.h"
 #include "common/http/utility.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
@@ -30,35 +33,9 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-const std::string ALPN_STRING = "h2";
-
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
-
-/**
- * All stats for the HTTP/2 codec. @see stats_macros.h
- */
-#define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
-  COUNTER(header_overflow)                                                                         \
-  COUNTER(headers_cb_no_stream)                                                                    \
-  COUNTER(inbound_empty_frames_flood)                                                              \
-  COUNTER(inbound_priority_frames_flood)                                                           \
-  COUNTER(inbound_window_update_frames_flood)                                                      \
-  COUNTER(outbound_control_flood)                                                                  \
-  COUNTER(outbound_flood)                                                                          \
-  COUNTER(rx_messaging_error)                                                                      \
-  COUNTER(rx_reset)                                                                                \
-  COUNTER(too_many_header_frames)                                                                  \
-  COUNTER(trailers)                                                                                \
-  COUNTER(tx_reset)
-
-/**
- * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
- */
-struct CodecStats {
-  ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 class Utility {
 public:
@@ -73,12 +50,47 @@ public:
                                           HeaderString& cookies);
 };
 
+class ConnectionImpl;
+
+// Abstract nghttp2_session factory. Used to enable injection of factories for testing.
+class Nghttp2SessionFactory {
+public:
+  using ConnectionImplType = ConnectionImpl;
+  virtual ~Nghttp2SessionFactory() = default;
+
+  // Returns a new nghttp2_session to be used with |connection|.
+  virtual nghttp2_session* create(const nghttp2_session_callbacks* callbacks,
+                                  ConnectionImplType* connection,
+                                  const nghttp2_option* options) PURE;
+
+  // Initializes the |session|.
+  virtual void init(nghttp2_session* session, ConnectionImplType* connection,
+                    const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
+};
+
+class ProdNghttp2SessionFactory : public Nghttp2SessionFactory {
+public:
+  nghttp2_session* create(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
+                          const nghttp2_option* options) override;
+
+  void init(nghttp2_session* session, ConnectionImpl* connection,
+            const envoy::config::core::v3::Http2ProtocolOptions& options) override;
+
+  // Returns a global factory instance. Note that this is possible because no internal state is
+  // maintained; the thread safety of create() and init()'s side effects is guaranteed by Envoy's
+  // worker based threading model.
+  static ProdNghttp2SessionFactory& get() {
+    static ProdNghttp2SessionFactory* instance = new ProdNghttp2SessionFactory();
+    return *instance;
+  }
+};
+
 /**
  * Base class for HTTP/2 client and server codecs.
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
-  ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
+  ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                  const uint32_t max_headers_kb, const uint32_t max_headers_count);
 
@@ -86,7 +98,7 @@ public:
 
   // Http::Connection
   // NOTE: the `dispatch` method is also overridden in the ServerConnectionImpl class
-  void dispatch(Buffer::Instance& data) override;
+  Http::Status dispatch(Buffer::Instance& data) override;
   void goAway() override;
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
@@ -103,7 +115,19 @@ public:
     }
   }
 
+  /**
+   * An inner dispatch call that executes the dispatching logic. While exception removal is in
+   * migration (#10878), this function may either throw an exception or return an error status.
+   * Exceptions are caught and translated to their corresponding statuses in the outer level
+   * dispatch.
+   * This needs to be virtual so that ServerConnectionImpl can override.
+   * TODO(#10878): Remove this when exception removal is complete.
+   */
+  virtual Http::Status innerDispatch(Buffer::Instance& data);
+
 protected:
+  friend class ProdNghttp2SessionFactory;
+
   /**
    * Wrapper for static nghttp2 callback dispatchers.
    */
@@ -147,10 +171,22 @@ protected:
                       public StreamCallbackHelper {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
+    ~StreamImpl() override;
+    // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
+    // deferred delete lifetime issues that need sorting out if the destructor of the stream is
+    // going to be able to refer to the parent connection.
+    void destroy();
+    void disarmStreamIdleTimer() {
+      if (stream_idle_timer_ != nullptr) {
+        // To ease testing and the destructor assertion.
+        stream_idle_timer_->disableTimer();
+        stream_idle_timer_.reset();
+      }
+    }
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
-    int onDataSourceSend(const uint8_t* framehd, size_t length);
+    Status onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
@@ -163,6 +199,9 @@ protected:
     virtual StreamDecoder& decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
+    virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
+    virtual void createPendingFlushTimer() PURE;
+    void onPendingFlushTimer();
 
     // Http::StreamEncoder
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -171,8 +210,8 @@ protected:
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
 
     // Http::Stream
-    void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
-    void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
+    void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
+    void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
@@ -180,15 +219,24 @@ protected:
       return parent_.connection_.localAddress();
     }
     absl::string_view responseDetails() override { return details_; }
+    void setFlushTimeout(std::chrono::milliseconds timeout) override {
+      stream_idle_timeout_ = timeout;
+    }
 
     // This code assumes that details is a static string, so that we
     // can avoid copying it.
     void setDetails(absl::string_view details) {
-      // It is probably a mistake to call setDetails() twice, so
-      // assert that details_ is empty.
-      ASSERT(details_.empty());
-
-      details_ = details;
+      // TODO(asraa): In some cases nghttp2's error handling may cause processing of multiple
+      // invalid frames for a single stream. If a temporal stream error is returned from a callback,
+      // remaining frames in the buffer will still be partially processed. For example, remaining
+      // frames will still parse through nghttp2's push promise error handling and in
+      // onBeforeFrame(Send/Received) callbacks, which may return invalid frame errors and attempt
+      // to set details again. In these cases, we simply do not overwrite details. When internal
+      // error latching is implemented in the codec for exception removal, we should prevent calling
+      // setDetails in an error state.
+      if (details_.empty()) {
+        details_ = details;
+      }
     }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
@@ -207,7 +255,7 @@ protected:
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
-    virtual void decodeHeaders(bool allow_waiting_for_informational_headers) PURE;
+    virtual void decodeHeaders() PURE;
     virtual void decodeTrailers() PURE;
 
     // Get MetadataEncoder for this stream.
@@ -217,7 +265,10 @@ protected:
     // Callback function for MetadataDecoder.
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
-    bool buffers_overrun() const { return read_disable_count_ > 0; }
+    bool buffersOverrun() const { return read_disable_count_ > 0; }
+
+    void encodeDataHelper(Buffer::Instance& data, bool end_stream,
+                          bool skip_encoding_empty_trailers);
 
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
@@ -225,10 +276,12 @@ protected:
     uint32_t read_disable_count_{0};
     Buffer::WatermarkBuffer pending_recv_data_{
         [this]() -> void { this->pendingRecvBufferLowWatermark(); },
-        [this]() -> void { this->pendingRecvBufferHighWatermark(); }};
+        [this]() -> void { this->pendingRecvBufferHighWatermark(); },
+        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
     Buffer::WatermarkBuffer pending_send_data_{
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
-        [this]() -> void { this->pendingSendBufferHighWatermark(); }};
+        [this]() -> void { this->pendingSendBufferHighWatermark(); },
+        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;
@@ -237,11 +290,14 @@ protected:
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;
     bool data_deferred_ : 1;
-    bool waiting_for_non_informational_headers_ : 1;
+    bool received_noninformational_headers_ : 1;
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
     absl::string_view details_;
+    // See HttpConnectionManager.stream_idle_timeout.
+    std::chrono::milliseconds stream_idle_timeout_{};
+    Event::TimerPtr stream_idle_timer_;
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -253,13 +309,13 @@ protected:
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
                      ResponseDecoder& response_decoder)
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
-          headers_or_trailers_(std::make_unique<ResponseHeaderMapImpl>()) {}
+          headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     StreamDecoder& decoder() override { return response_decoder_; }
-    void decodeHeaders(bool allow_waiting_for_informational_headers) override;
+    void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
@@ -271,13 +327,18 @@ protected:
     void allocTrailers() override {
       // If we are waiting for informational headers, make a new response header map, otherwise
       // we are about to receive trailers. The codec makes sure this is the only valid sequence.
-      if (waiting_for_non_informational_headers_) {
-        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(
-            std::make_unique<ResponseHeaderMapImpl>());
+      if (received_noninformational_headers_) {
+        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
       } else {
-        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
-            std::make_unique<ResponseTrailerMapImpl>());
+        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
       }
+    }
+    HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
+      return createHeaderMap<RequestTrailerMapImpl>(trailers);
+    }
+    void createPendingFlushTimer() override {
+      // Client streams do not create a flush timer because we currently assume that any failure
+      // to flush would be covered by a request/stream/etc. timeout.
     }
 
     // RequestEncoder
@@ -298,14 +359,13 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit),
-          headers_or_trailers_(std::make_unique<RequestHeaderMapImpl>()) {}
+        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     StreamDecoder& decoder() override { return *request_decoder_; }
-    void decodeHeaders(bool allow_waiting_for_informational_headers) override;
+    void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
@@ -315,8 +375,12 @@ protected:
       }
     }
     void allocTrailers() override {
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::make_unique<RequestTrailerMapImpl>());
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
     }
+    HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
+      return createHeaderMap<ResponseTrailerMapImpl>(trailers);
+    }
+    void createPendingFlushTimer() override;
 
     // ResponseEncoder
     void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
@@ -332,27 +396,53 @@ protected:
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
 
   ConnectionImpl* base() { return this; }
+  // NOTE: Always use non debug nullptr checks against the return value of this function. There are
+  // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
+  // that is not associated with an existing stream.
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
-  void sendPendingFrames();
+  Status sendPendingFrames();
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
   // NOTE: This is only used for tests.
   virtual void onSettingsForTest(const nghttp2_settings&) {}
 
+  /**
+   * Check if header name contains underscore character.
+   * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
+   * as a security measure due to systems that treat '_' and '-' as interchangeable.
+   * The ServerConnectionImpl may drop header or reject request based on the
+   * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
+   * HttpConnectionManager.
+   */
+  virtual absl::optional<int> checkHeaderNameForUnderscores(absl::string_view /* header_name */) {
+    return absl::nullopt;
+  }
+
+  /**
+   * Save `status` into nghttp2_callback_status_.
+   * Return nghttp2 callback return code corresponding to `status`.
+   */
+  int setAndCheckNghttp2CallbackStatus(Status&& status);
+
   static Http2Callbacks http2_callbacks_;
 
   std::list<StreamImplPtr> active_streams_;
   nghttp2_session* session_{};
-  CodecStats stats_;
+  CodecStats& stats_;
   Network::Connection& connection_;
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
   const bool stream_error_on_invalid_http_messaging_;
-  bool flood_detected_;
+
+  // Status for any errors encountered by the nghttp2 callbacks.
+  // nghttp2 library uses single return code to indicate callback failure and
+  // `nghttp2_callback_status_` is used to save right error information returned by a callback. The
+  // `nghttp2_callback_status_` is valid iff nghttp call returned NGHTTP2_ERR_CALLBACK_FAILURE.
+  Status nghttp2_callback_status_;
 
   // Set if the type of frame that is about to be sent is PING or SETTINGS with the ACK flag set, or
   // RST_STREAM.
@@ -364,7 +454,7 @@ protected:
   // Maximum number of outbound frames. Initialized from corresponding http2_protocol_options.
   // Default value is 10000.
   const uint32_t max_outbound_frames_;
-  const Buffer::OwnedBufferFragmentImpl::Releasor frame_buffer_releasor_;
+  const std::function<void()> frame_buffer_releasor_;
   // This counter keeps track of the number of outbound frames of types PING, SETTINGS and
   // RST_STREAM (these that were buffered in the underlying connection but not yet written into the
   // socket). If this counter exceeds the `max_outbound_control_frames_' value the connection is
@@ -373,7 +463,7 @@ protected:
   // Maximum number of outbound frames of types PING, SETTINGS and RST_STREAM. Initialized from
   // corresponding http2_protocol_options. Default value is 1000.
   const uint32_t max_outbound_control_frames_;
-  const Buffer::OwnedBufferFragmentImpl::Releasor control_frame_buffer_releasor_;
+  const std::function<void()> control_frame_buffer_releasor_;
   // This counter keeps track of the number of consecutive inbound frames of types HEADERS,
   // CONTINUATION and DATA with an empty payload and no end stream flag. If this counter exceeds
   // the `max_consecutive_inbound_frames_with_empty_payload_` value the connection is terminated.
@@ -409,38 +499,44 @@ protected:
   // from corresponding http2_protocol_options. Default value is 10.
   const uint32_t max_inbound_window_update_frames_per_data_frame_sent_;
 
-private:
-  virtual ConnectionCallbacks& callbacks() PURE;
-  virtual int onBeginHeaders(const nghttp2_frame* frame) PURE;
-  int onData(int32_t stream_id, const uint8_t* data, size_t len);
-  int onBeforeFrameReceived(const nghttp2_frame_hd* hd);
-  int onFrameReceived(const nghttp2_frame* frame);
-  int onBeforeFrameSend(const nghttp2_frame* frame);
-  int onFrameSend(const nghttp2_frame* frame);
-  virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
-  int onInvalidFrame(int32_t stream_id, int error_code);
-
   // For the flood mitigation to work the onSend callback must be called once for each outbound
   // frame. This is what the nghttp2 library is doing, however this is not documented. The
   // Http2FloodMitigationTest.* tests in test/integration/http2_integration_test.cc will break if
   // this changes in the future. Also it is important that onSend does not do partial writes, as the
   // nghttp2 library will keep calling this callback to write the rest of the frame.
-  ssize_t onSend(const uint8_t* data, size_t length);
+  StatusOr<ssize_t> onSend(const uint8_t* data, size_t length);
+
+  // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
+  // a problem with processing empty trailers (END_STREAM | END_HEADERS with zero length HEADERS) of
+  // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514. This is
+  // controlled by "envoy.reloadable_features.http2_skip_encoding_empty_trailers" runtime feature
+  // flag.
+  const bool skip_encoding_empty_trailers_;
+
+private:
+  virtual ConnectionCallbacks& callbacks() PURE;
+  virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
+  int onData(int32_t stream_id, const uint8_t* data, size_t len);
+  Status onBeforeFrameReceived(const nghttp2_frame_hd* hd);
+  Status onFrameReceived(const nghttp2_frame* frame);
+  int onBeforeFrameSend(const nghttp2_frame* frame);
+  int onFrameSend(const nghttp2_frame* frame);
+  int onError(absl::string_view error);
+  virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
+  int onInvalidFrame(int32_t stream_id, int error_code);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
   ssize_t packMetadata(int32_t stream_id, uint8_t* buf, size_t len);
-
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
-  // Returns true on success or false if outbound queue limits were exceeded.
-  bool addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual void checkOutboundQueueLimits() PURE;
-  void incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
-  virtual bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
-  virtual bool checkInboundFrameLimits() PURE;
-
-  void releaseOutboundFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
-  void releaseOutboundControlFrame(const Buffer::OwnedBufferFragmentImpl* fragment);
+  // Returns Ok Status on success or error if outbound queue limits were exceeded.
+  Status addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
+  virtual Status checkOutboundQueueLimits() PURE;
+  Status incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame);
+  virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
+  virtual Status checkInboundFrameLimits(int32_t stream_id) PURE;
+  void releaseOutboundFrame();
+  void releaseOutboundControlFrame();
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
@@ -452,11 +548,13 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
+  using SessionFactory = Nghttp2SessionFactory;
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats,
+                       CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
-                       const uint32_t max_response_headers_count);
+                       const uint32_t max_response_headers_count,
+                       SessionFactory& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
@@ -464,19 +562,19 @@ public:
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  int onBeginHeaders(const nghttp2_frame* frame) override;
+  Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
 
   // Presently client connections only perform accounting of outbound frames and do not
   // terminate connections when queue limits are exceeded. The primary reason is the complexity of
   // the clean-up of upstream connections. The clean-up of upstream connection causes RST_STREAM
   // messages to be sent on corresponding downstream connections. This may actually trigger flood
-  // mitigation on the downstream connections, which causes an exception to be thrown in the middle
-  // of the clean-up loop, leaving resources in a half cleaned up state.
+  // mitigation on the downstream connections, however there is currently no mechanism for
+  // handling these types of errors.
   // TODO(yanavlasov): add flood mitigation for upstream connections as well.
-  void checkOutboundQueueLimits() override {}
-  bool trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return true; }
-  bool checkInboundFrameLimits() override { return true; }
+  Status checkOutboundQueueLimits() override { return okStatus(); }
+  Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override { return okStatus(); }
+  Status checkInboundFrameLimits(int32_t) override { return okStatus(); }
 
   Http::ConnectionCallbacks& callbacks_;
 };
@@ -487,19 +585,22 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Scope& scope,
+                       CodecStats& stats,
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_request_headers_kb,
-                       const uint32_t max_request_headers_count);
+                       const uint32_t max_request_headers_count,
+                       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+                           headers_with_underscores_action);
 
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
-  int onBeginHeaders(const nghttp2_frame* frame) override;
+  Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  void checkOutboundQueueLimits() override;
-  bool trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
-  bool checkInboundFrameLimits() override;
+  Status checkOutboundQueueLimits() override;
+  Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
+  Status checkInboundFrameLimits(int32_t stream_id) override;
+  absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
 
   // Http::Connection
   // The reason for overriding the dispatch method is to do flood mitigation only when
@@ -508,13 +609,18 @@ private:
   // ClientConnectionImpl::checkOutboundQueueLimits method). The dispatch method on the
   // ServerConnectionImpl objects is called only when processing data from the downstream client in
   // the ConnectionManagerImpl::onData method.
-  void dispatch(Buffer::Instance& data) override;
+  Http::Status dispatch(Buffer::Instance& data) override;
+  Http::Status innerDispatch(Buffer::Instance& data) override;
 
   ServerConnectionCallbacks& callbacks_;
 
   // This flag indicates that downstream data is being dispatched and turns on flood mitigation
   // in the checkMaxOutbound*Framed methods.
   bool dispatching_downstream_data_{false};
+
+  // The action to take when a request header name contains underscore characters.
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
 };
 
 } // namespace Http2

@@ -41,7 +41,7 @@ For more information on CSRF please refer to the pages below.
 
 * https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29
 * https://seclab.stanford.edu/websec/csrf/csrf.pdf
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.csrf.v2.CsrfPolicy>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.csrf.v3.CsrfPolicy>`
 
   .. note::
 
@@ -57,7 +57,7 @@ valid. The reason it is able to do this while still mitigating cross-site reques
 forgery attempts is because the target origin has already been reached by the time
 front-envoy is applying the filter. This means that while endpoints may support
 cross-origin requests they are still protected from malicious third-parties who
-have not been whitelisted.
+have not been allowlisted.
 
 It's important to note that requests should generally originate from the same
 origin as the target but there are use cases where that may not be possible.
@@ -76,12 +76,12 @@ Runtime
 -------
 
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
-<envoy_api_field_config.filter.http.csrf.v2.CsrfPolicy.filter_enabled>` field.
+<envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_v3_api_field_extensions.filters.http.csrf.v3.CsrfPolicy.filter_enabled>` field.
 
 The fraction of requests for which the filter is enabled in shadow-only mode can be configured via
-the :ref:`runtime_key <envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` value of the
-:ref:`shadow_enabled <envoy_api_field_config.filter.http.csrf.v2.CsrfPolicy.shadow_enabled>` field.
+the :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` value of the
+:ref:`shadow_enabled <envoy_v3_api_field_extensions.filters.http.csrf.v3.CsrfPolicy.shadow_enabled>` field.
 When enabled in shadow-only mode, the filter will evaluate the request's *Origin* and *Destination*
 to determine if it's valid but will not enforce any policies.
 
