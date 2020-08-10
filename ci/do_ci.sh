@@ -101,7 +101,7 @@ function bazel_binary_build() {
 CI_TARGET=$1
 shift
 
-if [[ $# -gt 1 ]]; then
+if [[ $# -ge 1 ]]; then
   COVERAGE_TEST_TARGETS=$*
   TEST_TARGETS="$COVERAGE_TEST_TARGETS"
 else
