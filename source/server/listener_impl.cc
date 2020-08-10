@@ -5,6 +5,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/network/udp_packet_writer_config.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -276,6 +277,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
   buildUdpListenerFactory(socket_type, concurrency);
+  buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
@@ -331,6 +333,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
   buildUdpListenerFactory(socket_type, concurrency);
+  buildUdpWriterFactory(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
@@ -369,6 +372,24 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
+  }
+}
+
+void ListenerImpl::buildUdpWriterFactory(Network::Socket::Type socket_type) {
+  if (socket_type == Network::Socket::Type::Datagram) {
+    auto udp_writer_config = config_.udp_writer_config();
+    if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
+        udp_writer_config.typed_config().type_url().empty()) {
+      const std::string default_type_url =
+          "type.googleapis.com/envoy.config.listener.v3.UdpDefaultWriterOptions";
+      udp_writer_config.mutable_typed_config()->set_type_url(default_type_url);
+    }
+    auto& config_factory =
+        Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(
+            udp_writer_config);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        udp_writer_config.typed_config(), validation_visitor_, config_factory);
+    udp_writer_factory_ = config_factory.createUdpPacketWriterFactory(*message);
   }
 }
 
