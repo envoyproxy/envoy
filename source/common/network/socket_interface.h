@@ -61,10 +61,7 @@ using SocketInterfaceLoader = ScopedInjectableLoader<SocketInterface>;
 static inline IoHandlePtr ioHandleForAddr(Socket::Type type,
                                           const Address::InstanceConstSharedPtr addr) {
   auto sock_interface = addr->socketInterface();
-  if (sock_interface) {
-    return sock_interface->socket(type, addr);
-  }
-  return SocketInterfaceSingleton::get().socket(type, addr);
+  return sock_interface->socket(type, addr);
 }
 
 } // namespace Network

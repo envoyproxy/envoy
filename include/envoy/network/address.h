@@ -182,7 +182,7 @@ public:
   virtual Type type() const PURE;
 
   /**
-   * @return SocketInterface if one was configured or nullptr
+   * @return SocketInterface to be used with the address
    */
   virtual const Network::SocketInterface* socketInterface() const PURE;
 };
