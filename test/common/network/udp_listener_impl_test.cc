@@ -75,7 +75,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
 // Test that socket options are set after the listener is setup.
 TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
   MockUdpListenerCallbacks listener_callbacks;
-  auto socket = std::make_shared<Network::UdpListenSocket>(Network::Test::getCanonicalLoopbackAddress(version_),
+  auto socket = std::make_shared<Network::UdpListenSocket>(Network::Test::getAnyAddress(version_),
                                                            nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
