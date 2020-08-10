@@ -51,6 +51,12 @@ void WatermarkBuffer::move(Instance& rhs, uint64_t length) {
   checkHighAndOverflowWatermarks();
 }
 
+SliceDataPtr WatermarkBuffer::extractMutableFrontSlice() {
+  auto result = OwnedImpl::extractMutableFrontSlice();
+  checkLowWatermark();
+  return result;
+}
+
 Api::IoCallUint64Result WatermarkBuffer::read(Network::IoHandle& io_handle, uint64_t max_length) {
   Api::IoCallUint64Result result = OwnedImpl::read(io_handle, max_length);
   checkHighAndOverflowWatermarks();
@@ -67,6 +73,15 @@ Api::IoCallUint64Result WatermarkBuffer::write(Network::IoHandle& io_handle) {
   Api::IoCallUint64Result result = OwnedImpl::write(io_handle);
   checkLowWatermark();
   return result;
+}
+
+void WatermarkBuffer::appendSliceForTest(const void* data, uint64_t size) {
+  OwnedImpl::appendSliceForTest(data, size);
+  checkHighAndOverflowWatermarks();
+}
+
+void WatermarkBuffer::appendSliceForTest(absl::string_view data) {
+  appendSliceForTest(data.data(), data.size());
 }
 
 void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark) {

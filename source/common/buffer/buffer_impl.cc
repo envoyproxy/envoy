@@ -201,6 +201,34 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
   return raw_slices;
 }
 
+SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
+  RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
+  // Remove zero byte fragments from the front of the queue to ensure
+  // that the extracted slice has data.
+  while (!slices_.empty() && slices_.front()->dataSize() == 0) {
+    slices_.pop_front();
+  }
+  ASSERT(!slices_.empty());
+  ASSERT(slices_.front());
+  auto slice = std::move(slices_.front());
+  auto size = slice->dataSize();
+  length_ -= size;
+  slices_.pop_front();
+  if (!slice->isMutable()) {
+    // Create a mutable copy of the immutable slice data.
+    auto mutable_slice = OwnedSlice::create(size);
+    auto copy_size = mutable_slice->append(slice->data(), size);
+    ASSERT(copy_size == size);
+    // Drain trackers for the immutable slice will be called as part of the slice destructor.
+    return mutable_slice;
+  } else {
+    // Make sure drain trackers are called before ownership of the slice is transferred from
+    // the buffer to the caller.
+    slice->callAndClearDrainTrackers();
+    return slice;
+  }
+}
+
 uint64_t OwnedImpl::length() const {
 #ifndef NDEBUG
   // When running in debug mode, verify that the precomputed length matches the sum
