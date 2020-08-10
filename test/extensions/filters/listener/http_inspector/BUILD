@@ -15,6 +15,9 @@ envoy_extension_cc_test(
     name = "http_inspector_test",
     srcs = ["http_inspector_test.cc"],
     extension_name = "envoy.filters.listener.http_inspector",
+    #TODO(davinci26): The test passes on Windows *but* http inspector
+    # relies on Event::FileTriggerType::Edge and we get away with it
+    # because we mock the dispather.
     tags = ["fails_on_windows"],
     deps = [
         "//source/common/common:hex_lib",

@@ -584,19 +584,20 @@ TEST_F(HttpInspectorTest, Http1WithLargeRequestLine) {
     num_loops = 2;
 #endif
 
-    for (size_t i = 1; i <= num_loops; i++) {
-      size_t len = i;
-      if (num_loops == 2) {
-        len = size_t(Config::MAX_INSPECT_SIZE / (3 - i));
-      }
-      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&data, len](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= len);
-                memcpy(buffer, data.data(), len);
-                return Api::SysCallSizeResult{ssize_t(len), 0};
-              }));
-    }
+    size_t ctr = 1;
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+    .Times(num_loops)
+    .WillRepeatedly(Invoke(
+        [&data, &ctr, num_loops](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+          size_t len = ctr;
+          if (num_loops == 2) {
+            len = size_t(Config::MAX_INSPECT_SIZE / (3 - ctr));
+          }
+          ASSERT(length >= len);
+          memcpy(buffer, data.data(), len);
+          ctr += 1;
+          return Api::SysCallSizeResult{ssize_t(len), 0};
+        }));  
   }
 
   bool got_continue = false;
