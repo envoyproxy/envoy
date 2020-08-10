@@ -152,7 +152,7 @@ public:
   virtual absl::optional<std::string> x509Extension(absl::string_view extension_name) const PURE;
 
   /**
-   * Performs a TLS handshake on ths SSL object and returns an action indicating
+   * Performs a TLS handshake on the SSL object and returns an action indicating
    * whether the callsite should close the connection or keep it open.
    */
   virtual Network::PostIoAction doHandshake(SocketState& state) PURE;
