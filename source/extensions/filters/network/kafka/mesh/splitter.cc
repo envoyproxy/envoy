@@ -16,21 +16,22 @@ RequestInFlightFactory::RequestInFlightFactory(
 
 AbstractInFlightRequestSharedPtr
 RequestInFlightFactory::create(const std::shared_ptr<Request<ProduceRequest>> request) const {
-  ENVOY_LOG(warn, "RequestInFlightFactory - create(Produce) for {}",
+  ENVOY_LOG(warn, "RequestInFlightFactory - create(Produce({})) for cid {}",
+            request->request_header_.api_version_,
             request->request_header_.correlation_id_);
   return std::make_shared<ProduceRequestHolder>(origin_, request);
 }
 
 AbstractInFlightRequestSharedPtr
 RequestInFlightFactory::create(const std::shared_ptr<Request<MetadataRequest>> request) const {
-  ENVOY_LOG(warn, "RequestInFlightFactory - create(Metadata) for {}",
+  ENVOY_LOG(warn, "RequestInFlightFactory - create(Metadata) for cid {}",
             request->request_header_.correlation_id_);
   return std::make_shared<MetadataRequestHolder>(origin_, clustering_configuration_, request);
 }
 
 AbstractInFlightRequestSharedPtr
 RequestInFlightFactory::create(const std::shared_ptr<Request<ApiVersionsRequest>> request) const {
-  ENVOY_LOG(warn, "RequestInFlightFactory - create(ApiVersions) for {}",
+  ENVOY_LOG(warn, "RequestInFlightFactory - create(ApiVersions) for cid {}",
             request->request_header_.correlation_id_);
   return std::make_shared<ApiVersionsRequestHolder>(origin_, request);
 }

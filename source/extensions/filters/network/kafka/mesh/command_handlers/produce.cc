@@ -45,25 +45,39 @@ ProduceRequestHolder::computeFootmarks(const std::string& topic, const int32_t p
   const char* ptr = reinterpret_cast<const char*>(records.data());
   absl::string_view sv = {ptr, records.size()};
 
-  unsigned int step = 8 + 4 + 4;
+  unsigned int step = /* BaseOffset */ 8 + /* Length */ 4 + /* PartitionLeaderEpoch */ 4;
   if (sv.length() < step) {
     ENVOY_LOG(error, "bad data 1");
     return {};
   }
   sv = {sv.data() + step, sv.length() - step};
 
-  Int8Deserializer magic;
-  magic.feed(sv);
+  /* Magic */
+  Int8Deserializer magic_deserializer;
+  magic_deserializer.feed(sv);
 
-  if (magic.ready()) {
-    int8_t m = magic.get();
-    if (2 != m) {
-      ENVOY_LOG(error, "bad data 2 - magic not equal to 2: {}", m);
-      return {};
+  if (magic_deserializer.ready()) {
+    int8_t magic = magic_deserializer.get();
+    switch (magic) {
+      case 0:
+      case 1:
+        ENVOY_LOG(error, "bad data 2 - magic not equal to 2: {}", magic);
+        return {};
+      case 2:
+        return processMagic2(topic, partition, sv);
+      default:
+        ENVOY_LOG(error, "bad data 2 - magic not equal to 2: {}", magic);
+        return {};
     }
   }
 
-  unsigned int step2 = 4 + 2 + 4 + 8 + 8 + 8 + 2 + 4;
+  ENVOY_LOG(error, "bad data 3 - no magic present");
+  return {};
+}
+
+std::vector<ProduceRequestHolder::RecordFootmark> ProduceRequestHolder::processMagic2(const std::string& topic, const int32_t partition, absl::string_view sv) {
+
+  unsigned int step2 = /* CRC */ 4 + /* Attributes */ 2 + /* LastOffsetDelta */ 4 + /* FirstTimestamp */ 8 + /* MaxTimestamp */ 8 + /* ProducerId */ 8 + /* ProducerEpoch */ 2 + /* BaseSequence */ 4;
   if (sv.length() < step2) {
     ENVOY_LOG(error, "bad data 3");
     return {};
