@@ -112,8 +112,8 @@ def class_definitions(cursor: Cursor) -> List[Cursor]:
       continue
     if not descendant.is_definition():
       continue
-    
-    # check if this class is directly enclosed by a namespace. 
+
+    # check if this class is directly enclosed by a namespace.
     # if it's not, then it's a nested class, our divided results
     # should not contain nested classes.
     if descendant.semantic_parent.kind != CursorKind.NAMESPACE:
