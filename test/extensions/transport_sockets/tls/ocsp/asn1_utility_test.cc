@@ -164,8 +164,9 @@ TEST_F(Asn1UtilityTest, GetOptionalMissingValueTest) {
   CBS cbs;
   CBS_init(&cbs, missing_val_bool.data(), missing_val_bool.size());
 
-  EXPECT_EQ("Failed to parse ASN.1 element tag",
-            absl::get<1>(Asn1Utility::getOptional(cbs, CBS_ASN1_BOOLEAN)));
+  auto res = Asn1Utility::getOptional(cbs, CBS_ASN1_BOOLEAN);
+  EXPECT_TRUE(absl::holds_alternative<absl::string_view>(res));
+  EXPECT_EQ("Failed to parse ASN.1 element tag", absl::get<1>(res));
 }
 
 TEST_F(Asn1UtilityTest, ParseOptionalTest) {

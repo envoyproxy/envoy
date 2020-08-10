@@ -6,6 +6,7 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -97,6 +98,16 @@ TEST_F(OcspFullResponseParsingTest, ThisUpdateAfterNowTest) {
   time_system_.setSystemTime(absl::ToChronoTime(past_time));
   EXPECT_THROW_WITH_REGEX(setup("good_ocsp_resp.der"), EnvoyException,
                           "OCSP Response thisUpdate field is set in the future");
+}
+
+TEST_F(OcspFullResponseParsingTest, ThisUpdateAfterNowCheckDisabledTest) {
+  auto past_time = TestUtility::parseTime("2000 01 01", "%Y %m %d");
+  time_system_.setSystemTime(absl::ToChronoTime(past_time));
+
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.check_ocsp_response_validity_start_time", "false"}});
+  setup("good_ocsp_resp.der");
 }
 
 TEST_F(OcspFullResponseParsingTest, ResponderIdKeyHashTest) {
