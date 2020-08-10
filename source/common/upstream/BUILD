@@ -493,9 +493,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_includes",
     hdrs = [
+        "thread_aware_lb_impl.h",
         "transport_socket_match_impl.h",
         "upstream_impl.h",
-        "thread_aware_lb_impl.h",
     ],
     external_deps = ["abseil_synchronization"],
     deps = [

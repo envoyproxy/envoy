@@ -256,13 +256,11 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   uint64_t seed = hash;
   std::default_random_engine random(seed);
   HostConstSharedPtr h;
-  std::cout << "chooseHost: num_hosts: " << num_hosts << ", seed: " << seed << std::endl;
   for (uint32_t i = 0; i < num_hosts; i++) {
     // The random shuffle algorithm
     std::uniform_int_distribution<int> uniform_dist(0, num_hosts - i - 1); // inclusive,inclusive
     uint32_t j = uniform_dist(random);
     std::swap(host_index[i], host_index[i + j]);
-    std::cout << "chooseHost:  " << host_index[i] << std::endl;
 
     uint32_t k = host_index[i];
     h = (*normalized_host_weights_)[k].first;

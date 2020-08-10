@@ -54,7 +54,6 @@ public:
 
   NormalizedHostWeightVectorPtr createHosts(uint32_t num_hosts) {
     const double equal_weight = static_cast<double>(1.0 / num_hosts);
-    std::cout << equal_weight << std::endl;
     std::shared_ptr<NormalizedHostWeightVector> vector =
         std::make_shared<NormalizedHostWeightVector>();
     for (uint32_t i = 0; i < num_hosts; i++) {
@@ -67,7 +66,6 @@ public:
   std::pair<NormalizedHostWeightVectorPtr, NormalizedHostWeightVectorPtr>
   createHostsMappedByMultipleHosts(uint32_t num_hosts) {
     const double equal_weight = static_cast<double>(1.0 / num_hosts);
-    std::cout << equal_weight << std::endl;
     std::shared_ptr<NormalizedHostWeightVector> hosts =
         std::make_shared<NormalizedHostWeightVector>();
     std::shared_ptr<NormalizedHostWeightVector> ring =
