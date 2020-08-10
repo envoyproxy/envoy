@@ -1,0 +1,17 @@
+config {
+  name: "envoy.filters.network.zookeeper_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy"
+    value: "\nVtype.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy\032\000"
+  }
+}
+actions {
+  on_write {
+    data: "\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030c.googlers.com\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030\030"
+  }
+}
+actions {
+  on_write {
+  }
+}
+
