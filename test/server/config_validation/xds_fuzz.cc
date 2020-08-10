@@ -362,11 +362,11 @@ void XdsFuzzTest::verifyState() {
   ENVOY_LOG_MISC(debug, "Verified routes");
 
   FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_draining")->value() ==
-            verifier_.numDraining());
+              verifier_.numDraining());
   FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_warming")->value() ==
-            verifier_.numWarming());
+              verifier_.numWarming());
   FUZZ_ASSERT(test_server_->gauge("listener_manager.total_listeners_active")->value() ==
-            verifier_.numActive());
+              verifier_.numActive());
   ENVOY_LOG_MISC(debug, "Verified stats");
   ENVOY_LOG_MISC(debug, "warming {} ({}), active {} ({}), draining {} ({})", verifier_.numWarming(),
                  test_server_->gauge("listener_manager.total_listeners_warming")->value(),

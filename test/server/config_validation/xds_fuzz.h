@@ -11,12 +11,12 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
+#include "test/fuzz/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/server/config_validation/xds_fuzz.pb.h"
 #include "test/server/config_validation/xds_verifier.h"
 
 #include "absl/types/optional.h"
-#include "test/fuzz/utility.h"
 
 namespace Envoy {
 
