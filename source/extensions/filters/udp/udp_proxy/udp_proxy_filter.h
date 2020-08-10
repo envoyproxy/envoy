@@ -226,7 +226,7 @@ private:
   }
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) final;
   void onClusterRemoval(const std::string& cluster_name) override;
 
   const UdpProxyFilterConfigSharedPtr config_;

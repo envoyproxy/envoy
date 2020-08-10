@@ -108,7 +108,7 @@ public:
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
-  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+  SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
 private:
   Unit unit_;

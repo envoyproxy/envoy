@@ -59,7 +59,7 @@ public:
   void recordValue(uint64_t value) override;
 
   // Stats::Metric
-  SymbolTable& symbolTable() override { return symbol_table_; }
+  SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
 
 private:
@@ -334,13 +334,14 @@ private:
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
-    const SymbolTable& constSymbolTable() const override { return parent_.constSymbolTable(); }
-    SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+    const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
+    SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
     Counter& counterFromString(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
+
     Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName(), import_mode);

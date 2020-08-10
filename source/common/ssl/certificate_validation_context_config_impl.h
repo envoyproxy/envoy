@@ -21,7 +21,7 @@ public:
   const std::string& certificateRevocationList() const override {
     return certificate_revocation_list_;
   }
-  const std::string& certificateRevocationListPath() const override {
+  const std::string& certificateRevocationListPath() const final {
     return certificate_revocation_list_path_;
   }
   const std::vector<std::string>& verifySubjectAltNameList() const override {

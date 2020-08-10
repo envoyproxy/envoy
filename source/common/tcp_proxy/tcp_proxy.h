@@ -322,7 +322,7 @@ public:
     bool on_high_watermark_called_{false};
   };
 
-  virtual StreamInfo::StreamInfo& getStreamInfo();
+  StreamInfo::StreamInfo& getStreamInfo();
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
