@@ -91,7 +91,7 @@ public:
    * @param ssl a connected SSL connection
    * @return the DER-encoded leaf certificate that was presented during the SSL handshake.
    */
-  static CRYPTO_BUFFER* leafCertificate(SSL* ssl);
+  static CRYPTO_BUFFER* localLeafCertificate(SSL* ssl);
 
   SslStats& stats() { return stats_; }
 

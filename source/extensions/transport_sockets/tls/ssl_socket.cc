@@ -529,7 +529,7 @@ X509* SslSocketInfo::getX509Certificate() const {
   if (cached_certificate_) {
     return cached_certificate_.get();
   }
-  CRYPTO_BUFFER* leaf = ContextImpl::leafCertificate(ssl_.get());
+  CRYPTO_BUFFER* leaf = ContextImpl::localLeafCertificate(ssl_.get());
   if (leaf) {
     auto* start = CRYPTO_BUFFER_data(leaf);
     cached_certificate_.reset(d2i_X509(nullptr, &start, CRYPTO_BUFFER_len(leaf)));

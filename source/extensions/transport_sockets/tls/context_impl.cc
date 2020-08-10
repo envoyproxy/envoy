@@ -875,7 +875,7 @@ bool ContextImpl::dnsNameMatch(const absl::string_view dns_name, const absl::str
   return false;
 }
 
-CRYPTO_BUFFER* ContextImpl::leafCertificate(SSL* ssl) {
+CRYPTO_BUFFER* ContextImpl::localLeafCertificate(SSL* ssl) {
   auto tls_context = reinterpret_cast<TlsContext*>(
       SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslTlsContextIndex()));
   return tls_context->cert_.get();
