@@ -105,6 +105,9 @@ protected:
   ScopedRoutesConfigProviderManagerPtr config_provider_manager_;
 
   Event::SimulatedTimeSystem time_system_;
+
+  std::function<void(bool)> route_config_updated_cb_ = [](bool) {};
+  NiceMock<Event::MockDispatcher> event_dispatcher_;
 };
 
 class ScopedRdsTest : public ScopedRoutesTestBase {
@@ -1040,12 +1043,11 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
               IsNull());
-  testing::NiceMock<Event::MockDispatcher> dispatcher;
   absl::optional<uint64_t> key_hash =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
-  std::function<void(bool)> route_config_updated_cb = [](bool) {};
-  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, dispatcher, route_config_updated_cb);
+  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_, route_config_updated_cb_);
   // After on demand request, push rds update.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
@@ -1111,12 +1113,12 @@ key:
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
-  testing::NiceMock<Event::MockDispatcher> dispatcher;
   absl::optional<uint64_t> key_hash =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
-  std::function<void(bool)> route_config_updated_cb = [](bool) {};
-  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, dispatcher, route_config_updated_cb);
+  EXPECT_CALL(server_factory_context_, dispatcher()).Times(1);
+  EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
+  getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_, route_config_updated_cb_);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
@@ -1171,6 +1173,42 @@ key:
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+}
+
+TEST_F(ScopedRdsTest, runOnDemandUpdatedCallback) {
+  setup();
+  init_watcher_.expectReady();
+  // Secondary priority scope should be loaded lazily.
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+priority: Secondary
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
+
+  // Delta API.
+  const auto decoded_resources = TestUtility::decodeResources({lazy_resource});
+  context_init_manager_.initialize(init_watcher_);
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+
+  absl::optional<uint64_t> key_hash =
+      getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+  EXPECT_CALL(event_dispatcher_, post(_)).Times(5);
+  for (int i = 0; i < 5; i++) {
+    getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
+                                              route_config_updated_cb_);
+  }
+  // After on demand request, push rds update.
+  pushRdsConfig({"foo_routes"}, "111");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "foo_routes");
 }
