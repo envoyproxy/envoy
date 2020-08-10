@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.tap.v4alpha;
 
+import "envoy/config/common/matcher/v4alpha/matcher.proto";
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/grpc_service.proto";
 import "envoy/config/route/v4alpha/route_components.proto";
@@ -25,9 +26,16 @@ message TapConfig {
 
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.tap.v3.TapConfig";
 
+  reserved 1;
+
+  reserved "match_config";
+
   // The match configuration. If the configuration matches the data source being tapped, a tap will
   // occur, with the result written to the configured output.
-  MatchPredicate match_config = 1 [(validate.rules).message = {required: true}];
+  // Exactly one of :ref:`match <envoy_api_field_config.tap.v4alpha.TapConfig.match>` and
+  // :ref:`match_config <envoy_api_field_config.tap.v4alpha.TapConfig.match_config>` must be set. If both
+  // are set, the :ref:`match <envoy_api_field_config.tap.v4alpha.TapConfig.match>` will be used.
+  common.matcher.v4alpha.MatchPredicate match = 4;
 
   // The tap output configuration. If a match configuration matches a data source being tapped,
   // a tap will occur and the data will be written to the configured output.

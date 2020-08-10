@@ -7,13 +7,16 @@
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
+#include "extensions/common/matcher/matcher.h"
 #include "extensions/common/tap/tap.h"
-#include "extensions/common/tap/tap_matcher.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
+
+using Matcher = Envoy::Extensions::Common::Matcher::Matcher;
+using MatcherPtr = Envoy::Extensions::Common::Matcher::MatcherPtr;
 
 /**
  * Common utilities for tapping.

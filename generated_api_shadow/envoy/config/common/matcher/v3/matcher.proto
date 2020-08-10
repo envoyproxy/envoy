@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package envoy.config.common.matcher.v3;
+
+import "envoy/config/route/v3/route_components.proto";
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.common.matcher.v3";
+option java_outer_classname = "MatcherProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Unified Matcher API]
+
+// Match configuration. This is a recursive structure which allows complex nested match
+// configurations to be built using various logical operators.
+// [#next-free-field: 11]
+message MatchPredicate {
+  // A set of match configurations used for logical operations.
+  message MatchSet {
+    // The list of rules that make up the set.
+    repeated MatchPredicate rules = 1 [(validate.rules).repeated = {min_items: 2}];
+  }
+
+  oneof rule {
+    option (validate.required) = true;
+
+    // A set that describes a logical OR. If any member of the set matches, the match configuration
+    // matches.
+    MatchSet or_match = 1;
+
+    // A set that describes a logical AND. If all members of the set match, the match configuration
+    // matches.
+    MatchSet and_match = 2;
+
+    // A negation match. The match configuration will match if the negated match condition matches.
+    MatchPredicate not_match = 3;
+
+    // The match configuration will always match.
+    bool any_match = 4 [(validate.rules).bool = {const: true}];
+
+    // HTTP request headers match configuration.
+    HttpHeadersMatch http_request_headers_match = 5;
+
+    // HTTP request trailers match configuration.
+    HttpHeadersMatch http_request_trailers_match = 6;
+
+    // HTTP response headers match configuration.
+    HttpHeadersMatch http_response_headers_match = 7;
+
+    // HTTP response trailers match configuration.
+    HttpHeadersMatch http_response_trailers_match = 8;
+
+    // HTTP request generic body match configuration.
+    HttpGenericBodyMatch http_request_generic_body_match = 9;
+
+    // HTTP response generic body match configuration.
+    HttpGenericBodyMatch http_response_generic_body_match = 10;
+  }
+}
+
+// HTTP headers match configuration.
+message HttpHeadersMatch {
+  // HTTP headers to match.
+  repeated route.v3.HeaderMatcher headers = 1;
+}
+
+// HTTP generic body match configuration.
+// List of text strings and hex strings to be located in HTTP body.
+// All specified strings must be found in the HTTP body for positive match.
+// The search may be limited to specified number of bytes from the body start.
+//
+// .. attention::
+//
+//   Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+//   If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
+//   to scan only part of the http body.
+message HttpGenericBodyMatch {
+  message GenericTextMatch {
+    oneof rule {
+      option (validate.required) = true;
+
+      // Text string to be located in HTTP body.
+      string string_match = 1;
+
+      // Sequence of bytes to be located in HTTP body.
+      bytes binary_match = 2;
+    }
+  }
+
+  // Limits search to specified number of bytes - default zero (no limit - match entire captured buffer).
+  uint32 bytes_limit = 1;
+
+  // List of patterns to match.
+  repeated GenericTextMatch patterns = 2 [(validate.rules).repeated = {min_items: 1}];
+}

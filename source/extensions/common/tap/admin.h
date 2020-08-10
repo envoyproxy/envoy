@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/server/admin.h"
 #include "envoy/singleton/manager.h"
 

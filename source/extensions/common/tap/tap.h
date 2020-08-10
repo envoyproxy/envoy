@@ -5,7 +5,7 @@
 #include "envoy/data/tap/v3/wrapper.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "extensions/common/tap/tap_matcher.h"
+#include "extensions/common/matcher/matcher.h"
 
 #include "absl/strings/string_view.h"
 
@@ -13,6 +13,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
+
+using Matcher = Envoy::Extensions::Common::Matcher::Matcher;
 
 using TraceWrapperPtr = std::unique_ptr<envoy::data::tap::v3::TraceWrapper>;
 inline TraceWrapperPtr makeTraceWrapper() {

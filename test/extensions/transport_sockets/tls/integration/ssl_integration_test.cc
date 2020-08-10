@@ -396,10 +396,8 @@ public:
   envoy::extensions::transport_sockets::tap::v3::Tap
   createTapConfig(const envoy::config::core::v3::TransportSocket& inner_transport) {
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config;
-    tap_config.mutable_common_config()
-        ->mutable_static_config()
-        ->mutable_match_config()
-        ->set_any_match(true);
+    tap_config.mutable_common_config()->mutable_static_config()->mutable_match()->set_any_match(
+        true);
     auto* output_config =
         tap_config.mutable_common_config()->mutable_static_config()->mutable_output_config();
     if (max_rx_bytes_.has_value()) {
