@@ -1,7 +1,5 @@
 #include "common/common/utility.h"
 
-#include <bits/stdint-uintn.h>
-
 #include <array>
 #include <chrono>
 #include <cmath>
