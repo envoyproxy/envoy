@@ -66,9 +66,9 @@ ThreadLocalKafkaFacade::registerNewProducer(const ClusterConfig& cluster_config)
 }
 
 UpstreamKafkaFacade::UpstreamKafkaFacade(const ClusteringConfiguration& clustering_configuration,
-                                         ThreadLocal::SlotAllocator& tls_allocator,
+                                         ThreadLocal::SlotAllocator& slot_allocator,
                                          Thread::ThreadFactory& thread_factory)
-    : tls_{tls_allocator.allocateSlot()} {
+    : tls_{slot_allocator.allocateSlot()} {
 
   ThreadLocal::Slot::InitializeCb cb =
       [&clustering_configuration,

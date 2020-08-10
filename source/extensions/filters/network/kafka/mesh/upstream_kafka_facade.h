@@ -20,7 +20,7 @@ namespace Mesh {
 class UpstreamKafkaFacade : private Logger::Loggable<Logger::Id::kafka> {
 public:
   UpstreamKafkaFacade(const ClusteringConfiguration& clustering_configuration,
-                      ThreadLocal::SlotAllocator& tls_allocator,
+                      ThreadLocal::SlotAllocator& slot_allocator,
                       Thread::ThreadFactory& thread_factory);
 
   KafkaProducerWrapper& getProducerForTopic(const std::string& topic);

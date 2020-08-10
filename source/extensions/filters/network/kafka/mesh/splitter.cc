@@ -17,8 +17,7 @@ RequestInFlightFactory::RequestInFlightFactory(
 AbstractInFlightRequestSharedPtr
 RequestInFlightFactory::create(const std::shared_ptr<Request<ProduceRequest>> request) const {
   ENVOY_LOG(warn, "RequestInFlightFactory - create(Produce({})) for cid {}",
-            request->request_header_.api_version_,
-            request->request_header_.correlation_id_);
+            request->request_header_.api_version_, request->request_header_.correlation_id_);
   return std::make_shared<ProduceRequestHolder>(origin_, request);
 }
 

@@ -2,16 +2,16 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 load("//bazel:envoy_internal.bzl", "envoy_external_dep_path")
 
 licenses(["notice"])  # Apache 2
 
-# Kafka network filter.
-# Broker filter public docs: docs/root/configuration/network_filters/kafka_broker_filter.rst
+# Kafka-mesh network filter.
+# Mesh filter public docs: ADAM WAS HERE
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_extension(
     name = "config_lib",

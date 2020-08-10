@@ -53,8 +53,8 @@ private:
   static std::vector<RecordFootmark>
   computeFootmarks(const std::string& topic, const int32_t partition, const Bytes& records);
 
-  static std::vector<RecordFootmark>
-  processMagic2(const std::string& topic, const int32_t partition, absl::string_view sv);
+  static std::vector<RecordFootmark> processMagic2(const std::string& topic,
+                                                   const int32_t partition, absl::string_view sv);
 
   // Original request.
   const std::shared_ptr<Request<ProduceRequest>> request_;

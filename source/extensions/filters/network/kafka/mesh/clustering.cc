@@ -16,8 +16,8 @@ using KafkaClusterDefinition =
     envoy::extensions::filters::network::kafka_mesh::v3alpha::KafkaClusterDefinition;
 using ForwardingRule = envoy::extensions::filters::network::kafka_mesh::v3alpha::ForwardingRule;
 
-ClusteringConfiguration::ClusteringConfiguration(const KafkaMeshProtoConfig& config)
-    : advertised_host_{config.advertised_host()}, advertised_port_{config.advertised_port()} {
+ClusteringConfigurationImpl::ClusteringConfigurationImpl(const KafkaMeshProtoConfig& config)
+    : advertised_address_{config.advertised_host(), config.advertised_port()} {
 
   // Processing cluster data.
   const auto& upstream_clusters = config.upstream_clusters();
@@ -67,7 +67,7 @@ ClusteringConfiguration::ClusteringConfiguration(const KafkaMeshProtoConfig& con
 }
 
 absl::optional<ClusterConfig>
-ClusteringConfiguration::computeClusterConfigForTopic(const std::string& topic) const {
+ClusteringConfigurationImpl::computeClusterConfigForTopic(const std::string& topic) const {
   for (const auto& it : topic_prefix_to_cluster_config_) {
     if (topic.rfind(it.first, 0) == 0) {
       const ClusterConfig cluster_config = it.second;
@@ -75,6 +75,10 @@ ClusteringConfiguration::computeClusterConfigForTopic(const std::string& topic) 
     }
   }
   return absl::nullopt;
+}
+
+std::pair<std::string, int32_t> ClusteringConfigurationImpl::getAdvertisedAddress() const {
+  return advertised_address_;
 }
 
 } // namespace Mesh

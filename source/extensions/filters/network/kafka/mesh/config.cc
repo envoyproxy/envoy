@@ -15,13 +15,18 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+// The mesh filter doesn't do anything special, it just sets up the shared entities.
+// Any extra configuration validation is done in ClusteringConfiguration constructor.
 Network::FilterFactoryCb KafkaMeshConfigFactory::createFilterFactoryFromProtoTyped(
     const KafkaMeshProtoConfig& config, Server::Configuration::FactoryContext& context) {
 
+  ENVOY_LOG(warn, "Creating ClusteringConfiguration instance");
   const ClusteringConfigurationSharedPtr clustering_configuration =
-      std::make_shared<ClusteringConfiguration>(config);
+      std::make_shared<ClusteringConfigurationImpl>(config);
+  ENVOY_LOG(warn, "Creating UpstreamKafkaFacade instance");
   const UpstreamKafkaFacadeSharedPtr upstream_kafka_facade = std::make_shared<UpstreamKafkaFacade>(
       *clustering_configuration, context.threadLocal(), context.api().threadFactory());
+  ENVOY_LOG(warn, "Shared instances have been created");
 
   return [clustering_configuration,
           upstream_kafka_facade](Network::FilterManager& filter_manager) -> void {
