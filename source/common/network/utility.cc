@@ -194,6 +194,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     throwWithMalformedIp(ip_address);
   }
   sockaddr_in sa4;
+  memset(&sa4, 0, sizeof(sa4));
   if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
     throwWithMalformedIp(ip_address);
   }
@@ -379,6 +380,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
   }
 
   sockaddr_storage orig_addr;
+  memset(&orig_addr, 0, sizeof(orig_addr));
   socklen_t addr_len = sizeof(sockaddr_storage);
   int status;
 

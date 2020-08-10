@@ -114,7 +114,7 @@ struct ClientCodecFacade : public ClientConnection {
   virtual nghttp2_session* session() PURE;
   virtual Http::Stream* getStream(int32_t stream_id) PURE;
   virtual uint64_t getStreamPendingSendDataLength(int32_t stream_id) PURE;
-  virtual void sendPendingFrames() PURE;
+  virtual Status sendPendingFrames() PURE;
   virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) PURE;
 };
 
@@ -148,7 +148,7 @@ public:
   uint64_t getStreamPendingSendDataLength(int32_t stream_id) override {
     return CodecImplType::getStream(stream_id)->pending_send_data_.length();
   }
-  void sendPendingFrames() override { CodecImplType::sendPendingFrames(); }
+  Status sendPendingFrames() override;
   // Submits an H/2 METADATA frame to the peer.
   // Returns true on success, false otherwise.
   bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) override {
@@ -161,6 +161,18 @@ protected:
   // Overrides ClientConnectionImpl::onSettingsForTest().
   void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
 };
+
+template <typename CodecImplType>
+Status TestClientConnectionImpl<CodecImplType>::sendPendingFrames() {
+  return CodecImplType::sendPendingFrames();
+}
+
+template <>
+Status
+TestClientConnectionImpl<Envoy::Http::Legacy::Http2::ClientConnectionImpl>::sendPendingFrames() {
+  Envoy::Http::Legacy::Http2::ClientConnectionImpl::sendPendingFrames();
+  return okStatus();
+}
 
 using TestClientConnectionImplLegacy =
     TestClientConnectionImpl<Envoy::Http::Legacy::Http2::ClientConnectionImpl>;

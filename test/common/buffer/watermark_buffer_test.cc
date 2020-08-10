@@ -142,6 +142,7 @@ TEST_F(WatermarkBufferTest, Drain) {
   buffer_.add(TEN_BYTES, 11);
   buffer_.drain(5);
   EXPECT_EQ(6, buffer_.length());
+  EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(0, times_low_watermark_called_);
 
   // Now drain below.
@@ -149,6 +150,38 @@ TEST_F(WatermarkBufferTest, Drain) {
   EXPECT_EQ(1, times_low_watermark_called_);
 
   // Going back above should trigger the high again
+  buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(2, times_high_watermark_called_);
+}
+
+TEST_F(WatermarkBufferTest, DrainUsingExtract) {
+  // Similar to `Drain` test, but using extractMutableFrontSlice() instead of drain().
+  buffer_.add(TEN_BYTES, 10);
+  ASSERT_EQ(buffer_.length(), 10);
+  buffer_.extractMutableFrontSlice();
+  EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  // Go above the high watermark then drain down to just at the low watermark.
+  buffer_.appendSliceForTest(TEN_BYTES, 5);
+  buffer_.appendSliceForTest(TEN_BYTES, 1);
+  buffer_.appendSliceForTest(TEN_BYTES, 5);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(0, times_low_watermark_called_);
+  auto slice0 = buffer_.extractMutableFrontSlice(); // essentially drain(5)
+  ASSERT_TRUE(slice0);
+  EXPECT_EQ(slice0->getMutableData().size(), 5);
+  EXPECT_EQ(6, buffer_.length());
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  // Now drain below.
+  auto slice1 = buffer_.extractMutableFrontSlice(); // essentially drain(1)
+  ASSERT_TRUE(slice1);
+  EXPECT_EQ(slice1->getMutableData().size(), 1);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, times_low_watermark_called_);
+
+  // Going back above should trigger the high again.
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(2, times_high_watermark_called_);
 }
@@ -431,19 +464,22 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
 
   // Make sure the overflow threshold will be above std::numeric_limits<uint32_t>::max()
   Runtime::LoaderSingleton::getExisting()->mergeValues({{"envoy.buffer.overflow_multiplier", "3"}});
-  buffer1.setWatermarks((std::numeric_limits<uint32_t>::max() / 3) + 4);
+  buffer1.setWatermarks((std::numeric_limits<uint32_t>::max() / 3) + 1);
 
-  // Add 2 halves instead of full uint32_t::max to get around std::bad_alloc exception
-  const uint32_t half_max = std::numeric_limits<uint32_t>::max() / 2;
-  const std::string half_max_str = std::string(half_max, 'a');
-  buffer1.add(half_max_str.data(), half_max);
-  buffer1.add(half_max_str.data(), half_max);
+  // Add many segments instead of full uint32_t::max to get around std::bad_alloc exception
+  const uint32_t segment_denominator = 128;
+  const uint32_t big_segment_len = std::numeric_limits<uint32_t>::max() / segment_denominator + 1;
+  const std::string big_segment_str = std::string(big_segment_len, 'a');
+  for (uint32_t i = 0; i < segment_denominator; ++i) {
+    buffer1.add(big_segment_str.data(), big_segment_len);
+  }
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  EXPECT_EQ(2 * half_max + static_cast<uint64_t>(10), buffer1.length());
+  EXPECT_EQ(static_cast<uint64_t>(segment_denominator) * big_segment_len + 10, buffer1.length());
+  EXPECT_GT(buffer1.length(), std::numeric_limits<uint32_t>::max());
 #endif
 }
 

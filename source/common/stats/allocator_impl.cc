@@ -63,7 +63,7 @@ public:
   }
 
   // Metric
-  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
+  SymbolTable& symbolTable() final { return alloc_.symbolTable(); }
   bool used() const override { return flags_ & Metric::Flags::Used; }
 
   // RefcountInterface

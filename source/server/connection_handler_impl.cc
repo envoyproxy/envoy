@@ -362,7 +362,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   // Otherwise we let active_socket be destructed when it goes out of scope.
   if (active_socket->iter_ != active_socket->accept_filters_.end()) {
     active_socket->startTimer();
-    active_socket->moveIntoListBack(std::move(active_socket), sockets_);
+    LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
   }
 }
 
@@ -422,7 +422,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
     active_connection->connection_->addConnectionCallbacks(*active_connection);
-    active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
+    LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }
 }
 
@@ -515,46 +515,60 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
-
-  active_connections_.listener_.stats_.downstream_cx_total_.inc();
-  active_connections_.listener_.stats_.downstream_cx_active_.inc();
-  active_connections_.listener_.per_worker_stats_.downstream_cx_total_.inc();
-  active_connections_.listener_.per_worker_stats_.downstream_cx_active_.inc();
+  auto& listener = active_connections_.listener_;
+  listener.stats_.downstream_cx_total_.inc();
+  listener.stats_.downstream_cx_active_.inc();
+  listener.per_worker_stats_.downstream_cx_total_.inc();
+  listener.per_worker_stats_.downstream_cx_active_.inc();
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept
   // path if there is no configured balancer.
-  ++active_connections_.listener_.parent_.num_handler_connections_;
+  ++listener.parent_.num_handler_connections_;
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
   emitLogs(*active_connections_.listener_.config_, *stream_info_);
-
-  active_connections_.listener_.stats_.downstream_cx_active_.dec();
-  active_connections_.listener_.stats_.downstream_cx_destroy_.inc();
-  active_connections_.listener_.per_worker_stats_.downstream_cx_active_.dec();
+  auto& listener = active_connections_.listener_;
+  listener.stats_.downstream_cx_active_.dec();
+  listener.stats_.downstream_cx_destroy_.inc();
+  listener.per_worker_stats_.downstream_cx_active_.dec();
   conn_length_->complete();
 
   // Active listener connections (not handler).
-  active_connections_.listener_.decNumConnections();
+  listener.decNumConnections();
 
   // Active handler connections (not listener).
-  active_connections_.listener_.parent_.decNumConnections();
+  listener.parent_.decNumConnections();
 }
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
-    : ActiveRawUdpListener(
-          parent,
-          dispatcher.createUdpListener(config.listenSocketFactory().getListenSocket(), *this),
-          config) {}
+    : ActiveRawUdpListener(parent, config.listenSocketFactory().getListenSocket(), dispatcher,
+                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::SocketSharedPtr listen_socket_ptr,
+                                           Event::Dispatcher& dispatcher,
+                                           Network::ListenerConfig& config)
+    : ActiveRawUdpListener(parent, *listen_socket_ptr, listen_socket_ptr, dispatcher, config) {}
+
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::Socket& listen_socket,
+                                           Network::SocketSharedPtr listen_socket_ptr,
+                                           Event::Dispatcher& dispatcher,
+                                           Network::ListenerConfig& config)
+    : ActiveRawUdpListener(parent, listen_socket,
+                           dispatcher.createUdpListener(std::move(listen_socket_ptr), *this),
+                           config) {}
+
+ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
+                                           Network::Socket& listen_socket,
                                            Network::UdpListenerPtr&& listener,
                                            Network::ListenerConfig& config)
     : ConnectionHandlerImpl::ActiveListenerImplBase(parent, &config),
-      udp_listener_(std::move(listener)), read_filter_(nullptr) {
+      udp_listener_(std::move(listener)), read_filter_(nullptr), listen_socket_(listen_socket) {
   // Create the filter chain on creating a new udp listener
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
@@ -564,6 +578,10 @@ ActiveRawUdpListener::ActiveRawUdpListener(Network::ConnectionHandler& parent,
         fmt::format("Cannot create listener as no read filter registered for the udp listener: {} ",
                     config_->name()));
   }
+
+  // Create udp_packet_writer
+  udp_packet_writer_ = config.udpPacketWriterFactory()->get().createUdpPacketWriter(
+      listen_socket_.ioHandle(), config.listenerScope());
 }
 
 void ActiveRawUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
@@ -574,6 +592,9 @@ void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
   // TODO(sumukhs): This is not used now. When write filters are implemented, this is a
   // trigger to invoke the on write ready API on the filters which is when they can write
   // data
+
+  // Clear write_blocked_ status for udpPacketWriter
+  udp_packet_writer_->setWritable();
 }
 
 void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {

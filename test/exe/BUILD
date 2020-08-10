@@ -63,8 +63,6 @@ envoy_cc_test(
     name = "main_common_test",
     srcs = ["main_common_test.cc"],
     data = ["//test/config/integration:google_com_proxy_port_0"],
-    # Fails on windows with cr/lf yaml file checkouts
-    tags = ["fails_on_windows"],
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:main_common_lib",

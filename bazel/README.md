@@ -611,6 +611,17 @@ local_repository(
 ...
 ```
 
+## Extra extensions
+
+If you are building your own Envoy extensions or custom Envoy builds and encounter visibility
+problems with, you may need to adjust the default visibility rules.
+By default, Envoy extensions are set up to only be visible to code within the
+[//source/extensions](../source/extensions/), or the Envoy server target. To adjust this,
+add any additional targets you need to `ADDITIONAL_VISIBILITY` in
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+See the instructions above about how to create your own custom version of
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+
 # Release builds
 
 Release builds should be built in `opt` mode, processed with `strip` and have a
@@ -724,7 +735,7 @@ For example, you can use [You Complete Me](https://valloric.github.io/YouComplet
 For example, use following command to prepare a compilation database:
 
 ```
-TEST_TMPDIR=/tmp tools/gen_compilation_database.py --run_bazel_build
+TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
 
