@@ -678,7 +678,8 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
   auto end_time = time_system_.monotonicTime() + timeout;
   while (data_.size() != num_bytes) {
     if (time_system_.monotonicTime() >= end_time) {
-      return AssertionFailure() << "Timed out waiting for data.";
+      return AssertionFailure() << fmt::format(
+                 "Timed out waiting for data. Got '{}', waiting for {} bytes.", data_, num_bytes);
     }
     time_system_.waitFor(lock_, connection_event_, 5ms); // Safe since CondVar::waitFor won't throw.
   }

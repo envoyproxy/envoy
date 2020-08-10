@@ -975,6 +975,11 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "tcp_proxy_integration_proto",
+    srcs = [":tcp_proxy_integration_test.proto"],
+)
+
 envoy_cc_test(
     name = "tcp_proxy_integration_test",
     srcs = [
@@ -988,17 +993,20 @@ envoy_cc_test(
     tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
+        ":tcp_proxy_integration_proto_cc_proto",
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
