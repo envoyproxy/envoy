@@ -108,6 +108,18 @@ private:
   static void onPrepareForStats(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
   static void onCheckForStats(evwatch*, const evwatch_check_cb_info*, void* arg);
 
+  static constexpr int flagsBasedOnEventType() {
+    if (Event::PlatformDefaultTriggerType == FileTriggerType::Level)
+    {
+      // On Windows, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run forever.
+      // This is because libevent only supports level triggering on Windows, and so the write
+      // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
+      // loop will run at most once
+      return EVLOOP_NONBLOCK | EVLOOP_ONCE;
+    }
+    return EVLOOP_NONBLOCK;
+  }
+
   Libevent::BasePtr libevent_;
   DispatcherStats* stats_{}; // stats owned by the containing DispatcherImpl
   bool timeout_set_{};       // whether there is a poll timeout in the current event loop iteration
