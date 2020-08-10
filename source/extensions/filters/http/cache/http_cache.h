@@ -11,6 +11,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 
 #include "source/extensions/filters/http/cache/key.pb.h"
 
@@ -34,8 +35,10 @@ enum class CacheEntryStatus {
   // This entry is fresh, and an appropriate basis for a 304 Not Modified
   // response.
   FoundNotModified,
-  // This entry is fresh, but can't satisfy the requested range(s).
-  UnsatisfiableRange,
+  // This entry is fresh, but cannot satisfy the requested range(s).
+  NotSatisfiableRange,
+  // This entry is fresh, and can satisfy the requested range(s).
+  SatisfiableRange,
 };
 
 std::ostream& operator<<(std::ostream& os, CacheEntryStatus status);
@@ -69,6 +72,16 @@ public:
 private:
   const uint64_t first_byte_pos_;
   const uint64_t last_byte_pos_;
+};
+
+class RangeRequests : Logger::Loggable<Logger::Id::cache_filter> {
+public:
+  // Parses the ranges from the request headers into a vector<RawByteRange>.
+  // max_byte_range_specs defines how many byte ranges can be parsed from the header value.
+  // If there is no range header, multiple range headers, the header value is malformed, or there
+  // are more ranges than max_byte_range_specs, returns an empty vector.
+  static std::vector<RawByteRange> parseRanges(const Http::RequestHeaderMap& request_headers,
+                                               uint64_t max_byte_range_specs);
 };
 
 // Byte range from an HTTP request, adjusted for a known response body size, and converted from an
@@ -138,6 +151,7 @@ struct LookupResult {
   // True if the cached response has trailers.
   bool has_trailers_ = false;
 };
+using LookupResultPtr = std::unique_ptr<LookupResult>;
 
 // Produces a hash of key that is consistent across restarts, architectures,
 // builds, and configurations. Caches that store persistent entries based on a
@@ -292,8 +306,8 @@ public:
   //
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
-  virtual void updateHeaders(LookupContextPtr&& lookup_context,
-                             Http::ResponseHeaderMapPtr&& response_headers) PURE;
+  virtual void updateHeaders(const LookupContext& lookup_context,
+                             const Http::ResponseHeaderMap& response_headers) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;

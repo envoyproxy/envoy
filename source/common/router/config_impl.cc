@@ -1197,7 +1197,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
-          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
+          throw EnvoyException(fmt::format("Only a single wildcard domain is permitted in route {}",
+                                           route_config.name()));
         }
         default_virtual_host_ = virtual_host;
       } else if (!domain.empty() && '*' == domain[0]) {
@@ -1212,8 +1213,9 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         duplicate_found = !virtual_hosts_.emplace(domain, virtual_host).second;
       }
       if (duplicate_found) {
-        throw EnvoyException(fmt::format(
-            "Only unique values for domains are permitted. Duplicate entry of domain {}", domain));
+        throw EnvoyException(fmt::format("Only unique values for domains are permitted. Duplicate "
+                                         "entry of domain {} in route {}",
+                                         domain, route_config.name()));
       }
     }
   }

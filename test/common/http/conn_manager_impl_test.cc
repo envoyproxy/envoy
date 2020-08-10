@@ -97,7 +97,7 @@ public:
         stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "", fake_stats_),
-        tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
+
         listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
         request_id_extension_(RequestIDExtensionFactory::defaultInstance(random_)),
         local_reply_(LocalReply::Factory::createDefault()) {
@@ -380,7 +380,7 @@ public:
   MockServerConnection* codec_;
   NiceMock<MockFilterChainFactory> filter_factory_;
   ConnectionManagerStats stats_;
-  ConnectionManagerTracingStats tracing_stats_;
+  ConnectionManagerTracingStats tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))};
   NiceMock<Network::MockDrainDecision> drain_close_;
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
@@ -5954,7 +5954,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSessionTrace) {
           std::stringstream out;
           object->dumpState(out);
           std::string state = out.str();
-          EXPECT_THAT(state, testing::HasSubstr("request_headers_: null"));
+          EXPECT_THAT(state, testing::HasSubstr("request_headers_:   null"));
           EXPECT_THAT(state, testing::HasSubstr("protocol_: 1"));
           return nullptr;
         }))
