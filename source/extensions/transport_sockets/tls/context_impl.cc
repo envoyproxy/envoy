@@ -381,16 +381,17 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       throw EnvoyException(
           absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
     }
-    bssl::UniquePtr<uint8_t> der(data);
-    ctx.cert_.reset(CRYPTO_BUFFER_new(data, len, nullptr));
-
+    {
+      bssl::UniquePtr<uint8_t> der(data);
+      ctx.cert_.reset(CRYPTO_BUFFER_new(data, len, nullptr));
+    }
     // Read rest of the certificate chain.
     std::vector<bssl::UniquePtr<CRYPTO_BUFFER>> chain;
     while (true) {
       if (!PEM_bytes_read_bio(&data, &len, nullptr, PEM_STRING_X509, bio.get(), nullptr, nullptr)) {
         break;
       }
-      der.reset(data);
+      bssl::UniquePtr<uint8_t> der(data);
       chain.push_back(bssl::UniquePtr<CRYPTO_BUFFER>(CRYPTO_BUFFER_new(data, len, nullptr)));
     }
     // Check for EOF.
