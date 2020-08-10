@@ -33,7 +33,6 @@ envoy_cc_test_library(
     hdrs = ["listener_filter_fakes.h"],
     deps = [
         "//source/common/api:os_sys_calls_lib",
-        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
     ],
 )
