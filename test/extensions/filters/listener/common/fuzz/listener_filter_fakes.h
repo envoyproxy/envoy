@@ -43,6 +43,10 @@ public:
 
   absl::string_view detectedTransportProtocol() const override;
 
+  void setRequestedServerName(absl::string_view server_name) override;
+
+  absl::string_view requestedServerName() const override;
+
   Api::SysCallIntResult getSocketOption(int level, int, void* optval, socklen_t*) const override;
 
 private:
@@ -52,6 +56,7 @@ private:
   Network::Address::Type addr_type_;
   std::vector<std::string> application_protocols_;
   std::string transport_protocol_;
+  std::string server_name_;
 };
 
 // TODO: Move over to Fake (name is confusing)

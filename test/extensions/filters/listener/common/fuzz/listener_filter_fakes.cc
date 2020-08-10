@@ -59,6 +59,14 @@ const std::vector<std::string>& FakeConnectionSocket::requestedApplicationProtoc
   return application_protocols_;
 }
 
+void FakeConnectionSocket::setRequestedServerName(absl::string_view server_name) {
+  server_name_ = std::string(server_name);
+}
+
+absl::string_view FakeConnectionSocket::requestedServerName() const {
+  return server_name_;
+}
+
 Api::SysCallIntResult FakeConnectionSocket::getSocketOption(int level, int, void* optval,
                                                             socklen_t*) const {
   switch (level) {
