@@ -1,7 +1,8 @@
 #include "common/common/utility.h"
 
-#include <array>
 #include <bits/stdint-uintn.h>
+
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
