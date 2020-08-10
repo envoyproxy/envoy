@@ -157,6 +157,7 @@ public:
   virtual Network::PostIoAction doHandshake() PURE;
 };
 
+using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;
 using ConnectionInfoSharedPtr = std::shared_ptr<ConnectionInfo>;
 
 } // namespace Ssl

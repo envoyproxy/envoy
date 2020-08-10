@@ -262,7 +262,7 @@ public:
 
   void onPoolReadyBase(Upstream::HostDescriptionConstSharedPtr& host,
                        const Network::Address::InstanceConstSharedPtr& local_address,
-                       Ssl::ConnectionInfoSharedPtr ssl_info);
+                       Ssl::ConnectionInfoConstSharedPtr ssl_info);
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
