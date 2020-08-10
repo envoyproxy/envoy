@@ -205,7 +205,7 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
   evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
                       &prepare_watcher);
 
-const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
   Event::FileEventPtr file_event = dispatcher->createFileEvent(
       fd,

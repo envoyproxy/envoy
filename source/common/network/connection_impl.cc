@@ -65,7 +65,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     connecting_ = true;
   }
 
-  // Libevent only supports Level trigger on Windows.
   Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
   // We never ask for both early close and read at the same time. If we are reading, we want to

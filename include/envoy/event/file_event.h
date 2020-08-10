@@ -22,9 +22,10 @@ enum class FileTriggerType { Level, Edge };
 
 static constexpr FileTriggerType PlatformDefaultTriggerType 
 #ifdef WIN32
-      {FileTriggerType::Level};
+    // Libevent only supports Level trigger on Windows.
+    {FileTriggerType::Level};
 #else
-      {FileTriggerType::Edge};
+    {FileTriggerType::Edge};
 #endif
 
 /**
