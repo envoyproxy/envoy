@@ -260,7 +260,7 @@ ACK/NACK and resource type instance version
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Every xDS resource type has a version string that indicates the version for that resource type.
-Whenever one resource of that type changes, the version number is changed.
+Whenever one resource of that type changes, the version is changed.
 
 In a responses sent by the xDS server, the
 :ref:`version_info<envoy_api_field_DiscoveryResponse.version_info>` field indicates the current
