@@ -272,7 +272,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       verify_mode = SSL_VERIFY_PEER;
       verify_trusted_ca_ = true;
 
-      // NOTE: We're using SSL_CTX_set_custom_verify_cb() instead of X509_verify_cert() directly.
+      // NOTE: We're using SSL_CTX_set_custom_verify() instead of X509_verify_cert() directly.
       // However, our new callback is still calling X509_verify_cert() under the hood. Therefore, to
       // ignore cert expiration, we need to set the callback for X509_verify_cert() to ignore that
       // error.
