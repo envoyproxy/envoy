@@ -20,6 +20,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
 // is considered to be disabled.
+// Note that if specifying the filter per route, first the route is matched, and then transcoding
+// filter is applied. It matters when specifying the route configuration and paths to match the
+// request - for per-route grpc transcoder configs, the original path should be matched, while
+// in other cases, the grpc-like path is expected (the one AFTER the filter is applied).
 message GrpcJsonTranscoder {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder";
