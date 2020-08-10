@@ -6,6 +6,7 @@
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/udp_packet_writer_handler_impl.h"
 
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
@@ -30,9 +31,11 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
     Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket)
-    : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory,
-                                new EnvoyQuicPacketWriter(*connection_socket), true,
-                                supported_versions, dispatcher, std::move(connection_socket)) {}
+    : EnvoyQuicClientConnection(
+          server_connection_id, helper, alarm_factory,
+          new EnvoyQuicPacketWriter(
+              std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
+          true, supported_versions, dispatcher, std::move(connection_socket)) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
@@ -41,7 +44,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     Network::ConnectionSocketPtr&& connection_socket)
     : EnvoyQuicConnection(
           server_connection_id,
-          envoyAddressInstanceToQuicSocketAddress(connection_socket->remoteAddress()), helper,
+          envoyIpAddressToQuicSocketAddress(connection_socket->remoteAddress()->ip()), helper,
           alarm_factory, writer, owns_writer, quic::Perspective::IS_CLIENT, supported_versions,
           std::move(connection_socket)),
       dispatcher_(dispatcher) {}
@@ -64,8 +67,8 @@ void EnvoyQuicClientConnection::processPacket(
                                   timestamp, /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
-  ProcessUdpPacket(envoyAddressInstanceToQuicSocketAddress(local_address),
-                   envoyAddressInstanceToQuicSocketAddress(peer_address), packet);
+  ProcessUdpPacket(envoyIpAddressToQuicSocketAddress(local_address->ip()),
+                   envoyIpAddressToQuicSocketAddress(peer_address->ip()), packet);
 }
 
 uint64_t EnvoyQuicClientConnection::maxPacketSize() const {
@@ -94,7 +97,8 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
 
 void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
-  auto writer = std::make_unique<EnvoyQuicPacketWriter>(*connection_socket);
+  auto writer = std::make_unique<EnvoyQuicPacketWriter>(
+      std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle()));
   // Destroy the old file_event before closing the old socket. Otherwise the socket might be picked
   // up by another socket() call while file_event is still operating on it.
   file_event_.reset();
