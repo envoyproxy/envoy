@@ -74,8 +74,8 @@ public:
   void setSampled(bool sampled) override;
 
   // OpenCensus doesn't support baggage, so noop these OpenTracing functions.
-  void setBaggage(absl::string_view, absl::string_view) override;
-  std::string getBaggage(absl::string_view) override;
+  void setBaggage(absl::string_view, absl::string_view) override{};
+  std::string getBaggage(absl::string_view) override { return std::string(); };
 
 private:
   ::opencensus::trace::Span span_;
@@ -196,9 +196,6 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
   // timestamp is ignored.
   span_.AddAnnotation(event);
 }
-void Span::setBaggage(absl::string_view, absl::string_view) {}
-
-std::string Span::getBaggage(absl::string_view) { return std::string(); }
 
 void Span::finishSpan() { span_.End(); }
 
