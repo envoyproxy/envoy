@@ -1,7 +1,6 @@
 #include "extensions/transport_sockets/tls/ocsp/ocsp.h"
 
 #include "common/common/utility.h"
-#include "common/runtime/runtime_features.h"
 
 #include "extensions/transport_sockets/tls/ocsp/asn1_utility.h"
 #include "extensions/transport_sockets/tls/utility.h"
@@ -105,13 +104,11 @@ OcspResponseWrapper::OcspResponseWrapper(std::vector<uint8_t> der_response, Time
   }
 
   auto& this_update = response_->response_->getThisUpdate();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.check_ocsp_response_validity_start_time") &&
-      time_source_.systemTime() < this_update) {
+  if (time_source_.systemTime() < this_update) {
     std::string time_format(GENERALIZED_TIME_FORMAT);
     DateFormatter formatter(time_format);
-    throw EnvoyException(absl::StrCat("OCSP Response thisUpdate field is set in the future: ",
-                                      formatter.fromTime(this_update)));
+    ENVOY_LOG_MISC(warn, "OCSP Response thisUpdate field is set in the future: {}",
+                   formatter.fromTime(this_update));
   }
 }
 

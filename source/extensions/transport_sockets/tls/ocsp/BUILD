@@ -17,7 +17,6 @@ envoy_cc_library(
         ":asn1_utility_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/ssl:context_config_interface",
-        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/transport_sockets/tls:utility_lib",
     ],
 )
