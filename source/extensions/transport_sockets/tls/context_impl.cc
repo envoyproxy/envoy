@@ -640,7 +640,7 @@ ssl_verify_result_t ContextImpl::verifyCallback(SSL* ssl, uint8_t* out_alert) {
   for (size_t i = 0; i < sk_CRYPTO_BUFFER_num(buffers); ++i) {
     bssl::UniquePtr<X509> x509(X509_parse_from_buffer(sk_CRYPTO_BUFFER_value(buffers, i)));
     if (!x509) {
-      continue;
+      return ssl_verify_invalid;
     }
     if (!cert) {
       cert = std::move(x509);
