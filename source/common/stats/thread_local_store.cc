@@ -787,8 +787,14 @@ bool ParentHistogramImpl::decRefCount() {
     // initiating shutdown.
     ret = --ref_count_ == 0;
   } else {
-    // We delegate to the Store object to decrement the ref-count so it
-    // can hold the lock to the map, in case
+    // We delegate to the Store object to decrement the ref-count so it can hold
+    // the lock to the map. If we don't hold a lock, another thread may
+    // simultaneously try to allocate the same name'd histogram after we
+    // decrement it, and we'll wind up with a dtor/update race. To avoid this we
+    // must hold the lock until the histogram is removed from the map.
+    //
+    // See also StatsSharedImpl::decRefCount() in allocator_impl.cc, which has
+    // the same issue.
     ret = thread_local_store_.decHistogramRefCount(*this, ref_count_);
   }
   return ret;
