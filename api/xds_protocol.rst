@@ -269,6 +269,12 @@ version for that resource type. The client then sends another request to the ser
 recent valid version seen by the client. This provides a way for the server to determine when
 it sends a version that the client considers invalid.
 
+(In the :ref:`incremental protocol variants <xds_protocol_delta>`, the resource type instance
+version is sent by the server in the
+:ref:`system_version_info<envoy_api_field_DeltaDiscoveryResponse.system_version_info>` field.
+However, this information is not actually used by the client to communicate which resources are
+valid, because the incremental API variants have a separate mechanism for that.)
+
 The resource type instance version is separate for each resource type. When using the aggregated
 protocol variants, each resource type has its own version even though all resource types are being
 sent on the same stream.
