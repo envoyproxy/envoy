@@ -1599,7 +1599,7 @@ void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
 }
 
 void Http2FloodMitigationTest::beginSession() {
-  Envoy::Network::TestSocketInterface::Install();
+  Envoy::Network::TestSocketInterface::install();
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   // set lower outbound frame limits to make tests run faster
@@ -1625,7 +1625,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
     pos = std::copy(frame.begin(), frame.end(), pos);
   }
 
-  auto* io_handle = Envoy::Network::TestSocketInterface::GetSingleton().waitForAcceptedSocket(0);
+  auto* io_handle = Envoy::Network::TestSocketInterface::getSingleton().waitForAcceptedSocket(0);
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
   // to accumulate in the transport socket buffer.
   io_handle->setWritevOverride([](const Buffer::RawSlice*, uint64_t) {
@@ -1710,7 +1710,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // sets 1000 flood limit for all frame types. Including 1 HEADERS response frame
   // 1000 DATA frames should trigger flood protection.
   uint32_t request_idx = 0;
-  auto* io_handle = Envoy::Network::TestSocketInterface::GetSingleton().waitForAcceptedSocket(0);
+  auto* io_handle = Envoy::Network::TestSocketInterface::getSingleton().waitForAcceptedSocket(0);
 
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
   // to accumulate in the transport socket buffer.
@@ -1763,7 +1763,7 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   // Make sure we've got RST_STREAM from the server
   EXPECT_EQ(Http2Frame::Type::RstStream, response.type());
 
-  auto* io_handle = Envoy::Network::TestSocketInterface::GetSingleton().waitForAcceptedSocket(0);
+  auto* io_handle = Envoy::Network::TestSocketInterface::getSingleton().waitForAcceptedSocket(0);
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
   // to accumulate in the transport socket buffer.
   io_handle->setWritevOverride([](const Buffer::RawSlice*, uint64_t) {

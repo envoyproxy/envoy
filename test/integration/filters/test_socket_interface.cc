@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Network {
 
 TestIoSocketHandle::~TestIoSocketHandle() {
-  TestSocketInterface::GetMutableSingleton().clearSocket(this);
+  TestSocketInterface::getMutableSingleton().clearSocket(this);
 }
 
 void TestIoSocketHandle::setWritevOverride(WritevOverrideProc override_proc) {
@@ -76,7 +76,7 @@ void TestSocketInterface::clearAll() {
   accepted_sockets_.clear();
 }
 
-void TestSocketInterface::Install() {
+void TestSocketInterface::install() {
   static SocketInterfaceLoader* socket_interface_loader = nullptr;
   if (socket_interface_loader == nullptr) {
     Envoy::Network::SocketInterfaceSingleton::clear();

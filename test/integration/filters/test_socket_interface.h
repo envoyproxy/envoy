@@ -14,7 +14,7 @@
 
 /**
  * TestSocketInterface allows overriding the behavior of the IoHandle interface.
- * TestSocketInterface::Install() must be called early in the test initialization before
+ * TestSocketInterface::install() must be called early in the test initialization before
  * any network connections were established.
  */
 namespace Envoy {
@@ -72,29 +72,30 @@ public:
    * Must be called early in the test initialization before any network connections were
    * established.
    */
-  static void Install();
-  static const TestSocketInterface& GetSingleton() { return *singleton_; }
+  static void install();
+  static const TestSocketInterface& getSingleton() { return *singleton_; }
 
   /**
    * Wait for the Nth accepted socket and return a pointer to it.
    */
   TestIoSocketHandle* waitForAcceptedSocket(uint32_t index) const;
 
+private:
+  friend class TestIoSocketHandle;
+  static TestSocketInterface& getMutableSingleton() { return *singleton_; }
+
+  void addAcceptedSocket(TestIoSocketHandle* handle);
+  void clearSocket(TestIoSocketHandle* handle);
+  void clearAll();
+
   // SocketInterface
+  using SocketInterfaceImpl::socket;
   IoHandlePtr socket(os_fd_t fd) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override {
     return "envoy.extensions.network.socket_interface.test_socket_interface";
   };
-
-private:
-  friend class TestIoSocketHandle;
-  static TestSocketInterface& GetMutableSingleton() { return *singleton_; }
-
-  void addAcceptedSocket(TestIoSocketHandle* handle);
-  void clearSocket(TestIoSocketHandle* handle);
-  void clearAll();
 
   static TestSocketInterface* singleton_;
   mutable absl::Mutex mutex_;
