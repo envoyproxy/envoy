@@ -32,9 +32,34 @@ public:
   void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const;
   void clear(SymbolTable& symbol_table) { stat_names_.clear(symbol_table); }
 
+  // Hasher for metrics.
+  struct Hash {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    size_t operator()(const Metric* a) const { return a->statName().hash(); }
+    size_t operator()(StatName a) const { return a.hash(); }
+  };
+
+  // Comparator for metrics.
+  struct Compare {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    bool operator()(const Metric* a, const Metric* b) const {
+      return a->statName() == b->statName();
+    }
+    bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
+  };
+
 private:
   StatNameList stat_names_;
 };
+
+// An unordered set of stat pointers. which keys off Metric::statName().
+// This necessitates a custom comparator and hasher, using the StatNamePtr's
+// own StatNamePtrHash and StatNamePtrCompare operators.
+//
+// This is used by AllocatorImpl for counters, gauges, and text-readouts, and
+// is also used by thread_local_store.h for histograms.
+template <class StatType>
+using StatSet = absl::flat_hash_set<StatType*, MetricHelper::Hash, MetricHelper::Compare>;
 
 /**
  * Partial implementation of the Metric interface on behalf of Counters, Gauges,
