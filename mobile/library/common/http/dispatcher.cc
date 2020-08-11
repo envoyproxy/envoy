@@ -442,6 +442,7 @@ envoy_status_t Dispatcher::resetStream(envoy_stream_t stream) {
       // that another terminal callback has already happened. All terminal callbacks clean up stream
       // state, so there is no need to dispatch here.
       post([this, stream]() -> void {
+        RELEASE_ASSERT(this, "callback executed after Http::Dispatcher was deleted");
         Dispatcher::DirectStreamSharedPtr direct_stream = getStream(stream);
         if (direct_stream) {
           // This interaction is important. The runResetCallbacks call synchronously causes Envoy to
