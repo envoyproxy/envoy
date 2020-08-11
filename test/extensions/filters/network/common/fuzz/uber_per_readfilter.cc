@@ -34,8 +34,11 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().ThriftProxy,
         NetworkFilterNames::get().ZooKeeperProxy, NetworkFilterNames::get().SniDynamicForwardProxy,
         NetworkFilterNames::get().KafkaBroker, NetworkFilterNames::get().RocketmqProxy,
-        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac
-        // TODO(jianwendong): cover mongo_proxy, mysql_proxy, postgres_proxy, tcp_proxy.
+        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
+        NetworkFilterNames::get().MongoProxy, NetworkFilterNames::get().MySQLProxy
+        // TODO(jianwendong): add "NetworkFilterNames::get().Postgres" after it supports untrusted
+        // data.
+        // TODO(jianwendong): add fuzz test for "NetworkFilterNames::get().TcpProxy".
     };
     // Check whether each filter is loaded into Envoy.
     // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
