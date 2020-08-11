@@ -73,6 +73,10 @@ public:
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
 
+  // OpenCensus doesn't support baggage, so noop these OpenTracing functions.
+  void setBaggage(absl::string_view, absl::string_view) override{};
+  std::string getBaggage(absl::string_view) override { return std::string(); };
+
 private:
   ::opencensus::trace::Span span_;
   const envoy::config::trace::v3::OpenCensusConfig& oc_config_;
