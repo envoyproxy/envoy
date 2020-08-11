@@ -64,6 +64,8 @@ New Features
 * router: added new
   :ref:`envoy-ratelimited<config_http_filters_router_retry_policy-envoy-ratelimited>`
   retry policy, which allows retrying envoy's own rate limited responses.
+* router: added new :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`
+  option, which allows rewriting Host header based on path.
 * signal: added support for calling fatal error handlers without envoy's signal handler, via FatalErrorHandler::callFatalErrorHandlers().
 * stats: added optional histograms to :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>`
   that track headers and body sizes of requests and responses.
