@@ -164,8 +164,11 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     EXPECT_TRUE(response_decoder->complete());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
-    // Check that age header exists as this is a cached response
-    EXPECT_NE(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
+
+    // A response that has been validated should not contain an Age header as it is equivalent to a
+    // freshly served response from the origin, unless the 304 response has an Age header, which
+    // means it was served by an upstream cache.
+    EXPECT_EQ(response_decoder->headers().get(Http::Headers::get().Age), nullptr);
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(std::chrono::seconds(1));

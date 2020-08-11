@@ -1,7 +1,8 @@
 #pragma once
 
 #include "envoy/common/time.h"
-#include "envoy/http/header_map.h"
+
+#include "common/http/headers.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
@@ -90,6 +91,10 @@ public:
   // Parses header_entry as an HTTP time. Returns SystemTime() if
   // header_entry is null or malformed.
   static SystemTime httpTime(const Http::HeaderEntry* header_entry);
+
+  // Calculates the age of a cached response
+  static SystemTime::duration calculateAge(const Http::ResponseHeaderMap& response_headers,
+                                           const SystemTime now, const SystemTime response_time);
 
   /**
    * Read a leading positive decimal integer value and advance "*str" past the

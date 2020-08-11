@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "common/common/utility.h"
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 
 #include "common/common/logger.h"
@@ -81,6 +82,10 @@ private:
   InsertContextPtr insert_;
   LookupResultPtr lookup_result_;
 
+  // Format: IMF-fixdate. As per:
+  // https://tools.ietf.org/html/rfc7231#section-7.1.1.1
+  DateFormatter date_formatter_ {"%a, %d %b %Y %H:%M:%S GMT"};
+  
   // Tracks what body bytes still need to be read from the cache. This is
   // currently only one Range, but will expand when full range support is added. Initialized by
   // onHeaders for Range Responses, otherwise initialized by encodeCachedResponse.

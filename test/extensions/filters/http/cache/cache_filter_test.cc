@@ -1,5 +1,4 @@
 #include "envoy/event/dispatcher.h"
-#include "envoy/http/header_map.h"
 
 #include "common/http/headers.h"
 
@@ -33,6 +32,10 @@ protected:
 
   void SetUp() override {
     ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(::testing::ReturnRef(*dispatcher_));
+    // Initialize the time source (otherwise it returns the real time)
+    time_source_.setSystemTime(std::chrono::hours(1));
+    // Use the initialized time source to set the response date header
+    response_headers_.setDate(formatter_.now(time_source_));
   }
 
   void testDecodeRequestMiss(CacheFilterSharedPtr filter) {
@@ -59,7 +62,7 @@ protected:
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                true));
 
     // The filter should not encode any data as the response has no body.
@@ -85,7 +88,7 @@ protected:
     // The filter should encode cached headers.
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef("age", "0")),
+                                              HeaderHasValueRef(Http::Headers::get().Age, "0")),
                                false));
 
     // The filter should encode cached data.
@@ -119,7 +122,6 @@ protected:
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
-                                                    {"date", formatter_.now(time_source_)},
                                                     {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -292,9 +294,7 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     // Check for the cached response headers with updated date
     Http::TestResponseHeaderMapImpl updated_response_headers = response_headers_;
     updated_response_headers.setDate(not_modified_date);
-    EXPECT_THAT(not_modified_response_headers,
-                testing::AllOf(IsSupersetOfHeaders(updated_response_headers),
-                               HeaderHasValueRef(Http::Headers::get().Age, "0")));
+    EXPECT_THAT(not_modified_response_headers, IsSupersetOfHeaders(updated_response_headers));
 
     // A 304 response should not have a body, so encodeData should not be called
     // However, if a body is present by mistake, encodeData should stop iteration until

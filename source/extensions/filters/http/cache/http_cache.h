@@ -170,6 +170,11 @@ using LookupResultPtr = std::unique_ptr<LookupResult>;
 // TODO(toddmgreer): Ensure that stability guarantees above are accurate.
 size_t stableHashKey(const Key& key);
 
+// A header that represents the time at which a cached response was recevied by the cache
+// This represents "response_time" in the age header calculations at:
+// https://httpwg.org/specs/rfc7234.html#age.calculations
+inline constexpr absl::string_view ResponseTimeHeader = "Envoy-Cache-Response-Time";
+
 // LookupRequest holds everything about a request that's needed to look for a
 // response in a cache, to evaluate whether an entry from a cache is usable, and
 // to determine what ranges are needed.
@@ -200,7 +205,8 @@ public:
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
-  bool requiresValidation(const Http::ResponseHeaderMap& response_headers) const;
+  bool requiresValidation(const Http::ResponseHeaderMap& response_headers,
+                          SystemTime::duration age) const;
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
