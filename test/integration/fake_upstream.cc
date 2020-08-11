@@ -374,8 +374,8 @@ makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
 }
 
 static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::IpVersion version) {
-  return makeTcpListenSocket(
-      Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version), port));
+  return makeTcpListenSocket(Network::Utility::parseInternetAddress(
+      Network::Test::getLoopbackAddressString(version), port));
 }
 
 static Network::SocketPtr
