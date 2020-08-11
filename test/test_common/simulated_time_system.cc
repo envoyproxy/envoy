@@ -204,7 +204,6 @@ private:
 };
 
 SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
-  ASSERT(cb_ == nullptr);
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
