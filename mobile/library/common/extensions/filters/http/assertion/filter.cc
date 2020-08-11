@@ -10,16 +10,16 @@ namespace Assertion {
 
 AssertionFilterConfig::AssertionFilterConfig(
     const envoymobile::extensions::filters::http::assertion::Assertion& proto_config) {
-  Common::Tap::buildMatcher(proto_config.match_config(), matchers_);
+  Common::Matcher::buildMatcher(proto_config.match_config(), matchers_);
 }
 
-Extensions::Common::Tap::Matcher& AssertionFilterConfig::rootMatcher() const {
+Extensions::Common::Matcher::Matcher& AssertionFilterConfig::rootMatcher() const {
   ASSERT(!matchers_.empty());
   return *matchers_[0];
 }
 
 AssertionFilter::AssertionFilter(AssertionFilterConfigSharedPtr config) : config_(config) {
-  statuses_ = Extensions::Common::Tap::Matcher::MatchStatusVector(config_->matchersSize());
+  statuses_ = Extensions::Common::Matcher::Matcher::MatchStatusVector(config_->matchersSize());
   config_->rootMatcher().onNewStream(statuses_);
 }
 

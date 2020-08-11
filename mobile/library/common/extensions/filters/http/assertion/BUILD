@@ -6,7 +6,7 @@ licenses(["notice"])  # Apache 2
 package(default_visibility = ["//visibility:public"])
 
 api_proto_package(
-    deps = ["@envoy_api//envoy/config/tap/v3:pkg"],
+    deps = ["@envoy_api//envoy/config/common/matcher/v3:pkg"],
 )
 
 envoy_cc_library(
@@ -18,7 +18,7 @@ envoy_cc_library(
         ":pkg_cc_proto",
         "@envoy//include/envoy/http:codes_interface",
         "@envoy//include/envoy/http:filter_interface",
-        "@envoy//source/extensions/common/tap:tap_matcher",
+        "@envoy//source/extensions/common/matcher:matcher_lib",
         "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
