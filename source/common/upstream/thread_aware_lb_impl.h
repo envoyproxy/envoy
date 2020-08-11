@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Upstream {
 
 using NormalizedHostWeightVector = std::vector<std::pair<HostConstSharedPtr, double>>;
-using NormalizedHostWeightVectorPtr = std::shared_ptr<NormalizedHostWeightVector>;
+using NormalizedHostWeightVectorConstPtr = std::unique_ptr<const NormalizedHostWeightVector>;
 using NormalizedHostWeightMap = std::map<HostConstSharedPtr, double>;
 
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
@@ -30,7 +30,6 @@ public:
   };
   using HashingLoadBalancerSharedPtr = std::shared_ptr<HashingLoadBalancer>;
 
-  using HostOverloadedPredicate = std::function<bool(HostConstSharedPtr host, double weight)>;
   class BoundedLoadHashingLoadBalancer : public HashingLoadBalancer {
   public:
     /**
@@ -39,16 +38,10 @@ public:
      * next host when one is overloaded is independent of the CH-LB type.
      */
     BoundedLoadHashingLoadBalancer(HashingLoadBalancerSharedPtr hlb_ptr,
-                                   const NormalizedHostWeightVectorPtr normalized_host_weight,
-                                   uint32_t hash_balanee_factor)
-        : BoundedLoadHashingLoadBalancer(hlb_ptr, normalized_host_weight, hash_balanee_factor,
-                                         nullptr) {}
-    BoundedLoadHashingLoadBalancer(HashingLoadBalancerSharedPtr hlb_ptr,
-                                   const NormalizedHostWeightVectorPtr normalized_host_weight,
-                                   uint32_t hash_balance_factor,
-                                   HostOverloadedPredicate is_host_overloaded)
-        : hlb_ptr(hlb_ptr), normalized_host_weights_(normalized_host_weight),
-          hash_balance_factor(hash_balance_factor), is_host_overloaded_(is_host_overloaded) {
+                                   NormalizedHostWeightVectorConstPtr& normalized_host_weights_ptr,
+                                   uint32_t hash_balance_factor)
+        : hlb_ptr(hlb_ptr), normalized_host_weights_(std::move(normalized_host_weights_ptr)),
+          hash_balance_factor(hash_balance_factor) {
       ASSERT(hash_balance_factor > 0);
       ASSERT(normalized_host_weights_ != nullptr);
       for (auto const& item : *normalized_host_weights_) {
@@ -58,13 +51,14 @@ public:
     virtual ~BoundedLoadHashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const;
 
+  protected:
+    virtual bool isHostOverloaded(HostConstSharedPtr host, double weight) const;
+
   private:
-    bool isHostOverloaded(HostConstSharedPtr host, double weight) const;
     HashingLoadBalancerSharedPtr hlb_ptr;
-    NormalizedHostWeightVectorPtr normalized_host_weights_;
+    NormalizedHostWeightVectorConstPtr normalized_host_weights_;
     NormalizedHostWeightMap normalized_host_weights_map_;
     uint32_t hash_balance_factor;
-    HostOverloadedPredicate is_host_overloaded_;
   };
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
@@ -121,7 +115,7 @@ private:
   };
 
   virtual HashingLoadBalancerSharedPtr
-  createLoadBalancer(const NormalizedHostWeightVectorPtr normalized_host_weights,
+  createLoadBalancer(NormalizedHostWeightVectorConstPtr normalized_host_weights,
                      double min_normalized_weight, double max_normalized_weight) PURE;
   void refresh();
 

@@ -72,7 +72,7 @@ private:
 
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr
-  createLoadBalancer(const NormalizedHostWeightVectorPtr normalized_host_weights,
+  createLoadBalancer(NormalizedHostWeightVectorConstPtr normalized_host_weights,
                      double min_normalized_weight, double /* max_normalized_weight */) override {
     HashingLoadBalancerSharedPtr hlb_ptr =
         std::make_shared<Ring>(*normalized_host_weights, min_normalized_weight, min_ring_size_,

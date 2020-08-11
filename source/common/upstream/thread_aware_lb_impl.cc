@@ -117,14 +117,14 @@ void ThreadAwareLoadBalancerBase::refresh() {
     per_priority_state->global_panic_ = per_priority_panic_[priority];
 
     // Normalize host and locality weights such that the sum of all normalized weights is 1.
-    std::shared_ptr<NormalizedHostWeightVector> normalized_host_weights =
-        std::make_shared<NormalizedHostWeightVector>();
+    std::unique_ptr<NormalizedHostWeightVector> normalized_host_weights =
+        std::make_unique<NormalizedHostWeightVector>();
     double min_normalized_weight = 1.0;
     double max_normalized_weight = 0.0;
     normalizeWeights(*host_set, per_priority_state->global_panic_, *normalized_host_weights,
                      min_normalized_weight, max_normalized_weight);
-    per_priority_state->current_lb_ =
-        createLoadBalancer(normalized_host_weights, min_normalized_weight, max_normalized_weight);
+    per_priority_state->current_lb_ = createLoadBalancer(
+        std::move(normalized_host_weights), min_normalized_weight, max_normalized_weight);
   }
 
   {
@@ -160,7 +160,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   }
 
   HostConstSharedPtr host;
-  uint32_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
+  const uint32_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (uint32_t i = 0; i < max_attempts; ++i) {
     host = per_priority_state->current_lb_->chooseHost(h, i);
 
@@ -188,11 +188,6 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
 
 bool ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::isHostOverloaded(
     HostConstSharedPtr host, double weight) const {
-
-  if (is_host_overloaded_ != nullptr) {
-    // this is only used while testing.
-    return is_host_overloaded_(host, weight);
-  }
   /*
   Consistent Hashing with Bounded Load
   Ref: https://arxiv.org/abs/1608.01350
@@ -222,7 +217,7 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   if (hlb_ptr == nullptr) {
     return nullptr;
   }
-  if (normalized_host_weights_ == nullptr || (*normalized_host_weights_).empty()) {
+  if (normalized_host_weights_ == nullptr || normalized_host_weights_->empty()) {
     return nullptr;
   }
 
@@ -247,13 +242,13 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   next one in the ring. The random sequence is seeded by the hash, so the same input gets the same
   sequence of hosts all the time.
   */
-  uint32_t num_hosts = normalized_host_weights_->size();
+  const uint32_t num_hosts = normalized_host_weights_->size();
   auto host_index = std::vector<uint32_t>(num_hosts);
   for (uint32_t i = 0; i < num_hosts; i++) {
     host_index[i] = i;
   }
 
-  uint64_t seed = hash;
+  const uint64_t seed = hash;
   std::default_random_engine random(seed);
   HostConstSharedPtr h;
   for (uint32_t i = 0; i < num_hosts; i++) {
@@ -264,8 +259,9 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
 
     uint32_t k = host_index[i];
     h = (*normalized_host_weights_)[k].first;
-    if (h == host)
+    if (h == host) {
       continue;
+    }
 
     const double w = (*normalized_host_weights_)[k].second;
 
