@@ -117,7 +117,7 @@ protected:
         return parent_.parent_.address();
       }
       void setConnectionStats(const Network::Connection::ConnectionStats&) override {}
-      Ssl::ConnectionInfoSharedPtr ssl() const override { return nullptr; }
+      Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
       absl::string_view requestedServerName() const override { return EMPTY_STRING; }
       State state() const override { return Network::Connection::State::Open; }
       void write(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

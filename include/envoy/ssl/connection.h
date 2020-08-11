@@ -158,7 +158,6 @@ public:
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;
-using ConnectionInfoSharedPtr = std::shared_ptr<ConnectionInfo>;
 
 } // namespace Ssl
 } // namespace Envoy

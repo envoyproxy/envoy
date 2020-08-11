@@ -119,7 +119,7 @@ QuicFilterManagerConnectionImpl::localAddress() const {
   return quic_connection_->connectionSocket()->localAddress();
 }
 
-Ssl::ConnectionInfoSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
+Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
   // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
   return nullptr;
 }

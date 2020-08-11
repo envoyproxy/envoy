@@ -20,7 +20,7 @@ public:
   void onConnected() override;
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
-  Ssl::ConnectionInfoSharedPtr ssl() const override { return nullptr; }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
 
 private:
   TransportSocketCallbacks* callbacks_{};

@@ -56,7 +56,7 @@ public:
     Network::ConnectionImplBase::setConnectionStats(stats);
     quic_connection_->setConnectionStats(stats);
   }
-  Ssl::ConnectionInfoSharedPtr ssl() const override;
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   Network::Connection::State state() const override {
     if (quic_connection_ != nullptr && quic_connection_->connected()) {
       return Network::Connection::State::Open;

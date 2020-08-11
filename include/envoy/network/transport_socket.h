@@ -144,7 +144,7 @@ public:
   /**
    * @return the SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual Ssl::ConnectionInfoSharedPtr ssl() const PURE;
+  virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;
