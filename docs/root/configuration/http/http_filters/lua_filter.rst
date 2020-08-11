@@ -424,6 +424,8 @@ the length of the signature. *data* is the content which will be hashed. *dataLe
 The function returns a pair. If the first element is *true*, the second element will be empty
 which means signature is verified; otherwise, the second element will store the error message.
 
+.. _config_http_filters_lua_stream_handle_api_base64_escape:
+
 base64Escape()
 ^^^^^^^^^^^^^^
 .. code-block:: lua
