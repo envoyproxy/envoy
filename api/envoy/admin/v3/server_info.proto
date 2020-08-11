@@ -177,6 +177,6 @@ message CommandLineOptions {
   // See :option:`--bootstrap-version` for details.
   uint32 bootstrap_version = 29;
 
-  // See :option:`--log-mode` for details.
+  // See :option:`--fancy-log` for details.
   bool log_mode = 34;
 }

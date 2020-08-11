@@ -109,7 +109,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                       "Escape c-style escape sequences in the application logs",
                                       cmd, false);
   TCLAP::SwitchArg log_mode(
-      "", "log-mode", "Logger mode: enable file level log control(Fancy Logger)or not", cmd, false);
+      "", "fancy-log", "Logger mode: enable file level log control(Fancy Logger)or not", cmd, false);
   TCLAP::ValueArg<bool> log_format_prefix_with_location(
       "", "log-format-prefix-with-location",
       "Prefix all occurrences of '%v' in log format with with '[%g:%#] ' ('[path/to/file.cc:99] "

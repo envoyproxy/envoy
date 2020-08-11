@@ -234,7 +234,7 @@ enum class LoggerMode { Envoy, Fancy };
 class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape, bool log_mode);
+          Thread::BasicLockable& lock, bool should_escape, bool log_mode = false);
   ~Context();
 
   /**
@@ -438,7 +438,7 @@ protected:
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
   do {                                                                                             \
     if (LOGGER_MODE) {                                                                             \
-      FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##_VA_ARGS__);                                       \
+      FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                       \
     } else {                                                                                       \
       ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \
     }                                                                                              \
