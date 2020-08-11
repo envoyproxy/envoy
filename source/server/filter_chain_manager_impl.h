@@ -90,13 +90,11 @@ public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)), filter_chain_message_(nullptr),
-        is_placeholder_(false), has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
+        filters_factory_(std::move(filters_factory)), is_placeholder_(false) {}
 
   // Ctor for filter chain placeholder.
   FilterChainImpl(const envoy::config::listener::v3::FilterChain* filter_chain)
-      : filter_chain_message_(filter_chain), is_placeholder_(true),
-        has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
+      : filter_chain_message_(filter_chain), is_placeholder_(true) {}
 
   void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     absl::MutexLock lock(&lock_);
@@ -145,7 +143,7 @@ private:
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
 
-  const envoy::config::listener::v3::FilterChain* const filter_chain_message_;
+  const envoy::config::listener::v3::FilterChain* const filter_chain_message_{nullptr};
 
   // pthread_mutex_t lock_;
   mutable absl::Mutex lock_;
@@ -154,9 +152,9 @@ private:
   // this to false.
   bool is_placeholder_;
   // After a filter chain placeholder is rebuilt, set this to true.
-  bool has_rebuilt_filter_chain_;
+  bool has_rebuilt_filter_chain_{false};
   // The rebuilt filter chain.
-  Network::FilterChainSharedPtr rebuilt_filter_chain_;
+  Network::FilterChainSharedPtr rebuilt_filter_chain_{nullptr};
 };
 
 /**
