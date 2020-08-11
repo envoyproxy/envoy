@@ -64,6 +64,18 @@ message Filter {
 // ``www.example.com``, then ``*.example.com``, then ``*.com``, then any filter
 // chain without ``server_names`` requirements).
 //
+// Yet another approach to reason about the filter chain matches.
+// Suppose you have N filter chains in hand. Sieve the filter chain set in the above 8 rounds.
+// In each round, filter chains matching the attributes best survives to the next round.
+// The listener guarantees at most 1 filter chain left after all the rounds.
+//
+// Example:
+//
+// For destination port, filter chains specifying the destination port of incoming traffic are the
+// best match. If none of the filter chains specifies the exact destination port, the filter
+// chains which do not specify ports are the best match. Filter chains specifying the wrong
+// port can never be the best match.
+//
 // [#comment: Implemented rules are kept in the preference order, with deprecated fields
 // listed at the end, because that's how we want to list them in the docs.
 //
