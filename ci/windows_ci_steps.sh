@@ -31,7 +31,19 @@ BAZEL_BUILD_OPTIONS="-c opt --config=msvc-cl --show_task_finish --verbose_failur
 bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static --build_tag_filters=-skip_on_windows
 
 # Test invocations of known-working tests on Windows
-bazel ${BAZEL_STARTUP_OPTIONS} test ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows --build_tests_only
+bazel ${BAZEL_STARTUP_OPTIONS} test ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,-fails_on_windows,-flaky_on_windows --build_tests_only
 
-# Build tests that are failing to ensure no regressions
-bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,fails_on_windows --build_tests_only
+# Build tests that are known-flaky or known-failing to ensure no compilation regressions
+bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows,fails_on_windows,flaky_on_windows --build_tests_only
+
+# Detail exclusions to encourage developers to attempt currently bypassed tests, if any may be resolved by their PR
+# Simply remove the BUILD component tags = ["fails_on_windows"] in order to try the test on the next CI pass
+#
+# Not worth detailing each skip_on_windows test, these are rarely affected by typical development;
+echo Tests bypassed as skip_on_windows: `bazel query 'kind(".*test rule", attr("tags", "skip_on_windows", //test/...))' 2>/dev/null | sort | wc -l` known unbuildable or inapplicable tests
+
+echo Tests bypassed as fails_on_windows:
+echo Tests bypassed as fails_on_windows: `bazel query 'kind(".*test rule", attr("tags", "fails_on_windows", //test/...))' 2>/dev/null | sort | tee /dev/tty | wc -l` known incompatible tests
+
+echo Tests bypassed as flaky_on_windows:
+echo Tests bypassed as flaky_on_windows: `bazel query 'kind(".*test rule", attr("tags", "flaky_on_windows", //test/...))' 2>/dev/null | sort | tee /dev/tty | wc -l` known unstable tests
