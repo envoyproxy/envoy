@@ -91,16 +91,11 @@ void ListenerImpl::onSocketEvent(short flags) {
 }
 
 void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
-#ifdef WIN32
-  auto trigger = Event::FileTriggerType::Level;
-#else
-  auto trigger = Event::FileTriggerType::Edge;
-#endif
   // TODO(fcoras): make listen backlog configurable
   socket.ioHandle().listen(128);
   file_event_ = dispatcher.createFileEvent(
-      socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); }, trigger,
-      Event::FileReadyType::Read);
+      socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
+      Event::FileTriggerType::Level, Event::FileReadyType::Read);
 
   RELEASE_ASSERT(file_event_, "file event must be valid");
 

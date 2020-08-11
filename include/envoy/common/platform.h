@@ -120,9 +120,6 @@ struct msghdr {
 #define SOCKET_FAILURE(rc) ((rc) == SOCKET_ERROR)
 #define SET_SOCKET_INVALID(sock) (sock) = INVALID_SOCKET
 
-// Envoy socket flags
-#define ENVOY_SOCK_NONBLOCK 0x1
-
 // arguments to shutdown
 #define ENVOY_SHUT_RD SD_RECEIVE
 #define ENVOY_SHUT_WR SD_SEND
@@ -199,13 +196,6 @@ typedef int os_fd_t;
 #define SOCKET_INVALID(sock) ((sock) == -1)
 #define SOCKET_FAILURE(rc) ((rc) == -1)
 #define SET_SOCKET_INVALID(sock) (sock) = -1
-
-// Envoy socket flags
-#if defined(__linux__)
-#define ENVOY_SOCK_NONBLOCK SOCK_NONBLOCK
-#else
-#define ENVOY_SOCK_NONBLOCK 0x1
-#endif
 
 // arguments to shutdown
 #define ENVOY_SHUT_RD SHUT_RD
