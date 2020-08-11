@@ -203,12 +203,12 @@ TEST(Fancy, Iteration) {
 TEST(Fancy, Context) {
   FANCY_LOG(info, "Info: context API needs test.");
   Logger::LoggerMode mode = Logger::Context::getLoggerMode();
-  Logger::LoggerMode compile_mode =
+  Logger::LoggerMode cmd_option =
       LOGGER_MODE ? Logger::LoggerMode::Fancy : Logger::LoggerMode::Envoy;
   printf(" --> Logger Mode: %d\n", LOGGER_MODE);
-  EXPECT_EQ(mode, compile_mode);
+  EXPECT_EQ(mode, cmd_option);
   if (LOGGER_MODE) {
-    FANCY_LOG(critical, "Compile option set: all previous Envoy Log should be converted now!");
+    FANCY_LOG(critical, "Cmd option set: all previous Envoy Log should be converted now!");
   }
   Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
   EXPECT_EQ(Logger::Context::getLoggerMode(), Logger::LoggerMode::Fancy);

@@ -112,9 +112,9 @@ static Context* current_context = nullptr;
 int Context::logger_mode_ = 0; // 0 for Envoy, 1 for Fancy
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock, bool should_escape)
+                 Thread::BasicLockable& lock, bool should_escape, bool log_mode)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
-      save_context_(current_context) {
+      log_mode_(log_mode), save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -137,6 +137,7 @@ void Context::activate() {
   // sets level and format for Fancy Logger
   fancy_default_level_ = log_level_;
   fancy_log_format_ = log_format_;
+  logger_mode_ = log_mode_;
   if (logger_mode_ == 1) {
     // loggers with default level before are set to log_level_ as new default
     getFancyContext().setDefaultFancyLevelFormat(log_level_, log_format_);
@@ -144,6 +145,8 @@ void Context::activate() {
 }
 
 LoggerMode Context::getLoggerMode() { return static_cast<LoggerMode>(logger_mode_); }
+
+bool Context::useFancyLogger() { return current_context->log_mode_; }
 
 void Context::setLoggerMode(LoggerMode mode) {
   logger_mode_ = static_cast<int>(mode);

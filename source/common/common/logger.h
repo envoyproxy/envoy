@@ -234,7 +234,7 @@ enum class LoggerMode { Envoy, Fancy };
 class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape);
+          Thread::BasicLockable& lock, bool should_escape, bool log_mode);
   ~Context();
 
   /**
@@ -242,6 +242,11 @@ public:
    * in the implementation of Fancy Logger.
    */
   static LoggerMode getLoggerMode();
+
+  /**
+   * Same as before, with boolean returned to use in log macros.
+   */
+  static bool useFancyLogger();
 
   /**
    * Sets current logger mode. It's used when logger mode is obtained from compile
@@ -259,6 +264,7 @@ private:
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
+  bool log_mode_;
   Context* const save_context_;
 
   /**
@@ -397,28 +403,45 @@ protected:
 
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 
-#ifndef FANCY
 /**
- * Convenient macros to flush log, log with connection/stream in Envoy.
+ * Command line options for log macros: use Fancy Logger or not.
  */
-#define LOGGER_MODE 0
-#define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
-#define ENVOY_FLUSH_LOG() ENVOY_LOGGER().flush()
+#define LOGGER_MODE Logger::Context::useFancyLogger()
+
+#define ENVOY_LOG(LEVEL, ...)                                                                      \
+  do {                                                                                             \
+    if (LOGGER_MODE) {                                                                             \
+      FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    } else {                                                                                       \
+      ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__);                                   \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_FLUSH_LOG()                                                                          \
+  do {                                                                                             \
+    if (LOGGER_MODE) {                                                                             \
+      FANCY_FLUSH_LOG();                                                                           \
+    } else {                                                                                       \
+      ENVOY_LOGGER().flush();                                                                      \
+    }                                                                                              \
+  } while (0)
+
 #define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
+  do {                                                                                             \
+    if (LOGGER_MODE) {                                                                             \
+      FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);                                    \
+    } else {                                                                                       \
+      ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);          \
+    }                                                                                              \
+  } while (0)
+
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
-  ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
-#else
-/**
- * Macros of Fancy Logger.
- */
-#define LOGGER_MODE 1
-#define ENVOY_LOG(LEVEL, ...) FANCY_LOG(LEVEL, ##__VA_ARGS__)
-#define ENVOY_FLUSH_LOG() FANCY_FLUSH_LOG()
-#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
-#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
-  FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__)
-#endif
+  do {                                                                                             \
+    if (LOGGER_MODE) {                                                                             \
+      FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##_VA_ARGS__);                                       \
+    } else {                                                                                       \
+      ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \
+    }                                                                                              \
+  } while (0)
 
 } // namespace Envoy
