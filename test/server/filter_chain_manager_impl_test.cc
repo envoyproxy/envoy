@@ -65,6 +65,7 @@ public:
     TestUtility::loadFromYaml(
         TestEnvironment::substitute(filter_chain_yaml, Network::Address::IpVersion::v4),
         filter_chain_template_);
+    fallback_filter_chain_.mutable_filter_chain_match()->set_match_all(true);
   }
 
   const Network::FilterChain*
@@ -99,10 +100,21 @@ public:
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 
-  void addSingleFilterChainHelper(const envoy::config::listener::v3::FilterChain& filter_chain) {
-    filter_chain_manager_.addFilterChain(
-        std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
-        filter_chain_factory_builder_, filter_chain_manager_);
+  void addSingleFilterChainHelper(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      const envoy::config::listener::v3::FilterChain* fallback_filter_chain = nullptr) {
+    if (fallback_filter_chain == nullptr) {
+      filter_chain_manager_.addFilterChain(
+          std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
+          filter_chain_factory_builder_, filter_chain_manager_);
+    } else {
+      ASSERT(fallback_filter_chain->filter_chain_match().match_all());
+      ASSERT(!filter_chain.filter_chain_match().match_all());
+      filter_chain_manager_.addFilterChain(
+          std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain,
+                                                                       fallback_filter_chain},
+          filter_chain_factory_builder_, filter_chain_manager_);
+    }
   }
 
   // Intermediate states.
@@ -128,6 +140,12 @@ public:
   )EOF";
   Init::ManagerImpl init_manager_{"for_filter_chain_manager_test"};
   envoy::config::listener::v3::FilterChain filter_chain_template_;
+  std::shared_ptr<Network::MockFilterChain> build_out_filter_chain_{
+      std::make_shared<Network::MockFilterChain>()};
+  envoy::config::listener::v3::FilterChain fallback_filter_chain_;
+  std::shared_ptr<Network::MockFilterChain> build_out_fallback_filter_chain_{
+      std::make_shared<Network::MockFilterChain>()};
+
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
   // Test target.
@@ -145,6 +163,23 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   addSingleFilterChainHelper(filter_chain_template_);
   auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
+}
+
+TEST_F(FilterChainManagerImplTest, FilterChainUseFallbackIfNoFilterChainMatches) {
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _))
+      .WillRepeatedly(Return(std::make_shared<Network::MockFilterChain>()));
+  EXPECT_CALL(filter_chain_factory_builder_,
+              buildFilterChain(testing::Truly([](const auto& filter_chain) {
+                                 return filter_chain.filter_chain_match().match_all();
+                               }),
+                               _))
+      .WillOnce(Return(build_out_fallback_filter_chain_));
+  addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
+  auto filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_NE(filter_chain, nullptr);
+  auto fallback_filter_chain =
+      findFilterChainHelper(9999, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  EXPECT_EQ(fallback_filter_chain, build_out_fallback_filter_chain_.get());
 }
 
 TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage) {

@@ -296,6 +296,10 @@ private:
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
+  // The optional fallback filter chain if destination_ports_map_ does not find a matched filter
+  // chain.
+  Network::FilterChainSharedPtr match_all_filter_chain_;
+
   const Network::Address::InstanceConstSharedPtr address_;
   // This is the reference to a factory context which all the generations of listener share.
   Configuration::FactoryContext& parent_context_;

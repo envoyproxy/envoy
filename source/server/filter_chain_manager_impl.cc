@@ -150,8 +150,18 @@ void FilterChainManagerImpl::addFilterChain(
                       MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
+  bool see_match_all = false;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
+    if (filter_chain_match.match_all()) {
+      if (see_match_all) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': has more than 1 match all filter chain '{}'",
+                        address_->asString(), filter_chain->name()));
+      } else {
+        see_match_all = true;
+      }
+    }
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
       throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
                                        "unimplemented fields",
@@ -202,12 +212,17 @@ void FilterChainManagerImpl::addFilterChain(
       ++new_filter_chain_size;
     }
 
-    addFilterChainForDestinationPorts(
-        destination_ports_map_,
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-        filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
-        filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
-        filter_chain_match.source_ports(), filter_chain_impl);
+    if (filter_chain_match.match_all()) {
+      ASSERT(match_all_filter_chain_ == nullptr);
+      match_all_filter_chain_ = filter_chain_impl;
+    } else {
+      addFilterChainForDestinationPorts(
+          destination_ports_map_,
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+          filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
+          filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
+          filter_chain_match.source_ports(), filter_chain_impl);
+    }
     fc_contexts_[*filter_chain] = filter_chain_impl;
   }
   convertIPsToTries();
@@ -381,21 +396,22 @@ const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
   const auto& address = socket.localAddress();
 
+  const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
   if (address->type() == Network::Address::Type::Ip) {
     const auto port_match = destination_ports_map_.find(address->ip()->port());
     if (port_match != destination_ports_map_.end()) {
-      return findFilterChainForDestinationIP(*port_match->second.second, socket);
+      best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
+    }
+  } else {
+    // Match on catch-all port 0.
+    const auto port_match = destination_ports_map_.find(0);
+    if (port_match != destination_ports_map_.end()) {
+      best_match_filter_chain = findFilterChainForDestinationIP(*port_match->second.second, socket);
     }
   }
-
-  // Match on catch-all port 0.
-  const auto port_match = destination_ports_map_.find(0);
-  if (port_match != destination_ports_map_.end()) {
-    return findFilterChainForDestinationIP(*port_match->second.second, socket);
-  }
-
-  return nullptr;
+  return best_match_filter_chain != nullptr ? best_match_filter_chain
+                                            : match_all_filter_chain_.get();
 }
 
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinationIP(
