@@ -160,9 +160,9 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
           [this] { onIdleTimer(); })),
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
-      io_handle_(cluster.filter_.createIoHandle(host)),
+      socket_(cluster.filter_.createSocket(host)),
       socket_event_(cluster.filter_.read_callbacks_->udpListener().dispatcher().createFileEvent(
-          io_handle_->fd(), [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
+          socket_->ioHandle().fd(), [this](uint32_t) { onReadReady(); }, Event::PlatformDefaultTriggerType,
           Event::FileReadyType::Read)) {
   ENVOY_LOG(debug, "creating new session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
@@ -178,27 +178,25 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
     ENVOY_LOG(debug, "The original src is enabled for address {}.",
               addresses_.peer_->asStringView());
 
-    const auto ip_trans = ENVOY_SOCKET_IP_TRANSPARENT;
     const auto host_addr = host_->address()->ip();
     const int trans_value = 1;
     Api::SysCallIntResult result;
 
     if (host_addr->version() == Network::Address::IpVersion::v6) {
       // set ipv6 option
-      const auto ipv6_trans = ENVOY_SOCKET_IPV6_TRANSPARENT;
-      result = io_handle_->setOption(ipv6_trans.level(), ipv6_trans.option(), &trans_value,
-                                     sizeof(trans_value));
+      result = Network::SocketOptionImpl::setSocketOption(*socket_, ENVOY_SOCKET_IPV6_TRANSPARENT,
+                                                          &trans_value, sizeof(trans_value));
       RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
       if (!host_addr->ipv6()->v6only()) {
         // set ipv4 option
-        result = io_handle_->setOption(ip_trans.level(), ip_trans.option(), &trans_value,
-                                       sizeof(trans_value));
+        result = Network::SocketOptionImpl::setSocketOption(*socket_, ENVOY_SOCKET_IP_TRANSPARENT,
+                                                            &trans_value, sizeof(trans_value));
         RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
       }
     } else {
       // set ipv4 option
-      result = io_handle_->setOption(ip_trans.level(), ip_trans.option(), &trans_value,
-                                     sizeof(trans_value));
+      result = Network::SocketOptionImpl::setSocketOption(*socket_, ENVOY_SOCKET_IP_TRANSPARENT,
+                                                          &trans_value, sizeof(trans_value));
       RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
     }
   }
@@ -232,7 +230,7 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
   //                     not trying to populate the local address for received packets.
   uint32_t packets_dropped = 0;
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
-      *io_handle_, *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
+      socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
       packets_dropped);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
@@ -259,7 +257,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   //       We allow the OS to select the right IP based on outbound routing rules.
   const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
   Api::IoCallUint64Result rc =
-      Network::Utility::writeToSocket(*io_handle_, buffer, local_ip, *host_->address());
+      Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip, *host_->address());
   if (!rc.ok()) {
     cluster_.cluster_stats_.sess_tx_errors_.inc();
   } else {

@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
+#include "common/network/socket_impl.h"
 #include "common/network/socket_option_impl.h"
 
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
@@ -25,11 +26,47 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace {
 
+class MockSocket : public Network::Socket {
+public:
+  MockSocket() = default;
+  ~MockSocket() override = default;
+
+  Network::IoHandle& ioHandle() override { return io_handle_; };
+
+  const Network::IoHandle& ioHandle() const override { return io_handle_; };
+
+  Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
+                                        socklen_t len) override {
+    return io_handle_.setOption(level, optname, optval, len);
+  }
+
+  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
+  MOCK_METHOD(void, setLocalAddress, (const Network::Address::InstanceConstSharedPtr&), (override));
+  MOCK_METHOD(Network::Socket::Type, socketType, (), (const, override));
+  MOCK_METHOD(Network::Address::Type, addressType, (), (const, override));
+  MOCK_METHOD(absl::optional<Network::Address::IpVersion>, ipVersion, (), (const, override));
+  MOCK_METHOD(void, close, (), (override));
+  MOCK_METHOD(bool, isOpen, (), (const, override));
+  MOCK_METHOD(const OptionsSharedPtr&, options, (), (const, override));
+  MOCK_METHOD(Api::SysCallIntResult, bind, (const Network::Address::InstanceConstSharedPtr),
+              (override));
+  MOCK_METHOD(Api::SysCallIntResult, connect, (const Network::Address::InstanceConstSharedPtr),
+              (override));
+  MOCK_METHOD(Api::SysCallIntResult, listen, (int), (override));
+  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*),
+              (const, override));
+  MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool), (override));
+  MOCK_METHOD(void, addOption, (const Network::Socket::OptionConstSharedPtr&), (override));
+  MOCK_METHOD(void, addOptions, (const Network::Socket::OptionsSharedPtr&), (override));
+
+  Network::MockIoHandle io_handle_;
+};
+
 class TestUdpProxyFilter : public UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
 
-  MOCK_METHOD(Network::IoHandlePtr, createIoHandle, (const Upstream::HostConstSharedPtr& host));
+  MOCK_METHOD(Network::SocketPtr, createSocket, (const Upstream::HostConstSharedPtr& host));
 };
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
@@ -55,11 +92,10 @@ public:
   struct TestSession {
     TestSession(UdpProxyFilterTest& parent,
                 const Network::Address::InstanceConstSharedPtr& upstream_address)
-        : parent_(parent), upstream_address_(upstream_address),
-          io_handle_(new Network::MockIoHandle()) {}
+        : parent_(parent), upstream_address_(upstream_address), socket_(new MockSocket()) {}
 
     void expectUpstreamWriteOriginalSrcIp() {
-      EXPECT_CALL(*io_handle_, setOption(_, _, _, _))
+      EXPECT_CALL(socket_->io_handle_, setOption(_, _, _, _))
           .WillRepeatedly(Invoke([this](int level, int optname, const void* optval,
                                         socklen_t) -> Api::SysCallIntResult {
             sock_opts_[level][optname] = *reinterpret_cast<const int*>(optval);
@@ -70,7 +106,7 @@ public:
     void expectUpstreamWrite(const std::string& data, int sys_errno = 0,
                              const Network::Address::Ip* local_ip = nullptr) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
-      EXPECT_CALL(*io_handle_, sendmsg(_, 1, 0, local_ip, _))
+      EXPECT_CALL(socket_->io_handle_, sendmsg(_, 1, 0, local_ip, _))
           .WillOnce(Invoke(
               [this, data, local_ip, sys_errno](
                   const Buffer::RawSlice* slices, uint64_t, int,
@@ -90,10 +126,10 @@ public:
                               int send_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
 
-      EXPECT_CALL(*io_handle_, supportsUdpGro());
-      EXPECT_CALL(*io_handle_, supportsMmsg());
+      EXPECT_CALL(socket_->io_handle_, supportsUdpGro());
+      EXPECT_CALL(socket_->io_handle_, supportsMmsg());
       // Return the datagram.
-      EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
+      EXPECT_CALL(socket_->io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
               Invoke([this, data, recv_sys_errno](
                          Buffer::RawSlice* slices, const uint64_t, uint32_t,
@@ -122,9 +158,9 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        EXPECT_CALL(*io_handle_, supportsUdpGro());
-        EXPECT_CALL(*io_handle_, supportsMmsg());
-        EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
+        EXPECT_CALL(socket_->io_handle_, supportsUdpGro());
+        EXPECT_CALL(socket_->io_handle_, supportsMmsg());
+        EXPECT_CALL(socket_->io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(
                 0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                    Network::IoSocketError::deleteIoError)))));
@@ -137,7 +173,7 @@ public:
     UdpProxyFilterTest& parent_;
     const Network::Address::InstanceConstSharedPtr upstream_address_;
     Event::MockTimer* idle_timer_{};
-    Network::MockIoHandle* io_handle_;
+    MockSocket* socket_;
     std::map<int, std::map<int, int>> sock_opts_;
     Event::FileReadyCb file_event_cb_;
   };
@@ -184,9 +220,9 @@ public:
     test_sessions_.emplace_back(*this, address);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
-    EXPECT_CALL(*filter_, createIoHandle(_))
-        .WillOnce(Return(ByMove(Network::IoHandlePtr{test_sessions_.back().io_handle_})));
-    EXPECT_CALL(*new_session.io_handle_, fd());
+    EXPECT_CALL(*filter_, createSocket(_))
+        .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
+    EXPECT_CALL(new_session.socket_->io_handle_, fd());
     EXPECT_CALL(
         callbacks_.udp_listener_.dispatcher_,
         createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))

@@ -6,6 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/network/socket_impl.h"
 #include "common/network/socket_interface_impl.h"
 #include "common/network/utility.h"
 
@@ -147,10 +148,10 @@ private:
     // idle timeouts work so we should consider unifying the implementation if we move to a time
     // stamp and scan approach.
     const Event::TimerPtr idle_timer_;
-    // The IO handle is used for writing packets to the selected upstream host as well as receiving
+    // The socket is used for writing packets to the selected upstream host as well as receiving
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
-    const Network::IoHandlePtr io_handle_;
+    const Network::SocketPtr socket_;
     const Event::FileEventPtr socket_event_;
   };
 
@@ -224,9 +225,9 @@ private:
         host_to_sessions_;
   };
 
-  virtual Network::IoHandlePtr createIoHandle(const Upstream::HostConstSharedPtr& host) {
+  virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return Network::ioHandleForAddr(Network::Socket::Type::Datagram, host->address());
+    return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address());
   }
 
   // Upstream::ClusterUpdateCallbacks
