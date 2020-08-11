@@ -51,7 +51,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   // TODO(cbdm): only allowing responses to be cacheable if there's no vary header or it is empty;
   // need to implement the logic for using an allowlist.
   const bool no_vary = (!headers.get(Http::Headers::get().Vary)) ||
-                       (headers.get(Http::Headers::get().Vary)->value() == "");
+                       (headers.get(Http::Headers::get().Vary)->value().empty());
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
