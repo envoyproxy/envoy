@@ -305,6 +305,7 @@ envoy_cc_library(
         ":well_known_names_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/network:udp_packet_writer_config_interface",
         "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:api_listener_interface",
         "//include/envoy/server:filter_config_interface",
