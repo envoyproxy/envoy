@@ -79,10 +79,8 @@ def RewriteIncludes(args):
     if include_lines and line.startswith('#include'):
       output_lines.extend(include_lines)
       include_lines = None
-    # Exclude API includes, except for a special case related to v2alpha
-    # ext_authz; this is needed to include the service descriptor in the build
-    # and is a hack that will go away when we remove v2.
-    if re.match(API_INCLUDE_REGEX, line) and 'envoy/service/auth/v2alpha' not in line:
+    # Exclude API includes.
+    if re.match(API_INCLUDE_REGEX, line):
       continue
     output_lines.append(line)
   # Rewrite file.

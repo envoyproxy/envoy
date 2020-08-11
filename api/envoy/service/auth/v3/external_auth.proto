@@ -27,6 +27,24 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // A generic interface for performing authorization check on incoming
 // requests to a networked service.
 service Authorization {
+  // For v2alpha to work as expected, we need to convince
+  // proto_sync.py that the v2alpha package is the previous version of
+  // either this package or the v2 package. And to do that, you'd
+  // "normally" use the
+  // "(udpa.annotations.versioning).previous_message_type" option; but
+  // we don't have a 'message' to put it on, we only have a 'service'.
+  // Fortunately, proto_sync.py's parser is sloppy, and we can fool it
+  // with a comment:
+  //
+  //   previous_message_type = "envoy.service.auth.v2alpha.Authorization";
+  //
+  // Now, we'd also "normally" do that in the v2 package, not here.
+  // But, because the v2alpha package imports the v2 package, that'd
+  // cause a cycle.
+  //
+  // The lesson is that the "have v2alpha be an alias for v2 instead
+  // of duplicating the files" thing we did was a bad thing to do.
+
   // Performs authorization check based on the attributes associated with the
   // incoming request, and returns status `OK` or not `OK`.
   rpc Check(CheckRequest) returns (CheckResponse) {
