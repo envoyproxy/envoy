@@ -225,8 +225,6 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
     const std::string scope_name = scoped_route_config.name();
-    // TODO(stevenzzz): Creating a new RdsRouteConfigProvider likely expensive, migrate RDS to
-    // config-provider-framework to make it light weight.
     rds.set_route_config_name(scoped_route_config.route_configuration_name());
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
