@@ -109,6 +109,7 @@ void ConnectionHandlerImpl::enableListeners() {
   }
 }
 
+// TODO(ASIPVII): add case when rebuilding fails.
 void ConnectionHandlerImpl::retryAllConnections(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message) {
   ENVOY_LOG(debug, "inside worker.handler.retryALLconnections");
@@ -120,18 +121,14 @@ void ConnectionHandlerImpl::retryAllConnections(
   // filter_chain, now retry connection with those sockets.
   for (auto& listener : listeners_) {
     if (listener.second.tcp_listener_.has_value()) {
-      ENVOY_LOG(debug, "listen has tcp");
       auto& active_tcp_listener = listener.second.tcp_listener_->get();
       const auto& listener_name = active_tcp_listener.config_->name();
-      ENVOY_LOG(debug, "active_tcp_listener: name: {}", listener_name);
       // Find all SocketMetadataPair of this active tcp listener.
       if (listener_sockets_map.find(listener_name) != listener_sockets_map.end()) {
-        ENVOY_LOG(debug, "we have saved this listener for retry connection");
         for (auto& socket_metadata_pair : listener_sockets_map[listener_name]) {
           // Retry connection with that socket on this active tcp listener.
           // Should point real filter chain ahead of retry connection, to avoid meet fake filter
           // chain again.
-          ENVOY_LOG(debug, "active_tcp_listener: newConnection");
           active_tcp_listener.newConnection(std::move(socket_metadata_pair.first),
                                             socket_metadata_pair.second);
         }
@@ -427,9 +424,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   if (dynamic_metadata.filter_metadata_size() > 0) {
     stream_info->dynamicMetadata().MergeFrom(dynamic_metadata);
   }
-  for (auto name : dynamic_metadata.filter_metadata()) {
-    ENVOY_LOG(debug, "metadata.string: {}", name.first);
-  }
 
   // Find matching filter chain.
   ENVOY_LOG(debug, "find filter chain");
@@ -448,11 +442,11 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   // TODO(ASOPVII): Check if 'findFilterChain' works well.
   // refer to ListenerFilterChainFactoryBuilder::buildFilterChainInternal. from v3 to
   // FilterChainImpl. We can not cast protobuf to FilterChainImpl.
-  if (filter_chain->isFakeFilterChain()) {
-    ENVOY_LOG(debug, "found a filter chain placeholder, start rebuilding request");
+  if (filter_chain->isPlaceholder()) {
+    ENVOY_LOG(debug, "Found a filter chain placeholder, start rebuilding request");
     const auto& worker_name = parent_.dispatcher_.name();
     const auto& listener_name = config_->name();
-    ENVOY_LOG(debug, "info: worker_name: {}, listener_name: {}", worker_name, listener_name);
+    ENVOY_LOG(debug, "Info: worker_name: {}, listener_name: {}", worker_name, listener_name);
 
     const auto& filter_chain_message = filter_chain->getFilterChainMessage();
 
@@ -463,13 +457,13 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     auto& server_dispatcher = listener.dispatcher();
 
     server_dispatcher.post([&listener, &filter_chain_message, &worker_name]() {
-      listener.buildRealFilterChains(filter_chain_message, worker_name);
+      listener.rebuildFilterChain(filter_chain_message, worker_name);
     });
     // Waiting for later callbacks from master thread to retry this connection.
     return;
   }
 
-  ENVOY_LOG(debug, "filter chain is not fake.");
+  ENVOY_LOG(debug, "Filter chain is not a placeholder.");
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);

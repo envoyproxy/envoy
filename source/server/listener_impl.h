@@ -371,8 +371,8 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
-  void buildRealFilterChains(const envoy::config::listener::v3::FilterChain* const& filter_chain,
-                             const std::string& worker_name);
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+                          const std::string& worker_name);
   WorkerPtr& getWorkerByName(const std::string& worker_name);
 
   SystemTime last_updated_;

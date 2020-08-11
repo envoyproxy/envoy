@@ -153,9 +153,9 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
   }
 }
 
-void WorkerImpl::notifyListeners(
+void WorkerImpl::notifyListenersOnRebuilt(
     const envoy::config::listener::v3::FilterChain* const& filter_chain) {
-  ENVOY_LOG(debug, "listeners on this worker should retry connections with rebuilt filter chain.");
+  ENVOY_LOG(debug, "Listeners on this worker should retry connections with rebuilt filter chain.");
   dispatcher_->post([this, &filter_chain]() { handler_->retryAllConnections(filter_chain); });
 }
 

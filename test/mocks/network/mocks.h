@@ -186,7 +186,7 @@ public:
   MOCK_METHOD(void, storeRealFilterChain, (Network::FilterChainSharedPtr));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
-  MOCK_METHOD(bool, isFakeFilterChain, (), (const));
+  MOCK_METHOD(bool, isPlaceholder, (), (const));
   MOCK_METHOD(const envoy::config::listener::v3::FilterChain* const&, getFilterChainMessage, (),
               (const));
 };

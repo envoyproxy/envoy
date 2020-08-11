@@ -4756,7 +4756,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleOnDemandFilterChain) {
   // IPv4 client connects to valid port - using 1st filter chain.
   filter_chain = findFilterChain(8080, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->isFakeFilterChain());
+  EXPECT_TRUE(filter_chain->isPlaceholder());
 }
 
 } // namespace

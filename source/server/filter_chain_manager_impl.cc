@@ -227,12 +227,11 @@ void FilterChainManagerImpl::addFilterChain(
             fc_contexts_.size(), new_filter_chain_size);
 }
 
-void FilterChainManagerImpl::addRealFilterChain(
+void FilterChainManagerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  ENVOY_LOG(debug, "Inside FilterChainManagerImpl::addRealFilterChain");
 
   const auto& filter_chain_match = filter_chain->filter_chain_match();
   if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
@@ -258,10 +257,8 @@ void FilterChainManagerImpl::addRealFilterChain(
   auto filter_chain_impl =
       filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
 
-  ENVOY_LOG(debug, "placeholder->storeRealFilterChain");
-  // TODO(ASOPVII): Call Ctor/Point of this placeholder to update its context.
+  // Store the rebuilt filter chain inside the placeholder, which is inserted into the match trie.
   auto placeholder = std::move(fc_contexts_[*filter_chain]);
-  // multi-threaded shared_ptr: lock before mutate.
   placeholder->storeRealFilterChain(std::move(filter_chain_impl));
 }
 
@@ -643,21 +640,17 @@ void FilterChainManagerImpl::convertIPsToTries() {
 
 Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
-  ENVOY_LOG(debug, "Inside findExistingFilterChain");
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
   if (origin == nullptr) {
-    ENVOY_LOG(debug, "origin = nullptr, return nullptr");
     return nullptr;
   }
   auto iter = origin->fc_contexts_.find(filter_chain_message);
   if (iter != origin->fc_contexts_.end()) {
     // copy the context to this filter chain manager.
-    ENVOY_LOG(debug, "origin fc_contexts already exists, emplace to new fc_contexts");
     fc_contexts_.emplace(filter_chain_message, iter->second);
     return iter->second;
   }
-  ENVOY_LOG(debug, "just return nullptr");
   return nullptr;
 }
 

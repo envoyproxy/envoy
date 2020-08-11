@@ -91,18 +91,17 @@ public:
                   std::vector<Network::FilterFactoryCb>&& filters_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)), filter_chain_message_(nullptr),
-        is_fake_placeholder_(false), has_rebuilt_filter_chain_(false),
-        rebuilt_filter_chain_(nullptr) {}
+        is_placeholder_(false), has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
 
   // Ctor for filter chain placeholder.
   FilterChainImpl(const envoy::config::listener::v3::FilterChain* filter_chain)
-      : filter_chain_message_(filter_chain), is_fake_placeholder_(true),
+      : filter_chain_message_(filter_chain), is_placeholder_(true),
         has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
 
   void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     absl::MutexLock lock(&lock_);
 
-    is_fake_placeholder_ = false;
+    is_placeholder_ = false;
     has_rebuilt_filter_chain_ = true;
     rebuilt_filter_chain_ = std::move(rebuilt_filter_chain);
   }
@@ -132,9 +131,9 @@ public:
     factory_context_ = std::move(filter_chain_factory_context);
   }
 
-  bool isFakeFilterChain() const override {
+  bool isPlaceholder() const override {
     absl::MutexLock lock(&lock_);
-    return is_fake_placeholder_;
+    return is_placeholder_;
   }
 
   const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
@@ -153,7 +152,7 @@ private:
 
   // On-demand filter chain is built with a placeholder, set this to true. After it is rebuilt, flip
   // this to false.
-  bool is_fake_placeholder_;
+  bool is_placeholder_;
   // After a filter chain placeholder is rebuilt, set this to true.
   bool has_rebuilt_filter_chain_;
   // The rebuilt filter chain.
@@ -241,7 +240,7 @@ public:
 
   // If a filter chain is first built with a fake placeholder, it will be need to be rebuilt on
   // demand.
-  void addRealFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
                           FilterChainFactoryBuilder& b,
                           FilterChainFactoryContextCreator& context_creator);
 

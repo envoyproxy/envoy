@@ -248,9 +248,9 @@ void PerFilterChainRebuilder::callbackToWorkers() {
 
   // Find all matching workers and listeners, send callback.
   for (const auto& worker_name : workers_to_callback_) {
-    ENVOY_LOG(debug, "rebuild completed, callback to worker: {}", worker_name);
+    ENVOY_LOG(debug, "Rebuilding completed, callback to worker: {}", worker_name);
     // TODO(ASOPVII): add completion status to callback.
-    listener_.getWorkerByName(worker_name)->notifyListeners(filter_chain_);
+    listener_.getWorkerByName(worker_name)->notifyListenersOnRebuilt(filter_chain_);
   }
   workers_to_callback_.clear();
 }
@@ -516,10 +516,9 @@ void ListenerImpl::buildFilterChains() {
   filter_chain_manager_.addFilterChain(config_.filter_chains(), builder, filter_chain_manager_);
 }
 
-void ListenerImpl::buildRealFilterChains(
+void ListenerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message,
     const std::string& worker_name) {
-  ENVOY_LOG(debug, "Inside ListenerImpl::buildRealFilterChains");
   if (filter_chain_message == nullptr) {
     ENVOY_LOG(debug, "Filter chain message is empty");
   }
@@ -554,8 +553,7 @@ void ListenerImpl::buildRealFilterChains(
 
     transport_factory_context.setInitManager(rebuilder->initManager());
     ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
-    ENVOY_LOG(debug, "Call filterchainManager.addRealFilterChain");
-    filter_chain_manager_.addRealFilterChain(filter_chain_message, builder, filter_chain_manager_);
+    filter_chain_manager_.rebuildFilterChain(filter_chain_message, builder, filter_chain_manager_);
     rebuilder->startRebuilding();
   }
 }

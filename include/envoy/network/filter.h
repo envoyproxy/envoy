@@ -368,7 +368,7 @@ public:
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
 
-  virtual bool isFakeFilterChain() const PURE;
+  virtual bool isPlaceholder() const PURE;
 
   virtual const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const PURE;
 };

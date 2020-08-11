@@ -408,17 +408,16 @@ private:
     // We can't use the default constructor because transport_socket_factory_ doesn't have a
     // default constructor.
     AdminFilterChain()
-        : filter_chain_message_(nullptr), is_fake_placeholder_(false),
-          has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {
-    } // NOLINT(modernize-use-equals-default)
+        : filter_chain_message_(nullptr), is_placeholder_(false), has_rebuilt_filter_chain_(false),
+          rebuilt_filter_chain_(nullptr) {} // NOLINT(modernize-use-equals-default)
 
     // Ctor for filter chain placeholder.
     AdminFilterChain(const envoy::config::listener::v3::FilterChain* filter_chain)
-        : filter_chain_message_(filter_chain), is_fake_placeholder_(true),
+        : filter_chain_message_(filter_chain), is_placeholder_(true),
           has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
 
     void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
-      is_fake_placeholder_ = false;
+      is_placeholder_ = false;
       has_rebuilt_filter_chain_ = true;
       rebuilt_filter_chain_ = rebuilt_filter_chain;
     }
@@ -439,7 +438,7 @@ private:
       }
     }
 
-    bool isFakeFilterChain() const override { return is_fake_placeholder_; }
+    bool isPlaceholder() const override { return is_placeholder_; }
 
     const envoy::config::listener::v3::FilterChain* const& getFilterChainMessage() const override {
       return filter_chain_message_;
@@ -449,7 +448,7 @@ private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
     const std::vector<Network::FilterFactoryCb> empty_network_filter_factory_;
     const envoy::config::listener::v3::FilterChain* const filter_chain_message_;
-    bool is_fake_placeholder_;
+    bool is_placeholder_;
     bool has_rebuilt_filter_chain_;
     Network::FilterChainSharedPtr rebuilt_filter_chain_;
   };

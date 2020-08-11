@@ -171,7 +171,7 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
 TEST_F(FilterChainManagerImplTest, AddOnDemandFilterChain) {
   addSingleFilterChainHelper(on_demand_filter_chain_template_);
   auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  EXPECT_TRUE(filter_chain->isFakeFilterChain());
+  EXPECT_TRUE(filter_chain->isPlaceholder());
 }
 
 TEST_F(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage) {
