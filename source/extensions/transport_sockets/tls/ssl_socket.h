@@ -6,6 +6,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
+#include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/ssl/ssl_socket_state.h"
@@ -51,18 +52,10 @@ private:
       Envoy::Ssl::ClientValidationStatus::NotValidated};
 };
 
-class HandshakeCallbacks {
-public:
-  virtual ~HandshakeCallbacks() = default;
-  virtual Network::Connection::State connectionState() const PURE;
-  virtual void onSuccess(SSL* ssl) PURE;
-  virtual void onFailure() PURE;
-};
-
-class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
+class SslSocketInfo : public Envoy::Ssl::ConnectionInfo, public Envoy::Ssl::Handshaker {
 public:
   SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
-                HandshakeCallbacks* handshake_callbacks_);
+                Ssl::HandshakeCallbacks* handshake_callbacks_);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -86,15 +79,18 @@ public:
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
   absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
+
+  // Ssl::Handshaker
   Network::PostIoAction doHandshake() override;
 
-  Ssl::SocketState& state() { return state_; }
+  Ssl::SocketState state() { return state_; }
+  void setState(Ssl::SocketState state) { state_ = state; }
   SSL* ssl() const { return ssl_.get(); }
 
   bssl::UniquePtr<SSL> ssl_;
 
 private:
-  HandshakeCallbacks* handshake_callbacks_;
+  Ssl::HandshakeCallbacks* handshake_callbacks_;
 
   Ssl::SocketState state_;
   mutable std::vector<std::string> cached_uri_san_local_certificate_;
@@ -118,7 +114,7 @@ using SslSocketInfoSharedPtr = std::shared_ptr<SslSocketInfo>;
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::PrivateKeyConnectionCallbacks,
-                  public HandshakeCallbacks,
+                  public Ssl::HandshakeCallbacks,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -136,7 +132,7 @@ public:
   Ssl::ConnectionInfoSharedPtr ssl() const override;
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
-  // HandshakeCallbacks
+  // Ssl::HandshakeCallbacks
   Network::Connection::State connectionState() const override;
   void onSuccess(SSL* ssl) override;
   void onFailure() override;

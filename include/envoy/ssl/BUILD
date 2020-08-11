@@ -15,7 +15,6 @@ envoy_cc_library(
     deps = [
         ":ssl_socket_state",
         "//include/envoy/common:time_interface",
-        "//include/envoy/network:post_io_action_interface",
     ],
 )
 
@@ -75,4 +74,13 @@ envoy_cc_library(
     name = "ssl_socket_state",
     hdrs = ["ssl_socket_state.h"],
     deps = [],
+)
+
+envoy_cc_library(
+    name = "handshaker_interface",
+    hdrs = ["handshaker.h"],
+    deps = [
+        ":connection_interface",
+        "//include/envoy/network:post_io_action_interface",
+    ],
 )

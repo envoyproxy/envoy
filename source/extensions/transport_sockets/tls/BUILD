@@ -47,6 +47,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/ssl:handshaker_interface",
         "//include/envoy/ssl:ssl_socket_extended_info_interface",
         "//include/envoy/ssl:ssl_socket_state",
         "//include/envoy/ssl/private_key:private_key_callbacks_interface",

@@ -278,7 +278,7 @@ void SslSocket::shutdownSsl() {
     int rc = SSL_shutdown(rawSsl());
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
     drainErrorQueue();
-    info_->state() = Ssl::SocketState::ShutdownSent;
+    info_->setState(Ssl::SocketState::ShutdownSent);
   }
 }
 
@@ -292,7 +292,7 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
 }
 
 SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
-                             HandshakeCallbacks* handshake_callbacks)
+                             Ssl::HandshakeCallbacks* handshake_callbacks)
     : ssl_(std::move(ssl)), handshake_callbacks_(handshake_callbacks),
       state_(Ssl::SocketState::PreHandshake) {
   SSL_set_ex_data(ssl_.get(), ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
