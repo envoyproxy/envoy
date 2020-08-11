@@ -35,6 +35,10 @@ void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
   span_.log(timestamp, event);
 }
 
+// TODO(#11622): Implement baggage storage for zipkin spans
+void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
+std::string ZipkinSpan::getBaggage(absl::string_view) { return std::string(); }
+
 void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
   request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
