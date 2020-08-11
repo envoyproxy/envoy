@@ -15,6 +15,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/network/filter_manager_impl.h"
+#include "common/network/socket_interface.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -442,11 +443,12 @@ public:
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
-  const Network::SocketInterface& socketInterface() const override { return *socket_interface_; }
+  const Network::SocketInterface& socketInterface() const override {
+    return SocketInterfaceSingleton::get();
+  }
 
   const std::string logical_;
   const std::string physical_;
-  const Network::SocketInterface* socket_interface_{nullptr};
 };
 
 class MockTransportSocketCallbacks : public TransportSocketCallbacks {
