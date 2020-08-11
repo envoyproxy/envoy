@@ -998,7 +998,7 @@ key:
               IsNull());
 }
 
-// push
+// Push Rds update after on demand request, route confguration should be initialized.
 TEST_F(ScopedRdsTest, PushRdsAfterOndemandRequest) {
   setup();
   init_watcher_.expectReady();
@@ -1131,10 +1131,10 @@ key:
 TEST_F(ScopedRdsTest, UpdateSecondaryScopeToPrimaryScope) {
   setup();
   init_watcher_.expectReady();
-  context_init_manager_.initialize(init_watcher_);
   // Secondary priority scope should be loaded lazily.
+  context_init_manager_.initialize(init_watcher_);
   const std::string config_yaml2 = R"EOF(
-name: foo_scope2
+name: foo_scope
 route_configuration_name: foo_routes
 priority: Secondary
 key:
@@ -1146,25 +1146,24 @@ key:
   const auto decoded_resources1 = TestUtility::decodeResources({lazy_resource});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources1.refvec_, "1"));
 
-  // The scope is of secondary priority and rds update won't be accepted.
-  pushRdsConfig({"foo_routes"}, "111");
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
 
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-
+  // Primary priority scope should be loaded eagerly.
   const std::string config_yaml = R"EOF(
-  name: foo_scope
-  route_configuration_name: foo_routes
-  key:
-    fragments:
-      - string_key: x-foo-key
-  )EOF";
+name: foo_scope2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
   const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
   const auto decoded_resources2 = TestUtility::decodeResources({eager_resource});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources2.refvec_, "2"));
+  EXPECT_EQ(getScopedRouteMap().size(), 1);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -1176,6 +1175,50 @@ key:
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                 ->name(),
             "foo_routes");
+}
+
+// Change a scope from primary to secondary will delete the route table.
+TEST_F(ScopedRdsTest, UpdatePrimaryScopeToSecondaryScope) {
+  setup();
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  // Secondary priority scope should be loaded lazily.
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto eager_resource = parseScopedRouteConfigurationFromYaml(config_yaml2);
+
+  const auto decoded_resources1 = TestUtility::decodeResources({eager_resource});
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources1.refvec_, "1"));
+
+  // The scope is of primary priority and rds update will be accepted.
+  pushRdsConfig({"foo_routes"}, "111");
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+  // Update the scope to secondary, rds provider and the route config will be deleted.
+  const std::string config_yaml = R"EOF(
+  name: foo_scope
+  route_configuration_name: foo_routes
+  priority: Secondary
+  key:
+    fragments:
+      - string_key: x-foo-key
+  )EOF";
+  const auto lazy_resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  const auto decoded_resources2 = TestUtility::decodeResources({lazy_resource});
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources2.refvec_, "2"));
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+              IsNull());
 }
 
 // Post on demand callbacks multiple times, all should be executed after rds update.
@@ -1201,6 +1244,7 @@ key:
   absl::optional<uint64_t> key_hash =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
+  // All the on demand updated callbacks will be executed when the route table comes.
   EXPECT_CALL(event_dispatcher_, post(_)).Times(5);
   for (int i = 0; i < 5; i++) {
     getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_,
