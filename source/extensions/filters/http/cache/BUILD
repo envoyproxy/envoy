@@ -84,7 +84,7 @@ envoy_cc_library(
     name = "inline_headers_handles",
     hdrs = ["inline_headers_handles.h"],
     deps = [
-        "//include/envoy/http:header_map_interface",
+        "//source/common/http:headers_lib",
     ],
 )
 
