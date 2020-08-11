@@ -35,12 +35,13 @@ NSString *_REQUEST_SCHEME = @"https";
 - (void)startEnvoy {
   NSLog(@"starting Envoy...");
   NSError *error;
-  StreamClientBuilder *builder = [[StreamClientBuilder alloc] init];
-  self.client = [builder buildAndReturnError:&error];
+  EngineBuilder *builder = [[EngineBuilder alloc] init];
+  id<Engine> engine = [builder buildAndReturnError:&error];
   if (error) {
     NSLog(@"starting Envoy failed: %@", error);
   } else {
     NSLog(@"started Envoy, beginning requests...");
+    self.client = [engine streamClient];
     [self startRequests];
   }
 }

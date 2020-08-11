@@ -23,8 +23,8 @@
     "//library/swift/test:retry_policy_mapper_tests_lib",
     "//library/swift/test:retry_policy_tests",
     "//library/swift/test:retry_policy_tests_lib",
-    "//library/swift/test:stream_client_builder_tests",
-    "//library/swift/test:stream_client_builder_tests_lib"
+    "//library/swift/test:engine_builder_tests",
+    "//library/swift/test:engine_builder_tests_lib"
   ],
   "optionSet" : {
     "BazelBuildOptionsDebug" : {

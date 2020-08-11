@@ -14,4 +14,6 @@ internal class MockEnvoyEngine : EnvoyEngine {
   override fun runWithConfig(configurationYAML: String?, logLevel: String?): Int = 0
 
   override fun startStream(callbacks: EnvoyHTTPCallbacks?): EnvoyHTTPStream = MockEnvoyHTTPStream(callbacks!!)
+
+  override fun recordCounter(elements: String, count: Int) {}
 }

@@ -1,7 +1,7 @@
 package io.envoyproxy.envoymobile
 
 /**
- * Client used to create new streams.
+ * Client used to create HTTP streams.
  */
 interface StreamClient {
   /**

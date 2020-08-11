@@ -1,9 +1,9 @@
 @_implementationOnly import EnvoyEngine
 import Foundation
 
-/// Builder used for creating new instances of a `StreamClient`.
+/// Builder used for creating and running a new Engine instance.
 @objcMembers
-public final class StreamClientBuilder: NSObject {
+public final class EngineBuilder: NSObject {
   private let base: BaseConfiguration
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
@@ -44,7 +44,7 @@ public final class StreamClientBuilder: NSObject {
   /// - parameter statsDomain: the domain to use.
   ///
   /// - returns: This builder.
-  public func addStatsDomain(_ statsDomain: String) -> StreamClientBuilder {
+  public func addStatsDomain(_ statsDomain: String) -> EngineBuilder {
     self.statsDomain = statsDomain
     return self
   }
@@ -54,7 +54,7 @@ public final class StreamClientBuilder: NSObject {
   /// - parameter logLevel: The log level to use with Envoy.
   ///
   /// - returns: This builder.
-  public func addLogLevel(_ logLevel: LogLevel) -> StreamClientBuilder {
+  public func addLogLevel(_ logLevel: LogLevel) -> EngineBuilder {
     self.logLevel = logLevel
     return self
   }
@@ -67,7 +67,7 @@ public final class StreamClientBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func addConnectTimeoutSeconds(_ connectTimeoutSeconds: UInt32)
-    -> StreamClientBuilder
+    -> EngineBuilder
   {
     self.connectTimeoutSeconds = connectTimeoutSeconds
     return self
@@ -79,7 +79,7 @@ public final class StreamClientBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> StreamClientBuilder {
+  public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> EngineBuilder {
     self.dnsRefreshSeconds = dnsRefreshSeconds
     return self
   }
@@ -91,7 +91,7 @@ public final class StreamClientBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSFailureRefreshSeconds(base: UInt32, max: UInt32) -> StreamClientBuilder {
+  public func addDNSFailureRefreshSeconds(base: UInt32, max: UInt32) -> EngineBuilder {
     self.dnsFailureRefreshSecondsBase = base
     self.dnsFailureRefreshSecondsMax = max
     return self
@@ -103,7 +103,7 @@ public final class StreamClientBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> StreamClientBuilder {
+  public func addStatsFlushSeconds(_ statsFlushSeconds: UInt32) -> EngineBuilder {
     self.statsFlushSeconds = statsFlushSeconds
     return self
   }
@@ -114,7 +114,7 @@ public final class StreamClientBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addFilter(factory: @escaping () -> Filter) -> StreamClientBuilder {
+  public func addFilter(factory: @escaping () -> Filter) -> EngineBuilder {
     let filterName = UUID().uuidString
     self.filterChain.append(EnvoyHTTPFilterFactory(filterName: filterName, factory: factory))
     return self
@@ -126,7 +126,7 @@ public final class StreamClientBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addAppVersion(_ appVersion: String) -> StreamClientBuilder {
+  public func addAppVersion(_ appVersion: String) -> EngineBuilder {
     self.appVersion = appVersion
     return self
   }
@@ -137,7 +137,7 @@ public final class StreamClientBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addAppId(_ appId: String) -> StreamClientBuilder {
+  public func addAppId(_ appId: String) -> EngineBuilder {
     self.appId = appId
     return self
   }
@@ -148,19 +148,19 @@ public final class StreamClientBuilder: NSObject {
   ///
   /// returns: This builder.
   @discardableResult
-  public func addVirtualClusters(_ virtualClusters: String) -> StreamClientBuilder {
+  public func addVirtualClusters(_ virtualClusters: String) -> EngineBuilder {
     self.virtualClusters = virtualClusters
     return self
   }
 
-  /// Builds a new instance of a `StreamClient` using the provided configurations.
+  /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
-  /// - returns: A new instance of a `StreamClient`.
-  public func build() throws -> StreamClient {
+  /// - returns: A new instance of Envoy.
+  public func build() throws -> Engine {
     let engine = self.engineType.init()
     switch self.base {
     case .custom(let yaml):
-      return EnvoyClient(configYAML: yaml, logLevel: self.logLevel, engine: engine)
+      return EngineImpl(configYAML: yaml, logLevel: self.logLevel, engine: engine)
     case .standard:
       let config = EnvoyConfiguration(
         statsDomain: self.statsDomain,
@@ -173,7 +173,7 @@ public final class StreamClientBuilder: NSObject {
         appVersion: self.appVersion,
         appId: self.appId,
         virtualClusters: self.virtualClusters)
-      return EnvoyClient(config: config, logLevel: self.logLevel, engine: engine)
+      return EngineImpl(config: config, logLevel: self.logLevel, engine: engine)
     }
   }
 
@@ -184,7 +184,7 @@ public final class StreamClientBuilder: NSObject {
   /// Used for testing, as initializing with `EnvoyEngine.Type` results in a
   /// segfault: https://github.com/lyft/envoy-mobile/issues/334
   @discardableResult
-  func addEngineType(_ engineType: EnvoyEngine.Type) -> StreamClientBuilder {
+  func addEngineType(_ engineType: EnvoyEngine.Type) -> EngineBuilder {
     self.engineType = engineType
     return self
   }

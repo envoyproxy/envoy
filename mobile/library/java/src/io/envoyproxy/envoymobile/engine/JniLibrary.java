@@ -139,4 +139,9 @@ class JniLibrary {
    *         configurations.
    */
   public static native String templateString();
+
+  /**
+   * Increment a counter.
+   */
+  protected static native void recordCounter(String elements, int count);
 }

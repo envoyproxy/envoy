@@ -185,6 +185,10 @@ static void ios_http_filter_release(const void *context) {
                                            callbacks:callbacks];
 }
 
+- (void)recordCounter:(NSString *)elements count:(NSUInteger)count {
+  record_counter(elements.UTF8String, count);
+}
+
 #pragma mark - Private
 
 - (void)startObservingLifecycleNotifications {

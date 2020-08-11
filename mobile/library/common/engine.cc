@@ -93,6 +93,19 @@ Engine::~Engine() {
   main_thread_.join();
 }
 
+void Engine::recordCounter(std::string elements, uint64_t count) {
+  if (server_) {
+    server_->dispatcher().post([this, elements, count]() -> void {
+      static const std::string client = "client";
+      absl::string_view prefix{client};
+      absl::string_view dynamic_elements{elements};
+      Stats::Utility::counterFromElements(server_->serverFactoryContext().scope(),
+                                          {prefix, dynamic_elements})
+          .add(count);
+    });
+  }
+}
+
 void Engine::flushStats() {
   // The server will be null if the post-init callback has not been completed within run().
   // In this case, we can simply ignore the flush.

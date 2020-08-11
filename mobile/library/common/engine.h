@@ -36,6 +36,11 @@ public:
   Http::Dispatcher& httpDispatcher();
 
   /**
+   * Increment a counter with a given string of elements and by the given count.
+   */
+  void recordCounter(std::string elements, uint64_t count);
+
+  /**
    * Flush the stats sinks outside of a flushing interval.
    * Note: stats flushing may not be synchronous.
    * Therefore, this function may return prior to flushing taking place.
