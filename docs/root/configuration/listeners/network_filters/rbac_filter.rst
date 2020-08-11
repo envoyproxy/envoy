@@ -26,6 +26,8 @@ The RBAC network filter outputs statistics in the *<stat_prefix>.rbac.* namespac
   denied, Counter, Total requests that were denied access
   shadow_allowed, Counter, Total requests that would be allowed access by the filter's shadow rules
   shadow_denied, Counter, Total requests that would be denied access by the filter's shadow rules
+  logged, Counter, Total requests that should be logged
+  not_logged, Counter, Total requests that should not be logged
 
 .. _config_network_filters_rbac_dynamic_metadata:
 
@@ -40,3 +42,4 @@ The RBAC filter emits the following dynamic metadata.
 
   shadow_effective_policy_id, string, The effective shadow policy ID matching the action (if any).
   shadow_engine_result, string, The engine result for the shadow rules (i.e. either `allowed` or `denied`).
+  access_log_hint, boolean, Whether the request should be logged. This metadata is shared and set under the key namespace 'envoy.common' (See :ref:`Shared Dynamic Metadata<shared_dynamic_metadata>`).

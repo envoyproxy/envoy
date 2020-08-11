@@ -80,8 +80,8 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   if (shadow_engine != nullptr) {
     std::string shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
-    if (shadow_engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(),
-                               &effective_policy_id)) {
+    if (shadow_engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
+                                    &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
       config_->stats().shadow_allowed_.inc();
     } else {
@@ -109,7 +109,8 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   const auto engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
-    if (engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr)) {
+    if (engine->handleAction(*callbacks_->connection(), headers, callbacks_->streamInfo(),
+                             nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;
