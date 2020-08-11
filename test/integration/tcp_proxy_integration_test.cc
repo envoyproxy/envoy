@@ -922,7 +922,7 @@ private:
   createFilterFactoryFromProtoTyped(const test::integration::tcp_proxy::InjectDynamicMetadata& cfg,
                                     Server::Configuration::FactoryContext&) override {
     std::string key = cfg.key();
-    return [key](Network::FilterManager& filter_manager) -> void {
+    return [key = std::move(key)](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<InjectDynamicMetadata>(key));
     };
   }
