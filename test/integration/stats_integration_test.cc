@@ -288,6 +288,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/07/21  12034    44811       46000   Add configurable histogram buckets.
   // 2020/07/31  12035    45002       46000   Init manager store unready targets in hash map.
   // 2020/08/10  12275    44949       46000   Re-organize tls histogram maps to improve continuity.
+  // 2020/08/11  12202    44949       46100   router: add new retry back-off strategy
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -308,7 +309,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 44949);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 46000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 46100); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
