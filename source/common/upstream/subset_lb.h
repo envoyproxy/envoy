@@ -31,6 +31,7 @@ public:
           lb_ring_hash_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
           least_request_config,
+      const absl::optional<envoy::config::cluster::v3::Cluster::KeyLbConfig>& key_config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
   ~SubsetLoadBalancer() override;
 
@@ -227,6 +228,7 @@ private:
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       least_request_config_;
+  const absl::optional<envoy::config::cluster::v3::Cluster::KeyLbConfig> key_config_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;
   Stats::Scope& scope_;

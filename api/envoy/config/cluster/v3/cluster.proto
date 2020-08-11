@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 51]
+// [#next-free-field: 52]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -116,6 +116,8 @@ message Cluster {
     // and instead using the new load_balancing_policy field as the one and only mechanism for
     // configuring this.]
     LOAD_BALANCING_POLICY_CONFIG = 7;
+
+    KEY = 8;
   }
 
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
@@ -413,6 +415,17 @@ message Cluster {
     //   route traffic to arbitrary hosts and/or ports, which may have serious security
     //   consequences.
     bool use_http_header = 1;
+  }
+
+  message KeyLbConfig {
+    // The key into the metadata.
+    string key = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    LbPolicy fallback_policy = 2 [(validate.rules).enum = {defined_only: true in: 0 in: 1 in: 3}];
+
+    oneof fallback_lb_config {
+      LeastRequestLbConfig least_request_lb_config = 3;
+    }
   }
 
   // Common configuration for all load balancer implementations.
@@ -809,6 +822,8 @@ message Cluster {
 
     // Optional configuration for the LeastRequest load balancing policy.
     LeastRequestLbConfig least_request_lb_config = 37;
+
+    KeyLbConfig key_lb_config = 51;
   }
 
   // Common configuration for all load balancer implementations.

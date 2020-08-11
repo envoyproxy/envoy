@@ -27,10 +27,12 @@ SubsetLoadBalancer::SubsetLoadBalancer(
         lb_ring_hash_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
         least_request_config,
+    const absl::optional<envoy::config::cluster::v3::Cluster::KeyLbConfig>& key_config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
-      least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
-      scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      least_request_config_(least_request_config), key_config_(key_config),
+      common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
+      random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
@@ -674,6 +676,15 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
         subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
+    break;
+
+  case LoadBalancerType::Key:
+    ASSERT(subset_lb.key_config_.has_value()); // Validated when constructing ClusterEntry
+
+    lb_ = std::make_unique<KeyLoadBalancer>(*this, subset_lb.original_local_priority_set_,
+                                            subset_lb.stats_, subset_lb.runtime_, subset_lb.random_,
+                                            subset_lb.common_config_, *subset_lb.key_config_,
+                                            subset_lb.least_request_config_);
     break;
 
   case LoadBalancerType::OriginalDst:

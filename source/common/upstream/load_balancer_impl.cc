@@ -10,6 +10,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
+#include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -882,5 +883,86 @@ SubsetSelectorImpl::SubsetSelectorImpl(
     throw EnvoyException("fallback_keys_subset cannot be equal to keys");
   }
 }
+
+KeyLoadBalancer::KeyLoadBalancer(
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+    const envoy::config::cluster::v3::Cluster::KeyLbConfig& key_config,
+    const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
+        least_request_config)
+    : priority_set_(priority_set), key_(key_config.key()) {
+  priority_set.addPriorityUpdateCb([this](uint32_t /*priority*/, const HostVector& /*hosts_added*/,
+                                          const HostVector& /*hosts_removed*/) { rebuild(); });
+
+  switch (key_config.fallback_policy()) {
+  case envoy::config::cluster::v3::Cluster::RANDOM:
+    fallback_lb_ = std::make_unique<RandomLoadBalancer>(priority_set, local_priority_set, stats,
+                                                        runtime, random, common_config);
+    break;
+  case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
+    fallback_lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set, local_priority_set, stats,
+                                                            runtime, random, common_config);
+    break;
+  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
+    fallback_lb_ =
+        std::make_unique<LeastRequestLoadBalancer>(priority_set, local_priority_set, stats, runtime,
+                                                   random, common_config, least_request_config);
+    break;
+  default:
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  rebuild();
+  ENVOY_LOG_MISC(warn, "Key load balancer created");
+}
+
+HostConstSharedPtr KeyLoadBalancer::chooseHost(LoadBalancerContext* context) {
+  auto match_criteria = context->metadataMatchCriteria();
+  if (match_criteria != nullptr) {
+    for (const auto& entry : match_criteria->metadataMatchCriteria()) {
+      if (entry->name() == key_) {
+        auto it = map_.find(entry->value());
+        if (it != map_.end()) {
+          if (it->second->health() != Host::Health::Unhealthy) {
+            ENVOY_LOG_MISC(
+                info, fmt::format("Matched on key: {}", entry->value().value().string_value()));
+            return it->second;
+          }
+        }
+
+        ENVOY_LOG_MISC(info, fmt::format("LB metadata key {} didn't match (or unhealthy)",
+                                         entry->value().value().string_value()));
+        break;
+      }
+    }
+  }
+
+  ENVOY_LOG_MISC(info, "Using fallback (random) load balancer");
+  return fallback_lb_->chooseHost(context);
+}
+
+void KeyLoadBalancer::rebuild() {
+  auto start = std::chrono::steady_clock::now();
+  map_.clear();
+  for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
+    for (const auto& host : host_set->hosts()) {
+      MetadataConstSharedPtr metadata = host->metadata();
+      const auto& filter_metadata = metadata->filter_metadata();
+      auto filter_it = filter_metadata.find(Config::MetadataFilters::get().ENVOY_LB);
+      if (filter_it != filter_metadata.end()) {
+        const auto& fields = filter_it->second.fields();
+        auto fields_it = fields.find(key_);
+        if (fields_it != fields.end()) {
+          map_[fields_it->second] = host;
+        }
+      }
+    }
+  }
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed = end - start;
+  ENVOY_LOG_MISC(info, "Key load balancer rebuild time: {}us",
+                 std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count());
+}
+
 } // namespace Upstream
 } // namespace Envoy

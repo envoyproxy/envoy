@@ -538,6 +538,29 @@ public:
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 };
 
+class KeyLoadBalancer : public LoadBalancer {
+public:
+  KeyLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                  ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
+                  const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+                  const envoy::config::cluster::v3::Cluster::KeyLbConfig& key_config,
+                  const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
+                      least_request_config);
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+
+private:
+  void rebuild();
+
+  const PrioritySet& priority_set_;
+  LoadBalancerPtr fallback_lb_;
+  const std::string key_;
+  absl::flat_hash_map<HashedValue, HostConstSharedPtr> map_;
+
+  // When there is more than one host with a given key value, put the extras here
+  // so that one of them can be used if the original entry is removed.
+  // std::unordered_multimap<std::string, HostConstSharedPtr> collisions_;
+};
+
 /**
  * Implementation of SubsetSelector
  */
