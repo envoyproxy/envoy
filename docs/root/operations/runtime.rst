@@ -16,3 +16,21 @@ Due to this usage of runtime guards, some deployments might find it useful to se
 dynamic runtime configuration as a safety measure to be able to quickly disable the new behavior
 without having to revert to an older version of Envoy or redeploy it with a new set of static
 runtime flags.
+
+Runtime Keys
+------------
+
+Currently the below runtime keys are provided.
+
+* Server
+      
+  * envoy.memory.heap_shrink_threshold
+      
+    If the gap between tcmalloc physical memory bytes and allocated bytes is greater than this threshold,
+    envoy will shrink heap to return the page to OS and gain RSS back. The default value is 100 MB.
+
+* :ref:`Cluster manager <config_cluster_manager_cluster_runtime>`
+
+* :ref:`Listener<config_listeners_runtime>`
+
+* :ref:`Http connection manager <config_http_conn_man_runtime>`
