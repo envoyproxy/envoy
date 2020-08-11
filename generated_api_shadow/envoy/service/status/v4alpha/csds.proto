@@ -62,8 +62,8 @@ message ClientStatusRequest {
   // The match follows OR semantics.
   repeated type.matcher.v4alpha.NodeMatcher node_matchers = 1;
 
-  // An opaque identifier for the csds request.
-  string id = 2;
+  // The node making the csds request.
+  config.core.v4alpha.Node node = 2;
 }
 
 // Detailed config (per xDS) with status.
