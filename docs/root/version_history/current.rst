@@ -64,6 +64,7 @@ New Features
   <envoy_v3_api_msg_config.route.v3.RetryPolicy.RateLimitedRetryBackOff>`
   strategy that uses headers like `Retry-After` or `X-RateLimit-Reset` to
   decide the back off interval.
+* rbac filter: added a log action to the :ref:`RBAC filter <envoy_v3_api_msg_config.rbac.v3.RBAC>` which sets dynamic metadata to inform access loggers whether to log.
 * router: added new
   :ref:`envoy-ratelimited<config_http_filters_router_retry_policy-envoy-ratelimited>`
   retry policy, which allows retrying envoy's own rate limited responses.
