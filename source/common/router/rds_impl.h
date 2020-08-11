@@ -193,7 +193,8 @@ struct UpdateOnDemandCallback {
  * the subscription.
  */
 class RdsRouteConfigProviderImpl : public RouteConfigProvider,
-                                   Logger::Loggable<Logger::Id::router> {
+                                   Logger::Loggable<Logger::Id::router>,
+                                   public std::enable_shared_from_this<RdsRouteConfigProviderImpl> {
 public:
   ~RdsRouteConfigProviderImpl() override;
 
@@ -225,8 +226,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
-  std::shared_ptr<std::list<UpdateOnDemandCallback>> config_update_callbacks_{
-      std::make_shared<std::list<UpdateOnDemandCallback>>()};
+  std::list<UpdateOnDemandCallback> config_update_callbacks_;
 
   friend class RouteConfigProviderManagerImpl;
 };

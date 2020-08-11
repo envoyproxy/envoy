@@ -273,7 +273,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
-  for (auto it = config_update_callbacks_->begin(); it != config_update_callbacks_->end();) {
+  for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
     auto found = aliases.find(it->alias_);
     if (found != aliases.end()) {
       // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
@@ -286,7 +286,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
           (*cb)(host_exists);
         }
       });
-      it = config_update_callbacks_->erase(it);
+      it = config_update_callbacks_.erase(it);
     } else {
       it++;
     }
@@ -308,15 +308,16 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
       VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
   // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. We use a weak_ptr here to verify that the instance is still around.
-  factory_context_.dispatcher().post(
-      [this,
-       config_cbs = std::weak_ptr<std::list<UpdateOnDemandCallback>>(config_update_callbacks_),
-       alias, &thread_local_dispatcher, route_config_updated_cb]() -> void {
-        if (auto callbacks = config_cbs.lock()) {
-          subscription_->updateOnDemand(alias);
-          callbacks->push_back({alias, thread_local_dispatcher, route_config_updated_cb});
-        }
-      });
+  factory_context_.dispatcher().post([this,
+                                      self = std::weak_ptr<RdsRouteConfigProviderImpl>(
+                                          shared_from_this()),
+                                      alias, &thread_local_dispatcher,
+                                      route_config_updated_cb]() -> void {
+    if (self.lock()) {
+      subscription_->updateOnDemand(alias);
+      config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+    }
+  });
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
