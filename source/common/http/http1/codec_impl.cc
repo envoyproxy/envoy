@@ -442,15 +442,14 @@ http_parser_settings ConnectionImpl::settings_{
 };
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
-                               http_parser_type type, uint32_t max_headers_kb,
-                               const uint32_t max_headers_count,
-                               HeaderKeyFormatterPtr&& header_key_formatter, Http1Settings settings)
-    : connection_(connection), stats_(stats),
+                               const Http1Settings& settings, http_parser_type type,
+                               uint32_t max_headers_kb, const uint32_t max_headers_count,
+                               HeaderKeyFormatterPtr&& header_key_formatter)
+    : connection_(connection), stats_(stats), codec_settings_(settings),
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
       handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_header_sanitization")),
-      codec_settings_(settings),
       strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
       output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
@@ -786,8 +785,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action)
-    : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
-                     max_request_headers_count, formatter(settings), settings),
+    : ConnectionImpl(connection, stats, settings, HTTP_REQUEST, max_request_headers_kb,
+                     max_request_headers_count, formatter(settings)),
       callbacks_(callbacks),
       response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundResponse(fragment);
@@ -1079,8 +1078,8 @@ void ServerConnectionImpl::checkHeaderNameForUnderscores() {
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
-    : ConnectionImpl(connection, stats, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
-                     max_response_headers_count, formatter(settings), settings) {}
+    : ConnectionImpl(connection, stats, settings, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB,
+                     max_response_headers_count, formatter(settings)) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {

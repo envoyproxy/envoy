@@ -218,9 +218,9 @@ public:
   bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
 
 protected:
-  ConnectionImpl(Network::Connection& connection, CodecStats& stats, http_parser_type type,
-                 uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter, Http1Settings settings);
+  ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
+                 http_parser_type type, uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 HeaderKeyFormatterPtr&& header_key_formatter);
 
   bool resetStreamCalled() { return reset_stream_called_; }
   void onMessageBeginBase();
@@ -241,6 +241,7 @@ protected:
 
   Network::Connection& connection_;
   CodecStats& stats_;
+  const Http1Settings codec_settings_;
   http_parser parser_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
@@ -254,7 +255,6 @@ protected:
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
   const bool connection_header_sanitization_ : 1;
-  Http1Settings codec_settings_;
   const bool strict_1xx_and_204_headers_ : 1;
 
 private:
