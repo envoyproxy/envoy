@@ -16,7 +16,7 @@ values, they are passed from parent to child in an RPC protocol.
 They were previously held in shared memory, which imposed various restrictions.
 Unlike the shared memory implementation, the RPC passing *requires a mode-bit specified
 when constructing gauges indicating whether it should be accumulated across hot-restarts*.
-    
+
 ## Performance and Thread Local Storage
 
 A key tenant of the Envoy architecture is high performance on machines with
@@ -76,6 +76,18 @@ followed.
  * The main thread now goes through all histograms, collect them across each worker and
    accumulates in to *interval* histograms.
  * Finally the main *interval* histogram is merged to *cumulative* histogram.
+
+`ParentHistogram`s are held weakly a set in ThreadLocalStore. Like other stats,
+they keep an embedded reference count and are removed from the set and destroyed
+when the last strong reference disappears. Consequently, we must hold a lock for
+the set when decrementing histogram reference counts. A similar process occurs for
+other types of stats, but in those cases it is taken care of in `AllocatorImpl`.
+There are strong references to `ParentHistograms` in TlsCacheEntry::parent_histograms_.
+
+Thread-local `TlsHistogram`s are created on behalf of a `ParentHistogram`
+whenever accessed from a worker thread. They are strongly referenced in the
+`ParentHistogram` as well as in a cache in the `ThreadLocalStore`, to help
+maintain data continuity as scopes are re-created during operation.
 
 ## Stat naming infrastructure and memory consumption
 

@@ -97,6 +97,7 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
+  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_ = *address;
   ip_.friendly_address_ = sockaddrToString(*address);
 

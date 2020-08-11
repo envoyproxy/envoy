@@ -1,3 +1,5 @@
+#include "envoy/http/header_map.h"
+
 #include "extensions/filters/http/cache/cacheability_utils.h"
 
 #include "test/test_common/utility.h"
@@ -10,7 +12,7 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-class IsCacheableRequestTest : public testing::Test {
+class IsCacheableRequestTest : public testing::TestWithParam<std::string> {
 protected:
   const Http::TestRequestHeaderMapImpl cacheable_request_headers_ = {{":path", "/"},
                                                                      {":method", "GET"},
@@ -71,6 +73,17 @@ TEST_F(IsCacheableRequestTest, AuthorizationHeader) {
   EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers));
   request_headers.setCopy(Http::CustomHeaders::get().Authorization,
                           "basic YWxhZGRpbjpvcGVuc2VzYW1l");
+  EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers));
+}
+
+INSTANTIATE_TEST_SUITE_P(ConditionalHeaders, IsCacheableRequestTest,
+                         testing::Values("if-match", "if-none-match", "if-modified-since",
+                                         "if-unmodified-since", "if-range"));
+
+TEST_P(IsCacheableRequestTest, ConditionalHeaders) {
+  Http::TestRequestHeaderMapImpl request_headers = cacheable_request_headers_;
+  EXPECT_TRUE(CacheabilityUtils::isCacheableRequest(request_headers));
+  request_headers.setCopy(Http::LowerCaseString{GetParam()}, "test-value");
   EXPECT_FALSE(CacheabilityUtils::isCacheableRequest(request_headers));
 }
 
