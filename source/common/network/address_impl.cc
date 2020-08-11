@@ -45,11 +45,11 @@ std::string friendlyNameFromAbstractPath(absl::string_view path) {
   return friendly_name;
 }
 
-} // namespace
-
-static inline const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interface) {
+const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interface) {
   return sock_interface == nullptr ? &SocketInterfaceSingleton::get() : sock_interface;
 }
+
+} // namespace
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {

@@ -38,7 +38,7 @@ public:
   const std::string& logicalName() const override { return asString(); }
   Type type() const override { return type_; }
 
-  const SocketInterface* socketInterface() const override { return socket_interface_; }
+  const SocketInterface& socketInterface() const override { return *socket_interface_; }
 
 protected:
   InstanceBase(Type type, const SocketInterface* sock_interface) : type_(type) {

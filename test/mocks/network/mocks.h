@@ -432,7 +432,7 @@ public:
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }
   const std::string& logicalName() const override { return logical_; }
-  const Network::SocketInterface* socketInterface() const override { return socket_interface_; }
+  const Network::SocketInterface& socketInterface() const override { return *socket_interface_; }
 
   const std::string logical_;
   const std::string physical_;

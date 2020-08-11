@@ -184,7 +184,7 @@ public:
   /**
    * @return SocketInterface to be used with the address
    */
-  virtual const Network::SocketInterface* socketInterface() const PURE;
+  virtual const Network::SocketInterface& socketInterface() const PURE;
 };
 
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
