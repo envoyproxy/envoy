@@ -112,15 +112,15 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     // Iterate through all hosts in our priority set.
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       // Get a grouping of hosts by locality.
-      for (const auto& localityHosts : hosts->hostsPerLocality().get()) {
+      for (const auto& locality_hosts : hosts->hostsPerLocality().get()) {
 
         // For this locality, add the response grouping.
         envoy::service::health::v3::LocalityEndpointsHealth* locality_health =
             cluster_health->add_locality_endpoints_health();
-        locality_health->mutable_locality()->MergeFrom(localityHosts[0]->locality());
+        locality_health->mutable_locality()->MergeFrom(locality_hosts[0]->locality());
 
         // Add all hosts to this locality.
-        for (const auto& host : localityHosts) {
+        for (const auto& host : locality_hosts) {
 
           // Add this endpoint's health status to this locality grouping.
           auto* endpoint = locality_health->add_endpoints_health();
@@ -286,22 +286,26 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   // Temporary structure to hold Host pointers grouped by locality, to build
   // initial_hosts_per_locality_.
   std::vector<HostVector> hosts_by_locality;
+  hosts_by_locality.reserve(cluster_.load_assignment().endpoints_size());
+
   // Iterate over every endpoint in every cluster.
   for (const auto& locality_endpoints : cluster_.load_assignment().endpoints()) {
     // Add a locality grouping to the hosts sorted by locality.
-    hosts_by_locality.emplace_back();
+    hosts_by_locality.push_back();
+    hosts_by_locality.back().reserve(locality_endpoints.lb_endpoints_size());
+
     for (const auto& host : locality_endpoints.lb_endpoints()) {
       // Initialize an endpoint host object.
-      HostSharedPtr endpoint = std::make_unique<HostImpl>(
+      HostSharedPtr endpoint = std::make_shared<HostImpl>(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
           locality_endpoints.locality(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
           envoy::config::core::v3::UNKNOWN);
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
-      initial_hosts_->emplace_back(endpoint);
+      initial_hosts_->push_back(endpoint);
       // Add this host/endpoint pointer to our structured list by locality so results can be
       // requested by locality.
-      hosts_by_locality.back().emplace_back(endpoint);
+      hosts_by_locality.back().push_back(endpoint);
     }
   }
   // Create the HostsPerLocality.
