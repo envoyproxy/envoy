@@ -35,13 +35,6 @@ SpdLoggerSharedPtr FancyContext::getFancyLogEntry(std::string key)
 
 void FancyContext::initFancyLogger(std::string key, std::atomic<spdlog::logger*>& logger)
     ABSL_LOCKS_EXCLUDED(fancy_log_lock_) {
-  if (LOGGER_MODE && Logger::Context::getLoggerMode() == Logger::LoggerMode::Envoy) {
-    // Enabled by compile option, but FANCY_LOG can be used in mode Envoy as FANCY_LOG is explicitly
-    // defined. The only problem in this case is that admin for Fancy is not supported by default,
-    // and the solution is to use setLoggerMode(Logger::LoggerMode::Fancy) manually.
-    Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
-  }
-
   absl::WriterMutexLock l(&fancy_log_lock_);
   auto it = fancy_log_map_->find(key);
   spdlog::logger* target;
@@ -86,7 +79,6 @@ std::string FancyContext::listFancyLoggers() ABSL_LOCKS_EXCLUDED(fancy_log_lock_
   for (const auto& it : *fancy_log_map_) {
     info += fmt::format("   {}: {}\n", it.first, static_cast<int>(it.second->level()));
   }
-  // info += "\n";
   return info;
 }
 

@@ -108,7 +108,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::SwitchArg log_format_escaped("", "log-format-escaped",
                                       "Escape c-style escape sequences in the application logs",
                                       cmd, false);
-  TCLAP::SwitchArg log_mode("", "fancy-log",
+  TCLAP::SwitchArg enable_fancy_log("", "enable-fancy-log",
                             "Logger mode: enable file level log control(Fancy Logger)or not", cmd,
                             false);
   TCLAP::ValueArg<bool> log_format_prefix_with_location(
@@ -194,7 +194,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     log_format_ = absl::StrReplaceAll(log_format_, {{"%%", "%%"}, {"%v", "[%g:%#] %v"}});
   }
   log_format_escaped_ = log_format_escaped.getValue();
-  log_mode_ = log_mode.getValue();
+  enable_fancy_log_ = enable_fancy_log.getValue();
 
   parseComponentLogLevels(component_log_level.getValue());
 
@@ -358,7 +358,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
                                       spdlog::level::to_string_view(logLevel()).size());
   command_line_options->set_log_format(logFormat());
   command_line_options->set_log_format_escaped(logFormatEscaped());
-  command_line_options->set_log_mode(logMode());
+  command_line_options->set_enable_fancy_log(enableFancyLog());
   command_line_options->set_log_path(logPath());
   command_line_options->set_service_cluster(serviceClusterName());
   command_line_options->set_service_node(serviceNodeName());

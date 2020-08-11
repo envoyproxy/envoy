@@ -181,7 +181,7 @@ public:
   /**
    * @return const bool logger mode: whether to use Fancy Logger.
    */
-  virtual bool logMode() const PURE;
+  virtual bool enableFancyLog() const PURE;
 
   /**
    * @return const std::string& the log file path.

@@ -133,7 +133,7 @@ public:
   }
   const std::string& logFormat() const override { return log_format_; }
   bool logFormatEscaped() const override { return log_format_escaped_; }
-  bool logMode() const override { return log_mode_; }
+  bool enableFancyLog() const override { return enable_fancy_log_; }
   const std::string& logPath() const override { return log_path_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
@@ -185,7 +185,7 @@ private:
   std::string component_log_level_str_;
   std::string log_format_;
   bool log_format_escaped_;
-  bool log_mode_;
+  bool enable_fancy_log_;
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;

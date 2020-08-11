@@ -22,7 +22,7 @@ More macros with connection and stream information:
 ```
 To flush a logger, `FANCY_FLUSH_LOG()` can be used. 
 
-### Logger Mode: Fancy or Envoy
+### Logger Mode: Fancy or Envoy [Deprecated: commandline option now]
 By default, Envoy's logger is used and a compile option is provided to enable Fancy Logger. If macro `FANCY` is defined using `--copt` like the following,
 ```
 bazel test -c opt --copt="-D FANCY" //test/common/common:log_macros_test
@@ -31,8 +31,7 @@ the mode is **Fancy mode**. Fancy Logger is enabled and most Envoy's log macros 
 
 Note that Envoy's logger can still be used in Fancy mode. These macros are not replaced: `GET_MISC_LOGGER, ENVOY_LOG_MISC, ENVOY_LOGGER, ENVOY_LOG_TO_LOGGER, ENVOY_CONN_LOG_TO_LOGGER, ENVOY_STREAM_LOG_TO_LOGGER`. For example, `ENVOY_LOG_LOGGER(ENVOY_LOGGER(), LEVEL, ...)` is equivalent to `ENVOY_LOG` in Envoy mode. 
 
-If macro `FANCY` is not defined, it's **Envoy mode** with existing Envoy's logger being used. In this mode, basic macros like `FANCY_LOG` can be used but the main part of `ENVOY_LOG` will keep the same. One limitation is that logger update in admin page is not supported by default as it detects Envoy mode. The reason is: Envoy mode is designed only to be back compatible. To address it, developers can use `Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy)` to manually set logger mode to Fancy. Note that it enables the admin page support but **not the macro expansion** as it's a runtime setting.
-
+If macro `FANCY` is not defined, it's **Envoy mode** with existing Envoy's logger being used. In this mode, basic macros like `FANCY_LOG` can be used but the main part of `ENVOY_LOG` will keep the same. One limitation is that logger update in admin page is not supported by default as it detects Envoy mode. The reason is: Envoy mode is designed only to be back compatible. To address it, developers can use `Logger::Context::enableFancyLogger()` to manually set logger mode to Fancy.
 
 ### Runtime Update
 Runtime update of Fancy Logger is supported with administration interface, i.e. admin page, and Fancy mode needs to be enabled to use it. Same as Envoy's logger, the following functionalities are provided:

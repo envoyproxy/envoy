@@ -234,25 +234,16 @@ enum class LoggerMode { Envoy, Fancy };
 class Context {
 public:
   Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape, bool log_mode = false);
+          Thread::BasicLockable& lock, bool should_escape, bool enable_fancy_log = false);
   ~Context();
-
-  /**
-   * Gets current logger mode (Envoy or Fancy). It's used in log handler in admin and
-   * in the implementation of Fancy Logger.
-   */
-  static LoggerMode getLoggerMode();
 
   /**
    * Same as before, with boolean returned to use in log macros.
    */
   static bool useFancyLogger();
 
-  /**
-   * Sets current logger mode. It's used when logger mode is obtained from compile
-   * option.
-   */
-  static void setLoggerMode(LoggerMode mode);
+  static void enableFancyLogger();
+  static void disableFancyLogger();
 
   static std::string getFancyLogFormat();
   static spdlog::level::level_enum getFancyDefaultLevel();
@@ -264,15 +255,9 @@ private:
   const std::string log_format_;
   Thread::BasicLockable& lock_;
   bool should_escape_;
-  bool log_mode_;
+  bool enable_fancy_log_;
   Context* const save_context_;
 
-  /**
-   * Logger mode, 0 for Envoy and 1 for Fancy. It's static as it should work even
-   * when there's no context instance (benchmark environment). Certainly default
-   * format and level are used for Fancy Logger in that case.
-   */
-  static int logger_mode_;
   std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
   spdlog::level::level_enum fancy_default_level_ = spdlog::level::info;
 };
@@ -406,11 +391,9 @@ protected:
 /**
  * Command line options for log macros: use Fancy Logger or not.
  */
-#define LOGGER_MODE Logger::Context::useFancyLogger()
-
 #define ENVOY_LOG(LEVEL, ...)                                                                      \
   do {                                                                                             \
-    if (LOGGER_MODE) {                                                                             \
+    if (Logger::Context::useFancyLogger()) {                                                                             \
       FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     } else {                                                                                       \
       ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__);                                   \
@@ -419,7 +402,7 @@ protected:
 
 #define ENVOY_FLUSH_LOG()                                                                          \
   do {                                                                                             \
-    if (LOGGER_MODE) {                                                                             \
+    if (Logger::Context::useFancyLogger()) {                                                                             \
       FANCY_FLUSH_LOG();                                                                           \
     } else {                                                                                       \
       ENVOY_LOGGER().flush();                                                                      \
@@ -428,7 +411,7 @@ protected:
 
 #define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
   do {                                                                                             \
-    if (LOGGER_MODE) {                                                                             \
+    if (Logger::Context::useFancyLogger()) {                                                                             \
       FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);                                    \
     } else {                                                                                       \
       ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);          \
@@ -437,7 +420,7 @@ protected:
 
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
   do {                                                                                             \
-    if (LOGGER_MODE) {                                                                             \
+    if (Logger::Context::useFancyLogger()) {                                                                             \
       FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                      \
     } else {                                                                                       \
       ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \

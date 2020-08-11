@@ -202,16 +202,13 @@ TEST(Fancy, Iteration) {
 
 TEST(Fancy, Context) {
   FANCY_LOG(info, "Info: context API needs test.");
-  Logger::LoggerMode mode = Logger::Context::getLoggerMode();
-  Logger::LoggerMode cmd_option =
-      LOGGER_MODE ? Logger::LoggerMode::Fancy : Logger::LoggerMode::Envoy;
-  printf(" --> Logger Mode: %d\n", LOGGER_MODE);
-  EXPECT_EQ(mode, cmd_option);
-  if (LOGGER_MODE) {
+  bool enable_fancy_log = Logger::Context::useFancyLogger();
+  printf(" --> If use fancy logger: %d\n", enable_fancy_log);
+  if (enable_fancy_log) {
     FANCY_LOG(critical, "Cmd option set: all previous Envoy Log should be converted now!");
   }
-  Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
-  EXPECT_EQ(Logger::Context::getLoggerMode(), Logger::LoggerMode::Fancy);
+  Logger::Context::enableFancyLogger();
+  EXPECT_EQ(Logger::Context::useFancyLogger(), true);
   EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
   // EXPECT_EQ(Logger::Context::getFancyDefaultLevel(),
   //           spdlog::level::err); // default is error in test environment

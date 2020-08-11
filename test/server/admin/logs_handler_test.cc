@@ -26,7 +26,7 @@ TEST_P(AdminInstanceTest, LogLevelSetting) {
 
   // now for Envoy, w/o setting the mode
   FANCY_LOG(info, "Build the logger for this file.");
-  Logger::Context::setLoggerMode(Logger::LoggerMode::Fancy);
+  Logger::Context::enableFancyLogger();
   postCallback("/logging", header_map, response);
   FANCY_LOG(error, response.toString());
 

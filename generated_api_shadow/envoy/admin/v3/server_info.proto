@@ -175,8 +175,8 @@ message CommandLineOptions {
   // See :option:`--bootstrap-version` for details.
   uint32 bootstrap_version = 29;
 
-  // See :option:`--fancy-log` for details.
-  bool log_mode = 34;
+  // See :option:`--enable-fancy-log` for details.
+  bool enable_fancy_log = 34;
 
   uint64 hidden_envoy_deprecated_max_stats = 20
       [deprecated = true, (envoy.annotations.disallowed_by_default) = true];

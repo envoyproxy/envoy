@@ -109,12 +109,10 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
 
 static Context* current_context = nullptr;
 
-int Context::logger_mode_ = 0; // 0 for Envoy, 1 for Fancy
-
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock, bool should_escape, bool log_mode)
+                 Thread::BasicLockable& lock, bool should_escape, bool enable_fancy_log)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
-      log_mode_(log_mode), save_context_(current_context) {
+      enable_fancy_log_(enable_fancy_log), save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -137,25 +135,26 @@ void Context::activate() {
   // sets level and format for Fancy Logger
   fancy_default_level_ = log_level_;
   fancy_log_format_ = log_format_;
-  logger_mode_ = log_mode_;
-  if (logger_mode_ == 1) {
+  if (enable_fancy_log_) {
     // loggers with default level before are set to log_level_ as new default
     getFancyContext().setDefaultFancyLevelFormat(log_level_, log_format_);
   }
 }
 
-LoggerMode Context::getLoggerMode() { return static_cast<LoggerMode>(logger_mode_); }
+bool Context::useFancyLogger() { return current_context->enable_fancy_log_; }
 
-bool Context::useFancyLogger() { return current_context->log_mode_; }
-
-void Context::setLoggerMode(LoggerMode mode) {
-  logger_mode_ = static_cast<int>(mode);
-  if (mode == LoggerMode::Fancy && current_context) {
+void Context::enableFancyLogger() {
+  current_context->enable_fancy_log_ = true;
+  if (current_context) {
     getFancyContext().setDefaultFancyLevelFormat(current_context->log_level_,
                                                  current_context->log_format_);
     current_context->fancy_default_level_ = current_context->log_level_;
     current_context->fancy_log_format_ = current_context->log_format_;
   }
+}
+
+void Context::disableFancyLogger() {
+  current_context->enable_fancy_log_ = false;
 }
 
 std::string Context::getFancyLogFormat() {
