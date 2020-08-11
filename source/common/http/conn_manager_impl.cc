@@ -517,18 +517,14 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallback route_config_updated_cb,
-    std::weak_ptr<Http::RouteConfigUpdatedCallback> weak_callback) {
+    Http::RouteConfigUpdatedCallback route_config_updated_cb) {
   // If it is inline scope_route_config_provider, will be cast to nullptr.
   if (!scoped_route_config_provider_) {
     thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
     return;
   }
-  // This is a raw pointer to config provider, should lock before peforming update.
-  if (weak_callback.lock()) {
-    scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
-                                                     move(route_config_updated_cb));
-  }
+  scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
+                                                   move(route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
@@ -1597,9 +1593,8 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
                 (*cb)(scope_exist && hasCachedRoute());
               }
             });
-    route_config_update_requester_->requestSrdsUpdate(
-        *scope_key_hash_, thread_local_dispatcher, scoped_route_config_updated_cb,
-        std::weak_ptr<Http::RouteConfigUpdatedCallback>(route_config_updated_cb));
+    route_config_update_requester_->requestSrdsUpdate(*scope_key_hash_, thread_local_dispatcher,
+                                                      scoped_route_config_updated_cb);
     return;
   }
   // Continue the filter chain if no on demand update is requested.

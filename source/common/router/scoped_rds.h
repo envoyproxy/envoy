@@ -1,6 +1,5 @@
 #pragma once
 
-#include <list>
 #include <memory>
 #include <string>
 
@@ -146,7 +145,7 @@ private:
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
-    std::list<std::function<void()>> on_demand_update_callbacks_;
+    std::vector<std::function<void()>> on_demand_update_callbacks_;
   };
 
   using RdsRouteConfigProviderHelperPtr = std::unique_ptr<RdsRouteConfigProviderHelper>;

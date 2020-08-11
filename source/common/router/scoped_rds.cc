@@ -463,6 +463,7 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
                                       route_config_updated_cb, weak_subscription]() {
     // If the subscription has been destroyed, return immediately.
     if (!weak_subscription.lock()) {
+      thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
       return;
     }
     auto iter = scope_name_by_hash_.find(key_hash);

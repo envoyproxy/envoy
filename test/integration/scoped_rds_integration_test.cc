@@ -37,6 +37,7 @@ protected:
   void initialize() override {
     // Setup two upstream hosts, one for each cluster.
     setUpstreamCount(2);
+
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add the static cluster to serve SRDS.
       auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
@@ -55,6 +56,7 @@ protected:
       rds_cluster->set_name("rds_cluster");
       rds_cluster->mutable_http2_protocol_options();
     });
+
     config_helper_.addConfigModifier(
         [this](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

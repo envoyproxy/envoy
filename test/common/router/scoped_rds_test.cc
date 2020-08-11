@@ -1223,7 +1223,7 @@ key:
 }
 
 // Post on demand callbacks multiple times, all should be executed after rds update.
-TEST_F(ScopedRdsTest, multipleOnDemandUpdatedCallback) {
+TEST_F(ScopedRdsTest, MultipleOnDemandUpdatedCallback) {
   setup();
   init_watcher_.expectReady();
   // Secondary priority scope should be loaded lazily.
@@ -1260,7 +1260,7 @@ key:
             "foo_routes");
 }
 
-TEST_F(ScopedRdsTest, danglingSubscriptionOnDemandUpdate) {
+TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   setup();
   Event::PostCb temp_post_cb;
   {

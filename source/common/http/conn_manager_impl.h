@@ -375,8 +375,7 @@ private:
     void requestVhdsUpdate(const std::string host_header,
                            Event::Dispatcher& thread_local_dispatcher,
                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
-    void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback,
-                           std::weak_ptr<Http::RouteConfigUpdatedCallback>);
+    void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback);
 
   private:
     Router::RouteConfigProvider* route_config_provider_;

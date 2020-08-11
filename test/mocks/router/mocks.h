@@ -503,6 +503,7 @@ public:
   ~MockScopedConfig() override;
 
   MOCK_METHOD(ConfigConstSharedPtr, getRouteConfig, (const Http::HeaderMap& headers), (const));
+
   std::shared_ptr<MockConfig> route_config_{new NiceMock<MockConfig>()};
 };
 
@@ -517,6 +518,7 @@ public:
   MOCK_METHOD(Envoy::Config::ConfigProvider::ConfigProtoVector, getConfigProtos, (), (const));
   MOCK_METHOD(ConfigConstSharedPtr, getConfig, (), (const));
   MOCK_METHOD(ApiType, apiType, (), (const));
+
   std::shared_ptr<MockScopedConfig> config_;
 };
 
