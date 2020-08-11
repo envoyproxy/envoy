@@ -239,6 +239,8 @@ modify different aspects of the server:
 
     Generally only used during development.
 
+.. _operations_admin_interface_memory:
+
 .. http:get:: /memory
 
   Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
