@@ -84,7 +84,8 @@ TEST_F(OptionsImplTest, All) {
       "--local-address-ip-version v6 -l info --component-log-level upstream:debug,connection:trace "
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
-      "--drain-time-s 60 --log-format [%v] --fancy-log --parent-shutdown-time-s 90 --log-path /foo/bar "
+      "--drain-time-s 60 --log-format [%v] --fancy-log --parent-shutdown-time-s 90 --log-path "
+      "/foo/bar "
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
       "--reject-unknown-dynamic-fields --use-fake-symbol-table 0 --base-id 5 "
       "--use-dynamic-base-id --base-id-path /foo/baz");

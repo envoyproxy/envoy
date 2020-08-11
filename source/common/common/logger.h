@@ -438,7 +438,7 @@ protected:
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
   do {                                                                                             \
     if (LOGGER_MODE) {                                                                             \
-      FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                       \
+      FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                      \
     } else {                                                                                       \
       ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \
     }                                                                                              \
