@@ -74,24 +74,15 @@ public:
   };
 
   void release() {
-    bool cancel = false;
-    bool do_delete = true;
-    {
-      absl::MutexLock lock(&time_system_.mutex_);
-      if (busy_) {
-        ASSERT(!delete_when_idle_);
-        delete_when_idle_ = true;
-        do_delete = false;
-      }
-      if (armed_) {
-        cancel = true;
-        disableTimerLockHeld();
-      }
-    }
-    if (cancel) {
+    absl::MutexLock lock(&time_system_.mutex_);
+    ASSERT(!delete_when_idle_);
+    if (armed_) {
       cb_->cancel();
+      disableTimerLockHeld();
     }
-    if (do_delete) {
+    if (busy_) {
+      delete_when_idle_ = true;
+    } else {
       delete this;
     }
   }
@@ -213,11 +204,7 @@ private:
 };
 
 SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
-  /*
-  if (armed_) {
-    cb_->cancel();
-  }
-  */
+  ASSERT(cb_ == nullptr);
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
@@ -240,17 +227,7 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
     const std::chrono::microseconds& duration, const ScopeTrackedObject* /*scope*/) {
   if (duration.count() != 0) {
-    //absl::MutexLock lock(&time_system_.mutex_);
     cb_->cancel();
-    /*ASSERT(!busy_);
-    busy_ = true;
-    disableTimerLockHeld();
-    ASSERT(busy_);
-    busy_ = false;
-    if (delete_when_idle_) {
-      delete this;
-      return;
-      }*/
   }
   absl::MutexLock lock(&time_system_.mutex_);
   if (pending_) {
@@ -446,15 +423,6 @@ void SimulatedTimeSystemHelper::scheduleReadyAlarms() {
   absl::MutexLock lock(&mutex_);
   scheduleReadyAlarmsLockHeld();
 }
-
-/*
-void SimulatedTimeSystemHelper::deleteReleasedAlarmsLockHeld() {
-  for (Alarm* alarm : released_alarms_) {
-    delete alarm;
-  }
-  released_alarms_.clear();
-}
-*/
 
 void SimulatedTimeSystemHelper::scheduleReadyAlarmsLockHeld() {
   // Alarms is a std::set ordered by wakeup time, so pulling off begin() each
