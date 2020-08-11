@@ -119,7 +119,7 @@ protected:
   // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
   // with only one health check type.
   std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>
-  createComplexSpecifier(int n_clusters, int n_localities, int n_endpoints) {
+  createComplexSpecifier(uint32_t n_clusters, uint32_t n_localities, uint32_t n_endpoints) {
     // Final specifier to return.
     std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier> msg =
         std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>();
@@ -127,7 +127,7 @@ protected:
     // set interval.
     msg->mutable_interval()->set_seconds(1);
 
-    for (int cluster_num = 0; cluster_num < n_clusters; cluster_num++) {
+    for (uint32_t cluster_num = 0; cluster_num < n_clusters; cluster_num++) {
       // add a cluster with a name by iteration, with path /healthcheck
       auto* health_check = msg->add_cluster_health_checks();
       health_check->set_cluster_name(absl::StrCat("anna", cluster_num));
@@ -143,7 +143,7 @@ protected:
       health_check_http->set_path("/healthcheck");
 
       // add some locality groupings with iterative names for verification.
-      for (int loc_num = 0; loc_num < n_localities; loc_num++) {
+      for (uint32_t loc_num = 0; loc_num < n_localities; loc_num++) {
         auto* locality_endpoints = health_check->add_locality_endpoints();
 
         // set the locality information for this group.
@@ -153,7 +153,7 @@ protected:
         locality->set_sub_zone(absl::StrCat("subzone", loc_num));
 
         // add some endpoints to the locality group with iterative naming for verification.
-        for (int endpoint_num = 0; endpoint_num < n_endpoints; endpoint_num++) {
+        for (uint32_t endpoint_num = 0; endpoint_num < n_endpoints; endpoint_num++) {
           auto* socket_address =
               locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
           socket_address->set_address(
