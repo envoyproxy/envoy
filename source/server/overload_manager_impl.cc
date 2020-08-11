@@ -45,7 +45,7 @@ public:
         saturated_threshold_(config.saturation_threshold()),
         state_(OverloadActionState::inactive()) {
     if (scaling_threshold_ >= saturated_threshold_) {
-      throw EnvoyException("min_value must be less than max_value");
+      throw EnvoyException("scaling_threshold must be less than saturation_threshold");
     }
   }
 
@@ -278,7 +278,7 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                     const auto state = action_it->second.getState();
 
                     if (old_state.isSaturated() != state.isSaturated()) {
-                      ENVOY_LOG(info, "Overload action {} became {}", action,
+                      ENVOY_LOG(debug, "Overload action {} became {}", action,
                                 (state.isSaturated() ? "saturated" : "scaling"));
                     }
                     tls_->runOnAllThreads([this, action, state] {

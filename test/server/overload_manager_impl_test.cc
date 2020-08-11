@@ -409,7 +409,8 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
                           "Duplicate overload action .*");
 }
 
-TEST_F(OverloadManagerImplTest, ScaledTriggerMaxLessThanMin) {
+// A scaled trigger action's thresholds must conform to scaling < saturation.
+TEST_F(OverloadManagerImplTest, ScaledTriggerSaturationLessThanScalingThreshold) {
   const std::string config = R"EOF(
     resource_monitors {
       name: "envoy.resource_monitors.fake_resource1"
@@ -427,10 +428,11 @@ TEST_F(OverloadManagerImplTest, ScaledTriggerMaxLessThanMin) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "min_value must be less than max_value.*");
+                          "scaling_threshold must be less than saturation_threshold.*");
 }
 
-TEST_F(OverloadManagerImplTest, ScaledTriggerMaxEqualsMin) {
+// A scaled trigger action can't have threshold values that are equal.
+TEST_F(OverloadManagerImplTest, ScaledTriggerThresholdsEqual) {
   const std::string config = R"EOF(
     resource_monitors {
       name: "envoy.resource_monitors.fake_resource1"
@@ -448,7 +450,7 @@ TEST_F(OverloadManagerImplTest, ScaledTriggerMaxEqualsMin) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "min_value must be less than max_value.*");
+                          "scaling_threshold must be less than saturation_threshold.*");
 }
 
 TEST_F(OverloadManagerImplTest, UnknownTrigger) {
