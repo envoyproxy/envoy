@@ -8,6 +8,7 @@ import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -168,7 +169,7 @@ message FilterChainMatch {
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
 // various other parameters.
-// [#next-free-field: 8]
+// [#next-free-field: 10]
 message FilterChain {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.FilterChain";
 
@@ -203,6 +204,15 @@ message FilterChain {
   // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
   // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
   string name = 7;
+
+  // [#not-implemented-hide:] Whether the filter chain will be built on demand or not.
+  bool build_on_demand = 8;
+
+  // [#not-implemented-hide:] The timeout to wait for filter chain placeholder to complete rebuilding.
+  // If the timeout is reached, the filter chain rebuilding fails and sends callbacks to workers with failure signal
+  // so that workers will not retry connections that require this filter chain.
+  // Specify 0 to disable the timeout. If not specified, a default timeout of 15s is used.
+  google.protobuf.Duration rebuild_timeout = 9;
 
   envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
       hidden_envoy_deprecated_tls_context = 2 [deprecated = true];
