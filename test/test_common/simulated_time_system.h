@@ -66,7 +66,10 @@ public:
 private:
   class SimulatedScheduler;
   class Alarm;
+  using AlarmSharedPtr = std::shared_ptr<Alarm>;
   friend class Alarm; // Needed to reference mutex for thread annotations.
+  class TimerImpl;
+  friend class TimerImpl;
   struct AlarmRegistration {
     AlarmRegistration(MonotonicTime time, uint64_t randomness, Alarm& alarm)
         : time_(time), randomness_(randomness), alarm_(alarm) {}
@@ -127,6 +130,7 @@ private:
   }
   void decPendingLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) { --pending_alarms_; }
   void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  //void removeAlarm(Alarm&);
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ ABSL_GUARDED_BY(mutex_);

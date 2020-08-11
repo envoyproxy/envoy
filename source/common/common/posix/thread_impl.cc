@@ -80,14 +80,19 @@ public:
 #endif
   }
 
-  ~ThreadImplPosix() override { ASSERT(joined_); }
+  ~ThreadImplPosix() override {
+    ENVOY_LOG_MISC(error, "joined_={}", joined_);
+    ASSERT(joined_);
+  }
 
   std::string name() const override { return name_; }
 
   // Thread::Thread
   void join() override {
     ASSERT(!joined_);
+    ENVOY_LOG_MISC(error, "Setting joined to true");
     joined_ = true;
+    ENVOY_LOG_MISC(error, "Setting joined_={}", joined_);
     const int rc = pthread_join(thread_handle_, nullptr);
     RELEASE_ASSERT(rc == 0, "");
   }

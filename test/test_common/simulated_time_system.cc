@@ -49,25 +49,61 @@ private:
 
 // Our simulated alarm inherits from TimerImpl so that the same dispatching
 // mechanism used in RealTimeSystem timers is employed for simulated alarms.
-class SimulatedTimeSystemHelper::Alarm : public Timer {
+class SimulatedTimeSystemHelper::Alarm {
 public:
   Alarm(SimulatedScheduler& simulated_scheduler, SimulatedTimeSystemHelper& time_system,
         CallbackScheduler& cb_scheduler, TimerCb cb)
       : cb_(cb_scheduler.createSchedulableCallback([this, cb] { runAlarm(cb); })),
-        simulated_scheduler_(simulated_scheduler), time_system_(time_system), armed_(false),
-        pending_(false) {}
+        simulated_scheduler_(simulated_scheduler), time_system_(time_system) {}
 
-  ~Alarm() override;
+  ~Alarm();
 
-  // Timer
-  void disableTimer() override;
-  void enableTimer(const std::chrono::milliseconds& duration,
-                   const ScopeTrackedObject* scope) override {
-    enableHRTimer(duration, scope);
+  struct ScopedBusy {
+    ScopedBusy(Alarm& alarm) : alarm_(alarm) {
+      ASSERT(!alarm_.busy_);
+      alarm_.busy_ = true;
+    }
+    ~ScopedBusy() {
+      ASSERT(alarm_.busy_);
+      alarm_.busy_ = false;
+      if (alarm_.delete_when_idle_) {
+        delete &alarm_;
+      }
+    }
+    Alarm& alarm_;
   };
+
+  void release() {
+    bool cancel = false;
+    bool do_delete = true;
+    {
+      absl::MutexLock lock(&time_system_.mutex_);
+      if (busy_) {
+        ASSERT(!delete_when_idle_);
+        delete_when_idle_ = true;
+        do_delete = false;
+      }
+      if (armed_) {
+        cancel = true;
+        disableTimerLockHeld();
+      }
+    }
+    if (cancel) {
+      cb_->cancel();
+    }
+    if (do_delete) {
+      delete this;
+    }
+  }
+
+  void disableTimer();
+  void enableTimer(const std::chrono::milliseconds& duration,
+                   const ScopeTrackedObject* scope) {
+    enableHRTimer(duration, scope);
+  }
   void enableHRTimer(const std::chrono::microseconds& duration,
-                     const ScopeTrackedObject* scope) override;
-  bool enabled() override {
+                     const ScopeTrackedObject* scope);
+  bool enabled() {
     absl::MutexLock lock(&time_system_.mutex_);
     return armed_ || cb_->enabled();
   }
@@ -79,6 +115,9 @@ public:
    * typically via Dispatcher::run().
    */
   void activateLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
+    if (delete_when_idle_) {
+      return;
+    }
     ASSERT(armed_);
     armed_ = false;
     if (pending_) {
@@ -92,8 +131,17 @@ public:
     // https://github.com/libevent/libevent/blob/29cc8386a2f7911eaa9336692a2c5544d8b4734f/event.c#L1917
     // See class comment for UnlockGuard for details on saving
     // time_system_.mutex_ prior to running libevent, which may delete this.
-    UnlockGuard unlocker(time_system_.mutex_);
-    cb_->scheduleCallbackCurrentIteration();
+    ASSERT(!busy_);
+    busy_ = true;
+    {
+      UnlockGuard unlocker(time_system_.mutex_);
+      cb_->scheduleCallbackCurrentIteration();
+    }
+    ASSERT(busy_);
+    busy_ = false;
+    if (delete_when_idle_) {
+      delete this;
+    }
   }
 
   SimulatedTimeSystemHelper& timeSystem() { return time_system_; }
@@ -113,8 +161,33 @@ private:
   SchedulableCallbackPtr cb_;
   SimulatedScheduler& simulated_scheduler_;
   SimulatedTimeSystemHelper& time_system_;
-  bool armed_ ABSL_GUARDED_BY(time_system_.mutex_);
-  bool pending_ ABSL_GUARDED_BY(time_system_.mutex_);
+  bool armed_ ABSL_GUARDED_BY(time_system_.mutex_) = false;
+  bool pending_ ABSL_GUARDED_BY(time_system_.mutex_) = false;
+  bool busy_ ABSL_GUARDED_BY(time_system_.mutex_) = false;
+  bool delete_when_idle_ ABSL_GUARDED_BY(time_system_.mutex_) = false;
+};
+
+// Our simulated alarm inherits from TimerImpl so that the same dispatching
+// mechanism used in RealTimeSystem timers is employed for simulated alarms.
+class SimulatedTimeSystemHelper::TimerImpl : public Timer {
+public:
+  explicit TimerImpl(Alarm& alarm) : alarm_(alarm) {}
+  ~TimerImpl() { alarm_.release(); }
+
+  // Timer
+  void disableTimer() override { alarm_.disableTimer(); }
+  void enableTimer(const std::chrono::milliseconds& duration,
+                   const ScopeTrackedObject* scope) override {
+    alarm_.enableTimer(duration, scope);
+  }
+  void enableHRTimer(const std::chrono::microseconds& duration,
+                     const ScopeTrackedObject* scope) override {
+    alarm_.enableHRTimer(duration, scope);
+  }
+  bool enabled() override { return alarm_.enabled(); }
+
+private:
+  Alarm& alarm_;
 };
 
 // Each timer is maintained and ordered by a common TimeSystem, but is
@@ -128,9 +201,9 @@ public:
         schedule_ready_alarms_cb_(cb_scheduler.createSchedulableCallback(
             [this] { time_system_.scheduleReadyAlarms(); })) {}
   TimerPtr createTimer(const TimerCb& cb, Dispatcher& /*dispatcher*/) override {
-    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(*this, time_system_, cb_scheduler_,
-                                                              cb);
-  };
+    return std::make_unique<SimulatedTimeSystemHelper::TimerImpl>(
+        *new Alarm(*this, time_system_, cb_scheduler_, cb));
+  }
   void scheduleReadyAlarms() { schedule_ready_alarms_cb_->scheduleCallbackNextIteration(); }
 
 private:
@@ -140,9 +213,11 @@ private:
 };
 
 SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
+  /*
   if (armed_) {
-    disableTimer();
+    cb_->cancel();
   }
+  */
 }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
@@ -165,14 +240,24 @@ void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimerLockHeld() {
 void SimulatedTimeSystemHelper::Alarm::Alarm::enableHRTimer(
     const std::chrono::microseconds& duration, const ScopeTrackedObject* /*scope*/) {
   if (duration.count() != 0) {
-    disableTimer();
+    //absl::MutexLock lock(&time_system_.mutex_);
+    cb_->cancel();
+    /*ASSERT(!busy_);
+    busy_ = true;
+    disableTimerLockHeld();
+    ASSERT(busy_);
+    busy_ = false;
+    if (delete_when_idle_) {
+      delete this;
+      return;
+      }*/
   }
   absl::MutexLock lock(&time_system_.mutex_);
   if (pending_) {
     // Calling enableTimer on a timer that is already pending is a no-op. Timer will still fire
     // based on the original time it was scheduled.
     return;
-  } else if (armed_) {
+  } else if (armed_ ) {
     disableTimerLockHeld();
   }
 
@@ -362,6 +447,15 @@ void SimulatedTimeSystemHelper::scheduleReadyAlarms() {
   scheduleReadyAlarmsLockHeld();
 }
 
+/*
+void SimulatedTimeSystemHelper::deleteReleasedAlarmsLockHeld() {
+  for (Alarm* alarm : released_alarms_) {
+    delete alarm;
+  }
+  released_alarms_.clear();
+}
+*/
+
 void SimulatedTimeSystemHelper::scheduleReadyAlarmsLockHeld() {
   // Alarms is a std::set ordered by wakeup time, so pulling off begin() each
   // iteration gives you wakeup order. Also note that alarms may be added
@@ -375,6 +469,7 @@ void SimulatedTimeSystemHelper::scheduleReadyAlarmsLockHeld() {
     }
 
     Alarm& alarm = alarm_registration.alarm_;
+    //Alarm::ScopedBusy busy(alarm);
     removeAlarmLockHeld(alarm);
     alarmActivateLockHeld(alarm);
   }

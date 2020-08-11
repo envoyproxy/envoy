@@ -474,6 +474,20 @@ TEST_P(SimulatedTimeSystemTest, Enabled) {
   EXPECT_TRUE(timer->enabled());
 }
 
+TEST_P(SimulatedTimeSystemTest, DeleteTimerFromThread) {
+  //ENVOY_LOG_MISC(error, "1");
+  TimerPtr timer = scheduler_->createTimer([](){}, dispatcher_);
+  //ENVOY_LOG_MISC(error, "2");
+  timer->enableTimer(std::chrono::milliseconds(0));
+  //ENVOY_LOG_MISC(error, "3");
+  auto thread = Thread::threadFactoryForTest().createThread([&timer]() { timer.reset(); });
+  //ENVOY_LOG_MISC(error, "4");
+  advanceMsAndLoop(1);
+  ENVOY_LOG_MISC(error, "joining thread");
+  thread->join();
+  thread.reset();
+}
+
 } // namespace
 } // namespace Test
 } // namespace Event
