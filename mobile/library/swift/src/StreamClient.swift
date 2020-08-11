@@ -1,6 +1,6 @@
 import Foundation
 
-/// Client used to create new streams.
+/// Client used to create HTTP streams.
 @objc
 public protocol StreamClient: AnyObject {
   /// Create a new stream prototype which can be used to start streams.

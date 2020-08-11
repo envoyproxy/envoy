@@ -56,4 +56,15 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     return runWithConfig(envoyConfiguration.resolveTemplate(JniLibrary.templateString()), logLevel);
   }
+
+  /**
+   * Increment a counter with the given count.
+   *
+   * @param elements Elements of the counter stat.
+   * @param count Amount to add to the counter.
+   */
+  @Override
+  public void recordCounter(String elements, int count) {
+    JniLibrary.recordCounter(elements, count);
+  }
 }

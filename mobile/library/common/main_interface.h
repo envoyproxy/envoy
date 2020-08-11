@@ -97,6 +97,11 @@ envoy_engine_t init_engine();
 envoy_status_t set_preferred_network(envoy_network_t network);
 
 /**
+ * Increment a counter with the given elements and by the given count.
+ */
+void record_counter(const char* elements, uint64_t count);
+
+/**
  * Flush the stats sinks outside of a flushing interval.
  * Note: flushing before the engine has started will result in a no-op.
  * Note: stats flushing may not be synchronous.

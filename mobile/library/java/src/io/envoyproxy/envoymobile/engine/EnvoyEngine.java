@@ -28,4 +28,12 @@ public interface EnvoyEngine {
    * @return A status indicating if the action was successful.
    */
   int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
+
+  /**
+   * Increments a counter with the given count.
+   *
+   * @param elements Elements of the counter stat.
+   * @param count Amount to add to the counter.
+   */
+  void recordCounter(String elements, int count);
 }

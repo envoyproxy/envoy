@@ -7,6 +7,8 @@ final class MockEnvoyEngine: NSObject {
   static var onRunWithConfig: ((_ config: EnvoyConfiguration, _ logLevel: String?) -> Void)?
   /// Closure called when `run(withConfigYAML:)` is called.
   static var onRunWithYAML: ((_ configYAML: String, _ logLevel: String?) -> Void)?
+  /// Closure called when `recordCounter(_:count:)` is called.
+  static var onRecordCounter: ((_ elements: String, _ count: UInt) -> Void)?
 }
 
 extension MockEnvoyEngine: EnvoyEngine {
@@ -22,5 +24,9 @@ extension MockEnvoyEngine: EnvoyEngine {
 
   func startStream(with callbacks: EnvoyHTTPCallbacks) -> EnvoyHTTPStream {
     return MockEnvoyHTTPStream(handle: 0, callbacks: callbacks)
+  }
+
+  func recordCounter(_ elements: String, count: UInt) {
+    MockEnvoyEngine.onRecordCounter?(elements, count)
   }
 }

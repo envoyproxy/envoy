@@ -22,7 +22,7 @@ mock_template:
 
 private struct TestFilter: Filter {}
 
-final class StreamClientBuilderTests: XCTestCase {
+final class EngineBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
@@ -36,7 +36,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder(yaml: "foobar")
+    _ = try EngineBuilder(yaml: "foobar")
       .addEngineType(MockEnvoyEngine.self)
       .build()
     self.waitForExpectations(timeout: 0.01)
@@ -49,7 +49,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addLogLevel(.trace)
       .build()
@@ -63,7 +63,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsDomain("stats.envoyproxy.io")
       .build()
@@ -77,7 +77,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addConnectTimeoutSeconds(12345)
       .build()
@@ -91,7 +91,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSRefreshSeconds(23)
       .build()
@@ -105,7 +105,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addFilter(factory: TestFilter.init)
       .build()
@@ -120,7 +120,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSFailureRefreshSeconds(base: 1234, max: 5678)
       .build()
@@ -134,7 +134,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsFlushSeconds(42)
       .build()
@@ -148,7 +148,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppVersion("v1.2.3")
       .build()
@@ -162,7 +162,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addAppId("com.envoymobile.ios")
       .build()
@@ -176,7 +176,7 @@ final class StreamClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try StreamClientBuilder()
+    _ = try EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addVirtualClusters("[test]")
       .build()

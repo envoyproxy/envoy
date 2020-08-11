@@ -8,10 +8,10 @@ import android.util.Log
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import io.envoyproxy.envoymobile.AndroidStreamClientBuilder
+import io.envoyproxy.envoymobile.AndroidEngineBuilder
+import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
-import io.envoyproxy.envoymobile.StreamClient
 import io.envoyproxy.envoymobile.UpstreamHttpProtocol
 import io.envoyproxy.envoymobile.shared.Failure
 import io.envoyproxy.envoymobile.shared.ResponseRecyclerViewAdapter
@@ -30,13 +30,13 @@ class MainActivity : Activity() {
   private val thread = HandlerThread(REQUEST_HANDLER_THREAD_NAME)
   private lateinit var recyclerView: RecyclerView
   private lateinit var viewAdapter: ResponseRecyclerViewAdapter
-  private lateinit var streamClient: StreamClient
+  private lateinit var engine: Engine
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
-    streamClient = AndroidStreamClientBuilder(application).build()
+    engine = AndroidEngineBuilder(application).build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
     recyclerView.layoutManager = LinearLayoutManager(this)
@@ -82,7 +82,8 @@ class MainActivity : Activity() {
     )
       .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()
-    streamClient
+    engine
+      .streamClient()
       .newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, _ ->
         val status = responseHeaders.httpStatus ?: 0L
