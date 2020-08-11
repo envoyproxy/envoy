@@ -141,7 +141,7 @@ int TestRunner::RunTests(int argc, char** argv) {
 
   Server::Options& options = TestEnvironment::getOptions();
   Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false,
-                                options.logMode());
+                                options.enableFancyLog());
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;

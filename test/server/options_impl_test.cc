@@ -100,7 +100,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(2, options->componentLogLevels().size());
   EXPECT_EQ("[%v]", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
-  EXPECT_EQ(true, options->logMode());
+  EXPECT_EQ(true, options->enableFancyLog());
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
   EXPECT_EQ("zone", options->serviceZone());
