@@ -118,11 +118,11 @@ protected:
 
   // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
   // with only one health check type.
-  envoy::service::health::v3::HealthCheckSpecifier*
+  std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>
   createComplexSpecifier(int n_clusters, int n_localities, int n_endpoints) {
     // Final specifier to return.
-    envoy::service::health::v3::HealthCheckSpecifier* msg =
-        new envoy::service::health::v3::HealthCheckSpecifier;
+    std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier> msg =
+        std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>();
 
     // set interval.
     msg->mutable_interval()->set_seconds(1);
@@ -380,16 +380,16 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
 TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
   // number of clusters, localities by cluster, and endpoints by locality
   // to build and verify off of.
-  const int NumClusters = 2;
-  const int NumLocalities = 2;
-  const int NumEndpoints = 2;
+  const uint32_t NumClusters = 2;
+  const uint32_t NumLocalities = 2;
+  const uint32_t NumEndpoints = 2;
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
   createHdsDelegate();
 
   // Create Message
-  message.reset(createComplexSpecifier(NumClusters, NumLocalities, NumEndpoints));
+  message = createComplexSpecifier(NumClusters, NumLocalities, NumEndpoints);
 
   // Create a new active connection on request, setting its status to connected
   // to mock a found endpoint.
@@ -431,7 +431,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
 
   ASSERT_EQ(response.cluster_endpoints_health_size(), NumClusters);
 
-  for (int i = 0; i < NumClusters; i++) {
+  for (uint32_t i = 0; i < NumClusters; i++) {
     const auto& cluster = response.cluster_endpoints_health(i);
 
     // Expect the correct cluster name by index
@@ -440,7 +440,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
     // Every cluster should have two locality groupings
     ASSERT_EQ(cluster.locality_endpoints_health_size(), NumLocalities);
 
-    for (int j = 0; j < NumLocalities; j++) {
+    for (uint32_t j = 0; j < NumLocalities; j++) {
       // Every locality should have a number based on its index
       const auto& loc_group = cluster.locality_endpoints_health(j);
       EXPECT_EQ(loc_group.locality().region(), absl::StrCat("region", i));
@@ -450,7 +450,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
       // Every locality should have two endpoints.
       ASSERT_EQ(loc_group.endpoints_health_size(), NumEndpoints);
 
-      for (int k = 0; k < NumEndpoints; k++) {
+      for (uint32_t k = 0; k < NumEndpoints; k++) {
 
         // every endpoint's address is based on all 3 index values.
         const auto& endpoint_health = loc_group.endpoints_health(k);
