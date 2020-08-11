@@ -209,7 +209,7 @@ TEST(Fancy, Context) {
   }
   Logger::Context::enableFancyLogger();
   EXPECT_EQ(Logger::Context::useFancyLogger(), true);
-  EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v");
+  EXPECT_EQ(Logger::Context::getFancyLogFormat(), "[%Y-%m-%d %T.%e][%t][%l] [%g:%#] %v");
   // EXPECT_EQ(Logger::Context::getFancyDefaultLevel(),
   //           spdlog::level::err); // default is error in test environment
 }

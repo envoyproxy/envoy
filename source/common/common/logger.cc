@@ -10,6 +10,7 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/strip.h"
 #include "spdlog/spdlog.h"
 
@@ -138,6 +139,9 @@ void Context::activate() {
   if (enable_fancy_log_) {
     // loggers with default level before are set to log_level_ as new default
     getFancyContext().setDefaultFancyLevelFormat(log_level_, log_format_);
+    if (log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
+      fancy_log_format_ = absl::StrReplaceAll(log_format_, {{"[%n]", ""}});
+    }
   }
 }
 
@@ -150,16 +154,18 @@ void Context::enableFancyLogger() {
                                                  current_context->log_format_);
     current_context->fancy_default_level_ = current_context->log_level_;
     current_context->fancy_log_format_ = current_context->log_format_;
+    if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
+      current_context->fancy_log_format_ =
+          absl::StrReplaceAll(current_context->log_format_, {{"[%n]", ""}});
+    }
   }
 }
 
-void Context::disableFancyLogger() {
-  current_context->enable_fancy_log_ = false;
-}
+void Context::disableFancyLogger() { current_context->enable_fancy_log_ = false; }
 
 std::string Context::getFancyLogFormat() {
   if (!current_context) { // Context is not instantiated in benchmark test
-    return "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+    return "[%Y-%m-%d %T.%e][%t][%l] %v";
   }
   return current_context->fancy_log_format_;
 }

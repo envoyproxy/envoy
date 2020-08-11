@@ -393,7 +393,7 @@ protected:
  */
 #define ENVOY_LOG(LEVEL, ...)                                                                      \
   do {                                                                                             \
-    if (Logger::Context::useFancyLogger()) {                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                                             \
       FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
     } else {                                                                                       \
       ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__);                                   \
@@ -402,7 +402,7 @@ protected:
 
 #define ENVOY_FLUSH_LOG()                                                                          \
   do {                                                                                             \
-    if (Logger::Context::useFancyLogger()) {                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                                             \
       FANCY_FLUSH_LOG();                                                                           \
     } else {                                                                                       \
       ENVOY_LOGGER().flush();                                                                      \
@@ -411,7 +411,7 @@ protected:
 
 #define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
   do {                                                                                             \
-    if (Logger::Context::useFancyLogger()) {                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                                             \
       FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);                                    \
     } else {                                                                                       \
       ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);          \
@@ -420,7 +420,7 @@ protected:
 
 #define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
   do {                                                                                             \
-    if (Logger::Context::useFancyLogger()) {                                                                             \
+    if (Envoy::Logger::Context::useFancyLogger()) {                                                                             \
       FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                      \
     } else {                                                                                       \
       ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \
