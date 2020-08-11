@@ -17,6 +17,14 @@
 namespace Envoy {
 namespace Formatter {
 
+// We actually need a map to formatters, we can pass the ProtobufStruct, no need to reformat it.
+struct JsonMap;
+using JsonMapPtr = std::unique_ptr<JsonMap>;
+using JsonMapValue = absl::variant<std::string, JsonMapPtr>;
+struct JsonMap {
+  absl::flat_hash_map<std::string, JsonMapValue> values_;
+};
+
 /**
  * Access log format parser.
  */

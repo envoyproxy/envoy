@@ -6,7 +6,6 @@ namespace Envoy {
 namespace Formatter {
 namespace {
 
-absl::flat_hash_map<std::string, std::string>
 convertJsonFormatToMap(const ProtobufWkt::Struct& json_format) {
   absl::flat_hash_map<std::string, std::string> output;
   for (const auto& pair : json_format.fields()) {
