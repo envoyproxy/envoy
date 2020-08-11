@@ -527,6 +527,7 @@ void InstanceImpl::onRuntimeReady() {
     clusterManager().initializeSecondaryClusters(bootstrap_);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Skipping initialization of secondary cluster: {}", e.what());
+    shutdown();
   }
 
   if (bootstrap_.has_hds_config()) {
@@ -546,6 +547,7 @@ void InstanceImpl::onRuntimeReady() {
           *api_);
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
+      shutdown();
     }
   }
 
