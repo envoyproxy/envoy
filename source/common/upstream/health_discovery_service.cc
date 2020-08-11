@@ -104,68 +104,50 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse response;
 
   for (const auto& cluster : hds_clusters_) {
-    // Add cluster health response and set name
+    // Add cluster health response and set name.
     auto* cluster_health =
         response.mutable_endpoint_health_response()->add_cluster_endpoints_health();
     cluster_health->set_cluster_name(cluster->info()->name());
 
-    // Hold all endpoint health information by locality, updated when a new locality
-    // has been seen. When we ingest our configuration and endpoints during the call
-    // of the processMessage() function, all of the endpoints come grouped by cluster
-    // and locality. We continuously appended to the end of the list of endpoints
-    // by locality, meaning each group of endpoints by a particular locality are all
-    // next to each other in the list. If two endpoints next to each other have the same
-    // locality, then we append to the same locality grouping. When the locality
-    // changes from endpoint to endpoint, we start a new grouping by changing this
-    // pointer.
-    envoy::service::health::v3::LocalityEndpointsHealth* locality_health = nullptr;
-
     // Iterate through all hosts in our priority set.
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
-      for (const auto& host : hosts->hosts()) {
+      // Get a grouping of hosts by locality.
+      for (const auto& localityHosts : hosts->hostsPerLocality().get()) {
 
-        // If we are on a new locality grouping, add grouping and copy the locality.
-        // If this is the first endpoint, then locality_health will not be pointing
-        // at anything so we create a new grouping.
-        //
-        // If locality_health is already pointing to something, there is already
-        // a locality group open. We need to check to see if this endpoint is part
-        // of the current locality or of it is the start of a new locality grouping.
-        // we do this by comparing the last seen locality (locality_health variable)
-        // with the endpoint's actual stored locality information using the
-        // LocalityEqualTo. If they are not equal than this endpoint is the start
-        // of a new grouping, and so we add a new locality to our result list and
-        // copy over the information.
-        if (locality_health == nullptr ||
-            !LocalityEqualTo()(host->locality(), locality_health->locality())) {
-          locality_health = cluster_health->add_locality_endpoints_health();
-          locality_health->mutable_locality()->MergeFrom(host->locality());
-        }
+        // For this locality, add the response grouping.
+        envoy::service::health::v3::LocalityEndpointsHealth* locality_health =
+            cluster_health->add_locality_endpoints_health();
+        locality_health->mutable_locality()->MergeFrom(localityHosts[0]->locality());
 
-        // Add this endpoint's health status to this locality grouping.
-        auto* endpoint = locality_health->add_endpoints_health();
-        Network::Utility::addressToProtobufAddress(
-            *host->address(), *endpoint->mutable_endpoint()->mutable_address());
-        // TODO(lilika): Add support for more granular options of
-        // envoy::config::core::v3::HealthStatus
-        if (host->health() == Host::Health::Healthy) {
-          endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
-        } else {
-          if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
-            endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
-          } else if (host->getActiveHealthFailureType() ==
-                     Host::ActiveHealthFailureType::UNHEALTHY) {
-            endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
-          } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
-            endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+        // Add all hosts to this locality.
+        for (const auto& host : localityHosts) {
+
+          // Add this endpoint's health status to this locality grouping.
+          auto* endpoint = locality_health->add_endpoints_health();
+          Network::Utility::addressToProtobufAddress(
+              *host->address(), *endpoint->mutable_endpoint()->mutable_address());
+          // TODO(lilika): Add support for more granular options of
+          // envoy::config::core::v3::HealthStatus
+          if (host->health() == Host::Health::Healthy) {
+            endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
-            NOT_REACHED_GCOVR_EXCL_LINE;
+            if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
+              endpoint->set_health_status(envoy::config::core::v3::TIMEOUT);
+            } else if (host->getActiveHealthFailureType() ==
+                       Host::ActiveHealthFailureType::UNHEALTHY) {
+              endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+            } else if (host->getActiveHealthFailureType() ==
+                       Host::ActiveHealthFailureType::UNKNOWN) {
+              endpoint->set_health_status(envoy::config::core::v3::UNHEALTHY);
+            } else {
+              NOT_REACHED_GCOVR_EXCL_LINE;
+            }
           }
-        }
 
-        // TODO(drewsortega): remove this once we are on v4 and endpoint_health_response is removed.
-        // copy this endpoint's health info to the legacy flat-list.
-        response.mutable_endpoint_health_response()->add_endpoints_health()->MergeFrom(*endpoint);
+          // TODO(drewsortega): remove this once we are on v4 and endpoint_health_response is
+          // removed. Copy this endpoint's health info to the legacy flat-list.
+          response.mutable_endpoint_health_response()->add_endpoints_health()->MergeFrom(*endpoint);
+        }
       }
     }
   }
@@ -301,18 +283,30 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
-  // iterate over every endpoint in every cluster.
+  // Temporary structure to hold Host pointers grouped by locality, to build
+  // initial_hosts_per_locality_.
+  std::vector<HostVector> hosts_by_locality;
+  // Iterate over every endpoint in every cluster.
   for (const auto& locality_endpoints : cluster_.load_assignment().endpoints()) {
+    // Add a locality grouping to the hosts sorted by locality.
+    hosts_by_locality.emplace_back();
     for (const auto& host : locality_endpoints.lb_endpoints()) {
-      // for every endpoint, add to a flat list without structure by locality, but keeping
-      // locality internally as a member variable of the host/endpoint.
-      initial_hosts_->emplace_back(new HostImpl(
+      // Initialize an endpoint host object.
+      HostSharedPtr endpoint = std::make_unique<HostImpl>(
           info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()), nullptr, 1,
           locality_endpoints.locality(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-          envoy::config::core::v3::UNKNOWN));
+          envoy::config::core::v3::UNKNOWN);
+      // Add this host/endpoint pointer to our flat list of endpoints for health checking.
+      initial_hosts_->emplace_back(endpoint);
+      // Add this host/endpoint pointer to our structured list by locality so results can be
+      // requested by locality.
+      hosts_by_locality.back().emplace_back(endpoint);
     }
   }
+  // Create the HostsPerLocality.
+  initial_hosts_per_locality_ =
+      std::make_shared<Envoy::Upstream::HostsPerLocalityImpl>(std::move(hosts_by_locality), false);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -354,9 +348,9 @@ void HdsCluster::initialize(std::function<void()> callback) {
   for (const auto& host : *initial_hosts_) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
-
+  // Use the ungrouped and grouped hosts lists to retain locality structure in the priority set.
   priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
+      0, HostSetImpl::partitionHosts(initial_hosts_, initial_hosts_per_locality_), {},
       *initial_hosts_, {}, absl::nullopt);
 }
 
