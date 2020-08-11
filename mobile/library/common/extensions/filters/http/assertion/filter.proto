@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoymobile.extensions.filters.http.assertion;
 
-import "envoy/config/tap/v3/common.proto";
+import "envoy/config/common/matcher/v3/matcher.proto";
 
 import "validate/validate.proto";
 
@@ -11,5 +11,6 @@ message Assertion {
   // a local reply with Http::Code::OK on the last frame of the request stream (continuing on
   // intervening frames). Otherwise, it will send a local reply with Http::Code::BadRequest.
   // TODO: update upstream MatchPredicate proto to require at least one matcher.
-  envoy.config.tap.v3.MatchPredicate match_config = 1 [(validate.rules).message = {required: true}];
+  envoy.config.common.matcher.v3.MatchPredicate match_config = 1
+      [(validate.rules).message = {required: true}];
 }
