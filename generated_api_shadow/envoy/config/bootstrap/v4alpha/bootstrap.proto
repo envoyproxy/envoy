@@ -312,7 +312,7 @@ message Watchdog {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v3.Watchdog.WatchdogAction";
 
-    // In priority events are fired from KILL, MULTIKILL, MEGAMISS and MISS.
+    // The events are fired in this order: KILL, MULTIKILL, MEGAMISS, MISS.
     // Within an event type, actions execute in the order they are configured.
     // For KILL/MULTIKILL there is a default PANIC that will kill the process,
     // but it might be useful to specify several debug actions, and possibly
