@@ -1116,7 +1116,8 @@ key:
   absl::optional<uint64_t> key_hash =
       getScopedRdsProvider()->config<ScopedConfigImpl>()->computeKeyHash(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
-  EXPECT_CALL(server_factory_context_, dispatcher()).Times(1);
+  EXPECT_CALL(server_factory_context_, dispatcher());
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_, route_config_updated_cb_);
   EXPECT_EQ(getScopedRdsProvider()
@@ -1177,7 +1178,8 @@ key:
             "foo_routes");
 }
 
-TEST_F(ScopedRdsTest, runOnDemandUpdatedCallback) {
+// Post on demand callbacks multiple times, all should be executed after rds update.
+TEST_F(ScopedRdsTest, multipleOnDemandUpdatedCallback) {
   setup();
   init_watcher_.expectReady();
   // Secondary priority scope should be loaded lazily.
@@ -1211,6 +1213,38 @@ key:
                 ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
                 ->name(),
             "foo_routes");
+}
+
+TEST_F(ScopedRdsTest, danglingSubscriptionOnDemandUpdate) {
+  setup();
+  Event::PostCb temp_post_cb;
+  {
+    const std::string config_yaml = R"EOF(
+name: my_scoped_routes
+scope_key_builder:
+  fragments:
+    - header_value_extractor:
+        name: Address
+        element:
+          key: x-bar-key
+          separator: ;
+)EOF";
+    envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes
+        scoped_routes_config;
+    TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
+    Envoy::Config::ConfigProviderPtr provider = config_provider_manager_->createXdsConfigProvider(
+        scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "bar.",
+        ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
+                                                scoped_routes_config.rds_config_source(),
+                                                scoped_routes_config.scope_key_builder()));
+
+    EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
+        .WillOnce(testing::SaveArg<0>(&temp_post_cb));
+    dynamic_cast<ScopedRdsConfigProvider*>(provider.get())
+        ->onDemandRdsUpdate(666, event_dispatcher_, route_config_updated_cb_);
+    EXPECT_NO_THROW(temp_post_cb());
+  }
+  EXPECT_NO_THROW(temp_post_cb());
 }
 
 } // namespace

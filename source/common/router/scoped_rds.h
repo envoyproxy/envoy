@@ -112,8 +112,10 @@ public:
 
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
-  void onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-                         Http::RouteConfigUpdatedCallback route_config_updated_cb);
+  void
+  onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
+                    Http::RouteConfigUpdatedCallback route_config_updated_cb,
+                    std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase> weak_subscription);
 
 private:
   // A helper class that takes care of the life cycle management of a RDS route provider and the
@@ -223,8 +225,9 @@ public:
   }
   void onDemandRdsUpdate(uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
                          Http::RouteConfigUpdatedCallback route_config_updated_cb) const {
-    subscription().onDemandRdsUpdate(key_hash, thread_local_dispatcher,
-                                     move(route_config_updated_cb));
+    subscription().onDemandRdsUpdate(
+        key_hash, thread_local_dispatcher, move(route_config_updated_cb),
+        std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase>(subscription_));
   }
 };
 

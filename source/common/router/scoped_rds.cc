@@ -457,9 +457,14 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
 
 void ScopedRdsConfigSubscription::onDemandRdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallback route_config_updated_cb) {
+    Http::RouteConfigUpdatedCallback route_config_updated_cb,
+    std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase> weak_subscription) {
   factory_context_.dispatcher().post([this, &thread_local_dispatcher, key_hash,
-                                      route_config_updated_cb]() {
+                                      route_config_updated_cb, weak_subscription]() {
+    // If the subscription has been destroyed, return immediately.
+    if (!weak_subscription.lock()) {
+      return;
+    }
     auto iter = scope_name_by_hash_.find(key_hash);
     // Return to filter chain if we can't find the scope.
     if (iter == scope_name_by_hash_.end()) {
