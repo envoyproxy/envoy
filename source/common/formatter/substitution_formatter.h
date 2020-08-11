@@ -17,14 +17,6 @@
 namespace Envoy {
 namespace Formatter {
 
-// We actually need a map to formatters, we can pass the ProtobufStruct, no need to reformat it.
-struct JsonMap;
-using JsonMapPtr = std::unique_ptr<JsonMap>;
-using JsonMapValue = absl::variant<std::string, JsonMapPtr>;
-struct JsonMap {
-  absl::flat_hash_map<std::string, JsonMapValue> values_;
-};
-
 /**
  * Access log format parser.
  */
@@ -108,10 +100,17 @@ private:
   std::vector<FormatterProviderPtr> providers_;
 };
 
+struct JsonFormatMap;
+using JsonFormatMapValue =
+    absl::variant<const std::vector<FormatterProviderPtr>, const JsonFormatMap>;
+struct JsonFormatMap {
+  std::unique_ptr<std::map<std::string, JsonFormatMapValue>> value_;
+};
+
 class JsonFormatterImpl : public Formatter {
 public:
-  JsonFormatterImpl(const absl::flat_hash_map<std::string, std::string>& format_mapping,
-                    bool preserve_types);
+  JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types)
+      : preserve_types_(preserve_types), json_output_format_(toFormatMap(format_mapping)) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,
@@ -122,13 +121,14 @@ public:
 
 private:
   const bool preserve_types_;
-  std::map<const std::string, const std::vector<FormatterProviderPtr>> json_output_format_;
+  const JsonFormatMap json_output_format_;
 
   ProtobufWkt::Struct toStruct(const Http::RequestHeaderMap& request_headers,
                                const Http::ResponseHeaderMap& response_headers,
                                const Http::ResponseTrailerMap& response_trailers,
                                const StreamInfo::StreamInfo& stream_info,
                                absl::string_view local_reply_body) const;
+  JsonFormatMap toFormatMap(const ProtobufWkt::Struct& json_format) const;
 };
 
 /**
