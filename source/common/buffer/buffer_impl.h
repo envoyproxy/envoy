@@ -40,7 +40,7 @@ public:
   // SliceData
   absl::Span<uint8_t> getMutableData() override {
     RELEASE_ASSERT(isMutable(), "Not allowed to call getMutableData if slice is immutable");
-    return {base_ + data_, reservable_ - data_};
+    return {base_ + data_, static_cast<absl::Span<uint8_t>::size_type>(reservable_ - data_)};
   }
 
   /**
