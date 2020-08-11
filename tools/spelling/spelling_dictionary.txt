@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 ABI
 ACK
+ACL
 AES
 AFAICT
 ALPN
@@ -17,6 +18,7 @@ ASCII
 ASSERTs
 AST
 AWS
+Allowlisted
 BACKTRACE
 BSON
 BPF
@@ -24,6 +26,7 @@ CAS
 CB
 CDS
 CEL
+ceil
 CHACHA
 CHLO
 CHMOD
@@ -77,14 +80,17 @@ ECMP
 ECONNREFUSED
 EDESTRUCTION
 EDF
+EINPROGRESS
 EINVAL
 ELB
+EMSGSIZE
 ENOTFOUND
 ENOTSUP
 ENV
 EOF
 EOS
 EOY
+EPOLLOUT
 EPOLLRDHUP
 EQ
 ERANGE
@@ -118,6 +124,8 @@ GETting
 GLB
 GOAWAY
 GRPC
+GRO
+GSO
 GSS
 GTEST
 GURL
@@ -139,6 +147,7 @@ IDL
 IETF
 INADDR
 INET
+INVAL
 IO
 IOS
 IP
@@ -147,6 +156,7 @@ IPV
 IPs
 IPv
 ITOA
+Injectable
 Isode
 Iters
 JSON
@@ -170,14 +180,17 @@ LHS
 LLVM
 LPT
 LRS
+Loggable
 MB
 MD
 MERCHANTABILITY
 MGET
+MQ
 MSET
 MSVC
 MTLS
 MTU
+MULTIFRAME
 NACK
 NACKed
 NACKs
@@ -226,6 +239,7 @@ PROT
 Postgre
 Postgres
 Prereq
+QDCOUNT
 QUIC
 QoS
 RAII
@@ -272,6 +286,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SMTP
 SNI
 SOTW
 SPD
@@ -289,6 +304,7 @@ STL
 STRLEN
 STS
 SVG
+Symbolizer
 TBD
 TCLAP
 TCP
@@ -330,9 +346,11 @@ WASM
 WAVM
 WIP
 WKT
+WRONGPASS
 WRR
 WS
 WSA
+WSS
 Welford's
 Wi
 XDS
@@ -359,6 +377,7 @@ alloc
 alloca
 allocator
 allowlist
+allowlisted
 alls
 alphanumerics
 amongst
@@ -414,12 +433,15 @@ bools
 borks
 broadcasted
 buf
+buflen
 bugprone
 builtin
 builtins
 bulkstrings
 bursty
 bytecode
+bytestream
+cacheable
 cacheability
 callee
 callsite
@@ -474,6 +496,7 @@ coroutines
 cors
 cout
 coverity
+cplusplus
 cpuset
 creds
 crypto
@@ -499,6 +522,7 @@ dechunked
 decl
 decls
 decompressor
+decompressors
 decrement
 decrypt
 dedup
@@ -556,6 +580,7 @@ epoll
 errno
 etag
 etags
+evaluator
 evbuffer
 evbuffers
 evconnlistener
@@ -611,6 +636,7 @@ gmock
 goog
 google
 goto
+gso
 gzip
 hackery
 hacky
@@ -633,6 +659,7 @@ hoc
 hostname
 hostnames
 hostset
+hotrestart
 hrefs
 huffman
 hystrix
@@ -650,6 +677,7 @@ inflight
 -ing
 init
 initializer
+initializers
 inlined
 inlining
 inobservability
@@ -757,6 +785,8 @@ mutexes
 mux
 muxed
 mysql
+namelen
+nameserver
 namespace
 namespaces
 namespacing
@@ -791,6 +821,7 @@ openssl
 opentracing
 optimizations
 optname
+optval
 ostream
 outlier
 outliers
@@ -833,6 +864,7 @@ postfix
 postfixes
 postgres
 postgresql
+pragma
 pre
 preallocate
 preallocating
@@ -844,11 +876,14 @@ precompute
 precomputed
 predeclared
 prefetch
+prefetched
+prefetches
 preflight
 preorder
 prepend
 prepended
 prev
+probabilistically
 proc
 profiler
 programmatically
@@ -913,6 +948,7 @@ reimplements
 rele
 releasor
 reloadable
+remoting
 reparse
 repeatability
 reperform
@@ -933,7 +969,10 @@ restarter
 resync
 retriable
 retriggers
+revalidation
 rmdir
+rocketmq
+rewriter
 rollout
 roundtrip
 rpcs
@@ -952,8 +991,10 @@ sanitizer
 satisfiable
 scalability
 sched
+schedulable
 schemas
 scopekey
+secp
 sendmsg
 sendmmsg
 sendto
@@ -974,6 +1015,7 @@ snapshotted
 sockaddr
 socketpair
 sockfd
+socklen
 sockopt
 sockopts
 somestring
@@ -1081,7 +1123,9 @@ tuples
 typedef
 typeid
 typesafe
+uber
 ucontext
+udpa
 uint
 un-
 unacked
@@ -1133,8 +1177,7 @@ vptr
 wakeup
 wakeups
 websocket
-whitelist
-whitelisted
+wepoll
 whitespace
 whitespaces
 wildcard

@@ -1,14 +1,30 @@
 ---
 tasks:
   gcc:
+    name: "GCC"
     platform: ubuntu1804
     build_targets:
       - "//source/exe:envoy-static"
   rbe:
+    name: "RBE"
     platform: ubuntu1804
     test_targets:
-      - "//test/..."
+      - "//test/common/common/..."
+      - "//test/integration/..."
+      - "//test/exe/..."
     test_flags:
-      - "--config=remote-clang"
+      - "--config=remote-clang-libc++"
       - "--config=remote-ci"
       - "--jobs=75"
+  coverage:
+    name: "Coverage"
+    platform: ubuntu1804
+    shell_commands:
+      - "bazel/setup_clang.sh /usr/lib/llvm-10"
+    test_targets:
+      - "//test/common/common/..."
+      - "//test/integration/..."
+      - "//test/exe/..."
+    test_flags:
+      - "--config=coverage"
+      - "--config=clang"

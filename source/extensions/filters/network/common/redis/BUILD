@@ -1,12 +1,12 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
-envoy_package()
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
 
 envoy_cc_library(
     name = "codec_interface",
@@ -97,5 +97,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:timespan_lib",
+        "//source/common/stats:utility_lib",
     ],
 )

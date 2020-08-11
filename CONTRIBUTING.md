@@ -21,6 +21,23 @@ maximize the chances of your PR being merged.
 
 * See [STYLE.md](STYLE.md)
 
+# Inclusive language policy
+
+The Envoy community has an explicit goal to be inclusive to all. As such, all PRs must adhere to the
+following guidelines for all code, APIs, and documentation:
+
+* The following words and phrases are not allowed:
+  * *Whitelist*: use allowlist instead.
+  * *Blacklist*: use denylist or blocklist instead.
+  * *Master*: use primary instead.
+  * *Slave*: use secondary or replica instead.
+* Documentation should be written in an inclusive style. The [Google developer
+  documentation](https://developers.google.com/style/inclusive-documentation) contains an excellent
+  reference on this topic.
+* The above policy is not considered definitive and may be amended in the future as industry best
+  practices evolve. Additional comments on this topic may be provided by maintainers during code
+  review.
+
 # Breaking change policy
 
 Both API and implementation stability are important to Envoy. Since the API is consumed by clients
@@ -89,7 +106,10 @@ versioning guidelines:
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
   well as [release notes](docs/root/version_history/current.rst). API changes should be documented
-  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md).
+  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
+  to multiple sections of the release notes, it should be noted in the first (most important) section
+  that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
+  `Incompatible Behavior Changes` but not in `Bug Fixes`.
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
@@ -97,8 +117,15 @@ versioning guidelines:
   colon. Examples:
   * "docs: fix grammar error"
   * "http conn man: add new feature"
+* Your PR commit message will be used as the commit message when your PR is merged. You should
+  update this field if your PR diverges during review.
 * Your PR description should have details on what the PR does. If it fixes an existing issue it
   should end with "Fixes #XXX".
+* If your PR is co-authored or based on an earlier PR from another contributor,
+  please attribute them with `Co-authored-by: name <name@example.com>`. See
+  GitHub's [multiple author
+  guidance](https://help.github.com/en/github/committing-changes-to-your-project/creating-a-commit-with-multiple-authors)
+  for further details.
 * When all of the tests are passing and all other conditions described herein are satisfied, a
   maintainer will be assigned to review and merge the PR.
 * Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
@@ -123,10 +150,14 @@ versioning guidelines:
 
 # Runtime guarding
 
-Some high risk changes in Envoy are deemed worthy of runtime guarding. Instead of just replacing
+Some changes in Envoy are deemed worthy of runtime guarding. Instead of just replacing
 old code with new code, both code paths are supported for between one Envoy release (if it is
 guarded due to performance concerns) and a full deprecation cycle (if it is a high risk behavioral
-change).
+change). Generally as a community we try to guard both high risk changes (major
+refactors such as replacing Envoy's buffer implementation) and most user-visible
+non-config-guarded changes to protocol processing (for example additions or changes to HTTP headers or
+how HTTP is serialized out) for non-alpha features. Feel free to tag @envoyproxy/maintainers
+if you aren't sure if a given change merits runtime guarding.
 
 The canonical way to runtime guard a feature is
 ```
@@ -154,9 +185,10 @@ time.
 Runtime guarded features may either set true (running the new code by default) in the initial PR,
 after a testing interval, or during the next release cycle, at the PR author's and reviewing
 maintainer's discretion. Generally all runtime guarded features will be set true when a
-release is cut, and the old code path will be deprecated at that time. Runtime features
-are set true by default by inclusion in
-[source/common/runtime/runtime_features.h](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h)
+release is cut. Old code paths for refactors can be cleaned up after a release and there has been
+some production run time. Old code for behavioral changes will be deprecated after six months.
+Runtime features are set true by default by inclusion in
+[source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.cc)
 
 There are four suggested options for testing new runtime features:
 
@@ -166,7 +198,7 @@ There are four suggested options for testing new runtime features:
    GetParam() as outlined in (1).
 3. Set up integration tests with custom runtime defaults as documented in the
    [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
-4. Run a given unit test with the new runtime value explicitly set true as done
+4. Run a given unit test with the new runtime value explicitly set true or false as done
    for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD)
 
 Runtime code is held to the same standard as regular Envoy code, so both the old
@@ -190,13 +222,35 @@ and false.
   organization specific shortcuts into the code.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
+* Please make sure that the PR title, commit message, and description are updated if the PR changes
+  significantly during review.
 * Please **clean up the title and body** before merging. By default, GitHub fills the squash merge
   title with the original title, and the commit body with every individual commit from the PR.
   The maintainer doing the merge should make sure the title follows the guidelines above and should
-  overwrite the body with the original extended description from the PR (cleaning it up if necessary)
+  overwrite the body with the original commit message from the PR (cleaning it up if necessary)
   while preserving the PR author's final DCO sign-off.
 * If a PR includes a deprecation/breaking change, notification should be sent to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
+
+# Adding new extensions
+
+For developers adding a new extension, one can take an existing extension as the starting point.
+
+Extension configuration should be located in a directory structure like
+`api/envoy/extensions/area/plugin/`, for example `api/envoy/extensions/access_loggers/file/`
+
+The code for the extension should be located under the equivalent
+`source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
+configuration and tagged with the appropriate security posture, and an
+*envoy_cc_library* with the code. More details on how to add a new extension
+API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
+
+Other changes will likely include
+
+  * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
+  * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
+  * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
+  * Adding `source/extensions/area/well_known_names.h` for registered plugins
 
 # DCO: Sign your work
 

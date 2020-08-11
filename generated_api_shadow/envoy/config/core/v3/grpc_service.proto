@@ -8,6 +8,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
@@ -35,9 +36,15 @@ message GrpcService {
     // in the :ref:`Cluster <envoy_api_msg_config.cluster.v3.Cluster>` :ref:`transport_socket
     // <envoy_api_field_config.cluster.v3.Cluster.transport_socket>`.
     string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // The `:authority` header in the grpc request. If this field is not set, the authority header value will be `cluster_name`.
+    // Note that this authority does not override the SNI. The SNI is provided by the transport socket of the cluster.
+    string authority = 2
+        [(validate.rules).string =
+             {min_bytes: 0 max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 9]
   message GoogleGrpc {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.GrpcService.GoogleGrpc";
@@ -200,6 +207,24 @@ message GrpcService {
       }
     }
 
+    // Channel arguments.
+    message ChannelArgs {
+      message Value {
+        // Pointer values are not supported, since they don't make any sense when
+        // delivered via the API.
+        oneof value_specifier {
+          option (validate.required) = true;
+
+          string string_value = 1;
+
+          int64 int_value = 2;
+        }
+      }
+
+      // See grpc_types.h GRPC_ARG #defines for keys that work here.
+      map<string, Value> args = 1;
+    }
+
     // The target URI when using the `Google C++ gRPC client
     // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in
     // :ref:`channel_credentials <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials>`.
@@ -230,30 +255,37 @@ message GrpcService {
     // Additional configuration for site-specific customizations of the Google
     // gRPC library.
     google.protobuf.Struct config = 6;
+
+    // How many bytes each stream can buffer internally.
+    // If not set an implementation defined default is applied (1MiB).
+    google.protobuf.UInt32Value per_stream_buffer_limit_bytes = 7;
+
+    // Custom channels args.
+    ChannelArgs channel_args = 8;
   }
 
   reserved 4;
 
-  // Envoy's in-built gRPC client.
-  // See the :ref:`gRPC services overview <arch_overview_grpc_services>`
-  // documentation for discussion on gRPC client selection.
-  google.protobuf.Duration timeout = 3;
-
-  // `Google C++ gRPC client <https://github.com/grpc/grpc>`_
-  // See the :ref:`gRPC services overview <arch_overview_grpc_services>`
-  // documentation for discussion on gRPC client selection.
-  repeated HeaderValue initial_metadata = 5;
-
   oneof target_specifier {
     option (validate.required) = true;
 
-    // The timeout for the gRPC request. This is the timeout for a specific
-    // request.
+    // Envoy's in-built gRPC client.
+    // See the :ref:`gRPC services overview <arch_overview_grpc_services>`
+    // documentation for discussion on gRPC client selection.
     EnvoyGrpc envoy_grpc = 1;
 
-    // Additional metadata to include in streams initiated to the GrpcService.
-    // This can be used for scenarios in which additional ad hoc authorization
-    // headers (e.g. ``x-foo-bar: baz-key``) are to be injected.
+    // `Google C++ gRPC client <https://github.com/grpc/grpc>`_
+    // See the :ref:`gRPC services overview <arch_overview_grpc_services>`
+    // documentation for discussion on gRPC client selection.
     GoogleGrpc google_grpc = 2;
   }
+
+  // The timeout for the gRPC request. This is the timeout for a specific
+  // request.
+  google.protobuf.Duration timeout = 3;
+
+  // Additional metadata to include in streams initiated to the GrpcService.
+  // This can be used for scenarios in which additional ad hoc authorization
+  // headers (e.g. ``x-foo-bar: baz-key``) are to be injected.
+  repeated HeaderValue initial_metadata = 5;
 }

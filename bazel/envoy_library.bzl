@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy library targets
 load(
@@ -6,7 +8,6 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
 )
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -20,10 +21,10 @@ def tcmalloc_external_deps(repository):
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
-# all envoy targets pass through an envoy-declared skylark function where they can be modified
+# all envoy targets pass through an envoy-declared starlark function where they can be modified
 # before being passed to a native bazel function.
 def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
-    native.cc_library(
+    cc_library(
         name = name,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps],
         **kargs
@@ -69,12 +70,15 @@ def envoy_cc_extension(
         undocumented = False,
         status = "stable",
         tags = [],
+        # TODO(rgs1): revert this to //:extension_config once
+        # https://github.com/envoyproxy/envoy/issues/12444 is fixed.
+        visibility = ["//visibility:public"],
         **kwargs):
     if security_posture not in EXTENSION_SECURITY_POSTURES:
         fail("Unknown extension security posture: " + security_posture)
     if status not in EXTENSION_STATUS_VALUES:
         fail("Unknown extension status: " + status)
-    envoy_cc_library(name, tags = tags, **kwargs)
+    envoy_cc_library(name, tags = tags, visibility = visibility, **kwargs)
 
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(
@@ -86,7 +90,6 @@ def envoy_cc_library(
         external_deps = [],
         tcmalloc_dep = None,
         repository = "",
-        linkstamp = None,
         tags = [],
         deps = [],
         strip_include_prefix = None,
@@ -94,15 +97,7 @@ def envoy_cc_library(
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
 
-    # Intended for compilation database generation. This generates an empty cc
-    # source file so Bazel generates virtual includes and recognize them as C++.
-    # Workaround for https://github.com/bazelbuild/bazel/issues/10845.
-    srcs += select({
-        "@envoy//bazel:compdb_build": ["@envoy//bazel/external:empty.cc"],
-        "//conditions:default": [],
-    })
-
-    native.cc_library(
+    cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
@@ -122,16 +117,12 @@ def envoy_cc_library(
         include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
-        linkstamp = select({
-            repository + "//bazel:windows_x86_64": None,
-            "//conditions:default": linkstamp,
-        }),
         strip_include_prefix = strip_include_prefix,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate
     # include paths via `external/envoy...`
-    native.cc_library(
+    cc_library(
         name = name + "_with_external_headers",
         hdrs = hdrs,
         copts = envoy_copts(repository) + copts,

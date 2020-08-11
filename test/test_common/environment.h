@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/network/address.h"
@@ -10,6 +9,7 @@
 
 #include "common/json/json_loader.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -18,9 +18,16 @@
 namespace Envoy {
 class TestEnvironment {
 public:
-  using PortMap = std::unordered_map<std::string, uint32_t>;
+  using PortMap = absl::node_hash_map<std::string, uint32_t>;
 
-  using ParamMap = std::unordered_map<std::string, std::string>;
+  using ParamMap = absl::node_hash_map<std::string, std::string>;
+
+  /**
+   * Perform common initialization steps needed to run a test binary. This
+   * method should be called first in all test main functions.
+   * @param program_name argv[0] test program is invoked with
+   */
+  static void initializeTestMain(char* program_name);
 
   /**
    * Initialize command-line options for later access by tests in getOptions().
@@ -79,6 +86,23 @@ public:
   static std::string temporaryPath(absl::string_view path) {
     return absl::StrCat(temporaryDirectory(), "/", path);
   }
+
+  /**
+   * Obtain platform specific null device path
+   * @return const std::string& null device path
+   */
+  static const std::string& nullDevicePath();
+
+  /**
+   * Obtain platform specific new line character(s)
+   * @return absl::string_view platform specific new line character(s)
+   */
+  static constexpr absl::string_view newLine
+#ifdef WIN32
+      {"\r\n"};
+#else
+      {"\n"};
+#endif
 
   /**
    * Obtain read-only test input data directory.

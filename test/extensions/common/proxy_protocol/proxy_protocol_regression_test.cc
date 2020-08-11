@@ -1,6 +1,7 @@
 #include "envoy/network/address.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/basic_resource_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -12,7 +13,6 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -47,8 +47,7 @@ public:
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_)), name_("proxy"),
         filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
-    EXPECT_CALL(socket_factory_, socketType())
-        .WillOnce(Return(Network::Address::SocketType::Stream));
+    EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
     EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this);
@@ -71,6 +70,8 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
+  ResourceLimit& openConnections() override { return open_connections_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -98,7 +99,9 @@ public:
           filter_manager.addAcceptFilter(
               nullptr,
               std::make_unique<ListenerFilters::ProxyProtocol::Filter>(
-                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(listenerScope())));
+                  std::make_shared<ListenerFilters::ProxyProtocol::Config>(
+                      listenerScope(),
+                      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;
         }));
@@ -162,6 +165,7 @@ public:
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
+  BasicResourceLimitImpl open_connections_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;

@@ -170,7 +170,7 @@ ParseState Filter::onRead() {
                                                          config_->maxClientHelloSize(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
-  if (result.rc_ == -1 && result.errno_ == EAGAIN) {
+  if (SOCKET_FAILURE(result.rc_) && result.errno_ == SOCKET_ERROR_AGAIN) {
     return ParseState::Continue;
   } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();

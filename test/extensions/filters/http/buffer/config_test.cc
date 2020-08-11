@@ -4,7 +4,8 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/buffer/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -47,9 +48,9 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
 
 TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
   BufferFilterFactory factory;
+  auto empty_proto = factory.createEmptyConfigProto();
   envoy::extensions::filters::http::buffer::v3::Buffer config =
-      *dynamic_cast<envoy::extensions::filters::http::buffer::v3::Buffer*>(
-          factory.createEmptyConfigProto().get());
+      *dynamic_cast<envoy::extensions::filters::http::buffer::v3::Buffer*>(empty_proto.get());
 
   config.mutable_max_request_bytes()->set_value(1028);
 
@@ -62,9 +63,9 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
 
 TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
   BufferFilterFactory factory;
+  auto empty_proto = factory.createEmptyConfigProto();
   envoy::extensions::filters::http::buffer::v3::Buffer config =
-      *dynamic_cast<envoy::extensions::filters::http::buffer::v3::Buffer*>(
-          factory.createEmptyConfigProto().get());
+      *dynamic_cast<envoy::extensions::filters::http::buffer::v3::Buffer*>(empty_proto.get());
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, "stats", context),
@@ -74,10 +75,8 @@ TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
 TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
   BufferFilterFactory factory;
   EXPECT_NO_THROW({
-    envoy::extensions::filters::http::buffer::v3::BufferPerRoute* config =
-        dynamic_cast<envoy::extensions::filters::http::buffer::v3::BufferPerRoute*>(
-            factory.createEmptyRouteConfigProto().get());
-    EXPECT_NE(nullptr, config);
+    EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::buffer::v3::BufferPerRoute*>(
+                           factory.createEmptyRouteConfigProto().get()));
   });
 }
 

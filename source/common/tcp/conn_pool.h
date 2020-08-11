@@ -13,153 +13,198 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/http/conn_pool_base.h"
 #include "common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Tcp {
 
-class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::Instance {
+class ConnPoolImpl;
+
+struct TcpAttachContext : public Envoy::ConnectionPool::AttachContext {
+  TcpAttachContext(Tcp::ConnectionPool::Callbacks* callbacks) : callbacks_(callbacks) {}
+  Tcp::ConnectionPool::Callbacks* callbacks_;
+};
+
+class TcpPendingRequest : public Envoy::ConnectionPool::PendingRequest {
 public:
-  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
-               Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options);
+  TcpPendingRequest(Envoy::ConnectionPool::ConnPoolImplBase& parent, TcpAttachContext& context)
+      : Envoy::ConnectionPool::PendingRequest(parent), context_(context) {}
+  Envoy::ConnectionPool::AttachContext& context() override { return context_; }
 
-  ~ConnPoolImpl() override;
+  TcpAttachContext context_;
+};
 
-  // ConnectionPool::Instance
-  void addDrainedCallback(DrainedCb cb) override;
-  void drainConnections() override;
-  ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
-  Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
-
-protected:
-  struct ActiveConn;
-
-  struct ConnectionWrapper {
-    ConnectionWrapper(ActiveConn& parent);
-
-    Network::ClientConnection& connection();
-    void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks);
-    void setConnectionState(ConnectionPool::ConnectionStatePtr&& state) {
-      parent_.setConnectionState(std::move(state));
-    };
-    ConnectionPool::ConnectionState* connectionState() { return parent_.connectionState(); }
-
-    void release(bool closed);
-
-    void invalidate() { conn_valid_ = false; }
-
-    ActiveConn& parent_;
-    ConnectionPool::UpstreamCallbacks* callbacks_{};
-    bool released_{false};
-    bool conn_valid_{true};
-  };
-
-  using ConnectionWrapperSharedPtr = std::shared_ptr<ConnectionWrapper>;
-
-  struct ConnectionDataImpl : public ConnectionPool::ConnectionData {
-    ConnectionDataImpl(ConnectionWrapperSharedPtr wrapper) : wrapper_(std::move(wrapper)) {}
-    ~ConnectionDataImpl() override { wrapper_->release(false); }
-
-    // ConnectionPool::ConnectionData
-    Network::ClientConnection& connection() override { return wrapper_->connection(); }
-    void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks) override {
-      wrapper_->addUpstreamCallbacks(callbacks);
-    };
-    void setConnectionState(ConnectionPool::ConnectionStatePtr&& state) override {
-      wrapper_->setConnectionState(std::move(state));
-    }
-    ConnectionPool::ConnectionState* connectionState() override {
-      return wrapper_->connectionState();
-    }
-
-    ConnectionWrapperSharedPtr wrapper_;
-  };
-
+class ActiveTcpClient : public Envoy::ConnectionPool::ActiveClient {
+public:
   struct ConnReadFilter : public Network::ReadFilterBaseImpl {
-    ConnReadFilter(ActiveConn& parent) : parent_(parent) {}
+    ConnReadFilter(ActiveTcpClient& parent) : parent_(parent) {}
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
       parent_.onUpstreamData(data, end_stream);
       return Network::FilterStatus::StopIteration;
     }
-
-    ActiveConn& parent_;
+    ActiveTcpClient& parent_;
   };
 
-  struct ActiveConn : LinkedObject<ActiveConn>,
-                      public Network::ConnectionCallbacks,
-                      public Event::DeferredDeletable {
-    ActiveConn(ConnPoolImpl& parent);
-    ~ActiveConn() override;
-
-    void onConnectTimeout();
-    void onUpstreamData(Buffer::Instance& data, bool end_stream);
-
-    // Network::ConnectionCallbacks
-    void onEvent(Network::ConnectionEvent event) override;
-    void onAboveWriteBufferHighWatermark() override;
-    void onBelowWriteBufferLowWatermark() override;
-
-    void setConnectionState(ConnectionPool::ConnectionStatePtr&& state) {
-      conn_state_ = std::move(state);
+  // This acts as the bridge between the ActiveTcpClient and an individual TCP connection.
+  class TcpConnectionData : public Envoy::Tcp::ConnectionPool::ConnectionData {
+  public:
+    TcpConnectionData(ActiveTcpClient& parent, Network::ClientConnection& connection)
+        : parent_(&parent), connection_(connection) {
+      parent_->tcp_connection_data_ = this;
     }
-    ConnectionPool::ConnectionState* connectionState() { return conn_state_.get(); }
-
-    ConnPoolImpl& parent_;
-    Upstream::HostDescriptionConstSharedPtr real_host_description_;
-    ConnectionWrapperSharedPtr wrapper_;
-    Network::ClientConnectionPtr conn_;
-    ConnectionPool::ConnectionStatePtr conn_state_;
-    Event::TimerPtr connect_timer_;
-    Stats::TimespanPtr conn_length_;
-    uint64_t remaining_requests_;
-    bool timed_out_;
-  };
-
-  using ActiveConnPtr = std::unique_ptr<ActiveConn>;
-
-  struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
-    PendingRequest(ConnPoolImpl& parent, ConnectionPool::Callbacks& callbacks);
-    ~PendingRequest() override;
-
-    // ConnectionPool::Cancellable
-    void cancel(ConnectionPool::CancelPolicy cancel_policy) override {
-      parent_.onPendingRequestCancel(*this, cancel_policy);
+    ~TcpConnectionData() override {
+      // Generally it is the case that TcpConnectionData will be destroyed before the
+      // ActiveTcpClient. Because ordering on the deferred delete list is not guaranteed in the
+      // case of a disconnect, make sure parent_ is valid before doing clean-up.
+      if (parent_) {
+        parent_->clearCallbacks();
+      }
     }
 
-    ConnPoolImpl& parent_;
-    ConnectionPool::Callbacks& callbacks_;
+    Network::ClientConnection& connection() override { return connection_; }
+    void setConnectionState(ConnectionPool::ConnectionStatePtr&& state) override {
+      parent_->connection_state_ = std::move(state);
+    }
+
+    void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks) override {
+      parent_->callbacks_ = &callbacks;
+    }
+    void release() { parent_ = nullptr; }
+
+  protected:
+    ConnectionPool::ConnectionState* connectionState() override {
+      return parent_->connection_state_.get();
+    }
+
+  private:
+    ActiveTcpClient* parent_;
+    Network::ClientConnection& connection_;
   };
 
-  using PendingRequestPtr = std::unique_ptr<PendingRequest>;
+  ActiveTcpClient(ConnPoolImpl& parent, const Upstream::HostConstSharedPtr& host,
+                  uint64_t concurrent_stream_limit);
+  ~ActiveTcpClient() override;
 
-  void assignConnection(ActiveConn& conn, ConnectionPool::Callbacks& callbacks);
-  void createNewConnection();
-  void onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent event);
-  void onPendingRequestCancel(PendingRequest& request, ConnectionPool::CancelPolicy cancel_policy);
-  virtual void onConnReleased(ActiveConn& conn);
-  virtual void onConnDestroyed(ActiveConn& conn);
-  void onUpstreamReady();
-  void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
-  void checkForDrained();
+  // Override the default's of Envoy::ConnectionPool::ActiveClient for class-specific functions.
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
+  void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
 
-  Event::Dispatcher& dispatcher_;
-  Upstream::HostConstSharedPtr host_;
-  Upstream::ResourcePriority priority_;
-  const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  void close() override { connection_->close(Network::ConnectionCloseType::NoFlush); }
+  size_t numActiveRequests() const override { return callbacks_ ? 1 : 0; }
+  bool closingWithIncompleteRequest() const override { return false; }
+  uint64_t id() const override { return connection_->id(); }
 
-  std::list<ActiveConnPtr> pending_conns_; // conns awaiting connected event
-  std::list<ActiveConnPtr> ready_conns_;   // conns ready for assignment
-  std::list<ActiveConnPtr> busy_conns_;    // conns assigned
-  std::list<PendingRequestPtr> pending_requests_;
-  std::list<DrainedCb> drained_callbacks_;
-  Stats::TimespanPtr conn_connect_ms_;
-  Event::TimerPtr upstream_ready_timer_;
-  bool upstream_ready_enabled_{false};
+  void onUpstreamData(Buffer::Instance& data, bool end_stream) {
+    if (callbacks_) {
+      callbacks_->onUpstreamData(data, end_stream);
+    } else {
+      close();
+    }
+  }
+  void clearCallbacks();
+
+  ConnPoolImpl& parent_;
+  ConnectionPool::UpstreamCallbacks* callbacks_{};
+  Network::ClientConnectionPtr connection_;
+  ConnectionPool::ConnectionStatePtr connection_state_;
+  TcpConnectionData* tcp_connection_data_{};
+};
+
+class ConnPoolImpl : public Envoy::ConnectionPool::ConnPoolImplBase,
+                     public Tcp::ConnectionPool::Instance {
+public:
+  ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+               Upstream::ResourcePriority priority,
+               const Network::ConnectionSocket::OptionsSharedPtr& options,
+               Network::TransportSocketOptionsSharedPtr transport_socket_options)
+      : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
+                                                transport_socket_options),
+        upstream_ready_cb_(dispatcher.createSchedulableCallback([this]() {
+          upstream_ready_enabled_ = false;
+          onUpstreamReady();
+        })) {}
+  ~ConnPoolImpl() override { destructAllConnections(); }
+
+  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
+  void drainConnections() override {
+    drainConnectionsImpl();
+    // Legacy behavior for the TCP connection pool marks all connecting clients
+    // as draining.
+    for (auto& connecting_client : connecting_clients_) {
+      if (connecting_client->remaining_streams_ > 1) {
+        uint64_t old_limit = connecting_client->effectiveConcurrentRequestLimit();
+        connecting_client->remaining_streams_ = 1;
+        if (connecting_client->effectiveConcurrentRequestLimit() < old_limit) {
+          connecting_stream_capacity_ -=
+              (old_limit - connecting_client->effectiveConcurrentRequestLimit());
+        }
+      }
+    }
+  }
+
+  void closeConnections() override {
+    for (auto* list : {&ready_clients_, &busy_clients_, &connecting_clients_}) {
+      while (!list->empty()) {
+        list->front()->close();
+      }
+    }
+  }
+  ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
+    TcpAttachContext context(&callbacks);
+    return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
+  }
+
+  ConnectionPool::Cancellable*
+  newPendingRequest(Envoy::ConnectionPool::AttachContext& context) override {
+    Envoy::ConnectionPool::PendingRequestPtr pending_stream =
+        std::make_unique<TcpPendingRequest>(*this, typedContext<TcpAttachContext>(context));
+    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
+    return pending_streams_.front().get();
+  }
+
+  Upstream::HostDescriptionConstSharedPtr host() const override {
+    return Envoy::ConnectionPool::ConnPoolImplBase::host();
+  }
+
+  Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
+    return std::make_unique<ActiveTcpClient>(*this, Envoy::ConnectionPool::ConnPoolImplBase::host(),
+                                             1);
+  }
+
+  void onPoolReady(Envoy::ConnectionPool::ActiveClient& client,
+                   Envoy::ConnectionPool::AttachContext& context) override {
+    ActiveTcpClient* tcp_client = static_cast<ActiveTcpClient*>(&client);
+    auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
+    std::unique_ptr<Envoy::Tcp::ConnectionPool::ConnectionData> connection_data =
+        std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);
+    callbacks->onPoolReady(std::move(connection_data), tcp_client->real_host_description_);
+  }
+
+  void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
+                     absl::string_view, ConnectionPool::PoolFailureReason reason,
+                     Envoy::ConnectionPool::AttachContext& context) override {
+    auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
+    callbacks->onPoolFailure(reason, host_description);
+  }
+
+  // These two functions exist for testing parity between old and new Tcp Connection Pools.
+  virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) {
+    if (client.state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY) {
+      if (!pending_streams_.empty() && !upstream_ready_enabled_) {
+        upstream_ready_cb_->scheduleCallbackCurrentIteration();
+      }
+    }
+  }
+  virtual void onConnDestroyed() {}
+
+protected:
+  Event::SchedulableCallbackPtr upstream_ready_cb_;
+  bool upstream_ready_enabled_{};
 };
 
 } // namespace Tcp

@@ -8,7 +8,7 @@ from tools.api_proto_plugin import visitor
 from tools.protoxform import options
 from tools.protoxform import utils
 
-from envoy.annotations import resource_pb2
+from envoy_api_canonical.envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 from udpa.annotations import status_pb2
 from google.api import annotations_pb2
@@ -57,8 +57,8 @@ class UpgradeVisitor(visitor.Visitor):
         # We need to deal with envoy.api.* normalization in the v2 API. We won't
         # need this in v3+, so rather than churn docs, we just have this workaround.
         type_desc = self._typedb.types[api_v2_type_name]
-      repl_type = type_desc.next_version_type_name[len(
-          'envoy.'):] if type_desc.next_version_type_name else normalized_type_name
+      repl_type = type_desc.next_version_type_name[
+          len('envoy.'):] if type_desc.next_version_type_name else normalized_type_name
       # TODO(htuch): this should really either go through the type database or
       # via the descriptor pool and annotations, but there are only two of these
       # we need for the initial v2 -> v3 docs cut, so hard coding for now.
@@ -191,6 +191,8 @@ class UpgradeVisitor(visitor.Visitor):
 
   def VisitEnum(self, enum_proto, type_context):
     upgraded_proto = copy.deepcopy(enum_proto)
+    if upgraded_proto.options.deprecated and not self._envoy_internal_shadow:
+      options.AddHideOption(upgraded_proto.options)
     for v in upgraded_proto.value:
       if v.options.deprecated:
         # We need special handling for the zero field, as proto3 needs some value
@@ -249,6 +251,8 @@ def VersionUpgradeXform(n, envoy_internal_shadow, file_proto, params):
     v(N+1) FileDescriptorProto message.
   """
   # Load type database.
+  if params['type_db_path']:
+    utils.LoadTypeDb(params['type_db_path'])
   typedb = utils.GetTypeDb()
   # If this isn't a proto in an upgraded package, return None.
   if file_proto.name not in typedb.next_version_protos or not typedb.next_version_protos[

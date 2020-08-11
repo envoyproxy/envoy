@@ -3,11 +3,10 @@
 #include <cstdint>
 #include <functional>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
@@ -23,6 +22,8 @@
 #include "common/config/subscription_base.h"
 #include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Router {
@@ -41,7 +42,7 @@ public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
-                   std::unordered_set<RouteConfigProvider*>& route_config_providers,
+                   absl::node_hash_set<RouteConfigProvider*>& route_config_providers,
                    const envoy::config::core::v3::ApiVersion resource_api_version =
                        envoy::config::core::v3::ApiVersion::AUTO);
   ~VhdsSubscription() override { init_target_.ready(); }
@@ -59,24 +60,21 @@ public:
 
 private:
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&,
+  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
                       const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
+  void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
-  }
 
   RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopePtr scope_;
   VhdsStats stats_;
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
+  Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
-  std::unordered_set<RouteConfigProvider*>& route_config_providers_;
+  absl::node_hash_set<RouteConfigProvider*>& route_config_providers_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

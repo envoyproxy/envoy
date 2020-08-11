@@ -11,9 +11,9 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/config/metadata.h"
 #include "common/config/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/header_utility.h"
@@ -32,7 +32,7 @@ ComparisonFilter::ComparisonFilter(const envoy::config::accesslog::v3::Compariso
                                    Runtime::Loader& runtime)
     : config_(config), runtime_(runtime) {}
 
-bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
+bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
   uint64_t value = config_.value().default_value();
 
   if (!config_.value().runtime_key().empty()) {
@@ -52,7 +52,7 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   switch (config.filter_specifier_case()) {
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kStatusCodeFilter:
@@ -77,6 +77,8 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kGrpcStatusFilter:
     MessageUtil::validate(config, validation_visitor);
     return FilterPtr{new GrpcStatusFilter(config.grpc_status_filter())};
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kMetadataFilter:
+    return FilterPtr{new MetadataFilter(config.metadata_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
     MessageUtil::validate(config, validation_visitor);
     {
@@ -92,14 +94,15 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
                                       const Http::RequestHeaderMap& request_headers,
                                       const Http::ResponseHeaderMap&,
-                                      const Http::ResponseTrailerMap&) {
+                                      const Http::ResponseTrailerMap&) const {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
 bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                                const Http::ResponseHeaderMap&,
+                                const Http::ResponseTrailerMap&) const {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
@@ -108,7 +111,8 @@ bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 }
 
 bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                              const Http::ResponseHeaderMap&,
+                              const Http::ResponseTrailerMap&) const {
   absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
   ASSERT(final);
 
@@ -117,14 +121,15 @@ bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
 }
 
 RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& config,
-                             Runtime::Loader& runtime, Runtime::RandomGenerator& random)
+                             Runtime::Loader& runtime, Random::RandomGenerator& random)
     : runtime_(runtime), random_(random), runtime_key_(config.runtime_key()),
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
 bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                             const Http::ResponseHeaderMap&,
+                             const Http::ResponseTrailerMap&) const {
   auto rid_extension = stream_info.getRequestIDExtension();
   uint64_t random_value;
   if (use_independent_randomness_ ||
@@ -141,7 +146,7 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
 
 OperatorFilter::OperatorFilter(
     const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& config : configs) {
     filters_.emplace_back(FilterFactory::fromProto(config, runtime, random, validation_visitor));
@@ -149,19 +154,19 @@ OperatorFilter::OperatorFilter(
 }
 
 OrFilter::OrFilter(const envoy::config::accesslog::v3::OrFilter& config, Runtime::Loader& runtime,
-                   Runtime::RandomGenerator& random,
+                   Random::RandomGenerator& random,
                    ProtobufMessage::ValidationVisitor& validation_visitor)
     : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
 
 AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
                      ProtobufMessage::ValidationVisitor& validation_visitor)
     : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
 
 bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
                         const Http::RequestHeaderMap& request_headers,
                         const Http::ResponseHeaderMap& response_headers,
-                        const Http::ResponseTrailerMap& response_trailers) {
+                        const Http::ResponseTrailerMap& response_trailers) const {
   bool result = false;
   for (auto& filter : filters_) {
     result |= filter->evaluate(info, request_headers, response_headers, response_trailers);
@@ -177,7 +182,7 @@ bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
 bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
                          const Http::RequestHeaderMap& request_headers,
                          const Http::ResponseHeaderMap& response_headers,
-                         const Http::ResponseTrailerMap& response_trailers) {
+                         const Http::ResponseTrailerMap& response_trailers) const {
   bool result = true;
   for (auto& filter : filters_) {
     result &= filter->evaluate(info, request_headers, response_headers, response_trailers);
@@ -192,7 +197,7 @@ bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
 
 bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info,
                                     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                    const Http::ResponseTrailerMap&) {
+                                    const Http::ResponseTrailerMap&) const {
   return !info.healthCheck();
 }
 
@@ -201,7 +206,7 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
 
 bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&,
                             const Http::RequestHeaderMap& request_headers,
-                            const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                            const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) const {
   return Http::HeaderUtility::matchHeaders(request_headers, *header_data_);
 }
 
@@ -217,7 +222,8 @@ ResponseFlagFilter::ResponseFlagFilter(
 }
 
 bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
-                                  const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
+                                  const Http::ResponseHeaderMap&,
+                                  const Http::ResponseTrailerMap&) const {
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }
@@ -234,7 +240,7 @@ GrpcStatusFilter::GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatu
 
 bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
                                 const Http::ResponseHeaderMap& response_headers,
-                                const Http::ResponseTrailerMap& response_trailers) {
+                                const Http::ResponseTrailerMap& response_trailers) const {
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
   const auto& optional_status =
@@ -250,6 +256,44 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
     envoy::config::accesslog::v3::GrpcStatusFilter::Status status) const {
   return static_cast<Grpc::Status::GrpcStatus>(status);
+}
+
+MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config)
+    : default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
+      filter_(filter_config.matcher().filter()) {
+
+  if (filter_config.has_matcher()) {
+    auto& matcher_config = filter_config.matcher();
+
+    for (const auto& seg : matcher_config.path()) {
+      path_.push_back(seg.key());
+    }
+
+    // Matches if the value equals the configured 'MetadataMatcher' value.
+    const auto& val = matcher_config.value();
+    value_matcher_ = Matchers::ValueMatcher::create(val);
+  }
+
+  // Matches if the value is present in dynamic metadata
+  auto present_val = envoy::type::matcher::v3::ValueMatcher();
+  present_val.set_present_match(true);
+  present_matcher_ = Matchers::ValueMatcher::create(present_val);
+}
+
+bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
+                              const Http::ResponseHeaderMap&,
+                              const Http::ResponseTrailerMap&) const {
+  const auto& value =
+      Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
+  // If the key corresponds to a set value in dynamic metadata, return true if the value matches the
+  // the configured 'MetadataMatcher' value and false otherwise
+  if (present_matcher_->match(value)) {
+    return value_matcher_ && value_matcher_->match(value);
+  }
+
+  // If the key does not correspond to a set value in dynamic metadata, return true if
+  // 'match_if_key_not_found' is set to true and false otherwise
+  return default_match_;
 }
 
 InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,

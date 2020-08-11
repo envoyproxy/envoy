@@ -89,7 +89,7 @@ public:
   }
 
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                                              Network::Address::SocketType socket_type,
+                                              Network::Socket::Type socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               const ListenSocketCreationParams& params) override;
 
@@ -112,6 +112,7 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_added)                                                                          \
   COUNTER(listener_create_failure)                                                                 \
   COUNTER(listener_create_success)                                                                 \
+  COUNTER(listener_in_place_updated)                                                               \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
   COUNTER(listener_stopped)                                                                        \
@@ -152,6 +153,12 @@ public:
     drain_timer_->enableTimer(drain_time);
   }
 
+  void addFilterChainToDrain(const Network::FilterChain& filter_chain) {
+    draining_filter_chains_.push_back(&filter_chain);
+  }
+
+  uint32_t numDrainingFilterChains() const { return draining_filter_chains_.size(); }
+
 private:
   ListenerImplPtr draining_listener_;
   std::list<const Network::FilterChain*> draining_filter_chains_;
@@ -170,6 +177,7 @@ public:
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats);
 
   void onListenerWarmed(ListenerImpl& listener);
+  void inPlaceFilterChainUpdate(ListenerImpl& listener);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
@@ -178,7 +186,8 @@ public:
     ASSERT(lds_api_ == nullptr);
     lds_api_ = factory_.createLdsApi(lds_config);
   }
-  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners() override;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>>
+  listeners(ListenerState state = ListenerState::ACTIVE) override;
   uint64_t numConnections() const override;
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog) override;
@@ -188,27 +197,6 @@ public:
   void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
-
-  // TODO(lambdai): Remove follow 2 test helper once intelligent listener warm up is added.
-  // Delegate to private addListenerToWorker.
-  void addListenerToWorkerForTest(Worker& worker, absl::optional<uint64_t> overridden_listener,
-                                  ListenerImpl& listener,
-                                  std::function<void()> completion_callback) {
-    addListenerToWorker(worker, overridden_listener, listener, completion_callback);
-  }
-  // Erase the the listener draining filter chain from active listeners and then start the drain
-  // sequence.
-  void drainFilterChainsForTest(ListenerImpl* listener_raw_ptr) {
-    auto iter = std::find_if(active_listeners_.begin(), active_listeners_.end(),
-                             [listener_raw_ptr](const ListenerImplPtr& ptr) {
-                               return ptr != nullptr && ptr.get() == listener_raw_ptr;
-                             });
-    ASSERT(iter != active_listeners_.end());
-
-    ListenerImplPtr listener_impl_ptr = std::move(*iter);
-    active_listeners_.erase(iter);
-    drainFilterChains(std::move(listener_impl_ptr));
-  }
 
   Instance& server_;
   ListenerComponentFactory& factory_;
@@ -223,6 +211,8 @@ private:
   bool addOrUpdateListenerInternal(const envoy::config::listener::v3::Listener& config,
                                    const std::string& version_info, bool added_via_api,
                                    const std::string& name);
+  bool removeListenerInternal(const std::string& listener_name, bool dynamic_listeners_only);
+
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
         : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
@@ -264,11 +254,14 @@ private:
   void drainListener(ListenerImplPtr&& listener);
 
   /**
-   * Mark filter chains which owned by listener for draining. The new listener should have taken
-   * over the listener socket and partial of the filter chains from listener.
-   * @param listener supplies the listener to drain.
+   * Start to draining filter chains that are owned by draining listener but not owned by
+   * new_listener. The new listener should have taken over the listener socket and partial of the
+   * filter chains from listener. This method is used by in place filter chain update.
+   * @param draining_listener supplies the listener to be replaced.
+   * @param new_listener supplies the new listener config which is going to replace the draining
+   * listener.
    */
-  void drainFilterChains(ListenerImplPtr&& listener);
+  void drainFilterChains(ListenerImplPtr&& draining_listener, ListenerImpl& new_listener);
 
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be
@@ -328,15 +321,14 @@ public:
       ListenerComponentFactory& listener_component_factory,
       Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
 
-  std::shared_ptr<Network::DrainableFilterChain>
+  Network::DrainableFilterChainSharedPtr
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const override;
 
 private:
-  std::shared_ptr<Network::DrainableFilterChain>
-  buildFilterChainInternal(const envoy::config::listener::v3::FilterChain& filter_chain,
-                           std::unique_ptr<Configuration::FilterChainFactoryContext>&&
-                               filter_chain_factory_context) const;
+  Network::DrainableFilterChainSharedPtr buildFilterChainInternal(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const;
 
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;

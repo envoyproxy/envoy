@@ -52,7 +52,8 @@ public:
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
   }
 
-  void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
+  virtual void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
+    EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
     EXPECT_CALL(callbacks_, onSuccess_(_, _))
         .WillOnce(Invoke([sent_request, code](const AsyncClient::Request& request,
                                               ResponseMessage* response) -> void {
@@ -67,7 +68,7 @@ public:
                              bool end_stream) {
     EXPECT_CALL(callbacks, onHeaders_(_, end_stream))
         .WillOnce(Invoke([code](ResponseHeaderMap& headers, bool) -> void {
-          EXPECT_EQ(std::to_string(code), headers.Status()->value().getStringView());
+          EXPECT_EQ(std::to_string(code), headers.getStatusValue());
         }));
   }
 
@@ -81,7 +82,7 @@ public:
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
   AsyncClientImpl client_;
@@ -92,6 +93,22 @@ class AsyncClientImplTracingTest : public AsyncClientImplTest {
 public:
   Tracing::MockSpan parent_span_;
   const std::string child_span_name_{"Test Child Span Name"};
+
+  void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) override {
+    EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _))
+        .WillOnce(Invoke([](Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
+          span.setTag("onBeforeFinalizeUpstreamSpan", "called");
+          ASSERT_NE(nullptr, response_headers);
+        }));
+    EXPECT_CALL(callbacks_, onSuccess_(_, _))
+        .WillOnce(Invoke([sent_request, code](const AsyncClient::Request& request,
+                                              ResponseMessage* response) -> void {
+          // Verify that callback is called with the same request handle as returned by
+          // AsyncClient::send().
+          EXPECT_EQ(sent_request, &request);
+          EXPECT_EQ(code, Utility::getResponseStatus(response->headers()));
+        }));
+  }
 };
 
 TEST_F(AsyncClientImplTest, BasicStream) {
@@ -149,7 +166,7 @@ TEST_F(AsyncClientImplTest, Basic) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl copy(message_->headers());
+  TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
@@ -187,7 +204,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl copy(message_->headers());
+  TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
@@ -204,6 +221,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
 
   expectSuccess(request, 200);
 
+  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
@@ -231,7 +249,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl copy(message_->headers());
+  TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
@@ -250,6 +268,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
 
   expectSuccess(request, 200);
 
+  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
@@ -277,14 +296,14 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
       }));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+          Invoke([&](const std::string&, Upstream::ResourcePriority, auto,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
             // this is the hash of :path header value "/"
             EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
             return &cm_.conn_pool_;
           }));
 
-  TestHeaderMapImpl copy(message_->headers());
+  TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
   copy.addCopy("x-forwarded-for", "127.0.0.1");
   copy.addCopy(":scheme", "http");
@@ -520,6 +539,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
 
   // Finish request 2.
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(callbacks2, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   EXPECT_CALL(callbacks2, onSuccess_(_, _))
       .WillOnce(Invoke(
           [request2](const AsyncClient::Request& request, ResponseMessage* response) -> void {
@@ -538,6 +558,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
 
   // Finish request 3.
   ResponseHeaderMapPtr response_headers3(new TestResponseHeaderMapImpl{{":status", "500"}});
+  EXPECT_CALL(callbacks3, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   EXPECT_CALL(callbacks3, onSuccess_(_, _))
       .WillOnce(Invoke(
           [request3](const AsyncClient::Request& request, ResponseMessage* response) -> void {
@@ -885,6 +906,7 @@ TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
   auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   EXPECT_CALL(callbacks_, onFailure(_, _))
       .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
                                                 AsyncClient::FailureReason reason) {
@@ -927,6 +949,7 @@ TEST_F(AsyncClientImplTest, CancelRequest) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   AsyncClient::Request* request =
       client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
   request->cancel();
@@ -947,8 +970,15 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
   EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, injectContext(_));
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _))
+      .WillOnce(Invoke([](Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
+        span.setTag("onBeforeFinalizeUpstreamSpan", "called");
+        // Since this is  a failure, we expect no response headers.
+        ASSERT_EQ(nullptr, response_headers);
+      }));
   AsyncClient::Request* request = client_.send(std::move(message_), callbacks_, options);
 
+  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
@@ -992,6 +1022,7 @@ TEST_F(AsyncClientImplTest, DestroyWithActiveRequest) {
   EXPECT_NE(request, nullptr);
 
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   EXPECT_CALL(callbacks_, onFailure(_, _))
       .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
                                                 AsyncClient::FailureReason reason) {
@@ -1021,6 +1052,7 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   auto* request = client_.send(std::move(message_), callbacks_, options);
   EXPECT_NE(request, nullptr);
 
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   EXPECT_CALL(callbacks_, onFailure(_, _))
       .WillOnce(Invoke([sent_request = request](const AsyncClient::Request& request,
                                                 AsyncClient::FailureReason reason) {
@@ -1051,6 +1083,7 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
         return nullptr;
       }));
 
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   EXPECT_CALL(callbacks_, onSuccess_(_, _))
       .WillOnce(Invoke([](const AsyncClient::Request& request, ResponseMessage* response) -> void {
         // The callback gets called before AsyncClient::send() completes, which means that we don't
@@ -1075,6 +1108,7 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
         return nullptr;
       }));
 
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   EXPECT_CALL(callbacks_, onSuccess_(_, _))
       .WillOnce(Invoke([](const AsyncClient::Request& request, ResponseMessage* response) -> void {
         // The callback gets called before AsyncClient::send() completes, which means that we don't
@@ -1103,7 +1137,7 @@ TEST_F(AsyncClientImplTest, StreamTimeout) {
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
-  TestHeaderMapImpl expected_timeout{
+  TestRequestHeaderMapImpl expected_timeout{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_timeout), false));
   EXPECT_CALL(stream_callbacks_, onData(_, true));
@@ -1138,7 +1172,7 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
 
-  TestHeaderMapImpl expected_timeout{
+  TestRequestHeaderMapImpl expected_timeout{
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_timeout), true));
   EXPECT_CALL(stream_callbacks_, onComplete());
@@ -1207,6 +1241,7 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
 
   expectSuccess(request, 504);
 
+  EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
@@ -1236,6 +1271,7 @@ TEST_F(AsyncClientImplTest, DisableTimer) {
   AsyncClient::Request* request =
       client_.send(std::move(message_), callbacks_,
                    AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(200)));
+  EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _)).Times(1);
   request->cancel();
 }
 
@@ -1316,7 +1352,13 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
+  filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
+  filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(stream->isAboveWriteBufferHighWatermark());
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
@@ -1394,8 +1436,7 @@ TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
             route_impl_.routeEntry()->typedMetadata().get<Config::TypedMetadata::Object>("bar"));
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->perFilterConfig("bar"));
   EXPECT_TRUE(route_impl_.routeEntry()->upgradeMap().empty());
-  EXPECT_EQ(Router::InternalRedirectAction::PassThrough,
-            route_impl_.routeEntry()->internalRedirectAction());
+  EXPECT_EQ(false, route_impl_.routeEntry()->internalRedirectPolicy().enabled());
   EXPECT_TRUE(route_impl_.routeEntry()->shadowPolicies().empty());
   EXPECT_TRUE(route_impl_.routeEntry()->virtualHost().rateLimitPolicy().empty());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().corsPolicy());

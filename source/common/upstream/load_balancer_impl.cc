@@ -100,7 +100,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
 
 LoadBalancerBase::LoadBalancerBase(
     const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random,
+    Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : stats_(stats), runtime_(runtime), random_(random),
       default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
@@ -323,7 +323,8 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
 std::pair<HostSet&, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
   if (context) {
-    const auto priority_loads = context->determinePriorityLoad(priority_set_, per_priority_load_);
+    const auto priority_loads = context->determinePriorityLoad(
+        priority_set_, per_priority_load_, Upstream::RetryPriority::defaultPriorityMapping);
 
     const auto priority_and_source =
         choosePriority(random_.random(), priority_loads.healthy_priority_load_,
@@ -341,7 +342,7 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
       local_priority_set_(local_priority_set),
@@ -693,7 +694,7 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 
 EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),

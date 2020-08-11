@@ -1,5 +1,3 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -10,11 +8,14 @@ load(
     "envoy_extension_cc_test",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_package()
 
 envoy_cc_test(
     name = "injected_resource_monitor_test",
     srcs = ["injected_resource_monitor_test.cc"],
+    tags = ["fails_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",

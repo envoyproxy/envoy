@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_session.h"
 
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -27,7 +29,9 @@ void EnvoyQuicClientSession::connect() {
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.
   CryptoConnect();
-  SetMaxAllowedPushId(0u);
+  if (quic::VersionUsesHttp3(transport_version())) {
+    SetMaxPushId(0u);
+  }
 }
 
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
@@ -42,7 +46,12 @@ void EnvoyQuicClientSession::Initialize() {
 }
 
 void EnvoyQuicClientSession::OnCanWrite() {
+  const uint64_t headers_to_send_old =
+      quic::VersionUsesHttp3(transport_version()) ? 0u : headers_stream()->BufferedDataBytes();
   quic::QuicSpdyClientSession::OnCanWrite();
+  const uint64_t headers_to_send_new =
+      quic::VersionUsesHttp3(transport_version()) ? 0u : headers_stream()->BufferedDataBytes();
+  adjustBytesToSend(headers_to_send_new - headers_to_send_old);
   maybeApplyDelayClosePolicy();
 }
 
@@ -51,7 +60,7 @@ void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
                  quic::QuicErrorCodeToString(frame.error_code), frame.reason_phrase);
   quic::QuicSpdyClientSession::OnGoAway(frame);
   if (http_connection_callbacks_ != nullptr) {
-    http_connection_callbacks_->onGoAway();
+    http_connection_callbacks_->onGoAway(quicErrorCodeToEnvoyErrorCode(frame.error_code));
   }
 }
 
@@ -80,6 +89,10 @@ EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
 }
 
 bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
+
+void EnvoyQuicClientSession::OnOneRttKeysAvailable() {
+  raiseConnectionEvent(Network::ConnectionEvent::Connected);
+}
 
 } // namespace Quic
 } // namespace Envoy

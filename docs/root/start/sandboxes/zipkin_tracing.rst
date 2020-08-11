@@ -10,7 +10,7 @@ service1 makes an API call to service2 before returning a response.
 The three containers will be deployed inside a virtual network called ``envoymesh``.
 
 All incoming requests are routed via the front Envoy, which is acting as a reverse proxy
-sitting on the edge of the ``envoymesh`` network. Port ``80`` is mapped to  port ``8000``
+sitting on the edge of the ``envoymesh`` network. Port ``8000`` is exposed
 by docker compose (see :repo:`/examples/zipkin-tracing/docker-compose.yaml`). Notice that
 all Envoys are configured to collect request traces (e.g., http_connection_manager/config/tracing setup in
 :repo:`/examples/zipkin-tracing/front-envoy-zipkin.yaml`) and setup to propagate the spans generated
@@ -48,9 +48,9 @@ To build this sandbox example, and start the example apps run the following comm
 
                 Name                          Command             State                            Ports
     -----------------------------------------------------------------------------------------------------------------------------
-    zipkin-tracing_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-    zipkin-tracing_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
-    zipkin-tracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
+    zipkin-tracing_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:8001->8001/tcp
+    zipkin-tracing_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
+    zipkin-tracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 8000/tcp
     zipkin-tracing_zipkin_1        /busybox/sh run.sh             Up      9410/tcp, 0.0.0.0:9411->9411/tcp
 
 **Step 2: Generate some load**

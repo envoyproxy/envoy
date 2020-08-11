@@ -12,6 +12,7 @@
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
 #include "common/profiler/profiler.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_matcher_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -156,7 +157,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_TRUE(absl::StartsWith(response->body(), "   Count Lookup\n")) << response->body();
-  EXPECT_LT(30, response->body().size());
+  EXPECT_LT(28, response->body().size());
 
   // Now disable recent-lookups tracking and check that we get the error again.
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/disable", response));
@@ -226,6 +227,24 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(),
               HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
 
+  // Test that a specific bucket config is applied. Buckets 1-4 (inclusive) are set in initialize().
+  for (int i = 1; i <= 4; i++) {
+    EXPECT_THAT(
+        response->body(),
+        HasSubstr(fmt::format("envoy_cluster_upstream_cx_connect_ms_bucket{{envoy_cluster_name="
+                              "\"cluster_0\",le=\"{}\"}} 0\n",
+                              i)));
+  }
+
+  // Test that other histograms use the default buckets.
+  for (double bucket : Stats::HistogramSettingsImpl::defaultBuckets()) {
+    EXPECT_THAT(
+        response->body(),
+        HasSubstr(fmt::format("envoy_cluster_upstream_cx_length_ms_bucket{{envoy_cluster_name="
+                              "\"cluster_0\",le=\"{0:.32g}\"}} 0\n",
+                              bucket)));
+  }
+
   EXPECT_EQ("200", request("admin", "GET", "/stats/prometheus", response));
   EXPECT_THAT(
       response->body(),
@@ -262,37 +281,17 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
-  // TODO(#8324): "http1.metadata_not_supported_error" should not still be in
-  // the 'recent lookups' output after reset_counters.
   switch (GetParam().downstream_protocol) {
   case Http::CodecClient::Type::HTTP1:
     EXPECT_EQ("   Count Lookup\n"
-              "       1 http1.dropped_headers_with_underscores\n"
-              "       1 http1.metadata_not_supported_error\n"
-              "       1 http1.requests_rejected_with_underscores_in_headers\n"
-              "       1 http1.response_flood\n"
               "\n"
-              "total: 4\n",
+              "total: 0\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP2:
     EXPECT_EQ("   Count Lookup\n"
-              "       1 http2.dropped_headers_with_underscores\n"
-              "       1 http2.header_overflow\n"
-              "       1 http2.headers_cb_no_stream\n"
-              "       1 http2.inbound_empty_frames_flood\n"
-              "       1 http2.inbound_priority_frames_flood\n"
-              "       1 http2.inbound_window_update_frames_flood\n"
-              "       1 http2.outbound_control_flood\n"
-              "       1 http2.outbound_flood\n"
-              "       1 http2.requests_rejected_with_underscores_in_headers\n"
-              "       1 http2.rx_messaging_error\n"
-              "       1 http2.rx_reset\n"
-              "       1 http2.too_many_header_frames\n"
-              "       1 http2.trailers\n"
-              "       1 http2.tx_reset\n"
               "\n"
-              "total: 14\n",
+              "total: 0\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP3:
@@ -378,12 +377,35 @@ TEST_P(IntegrationAdminTest, Admin) {
   config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump?include_eds", response));
+  EXPECT_EQ("application/json", ContentType(response));
+  json = Json::Factory::loadFromString(response->body());
+  index = 0;
+  const std::string expected_types_eds[] = {
+      "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
+
+  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
+    EXPECT_TRUE(expected_types_eds[index].compare(obj_ptr->getString("@type")) == 0);
+    index++;
+  }
+
+  // Validate we can parse as proto.
+  envoy::admin::v3::ConfigDump config_dump_with_eds;
+  TestUtility::loadFromJson(response->body(), config_dump_with_eds);
+  EXPECT_EQ(7, config_dump_with_eds.configs_size());
+
   // Validate that the "inboundonly" does not stop the default listener.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 "/drain_listeners?inboundonly", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_EQ("OK\n", response->body());
 
@@ -395,7 +417,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_EQ("OK\n", response->body());
 
@@ -415,7 +437,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
       lookupPort("admin"), "POST", "/drain_listeners?inboundonly", "", downstreamProtocol(),
       version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
   EXPECT_EQ("OK\n", response->body());
 
@@ -493,7 +515,7 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
     BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
         lookupPort("admin"), "GET", "/server_info", "", downstreamProtocol(), version_);
     EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
 
@@ -523,7 +545,7 @@ public:
     response_ = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
                                                    downstreamProtocol(), version_);
     ASSERT_TRUE(response_->complete());
-    EXPECT_EQ("200", response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", response_->headers().getStatusValue());
   }
 
   BufferingStreamDecoderPtr response_;

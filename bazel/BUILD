@@ -1,12 +1,10 @@
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-
 envoy_package()
-
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 
 exports_files([
     "gen_sh_test_runner.sh",
@@ -41,12 +39,6 @@ genrule(
     # Undocumented attr to depend on workspace status files.
     # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
-)
-
-sh_binary(
-    name = "fuzzit_wrapper",
-    srcs = ["fuzzit_wrapper.sh"],
-    data = ["@fuzzit_linux//:fuzzit"],
 )
 
 # A target to optionally link C++ standard library dynamically in sanitizer runs.
@@ -108,6 +100,11 @@ config_setting(
 )
 
 config_setting(
+    name = "no_debug_info",
+    values = {"define": "no_debug_info=1"},
+)
+
+config_setting(
     name = "asan_build",
     values = {"define": "ENVOY_CONFIG_ASAN=1"},
 )
@@ -125,11 +122,6 @@ config_setting(
 config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
-)
-
-config_setting(
-    name = "compdb_build",
-    values = {"define": "ENVOY_CONFIG_COMPILATION_DATABASE=1"},
 )
 
 config_setting(
@@ -200,6 +192,11 @@ config_setting(
 config_setting(
     name = "enable_path_normalization_by_default",
     values = {"define": "path_normalization_by_default=true"},
+)
+
+config_setting(
+    name = "enable_new_codecs_in_integration_tests",
+    values = {"define": "use_new_codecs_in_integration_tests=true"},
 )
 
 cc_proto_library(
@@ -342,6 +339,19 @@ config_setting(
 config_setting(
     name = "android_logger",
     values = {"define": "logger=android"},
+)
+
+config_setting(
+    name = "libfuzzer_coverage",
+    define_values = {
+        "FUZZING_ENGINE": "libfuzzer",
+        "ENVOY_CONFIG_COVERAGE": "1",
+    },
+)
+
+config_setting(
+    name = "libfuzzer",
+    values = {"define": "FUZZING_ENGINE=libfuzzer"},
 )
 
 alias(

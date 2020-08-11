@@ -1,6 +1,6 @@
 #include "common/common/backoff_strategy.h"
 
-#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/common.h"
 
 #include "gtest/gtest.h"
 
@@ -10,7 +10,7 @@ using testing::Return;
 namespace Envoy {
 
 TEST(BackOffStrategyTest, JitteredBackOffBasicFlow) {
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
 
   JitteredBackOffStrategy jittered_back_off(25, 30, random);
@@ -19,7 +19,7 @@ TEST(BackOffStrategyTest, JitteredBackOffBasicFlow) {
 }
 
 TEST(BackOffStrategyTest, JitteredBackOffBasicReset) {
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(27));
 
   JitteredBackOffStrategy jittered_back_off(25, 30, random);
@@ -31,7 +31,7 @@ TEST(BackOffStrategyTest, JitteredBackOffBasicReset) {
 }
 
 TEST(BackOffStrategyTest, JitteredBackOffDoesntOverflow) {
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(std::numeric_limits<uint64_t>::max() - 1));
 
   JitteredBackOffStrategy jittered_back_off(1, std::numeric_limits<uint64_t>::max(), random);
@@ -42,7 +42,7 @@ TEST(BackOffStrategyTest, JitteredBackOffDoesntOverflow) {
 }
 
 TEST(BackOffStrategyTest, JitteredBackOffWithMaxInterval) {
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(9999));
 
   JitteredBackOffStrategy jittered_back_off(5, 100, random);
@@ -56,7 +56,7 @@ TEST(BackOffStrategyTest, JitteredBackOffWithMaxInterval) {
 }
 
 TEST(BackOffStrategyTest, JitteredBackOffWithMaxIntervalReset) {
-  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Random::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(9999));
 
   JitteredBackOffStrategy jittered_back_off(5, 100, random);

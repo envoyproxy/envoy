@@ -3,7 +3,7 @@ static_resources:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 80
+        port_value: 8000
     traffic_direction: INBOUND
     filter_chains:
     - filters:

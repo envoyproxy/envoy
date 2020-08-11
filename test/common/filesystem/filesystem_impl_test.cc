@@ -2,6 +2,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/environment.h"
@@ -103,7 +104,7 @@ TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
                EnvoyException);
 }
 
-TEST_F(FileSystemImplTest, FileReadToEndBlacklisted) {
+TEST_F(FileSystemImplTest, FileReadToEndDenylisted) {
   EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
   EXPECT_THROW(file_system_.fileReadToEnd("/proc/cpuinfo"), EnvoyException);
   EXPECT_THROW(file_system_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
@@ -117,7 +118,7 @@ TEST_F(FileSystemImplTest, CanonicalPathSuccess) { EXPECT_EQ("/", canonicalPath(
 TEST_F(FileSystemImplTest, CanonicalPathFail) {
   const Api::SysCallStringResult result = canonicalPath("/_some_non_existent_file");
   EXPECT_TRUE(result.rc_.empty());
-  EXPECT_STREQ("No such file or directory", ::strerror(result.errno_));
+  EXPECT_EQ("No such file or directory", errorDetails(result.errno_));
 }
 #endif
 

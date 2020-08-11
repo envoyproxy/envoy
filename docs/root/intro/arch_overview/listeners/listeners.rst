@@ -12,8 +12,8 @@ TCP
 ---
 
 Each listener is independently configured with some number :ref:`filter chains
-<envoy_api_msg_listener.FilterChain>`, where an individual chain is selected based on its
-:ref:`match criteria <envoy_api_msg_listener.FilterChainMatch>`. An individual filter chain is
+<envoy_v3_api_msg_config.listener.v3.FilterChain>`, where an individual chain is selected based on its
+:ref:`match criteria <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`. An individual filter chain is
 composed of one or more network level (L3/L4) :ref:`filters <arch_overview_network_filters>`. When
 a new connection is received on a listener, the appropriate filter chain is selected, and the
 configured connection local filter stack is instantiated and begins processing subsequent events.
@@ -32,6 +32,8 @@ Listeners can also be fetched dynamically via the :ref:`listener discovery servi
 <config_listeners_lds>`.
 
 Listener :ref:`configuration <config_listeners>`.
+
+.. _arch_overview_listeners_udp:
 
 UDP
 ---

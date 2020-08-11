@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "extensions/tracers/zipkin/span_context.h"
@@ -60,7 +60,7 @@ public:
    * @param shared_span_context Whether shared span id should be used.
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
-         Runtime::RandomGenerator& random_generator, const bool trace_id_128bit,
+         Random::RandomGenerator& random_generator, const bool trace_id_128bit,
          const bool shared_span_context, TimeSource& time_source)
       : service_name_(service_name), address_(address), reporter_(nullptr),
         random_generator_(random_generator), trace_id_128bit_(trace_id_128bit),
@@ -96,32 +96,17 @@ public:
   void reportSpan(Span&& span) override;
 
   /**
-   * @return the service-name attribute associated with the Tracer.
-   */
-  const std::string& serviceName() const { return service_name_; }
-
-  /**
-   * @return the pointer to the address object associated with the Tracer.
-   */
-  const Network::Address::InstanceConstSharedPtr address() const { return address_; }
-
-  /**
    * Associates a Reporter object with this Tracer.
    *
    * @param The span reporter.
    */
   void setReporter(ReporterPtr reporter);
 
-  /**
-   * @return the random-number generator associated with the Tracer.
-   */
-  Runtime::RandomGenerator& randomGenerator() { return random_generator_; }
-
 private:
   const std::string service_name_;
   Network::Address::InstanceConstSharedPtr address_;
   ReporterPtr reporter_;
-  Runtime::RandomGenerator& random_generator_;
+  Random::RandomGenerator& random_generator_;
   const bool trace_id_128bit_;
   const bool shared_span_context_;
   TimeSource& time_source_;

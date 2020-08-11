@@ -6,10 +6,10 @@ Supported load balancers
 When a filter needs to acquire a connection to a host in an upstream cluster, the cluster manager
 uses a load balancing policy to determine which host is selected. The load balancing policies are
 pluggable and are specified on a per upstream cluster basis in the :ref:`configuration
-<envoy_api_msg_Cluster>`. Note that if no active health checking policy is :ref:`configured
+<envoy_v3_api_msg_config.cluster.v3.Cluster>`. Note that if no active health checking policy is :ref:`configured
 <config_cluster_manager_cluster_hc>` for a cluster, all upstream cluster members are considered
 healthy, unless otherwise specified through
-:ref:`health_status <envoy_api_field_endpoint.LbEndpoint.health_status>`.
+:ref:`health_status <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.health_status>`.
 
 .. _arch_overview_load_balancing_types_round_robin:
 
@@ -18,7 +18,7 @@ Weighted round robin
 
 This is a simple policy in which each available upstream host is selected in round
 robin order. If :ref:`weights
-<envoy_api_field_endpoint.LbEndpoint.load_balancing_weight>` are assigned to
+<envoy_v3_api_field_config.endpoint.v3.LbEndpoint.load_balancing_weight>` are assigned to
 endpoints in a locality, then a weighted round robin schedule is used, where
 higher weighted endpoints will appear more often in the rotation to achieve the
 effective weighting.
@@ -32,7 +32,7 @@ The least request load balancer uses different algorithms depending on whether h
 same or different weights.
 
 * *all weights equal*: An O(1) algorithm which selects N random available hosts as specified in the
-  :ref:`configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` (2 by default) and picks the
+  :ref:`configuration <envoy_v3_api_msg_config.cluster.v3.Cluster.LeastRequestLbConfig>` (2 by default) and picks the
   host which has the fewest active requests (`Mitzenmacher et al.
   <https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
   approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
@@ -41,11 +41,25 @@ same or different weights.
   less than or equal to all of the other hosts.
 * *all weights not equal*:  If two or more hosts in the cluster have different load balancing
   weights, the load balancer shifts into a mode where it uses a weighted round robin schedule in
-  which weights are dynamically adjusted based on the host's request load at the time of selection
-  (weight is divided by the current active request count. For example, a host with weight 2 and an
-  active request count of 4 will have a synthetic weight of 2 / 4 = 0.5). This algorithm provides
-  good balance at steady state but may not adapt to load imbalance as quickly. Additionally, unlike
-  P2C, a host will never truly drain, though it will receive fewer requests over time.
+  which weights are dynamically adjusted based on the host's request load at the time of selection.
+
+  In this case the weights are calculated at the time a host is picked using the following formula:
+
+  `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`.
+
+  :ref:`active_request_bias<envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.active_request_bias>`
+  can be configured via runtime and defaults to 1.0. It must be greater than or equal to 0.0.
+
+  The larger the active request bias is, the more aggressively active requests will lower the
+  effective weight.
+
+  If `active_request_bias` is set to 0.0, the least request load balancer behaves like the round
+  robin load balancer and ignores the active request count at the time of picking.
+
+  For example, if active_request_bias is 1.0, a host with weight 2 and an active request count of 4
+  will have an effective weight of 2 / (4 + 1)^1 = 0.4. This algorithm provides good balance at
+  steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C, a host will
+  never truly drain, though it will receive fewer requests over time.
 
 .. _arch_overview_load_balancing_types_ring_hash:
 
@@ -66,8 +80,8 @@ partitioning of the circle, however, since the computed hashes could be coincide
 one another; so it is necessary to multiply the number of hashes per host---for example inserting
 100 entries on the ring for host A and 200 entries for host B---to better approximate the desired
 distribution. Best practice is to explicitly set
-:ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>` and
-:ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`, and monitor
+:ref:`minimum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.minimum_ring_size>` and
+:ref:`maximum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.maximum_ring_size>`, and monitor
 the :ref:`min_hashes_per_host and max_hashes_per_host
 gauges<config_cluster_manager_cluster_stats_ring_hash_lb>` to ensure good distribution. With the
 ring partitioned appropriately, the addition or removal of one host from a set of N hosts will

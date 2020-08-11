@@ -6,17 +6,22 @@ import "google/protobuf/empty.proto";
 
 import "test/fuzz/common.proto";
 
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+
 // Structured input for conn_manager_impl_fuzz_test.
 
 message NewStream {
   test.fuzz.Headers request_headers = 1;
   bool end_stream = 2;
-  // TODO(htuch): Support stop/continue status with headers.
+  HeaderStatus status = 3;
 }
 
 enum HeaderStatus {
   HEADER_CONTINUE = 0;
   HEADER_STOP_ITERATION = 1;
+  HEADER_CONTINUE_AND_END_STREAM = 2;
+  HEADER_STOP_ALL_ITERATION_AND_BUFFER = 3;
+  HEADER_STOP_ALL_ITERATION_AND_WATERMARK = 4;
 }
 
 enum DataStatus {
@@ -58,7 +63,9 @@ message RequestAction {
     DataAction data = 1;
     TrailerAction trailers = 2;
     google.protobuf.Empty continue_decoding = 3;
-    google.protobuf.Empty throw_decoder_exception = 4;
+    // Dispatch no longer throws, but rather returns an error status.
+    google.protobuf.Empty throw_decoder_exception = 4 [deprecated = true];
+    google.protobuf.Empty return_decoder_error = 5;
     // TODO(htuch): Model and fuzz watermark events.
   }
 }
@@ -94,4 +101,6 @@ message Action {
 
 message ConnManagerImplTestCase {
   repeated Action actions = 1;
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      .ForwardClientCertDetails forward_client_cert = 2;
 }

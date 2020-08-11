@@ -5,7 +5,8 @@
 #include "extensions/filters/common/rbac/engine.h"
 #include "extensions/filters/http/rbac/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -36,16 +37,14 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBAC*>(
-      factory.createEmptyConfigProto().get());
-  EXPECT_NE(nullptr, config);
+  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBAC*>(
+                         factory.createEmptyConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBACPerRoute*>(
-      factory.createEmptyRouteConfigProto().get());
-  EXPECT_NE(nullptr, config);
+  EXPECT_NE(nullptr, dynamic_cast<envoy::extensions::filters::http::rbac::v3::RBACPerRoute*>(
+                         factory.createEmptyRouteConfigProto().get()));
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {

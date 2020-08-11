@@ -22,7 +22,7 @@ public:
 
   ~JwksFetcherImpl() override { cancel(); }
 
-  void cancel() override {
+  void cancel() final {
     if (request_ && !complete_) {
       request_->cancel();
       ENVOY_LOG(debug, "fetch pubkey [uri = {}]: canceled", uri_->uri());
@@ -101,6 +101,8 @@ public:
     receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
     reset();
   }
+
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
 private:
   Upstream::ClusterManager& cm_;

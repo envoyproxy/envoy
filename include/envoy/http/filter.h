@@ -34,6 +34,7 @@ enum class FilterHeadersStatus {
   StopIteration,
   // Continue iteration to remaining filters, but ignore any subsequent data or trailers. This
   // results in creating a header only request/response.
+  // This status MUST NOT be returned by decodeHeaders() when end_stream is set to true.
   ContinueAndEndStream,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. ContinueDecoding() MUST
@@ -147,9 +148,27 @@ public:
    * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
    * a way that affects routing, clearRouteCache() must be called to clear the cache.
    *
-   * NOTE: In the future we may want to allow the filter to override the route entry.
+   * NOTE: In the future we want to split route() into 2 methods, one that just
+   * returns current route and another that actually resolve the route.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
+
+  /**
+   * Invokes callback with a matched route, callback can choose to accept this route by returning
+   * Router::RouteMatchStatus::Accept or continue route match from last matched route by returning
+   * Router::RouteMatchStatus::Continue, if there are more routes available.
+   *
+   * Returns route accepted by the callback or nullptr if no match found or none of route is
+   * accepted by the callback.
+   *
+   * NOTE: clearRouteCache() must be called before invoking this method otherwise cached route will
+   * be returned directly to the caller and the callback will not be invoked.
+   *
+   * Currently a route callback's decision is overridden by clearRouteCache() / route() call in the
+   * subsequent filters. We may want to persist callbacks so they always participate in later route
+   * resolution or make it an independent entity like filters that gets called on route resolution.
+   */
+  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
    * Returns the clusterInfo for the cached route.
@@ -307,10 +326,13 @@ public:
   virtual RequestTrailerMap& addDecodedTrailers() PURE;
 
   /**
-   * Create a locally generated response using the provided response_code and body_text parameters.
-   * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
-   * HTTP response code and grpc-status and grpc-message headers mapped from the provided
-   * parameters.
+   * Attempts to create a locally generated response using the provided response_code and body_text
+   * parameters. If the request was a gRPC request the local reply will be encoded as a gRPC
+   * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
+   * provided parameters.
+   *
+   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
    * @param body_text supplies the optional body text which is sent using the text/plain content
@@ -337,9 +359,10 @@ public:
   /**
    * Called with 100-Continue headers to be encoded.
    *
-   * This is not folded into encodeHeaders because most Envoy users and filters
-   * will not be proxying 100-continue and with it split out, can ignore the
-   * complexity of multiple encodeHeaders calls.
+   * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
+   * 100-continue and with it split out, can ignore the complexity of multiple encodeHeaders calls.
+   *
+   * This must not be invoked more than once per request.
    *
    * @param headers supplies the headers to be encoded.
    */
@@ -350,6 +373,9 @@ public:
    *
    * The connection manager inspects certain pseudo headers that are not actually sent downstream.
    * - See source/common/http/headers.h
+   *
+   * The only 1xx that may be provided to encodeHeaders() is a 101 upgrade, which will be the final
+   * encodeHeaders() for a response.
    *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
@@ -527,7 +553,7 @@ public:
    * should consider using StopAllIterationAndBuffer or StopAllIterationAndWatermark in
    * decodeHeaders() to prevent metadata passing to the following filters.
    *
-   * @param metadata supplies the decoded metadata.
+   * @param metadata_map supplies the decoded metadata.
    */
   virtual FilterMetadataStatus decodeMetadata(MetadataMap& /* metadata_map */) {
     return Http::FilterMetadataStatus::Continue;
@@ -696,6 +722,8 @@ public:
    * will not be proxying 100-continue and with it split out, can ignore the
    * complexity of multiple encodeHeaders calls.
    *
+   * This will only be invoked once per request.
+   *
    * @param headers supplies the 100-continue response headers to be encoded.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    *
@@ -704,6 +732,10 @@ public:
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
+   *
+   * The only 1xx that may be provided to encodeHeaders() is a 101 upgrade, which will be the final
+   * encodeHeaders() for a response.
+   *
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.

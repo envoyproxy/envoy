@@ -25,15 +25,15 @@ public:
   // HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& request) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override;
-  void updateHeaders(LookupContextPtr&& lookup_context,
-                     Http::ResponseHeaderMapPtr&& response_headers) override;
+  void updateHeaders(const LookupContext& lookup_context,
+                     const Http::ResponseHeaderMap& response_headers) override;
   CacheInfo cacheInfo() const override;
 
   Entry lookup(const LookupRequest& request);
   void insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers, std::string&& body);
 
   absl::Mutex mutex_;
-  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ GUARDED_BY(mutex_);
+  absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);
 };
 
 } // namespace Cache

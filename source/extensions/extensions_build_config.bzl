@@ -17,6 +17,13 @@ EXTENSIONS = {
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
 
     #
+    # Compression
+    #
+
+    "envoy.compression.gzip.compressor":                "//source/extensions/compression/gzip/compressor:config",
+    "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
+
+    #
     # gRPC Credentials Plugins
     #
 
@@ -34,12 +41,15 @@ EXTENSIONS = {
     #
 
     "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
+    "envoy.filters.http.admission_control":             "//source/extensions/filters/http/admission_control:config",
     "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
+    "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
+    "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
     "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
@@ -96,6 +106,7 @@ EXTENSIONS = {
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.rbac":                       "//source/extensions/filters/network/rbac:config",
     "envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
+    "envoy.filters.network.rocketmq_proxy":             "//source/extensions/filters/network/rocketmq_proxy:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
     "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
@@ -106,7 +117,7 @@ EXTENSIONS = {
     # UDP filters
     #
 
-    "envoy.filters.udp_listener.dns_filter":             "//source/extensions/filters/udp/dns_filter:config",
+    "envoy.filters.udp_listener.dns_filter":            "//source/extensions/filters/udp/dns_filter:config",
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
 
     #
@@ -149,8 +160,10 @@ EXTENSIONS = {
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
+    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_proxy_protocol",
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
+    "envoy.transport_sockets.quic":                     "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
 
     #
     # Retry host predicates
@@ -171,4 +184,23 @@ EXTENSIONS = {
     #
 
     "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+
+    #
+    # Internal redirect predicates
+    #
+    "envoy.internal_redirect_predicates.allow_listed_routes": "//source/extensions/internal_redirect/allow_listed_routes:config",
+    "envoy.internal_redirect_predicates.previous_routes":     "//source/extensions/internal_redirect/previous_routes:config",
+    "envoy.internal_redirect_predicates.safe_cross_scheme":   "//source/extensions/internal_redirect/safe_cross_scheme:config",
+
+    # Http Upstreams (excepting envoy.upstreams.http.generic which is hard-coded into the build so not registered here)
+    "envoy.upstreams.http.http":                     "//source/extensions/upstreams/http/http:config",
+    "envoy.upstreams.http.tcp":                     "//source/extensions/upstreams/http/tcp:config",
+
+
 }
+
+# This can be used to extend the visibility rules for Envoy extensions
+# (//:extension_config and //:extension_library in //BUILD)
+# if downstream Envoy builds need to directly reference envoy extensions.
+ADDITIONAL_VISIBILITY = [
+  ]

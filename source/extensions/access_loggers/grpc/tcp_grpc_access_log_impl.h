@@ -1,6 +1,5 @@
 #pragma once
 
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
@@ -30,7 +29,8 @@ public:
   TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                    envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config,
                    ThreadLocal::SlotAllocator& tls,
-                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
+                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
+                   Stats::Scope& scope);
 
 private:
   /**
@@ -48,6 +48,7 @@ private:
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
+  Stats::Scope& scope_;
   const envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;

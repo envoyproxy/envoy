@@ -39,24 +39,19 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
 DispatcherImpl::DispatcherImpl(const std::string& name, Buffer::WatermarkFactoryPtr&& factory,
                                Api::Api& api, Event::TimeSystem& time_system)
     : name_(name), api_(api), buffer_factory_(std::move(factory)),
-      scheduler_(time_system.createScheduler(base_scheduler_)),
-      deferred_delete_timer_(createTimerInternal([this]() -> void { clearDeferredDeleteList(); })),
-      post_timer_(createTimerInternal([this]() -> void { runPostCallbacks(); })),
+      scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
+      deferred_delete_cb_(base_scheduler_.createSchedulableCallback(
+          [this]() -> void { clearDeferredDeleteList(); })),
+      post_cb_(base_scheduler_.createSchedulableCallback([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
   ASSERT(!name_.empty());
-#ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::registerFatalErrorHandler(*this);
-#endif
+  FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
   base_scheduler_.registerOnPrepareCallback(
       std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
-DispatcherImpl::~DispatcherImpl() {
-#ifdef ENVOY_HANDLE_SIGNALS
-  SignalAction::removeFatalErrorHandler(*this);
-#endif
-}
+DispatcherImpl::~DispatcherImpl() { FatalErrorHandler::removeFatalErrorHandler(*this); }
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const absl::optional<std::string>& prefix) {
@@ -159,6 +154,11 @@ TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   return createTimerInternal(cb);
 }
 
+Event::SchedulableCallbackPtr DispatcherImpl::createSchedulableCallback(std::function<void()> cb) {
+  ASSERT(isThreadSafe());
+  return base_scheduler_.createSchedulableCallback(cb);
+}
+
 TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
   return scheduler_->createTimer(cb, *this);
 }
@@ -168,7 +168,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   current_to_delete_->emplace_back(std::move(to_delete));
   ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
   if (1 == current_to_delete_->size()) {
-    deferred_delete_timer_->enableTimer(std::chrono::milliseconds(0));
+    deferred_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
@@ -188,7 +188,7 @@ void DispatcherImpl::post(std::function<void()> callback) {
   }
 
   if (do_post) {
-    post_timer_->enableTimer(std::chrono::milliseconds(0));
+    post_cb_->scheduleCallbackCurrentIteration();
   }
 }
 

@@ -13,7 +13,7 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
@@ -676,6 +676,75 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
       }));
 
   context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+  EXPECT_NE(nullptr, upstream_callbacks_);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(*upgrade_response, onData(Ref(buffer))).WillOnce(Return(false));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  EXPECT_CALL(*upgrade_response, onData(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(*protocol_, completeUpgrade(_, Ref(*upgrade_response)));
+  EXPECT_CALL(callbacks_, continueDecoding());
+  EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+        EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+        EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+        EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+      }));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  // Then the actual request...
+  sendTrivialStruct(FieldType::String);
+  completeRequest();
+  returnResponse();
+  destroyRouter();
+}
+
+// Test the case where an upgrade will occur, but the conn pool
+// returns immediately with a valid, but never, used connection.
+TEST_F(ThriftRouterTest, ProtocolUpgradeOnExistingUnusedConnection) {
+  initializeRouter();
+
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
+
+  conn_state_.reset();
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+      .WillRepeatedly(
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, setConnectionState_(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
+
+  MockThriftObject* upgrade_response = new NiceMock<MockThriftObject>();
+
+  EXPECT_CALL(upstream_connection_, write(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_EQ("upgrade request", buffer.toString());
+      }));
+
+  // Simulate an existing connection that's never been used.
+  EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+            context_.cluster_manager_.tcp_conn_pool_.newConnectionImpl(cb);
+
+            EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
+
+            EXPECT_CALL(*protocol_, attemptUpgrade(_, _, _))
+                .WillOnce(Invoke([&](Transport&, ThriftConnectionState&,
+                                     Buffer::Instance& buffer) -> ThriftObjectPtr {
+                  buffer.add("upgrade request");
+                  return ThriftObjectPtr{upgrade_response};
+                }));
+
+            context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+            return nullptr;
+          }));
+
+  startRequest(MessageType::Call);
+
   EXPECT_NE(nullptr, upstream_callbacks_);
 
   Buffer::OwnedImpl buffer;

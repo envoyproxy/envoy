@@ -1,11 +1,12 @@
 #pragma once
 
-#include "envoy/config/filter/udp/udp_proxy/v2alpha/udp_proxy.pb.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/network/socket_interface_impl.h"
 #include "common/network/utility.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -59,7 +60,7 @@ class UdpProxyFilterConfig {
 public:
   UdpProxyFilterConfig(Upstream::ClusterManager& cluster_manager, TimeSource& time_source,
                        Stats::Scope& root_scope,
-                       const envoy::config::filter::udp::udp_proxy::v2alpha::UdpProxyConfig& config)
+                       const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
       : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         stats_(generateStats(config.stat_prefix(), root_scope)) {}
@@ -221,11 +222,11 @@ private:
 
   virtual Network::IoHandlePtr createIoHandle(const Upstream::HostConstSharedPtr& host) {
     // Virtual so this can be overridden in unit tests.
-    return host->address()->socket(Network::Address::SocketType::Datagram);
+    return Network::ioHandleForAddr(Network::Socket::Type::Datagram, host->address());
   }
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) final;
   void onClusterRemoval(const std::string& cluster_name) override;
 
   const UdpProxyFilterConfigSharedPtr config_;

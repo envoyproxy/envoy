@@ -32,7 +32,9 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
+#include "common/runtime/runtime_features.h"
 #include "common/tcp/conn_pool.h"
+#include "common/tcp/original_conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
@@ -127,11 +129,19 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
     return;
   }
 
-  // If we are still waiting for primary clusters to initialize, do nothing.
-  ASSERT(state_ == State::WaitingToStartSecondaryInitialization || state_ == State::CdsInitialized);
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization ||
+         state_ == State::CdsInitialized ||
+         state_ == State::WaitingForPrimaryInitializationToComplete);
   ENVOY_LOG(debug, "maybe finish initialize primary init clusters empty: {}",
             primary_init_clusters_.empty());
+  // If we are still waiting for primary clusters to initialize, do nothing.
   if (!primary_init_clusters_.empty()) {
+    return;
+  } else if (state_ == State::WaitingForPrimaryInitializationToComplete) {
+    state_ = State::WaitingToStartSecondaryInitialization;
+    if (primary_clusters_initialized_callback_) {
+      primary_clusters_initialized_callback_();
+    }
     return;
   }
 
@@ -141,19 +151,17 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
             secondary_init_clusters_.empty());
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
-      const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          envoy::config::core::v3::ApiVersion::V2);
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      if (cm_.adsMux() == nullptr || cm_.adsMux()->paused(type_url)) {
-        initializeSecondaryClusters();
-      } else {
-        cm_.adsMux()->pause(type_url);
-        Cleanup eds_resume([this, type_url] { cm_.adsMux()->resume(type_url); });
-        initializeSecondaryClusters();
+      Config::ScopedResume maybe_resume_eds;
+      if (cm_.adsMux()) {
+        const auto type_urls =
+            Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+        maybe_resume_eds = cm_.adsMux()->pause(type_urls);
       }
+      initializeSecondaryClusters();
     }
     return;
   }
@@ -179,7 +187,8 @@ void ClusterManagerInitHelper::onStaticLoadComplete() {
   ASSERT(state_ == State::Loading);
   // After initialization of primary clusters has completed, transition to
   // waiting for signal to initialize secondary clusters and then CDS.
-  state_ = State::WaitingToStartSecondaryInitialization;
+  state_ = State::WaitingForPrimaryInitializationToComplete;
+  maybeFinishInitialize();
 }
 
 void ClusterManagerInitHelper::startInitializingSecondaryClusters() {
@@ -200,7 +209,8 @@ void ClusterManagerInitHelper::setCds(CdsApi* cds) {
   }
 }
 
-void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) {
+void ClusterManagerInitHelper::setInitializedCb(
+    ClusterManager::InitializationCompleteCallback callback) {
   if (state_ == State::AllClustersInitialized) {
     callback();
   } else {
@@ -208,10 +218,23 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
   }
 }
 
+void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
+    ClusterManager::PrimaryClustersReadyCallback callback) {
+  // The callback must be set before or at the `WaitingToStartSecondaryInitialization` state.
+  ASSERT(state_ == State::WaitingToStartSecondaryInitialization ||
+         state_ == State::WaitingForPrimaryInitializationToComplete || state_ == State::Loading);
+  if (state_ == State::WaitingToStartSecondaryInitialization) {
+    // This is the case where all clusters are STATIC and without health checking.
+    callback();
+  } else {
+    primary_clusters_initialized_callback_ = callback;
+  }
+}
+
 ClusterManagerImpl::ClusterManagerImpl(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+    Random::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context)
@@ -224,7 +247,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context),
       subscription_factory_(local_info, main_thread_dispatcher, *this, random,
-                            validation_context.dynamicValidationVisitor(), api) {
+                            validation_context.dynamicValidationVisitor(), api, runtime_) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -251,12 +274,22 @@ ClusterManagerImpl::ClusterManagerImpl(
   // loading is done because in v2 configuration each EDS cluster individually sets up a
   // subscription. When this subscription is an API source the cluster will depend on a non-EDS
   // cluster, so the non-EDS clusters must be loaded first.
+  auto is_primary_cluster = [](const envoy::config::cluster::v3::Cluster& cluster) -> bool {
+    return cluster.type() != envoy::config::cluster::v3::Cluster::EDS ||
+           (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
+            cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
+                envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath);
+  };
+  // Build book-keeping for which clusters are primary. This is useful when we
+  // invoke loadCluster() below and it needs the complete set of primaries.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
-    // First load all the primary clusters.
-    if (cluster.type() != envoy::config::cluster::v3::Cluster::EDS ||
-        (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
-         cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
-             envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath)) {
+    if (is_primary_cluster(cluster)) {
+      primary_clusters_.insert(cluster.name());
+    }
+  }
+  // Load all the primary clusters.
+  for (const auto& cluster : bootstrap.static_resources().clusters()) {
+    if (is_primary_cluster(cluster)) {
       loadCluster(cluster, "", false, active_clusters_);
     }
   }
@@ -765,13 +798,13 @@ void ClusterManagerImpl::updateClusterCounts() {
   // signal to ADS to proceed with RDS updates.
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
-    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>(
-        envoy::config::core::v3::ApiVersion::V2);
+    const auto type_urls = Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      ads_mux_->pause(type_url);
+      resume_cds_ = ads_mux_->pause(type_urls);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      ads_mux_->resume(type_url);
+      ASSERT(resume_cds_ != nullptr);
+      resume_cds_.reset();
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());
@@ -791,7 +824,8 @@ ThreadLocalCluster* ClusterManagerImpl::get(absl::string_view cluster) {
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::httpConnPoolForCluster(const std::string& cluster, ResourcePriority priority,
-                                           Http::Protocol protocol, LoadBalancerContext* context) {
+                                           absl::optional<Http::Protocol> protocol,
+                                           LoadBalancerContext* context) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
   auto entry = cluster_manager.thread_local_clusters_.find(cluster);
@@ -1130,18 +1164,31 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     }
   }
   {
+    // Drain or close any TCP connection pool for the host. Draining a TCP pool doesn't lead to
+    // connections being closed, it only prevents new connections through the pool. The
+    // CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE can be used to make the pool close any
+    // active connections.
     const auto& container = config.host_tcp_conn_pool_map_.find(host);
     if (container != config.host_tcp_conn_pool_map_.end()) {
       for (const auto& pair : container->second.pools_) {
         const Tcp::ConnectionPool::InstancePtr& pool = pair.second;
-        pool->drainConnections();
+        if (host->cluster().features() &
+            ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
+          pool->closeConnections();
+        } else {
+          pool->drainConnections();
+        }
       }
     }
   }
 
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-
+    // Close non connection pool TCP connections obtained from tcpConnForCluster()
+    //
+    // TODO(jono): The only remaining user of the non-pooled connections seems to be the statsd
+    // TCP client. Perhaps it could be rewritten to use a connection pool, and this code deleted.
+    //
     // Each connection will remove itself from the TcpConnectionsMap when it closes, via its
     // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
     // from host_tcp_conn_map_, so do not cache it between iterations.
@@ -1244,7 +1291,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority, Http::Protocol protocol, LoadBalancerContext* context) {
+    ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+    LoadBalancerContext* context) {
   HostConstSharedPtr host = lb_->chooseHost(context);
   if (!host) {
     ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
@@ -1252,7 +1300,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     return nullptr;
   }
 
-  std::vector<uint8_t> hash_key = {uint8_t(protocol)};
+  auto upstream_protocol = host->cluster().upstreamHttpProtocol(downstream_protocol);
+  std::vector<uint8_t> hash_key = {uint8_t(upstream_protocol)};
 
   Network::Socket::OptionsSharedPtr upstream_options(std::make_shared<Network::Socket::Options>());
   if (context) {
@@ -1283,7 +1332,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
-            parent_.thread_local_dispatcher_, host, priority, protocol,
+            parent_.thread_local_dispatcher_, host, priority, upstream_protocol,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr);
       });
@@ -1368,8 +1417,13 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) {
-  return Tcp::ConnectionPool::InstancePtr{
-      new Tcp::ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options)};
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
+    return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                               transport_socket_options);
+  } else {
+    return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
+        dispatcher, host, priority, options, transport_socket_options)};
+  }
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(

@@ -3,15 +3,18 @@
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "common/common/hex.h"
-#include "common/compressor/zlib_compressor_impl.h"
-#include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
 
+#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
+#include "extensions/filters/http/gzip/config.h"
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -78,7 +81,8 @@ protected:
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
-    EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip, headers.get_("content-encoding"));
+    EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
+              headers.get_("content-encoding"));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
     if (with_trailers) {
       Buffer::OwnedImpl trailers_buffer;
@@ -120,8 +124,10 @@ protected:
   }
 
   void expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy strategy, absl::string_view strategy_name,
-      Compressor::ZlibCompressorImpl::CompressionLevel level, absl::string_view level_name) {
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy,
+      absl::string_view strategy_name,
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level,
+      absl::string_view level_name) {
     setUpFilter(fmt::format(R"EOF({{"compression_strategy": "{}", "compression_level": "{}"}})EOF",
                             strategy_name, level_name));
     EXPECT_EQ(strategy, config_->compressionStrategy());
@@ -154,7 +160,8 @@ protected:
   std::shared_ptr<GzipFilterConfig> config_;
   std::unique_ptr<Common::Compressors::CompressorFilter> filter_;
   Buffer::OwnedImpl data_;
-  Decompressor::ZlibDecompressorImpl decompressor_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Compression::Gzip::Decompressor::ZlibDecompressorImpl decompressor_{stats_store_, "test"};
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
   Stats::TestUtil::TestStore stats_;
@@ -189,26 +196,26 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
   EXPECT_EQ(28, config_->windowBits());
   EXPECT_EQ(false, config_->disableOnEtagHeader());
   EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
-  EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+  EXPECT_EQ(Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
             config_->compressionStrategy());
-  EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+  EXPECT_EQ(Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
             config_->compressionLevel());
   EXPECT_EQ(18, config_->contentTypeValues().size());
 }
 
 TEST_F(GzipFilterTest, AvailableCombinationCompressionStrategyAndLevelConfig) {
   expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
-      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, "FILTERED",
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
   expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
-      Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman, "HUFFMAN",
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Best, "BEST");
   expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
-      Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED");
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, "RLE",
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Speed, "SPEED");
   expectValidCompressionStrategyAndLevel(
-      Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
-      Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT");
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, "DEFAULT",
+      Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel::Standard, "DEFAULT");
 }
 
 // Acceptance Testing with default configuration.
@@ -407,6 +414,21 @@ TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
   }
 }
 
+// Test setting zlib's chunk size.
+TEST_F(GzipFilterTest, ChunkSize) {
+  // Default
+  setUpFilter("{}");
+  EXPECT_EQ(config_->chunkSize(), 4096);
+
+  // Override
+  setUpFilter(R"EOF(
+{
+  "chunk_size": 8192
+}
+)EOF");
+  EXPECT_EQ(config_->chunkSize(), 8192);
+}
+
 // Test that the deprecated extension name still functions.
 TEST(GzipFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.gzip";
@@ -415,6 +437,39 @@ TEST(GzipFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
           deprecated_name));
+}
+
+// Test that the deprecated extension triggers an exception.
+TEST(GzipFilterFactoryTest, DEPRECATED_FEATURE_TEST(TestCheckDeprecatedExtensionThrows)) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  GzipFilterFactory factory;
+  envoy::extensions::filters::http::gzip::v3::Gzip config;
+
+  EXPECT_CALL(
+      context.runtime_loader_.snapshot_,
+      deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_gzip_http_filter", _))
+      .WillRepeatedly(Return(false));
+
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, "stats.", context),
+                          EnvoyException,
+                          "Using deprecated extension 'envoy.extensions.filters.http.gzip'.*");
+}
+
+// Test that the deprecated extension gives a deprecation warning.
+TEST(GzipFilterFactoryTest, DEPRECATED_FEATURE_TEST(TestCheckDeprecatedExtensionWarns)) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  GzipFilterFactory factory;
+  envoy::extensions::filters::http::gzip::v3::Gzip config;
+
+  EXPECT_CALL(
+      context.runtime_loader_.snapshot_,
+      deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_gzip_http_filter", _))
+      .WillRepeatedly(Return(true));
+
+  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(config, "stats.", context));
+
+  EXPECT_LOG_CONTAINS("warn", "Using deprecated extension 'envoy.extensions.filters.http.gzip'.",
+                      factory.createFilterFactoryFromProto(config, "stats.", context));
 }
 
 } // namespace Gzip

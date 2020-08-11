@@ -45,10 +45,14 @@ public:
 
   /**
    * This is a helper on top of get() that casts the object stored in the slot to the specified
-   * type. Since the slot only stores pointers to the base interface, dynamic_cast provides some
-   * level of protection via RTTI.
+   * type. Since the slot only stores pointers to the base interface, the static_cast operates
+   * in production for performance, and the dynamic_cast validates correctness in tests and debug
+   * builds.
    */
-  template <class T> T& getTyped() { return *std::dynamic_pointer_cast<T>(get()); }
+  template <class T> T& getTyped() {
+    ASSERT(std::dynamic_pointer_cast<T>(get()) != nullptr);
+    return *static_cast<T*>(get().get());
+  }
 
   /**
    * Run a callback on all registered threads.

@@ -13,6 +13,9 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer_handle(Http::CustomHeaders::get().Referer);
+
 absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
   if (header == nullptr) {
     return {};
@@ -67,7 +70,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     // (which is not available at the time of the request headers)
     if (headers_.value_ != nullptr && headers_.value_->ContentLength() != nullptr) {
       int64_t length;
-      if (absl::SimpleAtoi(headers_.value_->ContentLength()->value().getStringView(), &length)) {
+      if (absl::SimpleAtoi(headers_.value_->getContentLengthValue(), &length)) {
         return CelValue::CreateInt64(length);
       }
     } else {
@@ -93,7 +96,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     if (value == Path) {
       return convertHeaderEntry(headers_.value_->Path());
     } else if (value == UrlPath) {
-      absl::string_view path = headers_.value_->Path()->value().getStringView();
+      absl::string_view path = headers_.value_->getPathValue();
       size_t query_offset = path.find('?');
       if (query_offset == absl::string_view::npos) {
         return CelValue::CreateStringView(path);
@@ -106,7 +109,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     } else if (value == Method) {
       return convertHeaderEntry(headers_.value_->Method());
     } else if (value == Referer) {
-      return convertHeaderEntry(headers_.value_->Referer());
+      return convertHeaderEntry(headers_.value_->getInline(referer_handle.handle()));
     } else if (value == ID) {
       return convertHeaderEntry(headers_.value_->RequestId());
     } else if (value == UserAgent) {
@@ -136,8 +139,8 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return CelValue::CreateInt64(info_.responseFlags());
   } else if (value == GrpcStatus) {
     auto const& optional_status = Grpc::Common::getGrpcStatus(
-        trailers_.value_ ? *trailers_.value_ : ConstSingleton<Http::ResponseTrailerMapImpl>::get(),
-        headers_.value_ ? *headers_.value_ : ConstSingleton<Http::ResponseHeaderMapImpl>::get(),
+        trailers_.value_ ? *trailers_.value_ : *Http::StaticEmptyHeaders::get().response_trailers,
+        headers_.value_ ? *headers_.value_ : *Http::StaticEmptyHeaders::get().response_headers,
         info_);
     if (optional_status.has_value()) {
       return CelValue::CreateInt64(optional_status.value());
@@ -187,6 +190,13 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
         upstream_host->address()->ip() != nullptr) {
       return CelValue::CreateInt64(upstream_host->address()->ip()->port());
     }
+  } else if (value == UpstreamLocalAddress) {
+    auto upstream_local_address = info_.upstreamLocalAddress();
+    if (upstream_local_address != nullptr) {
+      return CelValue::CreateStringView(upstream_local_address->asStringView());
+    }
+  } else if (value == UpstreamTransportFailureReason) {
+    return CelValue::CreateStringView(info_.upstreamTransportFailureReason());
   }
 
   auto ssl_info = info_.upstreamSslConnection();

@@ -147,8 +147,13 @@ public:
   virtual double getDouble(const std::string& name, double default_value) const PURE;
 
   /**
-   * @return a hash of the JSON object. This is a hash of each nested element in stable order.
-   *         It does not consider white space that was originally in the parsed JSON.
+   * @return a hash of the JSON object.
+   * Per RFC 7159:
+   *    An object is an unordered collection of zero or more name/value
+   *    pairs, where a name is a string and a value is a string, number,
+   *    boolean, null, object, or array.
+   * Objects with fields in different orders are equivalent and produce the same hash.
+   * It does not consider white space that was originally in the parsed JSON.
    */
   virtual uint64_t hash() const PURE;
 

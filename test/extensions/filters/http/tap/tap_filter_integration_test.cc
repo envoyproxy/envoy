@@ -4,6 +4,7 @@
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
@@ -87,7 +88,7 @@ public:
         {":method", "POST"}, {":path", "/tap"}, {":scheme", "http"}, {":authority", "host"}};
     admin_response_ = admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
     admin_response_->waitForHeaders();
-    EXPECT_EQ("200", admin_response_->headers().Status()->value().getStringView());
+    EXPECT_EQ("200", admin_response_->headers().getStatusValue());
     EXPECT_FALSE(admin_response_->complete());
   }
 
@@ -125,6 +126,27 @@ public:
     }
 
     return traces;
+  }
+
+  void verifyStaticFilePerTap(const std::string& filter_config) {
+    const std::string path_prefix = getTempPathPrefix();
+    initializeFilter(fmt::format(filter_config, path_prefix));
+
+    // Initial request/response with tap.
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+    codec_client_->close();
+    test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+
+    // Find the written .pb file and verify it.
+    auto files = TestUtility::listFiles(path_prefix, false);
+    auto pb_file = std::find_if(files.begin(), files.end(),
+                                [](const std::string& s) { return absl::EndsWith(s, ".pb"); });
+    ASSERT_NE(pb_file, files.end());
+
+    envoy::data::tap::v3::TraceWrapper trace;
+    TestUtility::loadFromFile(*pb_file, trace, *api_);
+    EXPECT_TRUE(trace.has_http_buffered_trace());
   }
 
   const Http::TestRequestHeaderMapImpl request_headers_tap_{{":method", "GET"},
@@ -168,7 +190,53 @@ TEST_P(TapIntegrationTest, StaticFilePerTap) {
       R"EOF(
 name: tap
 typed_config:
-  "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+  common_config:
+    static_config:
+      match:
+        any_match: true
+      output_config:
+        sinks:
+          - format: PROTO_BINARY
+            file_per_tap:
+              path_prefix: {}
+)EOF";
+
+  verifyStaticFilePerTap(filter_config);
+}
+
+// Verify the match field takes precedence over the deprecated match_config field.
+TEST_P(TapIntegrationTest, DEPRECATED_FEATURE_TEST(StaticFilePerTapWithMatchConfigAndMatch)) {
+  const std::string filter_config =
+      R"EOF(
+name: tap
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+  common_config:
+    static_config:
+      # match_config should be ignored by the match field.
+      match_config:
+        not_match:
+          any_match: true
+      match:
+        any_match: true
+      output_config:
+        sinks:
+          - format: PROTO_BINARY
+            file_per_tap:
+              path_prefix: {}
+)EOF";
+
+  verifyStaticFilePerTap(filter_config);
+}
+
+// Verify the deprecated match_config field.
+TEST_P(TapIntegrationTest, DEPRECATED_FEATURE_TEST(StaticFilePerTapWithMatchConfig)) {
+  const std::string filter_config =
+      R"EOF(
+name: tap
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
   common_config:
     static_config:
       match_config:
@@ -180,24 +248,7 @@ typed_config:
               path_prefix: {}
 )EOF";
 
-  const std::string path_prefix = getTempPathPrefix();
-  initializeFilter(fmt::format(filter_config, path_prefix));
-
-  // Initial request/response with tap.
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
-  codec_client_->close();
-  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-
-  // Find the written .pb file and verify it.
-  auto files = TestUtility::listFiles(path_prefix, false);
-  auto pb_file = std::find_if(files.begin(), files.end(),
-                              [](const std::string& s) { return absl::EndsWith(s, ".pb"); });
-  ASSERT_NE(pb_file, files.end());
-
-  envoy::data::tap::v3::TraceWrapper trace;
-  TestUtility::loadFromFile(*pb_file, trace, *api_);
-  EXPECT_TRUE(trace.has_http_buffered_trace());
+  verifyStaticFilePerTap(filter_config);
 }
 
 // Verify a basic tap flow using the admin handler.
@@ -212,7 +263,7 @@ TEST_P(TapIntegrationTest, AdminBasicFlow) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     or_match:
       rules:
         - http_request_headers_match:
@@ -275,7 +326,7 @@ tap_config:
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     and_match:
       rules:
         - http_request_headers_match:
@@ -308,6 +359,7 @@ tap_config:
 
   admin_client_->close();
   EXPECT_EQ(3UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+  test_server_->waitForGaugeEq("http.admin.downstream_rq_active", 0);
 }
 
 // Verify both request and response trailer matching works.
@@ -318,7 +370,7 @@ TEST_P(TapIntegrationTest, AdminTrailers) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     and_match:
       rules:
         - http_request_trailers_match:
@@ -359,7 +411,7 @@ TEST_P(TapIntegrationTest, AdminBodyAsBytes) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -390,7 +442,7 @@ TEST_P(TapIntegrationTest, AdminBodyAsString) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     sinks:
@@ -422,7 +474,7 @@ TEST_P(TapIntegrationTest, AdminBodyAsBytesTruncated) {
       R"EOF(
 config_id: test_config_id
 tap_config:
-  match_config:
+  match:
     any_match: true
   output_config:
     max_buffered_rx_bytes: 3
@@ -535,6 +587,53 @@ typed_config:
   EXPECT_TRUE(traces[5].http_streamed_trace_segment().has_response_trailers());
 
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+}
+
+// Verify that body matching works.
+TEST_P(TapIntegrationTest, AdminBodyMatching) {
+  initializeFilter(admin_filter_config_);
+
+  const std::string admin_request_yaml =
+      R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    and_match:
+      rules:
+        - http_request_generic_body_match:
+            patterns:
+              - string_match: request
+        - http_response_generic_body_match:
+            patterns:
+              - string_match: response
+  output_config:
+    sinks:
+      - format: JSON_BODY_AS_STRING
+        streaming_admin: {}
+)EOF";
+
+  startAdminRequest(admin_request_yaml);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  // Should not tap, request and response body do not match.
+  makeRequest(request_headers_no_tap_, {{"This is test payload"}}, nullptr,
+              response_headers_no_tap_, {{"This is test payload"}}, nullptr);
+  // Should not tap, request matches but response body does not match.
+  makeRequest(request_headers_no_tap_, {{"This is request payload"}}, nullptr,
+              response_headers_no_tap_, {{"This is test payload"}}, nullptr);
+  // Should tap, request and response body match.
+  makeRequest(request_headers_no_tap_, {{"This is request payload"}}, nullptr,
+              response_headers_no_tap_, {{"This is resp"}, {"onse payload"}}, nullptr);
+
+  envoy::data::tap::v3::TraceWrapper trace;
+  admin_response_->waitForBodyData(1);
+  TestUtility::loadFromYaml(admin_response_->body(), trace);
+  EXPECT_NE(std::string::npos,
+            trace.http_buffered_trace().request().body().as_string().find("request"));
+  EXPECT_NE(std::string::npos,
+            trace.http_buffered_trace().response().body().as_string().find("response"));
+
+  admin_client_->close();
 }
 
 } // namespace

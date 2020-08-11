@@ -1,7 +1,6 @@
 #include "common/upstream/subset_lb.h"
 
 #include <memory>
-#include <unordered_set>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -15,13 +14,15 @@
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
 
+#include "absl/container/node_hash_set.h"
+
 namespace Envoy {
 namespace Upstream {
 
 SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
+    Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
@@ -83,6 +84,8 @@ SubsetLoadBalancer::SubsetLoadBalancer(
           // This is a regular update with deltas.
           update(priority, hosts_added, hosts_removed);
         }
+
+        purgeEmptySubsets(subsets_);
       });
 }
 
@@ -91,7 +94,7 @@ SubsetLoadBalancer::~SubsetLoadBalancer() {
 
   // Ensure gauges reflect correct values.
   forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
-    if (entry->initialized() && entry->active()) {
+    if (entry->active()) {
       stats_.lb_subsets_removed_.inc();
       stats_.lb_subsets_active_.dec();
     }
@@ -363,8 +366,8 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
 void SubsetLoadBalancer::processSubsets(
     const HostVector& hosts_added, const HostVector& hosts_removed,
     std::function<void(LbSubsetEntryPtr)> update_cb,
-    std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> new_cb) {
-  std::unordered_set<LbSubsetEntryPtr> subsets_modified;
+    std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&)> new_cb) {
+  absl::node_hash_set<LbSubsetEntryPtr> subsets_modified;
 
   std::pair<const HostVector&, bool> steps[] = {{hosts_added, true}, {hosts_removed, false}};
   for (const auto& step : steps) {
@@ -392,7 +395,9 @@ void SubsetLoadBalancer::processSubsets(
               HostPredicate predicate = [this, kvs](const Host& host) -> bool {
                 return hostMatches(kvs, host);
               };
-              new_cb(entry, predicate, kvs, adding_hosts);
+              if (adding_hosts) {
+                new_cb(entry, predicate, kvs);
+              }
             }
           }
         }
@@ -421,31 +426,18 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
   processSubsets(
       hosts_added, hosts_removed,
       [&](LbSubsetEntryPtr entry) {
-        const bool active_before = entry->active();
         entry->priority_subset_->update(priority, hosts_added, hosts_removed);
-
-        if (active_before && !entry->active()) {
-          stats_.lb_subsets_active_.dec();
-          stats_.lb_subsets_removed_.inc();
-        } else if (!active_before && entry->active()) {
-          stats_.lb_subsets_active_.inc();
-          stats_.lb_subsets_created_.inc();
-        }
       },
-      [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
-          bool adding_host) {
-        UNREFERENCED_PARAMETER(kvs);
-        if (adding_host) {
-          ENVOY_LOG(debug, "subset lb: creating load balancer for {}", describeMetadata(kvs));
+      [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs) {
+        ENVOY_LOG(debug, "subset lb: creating load balancer for {}", describeMetadata(kvs));
 
-          // Initialize new entry with hosts and update stats. (An uninitialized entry
-          // with only removed hosts is a degenerate case and we leave the entry
-          // uninitialized.)
-          entry->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-              *this, predicate, locality_weight_aware_, scale_locality_weight_);
-          stats_.lb_subsets_active_.inc();
-          stats_.lb_subsets_created_.inc();
-        }
+        // Initialize new entry with hosts and update stats. (An uninitialized entry
+        // with only removed hosts is a degenerate case and we leave the entry
+        // uninitialized.)
+        entry->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+            *this, predicate, locality_weight_aware_, scale_locality_weight_);
+        stats_.lb_subsets_active_.inc();
+        stats_.lb_subsets_created_.inc();
       });
 }
 
@@ -593,6 +585,39 @@ void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
   }
 }
 
+void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
+  for (auto subset_it = subsets.begin(); subset_it != subsets.end();) {
+    for (auto it = subset_it->second.begin(); it != subset_it->second.end();) {
+      LbSubsetEntryPtr entry = it->second;
+
+      purgeEmptySubsets(entry->children_);
+
+      if (entry->active() || entry->hasChildren()) {
+        it++;
+        continue;
+      }
+
+      // If it wasn't initialized, it wasn't accounted for.
+      if (entry->initialized()) {
+        stats_.lb_subsets_active_.dec();
+        stats_.lb_subsets_removed_.inc();
+      }
+
+      auto next_it = std::next(it);
+      subset_it->second.erase(it);
+      it = next_it;
+    }
+
+    if (subset_it->second.empty()) {
+      auto next_subset_it = std::next(subset_it);
+      subsets.erase(subset_it);
+      subset_it = next_subset_it;
+    } else {
+      subset_it++;
+    }
+  }
+}
+
 // Initialize a new HostSubsetImpl and LoadBalancer from the SubsetLoadBalancer, filtering hosts
 // with the given predicate.
 SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb,
@@ -671,8 +696,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   // that we maintain a consistent view of the metadata and saves on computation
   // since metadata lookups can be expensive.
   //
-  // We use an unordered_set because this can potentially be in the tens of thousands.
-  std::unordered_set<const Host*> matching_hosts;
+  // We use an unordered container because this can potentially be in the tens of thousands.
+  absl::node_hash_set<const Host*> matching_hosts;
 
   auto cached_predicate = [&matching_hosts](const auto& host) {
     return matching_hosts.count(&host) == 1;

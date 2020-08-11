@@ -16,6 +16,11 @@
 
 * Please see [REPO_LAYOUT.md](REPO_LAYOUT.md).
 
+# Documentation
+
+* If you are modifying the data plane structually, please keep the [Life of a
+  Request](docs/root/intro/life_of_a_request.md) documentation up-to-date.
+
 # Deviations from Google C++ style guidelines
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
@@ -46,7 +51,7 @@
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
 * `absl::optional<std::reference_wrapper<T>> is type aliased:
   * `using FooOptRef = absl::optional<std::reference_wrapper<T>>;`
-  * `using FooOptConstRef = absl::optional<std::reference_wrapper<T>>;`
+  * `using FooOptConstRef = absl::optional<std::reference_wrapper<const T>>;`
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at

@@ -106,7 +106,7 @@ public:
    * Initialize the connection. Issue the auth command and readonly command as needed.
    * @param auth password for upstream host.
    */
-  virtual void initialize(const std::string& auth_password) PURE;
+  virtual void initialize(const std::string& auth_username, const std::string& auth_password) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -114,7 +114,7 @@ using ClientPtr = std::unique_ptr<Client>;
 /**
  * Read policy to use for Redis cluster.
  */
-enum class ReadPolicy { Master, PreferMaster, Replica, PreferReplica, Any };
+enum class ReadPolicy { Primary, PreferPrimary, Replica, PreferReplica, Any };
 
 /**
  * Configuration for a redis connection pool.
@@ -186,6 +186,8 @@ public:
   virtual ReadPolicy readPolicy() const PURE;
 };
 
+using ConfigSharedPtr = std::shared_ptr<Config>;
+
 /**
  * A factory for individual redis client connections.
  */
@@ -206,7 +208,8 @@ public:
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                            const Config& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
-                           Stats::Scope& scope, const std::string& auth_password) PURE;
+                           Stats::Scope& scope, const std::string& auth_username,
+                           const std::string& auth_password) PURE;
 };
 
 } // namespace Client

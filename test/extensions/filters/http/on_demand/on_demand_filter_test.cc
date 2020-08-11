@@ -31,7 +31,7 @@ public:
 
 // tests decodeHeaders() when no cached route is available and vhds is configured
 TEST_F(OnDemandFilterTest, TestDecodeHeaders) {
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   std::shared_ptr<Router::MockConfig> route_config_ptr{new NiceMock<Router::MockConfig>()};
   EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, routeConfig()).Times(2).WillRepeatedly(Return(route_config_ptr));
@@ -42,13 +42,13 @@ TEST_F(OnDemandFilterTest, TestDecodeHeaders) {
 
 // tests decodeHeaders() when no cached route is available
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailable) {
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
 // tests decodeHeaders() when no route configuration is available
 TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteConfigIsNotAvailable) {
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   std::shared_ptr<Router::MockConfig> route_config_ptr{new NiceMock<Router::MockConfig>()};
   EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, routeConfig()).WillOnce(Return(absl::nullopt));
@@ -56,7 +56,7 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteConfigIsNotAvailable) {
 }
 
 TEST_F(OnDemandFilterTest, TestDecodeTrailers) {
-  Http::RequestTrailerMapImpl headers;
+  Http::TestRequestTrailerMapImpl headers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 

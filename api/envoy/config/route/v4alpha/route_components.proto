@@ -3,8 +3,11 @@ syntax = "proto3";
 package envoy.config.route.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
-import "envoy/type/matcher/v3/regex.proto";
-import "envoy/type/matcher/v3/string.proto";
+import "envoy/config/core/v4alpha/extension.proto";
+import "envoy/config/core/v4alpha/proxy_protocol.proto";
+import "envoy/type/matcher/v4alpha/regex.proto";
+import "envoy/type/matcher/v4alpha/string.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/range.proto";
@@ -123,7 +126,9 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
-  repeated string response_headers_to_remove = 11;
+  repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
@@ -142,7 +147,7 @@ message VirtualHost {
   // will see the attempt count as perceived by the second Envoy. Defaults to false.
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
-  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  // <envoy_api_field_extensions.filters.http.router.v4alpha.Router.suppress_envoy_headers>` flag.
   //
   // [#next-major-version: rename to include_attempt_count_in_request.]
   bool include_request_attempt_count = 14;
@@ -154,7 +159,7 @@ message VirtualHost {
   // will see the attempt count as perceived by the Envoy closest upstream from itself. Defaults to false.
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
-  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  // <envoy_api_field_extensions.filters.http.router.v4alpha.Router.suppress_envoy_headers>` flag.
   bool include_attempt_count_in_response = 19;
 
   // Indicates the retry policy for all routes in this virtual host. Note that setting a
@@ -223,6 +228,8 @@ message Route {
     // [#not-implemented-hide:]
     // If true, a filter will define the action (e.g., it could dynamically generate the
     // RouteAction).
+    // [#comment: TODO(samflattery): Remove cleanup in route_fuzz_test.cc when
+    // implemented]
     FilterAction filter_action = 17;
   }
 
@@ -269,7 +276,9 @@ message Route {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
-  repeated string response_headers_to_remove = 11;
+  repeated string response_headers_to_remove = 11 [(validate.rules).repeated = {
+    items {string {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Presence of the object defines whether the connection manager's tracing configuration
   // is overridden by this route specific instance.
@@ -371,7 +380,7 @@ message WeightedCluster {
   string runtime_key_prefix = 2;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteMatch";
 
@@ -391,6 +400,12 @@ message RouteMatch {
     // If specified, the route will match against whether or not a certificate is validated.
     // If not specified, certificate validation status (true or false) will not be considered when route matching.
     google.protobuf.BoolValue validated = 2;
+  }
+
+  // An extensible message for matching CONNECT requests.
+  message ConnectMatcher {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.route.v3.RouteMatch.ConnectMatcher";
   }
 
   reserved 5, 3;
@@ -420,7 +435,18 @@ message RouteMatch {
     // path_specifier entirely and just rely on a set of header matchers which can already match
     // on :path, etc. The issue with that is it is unclear how to generically deal with query string
     // stripping. This needs more thought.]
-    type.matcher.v3.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+    type.matcher.v4alpha.RegexMatcher safe_regex = 10 [(validate.rules).message = {required: true}];
+
+    // If this is used as the matcher, the matcher will only match CONNECT requests.
+    // Note that this will not match HTTP/2 upgrade-style CONNECT requests
+    // (WebSocket and the like) as they are normalized in Envoy as HTTP/1.1 style
+    // upgrades.
+    // This is the only way to match CONNECT requests for HTTP/1.1. For HTTP/2,
+    // where CONNECT requests may have a path, the path matchers will work if
+    // there is a path present.
+    // Note that CONNECT support is currently considered alpha in Envoy.
+    // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
+    ConnectMatcher connect_matcher = 12;
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -481,7 +507,7 @@ message CorsPolicy {
 
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
-  repeated type.matcher.v3.StringMatcher allow_origin_string_match = 11;
+  repeated type.matcher.v4alpha.StringMatcher allow_origin_string_match = 11;
 
   // Specifies the content for the *access-control-allow-methods* header.
   string allow_methods = 2;
@@ -521,7 +547,7 @@ message CorsPolicy {
   core.v4alpha.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteAction";
 
@@ -531,12 +557,6 @@ message RouteAction {
 
     // HTTP status code - 404 Not Found.
     NOT_FOUND = 1;
-  }
-
-  // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
-  enum InternalRedirectAction {
-    PASS_THROUGH_INTERNAL_REDIRECT = 0;
-    HANDLE_INTERNAL_REDIRECT = 1;
   }
 
   // The router is capable of shadowing traffic from one cluster to another. The current
@@ -592,6 +612,10 @@ message RouteAction {
       string header_name = 1 [
         (validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}
       ];
+
+      // If specified, the request header value will be rewritten and used
+      // to produce the hash key.
+      type.matcher.v4alpha.RegexMatchAndSubstitute regex_rewrite = 2;
     }
 
     // Envoy supports two types of cookie affinity:
@@ -706,6 +730,16 @@ message RouteAction {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RouteAction.UpgradeConfig";
 
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    message ConnectConfig {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.route.v3.RouteAction.UpgradeConfig.ConnectConfig";
+
+      // If present, the proxy protocol header will be prepended to the CONNECT payload sent upstream.
+      core.v4alpha.ProxyProtocolConfig proxy_protocol_config = 1;
+    }
+
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
@@ -714,11 +748,17 @@ message RouteAction {
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
+
+    // Configuration for sending data upstream as a raw data payload. This is used for
+    // CONNECT requests, when forwarding CONNECT payload as raw TCP.
+    // Note that CONNECT support is currently considered alpha in Envoy.
+    // [#comment:TODO(htuch): Replace the above comment with an alpha tag.
+    ConnectConfig connect_config = 3;
   }
 
-  reserved 12, 18, 19, 16, 22, 21, 10;
+  reserved 12, 18, 19, 16, 22, 21, 10, 26, 31;
 
-  reserved "request_mirror_policy";
+  reserved "request_mirror_policy", "internal_redirect_action", "max_internal_redirects";
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -821,7 +861,7 @@ message RouteAction {
   // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
   //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
   //   ``/aaa/yyy/bbb``.
-  type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
+  type.matcher.v4alpha.RegexMatchAndSubstitute regex_rewrite = 32;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
@@ -958,23 +998,11 @@ message RouteAction {
 
   repeated UpgradeConfig upgrade_configs = 25;
 
-  InternalRedirectAction internal_redirect_action = 26;
-
-  // An internal redirect is handled, iff the number of previous internal redirects that a
-  // downstream request has encountered is lower than this value, and
-  // :ref:`internal_redirect_action <envoy_api_field_config.route.v4alpha.RouteAction.internal_redirect_action>`
-  // is set to :ref:`HANDLE_INTERNAL_REDIRECT
-  // <envoy_api_enum_value_config.route.v4alpha.RouteAction.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
-  // In the case where a downstream request is bounced among multiple routes by internal redirect,
-  // the first route that hits this threshold, or has
-  // :ref:`internal_redirect_action <envoy_api_field_config.route.v4alpha.RouteAction.internal_redirect_action>`
-  // set to
-  // :ref:`PASS_THROUGH_INTERNAL_REDIRECT
-  // <envoy_api_enum_value_config.route.v4alpha.RouteAction.InternalRedirectAction.PASS_THROUGH_INTERNAL_REDIRECT>`
-  // will pass the redirect back to downstream.
-  //
-  // If not specified, at most one redirect will be followed.
-  google.protobuf.UInt32Value max_internal_redirects = 31;
+  // If present, Envoy will try to follow an upstream redirect response instead of proxying the
+  // response back to the downstream. An upstream redirect response is defined
+  // by :ref:`redirect_response_codes
+  // <envoy_api_field_config.route.v4alpha.InternalRedirectPolicy.redirect_response_codes>`.
+  InternalRedirectPolicy internal_redirect_policy = 34;
 
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
@@ -1045,7 +1073,7 @@ message RetryPolicy {
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1. These are the same conditions documented for
   // :ref:`config_http_filters_router_x-envoy-max-retries`.
-  google.protobuf.UInt32Value num_retries = 2;
+  google.protobuf.UInt32Value max_retries = 2;
 
   // Specifies a non-zero upstream timeout per retry attempt. This parameter is optional. The
   // same conditions documented for
@@ -1166,6 +1194,21 @@ message RedirectAction {
 
   oneof path_rewrite_specifier {
     // The path portion of the URL will be swapped with this value.
+    // Please note that query string in path_redirect will override the
+    // request's query string and will not be stripped.
+    //
+    // For example, let's say we have the following routes:
+    //
+    // - match: { path: "/old-path-1" }
+    //   redirect: { path_redirect: "/new-path-1" }
+    // - match: { path: "/old-path-2" }
+    //   redirect: { path_redirect: "/new-path-2", strip-query: "true" }
+    // - match: { path: "/old-path-3" }
+    //   redirect: { path_redirect: "/new-path-3?foo=1", strip_query: "true" }
+    //
+    // 1. if request uri is "/old-path-1?bar=1", users will be redirected to "/new-path-1?bar=1"
+    // 2. if request uri is "/old-path-2?bar=1", users will be redirected to "/new-path-2"
+    // 3. if request uri is "/old-path-3?bar=1", users will be redirected to "/new-path-3?foo=1"
     string path_redirect = 2
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
@@ -1302,7 +1345,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RateLimit";
 
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.route.v3.RateLimit.Action";
@@ -1359,6 +1402,11 @@ message RateLimit {
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
+
+      // If set to true, Envoy skips the descriptor while calling rate limiting service
+      // when header is not present in the request. By default it skips calling the
+      // rate limiting service if this header is not present in the request.
+      bool skip_if_absent = 3;
     }
 
     // The following descriptor entry is appended to the descriptor and is populated using the
@@ -1411,6 +1459,27 @@ message RateLimit {
       repeated HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
     }
 
+    // The following descriptor entry is appended when the dynamic metadata contains a key value:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    message DynamicMetaData {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.route.v3.RateLimit.Action.DynamicMetaData";
+
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the dynamic metadata is of type string.
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+
+      // An optional value to use if *metadata_key* is empty. If not set and
+      // no value is present under the metadata_key then no descriptor is generated.
+      string default_value = 3;
+    }
+
     oneof action_specifier {
       option (validate.required) = true;
 
@@ -1431,6 +1500,33 @@ message RateLimit {
 
       // Rate limit on the existence of request headers.
       HeaderValueMatch header_value_match = 6;
+
+      // Rate limit on dynamic metadata.
+      DynamicMetaData dynamic_metadata = 7;
+    }
+  }
+
+  message Override {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.route.v3.RateLimit.Override";
+
+    // Fetches the override from the dynamic metadata.
+    message DynamicMetadata {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.route.v3.RateLimit.Override.DynamicMetadata";
+
+      // Metadata struct that defines the key and path to retrieve the struct value.
+      // The value must be a struct containing an integer "requests_per_unit" property
+      // and a "unit" property with a value parseable to :ref:`RateLimitUnit
+      // enum <envoy_api_enum_type.v3.RateLimitUnit>`
+      type.metadata.v3.MetadataKey metadata_key = 1 [(validate.rules).message = {required: true}];
+    }
+
+    oneof override_specifier {
+      option (validate.required) = true;
+
+      // Limit override from dynamic metadata.
+      DynamicMetadata dynamic_metadata = 1;
     }
   }
 
@@ -1453,6 +1549,12 @@ message RateLimit {
   // configuration. See :ref:`composing actions
   // <config_http_filters_rate_limit_composing_actions>` for additional documentation.
   repeated Action actions = 3 [(validate.rules).repeated = {min_items: 1}];
+
+  // An optional limit override to be appended to the descriptor produced by this
+  // rate limit configuration. If the override value is invalid or cannot be resolved
+  // from metadata, no override is provided. See :ref:`rate limit override
+  // <config_http_filters_rate_limit_rate_limit_override>` for more information.
+  Override limit = 4;
 }
 
 // .. attention::
@@ -1500,7 +1602,7 @@ message HeaderMatcher {
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex.
-    type.matcher.v3.RegexMatcher safe_regex_match = 11;
+    type.matcher.v4alpha.RegexMatcher safe_regex_match = 11;
 
     // If specified, header match will be performed based on range.
     // The rule will match if the request header value is within this range.
@@ -1562,9 +1664,40 @@ message QueryParameterMatcher {
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.
-    type.matcher.v3.StringMatcher string_match = 5 [(validate.rules).message = {required: true}];
+    type.matcher.v4alpha.StringMatcher string_match = 5
+        [(validate.rules).message = {required: true}];
 
     // Specifies whether a query parameter should be present.
     bool present_match = 6;
   }
+}
+
+// HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
+message InternalRedirectPolicy {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.route.v3.InternalRedirectPolicy";
+
+  // An internal redirect is not handled, unless the number of previous internal redirects that a
+  // downstream request has encountered is lower than this value.
+  // In the case where a downstream request is bounced among multiple routes by internal redirect,
+  // the first route that hits this threshold, or does not set :ref:`internal_redirect_policy
+  // <envoy_api_field_config.route.v4alpha.RouteAction.internal_redirect_policy>`
+  // will pass the redirect back to downstream.
+  //
+  // If not specified, at most one redirect will be followed.
+  google.protobuf.UInt32Value max_internal_redirects = 1;
+
+  // Defines what upstream response codes are allowed to trigger internal redirect. If unspecified,
+  // only 302 will be treated as internal redirect.
+  // Only 301, 302, 303, 307 and 308 are valid values. Any other codes will be ignored.
+  repeated uint32 redirect_response_codes = 2 [(validate.rules).repeated = {max_items: 5}];
+
+  // Specifies a list of predicates that are queried when an upstream response is deemed
+  // to trigger an internal redirect by all other criteria. Any predicate in the list can reject
+  // the redirect, causing the response to be proxied to downstream.
+  repeated core.v4alpha.TypedExtensionConfig predicates = 3;
+
+  // Allow internal redirect to follow a target URI with a different scheme than the value of
+  // x-forwarded-proto. The default is false.
+  bool allow_cross_scheme_redirect = 4;
 }

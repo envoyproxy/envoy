@@ -83,7 +83,6 @@ message Action {
     MutateAndMove mutate_and_move = 12;
     Append append = 11;
     google.protobuf.Empty copy = 7;
-    string lookup = 8;
     string remove = 9;
     string remove_prefix = 10;
   }

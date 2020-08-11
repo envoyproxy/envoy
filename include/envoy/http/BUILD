@@ -1,10 +1,10 @@
-licenses(["notice"])  # Apache 2
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
+
+licenses(["notice"])  # Apache 2
 
 envoy_package()
 
@@ -35,7 +35,9 @@ envoy_cc_library(
         ":metadata_interface",
         ":protocol_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/grpc:status",
         "//include/envoy/network:address_interface",
+        "//source/common/http:status_lib",
     ],
 )
 
@@ -89,6 +91,7 @@ envoy_cc_library(
     deps = [
         ":header_map_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/stream_info:filter_state_interface",
     ],
 )
 
@@ -126,6 +129,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "metadata_interface",
     hdrs = ["metadata_interface.h"],
+    external_deps = ["abseil_node_hash_map"],
 )
 
 envoy_cc_library(

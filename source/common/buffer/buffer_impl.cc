@@ -33,6 +33,11 @@ void OwnedImpl::addImpl(const void* data, uint64_t size) {
   }
 }
 
+void OwnedImpl::addDrainTracker(std::function<void()> drain_tracker) {
+  ASSERT(!slices_.empty());
+  slices_.back()->addDrainTracker(std::move(drain_tracker));
+}
+
 void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
@@ -143,7 +148,9 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   ASSERT(size == 0);
 }
 
-void OwnedImpl::drain(uint64_t size) {
+void OwnedImpl::drain(uint64_t size) { drainImpl(size); }
+
+void OwnedImpl::drainImpl(uint64_t size) {
   while (size != 0) {
     if (slices_.empty()) {
       break;
@@ -194,6 +201,34 @@ RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) cons
   return raw_slices;
 }
 
+SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
+  RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
+  // Remove zero byte fragments from the front of the queue to ensure
+  // that the extracted slice has data.
+  while (!slices_.empty() && slices_.front()->dataSize() == 0) {
+    slices_.pop_front();
+  }
+  ASSERT(!slices_.empty());
+  ASSERT(slices_.front());
+  auto slice = std::move(slices_.front());
+  auto size = slice->dataSize();
+  length_ -= size;
+  slices_.pop_front();
+  if (!slice->isMutable()) {
+    // Create a mutable copy of the immutable slice data.
+    auto mutable_slice = OwnedSlice::create(size);
+    auto copy_size = mutable_slice->append(slice->data(), size);
+    ASSERT(copy_size == size);
+    // Drain trackers for the immutable slice will be called as part of the slice destructor.
+    return mutable_slice;
+  } else {
+    // Make sure drain trackers are called before ownership of the slice is transferred from
+    // the buffer to the caller.
+    slice->callAndClearDrainTrackers();
+    return slice;
+  }
+}
+
 uint64_t OwnedImpl::length() const {
 #ifndef NDEBUG
   // When running in debug mode, verify that the precomputed length matches the sum
@@ -213,32 +248,20 @@ void* OwnedImpl::linearize(uint32_t size) {
   if (slices_.empty()) {
     return nullptr;
   }
-  uint64_t linearized_size = 0;
-  uint64_t num_slices_to_linearize = 0;
-  for (const auto& slice : slices_) {
-    num_slices_to_linearize++;
-    linearized_size += slice->dataSize();
-    if (linearized_size >= size) {
-      break;
-    }
-  }
-  if (num_slices_to_linearize > 1) {
-    auto new_slice = OwnedSlice::create(linearized_size);
-    uint64_t bytes_copied = 0;
-    Slice::Reservation reservation = new_slice->reserve(linearized_size);
+  if (slices_[0]->dataSize() < size) {
+    auto new_slice = OwnedSlice::create(size);
+    Slice::Reservation reservation = new_slice->reserve(size);
     ASSERT(reservation.mem_ != nullptr);
-    ASSERT(reservation.len_ == linearized_size);
-    auto dest = static_cast<uint8_t*>(reservation.mem_);
-    do {
-      uint64_t data_size = slices_.front()->dataSize();
-      memcpy(dest, slices_.front()->data(), data_size);
-      bytes_copied += data_size;
-      dest += data_size;
-      slices_.pop_front();
-    } while (bytes_copied < linearized_size);
-    ASSERT(dest == static_cast<const uint8_t*>(reservation.mem_) + linearized_size);
+    ASSERT(reservation.len_ == size);
+    copyOut(0, size, reservation.mem_);
     new_slice->commit(reservation);
+
+    // Replace the first 'size' bytes in the buffer with the new slice. Since new_slice re-adds the
+    // drained bytes, avoid use of the overridable 'drain' method to avoid incorrectly checking if
+    // we dipped below low-watermark.
+    drainImpl(size);
     slices_.emplace_front(std::move(new_slice));
+    length_ += size;
   }
   return slices_.front()->data();
 }
@@ -256,6 +279,7 @@ void OwnedImpl::coalesceOrAddSlice(SlicePtr&& other_slice) {
     // Copy content of the `other_slice`. The `move` methods which call this method effectively
     // drain the source buffer.
     addImpl(other_slice->data(), slice_size);
+    other_slice->transferDrainTrackersTo(*slices_.back());
   } else {
     // Take ownership of the slice.
     slices_.emplace_back(std::move(other_slice));
@@ -372,7 +396,7 @@ uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iove
   return num_slices_used;
 }
 
-ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
+ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start, size_t length) const {
   // This implementation uses the same search algorithm as evbuffer_search(), a naive
   // scan that requires O(M*N) comparisons in the worst case.
   // TODO(brian-pane): replace this with a more efficient search if it shows up
@@ -380,9 +404,17 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   if (size == 0) {
     return (start <= length_) ? start : -1;
   }
+
+  // length equal to zero means that entire buffer must be searched.
+  // Adjust the length to buffer length taking the staring index into account.
+  size_t left_to_search = length;
+  if (0 == length) {
+    left_to_search = length_ - start;
+  }
   ssize_t offset = 0;
   const uint8_t* needle = static_cast<const uint8_t*>(data);
-  for (size_t slice_index = 0; slice_index < slices_.size(); slice_index++) {
+  for (size_t slice_index = 0; slice_index < slices_.size() && (left_to_search > 0);
+       slice_index++) {
     const auto& slice = slices_[slice_index];
     uint64_t slice_size = slice->dataSize();
     if (slice_size <= start) {
@@ -395,20 +427,28 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
     const uint8_t* haystack_end = haystack + slice_size;
     haystack += start;
     while (haystack < haystack_end) {
+      const size_t slice_search_limit =
+          std::min(static_cast<size_t>(haystack_end - haystack), left_to_search);
       // Search within this slice for the first byte of the needle.
       const uint8_t* first_byte_match =
-          static_cast<const uint8_t*>(memchr(haystack, needle[0], haystack_end - haystack));
+          static_cast<const uint8_t*>(memchr(haystack, needle[0], slice_search_limit));
       if (first_byte_match == nullptr) {
+        left_to_search -= slice_search_limit;
         break;
       }
       // After finding a match for the first byte of the needle, check whether the following
       // bytes in the buffer match the remainder of the needle. Note that the match can span
       // two or more slices.
+      left_to_search -= static_cast<size_t>(first_byte_match - haystack + 1);
+      // Save the current number of bytes left to search.
+      // If the pattern is not found, the search will resume from the next byte
+      // and left_to_search value must be restored.
+      const size_t saved_left_to_search = left_to_search;
       size_t i = 1;
       size_t match_index = slice_index;
       const uint8_t* match_next = first_byte_match + 1;
       const uint8_t* match_end = haystack_end;
-      while (i < size) {
+      while ((i < size) && (0 < left_to_search)) {
         if (match_next >= match_end) {
           // We've hit the end of this slice, so continue checking against the next slice.
           match_index++;
@@ -421,6 +461,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
           match_end = match_next + match_slice->dataSize();
           continue;
         }
+        left_to_search--;
         if (*match_next++ != needle[i]) {
           break;
         }
@@ -432,6 +473,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
       }
       // If this wasn't a successful match, start scanning again at the next byte.
       haystack = first_byte_match + 1;
+      left_to_search = saved_left_to_search;
     }
     start = 0;
     offset += slice_size;

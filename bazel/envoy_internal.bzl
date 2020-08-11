@@ -14,7 +14,6 @@ def envoy_copts(repository, test = False):
         "-Wformat",
         "-Wformat-security",
         "-Wvla",
-        "-std=c++14",
     ]
 
     # Windows options for cleanest service compilation;
@@ -25,7 +24,6 @@ def envoy_copts(repository, test = False):
     msvc_options = [
         "-WX",
         "-Zc:__cplusplus",
-        "-std:c++14",
         "-DWIN32",
         "-D_WIN32_WINNT=0x0A00",  # _WIN32_WINNT_WIN10
         "-DNTDDI_VERSION=0x0A000000",  # NTDDI_WIN10
@@ -34,6 +32,9 @@ def envoy_copts(repository, test = False):
         "-DNOMCX",
         "-DNOIME",
         "-DNOCRYPT",
+        # this is to silence the incorrect MSVC compiler warning when trying to convert between
+        # std::optional data types while conversions between primitive types are producing no error
+        "-wd4244",
     ]
 
     return select({
@@ -48,8 +49,11 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
            }) + select({
-               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand"],
+               repository + "//bazel:clang_build": ["-fno-limit-debug-info", "-Wgnu-conditional-omitted-operand", "-Wc++2a-extensions"],
                repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
+               "//conditions:default": [],
+           }) + select({
+               repository + "//bazel:no_debug_info": ["-g0"],
                "//conditions:default": [],
            }) + select({
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],

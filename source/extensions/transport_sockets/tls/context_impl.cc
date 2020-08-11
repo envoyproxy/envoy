@@ -19,9 +19,13 @@
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
+#include "common/stats/utility.h"
 
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/container/node_hash_set.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
@@ -87,11 +91,24 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
     if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), config.cipherSuites().c_str())) {
+      // Break up a set of ciphers into each individual cipher and try them each individually in
+      // order to attempt to log which specific one failed. Example of config.cipherSuites():
+      // "-ALL:[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:ECDHE-ECDSA-AES128-SHA".
+      //
+      // "-" is both an operator when in the leading position of a token (-ALL: don't allow this
+      // cipher), and the common separator in names (ECDHE-ECDSA-AES128-GCM-SHA256). Don't split on
+      // it because it will separate pieces of the same cipher. When it is a leading character, it
+      // is removed below.
       std::vector<absl::string_view> ciphers =
-          StringUtil::splitToken(config.cipherSuites(), ":+-![|]", false);
+          StringUtil::splitToken(config.cipherSuites(), ":+![|]", false);
       std::vector<std::string> bad_ciphers;
       for (const auto& cipher : ciphers) {
         std::string cipher_str(cipher);
+
+        if (absl::StartsWith(cipher_str, "-")) {
+          cipher_str.erase(cipher_str.begin());
+        }
+
         if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), cipher_str.c_str())) {
           bad_ciphers.push_back(cipher_str);
         }
@@ -252,7 +269,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-  std::unordered_set<int> cert_pkey_ids;
+  absl::node_hash_set<int> cert_pkey_ids;
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     // Load certificate chain.
@@ -450,7 +467,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
                                           const unsigned char* in, unsigned int inlen) {
   // Currently this uses the standard selection algorithm in priority order.
-  const uint8_t* alpn_data = &parsed_alpn_protocols_[0];
+  const uint8_t* alpn_data = parsed_alpn_protocols_.data();
   size_t alpn_data_size = parsed_alpn_protocols_.size();
 
   if (SSL_select_next_proto(const_cast<unsigned char**>(out), outlen, alpn_data, alpn_data_size, in,
@@ -510,49 +527,50 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  Envoy::Ssl::SslExtendedSocketInfo* sslExtendedInfo =
+  auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
+  return impl->doVerifyCertChain(
+      store_ctx,
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
-          SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+          SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
+      *cert, static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl)));
+}
 
-  if (impl->verify_trusted_ca_) {
+int ContextImpl::doVerifyCertChain(
+    X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
+    const Network::TransportSocketOptions* transport_socket_options) {
+  if (verify_trusted_ca_) {
     int ret = X509_verify_cert(store_ctx);
-    if (sslExtendedInfo) {
-      sslExtendedInfo->setCertificateValidationStatus(
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(
           ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
                    : Envoy::Ssl::ClientValidationStatus::Failed);
     }
 
     if (ret <= 0) {
-      impl->stats_.fail_verify_error_.inc();
-      return impl->allow_untrusted_certificate_ ? 1 : ret;
+      stats_.fail_verify_error_.inc();
+      return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
 
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
-
-  const Network::TransportSocketOptions* transport_socket_options =
-      static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
-
-  Envoy::Ssl::ClientValidationStatus validated = impl->verifyCertificate(
-      cert.get(),
+  Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(
+      &leaf_cert,
       transport_socket_options &&
               !transport_socket_options->verifySubjectAltNameListOverride().empty()
           ? transport_socket_options->verifySubjectAltNameListOverride()
-          : impl->verify_subject_alt_name_list_,
-      impl->subject_alt_name_matchers_);
+          : verify_subject_alt_name_list_,
+      subject_alt_name_matchers_);
 
-  if (sslExtendedInfo) {
-    if (sslExtendedInfo->certificateValidationStatus() ==
+  if (ssl_extended_info) {
+    if (ssl_extended_info->certificateValidationStatus() ==
         Envoy::Ssl::ClientValidationStatus::NotValidated) {
-      sslExtendedInfo->setCertificateValidationStatus(validated);
+      ssl_extended_info->setCertificateValidationStatus(validated);
     } else if (validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
-      sslExtendedInfo->setCertificateValidationStatus(validated);
+      ssl_extended_info->setCertificateValidationStatus(validated);
     }
   }
 
-  return impl->allow_untrusted_certificate_
-             ? 1
-             : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
+  return allow_untrusted_certificate_ ? 1
+                                      : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
 }
 
 Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
@@ -594,10 +612,9 @@ Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
                              const Stats::StatName fallback) const {
-  Stats::SymbolTable& symbol_table = scope_.symbolTable();
-  Stats::SymbolTable::StoragePtr storage =
-      symbol_table.join({name, stat_name_set_->getBuiltin(value, fallback)});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  Stats::Counter& counter = Stats::Utility::counterFromElements(
+      scope_, {name, stat_name_set_->getBuiltin(value, fallback)});
+  counter.inc();
 
 #ifdef LOG_BUILTIN_STAT_NAMES
   std::cerr << absl::StrCat("Builtin ", symbol_table.toString(name), ": ", value, "\n")
@@ -659,7 +676,7 @@ bool ContextImpl::matchSubjectAltName(
       if (general_name->type == GEN_DNS &&
                   config_san_matcher.matcher().match_pattern_case() ==
                       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-              ? dnsNameMatch(config_san_matcher.matcher().exact(), san.c_str())
+              ? dnsNameMatch(config_san_matcher.matcher().exact(), absl::string_view(san))
               : config_san_matcher.match(san)) {
         return true;
       }
@@ -687,16 +704,21 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool ContextImpl::dnsNameMatch(const std::string& dns_name, const char* pattern) {
+bool ContextImpl::dnsNameMatch(const absl::string_view dns_name, const absl::string_view pattern) {
   if (dns_name == pattern) {
     return true;
   }
 
-  size_t pattern_len = strlen(pattern);
+  size_t pattern_len = pattern.length();
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
     if (dns_name.length() > pattern_len - 1) {
       const size_t off = dns_name.length() - pattern_len + 1;
-      return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.fix_wildcard_matching")) {
+        return dns_name.substr(0, off).find('.') == std::string::npos &&
+               dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
+      } else {
+        return dns_name.substr(off, pattern_len - 1) == pattern.substr(1, pattern_len - 1);
+      }
     }
   }
 
@@ -821,7 +843,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
     for (auto& ctx : tls_contexts_) {
-      const int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), &parsed_alpn_protocols_[0],
+      const int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), parsed_alpn_protocols_.data(),
                                              parsed_alpn_protocols_.size());
       RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
     }
@@ -851,6 +873,18 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   }
 }
 
+bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl) {
+  std::vector<uint8_t> parsed_alpn = parseAlpnProtocols(absl::StrJoin(alpn, ","));
+  if (!parsed_alpn.empty()) {
+    const int rc = SSL_set_alpn_protos(&ssl, parsed_alpn.data(), parsed_alpn.size());
+    // This should only if memory allocation fails, e.g. OOM.
+    RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
+    return true;
+  }
+
+  return false;
+}
+
 bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOptions* options) {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(options));
 
@@ -868,14 +902,23 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
-  if (options && !options->applicationProtocolListOverride().empty()) {
-    std::vector<uint8_t> parsed_override_alpn =
-        parseAlpnProtocols(absl::StrJoin(options->applicationProtocolListOverride(), ","));
-    if (!parsed_override_alpn.empty()) {
-      const int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
-                                         parsed_override_alpn.size());
-      RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
-    }
+  // We determine what ALPN using the following precedence:
+  // 1. Option-provided ALPN override.
+  // 2. ALPN statically configured in the upstream TLS context.
+  // 3. Option-provided ALPN fallback.
+
+  // At this point in the code the ALPN has already been set (if present) to the value specified in
+  // the TLS context. We've stored this value in parsed_alpn_protocols_ so we can check that to see
+  // if it's already been set.
+  bool has_alpn_defined = !parsed_alpn_protocols_.empty();
+  if (options) {
+    // ALPN override takes precedence over TLS context specified, so blindly overwrite it.
+    has_alpn_defined |= parseAndSetAlpn(options->applicationProtocolListOverride(), *ssl_con);
+  }
+
+  if (options && !has_alpn_defined && options->applicationProtocolFallback().has_value()) {
+    // If ALPN hasn't already been set (either through TLS context or override), use the fallback.
+    parseAndSetAlpn({*options->applicationProtocolFallback()}, *ssl_con);
   }
 
   if (allow_renegotiation_) {
@@ -1350,6 +1393,28 @@ bool ServerContextImpl::TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t
     }
   }
   return false;
+}
+
+bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates,
+                                  std::string& error_details) {
+  bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
+  // It doesn't matter which SSL context is used, because they share the same
+  // cert validation config.
+  X509_STORE* store = SSL_CTX_get_cert_store(tls_contexts_[0].ssl_ctx_.get());
+  if (!X509_STORE_CTX_init(ctx.get(), store, &leaf_cert, &intermediates)) {
+    error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
+    return false;
+  }
+
+  int res = doVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
+  if (res <= 0) {
+    const int n = X509_STORE_CTX_get_error(ctx.get());
+    const int depth = X509_STORE_CTX_get_error_depth(ctx.get());
+    error_details = absl::StrCat("X509_verify_cert: certificate verification error at depth ",
+                                 depth, ": ", X509_verify_cert_error_string(n));
+    return false;
+  }
+  return true;
 }
 
 } // namespace Tls

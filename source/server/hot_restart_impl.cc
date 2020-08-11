@@ -12,7 +12,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/server/instance.h"
-#include "envoy/server/options.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/api/os_sys_calls_impl_hot_restart.h"
@@ -24,13 +23,13 @@
 namespace Envoy {
 namespace Server {
 
-SharedMemory* attachSharedMemory(const Options& options) {
+SharedMemory* attachSharedMemory(uint32_t base_id, uint32_t restart_epoch) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::HotRestartOsSysCalls& hot_restart_os_sys_calls = Api::HotRestartOsSysCallsSingleton::get();
 
   int flags = O_RDWR;
-  const std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
-  if (options.restartEpoch() == 0) {
+  const std::string shmem_name = fmt::format("/envoy_shared_memory_{}", base_id);
+  if (restart_epoch == 0) {
     flags |= O_CREAT | O_EXCL;
 
     // If we are meant to be first, attempt to unlink a previous shared memory instance. If this
@@ -42,10 +41,10 @@ SharedMemory* attachSharedMemory(const Options& options) {
       hot_restart_os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
   if (result.rc_ == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
-                      shmem_name, strerror(result.errno_)));
+                      shmem_name, errorDetails(result.errno_)));
   }
 
-  if (options.restartEpoch() == 0) {
+  if (restart_epoch == 0) {
     const Api::SysCallIntResult truncateRes =
         os_sys_calls.ftruncate(result.rc_, sizeof(SharedMemory));
     RELEASE_ASSERT(truncateRes.rc_ != -1, "");
@@ -57,7 +56,7 @@ SharedMemory* attachSharedMemory(const Options& options) {
   RELEASE_ASSERT(shmem != MAP_FAILED, "");
   RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0, "");
 
-  if (options.restartEpoch() == 0) {
+  if (restart_epoch == 0) {
     shmem->size_ = sizeof(SharedMemory);
     shmem->version_ = HOT_RESTART_VERSION;
     initializeMutex(shmem->log_lock_);
@@ -91,10 +90,16 @@ void initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutex_init(&mutex, &attribute);
 }
 
-HotRestartImpl::HotRestartImpl(const Options& options)
-    : as_child_(HotRestartingChild(options.baseId(), options.restartEpoch())),
-      as_parent_(HotRestartingParent(options.baseId(), options.restartEpoch())),
-      shmem_(attachSharedMemory(options)), log_lock_(shmem_->log_lock_),
+// The base id is automatically scaled by 10 to prevent overlap of domain socket names when
+// multiple Envoys with different base-ids run on a single host. Note that older versions of Envoy
+// performed the multiplication in OptionsImpl which produced incorrect server info output.
+// TODO(zuercher): ideally, the base_id would be separated from the restart_epoch in
+// the socket names to entirely prevent collisions between consecutive base ids.
+HotRestartImpl::HotRestartImpl(uint32_t base_id, uint32_t restart_epoch)
+    : base_id_(base_id), scaled_base_id_(base_id * 10),
+      as_child_(HotRestartingChild(scaled_base_id_, restart_epoch)),
+      as_parent_(HotRestartingParent(scaled_base_id_, restart_epoch)),
+      shmem_(attachSharedMemory(scaled_base_id_, restart_epoch)), log_lock_(shmem_->log_lock_),
       access_log_lock_(shmem_->access_log_lock_) {
   // If our parent ever goes away just terminate us so that we don't have to rely on ops/launching
   // logic killing the entire process tree. We should never exist without our parent.
@@ -137,6 +142,7 @@ HotRestartImpl::mergeParentStatsIfAny(Stats::StoreRoot& stats_store) {
 
 void HotRestartImpl::shutdown() { as_parent_.shutdown(); }
 
+uint32_t HotRestartImpl::baseId() { return base_id_; }
 std::string HotRestartImpl::version() { return hotRestartVersion(); }
 
 std::string HotRestartImpl::hotRestartVersion() {

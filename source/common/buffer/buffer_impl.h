@@ -31,11 +31,22 @@ namespace Buffer {
  *                   |
  *                   data()
  */
-class Slice {
+class Slice : public SliceData {
 public:
   using Reservation = RawSlice;
 
-  virtual ~Slice() = default;
+  ~Slice() override { callAndClearDrainTrackers(); }
+
+  // SliceData
+  absl::Span<uint8_t> getMutableData() override {
+    RELEASE_ASSERT(isMutable(), "Not allowed to call getMutableData if slice is immutable");
+    return {base_ + data_, static_cast<absl::Span<uint8_t>::size_type>(reservable_ - data_)};
+  }
+
+  /**
+   * @return true if the data in the slice is mutable
+   */
+  virtual bool isMutable() const { return false; }
 
   /**
    * @return a pointer to the start of the usable content.
@@ -113,10 +124,10 @@ public:
    * @param reservation a reservation obtained from a previous call to reserve().
    *        If the reservation is not from this Slice, commit() will return false.
    *        If the caller is committing fewer bytes than provided by reserve(), it
-   *        should change the mem_ field of the reservation before calling commit().
+   *        should change the len_ field of the reservation before calling commit().
    *        For example, if a caller reserve()s 4KB to do a nonblocking socket read,
    *        and the read only returns two bytes, the caller should set
-   *        reservation.mem_ = 2 and then call `commit(reservation)`.
+   *        reservation.len_ = 2 and then call `commit(reservation)`.
    * @return whether the Reservation was successfully committed to the Slice.
    */
   bool commit(const Reservation& reservation) {
@@ -137,6 +148,9 @@ public:
    */
   uint64_t append(const void* data, uint64_t size) {
     uint64_t copy_size = std::min(size, reservableSize());
+    if (copy_size == 0) {
+      return 0;
+    }
     uint8_t* dest = base_ + reservable_;
     reservable_ += copy_size;
     // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
@@ -193,6 +207,32 @@ public:
     return SliceRepresentation{dataSize(), reservableSize(), capacity_};
   }
 
+  /**
+   * Move all drain trackers from the current slice to the destination slice.
+   */
+  void transferDrainTrackersTo(Slice& destination) {
+    destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
+    ASSERT(drain_trackers_.empty());
+  }
+
+  /**
+   * Add a drain tracker to the slice.
+   */
+  void addDrainTracker(std::function<void()> drain_tracker) {
+    drain_trackers_.emplace_back(std::move(drain_tracker));
+  }
+
+  /**
+   * Call all drain trackers associated with the slice, then clear
+   * the drain tracker list.
+   */
+  void callAndClearDrainTrackers() {
+    for (const auto& drain_tracker : drain_trackers_) {
+      drain_tracker();
+    }
+    drain_trackers_.clear();
+  }
+
 protected:
   Slice(uint64_t data, uint64_t reservable, uint64_t capacity)
       : data_(data), reservable_(reservable), capacity_(capacity) {}
@@ -208,6 +248,8 @@ protected:
 
   /** Total number of bytes in the slice */
   uint64_t capacity_;
+
+  std::list<std::function<void()>> drain_trackers_;
 };
 
 using SlicePtr = std::unique_ptr<Slice>;
@@ -242,6 +284,8 @@ public:
 
 private:
   OwnedSlice(uint64_t size) : Slice(0, 0, size) { base_ = storage_; }
+
+  bool isMutable() const override { return true; }
 
   /**
    * Compute a slice size big enough to hold a specified amount of data.
@@ -510,6 +554,7 @@ public:
   OwnedImpl(const void* data, uint64_t size);
 
   // Buffer::Instance
+  void addDrainTracker(std::function<void()> drain_tracker) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
   void add(absl::string_view data) override;
@@ -520,13 +565,14 @@ public:
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
+  SliceDataPtr extractMutableFrontSlice() override;
   uint64_t length() const override;
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
   Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
-  ssize_t search(const void* data, uint64_t size, size_t start) const override;
+  ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
   Api::IoCallUint64Result write(Network::IoHandle& io_handle) override;
   std::string toString() const override;
@@ -539,13 +585,13 @@ public:
    * @param data start of the content to copy.
    *
    */
-  void appendSliceForTest(const void* data, uint64_t size);
+  virtual void appendSliceForTest(const void* data, uint64_t size);
 
   /**
    * Create a new slice at the end of the buffer, and copy the supplied string into it.
    * @param data the string to append to the buffer.
    */
-  void appendSliceForTest(absl::string_view data);
+  virtual void appendSliceForTest(absl::string_view data);
 
   /**
    * Describe the in-memory representation of the slices in the buffer. For use
@@ -563,6 +609,7 @@ private:
   bool isSameBufferImpl(const Instance& rhs) const;
 
   void addImpl(const void* data, uint64_t size);
+  void drainImpl(uint64_t size);
 
   /**
    * Moves contents of the `other_slice` by either taking its ownership or coalescing it

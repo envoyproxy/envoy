@@ -1,5 +1,3 @@
-#include <unordered_map>
-
 #include "gtest/gtest.h"
 #include "proto_cxx_utils.h"
 
@@ -32,7 +30,7 @@ TEST(ProtoCxxUtils, ProtoToCxxType) {
 
 // Validate proto field accessor upgrades.
 TEST(ProtoCxxUtils, RenameMethod) {
-  const std::unordered_map<std::string, std::string> renames = {
+  const absl::node_hash_map<std::string, std::string> renames = {
       {"foo", "bar"},
       {"bar", "baz"},
   };
@@ -52,7 +50,7 @@ TEST(ProtoCxxUtils, RenameMethod) {
 
 // Validate proto constant upgrades.
 TEST(ProtoCxxUtils, RenameConstant) {
-  const std::unordered_map<std::string, std::string> renames = {
+  const absl::node_hash_map<std::string, std::string> renames = {
       {"foo_bar", "bar_foo"},
       {"foo_baz", "baz"},
   };
@@ -63,7 +61,7 @@ TEST(ProtoCxxUtils, RenameConstant) {
 
 // Validate proto enum value upgrades.
 TEST(ProtoCxxUtils, RenameEnumValue) {
-  const std::unordered_map<std::string, std::string> renames = {
+  const absl::node_hash_map<std::string, std::string> renames = {
       {"FOO_BAR", "BAR_FOO"},
   };
   EXPECT_EQ(absl::nullopt, ProtoCxxUtils::renameEnumValue("FOO_BAZ", renames));

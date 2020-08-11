@@ -65,7 +65,7 @@ TEST(GrpcContextTest, ChargeStats) {
 TEST(GrpcContextTest, ResolveServiceAndMethod) {
   std::string service;
   std::string method;
-  Http::RequestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   headers.setPath("/service_name/method_name?a=b");
   const Http::HeaderEntry* path = headers.Path();
   Stats::TestSymbolTable symbol_table;
@@ -73,8 +73,8 @@ TEST(GrpcContextTest, ResolveServiceAndMethod) {
   absl::optional<Context::RequestStatNames> request_names =
       context.resolveDynamicServiceAndMethod(path);
   EXPECT_TRUE(request_names);
-  EXPECT_EQ("service_name", symbol_table->toString(request_names->service_));
-  EXPECT_EQ("method_name", symbol_table->toString(request_names->method_));
+  EXPECT_EQ("service_name", absl::get<Stats::DynamicName>(request_names->service_));
+  EXPECT_EQ("method_name", absl::get<Stats::DynamicName>(request_names->method_));
   headers.setPath("");
   EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
   headers.setPath("/");

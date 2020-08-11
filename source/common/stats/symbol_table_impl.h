@@ -5,7 +5,6 @@
 #include <memory>
 #include <stack>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -93,7 +92,7 @@ public:
     /**
      * Decodes a uint8_t array into a SymbolVec.
      */
-    static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
+    static SymbolVec decodeSymbols(const SymbolTable::Storage array, size_t size);
 
     /**
      * Decodes a uint8_t array into a sequence of symbols and literal strings.
@@ -103,25 +102,20 @@ public:
      *
      * @param array the StatName encoded as a uint8_t array.
      * @param size the size of the array in bytes.
-     * @param symbolTokenFn a function to be called whenever a symbol is encountered in the array.
-     * @param stringVIewTokeNFn a function to be called whenever a string literal is encountered.
+     * @param symbol_token_fn a function to be called whenever a symbol is encountered in the array.
+     * @param string_view_token_fn a function to be called whenever a string literal is encountered.
      */
-    static void decodeTokens(const SymbolTable::Storage array, uint64_t size,
-                             const std::function<void(Symbol)>& symbolTokenFn,
-                             const std::function<void(absl::string_view)>& stringViewTokenFn);
+    static void decodeTokens(const SymbolTable::Storage array, size_t size,
+                             const std::function<void(Symbol)>& symbol_token_fn,
+                             const std::function<void(absl::string_view)>& string_view_token_fn);
 
     /**
      * Returns the number of bytes required to represent StatName as a uint8_t
      * array, including the encoded size.
      */
-    uint64_t bytesRequired() const {
+    size_t bytesRequired() const {
       return data_bytes_required_ + encodingSizeBytes(data_bytes_required_);
     }
-
-    /**
-     * @return the number of uint8_t entries we collected while adding symbols.
-     */
-    uint64_t dataBytesRequired() const { return data_bytes_required_; }
 
     /**
      * Moves the contents of the vector into an allocated array. The array
@@ -135,13 +129,13 @@ public:
      * @param number A number to encode in a variable length byte-array.
      * @return The number of bytes it would take to encode the number.
      */
-    static uint64_t encodingSizeBytes(uint64_t number);
+    static size_t encodingSizeBytes(uint64_t number);
 
     /**
      * @param num_data_bytes The number of bytes in a data-block.
      * @return The total number of bytes required for the data-block and its encoded size.
      */
-    static uint64_t totalSizeBytes(uint64_t num_data_bytes) {
+    static size_t totalSizeBytes(size_t num_data_bytes) {
       return encodingSizeBytes(num_data_bytes) + num_data_bytes;
     }
 
@@ -172,12 +166,10 @@ public:
      * @param The encoded byte array, written previously by appendEncoding.
      * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
      */
-    static std::pair<uint64_t, uint64_t> decodeNumber(const uint8_t* encoding);
-
-    StoragePtr release() { return mem_block_.release(); }
+    static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
 
   private:
-    uint64_t data_bytes_required_{0};
+    size_t data_bytes_required_{0};
     MemBlockBuilder<uint8_t> mem_block_;
   };
 
@@ -236,7 +228,7 @@ private:
    * @param size the size of the array in bytes.
    * @return std::string the retrieved stat name.
    */
-  std::vector<absl::string_view> decodeStrings(const Storage array, uint64_t size) const;
+  std::vector<absl::string_view> decodeStrings(const Storage array, size_t size) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -244,7 +236,7 @@ private:
    * @param sv the individual string to be encoded as a symbol.
    * @return Symbol the encoded string.
    */
-  Symbol toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  Symbol toSymbol(absl::string_view sv) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   /**
    * Convenience function for decode(), decoding one symbol at a time.
@@ -252,7 +244,7 @@ private:
    * @param symbol the individual symbol to be decoded.
    * @return absl::string_view the decoded string.
    */
-  absl::string_view fromSymbol(Symbol symbol) const EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  absl::string_view fromSymbol(Symbol symbol) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   /**
    * Stages a new symbol for use. To be called after a successful insertion.
@@ -275,7 +267,7 @@ private:
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
-  Symbol next_symbol_ GUARDED_BY(lock_);
+  Symbol next_symbol_ ABSL_GUARDED_BY(lock_);
 
   // If the free pool is exhausted, we monotonically increase this counter.
   Symbol monotonic_counter_;
@@ -285,14 +277,14 @@ private:
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol>;
   using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
-  EncodeMap encode_map_ GUARDED_BY(lock_);
-  DecodeMap decode_map_ GUARDED_BY(lock_);
+  EncodeMap encode_map_ ABSL_GUARDED_BY(lock_);
+  DecodeMap decode_map_ ABSL_GUARDED_BY(lock_);
 
   // Free pool of symbols for re-use.
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
-  std::stack<Symbol> pool_ GUARDED_BY(lock_);
-  RecentLookups recent_lookups_ GUARDED_BY(lock_);
+  std::stack<Symbol> pool_ ABSL_GUARDED_BY(lock_);
+  RecentLookups recent_lookups_ ABSL_GUARDED_BY(lock_);
 };
 
 // Base class for holding the backing-storing for a StatName. The two derived
@@ -393,12 +385,7 @@ public:
       return H::combine(std::move(h), absl::string_view());
     }
 
-    // Casts the raw data as a string_view. Note that this string_view will not
-    // be in human-readable form, but it will be compatible with a string-view
-    // hasher.
-    const char* cdata = reinterpret_cast<const char*>(stat_name.data());
-    absl::string_view data_as_string_view = absl::string_view(cdata, stat_name.dataSize());
-    return H::combine(std::move(h), data_as_string_view);
+    return H::combine(std::move(h), stat_name.dataAsStringView());
   }
 
   /**
@@ -410,22 +397,21 @@ public:
   uint64_t hash() const { return absl::Hash<StatName>()(*this); }
 
   bool operator==(const StatName& rhs) const {
-    const uint64_t sz = dataSize();
-    return sz == rhs.dataSize() && memcmp(data(), rhs.data(), sz * sizeof(uint8_t)) == 0;
+    return dataAsStringView() == rhs.dataAsStringView();
   }
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
   /**
-   * @return uint64_t the number of bytes in the symbol array, excluding the
-   *                  overhead for the size itself.
+   * @return size_t the number of bytes in the symbol array, excluding the
+   *                overhead for the size itself.
    */
-  uint64_t dataSize() const;
+  size_t dataSize() const;
 
   /**
-   * @return uint64_t the number of bytes in the symbol array, including the
+   * @return size_t the number of bytes in the symbol array, including the
    *                  overhead for the size itself.
    */
-  uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
+  size_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
   /**
    * Copies the entire StatName representation into a MemBlockBuilder, including
@@ -459,15 +445,13 @@ public:
    * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const {
+    if (size_and_data_ == nullptr) {
+      return nullptr;
+    }
     return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
   }
 
   const uint8_t* dataIncludingSize() const { return size_and_data_; }
-
-  /**
-   * @return A pointer to the buffer, including the size bytes.
-   */
-  const uint8_t* sizeAndData() const { return size_and_data_; }
 
   /**
    * @return whether this is empty.
@@ -475,6 +459,16 @@ public:
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
+  /**
+   * Casts the raw data as a string_view. Note that this string_view will not
+   * be in human-readable form, but it will be compatible with a string-view
+   * hasher and comparator.
+   */
+  absl::string_view dataAsStringView() const {
+    return {reinterpret_cast<const char*>(data()),
+            static_cast<absl::string_view::size_type>(dataSize())};
+  }
+
   const uint8_t* size_and_data_{nullptr};
 };
 
@@ -503,7 +497,7 @@ public:
   // generate symbols for it.
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
-  StatNameManagedStorage(StatNameManagedStorage&& src)
+  StatNameManagedStorage(StatNameManagedStorage&& src) noexcept
       : StatNameStorage(std::move(src)), symbol_table_(src.symbol_table_) {}
 
   ~StatNameManagedStorage() { free(symbol_table_); }
@@ -606,11 +600,6 @@ private:
 class StatNameDynamicPool {
 public:
   explicit StatNameDynamicPool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-
-  /**
-   * Removes all StatNames from the pool.
-   */
-  void clear() { storage_vector_.clear(); }
 
   /**
    * @param name the name to add the container.
@@ -778,14 +767,22 @@ private:
   HashSet hash_set_;
 };
 
-// Captures StatNames for lookup by string, keeping two maps: a map of
-// 'built-ins' that is expected to be populated during initialization, and a map
-// of dynamically discovered names. The latter map is protected by a mutex, and
-// can be mutated at runtime.
+// Captures StatNames for lookup by string, keeping a map of 'built-ins' that is
+// expected to be populated during initialization.
 //
 // Ideally, builtins should be added during process initialization, in the
 // outermost relevant context. And as the builtins map is not mutex protected,
-// builtins must *not* be added in the request-path.
+// builtins must *not* be added to an existing StatNameSet in the request-path.
+//
+// It is fine to populate a new StatNameSet when (for example) an xDS
+// message reveals a new set of names to be used as stats. The population must
+// be completed prior to exposing the new StatNameSet to worker threads.
+//
+// To create stats using names discovered in the request path, dynamic stat
+// names must be used (see StatNameDynamicStorage). Consider using helper
+// methods such as Stats::Utility::counterFromElements in common/stats/utility.h
+// to simplify the process of allocating and combining stat names and creating
+// counters, gauges, and histograms from them.
 class StatNameSet {
 public:
   // This object must be instantiated via SymbolTable::makeSet(), thus constructor is private.
@@ -817,10 +814,26 @@ public:
    *
    * @return the StatName or fallback.
    */
-  StatName getBuiltin(absl::string_view token, StatName fallback);
+  StatName getBuiltin(absl::string_view token, StatName fallback) const;
 
   /**
    * Adds a StatName using the pool, but without remembering it in any maps.
+   *
+   * For convenience, StatNameSet offers pass-through thread-safe access to
+   * its mutex-protected pool. This is useful in constructor initializers, when
+   * StatNames are needed both from compile-time constants, as well as from
+   * other constructor args, e.g.
+   *    MyClass(const std::vector<absl::string_view>& strings, Stats::SymbolTable& symbol_table)
+   *        : stat_name_set_(symbol_table),
+   *          known_const_(stat_name_set_.add("known_const")) { // unmapped constants from pool
+   *      stat_name_set_.rememberBuiltins(strings); // mapped builtins.
+   *    }
+   * This avoids the need to make two different pools; one backing the
+   * StatNameSet mapped entries, and the other backing the set passed in via the
+   * constructor.
+   *
+   * @param str The string to add as a StatName
+   * @return The StatName for str.
    */
   StatName add(absl::string_view str) {
     absl::MutexLock lock(&mutex_);
@@ -835,7 +848,7 @@ private:
 
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
-  Stats::StatNamePool pool_ GUARDED_BY(mutex_);
+  Stats::StatNamePool pool_ ABSL_GUARDED_BY(mutex_);
   mutable absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;

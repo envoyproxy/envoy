@@ -40,7 +40,9 @@ def GetExtensionMetadata(target):
       stderr=subprocess.PIPE)
   security_posture, status, undocumented = r.stdout.decode('utf-8').strip().split(' ')
   if IsMissing(security_posture):
-    raise ExtensionDbError('Missing security posture for %s' % target)
+    raise ExtensionDbError(
+        'Missing security posture for %s.  Please make sure the target is an envoy_cc_extension and security_posture is set'
+        % target)
   return {
       'security_posture': security_posture,
       'undocumented': False if IsMissing(undocumented) else bool(undocumented),
@@ -53,5 +55,11 @@ if __name__ == '__main__':
   extension_db = {}
   for extension, target in extensions_build_config.EXTENSIONS.items():
     extension_db[extension] = GetExtensionMetadata(target)
+  # The TLS and generic upstream extensions are hard-coded into the build, so
+  # not in source/extensions/extensions_build_config.bzl
+  extension_db['envoy.transport_sockets.tls'] = GetExtensionMetadata(
+      '//source/extensions/transport_sockets/tls:config')
+  extension_db['envoy.upstreams.http.generic'] = GetExtensionMetadata(
+      '//source/extensions/upstreams/http/generic:config')
 
   pathlib.Path(output_path).write_text(json.dumps(extension_db))

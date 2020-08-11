@@ -10,9 +10,9 @@ namespace Envoy {
 namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
-                                               SubscriptionCallbacks& callbacks,
+                                               UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info)
-    : type_url_(std::move(type_url)), callbacks_(callbacks), local_info_(local_info) {}
+    : type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
@@ -81,7 +81,7 @@ void DeltaSubscriptionState::handleGoodResponse(
           fmt::format("duplicate name {} found in the union of added+removed resources", name));
     }
   }
-  callbacks_.onConfigUpdate(message.resources(), message.removed_resources(),
+  watch_map_.onConfigUpdate(message.resources(), message.removed_resources(),
                             message.system_version_info());
   for (const auto& resource : message.resources()) {
     setResourceVersion(resource.name(), resource.version());
@@ -108,11 +108,11 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
   ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
   ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
-  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
+  watch_map_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
 void DeltaSubscriptionState::handleEstablishmentFailure() {
-  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+  watch_map_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                   nullptr);
 }
 
@@ -124,16 +124,16 @@ DeltaSubscriptionState::getNextRequestAckless() {
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
-    for (auto const& resource : resource_versions_) {
+    for (auto const& [resource_name, resource_version] : resource_versions_) {
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource.second.waitingForServer()) {
-        (*request.mutable_initial_resource_versions())[resource.first] = resource.second.version();
+      if (!resource_version.waitingForServer()) {
+        (*request.mutable_initial_resource_versions())[resource_name] = resource_version.version();
       }
       // As mentioned above, fill resource_names_subscribe with everything, including names we
       // have yet to receive any resource for.
-      names_added_.insert(resource.first);
+      names_added_.insert(resource_name);
     }
     names_removed_.clear();
   }

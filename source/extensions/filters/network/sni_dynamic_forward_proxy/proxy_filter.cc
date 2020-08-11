@@ -15,11 +15,10 @@ namespace SniDynamicForwardProxy {
 ProxyFilterConfig::ProxyFilterConfig(
     const FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
-    Upstream::ClusterManager& cluster_manager)
+    Upstream::ClusterManager&)
     : port_(static_cast<uint16_t>(proto_config.port_value())),
       dns_cache_manager_(cache_manager_factory.get()),
-      dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
-      cluster_manager_(cluster_manager) {}
+      dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())) {}
 
 ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
@@ -34,14 +33,23 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::Continue;
   }
 
-  // TODO(lizan): implement circuit breaker in SNI dynamic forward proxy like it is in HTTP:
-  // https://github.com/envoyproxy/envoy/blob/master/source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.cc#L65
+  circuit_breaker_ = config_->cache().canCreateDnsRequest(absl::nullopt);
+
+  if (circuit_breaker_ == nullptr) {
+    ENVOY_CONN_LOG(debug, "pending request overflow", read_callbacks_->connection());
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    return Network::FilterStatus::StopIteration;
+  }
 
   uint32_t default_port = config_->port();
 
   auto result = config_->cache().loadDnsCacheEntry(sni, default_port, *this);
 
   cache_load_handle_ = std::move(result.handle_);
+  if (cache_load_handle_ == nullptr) {
+    circuit_breaker_.reset();
+  }
+
   switch (result.status_) {
   case LoadDnsCacheEntryStatus::InCache: {
     ASSERT(cache_load_handle_ == nullptr);
@@ -67,6 +75,8 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
 
 void ProxyFilter::onLoadDnsCacheComplete() {
   ENVOY_CONN_LOG(debug, "load DNS cache complete, continuing", read_callbacks_->connection());
+  ASSERT(circuit_breaker_ != nullptr);
+  circuit_breaker_.reset();
   read_callbacks_->continueReading();
 }
 

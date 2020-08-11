@@ -6,10 +6,12 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "server/configuration_impl.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -86,7 +88,7 @@ const LocalInfo::LocalInfo& PerFilterChainFactoryContextImpl::localInfo() const 
   return parent_context_.localInfo();
 }
 
-Envoy::Runtime::RandomGenerator& PerFilterChainFactoryContextImpl::random() {
+Envoy::Random::RandomGenerator& PerFilterChainFactoryContextImpl::random() {
   return parent_context_.random();
 }
 
@@ -148,22 +150,25 @@ void FilterChainManagerImpl::addFilterChain(
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
+  absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch, std::string, MessageUtil,
+                      MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
+      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
                                        "unimplemented fields",
-                                       address_->asString()));
+                                       address_->asString(), filter_chain->name()));
     }
-    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                       "the same matching rules are defined",
-                                       address_->asString()));
+    const auto& matching_iter = filter_chains.find(filter_chain_match);
+    if (matching_iter != filter_chains.end()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
+                                       "the same matching rules defined as '{}'",
+                                       address_->asString(), filter_chain->name(),
+                                       matching_iter->second));
     }
-    filter_chains.insert(filter_chain_match);
+    filter_chains.insert({filter_chain_match, filter_chain->name()});
 
     // Validate IP addresses.
     std::vector<std::string> destination_ips;
@@ -360,11 +365,11 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
                                                                          const T& data) {
   std::vector<Network::Address::CidrRange> subnets;
   if (cidr == EMPTY_STRING) {
-    if (Network::Address::ipFamilySupported(AF_INET)) {
+    if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()));
     }
-    if (Network::Address::ipFamilySupported(AF_INET6)) {
+    if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6)) {
       subnets.push_back(
           Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()));
     }
@@ -553,46 +558,44 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
 }
 
 void FilterChainManagerImpl::convertIPsToTries() {
-  for (auto& port : destination_ports_map_) {
+  for (auto& [destination_port, destination_ips_pair] : destination_ports_map_) {
     // These variables are used as we build up the destination CIDRs used for the trie.
-    auto& destination_ips_pair = port.second;
-    auto& destination_ips_map = destination_ips_pair.first;
+    auto& [destination_ips_map, destination_ips_trie] = destination_ips_pair;
     std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>>
         destination_ips_list;
     destination_ips_list.reserve(destination_ips_map.size());
 
-    for (const auto& entry : destination_ips_map) {
-      destination_ips_list.push_back(makeCidrListEntry(entry.first, entry.second));
+    for (const auto& [destination_ip, server_names_map_ptr] : destination_ips_map) {
+      destination_ips_list.push_back(makeCidrListEntry(destination_ip, server_names_map_ptr));
 
       // This hugely nested for loop greatly pains me, but I'm not sure how to make it better.
       // We need to get access to all of the source IP strings so that we can convert them into
       // a trie like we did for the destination IPs above.
-      for (auto& server_names_entry : *entry.second) {
-        for (auto& transport_protocols_entry : server_names_entry.second) {
-          for (auto& application_protocols_entry : transport_protocols_entry.second) {
-            for (auto& source_array_entry : application_protocols_entry.second) {
-              auto& source_ips_map = source_array_entry.first;
+      for (auto& [server_name, transport_protocols_map] : *server_names_map_ptr) {
+        for (auto& [transport_protocol, application_protocols_map] : transport_protocols_map) {
+          for (auto& [application_protocol, source_arrays] : application_protocols_map) {
+            for (auto& [source_ips_map, source_ips_trie] : source_arrays) {
               std::vector<
                   std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>
                   source_ips_list;
               source_ips_list.reserve(source_ips_map.size());
 
-              for (auto& source_ip : source_ips_map) {
-                source_ips_list.push_back(makeCidrListEntry(source_ip.first, source_ip.second));
+              for (auto& [source_ip, source_port_map_ptr] : source_ips_map) {
+                source_ips_list.push_back(makeCidrListEntry(source_ip, source_port_map_ptr));
               }
 
-              source_array_entry.second = std::make_unique<SourceIPsTrie>(source_ips_list, true);
+              source_ips_trie = std::make_unique<SourceIPsTrie>(source_ips_list, true);
             }
           }
         }
       }
     }
 
-    destination_ips_pair.second = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
+    destination_ips_trie = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
   }
 }
 
-std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExistingFilterChain(
+Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain_message) {
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
@@ -608,8 +611,7 @@ std::shared_ptr<Network::DrainableFilterChain> FilterChainManagerImpl::findExist
   return nullptr;
 }
 
-std::unique_ptr<Configuration::FilterChainFactoryContext>
-FilterChainManagerImpl::createFilterChainFactoryContext(
+Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
@@ -633,7 +635,7 @@ bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
 const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }
-Envoy::Runtime::RandomGenerator& FactoryContextImpl::random() { return server_.random(); }
+Envoy::Random::RandomGenerator& FactoryContextImpl::random() { return server_.random(); }
 Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime(); }
 Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }

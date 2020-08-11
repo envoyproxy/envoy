@@ -8,7 +8,7 @@ This section gets you started with a very simple configuration and provides some
 The fastest way to get started using Envoy is :ref:`installing pre-built binaries <install_binaries>`.
 You can also :ref:`build it <building>` from source.
 
-These examples use the :ref:`v2 Envoy API <envoy_api_reference>`, but use only the static configuration
+These examples use the :ref:`v3 Envoy API <envoy_api_reference>`, but use only the static configuration
 feature of the API, which is most useful for simple requirements. For more complex requirements
 :ref:`Dynamic Configuration <arch_overview_dynamic_config>` is supported.
 
@@ -38,9 +38,9 @@ Simple Configuration
 
 Envoy can be configured using a single YAML file passed in as an argument on the command line.
 
-The :ref:`admin message <envoy_api_msg_config.bootstrap.v2.Admin>` is required to configure
+The :ref:`admin message <envoy_v3_api_msg_config.bootstrap.v3.Admin>` is required to configure
 the administration server. The `address` key specifies the
-listening :ref:`address <envoy_api_file_envoy/api/v2/core/address.proto>`
+listening :ref:`address <envoy_v3_api_file_envoy/config/core/v3/address.proto>`
 which in this case is simply `0.0.0.0:9901`.
 
 .. code-block:: yaml
@@ -50,7 +50,7 @@ which in this case is simply `0.0.0.0:9901`.
     address:
       socket_address: { address: 0.0.0.0, port_value: 9901 }
 
-The :ref:`static_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
+The :ref:`static_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
 as opposed to the means of configuring resources dynamically when Envoy is running.
 The :ref:`v2 API Overview <config_overview>` describes this.
 
@@ -58,7 +58,7 @@ The :ref:`v2 API Overview <config_overview>` describes this.
 
     static_resources:
 
-The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/listener.proto>`.
+The specification of the :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`.
 
 .. code-block:: yaml
 
@@ -70,7 +70,7 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
         - filters:
           - name: envoy.filters.network.http_connection_manager
             typed_config:
-              "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
               stat_prefix: ingress_http
               codec_type: AUTO
               route_config:
@@ -80,11 +80,11 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
                   domains: ["*"]
                   routes:
                   - match: { prefix: "/" }
-                    route: { host_rewrite: www.google.com, cluster: service_google }
+                    route: { host_rewrite_literal: www.google.com, cluster: service_google }
               http_filters:
               - name: envoy.filters.http.router
 
-The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`.
+The specification of the :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`.
 
 .. code-block:: yaml
 
@@ -107,7 +107,7 @@ The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`
         transport_socket:
           name: envoy.transport_sockets.tls
           typed_config:
-            "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
             sni: www.google.com
 
 
@@ -148,6 +148,51 @@ by using a volume.
       volumes:
         - ./envoy.yaml:/etc/envoy/envoy.yaml
 
+By default the Docker image will run as the ``envoy`` user created at build time.
+
+The ``uid`` and ``gid`` of this user can be set at runtime using the ``ENVOY_UID`` and ``ENVOY_GID``
+environment variables. This can be done, for example, on the Docker command line:
+
+  $ docker run -d --name envoy -e ENVOY_UID=777 -e ENVOY_GID=777 -p 9901:9901 -p 10000:10000 envoy:v1
+
+This can be useful if you wish to restrict or provide access to ``unix`` sockets inside the container, or
+for controlling access to an ``envoy`` socket from outside of the container.
+
+If you wish to run the container as the ``root`` user you can set ``ENVOY_UID`` to ``0``.
+
+The ``envoy`` image sends application logs to ``/dev/stdout`` and ``/dev/stderr`` by default, and these
+can be viewed in the container log.
+
+If you send application, admin or access logs to a file output, the ``envoy`` user will require the
+necessary permissions to write to this file. This can be achieved by setting the ``ENVOY_UID`` and/or
+by making the file writeable by the envoy user.
+
+For example, to mount a log folder from the host and make it writable, you can:
+
+.. substitution-code-block:: none
+
+  $ mkdir logs
+  $ chown 777 logs
+  $ docker run -d -v `pwd`/logs:/var/log --name envoy -e ENVOY_UID=777 -p 9901:9901 -p 10000:10000 envoy:v1
+
+You can then configure ``envoy`` to log to files in ``/var/log``
+
+The default ``envoy`` ``uid`` and ``gid`` are ``101``.
+
+The ``envoy`` user also needs to have permission to access any required configuration files mounted
+into the container.
+
+If you are running in an environment with a strict ``umask`` setting, you may need to provide envoy with
+access either by setting the ``uid`` or ``gid`` of the file, or by making the configuration file readable
+by the envoy user.
+
+One method of doing this without changing any file permissions or running as root inside the container
+is to start the container with the host user's ``uid``, for example:
+
+.. substitution-code-block:: none
+
+  $ docker run -d --name envoy -e ENVOY_UID=`id -u` -p 9901:9901 -p 10000:10000 envoy:v1
+
 
 Sandboxes
 ---------
@@ -162,6 +207,7 @@ features. The following sandboxes are available:
 
     sandboxes/cors
     sandboxes/csrf
+    sandboxes/ext_authz
     sandboxes/fault_injection
     sandboxes/front_proxy
     sandboxes/grpc_bridge

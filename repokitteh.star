@@ -4,18 +4,33 @@ use("github.com/repokitteh/modules/assign.star")
 use("github.com/repokitteh/modules/review.star")
 use("github.com/repokitteh/modules/wait.star")
 use("github.com/repokitteh/modules/circleci.star", secret_token=get_secret('circle_token'))
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/azure_pipelines.star", secret_token=get_secret('azp_token'))
 use(
-  "github.com/repokitteh/modules/ownerscheck.star",
+  "github.com/envoyproxy/envoy/ci/repokitteh/modules/ownerscheck.star",
   paths=[
     {
       "owner": "envoyproxy/api-shepherds!",
-      "path": "api/",
+      "path":
+      "(api/envoy[\w/]*/(v1alpha\d?|v1|v2alpha\d?|v2))|(api/envoy/type/(matcher/)?\w+.proto)",
+      "label": "v2-freeze",
+      "allow_global_approval": False,
+      "github_status_label": "v2 freeze violations",
+    },
+    {
+      "owner": "envoyproxy/api-shepherds!",
+      "path": "api/envoy/",
       "label": "api",
+      "github_status_label": "any API change",
+    },
+    {
+      "owner": "envoyproxy/api-watchers",
+      "path": "api/envoy/",
     },
   ],
 )
 
-alias('retest', 'retry-circle')
+alias('retest-circle', 'retry-circle')
+alias('retest', 'retry-azp')
 
 def _backport():
   github.issue_label('backport/review')

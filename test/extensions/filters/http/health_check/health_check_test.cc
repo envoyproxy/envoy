@@ -9,7 +9,7 @@
 
 #include "extensions/filters/http/health_check/health_check.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -115,7 +115,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, NotHcRequest) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(body, false));
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
-  EXPECT_EQ("true", service_response.EnvoyImmediateHealthCheckFail()->value().getStringView());
+  EXPECT_EQ("true", service_response.getEnvoyImmediateHealthCheckFailValue());
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
@@ -227,8 +227,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
-        EXPECT_EQ("cluster_name",
-                  headers.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());
+        EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
         EXPECT_EQ(nullptr, headers.EnvoyImmediateHealthCheckFail());
       }));
 
@@ -250,10 +249,9 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
-  Http::TestResponseHeaderMapImpl service_hc_respnose{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
-  EXPECT_EQ("cluster_name",
-            service_hc_respnose.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());
+  Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_response, true));
+  EXPECT_EQ("cluster_name", service_hc_response.getEnvoyUpstreamHealthCheckedClusterValue());
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
@@ -270,10 +268,9 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
             filter_->encode100ContinueHeaders(continue_response));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
-  Http::TestResponseHeaderMapImpl service_hc_respnose{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
-  EXPECT_EQ("cluster_name",
-            service_hc_respnose.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());
+  Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_response, true));
+  EXPECT_EQ("cluster_name", service_hc_response.getEnvoyUpstreamHealthCheckedClusterValue());
 }
 
 TEST_F(HealthCheckFilterPassThroughTest, Failed) {
@@ -302,8 +299,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
-        EXPECT_EQ("cluster_name",
-                  headers.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());
+        EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
       }));
 
   EXPECT_CALL(callbacks_.stream_info_,
@@ -324,8 +320,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedOkCallbackNotCalled) {
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
-        EXPECT_EQ("cluster_name",
-                  headers.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());
+        EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
       }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -353,8 +348,7 @@ TEST_F(HealthCheckFilterCachingTest, All) {
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
-        EXPECT_EQ("cluster_name",
-                  headers.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());
+        EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
       }));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));
@@ -388,8 +382,7 @@ TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
       .Times(1)
       .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
-        EXPECT_EQ("cluster_name",
-                  headers.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());
+        EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
       }));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));

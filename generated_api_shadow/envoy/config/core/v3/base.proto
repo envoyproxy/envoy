@@ -13,6 +13,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -94,7 +95,7 @@ message BuildVersion {
   type.v3.SemanticVersion version = 1;
 
   // Free-form build information.
-  // Envoy defines several well known keys in the source/common/common/version.h file
+  // Envoy defines several well known keys in the source/common/version/version.h file
   google.protobuf.Struct metadata = 2;
 }
 
@@ -168,32 +169,32 @@ message Node {
   // E.g. "envoy" or "grpc"
   string user_agent_name = 6;
 
-  // Free-form string that identifies the version of the entity requesting config.
-  // E.g. "1.12.2" or "abcd1234", or "SpecialEnvoyBuild"
-  repeated Extension extensions = 9;
+  oneof user_agent_version_type {
+    // Free-form string that identifies the version of the entity requesting config.
+    // E.g. "1.12.2" or "abcd1234", or "SpecialEnvoyBuild"
+    string user_agent_version = 7;
 
-  // Structured version of the entity requesting config.
-  repeated string client_features = 10;
+    // Structured version of the entity requesting config.
+    BuildVersion user_agent_build_version = 8;
+  }
 
   // List of extensions and their versions supported by the node.
-  repeated Address listening_addresses = 11;
+  repeated Extension extensions = 9;
 
   // Client feature support list. These are well known features described
   // in the Envoy API repository for a given major version of an API. Client features
   // use reverse DNS naming scheme, for example `com.acme.feature`.
   // See :ref:`the list of features <client_features>` that xDS client may
   // support.
+  repeated string client_features = 10;
+
+  // Known listening ports on the node as a generic hint to the management server
+  // for filtering :ref:`listeners <config_listeners>` to be returned. For example,
+  // if there is a listener bound to port 80, the list can optionally contain the
+  // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
+  repeated Address listening_addresses = 11;
+
   string hidden_envoy_deprecated_build_version = 5 [deprecated = true];
-
-  oneof user_agent_version_type {
-    // Known listening ports on the node as a generic hint to the management server
-    // for filtering :ref:`listeners <config_listeners>` to be returned. For example,
-    // if there is a listener bound to port 80, the list can optionally contain the
-    // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
-    string user_agent_version = 7;
-
-    BuildVersion user_agent_build_version = 8;
-  }
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
@@ -330,7 +331,8 @@ message RetryPolicy {
 
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1.
-  google.protobuf.UInt32Value num_retries = 2;
+  google.protobuf.UInt32Value num_retries = 2
+      [(udpa.annotations.field_migrate).rename = "max_retries"];
 }
 
 // The message specifies how to fetch data from remote and how to verify it.

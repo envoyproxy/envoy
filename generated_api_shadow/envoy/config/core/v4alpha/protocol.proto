@@ -92,8 +92,6 @@ message HttpProtocolOptions {
 
   // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
   // reset independent of any other timeouts. If not specified, this value is not set.
-  // The current implementation implements this timeout on downstream connections only.
-  // [#comment:TODO(shikugawa): add this functionality to upstream.]
   google.protobuf.Duration max_stream_duration = 4;
 
   // Action to take when a client request with a header name containing underscore characters is received.
@@ -161,7 +159,7 @@ message Http1ProtocolOptions {
   bool enable_trailers = 5;
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.core.v3.Http2ProtocolOptions";
@@ -174,7 +172,7 @@ message Http2ProtocolOptions {
 
     // The 16 bit parameter identifier.
     google.protobuf.UInt32Value identifier = 1 [
-      (validate.rules).uint32 = {lte: 65536 gte: 1},
+      (validate.rules).uint32 = {lte: 65535 gte: 0},
       (validate.rules).message = {required: true}
     ];
 
@@ -282,8 +280,25 @@ message Http2ProtocolOptions {
   // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
   // when this option is enabled, only the offending stream is terminated.
   //
+  // This is overridden by HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
+  // iff present.
+  //
+  // This is deprecated in favor of :ref:`override_stream_error_on_invalid_http_message
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.override_stream_error_on_invalid_http_message>`
+  //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
-  bool stream_error_on_invalid_http_messaging = 12;
+  bool hidden_envoy_deprecated_stream_error_on_invalid_http_messaging = 12 [deprecated = true];
+
+  // Allows invalid HTTP messaging and headers. When this option is disabled (default), then
+  // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
+  // when this option is enabled, only the offending stream is terminated.
+  //
+  // This overrides any HCM :ref:`stream_error_on_invalid_http_messaging
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`
+  //
+  // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
+  google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 14;
 
   // [#not-implemented-hide:]
   // Specifies SETTINGS frame parameters to be sent to the peer, with two exceptions:

@@ -17,10 +17,13 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
-      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
+      service_method_(
+          Grpc::VersionedMethods("envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats",
+                                 "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
+              .getMethodDescriptorForVersion(transport_api_version)),
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
+  request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
@@ -44,6 +47,20 @@ void LoadStatsReporter::establishNewStream() {
 }
 
 void LoadStatsReporter::sendLoadStatsRequest() {
+  // TODO(htuch): This sends load reports for only the set of clusters in clusters_, which
+  // was initialized in startLoadReportPeriod() the last time we either sent a load report
+  // or received a new LRS response (whichever happened more recently). The code in
+  // startLoadReportPeriod() adds to clusters_ only those clusters that exist in the
+  // ClusterManager at the moment when startLoadReportPeriod() runs. This means that if
+  // a cluster is selected by the LRS server (either by being explicitly listed or by using
+  // the send_all_clusters field), if that cluster was added to the ClusterManager since the
+  // last time startLoadReportPeriod() was invoked, we will not report its load here. In
+  // practice, this means that for any newly created cluster, we will always drop the data for
+  // the initial load report period. This seems sub-optimal.
+  //
+  // One possible way to deal with this would be to get a notification whenever a new cluster is
+  // added to the cluster manager. When we get the notification, we record the current time in
+  // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
@@ -56,8 +73,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
-    if (cluster.info()->eds_service_name().has_value()) {
-      cluster_stats->set_cluster_service_name(cluster.info()->eds_service_name().value());
+    if (cluster.info()->edsServiceName().has_value()) {
+      cluster_stats->set_cluster_service_name(cluster.info()->edsServiceName().value());
     }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
@@ -123,9 +140,9 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& me
 void LoadStatsReporter::onReceiveMessage(
     std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
-  stats_.requests_.inc();
   message_ = std::move(message);
   startLoadReportPeriod();
+  stats_.requests_.inc();
 }
 
 void LoadStatsReporter::startLoadReportPeriod() {
@@ -135,26 +152,35 @@ void LoadStatsReporter::startLoadReportPeriod() {
   // problems due to referencing of temporaries in the below loop with Google's
   // internal string type. Consider this optimization when the string types
   // converge.
-  std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
-  for (const std::string& cluster_name : message_->clusters()) {
-    if (clusters_.count(cluster_name) > 0) {
-      existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
+  absl::node_hash_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
+  if (message_->send_all_clusters()) {
+    for (const auto& p : cm_.clusters()) {
+      const std::string& cluster_name = p.first;
+      if (clusters_.count(cluster_name) > 0) {
+        existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
+      }
+    }
+  } else {
+    for (const std::string& cluster_name : message_->clusters()) {
+      if (clusters_.count(cluster_name) > 0) {
+        existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
+      }
     }
   }
   clusters_.clear();
   // Reset stats for all hosts in clusters we are tracking.
-  for (const std::string& cluster_name : message_->clusters()) {
+  auto handle_cluster_func = [this, &existing_clusters](const std::string& cluster_name) {
     clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
                                         ? existing_clusters[cluster_name]
                                         : time_source_.monotonicTime().time_since_epoch());
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {
-      continue;
+      return;
     }
     // Don't reset stats for existing tracked clusters.
     if (existing_clusters.count(cluster_name) > 0) {
-      continue;
+      return;
     }
     auto& cluster = it->second.get();
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
@@ -165,6 +191,16 @@ void LoadStatsReporter::startLoadReportPeriod() {
       }
     }
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
+  };
+  if (message_->send_all_clusters()) {
+    for (const auto& p : cm_.clusters()) {
+      const std::string& cluster_name = p.first;
+      handle_cluster_func(cluster_name);
+    }
+  } else {
+    for (const std::string& cluster_name : message_->clusters()) {
+      handle_cluster_func(cluster_name);
+    }
   }
   response_timer_->enableTimer(std::chrono::milliseconds(
       DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));

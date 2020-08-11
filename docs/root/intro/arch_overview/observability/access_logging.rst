@@ -12,7 +12,7 @@ features:
   to different access logs.
 
 Downstream connection access logging can be enabled using :ref:`listener access
-logs<envoy_api_field_Listener.access_log>`. The listener access logs complement
+logs<envoy_v3_api_field_config.listener.v3.Listener.access_log>`. The listener access logs complement
 HTTP request access logging and can be enabled separately and independently from
 filter access logs.
 
@@ -22,9 +22,11 @@ Access log filters
 ------------------
 
 Envoy supports several built-in
-:ref:`access log filters<envoy_api_msg_config.filter.accesslog.v2.AccessLogFilter>` and
-:ref:`extension filters<envoy_api_field_config.filter.accesslog.v2.AccessLogFilter.extension_filter>`
+:ref:`access log filters<envoy_v3_api_msg_config.accesslog.v3.AccessLogFilter>` and
+:ref:`extension filters<envoy_v3_api_field_config.accesslog.v3.AccessLogFilter.extension_filter>`
 that are registered at runtime.
+
+.. _arch_overview_access_logs_sinks:
 
 Access logging sinks
 --------------------
@@ -48,6 +50,6 @@ Further reading
 ---------------
 
 * Access log :ref:`configuration <config_access_log>`.
-* File :ref:`access log sink <envoy_api_msg_config.accesslog.v2.FileAccessLog>`.
-* gRPC :ref:`Access Log Service (ALS) <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
+* File :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.file.v3.FileAccessLog>`.
+* gRPC :ref:`Access Log Service (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
   sink.

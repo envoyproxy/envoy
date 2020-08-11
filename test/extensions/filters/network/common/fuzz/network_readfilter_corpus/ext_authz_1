@@ -1,0 +1,20 @@
+config {
+  name: "envoy.filters.network.ext_authz"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz"
+  }
+}
+actions {
+  on_data {
+    data: "y"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 655360
+  }
+}

@@ -24,14 +24,12 @@ public:
       Upstream::ClusterManager& cluster_manager);
 
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
-  Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
   uint32_t port() { return port_; }
 
 private:
   const uint32_t port_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
-  Upstream::ClusterManager& cluster_manager_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -42,6 +40,7 @@ class ProxyFilter
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   ProxyFilter(ProxyFilterConfigSharedPtr config);
+
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance&, bool) override {
     return Network::FilterStatus::Continue;
@@ -56,6 +55,7 @@ public:
 
 private:
   const ProxyFilterConfigSharedPtr config_;
+  Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };

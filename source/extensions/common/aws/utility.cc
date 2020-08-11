@@ -14,49 +14,45 @@ namespace Aws {
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
   std::map<std::string, std::string> out;
-  headers.iterate(
-      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        auto* map = static_cast<std::map<std::string, std::string>*>(context);
-        // Skip empty headers
-        if (entry.key().empty() || entry.value().empty()) {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        // Pseudo-headers should not be canonicalized
-        if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        // Skip headers that are likely to mutate, when crossing proxies
-        const auto key = entry.key().getStringView();
-        if (key == Http::Headers::get().ForwardedFor.get() ||
-            key == Http::Headers::get().ForwardedProto.get() || key == "x-amzn-trace-id") {
-          return Http::HeaderMap::Iterate::Continue;
-        }
+  headers.iterate([&out](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    // Skip empty headers
+    if (entry.key().empty() || entry.value().empty()) {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    // Pseudo-headers should not be canonicalized
+    if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    // Skip headers that are likely to mutate, when crossing proxies
+    const auto key = entry.key().getStringView();
+    if (key == Http::Headers::get().ForwardedFor.get() ||
+        key == Http::Headers::get().ForwardedProto.get() || key == "x-amzn-trace-id") {
+      return Http::HeaderMap::Iterate::Continue;
+    }
 
-        std::string value(entry.value().getStringView());
-        // Remove leading, trailing, and deduplicate repeated ascii spaces
-        absl::RemoveExtraAsciiWhitespace(&value);
-        const auto iter = map->find(std::string(entry.key().getStringView()));
-        // If the entry already exists, append the new value to the end
-        if (iter != map->end()) {
-          iter->second += fmt::format(",{}", value);
-        } else {
-          map->emplace(std::string(entry.key().getStringView()), value);
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &out);
+    std::string value(entry.value().getStringView());
+    // Remove leading, trailing, and deduplicate repeated ascii spaces
+    absl::RemoveExtraAsciiWhitespace(&value);
+    const auto iter = out.find(std::string(entry.key().getStringView()));
+    // If the entry already exists, append the new value to the end
+    if (iter != out.end()) {
+      iter->second += fmt::format(",{}", value);
+    } else {
+      out.emplace(std::string(entry.key().getStringView()), value);
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
   // The AWS SDK has a quirk where it removes "default ports" (80, 443) from the host headers
   // Additionally, we canonicalize the :authority header as "host"
   // TODO(lavignes): This may need to be tweaked to canonicalize :authority for HTTP/2 requests
-  const auto* authority_header = headers.Host();
-  if (authority_header != nullptr && !authority_header->value().empty()) {
-    const auto& value = authority_header->value().getStringView();
-    const auto parts = StringUtil::splitToken(value, ":");
+  const absl::string_view authority_header = headers.getHostValue();
+  if (!authority_header.empty()) {
+    const auto parts = StringUtil::splitToken(authority_header, ":");
     if (parts.size() > 1 && (parts[1] == "80" || parts[1] == "443")) {
       // Has default port, so use only the host part
       out.emplace(Http::Headers::get().HostLegacy.get(), std::string(parts[0]));
     } else {
-      out.emplace(Http::Headers::get().HostLegacy.get(), std::string(value));
+      out.emplace(Http::Headers::get().HostLegacy.get(), std::string(authority_header));
     }
   }
   return out;

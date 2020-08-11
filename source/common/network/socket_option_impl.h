@@ -47,10 +47,22 @@ namespace Network {
 #define ENVOY_SOCKET_SO_MARK Network::SocketOptionName()
 #endif
 
+#ifdef SO_NOSIGPIPE
+#define ENVOY_SOCKET_SO_NOSIGPIPE ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_NOSIGPIPE)
+#else
+#define ENVOY_SOCKET_SO_NOSIGPIPE Network::SocketOptionName()
+#endif
+
 #ifdef SO_REUSEPORT
 #define ENVOY_SOCKET_SO_REUSEPORT ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT)
 #else
 #define ENVOY_SOCKET_SO_REUSEPORT Network::SocketOptionName()
+#endif
+
+#ifdef UDP_GRO
+#define ENVOY_SOCKET_UDP_GRO ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_UDP, UDP_GRO)
+#else
+#define ENVOY_SOCKET_UDP_GRO Network::SocketOptionName()
 #endif
 
 #ifdef TCP_KEEPCNT

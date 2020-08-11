@@ -24,6 +24,8 @@
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
 
+#include "openssl/ssl.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -32,13 +34,12 @@ namespace Quic {
 Network::Address::InstanceConstSharedPtr
 quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address);
 
-quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
-    const Network::Address::InstanceConstSharedPtr& envoy_address);
+quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address::Ip* envoy_ip);
 
 // The returned header map has all keys in lower case.
 template <class T>
 std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
-  auto headers = std::make_unique<T>();
+  auto headers = T::create();
   for (const auto& entry : header_list) {
     // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
     headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
@@ -48,7 +49,7 @@ std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_
 
 template <class T>
 std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
-  auto headers = std::make_unique<T>();
+  auto headers = T::create();
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
     std::string key(entry.first);
@@ -69,12 +70,25 @@ Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorC
 // Called when underlying QUIC connection is closed either locally or by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error);
 
+// Called when a GOAWAY frame is received.
+ABSL_MUST_USE_RESULT
+Http::GoAwayErrorCode quicErrorCodeToEnvoyErrorCode(quic::QuicErrorCode error) noexcept;
+
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
 Network::ConnectionSocketPtr
 createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
+
+// Convert a cert in string form to X509 object.
+// Return nullptr if the bytes passed cannot be passed.
+bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes, std::string* error_details);
+
+// Deduce the suitable signature algorithm according to the public key.
+// Return the sign algorithm id works with the public key; If the public key is
+// not supported, return 0 with error_details populated correspondingly.
+int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details);
 
 } // namespace Quic
 } // namespace Envoy

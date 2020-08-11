@@ -12,13 +12,21 @@ explaining the overall change. Both the component and the explanation must be lo
 * router:add x-envoy-overloaded header
 * tls: add support for specifying TLS session ticket keys
 
-### <a name="desc"></a>Description
+### <a name="desc"></a>Commit Message
 
-The description field should include a more verbose explanation of what this PR
-does. If this PR causes a change in behavior it should document the behavior
-before and after   If fixing a bug, please describe what the original issue is and
-how the change resolves it. If it is configuration controlled, it should note
-how the feature is enabled etc...
+The commit message field should include an explanation of what this PR
+does. This will be used as the final commit message that maintainers will use to
+populate the commit message when merging. If this PR causes a change in behavior
+it should document the behavior before and after. If fixing a bug, please
+describe what the original issue is and how the change resolves it. If it is
+configuration controlled, it should note how the feature is enabled etc...
+
+
+### <a name="desc"></a>Additional Description
+
+The additional description field should include information of what this PR does
+that may be out of scope for a commit message. This could include additional
+information or context useful to reviewers.
 
 ### <a name="risk"></a>Risk
 
@@ -51,6 +59,9 @@ If there are documentation changes, please include a brief description of what t
 changes may be in [docs/root](docs/root) and/or inline with the API protos. Please write in
 N/A if there were no documentation changes.
 
+Any PRs with structural changes to the dataplane should also update the [Life of a
+Request](docs/root/intro/life_of_a_request.md) documentation as appropriate.
+
 ### <a name="relnotes"></a>Release notes
 
 If this change is user impacting OR extension developer impacting (filter API, etc.) you **must**
@@ -58,6 +69,16 @@ add a release note to the [version history](docs/root/version_history/current.rs
 current version. Please include any relevant links. Each release note should be prefixed with the
 relevant subsystem in **alphabetical order** (see existing examples as a guide) and include links
 to relevant parts of the documentation. Thank you! Please write in N/A if there are no release notes.
+
+### <a name="runtime_guard"></a>Runtime guard
+
+If this PR has a user-visible behavioral change, or otherwise falls under the
+guidelines for runtime guarding in the [contributing doc](CONTRIBUTING.md)
+it should have a runtime guard, which should be documented both in the release
+notes and here in the PR description.
+
+For new feature additions guarded by configs, no-op refactors, docs changes etc.
+this field can be disregarded and/or removed.
 
 ### <a name="issues"></a>Issues
 

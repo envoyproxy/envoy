@@ -76,7 +76,7 @@ public:
 
 private:
   mutable absl::Mutex mu_;
-  std::vector<SpanData> spans_ GUARDED_BY(mu_);
+  std::vector<SpanData> spans_ ABSL_GUARDED_BY(mu_);
 };
 
 // Use a Singleton SpanCatcher.
@@ -123,6 +123,10 @@ TEST(OpenCensusTracerTest, Span) {
     child->finishSpan();
     span->setSampled(false); // Abandon tracer.
     span->finishSpan();
+
+    // Baggage methods are a noop in opencensus and won't affect events.
+    span->setBaggage("baggage_key", "baggage_value");
+    ASSERT_EQ("", span->getBaggage("baggage_key"));
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.

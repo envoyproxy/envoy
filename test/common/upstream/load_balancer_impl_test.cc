@@ -13,6 +13,8 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -39,7 +41,7 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
@@ -51,7 +53,7 @@ protected:
 class TestLb : public LoadBalancerBase {
 public:
   TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-         Runtime::RandomGenerator& random,
+         Random::RandomGenerator& random,
          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
@@ -128,7 +130,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
 
   HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
                                        Upstream::DegradedLoad({0, 0, 0})};
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _, _)).WillRepeatedly(ReturnRef(priority_load));
   // Primary and failover are in panic mode. Load distribution is based
   // on the number of hosts regardless of their health.
   EXPECT_EQ(50, lb_.percentageLoad(0));
@@ -205,11 +207,10 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
     updateHostSet(failover_host_set_, failover_set_hosts, unhealthy_hosts, degraded_hosts);
   }
 
-  EXPECT_CALL(context, determinePriorityLoad(_, _))
+  EXPECT_CALL(context, determinePriorityLoad(_, _, _))
       .WillRepeatedly(
-          Invoke([](const auto&, const auto& original_load) -> const HealthyAndDegradedLoad& {
-            return original_load;
-          }));
+          Invoke([](const auto&, const auto& original_load,
+                    const auto&) -> const HealthyAndDegradedLoad& { return original_load; }));
 
   for (uint64_t i = 0; i < total_hosts; ++i) {
     const auto hs = lb_.chooseHostSet(&context);
@@ -234,7 +235,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
   HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({0u, 100u}),
                                        Upstream::DegradedLoad({0, 0})};
   // return a filter that excludes priority 0
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _, _)).WillRepeatedly(ReturnRef(priority_load));
 
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 1);
@@ -1009,7 +1010,7 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
   } else {
     priority_load.healthy_priority_load_ = HealthyLoad({0u, 100u});
   }
-  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, determinePriorityLoad(_, _, _)).WillRepeatedly(ReturnRef(priority_load));
   EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(2));
 
   // Calling chooseHost multiple times always returns host one, since the filter will reject
@@ -1531,6 +1532,89 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+}
+
+// Validate that the load balancer defaults to an active request bias value of 1.0 if the runtime
+// value is invalid (less than 0.0).
+TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithInvalidActiveRequestBias) {
+  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
+  lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(-1.0));
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+
+  // Trigger callbacks. The added/removed lists are not relevant.
+  EXPECT_LOG_CONTAINS(
+      "warn", "upstream: invalid active request bias supplied (runtime key ar_bias), using 1.0",
+      hostSet().runCallbacks({}, {}));
+
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+
+  // We should see 2:1 ratio for hosts[1] to hosts[0].
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+
+  // Bringing hosts[1] to an active request should yield a 1:1 ratio.
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+
+  // Settings hosts[0] to an active request and hosts[1] to no active requests should yield a 4:1
+  // ratio.
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(0);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+}
+
+TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias) {
+  // Create a load balancer with a custom active request bias.
+  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
+  lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(0.0));
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+
+  // We should see 2:1 ratio for hosts[1] to hosts[0], regardless of the active request count.
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {

@@ -5,9 +5,11 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <unordered_set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
@@ -15,6 +17,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -23,12 +26,15 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
-#include "common/common/version.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/http/codes.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/address_impl.h"
+#include "common/network/listener_impl.h"
+#include "common/network/socket_interface.h"
+#include "common/network/socket_interface_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -36,11 +42,12 @@
 #include "common/stats/thread_local_store.h"
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
+#include "common/version/version.h"
 
+#include "server/admin/utils.h"
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
-#include "server/http/utils.h"
 #include "server/listener_hooks.h"
 #include "server/ssl_context_manager.h"
 
@@ -51,12 +58,13 @@ InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     HotRestart& restarter, Stats::StoreRoot& store, Thread::BasicLockable& access_log_lock,
-    ComponentFactory& component_factory, Runtime::RandomGeneratorPtr&& random_generator,
+    ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
     ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields()),
+                                             !options.rejectUnknownDynamicFields(),
+                                             options.ignoreUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
@@ -131,7 +139,7 @@ Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_.clust
 void InstanceImpl::drainListeners() {
   ENVOY_LOG(info, "closing and draining listeners");
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All);
-  drain_manager_->startDrainSequence(nullptr);
+  drain_manager_->startDrainSequence([] {});
 }
 
 void InstanceImpl::failHealthcheck(bool fail) {
@@ -157,6 +165,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store) {
   histograms_.reserve(snapped_histograms_.size());
   for (const auto& histogram : snapped_histograms_) {
     histograms_.push_back(*histogram);
+  }
+
+  snapped_text_readouts_ = store.textReadouts();
+  text_readouts_.reserve(snapped_text_readouts_.size());
+  for (const auto& text_readout : snapped_text_readouts_) {
+    text_readouts_.push_back(*text_readout);
   }
 }
 
@@ -219,6 +233,26 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
+namespace {
+// Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
+void loadBootsrap(absl::optional<uint32_t> bootstrap_version,
+                  envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                  std::function<void(Protobuf::Message&, bool)> load_function) {
+
+  if (!bootstrap_version.has_value()) {
+    load_function(bootstrap, true);
+  } else if (*bootstrap_version == 3) {
+    load_function(bootstrap, false);
+  } else if (*bootstrap_version == 2) {
+    envoy::config::bootstrap::v2::Bootstrap bootstrap_v2;
+    load_function(bootstrap_v2, false);
+    Config::VersionConverter::upgrade(bootstrap_v2, bootstrap);
+  } else {
+    throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
+  }
+}
+} // namespace
+
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                        const Options& options,
                                        ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -234,11 +268,19 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    loadBootsrap(
+        options.bootstrapVersion(), bootstrap,
+        [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
+          MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
+        });
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
+    loadBootsrap(options.bootstrapVersion(), bootstrap_override,
+                 [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
+                   MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
+                 });
+    // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSize() != 0) {
@@ -250,8 +292,8 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory, ListenerHooks& hooks) {
-  ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
-            restarter_.version());
+  ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
+            options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -269,20 +311,28 @@ void InstanceImpl::initialize(const Options& options,
     // setPrefix has a release assert verifying that setPrefix() is not called after prefix()
     ThreadSafeSingleton<Http::PrefixValue>::get().setPrefix(bootstrap_.header_prefix().c_str());
   }
+  // TODO(mattklein123): Custom O(1) headers can be registered at this point for creating/finalizing
+  // any header maps.
+  ENVOY_LOG(info, "HTTP header map info:");
+  for (const auto& info : Http::HeaderMapImplUtility::getAllHeaderMapImplInfo()) {
+    ENVOY_LOG(info, "  {}: {} bytes: {}", info.name_, info.size_,
+              absl::StrJoin(info.registered_headers_, ","));
+  }
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
   stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
       ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_HISTOGRAM_PREFIX(stats_store_, server_stats_prefix))});
-  validation_context_.static_warning_validation_visitor().setCounter(
+  validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
-  validation_context_.dynamic_warning_validation_visitor().setCounter(
+  validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
       server_stats_->dynamic_unknown_fields_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
@@ -292,6 +342,8 @@ void InstanceImpl::initialize(const Options& options,
 
   assert_action_registration_ = Assert::setDebugAssertionFailureRecordAction(
       [this]() { server_stats_->debug_assertion_failures_.inc(); });
+  envoy_bug_action_registration_ = Assert::setEnvoyBugFailureRecordAction(
+      [this]() { server_stats_->envoy_bug_failures_.inc(); });
 
   InstanceImpl::failHealthcheck(false);
 
@@ -332,6 +384,54 @@ void InstanceImpl::initialize(const Options& options,
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
+
+  loadServerFlags(initial_config.flagsPath());
+
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
+
+  // Initialize the overload manager early so other modules can register for actions.
+  overload_manager_ = std::make_unique<OverloadManagerImpl>(
+      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
+      messageValidationContext().staticValidationVisitor(), *api_);
+
+  heap_shrinker_ =
+      std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
+
+  for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+        bootstrap_extension);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
+  }
+
+  if (!bootstrap_.default_socket_interface().empty()) {
+    auto& sock_name = bootstrap_.default_socket_interface();
+    auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
+    if (sock != nullptr) {
+      Network::SocketInterfaceSingleton::clear();
+      Network::SocketInterfaceSingleton::initialize(sock);
+    }
+  }
+
+  // Workers get created first so they register for thread local updates.
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(
+      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
+
+  // The main thread is also registered for thread local updates so that code that does not care
+  // whether it runs on the main thread or on workers can still use TLS.
+  thread_local_.registerThread(*dispatcher_, true);
+
+  // We can now initialize stats for threading.
+  stats_store_.initializeThreading(*dispatcher_, thread_local_);
+
+  // It's now safe to start writing stats from the main thread's dispatcher.
+  if (bootstrap_.enable_dispatcher_stats()) {
+    dispatcher_->initializeStats(stats_store_, "server.");
+  }
+
   if (initial_config.admin().address()) {
     if (initial_config.admin().accessLogPath().empty()) {
       throw EnvoyException("An admin access log path is required for a listening server.");
@@ -348,34 +448,6 @@ void InstanceImpl::initialize(const Options& options,
       admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
-  }
-
-  loadServerFlags(initial_config.flagsPath());
-
-  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
-
-  // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_);
-
-  heap_shrinker_ =
-      std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
-
-  // Workers get created first so they register for thread local updates.
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(
-      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
-
-  // The main thread is also registered for thread local updates so that code that does not care
-  // whether it runs on the main thread or on workers can still use TLS.
-  thread_local_.registerThread(*dispatcher_, true);
-
-  // We can now initialize stats for threading.
-  stats_store_.initializeThreading(*dispatcher_, thread_local_);
-
-  // It's now safe to start writing stats from the main thread's dispatcher.
-  if (bootstrap_.enable_dispatcher_stats()) {
-    dispatcher_->initializeStats(stats_store_, "server.");
   }
 
   // The broad order of initialization from this point on is the following:
@@ -427,8 +499,8 @@ void InstanceImpl::initialize(const Options& options,
   // instantiated (which in turn relies on runtime...).
   Runtime::LoaderSingleton::get().initialize(clusterManager());
 
-  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
-  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
+  clusterManager().setPrimaryClustersInitializedCb(
+      [this]() { onClusterManagerPrimaryInitializationComplete(); });
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
     stats_store_.addSink(*sink);
@@ -442,6 +514,11 @@ void InstanceImpl::initialize(const Options& options,
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
+}
+
+void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
+  // If RTDS was not configured the `onRuntimeReady` callback is immediately invoked.
+  Runtime::LoaderSingleton::get().startRtdsSubscriptions([this]() { onRuntimeReady(); });
 }
 
 void InstanceImpl::onRuntimeReady() {
@@ -461,6 +538,15 @@ void InstanceImpl::onRuntimeReady() {
         stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
         *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
+  }
+
+  // If there is no global limit to the number of active connections, warn on startup.
+  // TODO (tonya11en): Move this functionality into the overload manager.
+  if (!runtime().snapshot().get(Network::ListenerImpl::GlobalMaxCxRuntimeKey)) {
+    ENVOY_LOG(warn,
+              "there is no configured limit to the number of allowed active connections. Set a "
+              "limit via the runtime key {}",
+              Network::ListenerImpl::GlobalMaxCxRuntimeKey);
   }
 }
 
@@ -545,13 +631,14 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(
-        envoy::config::core::v3::ApiVersion::V2);
+    const auto type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
+    Config::ScopedResume maybe_resume_rds;
     if (cm.adsMux()) {
-      cm.adsMux()->pause(type_url);
+      maybe_resume_rds = cm.adsMux()->pause(type_urls);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -559,9 +646,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
-    if (cm.adsMux()) {
-      cm.adsMux()->resume(type_url);
-    }
+    // This is done by tearing down the maybe_resume_rds Cleanup object.
   });
 }
 
