@@ -21,8 +21,8 @@ if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
 elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
   BUILD_ARCH_DIR="/linux/arm64"
 else
-  echo "Unknown architecture for building: '${ENVOY_BUILD_ARCH}'"
-  exit 1;
+  # Fall back to use the ENVOY_BUILD_ARCH itself.
+  BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
 
 echo "building using ${NUM_CPUS} CPUs"
