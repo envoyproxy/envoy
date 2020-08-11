@@ -163,7 +163,6 @@ public:
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
     // it should never reach here but the compiler complains and the alternative will be to change
     // the return type of the parent virtual function to absl::<optional<current_return_type>>
-    return nullptr;
   }
 
   void onWriteable() override {}
