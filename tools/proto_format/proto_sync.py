@@ -321,9 +321,6 @@ def GenerateCurrentApiDir(api_dir, dst_dir):
 
   for p in dst.glob('**/*.md'):
     p.unlink()
-  # envoy.service.auth.v2alpha exist for compatibility while we don't run in protoxform
-  # so we ignore it here.
-  shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
 
 def GitStatus(path):

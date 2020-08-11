@@ -1,4 +1,3 @@
-#include "envoy/service/auth/v2alpha/external_auth.pb.h" // for proto link
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
