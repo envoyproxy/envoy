@@ -90,7 +90,8 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
         std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     unexpected_response->set_type_url(type_url);
     unexpected_response->set_system_version_info("0");
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
+    // empty response should call onConfigUpdate on wildcard watch
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(1);
     grpc_mux_->onDiscoveryResponse(std::move(unexpected_response), control_plane_stats_);
   }
   {
