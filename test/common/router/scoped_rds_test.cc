@@ -1048,7 +1048,7 @@ key:
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   EXPECT_CALL(event_dispatcher_, post(_)).Times(1);
   getScopedRdsProvider()->onDemandRdsUpdate(*key_hash, event_dispatcher_, route_config_updated_cb_);
-  // After on demand request, push rds update.
+  // After on demand request, push rds update, both scopes should find the route configuration.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
@@ -1152,7 +1152,8 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-  // Primary priority scope should be loaded eagerly.
+  // Primary priority scope should be loaded eagerly, use a different scope name because we only
+  // have 1  init manager and init watcher.
   const std::string config_yaml = R"EOF(
 name: foo_scope2
 route_configuration_name: foo_routes

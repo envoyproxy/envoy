@@ -361,23 +361,7 @@ private:
 
   using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
 
-  // Used to abstract making of RouteConfig update request.
-  // RdsRouteConfigUpdateRequester is used when an RdsRouteConfigProvider is configured,
-  // NullRouteConfigUpdateRequester is used in all other cases (specifically when
-  // ScopedRdsConfigProvider/InlineScopedRoutesConfigProvider is configured)
-  class RouteConfigUpdateRequester {
-  public:
-    virtual ~RouteConfigUpdateRequester() = default;
-    virtual void requestVhdsUpdate(const std::string, Event::Dispatcher&,
-                                   Http::RouteConfigUpdatedCallbackSharedPtr) {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    };
-    virtual void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback) {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    };
-  };
-
-  class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
+  class RdsRouteConfigUpdateRequester {
   public:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
@@ -388,19 +372,15 @@ private:
         : scoped_route_config_provider_(
               dynamic_cast<Router::ScopedRdsConfigProvider*>(scoped_route_config_provider)) {}
 
-    void
-    requestVhdsUpdate(const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
-                      Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-    void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback) override;
+    void requestVhdsUpdate(const std::string host_header,
+                           Event::Dispatcher& thread_local_dispatcher,
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    void requestSrdsUpdate(uint64_t, Event::Dispatcher&, Http::RouteConfigUpdatedCallback,
+                           std::weak_ptr<Http::RouteConfigUpdatedCallback>);
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
     Router::ScopedRdsConfigProvider* scoped_route_config_provider_;
-  };
-
-  class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
-  public:
-    NullRouteConfigUpdateRequester() = default;
   };
 
   /**
@@ -1001,7 +981,7 @@ private:
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
     Network::Socket::OptionsSharedPtr upstream_options_;
-    std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
+    std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
     absl::optional<uint64_t> scope_key_hash_;
 

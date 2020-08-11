@@ -517,13 +517,18 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestVhdsUpdate(
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
     uint64_t key_hash, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallback route_config_updated_cb) {
+    Http::RouteConfigUpdatedCallback route_config_updated_cb,
+    std::weak_ptr<Http::RouteConfigUpdatedCallback> weak_callback) {
+  // If it is inline scope_route_config_provider, will be cast to nullptr.
   if (!scoped_route_config_provider_) {
     thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
     return;
   }
-  scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
-                                                   move(route_config_updated_cb));
+  // This is a raw pointer to config provider, should lock before peforming update.
+  if (weak_callback.lock()) {
+    scoped_route_config_provider_->onDemandRdsUpdate(key_hash, thread_local_dispatcher,
+                                                     move(route_config_updated_cb));
+  }
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
@@ -1500,8 +1505,6 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
-  scope_key_hash_ =
-      snapped_scoped_routes_config_->computeKeyHash(*filter_manager_.requestHeaders());
   snapped_route_config_ =
       snapped_scoped_routes_config_->getRouteConfig(*filter_manager_.requestHeaders());
   if (snapped_route_config_ == nullptr) {
@@ -1578,7 +1581,9 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
     route_config_update_requester_->requestVhdsUpdate(host_header, thread_local_dispatcher,
                                                       std::move(route_config_updated_cb));
     return;
-  } else if (snapped_scoped_routes_config_ != nullptr && scope_key_hash_) {
+  } else if (snapped_scoped_routes_config_ != nullptr &&
+             (scope_key_hash_ = snapped_scoped_routes_config_->computeKeyHash(
+                  *filter_manager_.requestHeaders()))) {
     // On demand srds
     Http::RouteConfigUpdatedCallback scoped_route_config_updated_cb =
         Http::RouteConfigUpdatedCallback(
@@ -1592,8 +1597,9 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
                 (*cb)(scope_exist && hasCachedRoute());
               }
             });
-    route_config_update_requester_->requestSrdsUpdate(*scope_key_hash_, thread_local_dispatcher,
-                                                      scoped_route_config_updated_cb);
+    route_config_update_requester_->requestSrdsUpdate(
+        *scope_key_hash_, thread_local_dispatcher, scoped_route_config_updated_cb,
+        std::weak_ptr<Http::RouteConfigUpdatedCallback>(route_config_updated_cb));
     return;
   }
   // Continue the filter chain if no on demand update is requested.
@@ -2790,7 +2796,7 @@ ConnectionManagerImpl::ActiveStreamDecoderFilter::getUpstreamSocketOptions() con
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  parent_.active_stream_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
+  parent_.active_stream_.requestRouteConfigUpdate(route_config_updated_cb);
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
