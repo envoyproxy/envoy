@@ -117,6 +117,8 @@ public:
                 EXPECT_EQ(peer_address, *upstream_address_);
                 if (self_ip && local_ip) {
                   EXPECT_EQ(self_ip->addressAsString(), local_ip->addressAsString());
+                } else if (local_ip == nullptr) {
+                  EXPECT_EQ(self_ip, nullptr);
                 }
                 return sys_errno == 0 ? makeNoError(data.size()) : makeError(sys_errno);
               }));
