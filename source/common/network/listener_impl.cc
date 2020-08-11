@@ -91,13 +91,15 @@ void ListenerImpl::onSocketEvent(short flags) {
 }
 
 void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
-  // TODO(fcoras): make listen backlog configurable
+  // TODO(fcoras): make listen backlog configurable. For now use 128, which is what libevent
+  // defaults to for listeners configured with a negative (unspecified) backlog
   socket.ioHandle().listen(128);
+
+  // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
+  // loss of the trigger due to transient accept errors.
   file_event_ = dispatcher.createFileEvent(
       socket.ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
-
-  RELEASE_ASSERT(file_event_, "file event must be valid");
 
   if (!Network::Socket::applyOptions(socket.options(), socket,
                                      envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
