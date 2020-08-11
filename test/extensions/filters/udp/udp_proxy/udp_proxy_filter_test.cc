@@ -28,16 +28,16 @@ namespace {
 
 class MockSocket : public Network::Socket {
 public:
-  MockSocket() = default;
+  MockSocket() : io_handle_(std::make_unique<Network::MockIoHandle>()){};
   ~MockSocket() override = default;
 
-  Network::IoHandle& ioHandle() override { return io_handle_; };
+  Network::IoHandle& ioHandle() override { return *io_handle_; };
 
-  const Network::IoHandle& ioHandle() const override { return io_handle_; };
+  const Network::IoHandle& ioHandle() const override { return *io_handle_; };
 
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
                                         socklen_t len) override {
-    return io_handle_.setOption(level, optname, optval, len);
+    return io_handle_->setOption(level, optname, optval, len);
   }
 
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
@@ -59,7 +59,7 @@ public:
   MOCK_METHOD(void, addOption, (const Network::Socket::OptionConstSharedPtr&), (override));
   MOCK_METHOD(void, addOptions, (const Network::Socket::OptionsSharedPtr&), (override));
 
-  Network::MockIoHandle io_handle_;
+  const std::unique_ptr<Network::MockIoHandle> io_handle_;
 };
 
 class TestUdpProxyFilter : public UdpProxyFilter {
@@ -95,7 +95,7 @@ public:
         : parent_(parent), upstream_address_(upstream_address), socket_(new MockSocket()) {}
 
     void expectUpstreamWriteOriginalSrcIp() {
-      EXPECT_CALL(socket_->io_handle_, setOption(_, _, _, _))
+      EXPECT_CALL(*socket_->io_handle_, setOption(_, _, _, _))
           .WillRepeatedly(Invoke([this](int level, int optname, const void* optval,
                                         socklen_t) -> Api::SysCallIntResult {
             sock_opts_[level][optname] = *reinterpret_cast<const int*>(optval);
@@ -106,7 +106,7 @@ public:
     void expectUpstreamWrite(const std::string& data, int sys_errno = 0,
                              const Network::Address::Ip* local_ip = nullptr) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
-      EXPECT_CALL(socket_->io_handle_, sendmsg(_, 1, 0, local_ip, _))
+      EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
           .WillOnce(Invoke(
               [this, data, local_ip, sys_errno](
                   const Buffer::RawSlice* slices, uint64_t, int,
@@ -126,10 +126,10 @@ public:
                               int send_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
 
-      EXPECT_CALL(socket_->io_handle_, supportsUdpGro());
-      EXPECT_CALL(socket_->io_handle_, supportsMmsg());
+      EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
+      EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
       // Return the datagram.
-      EXPECT_CALL(socket_->io_handle_, recvmsg(_, 1, _, _))
+      EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
               Invoke([this, data, recv_sys_errno](
                          Buffer::RawSlice* slices, const uint64_t, uint32_t,
@@ -158,9 +158,9 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        EXPECT_CALL(socket_->io_handle_, supportsUdpGro());
-        EXPECT_CALL(socket_->io_handle_, supportsMmsg());
-        EXPECT_CALL(socket_->io_handle_, recvmsg(_, 1, _, _))
+        EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
+        EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
+        EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(
                 0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                    Network::IoSocketError::deleteIoError)))));
@@ -179,7 +179,11 @@ public:
   };
 
   UdpProxyFilterTest()
-      : upstream_address_(Network::Utility::parseInternetAddressAndPort("20.0.0.1:443")) {
+      : UdpProxyFilterTest(Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000")) {}
+
+  explicit UdpProxyFilterTest(Network::Address::InstanceConstSharedPtr&& peer_address)
+      : upstream_address_(Network::Utility::parseInternetAddressAndPort("20.0.0.1:443")),
+        peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
@@ -222,7 +226,7 @@ public:
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
     EXPECT_CALL(*filter_, createSocket(_))
         .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
-    EXPECT_CALL(new_session.socket_->io_handle_, fd());
+    EXPECT_CALL(*new_session.socket_->io_handle_, fd());
     EXPECT_CALL(
         callbacks_.udp_listener_.dispatcher_,
         createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
@@ -250,6 +254,7 @@ public:
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;
   const Network::Address::InstanceConstSharedPtr upstream_address_;
+  const Network::Address::InstanceConstSharedPtr peer_address_;
 };
 
 class UdpProxyFilterTestIpv6 : public UdpProxyFilterTest {
@@ -259,7 +264,9 @@ public:
             Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::8a2e:370:7334]:443")) {}
 
   explicit UdpProxyFilterTestIpv6(Network::Address::InstanceConstSharedPtr&& address)
-      : upstream_address_v6_(std::move(address)) {
+      : UdpProxyFilterTest(
+            Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::9a2e:370:7334]:1000")),
+        upstream_address_v6_(std::move(address)) {
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_v6_));
   }
@@ -582,9 +589,8 @@ use_original_src_ip: true
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectUpstreamWriteOriginalSrcIp();
-  test_sessions_[0].expectUpstreamWrite(
-      "hello", 0, Network::Utility::parseInternetAddressAndPort("10.0.0.1:1000")->ip());
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  test_sessions_[0].expectUpstreamWrite("hello", 0, peer_address_->ip());
+  recvDataFromDownstream(peer_address_->asString(), "10.0.0.2:80", "hello");
 
   EXPECT_EQ(1, test_sessions_[0].sock_opts_[ip_trans.level()][ip_trans.option()]);
   EXPECT_EQ(0, test_sessions_[0].sock_opts_[ipv6_trans.level()][ipv6_trans.option()]);
@@ -616,11 +622,8 @@ use_original_src_ip: true
 
   expectSessionCreate(upstream_address_v6_);
   test_sessions_[0].expectUpstreamWriteOriginalSrcIp();
-  test_sessions_[0].expectUpstreamWrite(
-      "hello", 0,
-      Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::9a2e:370:7334]:1000")->ip());
-  recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000", "[2001:db8:85a3::9a2e:370:7335]:80",
-                         "hello");
+  test_sessions_[0].expectUpstreamWrite("hello", 0, peer_address_->ip());
+  recvDataFromDownstream(peer_address_->asString(), "[2001:db8:85a3::9a2e:370:7335]:80", "hello");
 
   EXPECT_EQ(0, test_sessions_[0].sock_opts_[ip_trans.level()][ip_trans.option()]);
   EXPECT_EQ(1, test_sessions_[0].sock_opts_[ipv6_trans.level()][ipv6_trans.option()]);
@@ -652,11 +655,8 @@ use_original_src_ip: true
 
   expectSessionCreate(upstream_address_v6_);
   test_sessions_[0].expectUpstreamWriteOriginalSrcIp();
-  test_sessions_[0].expectUpstreamWrite(
-      "hello", 0,
-      Network::Utility::parseInternetAddressAndPort("[2001:db8:85a3::9a2e:370:7334]:1000")->ip());
-  recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000", "[2001:db8:85a3::9a2e:370:7335]:80",
-                         "hello");
+  test_sessions_[0].expectUpstreamWrite("hello", 0, peer_address_->ip());
+  recvDataFromDownstream(peer_address_->asString(), "[2001:db8:85a3::9a2e:370:7335]:80", "hello");
 
   EXPECT_EQ(1, test_sessions_[0].sock_opts_[ip_trans.level()][ip_trans.option()]);
   EXPECT_EQ(1, test_sessions_[0].sock_opts_[ipv6_trans.level()][ipv6_trans.option()]);
