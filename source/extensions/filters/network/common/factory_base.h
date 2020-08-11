@@ -4,6 +4,8 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -56,7 +58,10 @@ private:
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsTyped(const ProtocolOptionsProto&,
                              Server::Configuration::ProtocolOptionsFactoryContext&) {
-    throw EnvoyException(fmt::format("filter {} does not support protocol options", name_));
+    ExceptionUtil::throwEnvoyException(
+        fmt::format("filter {} does not support protocol options", name_));
+    // to satisfy compiler and should never reach here.
+    return nullptr;
   }
 
   const std::string name_;

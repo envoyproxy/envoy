@@ -251,6 +251,16 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
+void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_name,
+                                                    const Protobuf::Message& message) {
+  throw MissingFieldException(field_name, message);
+}
+
+void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
+                                                       const Protobuf::Message& message) {
+  throw ProtoValidationException(validation_error, message);
+}
+
 size_t MessageUtil::hash(const Protobuf::Message& message) {
   std::string text_format;
 
@@ -467,7 +477,7 @@ public:
               "' from file ", filename,
               " while using the latest V3 configuration. This field has been removed from the "
               "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
-          throw ProtoValidationException(fatal_error, message);
+          ProtoExceptionUtil::throwProtoValidationException(fatal_error, message);
         }
       }
       const std::string warning =
