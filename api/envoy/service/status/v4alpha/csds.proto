@@ -61,6 +61,9 @@ message ClientStatusRequest {
   // Management server can use these match criteria to identify clients.
   // The match follows OR semantics.
   repeated type.matcher.v4alpha.NodeMatcher node_matchers = 1;
+
+  // The node making the csds request.
+  config.core.v4alpha.Node node = 2;
 }
 
 // Detailed config (per xDS) with status.
@@ -80,7 +83,6 @@ message PerXdsConfig {
 
     admin.v4alpha.ScopedRoutesConfigDump scoped_route_config = 5;
 
-    // [#not-implemented-hide:]
     admin.v4alpha.EndpointsConfigDump endpoint_config = 6;
   }
 }
