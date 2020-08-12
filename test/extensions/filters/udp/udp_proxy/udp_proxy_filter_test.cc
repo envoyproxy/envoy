@@ -120,7 +120,13 @@ public:
                 } else if (local_ip == nullptr) {
                   EXPECT_EQ(self_ip, nullptr);
                 }
-                return sys_errno == 0 ? makeNoError(data.size()) : makeError(sys_errno);
+                // For suppression of clang-tidy NewDeleteLeaks rule, don't use the ternary
+                // operator.
+                if (sys_errno == 0) {
+                  return makeNoError(data.size());
+                } else {
+                  return makeError(sys_errno);
+                }
               }));
     }
 
