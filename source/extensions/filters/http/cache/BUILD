@@ -20,10 +20,10 @@ envoy_cc_library(
         ":cache_headers_utils_lib",
         ":cacheability_utils_lib",
         ":http_cache_lib",
+        ":inline_headers_handles",
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
-        "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -37,6 +37,7 @@ envoy_cc_library(
     hdrs = ["cacheability_utils.h"],
     deps = [
         ":cache_headers_utils_lib",
+        ":inline_headers_handles",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
     ],
@@ -53,6 +54,7 @@ envoy_cc_library(
     hdrs = ["http_cache.h"],
     deps = [
         ":cache_headers_utils_lib",
+        ":inline_headers_handles",
         ":key_cc_proto",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
@@ -75,6 +77,14 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "inline_headers_handles",
+    hdrs = ["inline_headers_handles.h"],
+    deps = [
+        "//source/common/http:headers_lib",
     ],
 )
 
