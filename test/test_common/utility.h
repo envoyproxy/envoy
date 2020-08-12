@@ -246,13 +246,15 @@ public:
    * @param value target value.
    * @param time_system the time system to use for waiting.
    * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @param fixfix
    * @return AssertionSuccess() if the gauge was == to the value within the timeout, else
    * AssertionFailure().
    */
   static AssertionResult
   waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                  Event::TestTimeSystem& time_system,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                 Event::Dispatcher* dispatcher = nullptr);
 
   /**
    * Find a readout in a stats store.

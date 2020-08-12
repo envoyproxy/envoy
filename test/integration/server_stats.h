@@ -50,10 +50,11 @@ public:
    * @param name gauge name.
    * @param value target value.
    * @param timeout amount of time to wait before asserting false, or 0 for no timeout.
+   * @param fixfix
    */
-  virtual void
-  waitForGaugeEq(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) PURE;
+  virtual void waitForGaugeEq(const std::string& name, uint64_t value,
+                              std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                              Event::Dispatcher* dispatcher = nullptr) PURE;
 
   /**
    * Counter lookup. This is not thread safe, since we don't get a consistent

@@ -51,6 +51,12 @@ public:
    * Waits for the specified duration to expire, or for the condition to be satisfied, whichever
    * comes first.
    *
+   * NOTE: This function takes a duration parameter which is the timeout of the wait. This is *real*
+   *       time in all time systems. This is to avoid test hangs and provide a useful error message.
+   *       When using simulated time this does not advance monotonic time. Thus, to simulated time
+   *       tests all network behavior will appear instantaneous. If time needs to advance to fire
+   *       alarms advanceTimeWait() or advanceTimeAsync() should be used.
+   *
    * @param mutex A mutex which must be held before calling this function.
    * @param condvar The condition to wait on.
    * @param duration The maximum amount of time to wait.
@@ -58,7 +64,7 @@ public:
    */
   virtual bool waitForImpl(absl::Mutex& mutex, const absl::Condition& condition,
                            const Duration& duration) noexcept
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE;
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) PURE; // fixfix
 
   template <class D>
   bool waitFor(absl::Mutex& mutex, const absl::Condition& condition, const D& duration) noexcept
