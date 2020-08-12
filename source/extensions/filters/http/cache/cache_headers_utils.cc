@@ -149,7 +149,7 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
 
 SystemTime::duration
 CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
-                                const SystemTime now, const SystemTime response_time) {
+                                const SystemTime response_time, const SystemTime now) {
   // Age headers calculations follow: https://httpwg.org/specs/rfc7234.html#age.calculations
   const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
 
@@ -163,7 +163,7 @@ CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
       std::max(SystemTime::duration(0), response_time - date_value);
 
   // Assumption: response_delay is negligible.
-  const SystemTime::duration corrected_age_value = SystemTime::duration(age_value);
+  const SystemTime::duration corrected_age_value = std::chrono::seconds(age_value);
   const SystemTime::duration corrected_initial_age = std::max(apparent_age, corrected_age_value);
 
   // Caclulate current_age:

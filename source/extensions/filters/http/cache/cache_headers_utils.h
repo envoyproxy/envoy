@@ -94,7 +94,7 @@ public:
 
   // Calculates the age of a cached response
   static SystemTime::duration calculateAge(const Http::ResponseHeaderMap& response_headers,
-                                           const SystemTime now, const SystemTime response_time);
+                                           const SystemTime response_time, const SystemTime now);
 
   /**
    * Read a leading positive decimal integer value and advance "*str" past the

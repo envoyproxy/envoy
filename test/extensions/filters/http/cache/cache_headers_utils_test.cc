@@ -5,11 +5,13 @@
 #include "envoy/common/time.h"
 
 #include "common/common/macros.h"
+#include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "test/extensions/filters/http/cache/common.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -316,6 +318,104 @@ TEST(HttpTime, InvalidFormat) {
 }
 
 TEST(HttpTime, Null) { EXPECT_EQ(CacheHeadersUtils::httpTime(nullptr), SystemTime()); }
+
+struct CalculateAgeTestCase {
+  std::string test_name;
+  Http::TestResponseHeaderMapImpl response_headers;
+  SystemTime response_time, now;
+  SystemTime::duration expected_age;
+};
+
+using Seconds = std::chrono::seconds;
+
+class CalculateAgeTest : public testing::TestWithParam<CalculateAgeTestCase> {
+public:
+  static std::string durationToString(const SystemTime::duration& duration) {
+    return std::to_string(std::chrono::duration_cast<std::chrono::seconds>(duration).count());
+  }
+  static std::string formatTime(const SystemTime& time) { return formatter().fromTime(time); }
+  static const DateFormatter& formatter() {
+    CONSTRUCT_ON_FIRST_USE(DateFormatter, {"%a, %d %b %Y %H:%M:%S GMT"});
+  }
+  static const SystemTime& currentTime() {
+    CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());
+  }
+  static const std::vector<CalculateAgeTestCase>& getTestCases() {
+    // clang-format off
+    CONSTRUCT_ON_FIRST_USE(std::vector<CalculateAgeTestCase>,
+        {
+          "no_initial_age_all_times_equal",
+          /*response_headers=*/{{"date", formatTime(currentTime())}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime(),
+          /*expected_age=*/Seconds(0)
+        },
+        {
+          "initial_age_zero_all_times_equal",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "0"}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime(),
+          /*expected_age=*/Seconds(0)
+        },
+        {
+          "initial_age_non_zero_all_times_equal",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "50"}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime(),
+          /*expected_age=*/Seconds(50)
+        },
+        {
+          "date_after_response_time_no_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime() + Seconds(5))}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime() + Seconds(10),
+          /*expected_age=*/Seconds(10)
+        },
+        {
+          "date_after_response_time_with_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime() + Seconds(10))}, {"age", "5"}},
+          /*response_time=*/currentTime(),
+          /*now=*/currentTime() + Seconds(10),
+          /*expected_age=*/Seconds(15)
+        },
+        {
+          "apparent_age_equals_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "1"}},
+          /*response_time=*/currentTime() + Seconds(1),
+          /*now=*/currentTime() + Seconds(5),
+          /*expected_age=*/Seconds(5)
+        },
+        {
+          "apparent_age_lower_than_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "3"}},
+          /*response_time=*/currentTime() + Seconds(1),
+          /*now=*/currentTime() + Seconds(5),
+          /*expected_age=*/Seconds(7)
+        },
+        {
+          "apparent_age_higher_than_initial_age",
+          /*response_headers=*/{{"date", formatTime(currentTime())}, {"age", "1"}},
+          /*response_time=*/currentTime() + Seconds(3),
+          /*now=*/currentTime() + Seconds(5),
+          /*expected_age=*/Seconds(5)
+        },
+    );
+    // clang-format on
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(CalculateAgeTest, CalculateAgeTest,
+                         testing::ValuesIn(CalculateAgeTest::getTestCases()),
+                         [](const auto& info) { return info.param.test_name; });
+
+TEST_P(CalculateAgeTest, CalculateAgeTest) {
+  const SystemTime::duration calculated_age = CacheHeadersUtils::calculateAge(
+      GetParam().response_headers, GetParam().response_time, GetParam().now);
+  const SystemTime::duration expected_age = GetParam().expected_age;
+  EXPECT_EQ(calculated_age, expected_age)
+      << "Expected age: " << durationToString(expected_age)
+      << ", Calculated age: " << durationToString(calculated_age);
+}
 
 void testReadAndRemoveLeadingDigits(absl::string_view input, int64_t expected,
                                     absl::string_view remaining) {

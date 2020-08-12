@@ -134,7 +134,7 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
       response_headers->get(Http::LowerCaseString(std::string(ResponseTimeHeader))));
   // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
   SystemTime::duration response_age =
-      CacheHeadersUtils::calculateAge(*response_headers, timestamp_, response_time);
+      CacheHeadersUtils::calculateAge(*response_headers, response_time, timestamp_);
   response_headers->setReferenceKey(Http::Headers::get().Age, std::to_string(response_age.count()));
 
   result.cache_entry_status_ = requiresValidation(*response_headers, response_age)
