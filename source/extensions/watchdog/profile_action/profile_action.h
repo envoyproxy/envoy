@@ -32,9 +32,9 @@ private:
 
   const std::string path_;
   bool running_profile_;
-  uint64_t max_profiles_per_tid_;
+  const uint64_t max_profiles_per_tid_;
   uint64_t profiles_started_;
-  std::chrono::milliseconds duration_;
+  const std::chrono::milliseconds duration_;
   absl::flat_hash_map<Thread::ThreadId, uint64_t> tid_to_profile_count_;
   Server::Configuration::GuardDogActionFactoryContext& context_;
   Event::TimerPtr timer_cb_;

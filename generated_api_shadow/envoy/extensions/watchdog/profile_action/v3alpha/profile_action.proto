@@ -23,7 +23,7 @@ message ProfileActionConfig {
   google.protobuf.Duration profile_duration = 1;
 
   // File path to the directory to output profiles.
-  string profile_path = 2;
+  string profile_path = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // Limits the max number of profiles that will be written to disk by a given
   // thread to avoid filling disks. If not set (i.e. it's 0), a default of 10

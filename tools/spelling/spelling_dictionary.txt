@@ -27,6 +27,7 @@ CB
 CDS
 CEL
 LTT
+TIDs
 ceil
 CHACHA
 CHLO
