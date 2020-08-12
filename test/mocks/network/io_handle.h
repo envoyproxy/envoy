@@ -32,6 +32,7 @@ public:
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(Api::SysCallIntResult, bind, (Address::InstanceConstSharedPtr address));
   MOCK_METHOD(Api::SysCallIntResult, listen, (int backlog));
+  MOCK_METHOD(IoHandlePtr, accept, (struct sockaddr * addr, socklen_t* addrlen));
   MOCK_METHOD(Api::SysCallIntResult, connect, (Address::InstanceConstSharedPtr address));
   MOCK_METHOD(Api::SysCallIntResult, setOption,
               (int level, int optname, const void* optval, socklen_t optlen));

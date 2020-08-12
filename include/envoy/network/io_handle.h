@@ -166,6 +166,15 @@ public:
   virtual Api::SysCallIntResult listen(int backlog) PURE;
 
   /**
+   * Accept on listening handle
+   * @param addr remote address to be returned
+   * @param addrlen remote address length
+   * @param flags flags to be applied to accepted session
+   * @return accepted IoHandlePtr
+   */
+  virtual std::unique_ptr<IoHandle> accept(struct sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
    * Connect to address. The handle should have been created with a call to socket()
    * on this object.
    * @param address remote address to connect to.

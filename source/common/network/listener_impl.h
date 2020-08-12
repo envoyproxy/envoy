@@ -16,7 +16,6 @@ class ListenerImpl : public BaseListenerImpl {
 public:
   ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket, ListenerCallbacks& cb,
                bool bind_to_port);
-
   void disable() override;
   void enable() override;
 
@@ -28,15 +27,13 @@ protected:
   ListenerCallbacks& cb_;
 
 private:
-  static void listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr* remote_addr,
-                             int remote_addr_len, void* arg);
-  static void errorCallback(evconnlistener* listener, void* context);
+  void onSocketEvent(short flags);
 
   // Returns true if global connection limit has been reached and the accepted socket should be
   // rejected/closed. If the accepted socket is to be admitted, false is returned.
   static bool rejectCxOverGlobalLimit();
 
-  Event::Libevent::ListenerPtr listener_;
+  Event::FileEventPtr file_event_;
 };
 
 } // namespace Network

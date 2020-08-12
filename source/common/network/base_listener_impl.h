@@ -3,10 +3,7 @@
 #include "envoy/network/listener.h"
 
 #include "common/event/dispatcher_impl.h"
-#include "common/event/libevent.h"
 #include "common/network/listen_socket_impl.h"
-
-#include "event2/event.h"
 
 namespace Envoy {
 namespace Network {
