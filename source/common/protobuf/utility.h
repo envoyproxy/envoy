@@ -23,11 +23,7 @@
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a MissingFieldException.
-/*
-#define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
-  ((message).has_##field_name() ? (message).field_name().value()                                   \
-                                : throw MissingFieldException(#field_name, (message)))
-*/
+
 #define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
   ([](const auto& msg) {                                                                           \
     if (!msg.has_##field_name()) {                                                                 \
@@ -349,6 +345,7 @@ public:
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     MessageType typed_message;
     anyConvert(message, typed_message);
+    throw EnvoyException("hi");
     return typed_message;
   };
 

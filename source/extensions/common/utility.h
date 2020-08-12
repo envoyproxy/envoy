@@ -3,9 +3,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/common/utility.h"
 #include "common/common/documentation_url.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -93,7 +93,8 @@ public:
       return;
     }
 
-    ExceptionUtil::throwEnvoyException(fatalMessage(extension_type, deprecated_name, canonical_name));
+    ExceptionUtil::throwEnvoyException(
+        fatalMessage(extension_type, deprecated_name, canonical_name));
   }
 
 private:
