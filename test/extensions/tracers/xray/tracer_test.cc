@@ -109,7 +109,8 @@ TEST_F(XRayTracerTest, NonSampledSpansNotSerialized) {
 }
 
 TEST_F(XRayTracerTest, BaggageNotImplemented) {
-  Tracer tracer{"" /*span name*/, std::move(broker_), server_.timeSource()};
+  Tracer tracer{"" /*span name*/, "" /*origin*/, aws_metadata_, std::move(broker_),
+                server_.timeSource()};
   auto span = tracer.createNonSampledSpan();
   span->setBaggage("baggage_key", "baggage_value");
   span->finishSpan();
