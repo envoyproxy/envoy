@@ -6,10 +6,10 @@ import "envoy/service/auth/v2/external_auth.proto";
 
 import "udpa/annotations/status.proto";
 
+option java_package = "io.envoyproxy.envoy.service.auth.v2alpha";
+option java_outer_classname = "ExternalAuthProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option java_outer_classname = "CertsProto";
-option java_package = "io.envoyproxy.envoy.service.auth.v2alpha";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Authorization Service ]
@@ -22,5 +22,6 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 service Authorization {
   // Performs authorization check based on the attributes associated with the
   // incoming request, and returns status `OK` or not `OK`.
-  rpc Check(v2.CheckRequest) returns (v2.CheckResponse);
+  rpc Check(v2.CheckRequest) returns (v2.CheckResponse) {
+  }
 }
