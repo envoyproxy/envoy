@@ -262,6 +262,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   }
 }
 
+// TODO(yosrym93): Write a test that exercises this when SimpleHttpCache implements updateHeaders
 bool CacheFilter::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const {
   ASSERT(isResponseNotModified(response_headers),
          "shouldUpdateCachedEntry must only be called with 304 responses");

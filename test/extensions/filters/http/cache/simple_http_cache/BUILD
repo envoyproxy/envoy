@@ -14,6 +14,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.cache.simple_http_cache",
     deps = [
         "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
+        "//test/extensions/filters/http/cache:common",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],

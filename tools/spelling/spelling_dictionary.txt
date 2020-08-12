@@ -972,6 +972,7 @@ restarter
 resync
 retriable
 retriggers
+revalidated
 revalidation
 rmdir
 rocketmq

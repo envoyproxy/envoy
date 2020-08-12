@@ -9,6 +9,7 @@
 
 #include "extensions/filters/http/cache/cache_headers_utils.h"
 
+#include "test/extensions/filters/http/cache/common.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -302,11 +303,17 @@ TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
 
 INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(HttpTimeTest::getOkTestCases()));
 
-TEST_P(HttpTimeTest, Ok) {
+TEST_P(HttpTimeTest, OkFormats) {
   const Http::TestResponseHeaderMapImpl response_headers{{"date", GetParam()}};
   // Manually confirmed that 784111777 is 11/6/94, 8:46:37.
   EXPECT_EQ(784111777,
             SystemTime::clock::to_time_t(CacheHeadersUtils::httpTime(response_headers.Date())));
+}
+
+TEST(HttpTime, InvalidFormat) {
+  const std::string invalid_format_date = "Sunday, 06-11-1994 08:49:37";
+  const Http::TestResponseHeaderMapImpl response_headers{{"date", invalid_format_date}};
+  EXPECT_EQ(CacheHeadersUtils::httpTime(response_headers.Date()), SystemTime());
 }
 
 TEST(HttpTime, Null) { EXPECT_EQ(CacheHeadersUtils::httpTime(nullptr), SystemTime()); }

@@ -22,28 +22,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
-  switch (status) {
-  case CacheEntryStatus::Ok:
-    return os << "Ok";
-  case CacheEntryStatus::Unusable:
-    return os << "Unusable";
-  case CacheEntryStatus::RequiresValidation:
-    return os << "RequiresValidation";
-  case CacheEntryStatus::FoundNotModified:
-    return os << "FoundNotModified";
-  case CacheEntryStatus::NotSatisfiableRange:
-    return os << "NotSatisfiableRange";
-  case CacheEntryStatus::SatisfiableRange:
-    return os << "SatisfiableRange";
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
-  return os << "[" << range.begin() << "," << range.end() << ")";
-}
-
 LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp)
     : timestamp_(timestamp) {
   // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
