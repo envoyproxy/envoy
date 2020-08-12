@@ -28,7 +28,7 @@ def envoy_api_binding():
         _default_envoy_api(name = "envoy_api", reldir = "generated_api_shadow")
 
     # We also provide the non-shadowed API for developer use (see #9479).
-    if "envoy_api_raw" not in native.existing_rules().keys():
+    if "envoy_api_canonical" not in native.existing_rules().keys():
         _default_envoy_api(name = "envoy_api_canonical", reldir = "api")
 
     # TODO(https://github.com/envoyproxy/envoy/issues/7719) need to remove both bindings and use canonical rules
