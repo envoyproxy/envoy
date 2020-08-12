@@ -350,6 +350,10 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
   }
+  Event::Dispatcher& dispatcher() override;
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+                          const std::string& worker_name) override;
+
   Init::Manager& initManager();
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
@@ -362,8 +366,6 @@ public:
     }
   }
 
-  Event::Dispatcher& dispatcher() { return listener_factory_context_->dispatcher(); }
-
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;
@@ -371,8 +373,6 @@ public:
   void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
-  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
-                          const std::string& worker_name);
   WorkerPtr& getWorkerByName(const std::string& worker_name);
 
   SystemTime last_updated_;

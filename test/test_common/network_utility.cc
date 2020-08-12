@@ -1,6 +1,7 @@
 #include "test/test_common/network_utility.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/common/platform.h"

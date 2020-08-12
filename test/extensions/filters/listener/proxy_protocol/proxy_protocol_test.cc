@@ -4,6 +4,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -94,6 +95,9 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  Event::Dispatcher& dispatcher() override { return *dispatcher_; }
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
+                          const std::string&) override {}
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -1291,6 +1295,9 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
+  Event::Dispatcher& dispatcher() override { return *dispatcher_; }
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
+                          const std::string&) override {}
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

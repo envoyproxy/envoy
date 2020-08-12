@@ -158,6 +158,7 @@ envoy_cc_library(
         "//include/envoy/common:resource_interface",
         "//include/envoy/stats:stats_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

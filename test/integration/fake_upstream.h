@@ -7,6 +7,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -736,6 +737,10 @@ private:
       connection_resource_.setMax(num_connections);
     }
     void clearMaxConnections() { connection_resource_.resetMax(); }
+
+    Event::Dispatcher& dispatcher() override { return *parent_.dispatcher_; }
+    void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
+                            const std::string&) override {}
 
     FakeUpstream& parent_;
     const std::string name_;

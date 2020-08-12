@@ -1,4 +1,5 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/network/filter.h"
@@ -19,8 +20,10 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -45,6 +48,11 @@ public:
         handler_(new ConnectionHandlerImpl(dispatcher_)),
         filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()) {
+    TestUtility::loadFromYaml(
+        TestEnvironment::substitute(on_demand_filter_chain_yaml, Network::Address::IpVersion::v4),
+        on_demand_filter_chain_template_);
+    on_demand_filter_chain_ =
+        std::make_shared<Network::Test::EmptyFilterChain>(&on_demand_filter_chain_template_);
     ON_CALL(*listener_filter_matcher_, matches(_)).WillByDefault(Return(false));
   }
 
@@ -108,6 +116,10 @@ public:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
+    Event::Dispatcher& dispatcher() override { return parent_.master_dispatcher_; }
+    void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
+                            const std::string&) override {}
+
     ResourceLimit& openConnections() override { return open_connections_; }
 
     void setMaxConnections(const uint32_t num_connections) {
@@ -217,16 +229,27 @@ public:
     return listeners_.back().get();
   }
 
+  const std::string on_demand_filter_chain_yaml = R"EOF(
+      filter_chain_match:
+        destination_port: 10000
+      transport_socket:
+        name: tls
+      build_on_demand:
+        true
+  )EOF";
+  envoy::config::listener::v3::FilterChain on_demand_filter_chain_template_;
   Stats::TestUtil::TestStore stats_store_;
   std::shared_ptr<Network::MockListenSocketFactory> socket_factory_;
   Network::Address::InstanceConstSharedPtr local_address_{
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
+  NiceMock<Event::MockDispatcher> master_dispatcher_{"test_master"};
   std::list<TestListenerPtr> listeners_;
   Network::ConnectionHandlerPtr handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
   NiceMock<Network::MockFilterChainFactory> factory_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Network::FilterChainSharedPtr on_demand_filter_chain_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
@@ -483,6 +506,98 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(0);
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  EXPECT_CALL(*listener, onDestroy());
+}
+
+TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingNoCallback) {
+  InSequence s;
+
+  Network::ListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(on_demand_filter_chain_.get()));
+  EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0);
+  EXPECT_CALL(master_dispatcher_, post(_)).Times(1);
+  Network::MockConnectionSocket* socket = new NiceMock<Network::MockConnectionSocket>();
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{socket});
+
+  EXPECT_CALL(*listener, onDestroy());
+}
+
+TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingSuccess) {
+  Network::ListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+  Network::MockConnection* connection = new NiceMock<Network::MockConnection>();
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillRepeatedly(Return(on_demand_filter_chain_.get()));
+
+  // Will call newConnection twice. After calling onAccept, newConnection will find filter chain is
+  // placeholder. Rebuilding request will be post to master thread and the currently no
+  // createServerConnection will be called.
+  EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0);
+  EXPECT_CALL(master_dispatcher_, post(_)).Times(1);
+
+  Network::MockConnectionSocket* socket = new NiceMock<Network::MockConnectionSocket>();
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{socket});
+  // Rebuilding request has been sent.
+
+  // Expect call after rebuilding succeeded.
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(1);
+
+  // After rebuilding, rebuilt filter chain will be stored inside placeholder.
+  on_demand_filter_chain_->storeRealFilterChain(filter_chain_);
+  // Master thread sends callback to worker to call retryAllConnections. Then newConnection will be
+  // called again. At this time, the same filter chain is found not to be a placeholder. Will call
+  // createServerConnection.
+  handler_->retryAllConnections(true, &on_demand_filter_chain_template_);
+
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(0UL, handler_->numConnections());
+  EXPECT_CALL(*listener, onDestroy());
+}
+
+TEST_F(ConnectionHandlerTest, OnDemandFilterChainRebuildingFail) {
+  InSequence s;
+
+  Network::ListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(on_demand_filter_chain_.get()));
+
+  EXPECT_CALL(dispatcher_, createServerConnection_()).Times(0);
+  EXPECT_CALL(master_dispatcher_, post(_)).Times(1);
+
+  // Will call newConnection twice. After calling onAccept, newConnection will find filter chain is
+  // placeholder. Rebuilding request will be post and the method ends without
+  // createServerConnection.
+  Network::MockConnectionSocket* socket = new NiceMock<Network::MockConnectionSocket>();
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{socket});
+  // Rebuilding request has been sent.
+
+  // After rebuilding, rebuilt filter chain will be stored inside placeholder.
+  on_demand_filter_chain_->storeRealFilterChain(filter_chain_);
+  // Master thread sends callback to worker to call retryAllConnections.
+  // Since rebuilding fails, the socket will be closed with no new connections created.
+  handler_->retryAllConnections(false, &on_demand_filter_chain_template_);
   EXPECT_EQ(0UL, handler_->numConnections());
 
   EXPECT_CALL(*listener, onDestroy());

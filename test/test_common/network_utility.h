@@ -138,14 +138,11 @@ TransportSocketFactoryPtr createRawBufferSocketFactory();
 class EmptyFilterChain : public FilterChain {
 public:
   EmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory)
-      : transport_socket_factory_(std::move(transport_socket_factory)),
-        filter_chain_message_(nullptr), is_placeholder_(false), has_rebuilt_filter_chain_(false),
-        rebuilt_filter_chain_(nullptr) {}
+      : transport_socket_factory_(std::move(transport_socket_factory)) {}
 
   // Ctor for filter chain placeholder.
   EmptyFilterChain(const envoy::config::listener::v3::FilterChain* filter_chain)
-      : filter_chain_message_(filter_chain), is_placeholder_(true),
-        has_rebuilt_filter_chain_(false), rebuilt_filter_chain_(nullptr) {}
+      : filter_chain_message_(filter_chain), is_placeholder_(true) {}
 
   void storeRealFilterChain(Network::FilterChainSharedPtr rebuilt_filter_chain) override {
     is_placeholder_ = false;
@@ -179,10 +176,10 @@ public:
 private:
   const TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<FilterFactoryCb> empty_network_filter_factory_{};
-  const envoy::config::listener::v3::FilterChain* const filter_chain_message_;
-  bool is_placeholder_;
-  bool has_rebuilt_filter_chain_;
-  Network::FilterChainSharedPtr rebuilt_filter_chain_;
+  const envoy::config::listener::v3::FilterChain* const filter_chain_message_{nullptr};
+  bool is_placeholder_{false};
+  bool has_rebuilt_filter_chain_{false};
+  Network::FilterChainSharedPtr rebuilt_filter_chain_{nullptr};
 };
 
 /**

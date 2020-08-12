@@ -248,9 +248,8 @@ void PerFilterChainRebuilder::callbackToWorkers() {
 
   // Find all matching workers and listeners, send callback.
   for (const auto& worker_name : workers_to_callback_) {
-    ENVOY_LOG(debug, "Rebuilding completed, callback to worker: {}", worker_name);
-    // TODO(ASOPVII): add completion status to callback.
-    listener_.getWorkerByName(worker_name)->notifyListenersOnRebuilt(filter_chain_);
+    ENVOY_LOG(debug, "rebuilding completed, callback to worker: {}", worker_name);
+    listener_.getWorkerByName(worker_name)->notifyListenersOnRebuilt(success, filter_chain_);
   }
   workers_to_callback_.clear();
 }
@@ -515,6 +514,8 @@ void ListenerImpl::buildFilterChains() {
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
   filter_chain_manager_.addFilterChain(config_.filter_chains(), builder, filter_chain_manager_);
 }
+
+Event::Dispatcher& ListenerImpl::dispatcher() { return parent_.server_.dispatcher(); }
 
 void ListenerImpl::rebuildFilterChain(
     const envoy::config::listener::v3::FilterChain* const& filter_chain_message,

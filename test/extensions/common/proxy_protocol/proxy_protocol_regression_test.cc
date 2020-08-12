@@ -80,6 +80,10 @@ public:
     return empty_access_logs_;
   }
 
+  Event::Dispatcher& dispatcher() override { return *dispatcher_; }
+  void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
+                          const std::string&) override {}
+
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
     return filter_chain_.get();

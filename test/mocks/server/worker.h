@@ -46,7 +46,7 @@ public:
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
   MOCK_METHOD(void, notifyListenersOnRebuilt,
-              (const envoy::config::listener::v3::FilterChain* const& filter_chain));
+              (bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

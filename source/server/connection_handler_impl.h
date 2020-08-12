@@ -84,6 +84,7 @@ public:
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   void retryAllConnections(
+      bool success,
       const envoy::config::listener::v3::FilterChain* const& filter_chain_message) override;
 
   /**

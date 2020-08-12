@@ -95,7 +95,7 @@ public:
    * @param filter_chain filter chain protobuf message.
    */
   virtual void notifyListenersOnRebuilt(
-      const envoy::config::listener::v3::FilterChain* const& filter_chain) PURE;
+      bool success, const envoy::config::listener::v3::FilterChain* const& filter_chain) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

@@ -390,7 +390,9 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
       return empty_access_logs_;
     }
-
+    Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
+    void rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const&,
+                            const std::string&) override {}
     AdminImpl& parent_;
     const std::string name_;
     Stats::ScopePtr scope_;

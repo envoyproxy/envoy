@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -161,6 +162,12 @@ public:
    * @return std::vector<AccessLog::InstanceSharedPtr> access logs emitted by the listener.
    */
   virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  virtual void
+  rebuildFilterChain(const envoy::config::listener::v3::FilterChain* const& filter_chain,
+                     const std::string& worker_name) PURE;
 };
 
 /**

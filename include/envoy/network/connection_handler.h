@@ -97,6 +97,7 @@ public:
    * retry all connections requiring this filter chain.
    */
   virtual void retryAllConnections(
+      bool success,
       const envoy::config::listener::v3::FilterChain* const& filter_chain_message) PURE;
 
   /**

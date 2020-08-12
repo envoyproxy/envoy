@@ -361,6 +361,9 @@ public:
   MOCK_METHOD(Network::UdpPacketWriterFactoryOptRef, udpPacketWriterFactory, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
   MOCK_METHOD(ResourceLimit&, openConnections, ());
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(void, rebuildFilterChain,
+              (const envoy::config::listener::v3::FilterChain* const&, const std::string&));
 
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
@@ -408,7 +411,8 @@ public:
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
   MOCK_METHOD(void, retryAllConnections,
-              (const envoy::config::listener::v3::FilterChain* const& filter_chain_message));
+              (bool success,
+               const envoy::config::listener::v3::FilterChain* const& filter_chain_message));
 };
 
 class MockIp : public Address::Ip {
