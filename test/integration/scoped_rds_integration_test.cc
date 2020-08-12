@@ -88,12 +88,17 @@ fragments:
               scoped_routes->mutable_scoped_rds()
                   ->mutable_scoped_rds_config_source()
                   ->mutable_api_config_source();
+          envoy::config::core::v3::ConfigSource* srds_config_source =
+              scoped_routes->mutable_scoped_rds()->mutable_scoped_rds_config_source();
+          srds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
           if (isDelta()) {
             srds_api_config_source->set_api_type(
                 envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
           } else {
             srds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
           }
+          srds_api_config_source->set_transport_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
           grpc_service = srds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
         });
@@ -188,7 +193,7 @@ fragments:
                                   const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
+    envoy::api::v2::DeltaDiscoveryResponse response;
     response.set_system_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
@@ -201,7 +206,7 @@ fragments:
       auto resource = response.add_resources();
       resource->set_name(scoped_route_proto.name());
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(API_DOWNGRADE(scoped_route_proto));
+      resource->mutable_resource()->PackFrom(scoped_route_proto);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
@@ -218,7 +223,7 @@ fragments:
     for (const auto& resource_proto : resource_protos) {
       envoy::config::route::v3::ScopedRouteConfiguration scoped_route_proto;
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
-      response.add_resources()->PackFrom(API_DOWNGRADE(scoped_route_proto));
+      response.add_resources()->PackFrom(scoped_route_proto);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
