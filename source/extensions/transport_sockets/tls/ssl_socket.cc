@@ -47,7 +47,7 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)) {
   bssl::UniquePtr<SSL> ssl = ctx_->newSsl(transport_socket_options_.get());
-  info_ = std::make_shared<SslSocketInfo>(std::move(ssl), ctx_, this);
+  info_ = std::make_shared<SslHandshakerImpl>(std::move(ssl), ctx_, this);
 
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
@@ -291,24 +291,24 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
   return certificate_validation_status_;
 }
 
-SslSocketInfo::SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
-                             Ssl::HandshakeCallbacks* handshake_callbacks)
+SslHandshakerImpl::SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
+                                     Ssl::HandshakeCallbacks* handshake_callbacks)
     : ssl_(std::move(ssl)), handshake_callbacks_(handshake_callbacks),
       state_(Ssl::SocketState::PreHandshake) {
   SSL_set_ex_data(ssl_.get(), ctx->sslExtendedSocketInfoIndex(), &(this->extended_socket_info_));
 }
 
-bool SslSocketInfo::peerCertificatePresented() const {
+bool SslHandshakerImpl::peerCertificatePresented() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   return cert != nullptr;
 }
 
-bool SslSocketInfo::peerCertificateValidated() const {
+bool SslHandshakerImpl::peerCertificateValidated() const {
   return extended_socket_info_.certificateValidationStatus() ==
          Envoy::Ssl::ClientValidationStatus::Validated;
 }
 
-absl::Span<const std::string> SslSocketInfo::uriSanLocalCertificate() const {
+absl::Span<const std::string> SslHandshakerImpl::uriSanLocalCertificate() const {
   if (!cached_uri_san_local_certificate_.empty()) {
     return cached_uri_san_local_certificate_;
   }
@@ -323,7 +323,7 @@ absl::Span<const std::string> SslSocketInfo::uriSanLocalCertificate() const {
   return cached_uri_san_local_certificate_;
 }
 
-absl::Span<const std::string> SslSocketInfo::dnsSansLocalCertificate() const {
+absl::Span<const std::string> SslHandshakerImpl::dnsSansLocalCertificate() const {
   if (!cached_dns_san_local_certificate_.empty()) {
     return cached_dns_san_local_certificate_;
   }
@@ -337,7 +337,7 @@ absl::Span<const std::string> SslSocketInfo::dnsSansLocalCertificate() const {
   return cached_dns_san_local_certificate_;
 }
 
-const std::string& SslSocketInfo::sha256PeerCertificateDigest() const {
+const std::string& SslHandshakerImpl::sha256PeerCertificateDigest() const {
   if (!cached_sha_256_peer_certificate_digest_.empty()) {
     return cached_sha_256_peer_certificate_digest_;
   }
@@ -355,7 +355,7 @@ const std::string& SslSocketInfo::sha256PeerCertificateDigest() const {
   return cached_sha_256_peer_certificate_digest_;
 }
 
-const std::string& SslSocketInfo::sha1PeerCertificateDigest() const {
+const std::string& SslHandshakerImpl::sha1PeerCertificateDigest() const {
   if (!cached_sha_1_peer_certificate_digest_.empty()) {
     return cached_sha_1_peer_certificate_digest_;
   }
@@ -373,7 +373,7 @@ const std::string& SslSocketInfo::sha1PeerCertificateDigest() const {
   return cached_sha_1_peer_certificate_digest_;
 }
 
-const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificate() const {
+const std::string& SslHandshakerImpl::urlEncodedPemEncodedPeerCertificate() const {
   if (!cached_url_encoded_pem_encoded_peer_certificate_.empty()) {
     return cached_url_encoded_pem_encoded_peer_certificate_;
   }
@@ -395,7 +395,7 @@ const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificate() const {
   return cached_url_encoded_pem_encoded_peer_certificate_;
 }
 
-const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificateChain() const {
+const std::string& SslHandshakerImpl::urlEncodedPemEncodedPeerCertificateChain() const {
   if (!cached_url_encoded_pem_encoded_peer_cert_chain_.empty()) {
     return cached_url_encoded_pem_encoded_peer_cert_chain_;
   }
@@ -425,7 +425,7 @@ const std::string& SslSocketInfo::urlEncodedPemEncodedPeerCertificateChain() con
   return cached_url_encoded_pem_encoded_peer_cert_chain_;
 }
 
-absl::Span<const std::string> SslSocketInfo::uriSanPeerCertificate() const {
+absl::Span<const std::string> SslHandshakerImpl::uriSanPeerCertificate() const {
   if (!cached_uri_san_peer_certificate_.empty()) {
     return cached_uri_san_peer_certificate_;
   }
@@ -439,7 +439,7 @@ absl::Span<const std::string> SslSocketInfo::uriSanPeerCertificate() const {
   return cached_uri_san_peer_certificate_;
 }
 
-absl::Span<const std::string> SslSocketInfo::dnsSansPeerCertificate() const {
+absl::Span<const std::string> SslHandshakerImpl::dnsSansPeerCertificate() const {
   if (!cached_dns_san_peer_certificate_.empty()) {
     return cached_dns_san_peer_certificate_;
   }
@@ -475,7 +475,7 @@ std::string SslSocket::protocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
-uint16_t SslSocketInfo::ciphersuiteId() const {
+uint16_t SslHandshakerImpl::ciphersuiteId() const {
   const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl());
   if (cipher == nullptr) {
     return 0xffff;
@@ -487,7 +487,7 @@ uint16_t SslSocketInfo::ciphersuiteId() const {
   return static_cast<uint16_t>(SSL_CIPHER_get_id(cipher));
 }
 
-std::string SslSocketInfo::ciphersuiteString() const {
+std::string SslHandshakerImpl::ciphersuiteString() const {
   const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl());
   if (cipher == nullptr) {
     return {};
@@ -496,7 +496,7 @@ std::string SslSocketInfo::ciphersuiteString() const {
   return SSL_CIPHER_get_name(cipher);
 }
 
-const std::string& SslSocketInfo::tlsVersion() const {
+const std::string& SslHandshakerImpl::tlsVersion() const {
   if (!cached_tls_version_.empty()) {
     return cached_tls_version_;
   }
@@ -504,7 +504,8 @@ const std::string& SslSocketInfo::tlsVersion() const {
   return cached_tls_version_;
 }
 
-absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view extension_name) const {
+absl::optional<std::string>
+SslHandshakerImpl::x509Extension(absl::string_view extension_name) const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
     return absl::nullopt;
@@ -512,7 +513,7 @@ absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view exten
   return Utility::getX509ExtensionValue(*cert, extension_name);
 }
 
-Network::PostIoAction SslSocketInfo::doHandshake() {
+Network::PostIoAction SslHandshakerImpl::doHandshake() {
   ASSERT(state_ != Ssl::SocketState::HandshakeComplete && state_ != Ssl::SocketState::ShutdownSent);
   int rc = SSL_do_handshake(ssl());
   if (rc == 1) {
@@ -541,7 +542,7 @@ Network::PostIoAction SslSocketInfo::doHandshake() {
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
-const std::string& SslSocketInfo::serialNumberPeerCertificate() const {
+const std::string& SslHandshakerImpl::serialNumberPeerCertificate() const {
   if (!cached_serial_number_peer_certificate_.empty()) {
     return cached_serial_number_peer_certificate_;
   }
@@ -554,7 +555,7 @@ const std::string& SslSocketInfo::serialNumberPeerCertificate() const {
   return cached_serial_number_peer_certificate_;
 }
 
-const std::string& SslSocketInfo::issuerPeerCertificate() const {
+const std::string& SslHandshakerImpl::issuerPeerCertificate() const {
   if (!cached_issuer_peer_certificate_.empty()) {
     return cached_issuer_peer_certificate_;
   }
@@ -567,7 +568,7 @@ const std::string& SslSocketInfo::issuerPeerCertificate() const {
   return cached_issuer_peer_certificate_;
 }
 
-const std::string& SslSocketInfo::subjectPeerCertificate() const {
+const std::string& SslHandshakerImpl::subjectPeerCertificate() const {
   if (!cached_subject_peer_certificate_.empty()) {
     return cached_subject_peer_certificate_;
   }
@@ -580,7 +581,7 @@ const std::string& SslSocketInfo::subjectPeerCertificate() const {
   return cached_subject_peer_certificate_;
 }
 
-const std::string& SslSocketInfo::subjectLocalCertificate() const {
+const std::string& SslHandshakerImpl::subjectLocalCertificate() const {
   if (!cached_subject_local_certificate_.empty()) {
     return cached_subject_local_certificate_;
   }
@@ -593,7 +594,7 @@ const std::string& SslSocketInfo::subjectLocalCertificate() const {
   return cached_subject_local_certificate_;
 }
 
-absl::optional<SystemTime> SslSocketInfo::validFromPeerCertificate() const {
+absl::optional<SystemTime> SslHandshakerImpl::validFromPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
     return absl::nullopt;
@@ -601,7 +602,7 @@ absl::optional<SystemTime> SslSocketInfo::validFromPeerCertificate() const {
   return Utility::getValidFrom(*cert);
 }
 
-absl::optional<SystemTime> SslSocketInfo::expirationPeerCertificate() const {
+absl::optional<SystemTime> SslHandshakerImpl::expirationPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
     return absl::nullopt;
@@ -609,7 +610,7 @@ absl::optional<SystemTime> SslSocketInfo::expirationPeerCertificate() const {
   return Utility::getExpirationTime(*cert);
 }
 
-const std::string& SslSocketInfo::sessionId() const {
+const std::string& SslHandshakerImpl::sessionId() const {
   if (!cached_session_id_.empty()) {
     return cached_session_id_;
   }

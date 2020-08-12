@@ -52,10 +52,10 @@ private:
       Envoy::Ssl::ClientValidationStatus::NotValidated};
 };
 
-class SslSocketInfo : public Envoy::Ssl::ConnectionInfo, public Envoy::Ssl::Handshaker {
+class SslHandshakerImpl : public Envoy::Ssl::ConnectionInfo, public Envoy::Ssl::Handshaker {
 public:
-  SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
-                Ssl::HandshakeCallbacks* handshake_callbacks);
+  SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx,
+                    Ssl::HandshakeCallbacks* handshake_callbacks);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
@@ -110,7 +110,7 @@ private:
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
 };
 
-using SslSocketInfoSharedPtr = std::shared_ptr<SslSocketInfo>;
+using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::PrivateKeyConnectionCallbacks,
@@ -162,7 +162,7 @@ private:
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
 
-  SslSocketInfoSharedPtr info_;
+  SslHandshakerImplSharedPtr info_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,
