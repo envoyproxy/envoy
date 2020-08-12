@@ -21,6 +21,7 @@ types including:
 * :ref:`Request ID <arch_overview_tracing>`
 * Transport sockets
 * BoringSSL private key methods
+* :ref:`Internal redirect policy <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`
 
 As of this writing there is no high level extension developer documentation. The
 :repo:`existing extensions <source/extensions>` are a good way to learn what is possible.
