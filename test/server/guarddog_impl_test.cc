@@ -791,27 +791,6 @@ TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
   EXPECT_DEATH(die_function(), "ASSERT_GUARDDOG_ACTION");
 }
 
-TEST_P(GuardDogActionsTest, ShouldErrorOnUnknownEvent) {
-  std::vector<std::string> invalidActionsConfig = {
-      R"EOF(
-      {
-        "config": {
-          "name": "LogFactory",
-          "typed_config": {
-            "@type": "type.googleapis.com/google.protobuf.Empty"
-          }
-        },
-        "event": "UNKNOWN"
-      }
-    )EOF"};
-
-  const NiceMock<Configuration::MockMain> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
-                                                 DISABLE_MULTIKILL, 0, invalidActionsConfig);
-
-  EXPECT_THAT_THROWS_MESSAGE(setupFirstDog(config), ProtoValidationException,
-                             HasSubstr("UNKNOWN event"));
-}
-
 } // namespace
 } // namespace Server
 } // namespace Envoy

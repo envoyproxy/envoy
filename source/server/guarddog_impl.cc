@@ -61,15 +61,10 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 
         const auto& actions = config.wdActions();
         for (const auto& action : actions) {
-          if (action.event() == WatchDogAction::UNKNOWN) {
-            throw ProtoValidationException("WatchDogAction specified with UNKNOWN event", action);
-          } else {
-            // Get factory and add the created cb
-            auto& factory =
-                Config::Utility::getAndCheckFactory<Configuration::GuardDogActionFactory>(
-                    action.config());
-            map[action.event()].push_back(factory.createGuardDogActionFromProto(action, context));
-          }
+          // Get factory and add the created cb
+          auto& factory = Config::Utility::getAndCheckFactory<Configuration::GuardDogActionFactory>(
+              action.config());
+          map[action.event()].push_back(factory.createGuardDogActionFromProto(action, context));
         }
 
         return map;

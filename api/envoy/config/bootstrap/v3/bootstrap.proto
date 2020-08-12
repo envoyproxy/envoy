@@ -312,9 +312,10 @@ message Watchdog {
   message WatchdogAction {
     // The events are fired in this order: KILL, MULTIKILL, MEGAMISS, MISS.
     // Within an event type, actions execute in the order they are configured.
-    // For KILL/MULTIKILL there is a default PANIC that will kill the process,
-    // but it might be useful to specify several debug actions, and possibly
-    // an alternate FATAL action.
+    // For KILL/MULTIKILL there is a default PANIC that will run after the
+    // registered actions and kills the process if it wasn't already killed.
+    // It might be useful to specify several debug actions, and possibly an
+    // alternate FATAL action.
     enum WatchdogEvent {
       UNKNOWN = 0;
       KILL = 1;
@@ -326,7 +327,7 @@ message Watchdog {
     // Extension specific configuration for the action.
     core.v3.TypedExtensionConfig config = 1;
 
-    WatchdogEvent event = 2;
+    WatchdogEvent event = 2 [(validate.rules).enum = {defined_only: true}];
   }
 
   // Register actions that will fire on given WatchDog events.
