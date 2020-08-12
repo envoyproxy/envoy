@@ -71,19 +71,20 @@ The watchdog emits statistics in both the *server.* and *server.<thread_name>.* 
   watchdog_miss, Counter, Number of standard misses
   watchdog_mega_miss, Counter, Number of mega misses
 
+.. _operations_performance_heap_shrink:
 
 Heap Shrink
 -----------
 
-Envoy by default use tcmalloc as memory allocator which provides function to return unused pages to the
-OS and reduce the physical memory usage. Currently envoy could shrink heap when xDS response
-is received and also when an admin handler is hit. 
+Envoy by default uses tcmalloc as its memory allocator which provides a function to return unused pages to the
+OS and reduce the physical memory usage. Currently envoy Envoy will attempt to shrink the heap when an xDS response
+is received and also when any :ref:`admin handler<operations_admin_interface>` is hit. 
 
-Since shrink could be expensive, envoy should free memory only if free could reclaim physical memory back. 
-The runtime key "envoy.memory.heap_shrink_threshold" could be used to tune the behavior. If the gap beteween
-envoy requested memory and tcmalloc used physical memory is greater than this threshold, envoy will indeed
-request tcmalloc to free. 
+Since shrinking the heap can be expensive, Envoy will free memory only if there is a chance to reclaim physical memory back.
+The runtime key "envoy.memory.heap_shrink_threshold" can be used to tune this behavior. If the gap between
+Envoy requested memory and tcmalloc used physical memory is greater than this threshold, Envoy will 
+request tcmalloc to free memory back to the OS. 
 
 The default value is 100MB. Set a smaller value to aggressively free the memory to the OS, or set a bigger
-value when the free spend too many CPU cycles. Heurisically this number is recommended to set between 2x and
+value when less CPU usage is desired. Heuristically this number is recommended to be set to between 2x and
 3x of the allocated memory. See "allocated" in :ref:`memory admin interface <operations_admin_interface_memory>`.
