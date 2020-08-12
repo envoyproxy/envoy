@@ -123,6 +123,7 @@ void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
   lookup_->getHeaders([this, &request_headers,
                        &dispatcher = decoder_callbacks_->dispatcher()](LookupResult&& result) {
+    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
     // LookupResult is non-copyable as LookupResult::headers_ is a unique_ptr, which is
@@ -146,6 +147,7 @@ void CacheFilter::getBody() {
 
   lookup_->getBody(remaining_body_[0], [this, &dispatcher = decoder_callbacks_->dispatcher()](
                                            Buffer::InstancePtr&& body) {
+    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
     // "body" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw pointer then
@@ -160,6 +162,7 @@ void CacheFilter::getTrailers() {
 
   lookup_->getTrailers([this, &dispatcher = decoder_callbacks_->dispatcher()](
                            Http::ResponseTrailerMapPtr&& trailers) {
+    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
     // The lambda passed to dispatcher.post() needs to be copyable as it will be used to
     // initialize a std::function. Therefore, it cannot capture anything non-copyable.
     // "trailers" is a unique_ptr, which is non-copyable. Hence, it is captured as a raw
