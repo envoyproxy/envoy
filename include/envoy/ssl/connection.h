@@ -5,7 +5,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
-#include "envoy/network/post_io_action.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -149,12 +148,6 @@ public:
    * exists.
    */
   virtual absl::optional<std::string> x509Extension(absl::string_view extension_name) const PURE;
-
-  /**
-   * Performs a TLS handshake on the SSL object and returns an action indicating
-   * whether the callsite should close the connection or keep it open.
-   */
-  virtual Network::PostIoAction doHandshake() PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;
