@@ -644,28 +644,20 @@ AdminImpl::dumpUnreadyTargetsConfigs(const absl::optional<std::string>& mask) co
 }
 
 ProtobufTypes::MessagePtr AdminImpl::dumpListenerUnreadyTargetsConfigs() const {
-  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  auto unready_targets_config_dump_list =
+      std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDumpList>();
 
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   if (server_.listenerManager().isWorkerStarted()) {
     listeners = server_.listenerManager().listeners(ListenerManager::WARMING);
   } else {
     listeners = server_.listenerManager().listeners(ListenerManager::ACTIVE);
   }
 
-  auto unready_targets_config_dump_list =
-      std::make_unique<envoy::admin::v3::UnreadyTargetsConfigDumpList>();
-
-  for (auto& listener_config : listeners) {
-    auto& listener_message =
-        *unready_targets_config_dump_list->mutable_unready_targets_configs()->Add();
-    listener_message.set_name(listener_config.get().name());
-
+  for (const auto& listener_config : listeners) {
     auto& listener = dynamic_cast<ListenerImpl&>(listener_config.get());
-    const auto& init_manager = dynamic_cast<Init::ManagerImpl&>(listener.initManager());
-
-    for (const auto& unready_target : init_manager.unreadyTargets()) {
-      listener_message.add_target_names(unready_target.first);
-    }
+    listener.initManager().dumpUnreadyTargetsConfig(
+        std::move(unready_targets_config_dump_list));
   }
   return unready_targets_config_dump_list;
 }

@@ -2,6 +2,7 @@
 
 #include <list>
 
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/init/manager.h"
 
 #include "common/common/logger.h"
@@ -36,9 +37,9 @@ public:
   State state() const override;
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
-
-  // Expose the const reference of target_names_count_ hash map to public.
-  const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const;
+  const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const override;
+  void dumpUnreadyTargetsConfig(
+      std::unique_ptr<envoy::admin::v3::UnreadyTargetsConfigDumpList> config_dump_list) override;
 
 private:
   // Callback function with an additional target_name parameter, decrease unready targets count by

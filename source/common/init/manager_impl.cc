@@ -67,6 +67,17 @@ const absl::flat_hash_map<std::string, uint32_t>& ManagerImpl::unreadyTargets() 
   return target_names_count_;
 }
 
+void ManagerImpl::dumpUnreadyTargetsConfig(
+    std::unique_ptr<envoy::admin::v3::UnreadyTargetsConfigDumpList> config_dump_list) {
+  auto& message = *config_dump_list->mutable_unready_targets_configs()->Add();
+
+  message.set_name(absl::StrCat("init_manager_", name_));
+
+  for (const auto& [target_name, count] : target_names_count_) {
+    message.add_target_names(absl::StrCat("target_", target_name));
+  }
+}
+
 void ManagerImpl::onTargetReady(absl::string_view target_name) {
   // If there are no remaining targets and one mysteriously calls us back, this manager is haunted.
   ASSERT(count_ != 0,

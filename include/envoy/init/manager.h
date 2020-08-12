@@ -1,8 +1,11 @@
 #pragma once
 
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/init/target.h"
 #include "envoy/init/watcher.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Init {
@@ -73,6 +76,14 @@ struct Manager {
    * @param watcher the watcher to notify when initialization is complete.
    */
   virtual void initialize(const Watcher& watcher) PURE;
+
+  /**
+   * @return the unready targets of the manager.
+   */
+  virtual const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const PURE;
+
+  virtual void dumpUnreadyTargetsConfig(
+      std::unique_ptr<envoy::admin::v3::UnreadyTargetsConfigDumpList> config_dump_list) PURE;
 };
 
 } // namespace Init
