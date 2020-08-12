@@ -17,7 +17,15 @@ public:
    */
   virtual Network::Connection::State connectionState() const PURE;
 
+  /**
+   * A callback which will be executed at most once upon successful completion
+   * of a handshake.
+   */
   virtual void onSuccess(SSL* ssl) PURE;
+
+  /**
+   * A callback which will be executed at most once upon handshake failure.
+   */
   virtual void onFailure() PURE;
 };
 

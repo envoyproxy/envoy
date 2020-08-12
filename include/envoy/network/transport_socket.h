@@ -142,7 +142,7 @@ public:
   virtual void onConnected() PURE;
 
   /**
-   * @return the SSL connection data if this is an SSL connection, or nullptr if it is not.
+   * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr ssl() const PURE;
 };
