@@ -20,9 +20,8 @@ types including:
 * :ref:`Tracers <arch_overview_tracing>`
 * :ref:`Request ID <arch_overview_tracing>`
 * :ref:`Transport sockets <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProvider.typed_config>`
-* :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`
+* BoringSSL private key methods
 * :ref:`Watchdog action <envoy_v3_api_msg_config.bootstrap.v3.Watchdog.WatchdogAction>`
-* :ref:`HTTP internal redirects <arch_overview_internal_redirects>`
 
 
 As of this writing there is no high level extension developer documentation. The
