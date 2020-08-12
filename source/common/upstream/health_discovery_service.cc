@@ -291,7 +291,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   // Iterate over every endpoint in every cluster.
   for (const auto& locality_endpoints : cluster_.load_assignment().endpoints()) {
     // Add a locality grouping to the hosts sorted by locality.
-    hosts_by_locality.push_back();
+    hosts_by_locality.emplace_back();
     hosts_by_locality.back().reserve(locality_endpoints.lb_endpoints_size());
 
     for (const auto& host : locality_endpoints.lb_endpoints()) {
