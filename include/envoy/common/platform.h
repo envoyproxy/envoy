@@ -189,6 +189,18 @@ struct msghdr {
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
+#ifndef SOL_UDP
+#define SOL_UDP 17
+#endif
+
+#ifndef UDP_GRO
+#define UDP_GRO 104
+#endif
+
+#ifndef UDP_SEGMENT
+#define UDP_SEGMENT 103
+#endif
+
 typedef int os_fd_t;
 
 #define INVALID_SOCKET -1
