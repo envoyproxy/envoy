@@ -1191,6 +1191,9 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
   }
 }
 
+// override_stream_error_on_invalid_http_message=true and HCM
+// stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is left open on invalid
+// HTTP message (missing :host header)
 TEST_P(DownstreamProtocolIntegrationTest,
        Http1ConnectionIsLeftOpenIfHCMStreamErrorIsFalseAndOverrideIsTrue) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
@@ -1217,6 +1220,9 @@ TEST_P(DownstreamProtocolIntegrationTest,
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+// override_stream_error_on_invalid_http_message is not set and HCM
+// stream_error_on_invalid_http_message=true: test that HTTP/1.1 connection is left open on invalid
+// HTTP message (missing :host header)
 TEST_P(DownstreamProtocolIntegrationTest,
        Http1ConnectionIsLeftOpenIfHCMStreamErrorIsTrueAndOverrideNotSet) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
@@ -1238,6 +1244,9 @@ TEST_P(DownstreamProtocolIntegrationTest,
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+// override_stream_error_on_invalid_http_message is not set and HCM
+// stream_error_on_invalid_http_message=false: test that HTTP/1.1 connection is terminated on
+// invalid HTTP message (missing :host header)
 TEST_P(DownstreamProtocolIntegrationTest,
        Http1ConnectionIsTerminatedIfHCMStreamErrorIsFalseAndOverrideNotSet) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {

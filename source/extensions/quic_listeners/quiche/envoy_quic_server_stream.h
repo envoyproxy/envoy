@@ -37,7 +37,7 @@ public:
     return absl::nullopt;
   }
   absl::optional<bool> streamErrorOnInvalidHttpMessage() const override {
-    return absl::optional<bool>{};
+    return absl::nullopt;
   }
 
   // Http::Stream

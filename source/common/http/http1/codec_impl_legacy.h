@@ -128,9 +128,8 @@ public:
   ResponseEncoderImpl(ConnectionImpl& connection,
                       Http::Http1::HeaderKeyFormatter* header_key_formatter,
                       absl::optional<bool>& stream_error_on_invalid_http_message)
-      : StreamEncoderImpl(connection, header_key_formatter) {
-    stream_error_on_invalid_http_message_ = stream_error_on_invalid_http_message;
-  }
+      : StreamEncoderImpl(connection, header_key_formatter),
+        stream_error_on_invalid_http_message_(stream_error_on_invalid_http_message) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -145,7 +144,7 @@ public:
 
 private:
   bool started_response_{};
-  absl::optional<bool> stream_error_on_invalid_http_message_;
+  const absl::optional<bool> stream_error_on_invalid_http_message_;
 };
 
 /**
