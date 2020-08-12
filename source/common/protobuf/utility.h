@@ -345,7 +345,6 @@ public:
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     MessageType typed_message;
     anyConvert(message, typed_message);
-    throw EnvoyException("hi");
     return typed_message;
   };
 

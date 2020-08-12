@@ -477,7 +477,7 @@ public:
               "' from file ", filename,
               " while using the latest V3 configuration. This field has been removed from the "
               "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
-          ProtoExceptionUtil::throwProtoValidationException(fatal_error, message);
+          throw ProtoValidationException(fatal_error, message);
         }
       }
       const std::string warning =
