@@ -220,7 +220,7 @@ envoy_cmake_external(
         "CMAKE_CXX_COMPILER_FORCED": "on",
         "YAML_MSVC_SHARED_RT": "off",
     },
-    lib_source = "@com_github_jbeder_yaml_cpp//:all",
+    lib_source = "@com_github_greenhouse_org_yaml_cpp//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["yaml-cpp.lib"],
         "//conditions:default": ["libyaml-cpp.a"],

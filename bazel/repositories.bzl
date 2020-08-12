@@ -171,7 +171,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_libprotobuf_mutator()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
-    _com_github_jbeder_yaml_cpp()
+    _com_github_greenhouse_org_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
     _com_github_moonjit_moonjit()
@@ -338,10 +338,10 @@ def _com_github_google_libprotobuf_mutator():
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
     )
 
-def _com_github_jbeder_yaml_cpp():
-    location = _get_location("com_github_jbeder_yaml_cpp")
+def _com_github_greenhouse_org_yaml_cpp():
+    location = _get_location("com_github_greenhouse_org_yaml_cpp")
     http_archive(
-        name = "com_github_jbeder_yaml_cpp",
+        name = "com_github_greenhouse_org_yaml_cpp",
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
