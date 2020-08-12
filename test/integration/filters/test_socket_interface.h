@@ -1,7 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <vector>
 
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"

@@ -1718,13 +1718,11 @@ TEST_P(Http2FloodMitigationTest, Data) {
   // to respond with 1000 DATA frames. The Http2FloodMitigationTest::beginSession()
   // sets 1000 flood limit for all frame types. Including 1 HEADERS response frame
   // 1000 DATA frames should trigger flood protection.
-  uint32_t request_idx = 0;
-
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames start
   // to accumulate in the transport socket buffer.
   *writev_returns_egain = true;
 
-  auto request = Http2Frame::makeRequest(request_idx, "host", "/test/long/url",
+  auto request = Http2Frame::makeRequest(0, "host", "/test/long/url",
                                          {Http2Frame::Header("response_data_blocks", "1000")});
   sendFrame(request);
 
