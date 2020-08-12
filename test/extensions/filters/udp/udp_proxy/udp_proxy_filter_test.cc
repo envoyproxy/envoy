@@ -163,8 +163,9 @@ public:
     EXPECT_CALL(*filter_, createIoHandle(_))
         .WillOnce(Return(ByMove(Network::IoHandlePtr{test_sessions_.back().io_handle_})));
     EXPECT_CALL(*new_session.io_handle_, fd());
-    EXPECT_CALL(callbacks_.udp_listener_.dispatcher_,
-                createFileEvent_(_, _, Event::FileTriggerType::Edge, Event::FileReadyType::Read))
+    EXPECT_CALL(
+        callbacks_.udp_listener_.dispatcher_,
+        createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
         .WillOnce(DoAll(SaveArg<1>(&new_session.file_event_cb_), Return(nullptr)));
     // Internal Buffer is Empty, flush will be a no-op
     ON_CALL(callbacks_.udp_listener_, flush())

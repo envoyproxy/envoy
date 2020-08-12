@@ -33,7 +33,7 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
   file_event_ = dispatcher_.createFileEvent(
       socket_->ioHandle().fd(), [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   ASSERT(file_event_);
 

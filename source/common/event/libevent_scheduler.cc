@@ -48,15 +48,7 @@ void LibeventScheduler::run(Dispatcher::RunType mode) {
   int flag = 0;
   switch (mode) {
   case Dispatcher::RunType::NonBlock:
-    flag = EVLOOP_NONBLOCK;
-#ifdef WIN32
-    // On Windows, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run forever.
-    // This is because libevent only supports level triggering on Windows, and so the write
-    // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
-    // loop will run at most once
-    flag |= EVLOOP_ONCE;
-#endif
-    break;
+    flag = LibeventScheduler::flagsBasedOnEventType();
   case Dispatcher::RunType::Block:
     // The default flags have 'block' behavior. See
     // http://www.wangafu.net/~nickm/libevent-book/Ref3_eventloop.html

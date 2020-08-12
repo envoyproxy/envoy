@@ -74,7 +74,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         ASSERT(events == Event::FileReadyType::Read);
         onRead();
       },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   cb_ = &cb;
   return Network::FilterStatus::StopIteration;
 }
