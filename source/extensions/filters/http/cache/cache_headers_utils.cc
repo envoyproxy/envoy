@@ -9,6 +9,8 @@
 
 #include "common/common/utility.h"
 
+#include "extensions/filters/http/cache/inline_headers_handles.h"
+
 #include "absl/algorithm/container.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
@@ -154,15 +156,15 @@ CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_headers,
   const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
 
   long age_value;
-  const Http::HeaderEntry* age_header = response_headers.get(Http::Headers::get().Age);
-  if (!age_header || !absl::SimpleAtoi(age_header->value().getStringView(), &age_value)) {
+  const absl::string_view age_header = response_headers.getInlineValue(age_handle.handle());
+  if (!absl::SimpleAtoi(age_header, &age_value)) {
     age_value = 0;
   }
 
   const SystemTime::duration apparent_age =
       std::max(SystemTime::duration(0), response_time - date_value);
 
-  // Assumption: response_delay is negligible.
+  // Assumption: response_delay is negligible -> correct_age_value = age_value.
   const SystemTime::duration corrected_age_value = std::chrono::seconds(age_value);
   const SystemTime::duration corrected_initial_age = std::max(apparent_age, corrected_age_value);
 

@@ -77,6 +77,7 @@ envoy_cc_library(
     hdrs = ["cache_headers_utils.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":inline_headers_handles",
         "//include/envoy/common:time_interface",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",

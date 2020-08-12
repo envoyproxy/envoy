@@ -11,8 +11,8 @@
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/cache/inline_headers_handles.h"
 #include "extensions/filters/http/cache/cache_headers_utils.h"
+#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
@@ -94,7 +94,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
 
   // CacheabilityUtils::isCacheableResponse(..) guarantees that any cached response satisfies this.
   ASSERT(response_cache_control.max_age_.has_value() ||
-             (response_headers.get(Http::Headers::get().Expires) && response_headers.Date()),
+             (response_headers.getInline(expires_handle.handle()) && response_headers.Date()),
          "Cache entry does not have valid expiration data.");
 
   SystemTime::duration freshness_lifetime;
@@ -102,7 +102,7 @@ bool LookupRequest::requiresValidation(const Http::ResponseHeaderMap& response_h
     freshness_lifetime = response_cache_control.max_age_.value();
   } else {
     const SystemTime expires_value =
-        CacheHeadersUtils::httpTime(response_headers.get(Http::Headers::get().Expires));
+        CacheHeadersUtils::httpTime(response_headers.getInline(expires_handle.handle()));
     const SystemTime date_value = CacheHeadersUtils::httpTime(response_headers.Date());
     freshness_lifetime = expires_value - date_value;
   }
@@ -130,12 +130,14 @@ LookupResult LookupRequest::makeLookupResult(Http::ResponseHeaderMapPtr&& respon
   ASSERT(response_headers);
   LookupResult result;
 
-  const SystemTime response_time = CacheHeadersUtils::httpTime(
-      response_headers->get(Http::LowerCaseString(std::string(ResponseTimeHeader))));
+  // Get the internal response_time header and remove it from the cached response
+  const SystemTime response_time =
+      CacheHeadersUtils::httpTime(response_headers->getInline(response_time_handle.handle()));
+  response_headers->removeInline(response_time_handle.handle());
   // Assumption: Cache lookup time is negligible. Therefore, now == timestamp_
   SystemTime::duration response_age =
       CacheHeadersUtils::calculateAge(*response_headers, response_time, timestamp_);
-  response_headers->setReferenceKey(Http::Headers::get().Age, std::to_string(response_age.count()));
+  response_headers->setInline(age_handle.handle(), std::to_string(response_age.count()));
 
   result.cache_entry_status_ = requiresValidation(*response_headers, response_age)
                                    ? CacheEntryStatus::RequiresValidation

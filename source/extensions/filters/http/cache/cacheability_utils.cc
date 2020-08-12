@@ -68,7 +68,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
   //    Both "Expires" and "Date" headers.
   const bool has_validation_data = response_cache_control.must_validate_ ||
                                    response_cache_control.max_age_.has_value() ||
-                                   (headers.Date() && headers.get(Http::Headers::get().Expires));
+                                   (headers.Date() && headers.getInline(expires_handle.handle()));
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data;

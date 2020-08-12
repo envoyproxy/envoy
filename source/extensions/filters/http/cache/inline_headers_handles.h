@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/http/header_map.h"
+
 #include "common/http/headers.h"
 
 namespace Envoy {
@@ -7,6 +9,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+// An internal header that represents the time at which a cached response was recevied by the cache.
+// This header is added to cached responses and removed before they are served.
+// This represents "response_time" in the age header calculations at:
+// https://httpwg.org/specs/rfc7234.html#age.calculations
+inline constexpr absl::string_view ResponseTimeHeader = "Envoy-Cache-Response-Time";
+
+// Request headers inline handles
 inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     authorization_handle(Http::CustomHeaders::get().Authorization);
 
@@ -40,6 +49,15 @@ inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::
 
 inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     etag_handle(Http::CustomHeaders::get().Etag);
+
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    age_handle(Http::Headers::get().Age);
+
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    expires_handle(Http::Headers::get().Expires);
+
+inline Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    response_time_handle(Http::LowerCaseString{std::string(ResponseTimeHeader)});
 
 } // namespace Cache
 } // namespace HttpFilters

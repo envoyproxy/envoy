@@ -7,8 +7,8 @@
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/cache/cacheability_utils.h"
-#include "extensions/filters/http/cache/inline_headers_handles.h"
 #include "extensions/filters/http/cache/http_cache.h"
+#include "extensions/filters/http/cache/inline_headers_handles.h"
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
@@ -100,11 +100,10 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
     // Add the response time internal header to be copied into the cache
-    const Http::LowerCaseString response_time_header{std::string(ResponseTimeHeader)};
-    headers.addReferenceKey(response_time_header, date_formatter_.now(time_source_));
+    headers.setInline(response_time_handle.handle(), date_formatter_.now(time_source_));
     insert_->insertHeaders(headers, end_stream);
     // Then remove the internal header from the response served to the client
-    headers.remove(response_time_header);
+    headers.removeInline(response_time_handle.handle());
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -371,7 +370,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   // freshly served response from the origin, unless the 304 response has an Age header, which
   // means it was served by an upstream cache.
   // Remove any existing Age header in the cached response.
-  lookup_result_->headers_->remove(Http::Headers::get().Age);
+  lookup_result_->headers_->removeInline(age_handle.handle());
 
   // Add any missing headers from the cached response to the 304 response.
   lookup_result_->headers_->iterate([&response_headers](const Http::HeaderEntry& cached_header) {
@@ -387,11 +386,10 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   if (should_update_cached_entry) {
     // TODO(yosrym93): else the cached entry should be deleted.
     // Add the response time internal header to be copied into the cache
-    const Http::LowerCaseString response_time_header{std::string(ResponseTimeHeader)};
-    response_headers.addReferenceKey(response_time_header, date_formatter_.now(time_source_));
+    response_headers.setInline(response_time_handle.handle(), date_formatter_.now(time_source_));
     cache_.updateHeaders(*lookup_, response_headers);
     // Then remove the internal header from the response served to the client
-    response_headers.remove(response_time_header);
+    response_headers.removeInline(response_time_handle.handle());
   }
 }
 
