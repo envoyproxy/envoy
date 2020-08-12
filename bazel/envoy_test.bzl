@@ -96,7 +96,7 @@ def envoy_cc_fuzz_test(
         srcs = tar_src,
         testonly = 1,
     )
-    fuzz_copts = ["-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION"]
+    fuzz_copts = []
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,

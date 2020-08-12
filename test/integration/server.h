@@ -424,25 +424,49 @@ public:
   void
   waitForCounterEq(const std::string& name, uint64_t value,
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
-    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
+    AssertionResult res =
+        TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    ASSERT_TRUE(res);
+#else
+    RELEASE_ASSERT(res, fmt::format("timed out waiting for {} == {}", name, value));
+#endif
   }
 
   void
   waitForCounterGe(const std::string& name, uint64_t value,
                    std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
-    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
+    AssertionResult res =
+        TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    ASSERT_TRUE(res);
+#else
+    RELEASE_ASSERT(res, fmt::format("timed out waiting for {} >= {}", name, value));
+#endif
   }
 
   void
   waitForGaugeEq(const std::string& name, uint64_t value,
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
+    AssertionResult res =
+        TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    ASSERT_TRUE(res);
+#else
+    RELEASE_ASSERT(res, fmt::format("timed out waiting for {} == {}", name, value));
+#endif
   }
 
   void
   waitForGaugeGe(const std::string& name, uint64_t value,
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
+    AssertionResult res =
+        TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    ASSERT_TRUE(res);
+#else
+    RELEASE_ASSERT(res, fmt::format("timed out waiting for {} >= {}", name, value));
+#endif
   }
 
   void waitForCounterExists(const std::string& name) override {
