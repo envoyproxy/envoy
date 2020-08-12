@@ -1079,11 +1079,11 @@ TEST_P(ConnectionImplTest, BindTest) {
   std::string address_string = TestUtility::getIpv4Loopback();
   if (GetParam() == Network::Address::IpVersion::v4) {
     source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance(address_string, 0)};
+        new Network::Address::Ipv4Instance(address_string, 0, nullptr)};
   } else {
     address_string = "::1";
     source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance(address_string, 0)};
+        new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   setUpBasicConnection();
   connect();
@@ -1097,11 +1097,11 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
   Address::InstanceConstSharedPtr new_source_address;
   if (GetParam() == Network::Address::IpVersion::v4) {
     new_source_address = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance(address_string, 0)};
+        new Network::Address::Ipv4Instance(address_string, 0, nullptr)};
   } else {
     address_string = "::1";
     new_source_address = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance(address_string, 0)};
+        new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
   EXPECT_CALL(*option, setOption(_, Eq(envoy::config::core::v3::SocketOption::STATE_PREBIND)))
@@ -1123,11 +1123,11 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   if (GetParam() == Network::Address::IpVersion::v6) {
     const std::string address_string = TestUtility::getIpv4Loopback();
     source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance(address_string, 0)};
+        new Network::Address::Ipv4Instance(address_string, 0, nullptr)};
   } else {
     const std::string address_string = "::1";
     source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance(address_string, 0)};
+        new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   dispatcher_ = api_->allocateDispatcher("test_thread");
   socket_ = std::make_shared<Network::TcpListenSocket>(
