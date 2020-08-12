@@ -500,10 +500,11 @@ If you have clang-5.0 or newer, additional checks are provided with:
 bazel test -c dbg --config=clang-asan //test/...
 ```
 
-Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) testing:
+[Thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) tests rely on
+a TSAN-instrumented version of libc++ and have to be run under the docker sandbox:
 
 ```
-bazel test -c dbg --config=clang-tsan //test/...
+bazel test -c dbg --config=docker-tsan //test/...
 ```
 
 For [memory sanitizer (MSAN)](https://github.com/google/sanitizers/wiki/MemorySanitizer) testing,
