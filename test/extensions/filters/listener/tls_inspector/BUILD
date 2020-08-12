@@ -1,7 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
     "envoy_cc_fuzz_test",
+    "envoy_cc_library",
     "envoy_cc_test",
     "envoy_package",
     "envoy_proto_library",
