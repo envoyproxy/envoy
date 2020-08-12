@@ -225,8 +225,8 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
-  std::shared_ptr<std::list<UpdateOnDemandCallback>> config_update_callbacks_{
-      std::make_shared<std::list<UpdateOnDemandCallback>>()};
+  std::list<UpdateOnDemandCallback> config_update_callbacks_;
+  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 
   friend class RouteConfigProviderManagerImpl;
 };
