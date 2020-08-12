@@ -60,8 +60,6 @@ private:
                              Server::Configuration::ProtocolOptionsFactoryContext&) {
     ExceptionUtil::throwEnvoyException(
         fmt::format("filter {} does not support protocol options", name_));
-    // to satisfy compiler and should never reach here.
-    return nullptr;
   }
 
   const std::string name_;
