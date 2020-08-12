@@ -433,13 +433,11 @@ Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasi
     {
       absl::MutexLock lock(&mutex_);
       if (monotonic_time_ < end_time) {
-        int adjusts = 0;
         MonotonicTime next_wakeup = end_time;
         for (SimulatedScheduler* scheduler : schedulers_) {
           UnlockGuard unlocker(mutex_);
           absl::optional<MonotonicTime> min_alarm = scheduler->minAlarmRegistrationTime();
           if (min_alarm.has_value()) {
-            ++adjusts;
             next_wakeup = std::min(min_alarm.value(), next_wakeup);
           }
         }
