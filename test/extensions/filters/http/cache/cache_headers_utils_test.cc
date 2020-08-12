@@ -34,26 +34,9 @@ struct TestRequestCacheControl : public RequestCacheControl {
   }
 };
 
-struct TestResponseCacheControl : public ResponseCacheControl {
-  TestResponseCacheControl(bool must_validate, bool no_store, bool no_transform, bool no_stale,
-                           bool is_public, OptionalDuration max_age) {
-    must_validate_ = must_validate;
-    no_store_ = no_store;
-    no_transform_ = no_transform;
-    no_stale_ = no_stale;
-    is_public_ = is_public;
-    max_age_ = max_age;
-  }
-};
-
 struct RequestCacheControlTestCase {
   absl::string_view cache_control_header;
   TestRequestCacheControl request_cache_control;
-};
-
-struct ResponseCacheControlTestCase {
-  absl::string_view cache_control_header;
-  TestResponseCacheControl response_cache_control;
 };
 
 class RequestCacheControlTest : public testing::TestWithParam<RequestCacheControlTestCase> {
@@ -148,6 +131,32 @@ public:
     );
     // clang-format on
   }
+};
+
+INSTANTIATE_TEST_SUITE_P(RequestCacheControlTest, RequestCacheControlTest,
+                         testing::ValuesIn(RequestCacheControlTest::getTestCases()));
+
+TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
+  const absl::string_view cache_control_header = GetParam().cache_control_header;
+  const RequestCacheControl expected_request_cache_control = GetParam().request_cache_control;
+  EXPECT_EQ(expected_request_cache_control, RequestCacheControl(cache_control_header));
+}
+
+struct TestResponseCacheControl : public ResponseCacheControl {
+  TestResponseCacheControl(bool must_validate, bool no_store, bool no_transform, bool no_stale,
+                           bool is_public, OptionalDuration max_age) {
+    must_validate_ = must_validate;
+    no_store_ = no_store;
+    no_transform_ = no_transform;
+    no_stale_ = no_stale;
+    is_public_ = is_public;
+    max_age_ = max_age;
+  }
+};
+
+struct ResponseCacheControlTestCase {
+  absl::string_view cache_control_header;
+  TestResponseCacheControl response_cache_control;
 };
 
 class ResponseCacheControlTest : public testing::TestWithParam<ResponseCacheControlTestCase> {
@@ -269,7 +278,15 @@ public:
   }
 };
 
-// TODO(#9872): More tests for httpTime.
+INSTANTIATE_TEST_SUITE_P(ResponseCacheControlTest, ResponseCacheControlTest,
+                         testing::ValuesIn(ResponseCacheControlTest::getTestCases()));
+
+TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
+  const absl::string_view cache_control_header = GetParam().cache_control_header;
+  const ResponseCacheControl expected_response_cache_control = GetParam().response_cache_control;
+  EXPECT_EQ(expected_response_cache_control, ResponseCacheControl(cache_control_header));
+}
+
 class HttpTimeTest : public testing::TestWithParam<std::string> {
 public:
   static const std::vector<std::string>& getOkTestCases() {
@@ -282,24 +299,6 @@ public:
     // clang-format on
   }
 };
-
-INSTANTIATE_TEST_SUITE_P(RequestCacheControlTest, RequestCacheControlTest,
-                         testing::ValuesIn(RequestCacheControlTest::getTestCases()));
-
-TEST_P(RequestCacheControlTest, RequestCacheControlTest) {
-  const absl::string_view cache_control_header = GetParam().cache_control_header;
-  const RequestCacheControl expected_request_cache_control = GetParam().request_cache_control;
-  EXPECT_EQ(expected_request_cache_control, RequestCacheControl(cache_control_header));
-}
-
-INSTANTIATE_TEST_SUITE_P(ResponseCacheControlTest, ResponseCacheControlTest,
-                         testing::ValuesIn(ResponseCacheControlTest::getTestCases()));
-
-TEST_P(ResponseCacheControlTest, ResponseCacheControlTest) {
-  const absl::string_view cache_control_header = GetParam().cache_control_header;
-  const ResponseCacheControl expected_response_cache_control = GetParam().response_cache_control;
-  EXPECT_EQ(expected_response_cache_control, ResponseCacheControl(cache_control_header));
-}
 
 INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(HttpTimeTest::getOkTestCases()));
 
