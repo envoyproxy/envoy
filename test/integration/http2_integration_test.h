@@ -1,9 +1,12 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/common/http/http2/http2_frame.h"
+#include "test/integration/filters/test_socket_interface.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
@@ -92,8 +95,13 @@ public:
 protected:
   void floodServer(const Http2Frame& frame, const std::string& flood_stat, uint32_t num_frames);
   void floodServer(absl::string_view host, absl::string_view path,
-                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
+                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat,
+                   uint32_t num_frames, std::shared_ptr<bool> writev_returns_egain);
+
   void setNetworkConnectionBufferSize();
   void beginSession() override;
+  std::shared_ptr<bool> overrideWritev();
+
+  Envoy::Network::TestSocketInterface test_socket_interface_;
 };
 } // namespace Envoy

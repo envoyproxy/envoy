@@ -22,27 +22,28 @@ namespace Network {
 
 class TestIoSocketHandle : public IoSocketHandleImpl {
 public:
-  TestIoSocketHandle(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false)
-      : IoSocketHandleImpl(fd, socket_v6only) {}
-
-  ~TestIoSocketHandle() override;
-
   /**
    * Override the behavior of the IoSocketHandleImpl::writev() method.
    * The supplied callback is invoked with the arguments of the writev method.
    * Returning absl::nullopt from the callback continues normal execution of the
-   * IoSocketHandleImpl::writev() method. Returning a Api::IoCallUint64Result from callback aborts
+   * IoSocketHandleImpl::writev() method. Returning a Api::IoCallUint64Result from callback skips
    * the IoSocketHandleImpl::writev() with the returned result value.
    */
-  using WritevOverrideProc = std::function<absl::optional<Api::IoCallUint64Result>(
-      const Buffer::RawSlice* slices, uint64_t num_slice)>;
-  void setWritevOverride(WritevOverrideProc override_proc);
+  using WritevOverrideType = absl::optional<Api::IoCallUint64Result>(uint32_t index,
+                                                                     const Buffer::RawSlice* slices,
+                                                                     uint64_t num_slice);
+  using WritevOverrideProc = std::function<WritevOverrideType>;
+
+  TestIoSocketHandle(uint32_t index, WritevOverrideProc writev_override_proc,
+                     os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false)
+      : IoSocketHandleImpl(fd, socket_v6only), index_(index),
+        writev_override_(writev_override_proc) {}
 
 private:
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 
-  absl::Mutex mutex_;
-  WritevOverrideProc writev_override_ ABSL_GUARDED_BY(mutex_);
+  const uint32_t index_;
+  const WritevOverrideProc writev_override_;
 };
 
 /**
@@ -67,26 +68,13 @@ private:
 
 class TestSocketInterface : public SocketInterfaceImpl {
 public:
-  /**
-   * Replace default socket interface with the TestSocketInterface singleton.
-   * Must be called early in the test initialization before any network connections were
-   * established.
-   */
-  static void install();
-  static const TestSocketInterface& getSingleton() { return *singleton_; }
+  TestSocketInterface();
+  ~TestSocketInterface() override;
 
-  /**
-   * Wait for the Nth accepted socket and return a pointer to it.
-   */
-  TestIoSocketHandle* waitForAcceptedSocket(uint32_t index) const;
+  void overrideWritev(TestIoSocketHandle::WritevOverrideProc writev);
 
 private:
-  friend class TestIoSocketHandle;
-  static TestSocketInterface& getMutableSingleton() { return *singleton_; }
-
   void addAcceptedSocket(TestIoSocketHandle* handle);
-  void clearSocket(TestIoSocketHandle* handle);
-  void clearAll();
 
   // SocketInterface
   using SocketInterfaceImpl::socket;
@@ -97,9 +85,15 @@ private:
     return "envoy.extensions.network.socket_interface.test_socket_interface";
   };
 
-  static TestSocketInterface* singleton_;
+  uint32_t getAcceptedSocketIndex() {
+    absl::MutexLock lock(&mutex_);
+    return accepted_socket_index_++;
+  }
+
+  SocketInterface* const previous_socket_interface_;
+  TestIoSocketHandle::WritevOverrideProc writev_overide_proc_;
   mutable absl::Mutex mutex_;
-  std::vector<TestIoSocketHandle*> accepted_sockets_ ABSL_GUARDED_BY(mutex_);
+  uint32_t accepted_socket_index_ ABSL_GUARDED_BY(mutex_) = 0;
 };
 
 } // namespace Network
