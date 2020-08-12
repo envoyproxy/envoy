@@ -29,7 +29,7 @@ Http::Code LogsHandler::handlerLogging(absl::string_view url, Http::ResponseHead
     rc = Http::Code::NotFound;
   }
 
-  if (Logger::Context::useFancyLogger()) {
+  if (!Logger::Context::useFancyLogger()) {
     response.add("active loggers:\n");
     for (const Logger::Logger& logger : Logger::Registry::loggers()) {
       response.add(fmt::format("  {}: {}\n", logger.name(), logger.levelString()));
@@ -73,7 +73,7 @@ bool LogsHandler::changeLogLevel(const Http::Utility::QueryParams& params) {
     return false;
   }
 
-  if (Logger::Context::useFancyLogger()) {
+  if (!Logger::Context::useFancyLogger()) {
     // Now either change all levels or a single level.
     if (name == "level") {
       ENVOY_LOG(debug, "change all log levels: level='{}'", level);
