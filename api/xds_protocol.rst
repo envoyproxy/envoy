@@ -226,20 +226,67 @@ Transport API version
 In addition the resource type version described above, the xDS wire protocol has a
 transport version associated with it. This provides type versioning for messages such as
 :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` and :ref:`DiscoveryResponse
-<envoy_api_msg_DiscoveryResponse>`.
+<envoy_api_msg_DiscoveryResponse>`. It is also encoded in the gRPC method name, so a server
+can determine which version a client is speaking based on which method it calls.
 
-ACK/NACK and resource instance versioning
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Basic Protocol Overview
+^^^^^^^^^^^^^^^^^^^^^^^
 
-Each xDS stream begins with a
-:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` from the client, specifying
-the list of resources to subscribe to, the type URL corresponding to the
-subscribed resources, the node identifier and an empty :ref:`version_info <envoy_api_field_DiscoveryRequest.version_info>`.
+Each xDS stream begins with a :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` from the
+client, which specifies the list of resources to subscribe to, the type URL corresponding to the
+subscribed resources, the node identifier, and an optional resource type instance version
+indicating the most recent version of the resource type that the client has already seen (see
+:ref:`ACK/NACK and resource type instance version <xds_ack_nack>` for details).
 
-In addition to resource and transport type versioning schemes above, which operate at the type
-level, Envoy has a resource instance version. Unlike the resource/transport types, this is not a
-property of the API but is instead a reflection of the specific revision of a named resource
-delivered over xDS.
+The server will then send a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` containing
+any resources that the client has subscribed to that have changed since the last resource type
+instance version that the client indicated it has seen. The server may send additional responses
+at any time when the subscribed resources change.
+
+Whenever the client receives a new response, it will send another request indicating whether or
+not the resources in the response were valid (see
+:ref:`ACK/NACK and resource type instance version <xds_ack_nack>` for details).
+
+Only the first request on a stream is guaranteed to carry the node identifier.
+The subsequent discovery requests on the same stream may carry an empty node
+identifier. This holds true regardless of the acceptance of the discovery
+responses on the same stream. The node identifier should always be identical if
+present more than once on the stream. It is sufficient to only check the first
+message for the node identifier as a result.
+
+.. _xds_ack_nack:
+
+ACK/NACK and resource type instance version
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Every xDS resource type has a version string that indicates the version for that resource type.
+Whenever one resource of that type changes, the version is changed.
+
+In a responses sent by the xDS server, the
+:ref:`version_info<envoy_api_field_DiscoveryResponse.version_info>` field indicates the current
+version for that resource type. The client then sends another request to the server with the
+:ref:`version_info<envoy_api_field_DiscoveryRequest.version_info>` field indicating the most
+recent valid version seen by the client. This provides a way for the server to determine when
+it sends a version that the client considers invalid.
+
+(In the :ref:`incremental protocol variants <xds_protocol_delta>`, the resource type instance
+version is sent by the server in the
+:ref:`system_version_info<envoy_api_field_DeltaDiscoveryResponse.system_version_info>` field.
+However, this information is not actually used by the client to communicate which resources are
+valid, because the incremental API variants have a separate mechanism for that.)
+
+The resource type instance version is separate for each resource type. When using the aggregated
+protocol variants, each resource type has its own version even though all resource types are being
+sent on the same stream.
+
+The resource type is also separate for each xDS server (where an xDS server is identified by a
+unique :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`). When obtaining resources of a
+given type from multiple xDS servers, each xDS server will have a different notion of version.
+
+Note that the version for a resource type is not a property of an individual xDS stream but rather
+a property of the resources themselves. If the stream becomes broken and the client creates a new
+stream, the client's initial request on the new stream should indicate the most recent version
+seen by the client on the previous stream.
 
 An example EDS request might be:
 
@@ -275,7 +322,7 @@ ACK
 ^^^
 
 If the update was successfully applied, the
-:ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
+:ref:`version_info <envoy_api_field_DiscoveryRequest.version_info>` will be **X**, as indicated
 in the sequence diagram:
 
 .. figure:: diagrams/simple-ack.svg
@@ -319,21 +366,6 @@ ACK and NACK semantics summary
 - NACK signifies unsuccessful configuration update and contains the previous (existing)
   :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>`.
 - Only the NACK should populate the :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`.
-
-Versioning and Node Identifier
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Each stream has its own notion of versioning, there is no shared
-versioning across resource types. When ADS is not used, even each
-resource of a given resource type may have a distinct version, since the
-Envoy API allows distinct EDS/RDS resources to point at different :ref:`ConfigSources <envoy_api_msg_core.ConfigSource>`.
-
-Only the first request on a stream is guaranteed to carry the node identifier.
-The subsequent discovery requests on the same stream may carry an empty node
-identifier. This holds true regardless of the acceptance of the discovery
-responses on the same stream. The node identifier should always be identical if
-present more than once on the stream. It is sufficient to only check the first
-message for the node identifier as a result.
 
 .. _xds_protocol_resource_update:
 
