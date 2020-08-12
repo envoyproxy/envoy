@@ -1,5 +1,6 @@
 #!/bin/bash -E
 
+TESTFILTER="${1:-*}"
 FAILED=()
 SRCDIR="${SRCDIR:-$(pwd)}"
 EXCLUDED_BUILD_CONFIGS=${EXCLUDED_BUILD_CONFIGS:-"^./jaeger-native-tracing|docker-compose"}
@@ -488,7 +489,7 @@ run_example_zipkin_tracing () {
 run_examples () {
     local example examples example_test
     cd "${SRCDIR}/examples" || exit 1
-    examples=$(find . -mindepth 1 -maxdepth 1 -type d | sort)
+    examples=$(find . -mindepth 1 -maxdepth 1 -type d -name "$TESTFILTER" | sort)
     for example in $examples; do
         example_test="run_example_$(echo "$example" | cut -d/ -f2 | tr '-' '_')"
         $example_test
