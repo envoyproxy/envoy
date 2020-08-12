@@ -23,6 +23,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -697,7 +698,10 @@ TEST_F(StaticLoaderImplTest, InvalidNumerator) {
   // There is no assertion here - when numerator is invalid
   // featureEnabled() will just drop debug log line.
   EXPECT_CALL(generator_, random()).WillOnce(Return(500000));
-  loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent);
+  EXPECT_LOG_CONTAINS("debug",
+                      "runtime key 'invalid_numerator': numerator (111) > denominator (100), "
+                      "condition always evaluates to true",
+                      loader_->snapshot().featureEnabled("invalid_numerator", fractional_percent));
 }
 
 TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
