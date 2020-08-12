@@ -5,6 +5,8 @@
 #include "common/common/macros.h"
 #include "common/common/utility.h"
 
+#include "extensions/filters/http/cache/inline_headers_handles.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -29,11 +31,6 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
       &Http::CustomHeaders::get().IfUnmodifiedSince, &Http::CustomHeaders::get().IfRange);
 }
 } // namespace
-
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    authorization_handle(Http::CustomHeaders::get().Authorization);
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
-    cache_control_handle(Http::CustomHeaders::get().CacheControl);
 
 bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
@@ -60,7 +57,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
 }
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers) {
-  absl::string_view cache_control = headers.getInlineValue(cache_control_handle.handle());
+  absl::string_view cache_control = headers.getInlineValue(response_cache_control_handle.handle());
   ResponseCacheControl response_cache_control(cache_control);
 
   // Only cache responses with explicit validation data, either:

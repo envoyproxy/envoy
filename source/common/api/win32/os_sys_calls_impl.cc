@@ -349,5 +349,15 @@ SysCallSizeResult OsSysCallsImpl::write(os_fd_t sockfd, const void* buffer, size
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
+SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+  const os_fd_t rc = ::accept(sockfd, addr, addrlen);
+  if (SOCKET_INVALID(rc)) {
+    return {rc, ::WSAGetLastError()};
+  }
+
+  setsocketblocking(rc, false);
+  return {rc, 0};
+}
+
 } // namespace Api
 } // namespace Envoy
