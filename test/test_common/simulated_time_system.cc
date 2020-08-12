@@ -75,7 +75,9 @@ public:
 
   void waitUntilIdle() {
     absl::MutexLock lock(&mutex_);
-    mutex_.Await(absl::Condition(&not_running_cbs_));
+    auto triggered_alarms_empty =
+        +[](AlarmSet* triggered_alarms) { return triggered_alarms->empty(); };
+    mutex_.Await(absl::Condition(triggered_alarms_empty, &triggered_alarms_));
   }
 
   void updateTime(MonotonicTime monotonic_time, SystemTime system_time) {

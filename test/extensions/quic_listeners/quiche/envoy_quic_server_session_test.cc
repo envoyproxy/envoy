@@ -669,7 +669,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
   // Unblocking the stream shouldn't close the connection as it should be
   // delayed.
-  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   envoy_quic_session_.OnCanWrite();
   // delay close alarm should have been rescheduled.
   time_system_.advanceTimeAsync(std::chrono::milliseconds(90));
@@ -700,7 +701,9 @@ TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
-  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
   // The closing behavior should be changed.
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   // Unblocking the stream shouldn't close the connection as it should be
@@ -732,7 +735,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithNoPendingData) {
 
   // Advance the time a bit and try to close again. The delay close timer
   // shouldn't be rescheduled by this call.
-  time_system_.advanceTimeWait(std::chrono::milliseconds(10));
+  time_system_.advanceTimeAsync(std::chrono::milliseconds(10));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
