@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
 #include "extensions/filters/network/common/utility.h"
@@ -160,7 +161,16 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
           "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
           config.DebugString()));
     }
-  }
+  }else if(filter_name == NetworkFilterNames::get().MongoProxy){
+      envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy&
+          config = dynamic_cast<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy&>(*config_message);
+      if(config.mutable_delay()->has_header_delay()){
+        // Mongo has no header map. Only fixed_delay is supported.
+        throw EnvoyException(absl::StrCat(
+            "Header_delay is not supported here. Config:\n{}",
+            config.DebugString()));
+      }
+    }
 }
 
 } // namespace NetworkFilters

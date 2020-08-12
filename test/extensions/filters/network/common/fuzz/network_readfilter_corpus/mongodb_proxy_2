@@ -2,7 +2,7 @@ config {
   name: "envoy.filters.network.mongo_proxy"
   typed_config {
     type_url: "type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy"
-    value: "\n\001\\\032\007\"\003\010\200t*\000 \001"
+    value: "\n\001\\\032\t\032\002\020\010\"\003\010\200t \001"
   }
 }
 
