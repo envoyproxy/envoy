@@ -145,6 +145,7 @@ envoy_cc_test_library(
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
+        "//test/fuzz:utility_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
